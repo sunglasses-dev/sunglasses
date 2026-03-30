@@ -12,7 +12,7 @@ Attack vectors this catches:
 - Malicious URLs or commands encoded in QR
 
 Usage:
-    from glasses.extractors.qr import scan_qr
+    from sunglasses.extractors.qr import scan_qr
     result = scan_qr("/path/to/document_with_qr.png")
 
 Install: pip install glasses[qr]  (requires pyzbar + Pillow)
@@ -98,7 +98,7 @@ class QRExtractor:
 
 def scan_qr(image_path: str, engine=None) -> dict:
     """Convenience function: extract QR/barcode text and scan with GLASSES."""
-    from glasses.engine import GlassesEngine
+    from sunglasses.engine import GlassesEngine
 
     if engine is None:
         engine = GlassesEngine()

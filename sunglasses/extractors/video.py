@@ -8,7 +8,7 @@ Extracts text from video using multiple methods:
 4. Frame OCR — (future) extract text visible in video frames
 
 Usage:
-    from glasses.extractors.video import scan_video
+    from sunglasses.extractors.video import scan_video
     result = scan_video("/path/to/meeting.mp4")
 
 Install: pip install glasses[video]  (requires whisper + ffmpeg)
@@ -194,7 +194,7 @@ class VideoExtractor:
 
 def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dict:
     """Convenience function: extract text from video and scan with GLASSES."""
-    from glasses.engine import GlassesEngine
+    from sunglasses.engine import GlassesEngine
 
     if engine is None:
         engine = GlassesEngine()

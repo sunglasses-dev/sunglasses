@@ -1,16 +1,16 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="glasses",
+    name="sunglasses",
     version="0.1.0",
     description="Sunglasses for AI agents. Protection layer + neighborhood watch.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://sunglasses.dev",
     project_urls={
-        "Source": "https://github.com/sunglasses-dev/glasses",
-        "Threat Registry": "https://github.com/sunglasses-dev/glasses/tree/main/registry",
-        "Issues": "https://github.com/sunglasses-dev/glasses/issues",
+        "Source": "https://github.com/sunglasses-dev/sunglasses",
+        "Threat Registry": "https://github.com/sunglasses-dev/sunglasses/tree/main/registry",
+        "Issues": "https://github.com/sunglasses-dev/sunglasses/issues",
     },
     license="AGPL-3.0",
     packages=find_packages(),
@@ -18,7 +18,7 @@ setup(
     install_requires=[],
     entry_points={
         "console_scripts": [
-            "glasses=glasses.cli:main",
+            "sunglasses=sunglasses.cli:main",
         ],
     },
     classifiers=[

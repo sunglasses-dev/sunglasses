@@ -8,8 +8,8 @@ Extracts text from images using multiple methods:
 4. Steganographic markers — basic detection of text hiding techniques
 
 Usage:
-    from glasses.extractors.image import ImageExtractor
-    from glasses.engine import GlassesEngine
+    from sunglasses.extractors.image import ImageExtractor
+    from sunglasses.engine import GlassesEngine
 
     extractor = ImageExtractor()
     engine = GlassesEngine()
@@ -238,7 +238,7 @@ def scan_image(image_path: str, engine=None) -> dict:
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from glasses.engine import GlassesEngine
+    from sunglasses.engine import GlassesEngine
 
     if engine is None:
         engine = GlassesEngine()

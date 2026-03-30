@@ -5,7 +5,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from glasses.patterns import PATTERNS
+from sunglasses.patterns import PATTERNS
 
 CATEGORY_DIRS = {
     "prompt_injection": "prompt-injection",

@@ -1,4 +1,4 @@
-# GLASSES
+# SUNGLASSES
 
 **Sunglasses for AI agents.**
 
@@ -6,11 +6,11 @@ Protection layer + neighborhood watch for AI agents.
 
 ---
 
-## What is GLASSES?
+## What is SUNGLASSES?
 
 Most AI agent attacks don't look like attacks. They hide inside normal-looking content — emails, web pages, API responses, files — and try to hijack your agent's behavior.
 
-GLASSES is a free, open-source input defense layer. It filters everything before your agent sees it. Hidden instructions get stripped. Legitimate content passes through clean.
+SUNGLASSES is a free, open-source input defense layer. It filters everything before your agent sees it. Hidden instructions get stripped. Legitimate content passes through clean.
 
 **What it does:**
 - Scans incoming text across 5 channels (messages, files, APIs, web content, logs)
@@ -24,13 +24,13 @@ GLASSES is a free, open-source input defense layer. It filters everything before
 - Doesn't monitor agent behavior (that's SHIELD — coming later)
 - Doesn't send your data anywhere
 
-**Email cleaning example:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without GLASSES, your agent follows the hidden instructions. With GLASSES, the parasitic text gets stripped and your agent reads what the sender actually meant. Like sunglasses filtering UV. You don't even notice they're working.
+**Email cleaning example:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, the parasitic text gets stripped and your agent reads what the sender actually meant. Like sunglasses filtering UV. You don't even notice they're working.
 
 ## Quick Start
 
 ```bash
 # Install
-pip install glasses
+pip install sunglasses
 
 # Scan text
 glasses scan "some text to check"
@@ -117,7 +117,7 @@ GLASSES is risk reduction, not magic.
 
 1. **Verify signatures before cleaning.** If content has a digital signature, verify it first, then run GLASSES on the content. Cleaning before verification will break the signature.
 2. **Only scan content fields.** Feed GLASSES the message body, text, and attachments — never raw HTTP headers, cookies, or auth tokens.
-3. **Review mode for credentials in tutorials.** If a legitimate message contains an API key example, GLASSES flags it as "review" not "block." The user decides.
+3. **Review mode for credentials in tutorials.** If a legitimate message contains an API key example, SUNGLASSES flags it as "review" not "block." The user decides.
 
 ## Contributing
 
@@ -134,4 +134,4 @@ See [GOVERNANCE.md](GOVERNANCE.md) for how decisions are made.
 
 - Website: [sunglasses.dev](https://sunglasses.dev)
 - Threat Registry: [registry/](registry/)
-- Issues: [github.com/sunglasses-dev/glasses/issues](https://github.com/sunglasses-dev/glasses/issues)
+- Issues: [github.com/sunglasses-dev/sunglasses/issues](https://github.com/sunglasses-dev/sunglasses/issues)

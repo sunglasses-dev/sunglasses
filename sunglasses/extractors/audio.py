@@ -12,7 +12,7 @@ Attack vectors this catches:
 - Attack text in audio metadata tags
 
 Usage:
-    from glasses.extractors.audio import scan_audio
+    from sunglasses.extractors.audio import scan_audio
     result = scan_audio("/path/to/voicemail.mp3")
 
 Install: pip install glasses[audio]  (requires whisper + ffmpeg)
@@ -124,7 +124,7 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from glasses.engine import GlassesEngine
+    from sunglasses.engine import GlassesEngine
 
     if engine is None:
         engine = GlassesEngine()

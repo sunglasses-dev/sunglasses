@@ -8,7 +8,7 @@ Extracts text from PDFs using multiple methods:
 4. Embedded JavaScript — malicious scripts in PDF actions
 
 Usage:
-    from glasses.extractors.pdf import scan_pdf
+    from sunglasses.extractors.pdf import scan_pdf
     result = scan_pdf("/path/to/document.pdf")
 
 Install: pip install glasses[pdf]  (requires PyPDF2)
@@ -122,7 +122,7 @@ def scan_pdf(pdf_path: str, engine=None) -> dict:
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from glasses.engine import GlassesEngine
+    from sunglasses.engine import GlassesEngine
 
     if engine is None:
         engine = GlassesEngine()

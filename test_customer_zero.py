@@ -19,8 +19,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from glasses.engine import GlassesEngine
-from glasses.loader import load_attack_db
+from sunglasses.engine import GlassesEngine
+from sunglasses.loader import load_attack_db
 
 # Colors
 G = "\033[92m"; R = "\033[91m"; Y = "\033[93m"; C = "\033[96m"

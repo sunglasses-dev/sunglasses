@@ -13,7 +13,7 @@ GLASSES-DEEP (background, triggered by links/attachments):
     - Runs separately, agent continues working
 
 Usage:
-    from glasses.scanner import GlassesScanner
+    from sunglasses.scanner import GlassesScanner
 
     scanner = GlassesScanner()
 
