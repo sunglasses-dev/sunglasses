@@ -22,8 +22,9 @@ GLASSES is a free, open-source input defense layer. It filters everything before
 **What it doesn't do:**
 - Doesn't touch authentication (OAuth, cookies, tokens, headers)
 - Doesn't monitor agent behavior (that's SHIELD — coming later)
-- Doesn't require an internet connection
 - Doesn't send your data anywhere
+
+**Email cleaning example:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without GLASSES, your agent follows the hidden instructions. With GLASSES, the parasitic text gets stripped and your agent reads what the sender actually meant. Like sunglasses filtering UV. You don't even notice they're working.
 
 ## Quick Start
 
