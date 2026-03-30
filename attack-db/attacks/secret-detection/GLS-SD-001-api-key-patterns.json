@@ -1,0 +1,38 @@
+{
+  "id": "GLS-SD-001",
+  "name": "API key patterns",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "message"
+  ],
+  "description": "Known API key formats that should never appear in agent inputs.",
+  "keywords": [],
+  "regex": [
+    "sk-[a-zA-Z0-9]{20,}",
+    "sk-ant-[a-zA-Z0-9\\-]{20,}",
+    "AIza[0-9A-Za-z\\-_]{35}",
+    "ghp_[a-zA-Z0-9]{36}",
+    "glpat-[a-zA-Z0-9\\-]{20}",
+    "xoxb-[0-9]{10,}-[a-zA-Z0-9]+",
+    "AKIA[0-9A-Z]{16}"
+  ],
+  "examples": {
+    "malicious": [
+      "Here's the key: sk-ant-abc123def456ghi789jkl012mno345pqr",
+      "AWS key: AKIAIOSFODNN7EXAMPLE"
+    ],
+    "benign": [
+      "The format for OpenAI keys starts with sk- followed by alphanumeric chars.",
+      "AWS access keys begin with AKIA \u2014 check the IAM docs."
+    ]
+  },
+  "references": [
+    "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
+  ],
+  "contributed_by": "AZ Rollin",
+  "date_added": "2026-03-28"
+}
