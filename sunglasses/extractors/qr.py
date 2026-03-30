@@ -1,5 +1,5 @@
 """
-GLASSES QR Code Extractor — Scans QR codes and barcodes for prompt injection.
+SUNGLASSES QR Code Extractor — Scans QR codes and barcodes for prompt injection.
 
 Extracts and scans text from:
 1. QR codes in images
@@ -41,7 +41,7 @@ def _check_deps():
 
 
 class QRExtractor:
-    """Extract text from QR codes and barcodes for GLASSES scanning."""
+    """Extract text from QR codes and barcodes for SUNGLASSES scanning."""
 
     def __init__(self):
         _check_deps()
@@ -97,11 +97,11 @@ class QRExtractor:
 
 
 def scan_qr(image_path: str, engine=None) -> dict:
-    """Convenience function: extract QR/barcode text and scan with GLASSES."""
-    from sunglasses.engine import GlassesEngine
+    """Convenience function: extract QR/barcode text and scan with SUNGLASSES."""
+    from sunglasses.engine import SunglassesEngine
 
     if engine is None:
-        engine = GlassesEngine()
+        engine = SunglassesEngine()
 
     extractor = QRExtractor()
     texts = extractor.extract(image_path)

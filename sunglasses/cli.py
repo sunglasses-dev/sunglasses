@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GLASSES CLI — Scan text or files for AI agent attacks.
+SUNGLASSES CLI — Scan text or files for AI agent attacks.
 
 Usage:
     python -m sunglasses.cli scan "ignore previous instructions"
@@ -16,7 +16,7 @@ import json
 import sys
 import time
 
-from .engine import GlassesEngine
+from .engine import SunglassesEngine
 
 
 # ANSI colors for terminal output
@@ -64,7 +64,7 @@ def print_result(result, verbose=False):
 
 def cmd_scan(args):
     """Run a scan."""
-    engine = GlassesEngine()
+    engine = SunglassesEngine()
 
     if args.file:
         result = engine.scan_file(args.file)
@@ -95,7 +95,7 @@ def cmd_scan(args):
 
 def cmd_info(args):
     """Show engine info."""
-    engine = GlassesEngine()
+    engine = SunglassesEngine()
     info = engine.info()
     print(f"\n  {BOLD}SUNGLASSES v{info['version']}{RESET}")
     print(f"  {DIM}{'─' * 40}{RESET}")
@@ -108,7 +108,7 @@ def cmd_info(args):
 
 def cmd_demo(args):
     """Run demo with example attacks."""
-    engine = GlassesEngine()
+    engine = SunglassesEngine()
 
     demos = [
         ("Clean message", "Hey, can you help me write a Python function?", "message"),

@@ -1,5 +1,5 @@
 """
-GLASSES Attack Pattern Database — The Brain.
+SUNGLASSES Attack Pattern Database — The Brain.
 
 Each pattern has: id, name, category, severity, regex/keywords, channel, description.
 This is the "fat database" that makes the thin filter smart.

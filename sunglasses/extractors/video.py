@@ -1,5 +1,5 @@
 """
-GLASSES Video Extractor — Scans video for hidden prompt injection.
+SUNGLASSES Video Extractor — Scans video for hidden prompt injection.
 
 Extracts text from video using multiple methods:
 1. Subtitle tracks — SRT/VTT/ASS embedded subtitles
@@ -41,7 +41,7 @@ def _check_deps():
 
 
 class VideoExtractor:
-    """Extract text from video files for GLASSES scanning."""
+    """Extract text from video files for SUNGLASSES scanning."""
 
     def __init__(self, whisper_model: str = "base"):
         _check_deps()
@@ -193,11 +193,11 @@ class VideoExtractor:
 
 
 def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dict:
-    """Convenience function: extract text from video and scan with GLASSES."""
-    from sunglasses.engine import GlassesEngine
+    """Convenience function: extract text from video and scan with SUNGLASSES."""
+    from sunglasses.engine import SunglassesEngine
 
     if engine is None:
-        engine = GlassesEngine()
+        engine = SunglassesEngine()
 
     extractor = VideoExtractor(whisper_model=whisper_model)
     texts = extractor.extract(video_path)

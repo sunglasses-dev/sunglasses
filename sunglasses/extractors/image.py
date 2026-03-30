@@ -1,5 +1,5 @@
 """
-GLASSES Image Extractor — Scans images for hidden prompt injection.
+SUNGLASSES Image Extractor — Scans images for hidden prompt injection.
 
 Extracts text from images using multiple methods:
 1. OCR (Tesseract) — reads visible text in the image
@@ -9,10 +9,10 @@ Extracts text from images using multiple methods:
 
 Usage:
     from sunglasses.extractors.image import ImageExtractor
-    from sunglasses.engine import GlassesEngine
+    from sunglasses.engine import SunglassesEngine
 
     extractor = ImageExtractor()
-    engine = GlassesEngine()
+    engine = SunglassesEngine()
 
     texts = extractor.extract("/path/to/image.png")
     for source, text in texts:
@@ -47,7 +47,7 @@ def _check_deps():
 
 
 class ImageExtractor:
-    """Extract text from images for GLASSES scanning."""
+    """Extract text from images for SUNGLASSES scanning."""
 
     def __init__(self):
         _check_deps()
@@ -57,7 +57,7 @@ class ImageExtractor:
         Extract all text from an image file.
 
         Returns list of (source_label, extracted_text) tuples.
-        Each text chunk should be scanned separately through GLASSES.
+        Each text chunk should be scanned separately through SUNGLASSES.
         """
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
@@ -230,7 +230,7 @@ class ImageExtractor:
 
 def scan_image(image_path: str, engine=None) -> dict:
     """
-    Convenience function: extract text from image and scan with GLASSES.
+    Convenience function: extract text from image and scan with SUNGLASSES.
 
     Returns dict with:
         - sources: list of (source, text) extracted
@@ -238,10 +238,10 @@ def scan_image(image_path: str, engine=None) -> dict:
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from sunglasses.engine import GlassesEngine
+    from sunglasses.engine import SunglassesEngine
 
     if engine is None:
-        engine = GlassesEngine()
+        engine = SunglassesEngine()
 
     extractor = ImageExtractor()
     texts = extractor.extract(image_path)

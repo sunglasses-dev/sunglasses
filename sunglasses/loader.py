@@ -1,5 +1,5 @@
 """
-GLASSES Database Loader — Loads attack patterns from JSON files.
+SUNGLASSES Database Loader — Loads attack patterns from JSON files.
 
 Reads the attack-db/ directory and converts JSON patterns into the format
 the engine expects. This is what connects the "fat database" to the "thin filter."

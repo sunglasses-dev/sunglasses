@@ -1,11 +1,11 @@
 """
-GLASSES Extractors — Pull text from non-text sources for scanning.
+SUNGLASSES Extractors — Pull text from non-text sources for scanning.
 
 Each extractor converts a media type into text, which then goes through
-the standard GLASSES engine for threat detection.
+the standard SUNGLASSES engine for threat detection.
 
 Architecture:
-    Media file → Extractor → Text → GlassesEngine.scan() → Decision
+    Media file → Extractor → Text → SunglassesEngine.scan() → Decision
 
 Available extractors:
     - image: OCR + EXIF metadata + hidden text detection

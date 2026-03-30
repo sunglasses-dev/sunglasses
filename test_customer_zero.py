@@ -2,7 +2,7 @@
 """
 CUSTOMER ZERO TEST — AZ's Real-World Test Suite
 
-Tests GLASSES the way a real user would experience it:
+Tests SUNGLASSES the way a real user would experience it:
 1. Basic attacks (should block)
 2. Normal usage (should pass)
 3. Sneaky evasion attempts (should still catch)
@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sunglasses.engine import GlassesEngine
+from sunglasses.engine import SunglassesEngine
 from sunglasses.loader import load_attack_db
 
 # Colors
@@ -221,19 +221,19 @@ def performance_test(engine):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"  {B}GLASSES — CUSTOMER ZERO TEST{X}")
+    print(f"  {B}SUNGLASSES — CUSTOMER ZERO TEST{X}")
     print(f"  {D}Testing as a real user would experience it{X}")
     print(f"{'='*60}")
 
     # Test 1: Hardcoded patterns (what we had before)
-    engine_hardcoded = GlassesEngine()
+    engine_hardcoded = SunglassesEngine()
     print(f"\n  {D}Engine: {engine_hardcoded.pattern_count} hardcoded patterns, "
           f"{engine_hardcoded.keyword_count} keywords{X}")
     r1 = run_tests(engine_hardcoded, "HARDCODED PATTERNS")
 
     # Test 2: Database-loaded patterns
     db_patterns = load_attack_db()
-    engine_db = GlassesEngine(patterns=db_patterns)
+    engine_db = SunglassesEngine(patterns=db_patterns)
     print(f"\n  {D}Engine: {engine_db.pattern_count} database patterns, "
           f"{engine_db.keyword_count} keywords{X}")
     r2 = run_tests(engine_db, "DATABASE PATTERNS")

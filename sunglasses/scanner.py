@@ -1,21 +1,21 @@
 """
-GLASSES Scanner — Unified interface for FAST and DEEP scanning modes.
+SUNGLASSES Scanner — Unified interface for FAST and DEEP scanning modes.
 
-GLASSES-FAST (always on, non-blocking):
+SUNGLASSES-FAST (always on, non-blocking):
     - Text: emails, messages, web pages, APIs, logs → <1ms
     - Inline images: EXIF metadata + quick OCR → 1-3 sec
     - Never blocks the agent workflow
 
-GLASSES-DEEP (background, triggered by links/attachments):
+SUNGLASSES-DEEP (background, triggered by links/attachments):
     - Audio: Whisper speech-to-text → 30 sec - 6 min
     - Video: subtitles + audio + frame OCR → 1-10 min
     - Large PDFs, QR codes in documents
     - Runs separately, agent continues working
 
 Usage:
-    from sunglasses.scanner import GlassesScanner
+    from sunglasses.scanner import SunglassesScanner
 
-    scanner = GlassesScanner()
+    scanner = SunglassesScanner()
 
     # FAST — always on, inline
     result = scanner.scan_text("email content here")
@@ -30,7 +30,7 @@ import os
 import time
 from typing import Optional
 
-from .engine import GlassesEngine
+from .engine import SunglassesEngine
 
 
 # File extensions that trigger DEEP scan
@@ -47,16 +47,16 @@ FAST_EXTENSIONS = {
 }
 
 
-class GlassesScanner:
+class SunglassesScanner:
     """
-    Unified GLASSES scanner with FAST and DEEP modes.
+    Unified SUNGLASSES scanner with FAST and DEEP modes.
 
     FAST mode: text + images + small PDFs. Always on, non-blocking.
     DEEP mode: audio + video. Background process, opt-in.
     """
 
     def __init__(self, whisper_model: str = "base"):
-        self.engine = GlassesEngine()
+        self.engine = SunglassesEngine()
         self._whisper_model = whisper_model
 
     # =========================================================================

@@ -1,5 +1,5 @@
 """
-GLASSES PDF Extractor — Scans PDFs for hidden prompt injection.
+SUNGLASSES PDF Extractor — Scans PDFs for hidden prompt injection.
 
 Extracts text from PDFs using multiple methods:
 1. Page text — visible text content on each page
@@ -30,7 +30,7 @@ def _check_deps():
 
 
 class PDFExtractor:
-    """Extract text from PDFs for GLASSES scanning."""
+    """Extract text from PDFs for SUNGLASSES scanning."""
 
     def __init__(self):
         _check_deps()
@@ -114,7 +114,7 @@ class PDFExtractor:
 
 def scan_pdf(pdf_path: str, engine=None) -> dict:
     """
-    Convenience function: extract text from PDF and scan with GLASSES.
+    Convenience function: extract text from PDF and scan with SUNGLASSES.
 
     Returns dict with:
         - sources: list of (source, text) extracted
@@ -122,10 +122,10 @@ def scan_pdf(pdf_path: str, engine=None) -> dict:
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from sunglasses.engine import GlassesEngine
+    from sunglasses.engine import SunglassesEngine
 
     if engine is None:
-        engine = GlassesEngine()
+        engine = SunglassesEngine()
 
     extractor = PDFExtractor()
     texts = extractor.extract(pdf_path)

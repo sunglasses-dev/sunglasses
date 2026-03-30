@@ -1,5 +1,5 @@
 """
-GLASSES Preprocessor — Normalizes text before pattern matching.
+SUNGLASSES Preprocessor — Normalizes text before pattern matching.
 
 Strips Unicode tricks, decodes Base64, collapses invisible characters,
 maps homoglyphs to ASCII. This alone defends against 12 known evasion

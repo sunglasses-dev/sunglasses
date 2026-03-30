@@ -1,5 +1,5 @@
 """
-GLASSES Audio Extractor — Scans audio for hidden prompt injection.
+SUNGLASSES Audio Extractor — Scans audio for hidden prompt injection.
 
 Extracts text from audio using speech-to-text:
 1. Whisper transcription — converts speech to text, then scans
@@ -44,7 +44,7 @@ def _check_deps():
 
 
 class AudioExtractor:
-    """Extract text from audio files for GLASSES scanning."""
+    """Extract text from audio files for SUNGLASSES scanning."""
 
     def __init__(self, whisper_model: str = "base"):
         _check_deps()
@@ -116,7 +116,7 @@ class AudioExtractor:
 
 def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dict:
     """
-    Convenience function: extract text from audio and scan with GLASSES.
+    Convenience function: extract text from audio and scan with SUNGLASSES.
 
     Returns dict with:
         - sources: list of (source, text) extracted
@@ -124,10 +124,10 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
         - is_clean: True if ALL extractions are clean
         - threats: list of findings from non-clean results
     """
-    from sunglasses.engine import GlassesEngine
+    from sunglasses.engine import SunglassesEngine
 
     if engine is None:
-        engine = GlassesEngine()
+        engine = SunglassesEngine()
 
     extractor = AudioExtractor(whisper_model=whisper_model)
     texts = extractor.extract(audio_path)
