@@ -35,6 +35,14 @@ SUNGLASSES is a free, open-source input defense layer. It filters everything bef
 
 **Email cleaning:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, the parasitic text gets stripped and your agent reads what the sender actually meant. Like sunglasses filtering UV. You don't even notice they're working.
 
+## We're Not the Only Ones — And That's OK
+
+Tools like **Lakera Guard**, **LLM Guard**, **NVIDIA NeMo Guardrails**, and **Azure Prompt Shields** also protect AI agents from prompt injection. They're good at what they do — especially ML-based detection of novel attacks.
+
+We built SUNGLASSES for a different use case: **local-only, offline, zero-cost, no LLM needed.** Your data never leaves your machine. No API keys. No cloud calls. Works air-gapped.
+
+Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapter system** to connect with other security tools in the same pipeline. Security is layers — we're the local foundation layer.
+
 ## Quick Start
 
 ```bash
