@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CUSTOMER ZERO TEST — AZ's Real-World Test Suite
+CUSTOMER ZERO TEST — Real-World Test Suite
 
 Tests SUNGLASSES the way a real user would experience it:
 1. Basic attacks (should block)
@@ -247,11 +247,9 @@ def test_real_files(engine):
     print(f"\n  {B}═══ REAL FILE SCAN ═══{X}\n")
 
     files_to_scan = [
-        ("~/CLAUDE.md", "file"),
-        ("~/.openclaw/workspace/TASKS.md", "file"),
-        ("~/.openclaw/workspace/INBOX.md", "file"),
-        ("~/.openclaw/workspace/HEARTBEAT.md", "file"),
-        ("~/.openclaw/workspace/STATUS.md", "file"),
+        ("~/.bashrc", "file"),
+        ("~/.zshrc", "file"),
+        ("~/README.md", "file"),
     ]
 
     for filepath, channel in files_to_scan:

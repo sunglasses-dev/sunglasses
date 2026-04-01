@@ -357,8 +357,8 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # EXPANDED PATTERNS — Qaqu Expansion Pack v1 (GLS-PAT-0016..0045)
-    # Integrated: March 30, 2026
+    # EXPANDED PATTERNS — Community Pack v1 (GLS-PAT-0016..0045)
+    # Added: v0.1.0
     # =========================================================================
 
     # --- More Prompt Injection Variants ---

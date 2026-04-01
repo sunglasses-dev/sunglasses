@@ -13,3 +13,5 @@ venv/
 .mypy_cache/
 *.log
 .DS_Store
+.wrangler/
+.sunglasses/
