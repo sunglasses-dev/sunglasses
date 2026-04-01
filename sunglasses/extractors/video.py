@@ -36,7 +36,7 @@ def _check_deps():
     if missing:
         raise ImportError(
             f"Video scanning requires: {', '.join(missing)}. "
-            f"Install with: pip install glasses[video] and brew install ffmpeg"
+            f"Install with: pip install sunglasses[all] and brew install ffmpeg (Mac) or apt install ffmpeg (Linux)"
         )
 
 

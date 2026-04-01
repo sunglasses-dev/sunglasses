@@ -21,7 +21,7 @@ SUNGLASSES is a free, open-source input defense layer. It filters everything bef
 - QR Codes: decode QR codes and barcodes, scan content
 
 **What it catches:**
-- Prompt injection (11 languages)
+- Prompt injection (13 languages)
 - Credential exfiltration
 - Command injection
 - Memory poisoning
@@ -39,32 +39,49 @@ SUNGLASSES is a free, open-source input defense layer. It filters everything bef
 
 ```bash
 # Install
-pip install sunglasses              # text only, zero dependencies
-pip install sunglasses[image]       # + image scanning (OCR, EXIF)
-pip install sunglasses[audio]       # + audio scanning (Whisper)
-pip install sunglasses[video]       # + video scanning (subtitles + audio)
-pip install sunglasses[pdf]         # + PDF scanning
-pip install sunglasses[qr]          # + QR code scanning
-pip install sunglasses[all]         # everything
+pip install sunglasses              # text, images, PDFs, QR — zero heavy dependencies
+pip install sunglasses[all]         # + audio & video scanning (installs Whisper)
+
+# Check what's installed on your system
+sunglasses check
 
 # Scan text
 sunglasses scan "some text to check"
 
+# Scan a file (images, PDFs, text files)
+sunglasses scan --file document.pdf
+
+# Scan audio/video (needs sunglasses[all] + ffmpeg)
+sunglasses scan --file podcast.mp3 --deep
+
 # Scan with JSON output (for integration)
 sunglasses scan --json "some text to check"
 
-# Scan a file
-sunglasses scan --file document.txt
-
-# Scan from stdin
+# Scan from stdin (pipe from other tools)
 echo "check this" | sunglasses scan --stdin
 
-# Run the demo
+# Run the demo (10 attack scenarios)
 sunglasses demo
 
 # See what's loaded
 sunglasses info
 ```
+
+### Deep Scan Setup (Audio & Video)
+
+Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:
+
+```bash
+pip install sunglasses[all]                    # installs Whisper
+brew install ffmpeg                            # Mac
+# or: apt install ffmpeg                       # Linux
+
+sunglasses check                               # verify everything is ready
+sunglasses scan --file podcast.mp3 --deep      # scan audio
+sunglasses scan --file meeting.mp4 --deep      # scan video
+```
+
+SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
 ## Integration
 
@@ -113,32 +130,60 @@ result = scanner.scan_auto("any_file.ext")
 | Metric | Value |
 |--------|-------|
 | Average text scan | 0.01ms |
-| Throughput | ~90,000 scans/sec |
+| Throughput | ~82,000 scans/sec |
 | Patterns | 53 |
-| Keywords | 308 |
-| Languages | 11 |
+| Keywords | 334 |
+| Languages | 13 |
+| Attack categories | 12 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
+| Tests passing | 66/66 |
 | Core dependencies | Zero |
+| Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-## 11 Languages
+## 13 Languages
 
 English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian — plus community contributions.
 
-## Trusted Claims (today)
+## What Works Today (v0.1.0)
 
-- Deterministic pattern matching: 29/29 tests passing
-- Clean/review/block decision model across all channels
-- 6 media extractors: text, image, audio, video, PDF, QR
-- 11 languages with Unicode normalization
-- Runs 100% locally — your data never leaves your machine
-- All code is open and auditable
+- ✅ Text scanning: 53 patterns, 334 keywords, 13 languages, 12 attack categories
+- ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
+- ✅ 10-step processing pipeline: 7 cleaning steps + 2 detection steps + 1 decision
+- ✅ Image scanning: OCR + EXIF metadata + hidden text detection
+- ✅ PDF scanning: page text + metadata + annotations
+- ✅ QR code scanning: decode and scan content
+- ✅ Audio scanning: Whisper transcription → text scan (experimental, needs `--deep`)
+- ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental)
+- ✅ CLI: `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`
+- ✅ Python API: `SunglassesEngine` for text, `SunglassesScanner` for media
+- ✅ LangChain + CrewAI integrations
+- ✅ Daily protection report (local HTML)
+- ✅ 66/66 tests passing
+- ✅ 100% local — zero network calls, zero telemetry
+- ✅ AGPL-3.0
 
-## In Progress (near-term)
+## Roadmap
 
-- Public Threat Registry — accountability board for AI agent attacks
-- Output scanning — scan what the agent says back, not just what comes in
-- PII detection — auto-detect sensitive data in content
-- Community attack database — submit patterns, grow the defense
+### v0.2 — Coming Soon
+- 🔨 **Drag-and-drop web UI** — `sunglasses ui` opens a local browser page to scan files visually
+- 🔨 **URL scanning** — `sunglasses scan --url https://example.com`
+- 🔨 **Email report delivery** — daily reports to your inbox (your own SMTP, we never touch it)
+- 🔨 **`sunglasses update`** — update pattern database without reinstalling
+- 🔨 **Easy bug report form** — non-technical users can report issues
+
+### v0.3 — On the Horizon
+- 🔭 Output scanning — scan what the agent SAYS back, not just what comes in
+- 🔭 PII detection — auto-detect sensitive data in content
+- 🔭 Public Threat Registry — accountability board for AI agent attacks
+- 🔭 Community pattern submissions — submit attack patterns, grow the defense
+- 🔭 Deeper audio analysis — speaker separation, hidden speech detection
+
+### Community Help Needed
+- 🙏 Attack patterns in non-English languages
+- 🙏 False positive reports from real-world pipelines
+- 🙏 Adversarial bypass attempts (break it and tell us)
+- 🙏 Integration examples with other agent frameworks
+- 🙏 Audio/video testing with real-world media files
 
 ## Threat Registry
 
@@ -157,10 +202,11 @@ No provider wants to be listed as IGNORED. That's the accountability.
 SUNGLASSES is risk reduction, not magic.
 
 - **Pattern-based**: catches known attack patterns and variants. Novel zero-day attacks may pass until patterns are added.
-- **No context awareness**: "Do NOT run rm -rf" may trigger a false positive. Negation handling is in progress.
+- **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist — report them.
 - **Multilingual depth varies**: English has the deepest coverage. Other languages cover core injection + exfiltration. Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
-- **Audio/video speed**: Whisper transcription takes 30 sec - 10 min depending on file length. Runs in background.
+- **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
+- **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI coming in v0.2.
 
 ## Integration Notes
 

@@ -3,20 +3,25 @@
 SUNGLASSES CLI — Scan text or files for AI agent attacks.
 
 Usage:
-    python -m sunglasses.cli scan "ignore previous instructions"
-    python -m sunglasses.cli scan --file document.txt
-    python -m sunglasses.cli scan --channel web_content --file page.html
-    echo "some text" | python -m sunglasses.cli scan --stdin
-    python -m sunglasses.cli info
-    python -m sunglasses.cli demo
+    sunglasses scan "ignore previous instructions"
+    sunglasses scan --file document.txt
+    sunglasses scan --file podcast.mp3 --deep
+    sunglasses check
+    sunglasses info
+    sunglasses demo
 """
 
 import argparse
 import json
+import os
+import shutil
+import subprocess
 import sys
 import time
 
 from .engine import SunglassesEngine
+from .reporter import ProtectedEngine, generate_report
+from .mailer import set_email, get_email, send_report
 
 
 # ANSI colors for terminal output
@@ -62,13 +67,84 @@ def print_result(result, verbose=False):
         print()
 
 
+def _is_media_file(filepath):
+    """Check if a file is audio/video that needs deep scan."""
+    audio_exts = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.wma'}
+    video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv'}
+    ext = os.path.splitext(filepath)[1].lower()
+    return ext in audio_exts or ext in video_exts
+
+
 def cmd_scan(args):
     """Run a scan."""
     engine = SunglassesEngine()
 
     if args.file:
-        result = engine.scan_file(args.file)
-        source = args.file
+        filepath = args.file
+        if not os.path.exists(filepath):
+            print(f"\n  {RED}File not found:{RESET} {filepath}\n")
+            sys.exit(1)
+
+        # Check if this is audio/video
+        if _is_media_file(filepath):
+            if not args.deep:
+                ext = os.path.splitext(filepath)[1].lower()
+                print(f"\n  {YELLOW}{BOLD}DEEP SCAN NEEDED{RESET}")
+                print(f"  {DIM}{'─' * 50}{RESET}")
+                print(f"  {filepath} is an audio/video file ({ext}).")
+                print(f"  Deep scan transcribes audio to text, then scans for attacks.")
+                print(f"\n  To scan this file, add --deep:")
+                print(f"  {CYAN}sunglasses scan --file {filepath} --deep{RESET}")
+                print(f"\n  {DIM}Deep scan requires Whisper + FFmpeg.")
+                print(f"  Run 'sunglasses check' to see what's installed.{RESET}\n")
+                sys.exit(0)
+            else:
+                # Run deep scan
+                print(f"\n  {BOLD}SUNGLASSES v0.1.0{RESET} — deep scanning {filepath}")
+                print(f"  {DIM}{'─' * 50}{RESET}")
+                print(f"  {DIM}Transcribing audio with Whisper... (this may take a while){RESET}")
+                try:
+                    from .scanner import SunglassesScanner
+                    scanner = SunglassesScanner()
+                    start = time.time()
+                    result_dict = scanner.scan_deep(filepath)
+                    elapsed = time.time() - start
+
+                    if result_dict.get("error"):
+                        print(f"\n  {RED}Error:{RESET} {result_dict['error']}\n")
+                        sys.exit(1)
+
+                    threats = result_dict.get("threats", [])
+                    is_clean = result_dict.get("is_clean", len(threats) == 0)
+
+                    if args.json:
+                        print(json.dumps(result_dict))
+                        sys.exit(0 if is_clean else 1)
+
+                    if is_clean:
+                        print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({elapsed:.1f}s){RESET}")
+                        print(f"  {DIM}No threats found in audio/video content.{RESET}\n")
+                    else:
+                        print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
+                        for t in threats:
+                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {t.get('matched_text', '')}")
+                        print()
+
+                    # Show transcript preview
+                    for r in result_dict.get("results", []):
+                        preview = r.get("text_preview", "")[:200]
+                        if preview:
+                            print(f"  {DIM}Transcript preview: {preview}...{RESET}\n")
+
+                    sys.exit(0 if is_clean else 1)
+                except ImportError as e:
+                    print(f"\n  {RED}Missing dependencies:{RESET} {e}")
+                    print(f"  Run: {CYAN}pip install sunglasses[all]{RESET}")
+                    print(f"  And: {CYAN}brew install ffmpeg{RESET} (Mac) or {CYAN}apt install ffmpeg{RESET} (Linux)\n")
+                    sys.exit(1)
+        else:
+            result = engine.scan_file(filepath)
+            source = filepath
     elif args.stdin:
         text = sys.stdin.read()
         result = engine.scan(text, channel=args.channel)
@@ -91,6 +167,67 @@ def cmd_scan(args):
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
     sys.exit(0 if result.is_clean else 1)
+
+
+def cmd_check(args):
+    """Check what's installed on the user's system."""
+    print(f"\n  {BOLD}SUNGLASSES — System Check{RESET}")
+    print(f"  {DIM}{'─' * 50}{RESET}\n")
+
+    all_good = True
+
+    # Core (always available)
+    print(f"  {GREEN}✓{RESET} SUNGLASSES core installed")
+    engine = SunglassesEngine()
+    info = engine.info()
+    print(f"    {DIM}{info['patterns']} patterns, {info['keywords']} keywords, {info['regex_patterns']} regex{RESET}")
+
+    # Tesseract (OCR for images)
+    if shutil.which("tesseract"):
+        print(f"  {GREEN}✓{RESET} Tesseract (image OCR)")
+    else:
+        print(f"  {YELLOW}✗{RESET} Tesseract {DIM}— needed for image text scanning{RESET}")
+        print(f"    {DIM}Install: brew install tesseract (Mac) or apt install tesseract-ocr (Linux){RESET}")
+        all_good = False
+
+    # Whisper
+    try:
+        import whisper
+        print(f"  {GREEN}✓{RESET} Whisper (audio transcription)")
+    except ImportError:
+        print(f"  {YELLOW}✗{RESET} Whisper {DIM}— needed for audio/video scanning{RESET}")
+        print(f"    {DIM}Install: pip install sunglasses[all]{RESET}")
+        all_good = False
+
+    # FFmpeg
+    if shutil.which("ffmpeg"):
+        try:
+            result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+            version_line = result.stdout.split('\n')[0] if result.stdout else "unknown version"
+            print(f"  {GREEN}✓{RESET} FFmpeg ({DIM}{version_line.split(' Copyright')[0]}{RESET})")
+        except Exception:
+            print(f"  {GREEN}✓{RESET} FFmpeg")
+    else:
+        print(f"  {YELLOW}✗{RESET} FFmpeg {DIM}— needed for audio/video scanning{RESET}")
+        print(f"    {DIM}Install: brew install ffmpeg (Mac) or apt install ffmpeg (Linux){RESET}")
+        all_good = False
+
+    # pyzbar (QR codes)
+    try:
+        import pyzbar
+        print(f"  {GREEN}✓{RESET} pyzbar (QR code scanning)")
+    except ImportError:
+        print(f"  {YELLOW}✗{RESET} pyzbar {DIM}— needed for QR code scanning{RESET}")
+        print(f"    {DIM}Install: pip install pyzbar{RESET}")
+        all_good = False
+
+    print(f"\n  {DIM}{'─' * 50}{RESET}")
+    if all_good:
+        print(f"  {GREEN}{BOLD}All systems ready.{RESET} FAST + DEEP scanning available.\n")
+    else:
+        print(f"  {YELLOW}{BOLD}Some optional features unavailable.{RESET}")
+        print(f"  {DIM}Core text scanning works without any extras.{RESET}")
+        print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
 def cmd_info(args):
@@ -172,9 +309,14 @@ def main():
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
                              choices=["message", "file", "api_response", "web_content", "log_memory"])
+    scan_parser.add_argument("--deep", action="store_true", help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
     scan_parser.set_defaults(func=cmd_scan)
+
+    # check
+    check_parser = subparsers.add_parser("check", help="Check what's installed on your system")
+    check_parser.set_defaults(func=cmd_check)
 
     # info
     info_parser = subparsers.add_parser("info", help="Show engine info")
@@ -184,12 +326,67 @@ def main():
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")
     demo_parser.set_defaults(func=cmd_demo)
 
+    # report
+    report_parser = subparsers.add_parser("report", help="Generate daily protection report")
+    report_parser.add_argument("--date", "-d", help="Date (YYYY-MM-DD), default: today")
+    report_parser.add_argument("--html", action="store_true", help="Generate HTML report")
+    report_parser.add_argument("--save", "-s", help="Save report to file path")
+    report_parser.add_argument("--send", action="store_true", help="Email report to configured address")
+    report_parser.set_defaults(func=cmd_report)
+
+    # config
+    config_parser = subparsers.add_parser("config", help="Configure SUNGLASSES")
+    config_parser.add_argument("--email", "-e", help="Set email for daily reports")
+    config_parser.set_defaults(func=cmd_config)
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
         sys.exit(1)
 
     args.func(args)
+
+
+def cmd_report(args):
+    """Generate daily protection report."""
+    if args.send:
+        html = generate_report(date=args.date, as_html=True)
+        email = get_email()
+        if not email:
+            print(f"\n  {RED}No email configured.{RESET}")
+            print(f"  Run: {CYAN}sunglasses config --email your@email.com{RESET}\n")
+            sys.exit(1)
+        print(f"\n  Sending report to {CYAN}{email}{RESET}...")
+        if send_report(html, date=args.date or "today"):
+            print(f"  {GREEN}Sent!{RESET}\n")
+        sys.exit(0)
+
+    report = generate_report(date=args.date, as_html=args.html)
+
+    if args.save:
+        with open(args.save, "w") as f:
+            f.write(report)
+        print(f"  Report saved to {args.save}")
+        if args.html:
+            print(f"  Open in browser: file://{os.path.abspath(args.save)}")
+    else:
+        print(report)
+
+
+def cmd_config(args):
+    """Configure SUNGLASSES."""
+    if args.email:
+        set_email(args.email)
+        print(f"\n  {GREEN}Email saved:{RESET} {args.email}")
+        print(f"  Daily reports will be sent here when available.")
+        print(f"  {DIM}Stored locally at ~/.sunglasses/config.json{RESET}\n")
+    else:
+        email = get_email()
+        if email:
+            print(f"\n  {BOLD}Current config:{RESET}")
+            print(f"  Email: {CYAN}{email}{RESET}\n")
+        else:
+            print(f"\n  No config set. Use: sunglasses config --email your@email.com\n")
 
 
 if __name__ == "__main__":

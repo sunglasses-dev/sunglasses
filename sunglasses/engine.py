@@ -84,13 +84,28 @@ class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
     # Decision priority: higher severity = stronger action
-    SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "review": 0}
     SEVERITY_TO_DECISION = {
         "critical": "block",
         "high": "block",
         "medium": "quarantine",
         "low": "allow_redacted",
+        "review": "allow_redacted",
     }
+
+    # Negation phrases that indicate the text is a warning/example, not an attack.
+    # Checked within NEGATION_WINDOW characters before the matched keyword.
+    NEGATION_PHRASES = [
+        "do not", "don't", "don't", "dont",
+        "never", "warning:", "warning -",
+        "example of", "example:", "for example",
+        "avoid", "be careful", "watch out for",
+        "beware of", "caution:", "note:",
+        "not run", "not execute", "not use",
+        "should not", "shouldn't", "shouldn't",
+        "must not", "must never",
+    ]
+    NEGATION_WINDOW = 50  # characters before the match to search for negation
 
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None):
         self._patterns = patterns or PATTERNS
@@ -129,6 +144,20 @@ class SunglassesEngine:
         self._pattern_count = len(self._patterns)
         self._keyword_count = len(self._keyword_to_patterns)
 
+    def _check_negation(self, text: str, match_start: int) -> bool:
+        """
+        Check if negation context exists before a matched keyword position.
+
+        Looks backwards up to NEGATION_WINDOW characters from the match start
+        for any negation phrase. Returns True if negation was found.
+        """
+        window_start = max(0, match_start - self.NEGATION_WINDOW)
+        before_text = text[window_start:match_start].lower()
+        for phrase in self.NEGATION_PHRASES:
+            if phrase in before_text:
+                return True
+        return False
+
     @property
     def pattern_count(self) -> int:
         return self._pattern_count
@@ -166,12 +195,19 @@ class SunglassesEngine:
                     if pattern["id"] in seen_ids:
                         continue
                     seen_ids.add(pattern["id"])
-                    start_idx = max(0, end_idx - len(keyword) - 10)
+                    kw_start = end_idx - len(keyword) + 1
+                    start_idx = max(0, kw_start - 10)
                     end_show = min(len(normalized), end_idx + 20)
-                    findings.append({
+                    finding = {
                         **pattern,
                         "matched_text": normalized[start_idx:end_show],
-                    })
+                    }
+                    # Negation context check
+                    if self._check_negation(normalized, kw_start):
+                        finding["severity"] = "review"
+                        finding["negation_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                    findings.append(finding)
         else:
             # Fallback: pure Python string matching (no dependencies)
             for keyword, patterns in self._keyword_to_patterns.items():
@@ -185,10 +221,16 @@ class SunglassesEngine:
                         idx = normalized.index(keyword)
                         start_idx = max(0, idx - 10)
                         end_show = min(len(normalized), idx + len(keyword) + 20)
-                        findings.append({
+                        finding = {
                             **pattern,
                             "matched_text": normalized[start_idx:end_show],
-                        })
+                        }
+                        # Negation context check
+                        if self._check_negation(normalized, idx):
+                            finding["severity"] = "review"
+                            finding["negation_context"] = True
+                            finding["original_severity"] = pattern["severity"]
+                        findings.append(finding)
 
         # Step 3: Regex patterns (for things like API keys)
         for pattern, regexes in self._regex_patterns:
@@ -200,10 +242,16 @@ class SunglassesEngine:
                 match = rx.search(text)  # search ORIGINAL text for regex
                 if match:
                     seen_ids.add(pattern["id"])
-                    findings.append({
+                    finding = {
                         **pattern,
                         "matched_text": match.group(0)[:50],
-                    })
+                    }
+                    # Negation context check for regex matches too
+                    if self._check_negation(text, match.start()):
+                        finding["severity"] = "review"
+                        finding["negation_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                    findings.append(finding)
                     break
 
         # Step 4: Determine decision based on worst finding severity

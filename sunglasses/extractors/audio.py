@@ -39,7 +39,7 @@ def _check_deps():
     if missing:
         raise ImportError(
             f"Audio scanning requires: {', '.join(missing)}. "
-            f"Install with: pip install glasses[audio] and brew install ffmpeg"
+            f"Install with: pip install sunglasses[all] and brew install ffmpeg (Mac) or apt install ffmpeg (Linux)"
         )
 
 
