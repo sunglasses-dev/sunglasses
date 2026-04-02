@@ -972,4 +972,81 @@ PATTERNS = [
         ],
         "description": "Mixing languages in one message to bypass single-language pattern matching."
     },
+
+    # =========================================================================
+    # SUPPLY CHAIN — Malicious code patterns in dependencies and packages
+    # Added April 1, 2026 after scanning the real axios RAT (BlueNoroff/Lazarus)
+    # =========================================================================
+    {
+        "id": "GLS-SC-001",
+        "name": "HTTP exfiltration to hardcoded IP",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file"],
+        "regex": [r'(?:request\.post|https?\.request|fetch|axios\.post|got\.post)\s*\(\s*["\{].*?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}[:\d]*'],
+        "description": "HTTP POST/request to a hardcoded IP address — common in RATs and data exfiltration malware."
+    },
+    {
+        "id": "GLS-SC-002",
+        "name": "Credential path harvesting",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file"],
+        "regex": [r'(?:\.ssh/id_rsa|\.aws/credentials|\.npmrc|Login\s*Data|exodus\.wallet|solana/id\.json|\.kube/config|\.docker/config\.json|Keychains/login\.keychain)'],
+        "description": "Code accessing well-known credential file paths — signature of credential-stealing malware."
+    },
+    {
+        "id": "GLS-SC-003",
+        "name": "Remote code download and execute",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file"],
+        "regex": [r'(?:curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
+        "description": "Downloading remote code and executing it — classic RAT dropper behavior."
+    },
+    {
+        "id": "GLS-SC-004",
+        "name": "Browser extension data theft",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file"],
+        "regex": [r'(?:Local\s*Extension\s*Settings|nkbihfbeogaeaoehlefnkodbefgpgknn|ejbalbakoplchlghecdalmeeeajnimhm|BraveSoftware|Opera\s*Stable|Chrome.*User\s*Data)'],
+        "description": "Accessing browser extension storage or profile data — targets crypto wallets and saved passwords."
+    },
+    {
+        "id": "GLS-SC-005",
+        "name": "Self-deleting payload",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file"],
+        "regex": [r'(?:fs\.(?:rmSync|unlinkSync|unlink)\s*\(\s*__filename|fs\.rename.*package\.md.*package\.json)'],
+        "description": "Code that deletes itself after execution — anti-forensic technique used by supply chain attackers."
+    },
+    {
+        "id": "GLS-SC-006",
+        "name": "Suspicious postinstall hook",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file"],
+        "regex": [r'"postinstall"\s*:\s*"(?:node\s+setup|sh\s|bash\s|python|curl|wget)'],
+        "description": "Package.json postinstall script running suspicious commands — supply chain attack entry point."
+    },
+    {
+        "id": "GLS-SC-007",
+        "name": "Anti-debugging trap",
+        "category": "supply_chain",
+        "severity": "medium",
+        "channel": ["file"],
+        "regex": [r'(?:constructor\s*\(\s*["\']debugger["\']\s*\)|Function\s*\(\s*["\']return\s+\(function)'],
+        "description": "Anti-debugging techniques — code that crashes debuggers to prevent analysis."
+    },
+    {
+        "id": "GLS-SC-008",
+        "name": "Environment and system reconnaissance",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file"],
+        "regex": [r'(?:os\.hostname\(\).*os\.platform\(\).*os\.homedir\(\)|os\.userInfo\(\)\.username.*process\.env)'],
+        "description": "Collecting system info (hostname, platform, user, env vars) — reconnaissance phase of RAT."
+    },
 ]

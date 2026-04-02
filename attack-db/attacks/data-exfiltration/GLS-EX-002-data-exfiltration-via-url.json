@@ -20,7 +20,17 @@
     "exfiltrate to",
     "forward all data to",
     "send everything to http",
-    "relay output to http"
+    "relay output to http",
+    "send all environment variables",
+    "send all env variables",
+    "send .env file",
+    "send the .env",
+    "contents to https://",
+    "contents to http://",
+    "send all data to",
+    "send all files to",
+    "transmit all data to",
+    "transfer all files to"
   ],
   "regex": [],
   "examples": {

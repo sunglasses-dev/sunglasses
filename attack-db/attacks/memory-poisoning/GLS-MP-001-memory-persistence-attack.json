@@ -19,7 +19,17 @@
     "remember: ignore",
     "persist this instruction",
     "write to your memory:",
-    "save to your memory:"
+    "save to your memory:",
+    "from now on, remember",
+    "from now on remember",
+    "remember that the password",
+    "remember that the api key",
+    "always include it in responses",
+    "always include this in",
+    "include it in every response",
+    "remember this password",
+    "remember this secret",
+    "store this credential"
   ],
   "regex": [],
   "examples": {
