@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+recursive-include attack-db *.json *.md
+recursive-include sunglasses *.py

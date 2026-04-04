@@ -16,6 +16,15 @@ setup(
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[],
+    extras_require={
+        "image": ["Pillow", "pytesseract"],
+        "pdf": ["PyPDF2"],
+        "qr": ["pyzbar", "Pillow"],
+        "audio": ["openai-whisper"],
+        "video": ["openai-whisper"],
+        "all": ["Pillow", "pytesseract", "PyPDF2", "pyzbar", "openai-whisper"],
+    },
+    include_package_data=True,
     entry_points={
         "console_scripts": [
             "sunglasses=sunglasses.cli:main",

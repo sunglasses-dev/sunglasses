@@ -15,7 +15,7 @@ Usage:
     from sunglasses.extractors.audio import scan_audio
     result = scan_audio("/path/to/voicemail.mp3")
 
-Install: pip install glasses[audio]  (requires whisper + ffmpeg)
+Install: pip install sunglasses[all]  (requires whisper + ffmpeg)
 """
 
 import os

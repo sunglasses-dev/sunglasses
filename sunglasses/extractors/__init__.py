@@ -8,9 +8,9 @@ Architecture:
     Media file → Extractor → Text → SunglassesEngine.scan() → Decision
 
 Available extractors:
-    - image: OCR + EXIF metadata + hidden text detection
-    - pdf: (coming soon)
-    - audio: (coming soon)
-    - video: (coming soon)
-    - qr: (coming soon)
+    - image: OCR + EXIF metadata + hidden text detection (pip install sunglasses[image])
+    - pdf: Page text + metadata + annotations (pip install sunglasses[pdf])
+    - qr: QR codes + barcodes in images (pip install sunglasses[qr])
+    - audio: Whisper transcription + metadata (pip install sunglasses[all])
+    - video: Subtitles + audio transcript + metadata (pip install sunglasses[all])
 """

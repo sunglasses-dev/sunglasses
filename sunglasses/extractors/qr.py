@@ -15,7 +15,7 @@ Usage:
     from sunglasses.extractors.qr import scan_qr
     result = scan_qr("/path/to/document_with_qr.png")
 
-Install: pip install glasses[qr]  (requires pyzbar + Pillow)
+Install: pip install sunglasses[qr]  (requires pyzbar + Pillow)
 """
 
 import os
@@ -36,7 +36,7 @@ def _check_deps():
     if missing:
         raise ImportError(
             f"QR scanning requires: {', '.join(missing)}. "
-            f"Install with: pip install glasses[qr]"
+            f"Install with: pip install sunglasses[qr]"
         )
 
 

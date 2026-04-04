@@ -11,7 +11,7 @@ Usage:
     from sunglasses.extractors.video import scan_video
     result = scan_video("/path/to/meeting.mp4")
 
-Install: pip install glasses[video]  (requires whisper + ffmpeg)
+Install: pip install sunglasses[all]  (requires whisper + ffmpeg)
 """
 
 import os

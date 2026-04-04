@@ -136,7 +136,7 @@ class SunglassesScanner:
                     results["is_clean"] = False
                     results["threats"].extend(r.findings)
         except ImportError:
-            results["warning"] = "Image scanning requires: pip install glasses[image]"
+            results["warning"] = "Image scanning requires: pip install sunglasses[image]"
 
         # QR codes in the image
         try:
@@ -160,7 +160,7 @@ class SunglassesScanner:
             from .extractors.pdf import scan_pdf
             return scan_pdf(path, engine=self.engine)
         except ImportError:
-            return {"file": path, "warning": "PDF scanning requires: pip install glasses[pdf]"}
+            return {"file": path, "warning": "PDF scanning requires: pip install sunglasses[pdf]"}
 
     def _scan_text_file(self, path: str) -> dict:
         """FAST: Plain text file scan."""
@@ -203,7 +203,7 @@ class SunglassesScanner:
             from .extractors.audio import scan_audio
             return scan_audio(path, engine=self.engine, whisper_model=self._whisper_model)
         except ImportError:
-            return {"file": path, "warning": "Audio scanning requires: pip install glasses[audio]"}
+            return {"file": path, "warning": "Audio scanning requires: pip install sunglasses[audio]"}
 
     def _scan_video(self, path: str) -> dict:
         """DEEP: Video scan (subtitles + audio + metadata)."""
@@ -211,7 +211,7 @@ class SunglassesScanner:
             from .extractors.video import scan_video
             return scan_video(path, engine=self.engine, whisper_model=self._whisper_model)
         except ImportError:
-            return {"file": path, "warning": "Video scanning requires: pip install glasses[video]"}
+            return {"file": path, "warning": "Video scanning requires: pip install sunglasses[video]"}
 
     # =========================================================================
     # HELPERS

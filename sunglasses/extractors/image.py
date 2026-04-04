@@ -20,7 +20,7 @@ Usage:
         if not result.is_clean:
             print(f"Threat in {source}: {result.findings}")
 
-Install: pip install glasses[image]  (requires Pillow + pytesseract + Tesseract)
+Install: pip install sunglasses[image]  (requires Pillow + pytesseract + Tesseract)
 """
 
 import os
@@ -42,7 +42,7 @@ def _check_deps():
     if missing:
         raise ImportError(
             f"Image scanning requires: {', '.join(missing)}. "
-            f"Install with: pip install glasses[image]"
+            f"Install with: pip install sunglasses[image]"
         )
 
 

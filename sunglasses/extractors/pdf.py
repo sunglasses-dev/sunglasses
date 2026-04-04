@@ -11,7 +11,7 @@ Usage:
     from sunglasses.extractors.pdf import scan_pdf
     result = scan_pdf("/path/to/document.pdf")
 
-Install: pip install glasses[pdf]  (requires PyPDF2)
+Install: pip install sunglasses[pdf]  (requires PyPDF2)
 """
 
 import os
@@ -25,7 +25,7 @@ def _check_deps():
     except ImportError:
         raise ImportError(
             "PDF scanning requires PyPDF2. "
-            "Install with: pip install glasses[pdf]"
+            "Install with: pip install sunglasses[pdf]"
         )
 
 
