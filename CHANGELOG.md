@@ -2,6 +2,19 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.2] — 2026-04-04
+
+### Added
+- **New threat category: `agent_workflow_security`.** 3 patterns targeting AI agent-to-tool pipeline attacks — a class of threats no other scanner covers.
+  - GLS-AW-001: Web fetch to publish pipeline injection (critical)
+  - GLS-AW-002: Overprivileged CMS publish connector (critical)
+  - GLS-AW-003: Overprivileged social scheduler connector (high)
+- 36 new keywords and 6 new regex patterns for detecting agent workflow abuse
+- Patterns: 69 → 72 | Keywords: 370 → 406 | Categories: 17 → 18
+
+### Research source
+Patterns derived from CAVA's analysis of real-world agentic SEO/content automation workflows, cross-referenced with OWASP LLM01 and published prompt injection research.
+
 ## [0.2.1] — 2026-04-04
 
 ### Fixed

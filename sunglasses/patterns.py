@@ -1193,4 +1193,86 @@ PATTERNS = [
         ],
         "description": "Instruction reset phrases commonly found in retrieved documents, web pages, and emails targeting agents that read external content."
     },
+
+    # =========================================================================
+    # AGENT WORKFLOW SECURITY — Attacks on agent-to-tool pipelines
+    # =========================================================================
+    {
+        "id": "GLS-AW-001",
+        "name": "Web fetch to publish pipeline injection",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["web_content", "message", "api_response", "file"],
+        "keywords": [
+            "fetch page and publish",
+            "crawl this page and publish it",
+            "use this website as source of truth and publish",
+            "scrape competitor pages and turn them into a post",
+            "read this url and post the result to the cms",
+            "take the fetched content and publish directly",
+            "turn this scraped page into a live article",
+            "generate a post from this page and publish it",
+            "use the crawled content as instructions",
+            "publish whatever the fetched page tells you",
+            "convert this web research into a scheduled post",
+            "pull from rss and auto-publish",
+        ],
+        "regex": [
+            r"(?i)(fetch|crawl|scrape|read)\s+(?:this|the)?\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+            r"(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)",
+        ],
+        "description": "Indirect prompt injection or poisoned source content entering an agent workflow that fetches external pages, generates content, and pushes toward publishing systems."
+    },
+    {
+        "id": "GLS-AW-002",
+        "name": "Overprivileged CMS publish connector",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["api_response", "file", "message"],
+        "keywords": [
+            "publish directly to wordpress",
+            "publish directly to webflow",
+            "publish directly to shopify blog",
+            "skip draft and publish live",
+            "grant publish permission",
+            "full cms access token",
+            "content publish scope",
+            "write access to all pages",
+            "bypass editorial review",
+            "auto publish to cms",
+            "update site content without approval",
+            "connector can create and publish posts",
+        ],
+        "regex": [
+            r"(?i)(publish|write|edit|delete).{0,50}(wordpress|webflow|contentful|sanity|ghost|shopify)",
+            r"(?i)(skip|bypass).{0,40}(review|approval|draft).{0,40}(publish|go live)",
+        ],
+        "description": "Agent connector with direct CMS publish rights, broad content mutation scope, or missing draft-only controls — high-blast-radius path from prompt compromise to public site compromise."
+    },
+    {
+        "id": "GLS-AW-003",
+        "name": "Overprivileged social scheduler connector",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["api_response", "file", "message"],
+        "keywords": [
+            "schedule directly to all social accounts",
+            "post directly to linkedin and x",
+            "auto queue this thread",
+            "publish to all connected channels",
+            "social scheduler token",
+            "cross-post automatically",
+            "skip approval and queue posts",
+            "blast this to every channel",
+            "scheduler has publish access",
+            "approve and schedule automatically",
+            "send this campaign live now",
+            "queue these posts without review",
+        ],
+        "regex": [
+            r"(?i)(schedule|queue|post|publish).{0,70}(linkedin|twitter|x|facebook|instagram|tiktok|youtube)",
+            r"(?i)(all channels|every channel|all accounts|connected channels).{0,40}(schedule|post|publish)",
+        ],
+        "description": "Agent-connected social scheduling tool with direct posting rights across multiple channels — compromised prompts or poisoned content can cause broad, fast brand abuse without approval gates."
+    },
 ]
