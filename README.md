@@ -227,7 +227,7 @@ SUNGLASSES is risk reduction, not magic.
 We need attack patterns in every language. If you find a bypass, open an issue with reproducible input. We patch in public.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-See [GOVERNANCE.md](GOVERNANCE.md) for how decisions are made.
+See [sunglasses.dev/thesis](https://sunglasses.dev/thesis.html) for our security philosophy.
 
 ## License
 
@@ -236,5 +236,5 @@ See [GOVERNANCE.md](GOVERNANCE.md) for how decisions are made.
 ## Links
 
 - Website: [sunglasses.dev](https://sunglasses.dev)
-- Threat Registry: [registry/](registry/)
+- Threat Database: [attack-db/](attack-db/)
 - Issues: [github.com/sunglasses-dev/sunglasses/issues](https://github.com/sunglasses-dev/sunglasses/issues)

@@ -9,7 +9,7 @@ setup(
     url="https://sunglasses.dev",
     project_urls={
         "Source": "https://github.com/sunglasses-dev/sunglasses",
-        "Threat Registry": "https://github.com/sunglasses-dev/sunglasses/tree/main/registry",
+        "Threat Database": "https://github.com/sunglasses-dev/sunglasses/tree/main/attack-db",
         "Issues": "https://github.com/sunglasses-dev/sunglasses/issues",
     },
     license="AGPL-3.0",
@@ -25,6 +25,9 @@ setup(
         "all": ["Pillow", "pytesseract", "PyPDF2", "pyzbar", "openai-whisper"],
     },
     include_package_data=True,
+    package_data={
+        "sunglasses": ["data/attacks/**/*.json"],
+    },
     entry_points={
         "console_scripts": [
             "sunglasses=sunglasses.cli:main",

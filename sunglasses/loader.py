@@ -12,10 +12,11 @@ import os
 def load_attack_db(db_path: str = None) -> list:
     """Load all attack patterns from JSON files in the attack-db directory."""
     if db_path is None:
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            'attack-db', 'attacks'
-        )
+        # First try packaged data (inside the installed package)
+        packaged = os.path.join(os.path.dirname(__file__), 'data', 'attacks')
+        # Fall back to repo layout (attack-db/ next to sunglasses/)
+        repo = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'attack-db', 'attacks')
+        db_path = packaged if os.path.isdir(packaged) else repo
 
     if not os.path.isdir(db_path):
         return []

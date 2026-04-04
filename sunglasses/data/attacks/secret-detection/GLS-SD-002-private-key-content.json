@@ -1,0 +1,36 @@
+{
+  "id": "GLS-SD-002",
+  "name": "Private key content",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "log_memory",
+    "message"
+  ],
+  "description": "Private key material that should never be in agent-accessible content.",
+  "keywords": [
+    "-----begin rsa private key-----",
+    "-----begin openssh private key-----",
+    "-----begin private key-----",
+    "-----begin ec private key-----",
+    "-----begin dsa private key-----"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [
+      "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQ...",
+      "Here's the SSH key: -----BEGIN OPENSSH PRIVATE KEY-----"
+    ],
+    "benign": [
+      "Private keys should begin with -----BEGIN PRIVATE KEY----- header.",
+      "Store your SSH keys in ~/.ssh/ with 600 permissions."
+    ]
+  },
+  "references": [
+    "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
+  ],
+  "contributed_by": "AZ Rollin",
+  "date_added": "2026-03-28"
+}
