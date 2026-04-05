@@ -2,6 +2,19 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.3] — 2026-04-04
+
+### Added
+- **3 new agent workflow security patterns (batch 2)** — expanding coverage of agentic content automation threats.
+  - GLS-AW-004: Poisoned persistent prompt or skill (critical) — malicious instructions hidden in saved skills, playbooks, or persistent memory
+  - GLS-AW-005: Poisoned RSS or brand doc ingestion (high) — external feeds/docs containing hidden directives treated as trusted planning material
+  - GLS-AW-006: Unsafely auto-published marketing content (critical) — generated content pushed live without human review or validation
+- 36 new keywords and 6 new regex patterns
+- Patterns: 72 → 75 | Keywords: 406 → 442 | Categories: 18 (unchanged)
+
+### Research source
+Patterns derived from CAVA's continued analysis of real-world agentic SEO/content automation workflows, focusing on persistence attacks, poisoned ingestion pipelines, and missing approval gates.
+
 ## [0.2.2] — 2026-04-04
 
 ### Added
