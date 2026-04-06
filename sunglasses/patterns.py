@@ -1353,4 +1353,193 @@ PATTERNS = [
         ],
         "description": "Generated marketing content is pushed live automatically without sufficient human review, claim validation, approval receipts, or connector safety limits, creating a direct path to brand abuse, misinformation, or policy violations."
     },
+
+    # =========================================================================
+    # CVE-BASED PATTERNS — Real-world AI agent framework vulnerabilities
+    # Added: v0.2.4 (April 6, 2026)
+    # Source: Verified CVEs from BentoML, mobile-mcp, LangChain, LiteLLM, LangGraph
+    # =========================================================================
+
+    # --- GLS-CI-004: Unquoted shell interpolation injection (BentoML CVE-2026-35043) ---
+    {
+        "id": "GLS-CI-004",
+        "name": "Unquoted shell interpolation injection",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["file", "api_response", "message"],
+        "keywords": [
+            "system_packages",
+            "f-string shell",
+            "subprocess without shlex",
+            "os.system(f",
+            "shell=True",
+            "subprocess.call(f",
+            "subprocess.run(f",
+            "subprocess.Popen(f",
+            "shlex.quote missing",
+            "unsanitized package name",
+            "semicolon injection in package",
+            "format string shell command",
+            "os.popen(f",
+            "commands.getoutput(f",
+        ],
+        "regex": [
+            r"os\.system\s*\(\s*f['\"]",
+            r"subprocess\.(?:call|run|Popen)\s*\(\s*f['\"]",
+            r"os\.popen\s*\(\s*f['\"]",
+            r"subprocess\.(?:call|run|Popen)\s*\(.*shell\s*=\s*True",
+        ],
+        "description": "User-controlled strings interpolated directly into shell commands without shlex.quote or proper escaping. Based on BentoML CVE-2026-35043 where package names were injected into shell commands via f-strings."
+    },
+
+    # --- GLS-MCP-001: MCP URL scheme injection (mobile-mcp CVE-2026-35394) ---
+    {
+        "id": "GLS-MCP-001",
+        "name": "MCP URL scheme injection",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["message", "api_response", "file"],
+        "keywords": [
+            "tel:",
+            "sms:",
+            "content://",
+            "intent://",
+            "market://",
+            "file://",
+            "open_url without validation",
+            "unvalidated url scheme",
+            "arbitrary intent execution",
+            "deep link injection",
+            "custom scheme handler",
+            "mcp tool open_url",
+        ],
+        "regex": [
+            r"(?:open_url|launch_url|navigate)\s*\(\s*['\"](?:tel:|sms:|intent://|content://|market://|file://)",
+            r"(?:intent|content|market)://[^\s'\"]+",
+        ],
+        "description": "Dangerous URL schemes passed through MCP tool handlers without validation, enabling arbitrary intent execution on mobile devices. Based on mobile-mcp CVE-2026-35394."
+    },
+
+    # --- GLS-PT-001: Path traversal in prompt/template loading (LangChain CVE-2026-34070) ---
+    {
+        "id": "GLS-PT-001",
+        "name": "Path traversal in prompt/template loading",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "keywords": [
+            "../",
+            "..\\",
+            "path traversal",
+            "directory traversal",
+            "load_prompt(",
+            "file_path from user",
+            "unvalidated file path",
+            "arbitrary file read",
+            "template path injection",
+            "prompt template traversal",
+            "os.path.join without sanitization",
+            "user-controlled file path",
+        ],
+        "regex": [
+            r"(?:\.\./){2,}",
+            r"(?:load_prompt|load_template|read_file|open)\s*\(.*(?:\.\./|\.\.\\)",
+            r"os\.path\.join\s*\(.*(?:user_input|request\.|params\[|args\[)",
+        ],
+        "description": "Path traversal sequences in prompt template loading or file access, allowing reading arbitrary files outside intended directories. Based on LangChain CVE-2026-34070."
+    },
+
+    # --- GLS-DS-001: Insecure deserialization of untrusted data (LangChain CVE-2025-68664) ---
+    {
+        "id": "GLS-DS-001",
+        "name": "Insecure deserialization of untrusted data",
+        "category": "deserialization",
+        "severity": "critical",
+        "channel": ["file", "api_response", "message"],
+        "keywords": [
+            "pickle.loads(",
+            "pickle.load(",
+            "marshal.loads(",
+            "yaml.load(",
+            "yaml.unsafe_load(",
+            "dill.loads(",
+            "cloudpickle",
+            "deserialize untrusted",
+            "unpickle user",
+            "shelve.open(",
+            "joblib.load(",
+            "torch.load(",
+            "numpy.load( allow_pickle",
+        ],
+        "regex": [
+            r"pickle\.(?:loads?)\s*\(",
+            r"yaml\.(?:unsafe_)?load\s*\([^)]*(?!Loader\s*=\s*yaml\.SafeLoader)",
+            r"marshal\.loads?\s*\(",
+            r"dill\.loads?\s*\(",
+            r"torch\.load\s*\([^)]*(?!weights_only\s*=\s*True)",
+            r"numpy\.load\s*\([^)]*allow_pickle\s*=\s*True",
+        ],
+        "description": "Usage of unsafe deserialization functions (pickle, marshal, yaml.load, dill, torch.load) on untrusted input, enabling arbitrary code execution. Based on LangChain CVE-2025-68664."
+    },
+
+    # --- GLS-AB-001: Authentication bypass via token truncation (LiteLLM CVE-2026-35030) ---
+    {
+        "id": "GLS-AB-001",
+        "name": "Authentication bypass via token truncation",
+        "category": "auth_bypass",
+        "severity": "critical",
+        "channel": ["file", "api_response", "message"],
+        "keywords": [
+            "token[:20]",
+            "token truncation",
+            "partial token match",
+            "cache key collision",
+            "shortened auth token",
+            "token prefix only",
+            "hash_token[:10]",
+            "api_key[:16]",
+            "truncated token comparison",
+            "token prefix collision",
+            "partial key validation",
+            "short token cache key",
+        ],
+        "regex": [
+            r"(?:token|api_key|auth_key|secret)\s*\[\s*:\s*\d{1,2}\s*\]",
+            r"(?:hash|md5|sha)\s*\(.*(?:token|key)\s*\)\s*\[\s*:\s*\d+\s*\]",
+            r"cache_key\s*=.*(?:token|key)\s*\[\s*:\s*\d+\s*\]",
+        ],
+        "description": "Authentication tokens truncated or partially compared, allowing collision attacks where different users can share cache entries or bypass auth. Based on LiteLLM CVE-2026-35030."
+    },
+
+    # --- GLS-SI-001: SQL injection in metadata/filter queries (LangGraph CVE-2025-67644) ---
+    {
+        "id": "GLS-SI-001",
+        "name": "SQL injection in metadata/filter queries",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["file", "api_response", "message"],
+        "keywords": [
+            "metadata filter injection",
+            "unparameterized sql",
+            "f-string sql query",
+            "format string sql",
+            "user metadata key injection",
+            "sql injection via metadata",
+            "unsanitized filter parameter",
+            "raw sql from user input",
+            "string interpolation sql",
+            "WHERE clause injection",
+            "dynamic column name injection",
+            "unescaped metadata key",
+        ],
+        "regex": [
+            r"f['\"]SELECT\s",
+            r"f['\"]INSERT\s",
+            r"f['\"]UPDATE\s",
+            r"f['\"]DELETE\s",
+            r"(?:execute|cursor\.execute)\s*\(\s*f['\"]",
+            r"\.format\s*\(.*\)\s*#.*(?:sql|query|select|where)",
+        ],
+        "description": "SQL injection via user-controlled metadata keys or filter parameters in AI agent data stores. Based on LangGraph CVE-2025-67644 where metadata filter keys were not parameterized."
+    },
 ]
