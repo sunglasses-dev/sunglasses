@@ -14,7 +14,7 @@ pytest
 ## Ways to Contribute
 
 ### Add a Detection Pattern (Easiest)
-1. Look at `sunglasses/attacks/` for the pattern format
+1. Look at `attack-db/attacks/` for the JSON pattern format and `sunglasses/patterns.py` for the runtime patterns
 2. Add your pattern with: regex, category, severity, description
 3. Add a test case in `tests/`
 4. Run `pytest` — all tests must pass

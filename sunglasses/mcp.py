@@ -27,7 +27,7 @@ from sunglasses.scanner import SunglassesScanner
 # Protocol constants
 JSONRPC = "2.0"
 SERVER_NAME = "sunglasses"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.2.4"
 PROTOCOL_VERSION = "2024-11-05"
 
 

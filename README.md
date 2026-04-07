@@ -139,10 +139,10 @@ result = scanner.scan_auto("any_file.ext")
 |--------|-------|
 | Average text scan | 0.01ms |
 | Throughput | ~82,000 scans/sec |
-| Patterns | 75 |
-| Keywords | 442 |
+| Patterns | 88 |
+| Keywords | 543 |
 | Languages | 13 |
-| Attack categories | 18 |
+| Attack categories | 21 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Tests passing | 66/66 |
 | Core dependencies | Zero |
@@ -154,7 +154,7 @@ English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese,
 
 ## What Works Today (v0.2.4)
 
-- ✅ Text scanning: 81 patterns, 517 keywords, 13 languages, 21 attack categories
+- ✅ Text scanning: 88 patterns, 543 keywords, 13 languages, 21 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ 10-step processing pipeline: 7 cleaning steps + 2 detection steps + 1 decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection
@@ -172,14 +172,14 @@ English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese,
 
 ## Roadmap
 
-### v0.2 — Coming Soon
+### Next — In Progress
 - 🔨 **Drag-and-drop web UI** — `sunglasses ui` opens a local browser page to scan files visually
 - 🔨 **URL scanning** — `sunglasses scan --url https://example.com`
 - 🔨 **Email report delivery** — daily reports to your inbox (your own SMTP, we never touch it)
 - 🔨 **`sunglasses update`** — update pattern database without reinstalling
 - 🔨 **Easy bug report form** — non-technical users can report issues
 
-### v0.3 — On the Horizon
+### Later — On the Horizon
 - 🔭 Output scanning — scan what the agent SAYS back, not just what comes in
 - 🔭 PII detection — auto-detect sensitive data in content
 - 🔭 Public Threat Registry — accountability board for AI agent attacks
@@ -214,7 +214,7 @@ SUNGLASSES is risk reduction, not magic.
 - **Multilingual depth varies**: English has the deepest coverage. Other languages cover core injection + exfiltration. Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
-- **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI coming in v0.2.
+- **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
 
 ## Integration Notes
 

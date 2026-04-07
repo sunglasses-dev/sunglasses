@@ -284,7 +284,7 @@ class SunglassesEngine:
     def info(self) -> dict:
         """Return engine stats."""
         return {
-            "version": "0.1.0",
+            "version": "0.2.4",
             "patterns": self._pattern_count,
             "keywords": self._keyword_count,
             "regex_patterns": len(self._regex_patterns),
