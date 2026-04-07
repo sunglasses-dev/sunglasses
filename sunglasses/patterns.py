@@ -1511,6 +1511,145 @@ PATTERNS = [
         "description": "Authentication tokens truncated or partially compared, allowing collision attacks where different users can share cache entries or bypass auth. Based on LiteLLM CVE-2026-35030."
     },
 
+    # =========================================================================
+    # SECRET DETECTION — Expanded: Specific credential format detectors
+    # =========================================================================
+
+    # --- GLS-SD-003: AWS Access Key ID ---
+    {
+        "id": "GLS-SD-003",
+        "name": "AWS access key ID",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["file", "log_memory", "message", "web_content"],
+        "keywords": [
+            "aws access key",
+            "credential",
+            "secret exposure",
+        ],
+        "regex": [
+            r"AKIA[0-9A-Z]{16}",
+        ],
+        "description": "Detects AWS access key IDs in text."
+    },
+
+    # --- GLS-SD-004: Private Key (PEM-encoded) ---
+    {
+        "id": "GLS-SD-004",
+        "name": "PEM-encoded private key",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["file", "log_memory", "message", "web_content"],
+        "keywords": [
+            "private key",
+            "PEM",
+            "SSH key",
+            "credential",
+        ],
+        "regex": [
+            r"-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----",
+        ],
+        "description": "Detects PEM-encoded private keys."
+    },
+
+    # --- GLS-SD-005: JWT Token ---
+    {
+        "id": "GLS-SD-005",
+        "name": "JWT token",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["file", "log_memory", "message", "web_content", "api_response"],
+        "keywords": [
+            "JWT",
+            "bearer token",
+            "auth token",
+        ],
+        "regex": [
+            r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{10,}",
+        ],
+        "description": "Detects JSON Web Tokens."
+    },
+
+    # --- GLS-SD-006: GitHub classic Personal Access Token ---
+    {
+        "id": "GLS-SD-006",
+        "name": "GitHub classic PAT",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["file", "log_memory", "message", "web_content"],
+        "keywords": [
+            "GitHub token",
+            "PAT",
+            "credential",
+        ],
+        "regex": [
+            r"ghp_[A-Za-z0-9]{36}",
+        ],
+        "description": "Detects GitHub classic personal access tokens."
+    },
+
+    # --- GLS-SD-007: Slack API Token ---
+    {
+        "id": "GLS-SD-007",
+        "name": "Slack API token",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["file", "log_memory", "message", "web_content"],
+        "keywords": [
+            "Slack token",
+            "bot token",
+            "credential",
+        ],
+        "regex": [
+            r"xox[baprs]-[A-Za-z0-9-]{10,}",
+        ],
+        "description": "Detects Slack API tokens."
+    },
+
+    # =========================================================================
+    # EXFILTRATION — Expanded: Infrastructure and behavioral patterns
+    # =========================================================================
+
+    # --- GLS-EX-005: Webhook exfiltration sinks ---
+    {
+        "id": "GLS-EX-005",
+        "name": "Webhook exfiltration sinks",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "api_response"],
+        "keywords": [
+            "webhook.site",
+            "hookbin",
+            "pipedream",
+            "requestbin",
+            "exfiltration sink",
+        ],
+        "regex": [
+            r"webhook\.site|hookbin|pipedream|requestbin",
+        ],
+        "description": "Detects known webhook testing services commonly used as exfiltration endpoints."
+    },
+
+    # --- GLS-EX-006: Public tunnel infrastructure ---
+    {
+        "id": "GLS-EX-006",
+        "name": "Public tunnel infrastructure",
+        "category": "exfiltration",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content", "api_response"],
+        "keywords": [
+            "ngrok",
+            "trycloudflare",
+            "localtunnel",
+            "serveo",
+            "tunnel",
+        ],
+        "regex": [
+            r"ngrok|trycloudflare|localtunnel|serveo",
+        ],
+        "description": "Detects public tunnel services that can be used for data exfiltration or C2 callbacks."
+    },
+
     # --- GLS-SI-001: SQL injection in metadata/filter queries (LangGraph CVE-2025-67644) ---
     {
         "id": "GLS-SI-001",
