@@ -73,6 +73,6 @@ Our security research agent (CAVA) audited the built release artifacts and found
 - 66/66 tests passing
 
 ### Philosophy
-- Free and open source (AGPL-3.0)
+- Free and open source (MIT License)
 - Local-first: no data leaves your machine
 - Honest positioning: we acknowledge competitors and explain where we fit

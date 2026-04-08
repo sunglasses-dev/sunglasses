@@ -168,7 +168,7 @@ English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese,
 - ✅ Daily protection report (local HTML)
 - ✅ 66/66 tests passing
 - ✅ 100% local — zero network calls, zero telemetry
-- ✅ AGPL-3.0
+- ✅ MIT License
 
 ## Roadmap
 
@@ -231,7 +231,7 @@ See [sunglasses.dev/thesis](https://sunglasses.dev/thesis.html) for our security
 
 ## License
 
-[AGPL-3.0](LICENSE) — Free forever. Nobody can close-source this. If you build on it, your version must be open too.
+[MIT](LICENSE) — Free forever. Use it anywhere — personal, commercial, enterprise. No restrictions.
 
 ## Links
 

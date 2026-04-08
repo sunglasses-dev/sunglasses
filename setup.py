@@ -12,7 +12,7 @@ setup(
         "Threat Database": "https://github.com/sunglasses-dev/sunglasses/tree/main/attack-db",
         "Issues": "https://github.com/sunglasses-dev/sunglasses/issues",
     },
-    license="AGPL-3.0",
+    license="MIT",
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[],
