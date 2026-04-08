@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SC-011",
+  "name": "Staged payload selector",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects staged payload selectors used in the Axios/BlueNoroff multi-stage attack.",
+  "keywords": [
+    "packages.npm.org",
+    "stage selector",
+    "product0",
+    "product1",
+    "product2"
+  ],
+  "regex": [
+    "packages\\.npm\\.org/product[012]"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-011"
+}

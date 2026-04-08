@@ -1,0 +1,31 @@
+{
+  "id": "GLS-MCP-003",
+  "name": "MCP capability expansion",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects post-trust capability expansion events in MCP servers.",
+  "keywords": [
+    "new tool",
+    "added prompt",
+    "expanded scope",
+    "broadened permission",
+    "capability drift"
+  ],
+  "regex": [
+    "(?i)(?:new|added|expanded|broadened).{0,80}(?:tool|prompt|resource|scope|permission|oauth|capabilit)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-003"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "GLS-RTL-001",
+  "name": "RTL override marker",
+  "version": "1.0",
+  "category": "rtl_obfuscation",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Right-to-left Unicode markers used to visually reverse or hide text direction.",
+  "keywords": [
+    "\u202e",
+    "\u200f",
+    "\u202b"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-RTL-001"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SC-012",
+  "name": "Malicious release asset",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects known malicious release assets from fake Claude Code GitHub repos.",
+  "keywords": [
+    "ClaudeCode_x64.exe",
+    "Claude Code - Leaked Source Code",
+    "Vidar",
+    "GhostSocks"
+  ],
+  "regex": [
+    "(?i)ClaudeCode_x64\\.exe|Claude Code - Leaked Source Code\\s*\\(\\.7z\\)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-012"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-008",
+  "name": "Environment and system reconnaissance",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Collecting system info (hostname, platform, user, env vars) \u2014 reconnaissance phase of RAT.",
+  "keywords": [],
+  "regex": [
+    "(?:os\\.hostname\\(\\).*os\\.platform\\(\\).*os\\.homedir\\(\\)|os\\.userInfo\\(\\)\\.username.*process\\.env)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-008"
+}

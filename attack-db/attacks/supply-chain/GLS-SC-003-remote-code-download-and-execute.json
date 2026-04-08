@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-003",
+  "name": "Remote code download and execute",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Downloading remote code and executing it \u2014 classic RAT dropper behavior.",
+  "keywords": [],
+  "regex": [
+    "(?:curl\\s+-[A-Za-z]*[oL].*(?:\\|\\s*(?:bash|sh|python|node))|request\\.get\\(.*\\bwriteFileSync\\b.*\\bexec\\b|eval\\s*\\(\\s*Buffer\\.from)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-003"
+}

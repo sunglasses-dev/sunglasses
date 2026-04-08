@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SE-004",
+  "name": "Security bypass via social proof",
+  "version": "1.0",
+  "category": "social_engineering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects social proof language used to convince agents to bypass security checks.",
+  "keywords": [
+    "owner approved",
+    "already approved",
+    "safe to proceed",
+    "ignore scanner warning"
+  ],
+  "regex": [
+    "(?i)(?:ignore|dismiss).{0,60}(?:scanner|warning|security warning|policy check|guardrail).{0,120}(?:owner approved|already approved|safe to proceed)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SE-004"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-PE-001",
+  "name": "Admin/debug mode activation",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "Attempt to escalate agent privileges via fake mode activation.",
+  "keywords": [
+    "enter admin mode",
+    "activate admin mode",
+    "enable admin access",
+    "you are now in debug mode",
+    "debug mode activated",
+    "enter root mode",
+    "sudo mode enabled"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PE-001"
+}

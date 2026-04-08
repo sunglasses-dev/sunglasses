@@ -1,0 +1,40 @@
+{
+  "id": "GLS-PT-001",
+  "name": "Path traversal in prompt/template loading",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Path traversal sequences in prompt template loading or file access, allowing reading arbitrary files outside intended directories. Based on LangChain CVE-2026-34070.",
+  "keywords": [
+    "../",
+    "..\\",
+    "path traversal",
+    "directory traversal",
+    "load_prompt(",
+    "file_path from user",
+    "unvalidated file path",
+    "arbitrary file read",
+    "template path injection",
+    "prompt template traversal",
+    "os.path.join without sanitization",
+    "user-controlled file path"
+  ],
+  "regex": [
+    "(?:\\.\\./){2,}",
+    "(?:load_prompt|load_template|read_file|open)\\s*\\(.*(?:\\.\\./|\\.\\.\\\\)",
+    "os\\.path\\.join\\s*\\(.*(?:user_input|request\\.|params\\[|args\\[)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PT-001"
+}

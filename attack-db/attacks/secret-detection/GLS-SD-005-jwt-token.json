@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SD-005",
+  "name": "JWT token",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "message",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Detects JSON Web Tokens.",
+  "keywords": [
+    "JWT",
+    "bearer token",
+    "auth token"
+  ],
+  "regex": [
+    "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9._-]{10,}\\.[A-Za-z0-9._-]{10,}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-005"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SE-002",
+  "name": "Fake support impersonation",
+  "version": "1.0",
+  "category": "social_engineering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Impersonating AI provider support staff to gain trust.",
+  "keywords": [
+    "i am openai support",
+    "i am anthropic support",
+    "i am google ai support",
+    "i am from anthropic security",
+    "i am from openai security",
+    "this is official support",
+    "security team notification"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SE-002"
+}

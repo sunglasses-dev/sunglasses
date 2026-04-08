@@ -1,0 +1,30 @@
+{
+  "id": "GLS-EX-009",
+  "name": "Archive-then-egress exfiltration",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects archive creation followed by upload commands \u2014 a classic data exfiltration behavioral signature.",
+  "keywords": [
+    "tar upload",
+    "zip upload",
+    "archive exfil",
+    "compress and send"
+  ],
+  "regex": [
+    "(?:tar|zip|7z|gzip)\\b.*\\b(?:curl|wget|scp|aws s3 cp|gsutil cp)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-009"
+}

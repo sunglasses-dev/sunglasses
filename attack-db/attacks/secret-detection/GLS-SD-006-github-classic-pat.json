@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SD-006",
+  "name": "GitHub classic PAT",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "log_memory",
+    "message",
+    "web_content"
+  ],
+  "description": "Detects GitHub classic personal access tokens.",
+  "keywords": [
+    "GitHub token",
+    "PAT",
+    "credential"
+  ],
+  "regex": [
+    "ghp_[A-Za-z0-9]{36}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-006"
+}

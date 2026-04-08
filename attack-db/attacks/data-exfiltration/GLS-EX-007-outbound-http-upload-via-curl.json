@@ -1,0 +1,32 @@
+{
+  "id": "GLS-EX-007",
+  "name": "Outbound HTTP upload via curl",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects curl commands used for outbound data upload, a common exfiltration technique in agent workflows.",
+  "keywords": [
+    "curl POST",
+    "curl PUT",
+    "curl upload",
+    "curl --data",
+    "curl -F",
+    "curl --upload-file"
+  ],
+  "regex": [
+    "curl\\b[^\\n]{0,200}\\b(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary)?\\b|-F\\b|--upload-file\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-007"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-C2-001",
+  "name": "Known C2 indicators (BlueNoroff/Lazarus)",
+  "version": "1.0",
+  "category": "c2_indicator",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects known C2 infrastructure from BlueNoroff/Lazarus group Axios supply chain attack.",
+  "keywords": [
+    "sfrclak.com",
+    "UNC1069",
+    "Sapphire Sleet",
+    "BlueNoroff C2"
+  ],
+  "regex": [
+    "sfrclak\\.com|142\\.11\\.206\\.73|23\\.254\\.167\\.216"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-C2-001"
+}

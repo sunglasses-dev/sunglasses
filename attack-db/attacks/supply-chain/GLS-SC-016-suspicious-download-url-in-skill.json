@@ -1,0 +1,28 @@
+{
+  "id": "GLS-SC-016",
+  "name": "Suspicious download URL in skill",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects suspicious download URLs from shorteners or file hosting in skill manifests.",
+  "keywords": [
+    "URL shortener",
+    "executable download",
+    "script download"
+  ],
+  "regex": [
+    "(?i)(?:bit\\.ly|tinyurl\\.com|t\\.co|goo\\.gl|dropbox\\.com/s/|drive\\.google\\.com|mega\\.nz|mediafire\\.com).{0,120}(?:\\.exe|\\.sh|\\.ps1|\\.bat|curl|wget|Invoke-WebRequest)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-016"
+}

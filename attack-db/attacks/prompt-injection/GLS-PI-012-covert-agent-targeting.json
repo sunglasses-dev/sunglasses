@@ -1,0 +1,31 @@
+{
+  "id": "GLS-PI-012",
+  "name": "Covert agent targeting",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects content that explicitly targets an AI agent while suppressing disclosure to the user.",
+  "keywords": [
+    "if you are an AI",
+    "for the agent only",
+    "keep secret",
+    "silently",
+    "do not mention"
+  ],
+  "regex": [
+    "(?i)(?:if you are (?:an )?(?:ai|llm|assistant|agent|coding assistant)|for (?:the )?(?:assistant|agent) only).{0,220}(?:do not mention|do not tell|keep (?:this )?secret|silently|without telling|without mentioning|do not alert)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-012"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "GLS-AW-007",
+  "name": "Agent permission bypass via compound commands",
+  "version": "1.0",
+  "category": "agent_workflow",
+  "severity": "high",
+  "channels": [
+    "message",
+    "code"
+  ],
+  "description": "Detects compound command padding used to bypass agent permission checks (Adversa Claude Code bypass).",
+  "keywords": [
+    "compound command padding",
+    "true &&",
+    "deny rule bypass"
+  ],
+  "regex": [
+    "(?i)(?:true\\s*&&\\s*){50,}.*(?:curl|wget|rm|scp|nc)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AW-007"
+}

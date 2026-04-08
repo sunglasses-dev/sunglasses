@@ -1,0 +1,29 @@
+{
+  "id": "GLS-MCP-007",
+  "name": "MCP localhost origin risk",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects MCP server exposure on localhost without strict origin/host validation \u2014 vulnerable to DNS rebinding (GHSA-8jxr-pr72-r468).",
+  "keywords": [
+    "MCP localhost",
+    "origin validation",
+    "host validation",
+    "DNS rebinding"
+  ],
+  "regex": [
+    "(?i)(?:mcp|model context protocol).{0,120}(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0).{0,120}(?:origin|host|dns rebinding|rebind)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-007"
+}

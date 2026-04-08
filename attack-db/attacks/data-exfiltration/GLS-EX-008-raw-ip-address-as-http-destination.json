@@ -1,0 +1,29 @@
+{
+  "id": "GLS-EX-008",
+  "name": "Raw IP address as HTTP destination",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects HTTP requests to raw IP addresses, which are high-risk in agent tool traffic.",
+  "keywords": [
+    "raw IP URL",
+    "direct IP",
+    "outbound HTTP IP"
+  ],
+  "regex": [
+    "https?://(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d+)?/"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-008"
+}

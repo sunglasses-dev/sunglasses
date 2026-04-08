@@ -1,0 +1,28 @@
+{
+  "id": "GLS-SC-009",
+  "name": "npm postinstall hook attack",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects suspicious npm postinstall hooks that execute setup scripts \u2014 a known supply chain attack vector (Axios compromise).",
+  "keywords": [
+    "postinstall",
+    "node setup.js",
+    "npm install hook"
+  ],
+  "regex": [
+    "(?i)\"postinstall\"\\s*:\\s*\"node\\s+setup\\.js\""
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-009"
+}

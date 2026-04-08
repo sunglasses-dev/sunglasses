@@ -1,0 +1,28 @@
+{
+  "id": "GLS-EX-017",
+  "name": "Diagnostic exfiltration destination",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "Detects exfiltration disguised as diagnostic data being sent to temporary webhook services.",
+  "keywords": [
+    "temporary support webhook",
+    "diagnostic bundle",
+    "archive upload"
+  ],
+  "regex": [
+    "(?i)(?:webhook\\.site|requestbin|hookbin|pipedream|temporary support webhook).{0,180}(?:diagnostic|bundle|archive|upload|post|send)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-017"
+}

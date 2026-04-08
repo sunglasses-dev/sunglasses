@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SC-014",
+  "name": "Malicious skill install guidance",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands.",
+  "keywords": [
+    "prerequisites",
+    "setup",
+    "installation",
+    "download",
+    "terminal",
+    "paste"
+  ],
+  "regex": [
+    "(?i)(?:prerequisites?|setup|installation).{0,200}(?:download|curl|wget|terminal|powershell|bash).{0,200}(?:run|execute|paste)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-014"
+}

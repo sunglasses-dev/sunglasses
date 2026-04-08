@@ -1,0 +1,29 @@
+{
+  "id": "GLS-EX-014",
+  "name": "Skill exfiltration chain",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects multi-step skill exfiltration chains: read secrets, encode, POST to external endpoint.",
+  "keywords": [
+    "aws credentials",
+    "API_KEY",
+    "SECRET_TOKEN",
+    "base64 POST"
+  ],
+  "regex": [
+    "(?is)(?:~/\\.aws/credentials|id_rsa|\\.env|API_KEY|SECRET_TOKEN).{0,200}(?:base64|b64encode|encode).{0,200}(?:requests\\.post|httpx\\.post|urllib\\.request|curl\\b[^\\n]{0,80}-X\\s+POST)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-014"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-IU-001",
+  "name": "Invisible Unicode characters",
+  "version": "1.0",
+  "category": "invisible_unicode",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Zero-width and invisible Unicode characters used to smuggle hidden instructions through text that appears normal to humans.",
+  "keywords": [
+    "\u200b",
+    "\u200c",
+    "\u200d",
+    "\ufeff",
+    "\u2060"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-IU-001"
+}

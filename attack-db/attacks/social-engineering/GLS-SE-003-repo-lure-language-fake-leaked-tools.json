@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SE-003",
+  "name": "Repo lure language (fake leaked tools)",
+  "version": "1.0",
+  "category": "social_engineering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects fake GitHub repo lure language used to distribute Vidar/GhostSocks malware via fake Claude Code repos.",
+  "keywords": [
+    "leaked Claude Code",
+    "Claude Code leak",
+    "unlocked enterprise features",
+    "no message limits",
+    "full source"
+  ],
+  "regex": [
+    "(?i)(?:leaked\\s+claude\\s+code|claude\\s+code\\s+leak|unlocked\\s+enterprise\\s+features|no\\s+message\\s+limits|full\\s+source)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SE-003"
+}

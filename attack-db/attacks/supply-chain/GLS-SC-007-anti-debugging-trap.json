@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-007",
+  "name": "Anti-debugging trap",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "Anti-debugging techniques \u2014 code that crashes debuggers to prevent analysis.",
+  "keywords": [],
+  "regex": [
+    "(?:constructor\\s*\\(\\s*[\"\\']debugger[\"\\']\\s*\\)|Function\\s*\\(\\s*[\"\\']return\\s+\\(function)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-007"
+}

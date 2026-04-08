@@ -1,0 +1,39 @@
+{
+  "id": "GLS-MCP-001",
+  "name": "MCP URL scheme injection",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response",
+    "file"
+  ],
+  "description": "Dangerous URL schemes passed through MCP tool handlers without validation, enabling arbitrary intent execution on mobile devices. Based on mobile-mcp CVE-2026-35394.",
+  "keywords": [
+    "tel:",
+    "sms:",
+    "content://",
+    "intent://",
+    "market://",
+    "file://",
+    "open_url without validation",
+    "unvalidated url scheme",
+    "arbitrary intent execution",
+    "deep link injection",
+    "custom scheme handler",
+    "mcp tool open_url"
+  ],
+  "regex": [
+    "(?:open_url|launch_url|navigate)\\s*\\(\\s*['\\\"](?:tel:|sms:|intent://|content://|market://|file://)",
+    "(?:intent|content|market)://[^\\s'\\\"]+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-001"
+}

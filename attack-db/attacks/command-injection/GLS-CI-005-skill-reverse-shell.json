@@ -1,0 +1,31 @@
+{
+  "id": "GLS-CI-005",
+  "name": "Skill reverse shell",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects reverse-shell logic embedded in agent skills \u2014 a critical code execution threat.",
+  "keywords": [
+    "os.system",
+    "subprocess",
+    "bash -i",
+    "/dev/tcp",
+    "nc -e",
+    "reverse shell"
+  ],
+  "regex": [
+    "(?i)os\\.system\\(|subprocess\\.(?:Popen|run|call)|bash -i|/dev/tcp/|nc\\s+-e|reverse shell"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CI-005"
+}

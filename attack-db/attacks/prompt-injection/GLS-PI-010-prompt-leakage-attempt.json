@@ -1,0 +1,29 @@
+{
+  "id": "GLS-PI-010",
+  "name": "Prompt leakage attempt",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects attempts to extract system prompts, hidden instructions, or policy configurations.",
+  "keywords": [
+    "reveal system prompt",
+    "show hidden instructions",
+    "dump developer message",
+    "expose policy"
+  ],
+  "regex": [
+    "(?i)(?:reveal|show|print|dump|repeat|expose).{0,80}(?:system prompt|hidden instructions|developer message|policy|guardrails?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-010"
+}

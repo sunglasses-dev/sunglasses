@@ -1,0 +1,29 @@
+{
+  "id": "GLS-PE-002",
+  "name": "Approval bypass",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "Attempt to bypass approval or safety checks.",
+  "keywords": [
+    "bypass approval checks",
+    "skip verification",
+    "bypass safety checks",
+    "skip authentication",
+    "bypass all restrictions",
+    "override safety"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PE-002"
+}

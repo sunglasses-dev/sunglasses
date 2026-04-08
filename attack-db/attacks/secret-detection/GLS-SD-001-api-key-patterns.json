@@ -21,18 +21,11 @@
     "AKIA[0-9A-Z]{16}"
   ],
   "examples": {
-    "malicious": [
-      "Here's the key: sk-ant-abc123def456ghi789jkl012mno345pqr",
-      "AWS key: AKIAIOSFODNN7EXAMPLE"
-    ],
-    "benign": [
-      "The format for OpenAI keys starts with sk- followed by alphanumeric chars.",
-      "AWS access keys begin with AKIA \u2014 check the IAM docs."
-    ]
+    "malicious": [],
+    "benign": []
   },
-  "references": [
-    "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
-  ],
-  "contributed_by": "AZ Rollin",
-  "date_added": "2026-03-28"
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-001"
 }

@@ -1,0 +1,26 @@
+{
+  "id": "GLS-UE-001",
+  "name": "Cyrillic homoglyph: ignore instructions",
+  "version": "1.0",
+  "category": "unicode_evasion",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Using Cyrillic lookalike characters to bypass English pattern matching.",
+  "keywords": [
+    "\u0456gnore prev\u0456ous instruct\u0456ons",
+    "\u0456gn\u043er\u0435 pr\u0435v\u0456\u043eus \u0456nstru\u0441t\u0456\u043ens"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-UE-001"
+}

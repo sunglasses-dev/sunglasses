@@ -1,0 +1,29 @@
+{
+  "id": "GLS-MCP-004",
+  "name": "Tool trust mismatch",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects capability mismatch between claimed tool safety and actual action verbs in MCP tool descriptions.",
+  "keywords": [
+    "read-only mismatch",
+    "safe tool export",
+    "viewer webhook"
+  ],
+  "regex": [
+    "(?i)(?:read[- ]only|safe|viewer|search).{0,120}(?:send|post|export|sync|webhook|write|delete|execute)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-004"
+}

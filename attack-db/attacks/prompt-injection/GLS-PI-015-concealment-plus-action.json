@@ -1,0 +1,30 @@
+{
+  "id": "GLS-PI-015",
+  "name": "Concealment plus action",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects concealment language co-occurring with action verbs \u2014 a key indicator of covert malicious workflow steering.",
+  "keywords": [
+    "do not mention",
+    "keep out of summary",
+    "quietly",
+    "silently upload"
+  ],
+  "regex": [
+    "(?i)(?:do not mention|keep.*out of (?:the )?(?:summary|report|final answer)|avoid clutter|quietly|silently).{0,120}(?:upload|send|attach|collect|gather|include)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-015"
+}

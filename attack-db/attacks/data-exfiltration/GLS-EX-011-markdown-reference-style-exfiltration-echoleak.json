@@ -1,0 +1,29 @@
+{
+  "id": "GLS-EX-011",
+  "name": "Markdown reference-style exfiltration (EchoLeak)",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "Detects reference-style Markdown links used to bypass simpler markdown filtering for data exfiltration (CVE-2025-32711 / EchoLeak).",
+  "keywords": [
+    "reference-style markdown",
+    "external URL",
+    "link redaction bypass",
+    "EchoLeak"
+  ],
+  "regex": [
+    "(?is)\\[[^\\]\\n]{1,200}\\]\\[[^\\]\\n]{1,100}\\]\\s*\\n\\s*\\[[^\\]\\n]{1,100}\\]\\s*:\\s*https?://[^\\s>]+(?:\\?[^\\s>]*)?"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-011"
+}

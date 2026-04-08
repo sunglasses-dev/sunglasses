@@ -1,0 +1,29 @@
+{
+  "id": "GLS-TD-001",
+  "name": "Environment variable poisoning",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Environment variable override to redirect package installs to malicious registries or inject code. Source: OpenClaw GHSA-7ggg.",
+  "keywords": [
+    "PIP_INDEX_URL",
+    "UV_INDEX_URL",
+    "NPM_CONFIG_REGISTRY",
+    "PYTHONPATH=",
+    "NODE_PATH=",
+    "LD_PRELOAD="
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-TD-001"
+}

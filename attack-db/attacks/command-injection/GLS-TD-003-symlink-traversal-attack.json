@@ -1,0 +1,26 @@
+{
+  "id": "GLS-TD-003",
+  "name": "Symlink traversal attack",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Sandbox escape via symlink pointing to host filesystem for arbitrary file read/write. Source: OpenClaw GHSA-cwf8.",
+  "keywords": [
+    "ln -s /",
+    "os.symlink(",
+    "fs.symlinkSync("
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-TD-003"
+}

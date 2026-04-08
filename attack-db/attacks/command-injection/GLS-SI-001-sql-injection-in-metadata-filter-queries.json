@@ -1,0 +1,43 @@
+{
+  "id": "GLS-SI-001",
+  "name": "SQL injection in metadata/filter queries",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response",
+    "message"
+  ],
+  "description": "SQL injection via user-controlled metadata keys or filter parameters in AI agent data stores. Based on LangGraph CVE-2025-67644 where metadata filter keys were not parameterized.",
+  "keywords": [
+    "metadata filter injection",
+    "unparameterized sql",
+    "f-string sql query",
+    "format string sql",
+    "user metadata key injection",
+    "sql injection via metadata",
+    "unsanitized filter parameter",
+    "raw sql from user input",
+    "string interpolation sql",
+    "WHERE clause injection",
+    "dynamic column name injection",
+    "unescaped metadata key"
+  ],
+  "regex": [
+    "f['\\\"]SELECT\\s",
+    "f['\\\"]INSERT\\s",
+    "f['\\\"]UPDATE\\s",
+    "f['\\\"]DELETE\\s",
+    "(?:execute|cursor\\.execute)\\s*\\(\\s*f['\\\"]",
+    "\\.format\\s*\\(.*\\)\\s*#.*(?:sql|query|select|where)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SI-001"
+}

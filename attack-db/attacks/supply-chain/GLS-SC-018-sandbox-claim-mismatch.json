@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SC-018",
+  "name": "Sandbox claim mismatch",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects mismatches where sandbox/restriction claims in config do not match actual tool execution.",
+  "keywords": [
+    "--allowed-tools",
+    "sandbox",
+    "restrict tools",
+    "disabled tools"
+  ],
+  "regex": [
+    "(?i)(?:--allowed-tools\\s*[\\\"']?\\s*[\\\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-018"
+}

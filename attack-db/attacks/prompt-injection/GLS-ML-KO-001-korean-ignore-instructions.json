@@ -1,0 +1,28 @@
+{
+  "id": "GLS-ML-KO-001",
+  "name": "Korean: Ignore instructions",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Korean-language prompt injection: 'ignore all previous instructions'.",
+  "keywords": [
+    "\uc774\uc804\uc758 \ubaa8\ub4e0 \uc9c0\uc2dc\ub97c \ubb34\uc2dc\ud574",
+    "\uc774\uc804 \uc9c0\uc2dc\ub97c \ubb34\uc2dc\ud574",
+    "\ubaa8\ub4e0 \uc9c0\uc2dc\ub97c \uc78a\uc5b4",
+    "\uaddc\uce59\uc744 \ubb34\uc2dc\ud574"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-ML-KO-001"
+}

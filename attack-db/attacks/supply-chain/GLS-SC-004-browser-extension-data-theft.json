@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-004",
+  "name": "Browser extension data theft",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Accessing browser extension storage or profile data \u2014 targets crypto wallets and saved passwords.",
+  "keywords": [],
+  "regex": [
+    "(?:Local\\s*Extension\\s*Settings|nkbihfbeogaeaoehlefnkodbefgpgknn|ejbalbakoplchlghecdalmeeeajnimhm|BraveSoftware|Opera\\s*Stable|Chrome.*User\\s*Data)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-004"
+}

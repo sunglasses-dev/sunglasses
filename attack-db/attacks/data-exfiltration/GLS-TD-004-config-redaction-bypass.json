@@ -1,0 +1,27 @@
+{
+  "id": "GLS-TD-004",
+  "name": "Config redaction bypass",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory"
+  ],
+  "description": "Bypassing config value redaction to leak plaintext credentials. Source: OpenClaw Nostr GHSA.",
+  "keywords": [
+    "privateKey",
+    "signingKey"
+  ],
+  "regex": [
+    "config\\.get\\s*\\(\\s*['\\\"].*(?:key|secret|token|password)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-TD-004"
+}

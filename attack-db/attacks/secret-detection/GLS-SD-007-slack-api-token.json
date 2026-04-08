@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SD-007",
+  "name": "Slack API token",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "message",
+    "web_content"
+  ],
+  "description": "Detects Slack API tokens.",
+  "keywords": [
+    "Slack token",
+    "bot token",
+    "credential"
+  ],
+  "regex": [
+    "xox[baprs]-[A-Za-z0-9-]{10,}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-007"
+}

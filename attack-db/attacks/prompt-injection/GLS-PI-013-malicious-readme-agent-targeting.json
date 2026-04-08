@@ -1,0 +1,29 @@
+{
+  "id": "GLS-PI-013",
+  "name": "Malicious README agent targeting",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects hostile README files that target AI coding agents with override instructions.",
+  "keywords": [
+    "if you are an AI agent",
+    "follow this README",
+    "higher priority",
+    "override instructions"
+  ],
+  "regex": [
+    "(?i)(?:if you are (?:an )?(?:ai|assistant|agent|coding agent|research agent)).{0,140}(?:ignore|override|follow this README|follow this file|higher priority)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-013"
+}
