@@ -1681,4 +1681,936 @@ PATTERNS = [
         ],
         "description": "SQL injection via user-controlled metadata keys or filter parameters in AI agent data stores. Based on LangGraph CVE-2025-67644 where metadata filter keys were not parameterized."
     },
+
+    # =========================================================================
+    # JACK'S RESEARCH PATTERNS — Extracted from 24-task autonomous security mission
+    # Source: ~/jack-data/JACK_EXTRACTED_PATTERNS.md
+    # Added: April 8, 2026
+    # =========================================================================
+
+    # --- GLS-EX-007: Outbound HTTP upload via curl ---
+    {
+        "id": "GLS-EX-007",
+        "name": "Outbound HTTP upload via curl",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "curl POST",
+            "curl PUT",
+            "curl upload",
+            "curl --data",
+            "curl -F",
+            "curl --upload-file",
+        ],
+        "regex": [
+            r"curl\b[^\n]{0,200}\b(?:-X\s+(?:POST|PUT|PATCH)|--data(?:-binary)?\b|-F\b|--upload-file\b)",
+        ],
+        "description": "Detects curl commands used for outbound data upload, a common exfiltration technique in agent workflows."
+    },
+
+    # --- GLS-EX-008: Raw IP address as HTTP destination ---
+    {
+        "id": "GLS-EX-008",
+        "name": "Raw IP address as HTTP destination",
+        "category": "exfiltration",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "raw IP URL",
+            "direct IP",
+            "outbound HTTP IP",
+        ],
+        "regex": [
+            r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/",
+        ],
+        "description": "Detects HTTP requests to raw IP addresses, which are high-risk in agent tool traffic."
+    },
+
+    # --- GLS-SD-008: Google API Key ---
+    {
+        "id": "GLS-SD-008",
+        "name": "Google API Key",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "Google API key",
+            "AIza",
+            "google credential",
+        ],
+        "regex": [
+            r"AIza[0-9A-Za-z\-_]{35}",
+        ],
+        "description": "Detects Google API keys in the standard AIza format."
+    },
+
+    # --- GLS-SD-009: GitHub Fine-Grained Personal Access Token ---
+    {
+        "id": "GLS-SD-009",
+        "name": "GitHub fine-grained PAT",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "GitHub fine-grained token",
+            "github_pat_",
+            "PAT credential",
+        ],
+        "regex": [
+            r"github_pat_[A-Za-z0-9_]{20,}",
+        ],
+        "description": "Detects GitHub fine-grained personal access tokens."
+    },
+
+    # --- GLS-SD-010: Environment config dump ---
+    {
+        "id": "GLS-SD-010",
+        "name": "Environment config secret dump",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            ".env",
+            "API_KEY=",
+            "SECRET_KEY=",
+            "ACCESS_KEY=",
+            "TOKEN=",
+            "PASSWORD=",
+            "DATABASE_URL=",
+            "OPENAI_API_KEY=",
+            "ANTHROPIC_API_KEY=",
+            "AWS_SECRET_ACCESS_KEY=",
+        ],
+        "regex": [
+            r"(?m)^(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
+        ],
+        "description": "Detects environment variable / config file secret leakage patterns."
+    },
+
+    # --- GLS-EP-001: Large base64 encoded payload ---
+    {
+        "id": "GLS-EP-001",
+        "name": "Large base64 encoded payload",
+        "category": "encoded_payload",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "base64",
+            "encoded blob",
+            "obfuscation",
+            "exfiltration payload",
+        ],
+        "regex": [
+            r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{200,}={0,2}(?![A-Za-z0-9+/=])",
+        ],
+        "description": "Detects suspiciously large base64-encoded payloads that may indicate data exfiltration or obfuscated malicious content."
+    },
+
+    # --- GLS-EP-002: Gzip + base64 compressed payload ---
+    {
+        "id": "GLS-EP-002",
+        "name": "Gzip + base64 compressed payload",
+        "category": "encoded_payload",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "gzip",
+            "base64 gzip",
+            "compressed payload",
+        ],
+        "regex": [
+            r"H4sIA[A-Za-z0-9+/=]{20,}",
+        ],
+        "description": "Detects gzip+base64 payloads (H4sIA magic bytes), commonly used for compressed data exfiltration."
+    },
+
+    # --- GLS-DN-001: Base32 DNS tunneling label ---
+    {
+        "id": "GLS-DN-001",
+        "name": "Base32 DNS tunneling label",
+        "category": "dns_tunneling",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "base32",
+            "DNS label",
+            "DNS tunneling",
+            "exfiltration via DNS",
+        ],
+        "regex": [
+            r"\b[A-Z2-7]{32,63}\b",
+        ],
+        "description": "Detects base32-like strings commonly used as DNS labels in DNS tunneling exfiltration."
+    },
+
+    # --- GLS-EX-009: Archive-then-egress exfiltration ---
+    {
+        "id": "GLS-EX-009",
+        "name": "Archive-then-egress exfiltration",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "tar upload",
+            "zip upload",
+            "archive exfil",
+            "compress and send",
+        ],
+        "regex": [
+            r"(?:tar|zip|7z|gzip)\b.*\b(?:curl|wget|scp|aws s3 cp|gsutil cp)",
+        ],
+        "description": "Detects archive creation followed by upload commands — a classic data exfiltration behavioral signature."
+    },
+
+    # --- GLS-PI-007: Bypass instructions then exfiltrate ---
+    {
+        "id": "GLS-PI-007",
+        "name": "Bypass instructions then exfiltrate",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "ignore instructions",
+            "bypass policy",
+            "bypass guardrails",
+            "exfiltrate",
+        ],
+        "regex": [
+            r"(?i)(?:ignore|bypass).{0,40}(?:instructions|policy|guardrails).{0,120}(?:send|upload|exfiltrate|post)",
+        ],
+        "description": "Detects instructions that combine policy bypass language with exfiltration commands."
+    },
+
+    # --- GLS-PI-008: Read secrets then send ---
+    {
+        "id": "GLS-PI-008",
+        "name": "Read secrets then send",
+        "category": "prompt_injection",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "read .env",
+            "read credentials",
+            "send webhook",
+            "upload secrets",
+        ],
+        "regex": [
+            r"(?i)(?:read|open|cat).{0,60}(?:\.env|id_rsa|credentials|config|secrets?).{0,120}(?:send|post|upload|webhook|URL)",
+        ],
+        "description": "Detects instructions to read sensitive files followed by outbound transmission — a direct exfiltration chain."
+    },
+
+    # --- GLS-SC-009: npm postinstall hook attack ---
+    {
+        "id": "GLS-SC-009",
+        "name": "npm postinstall hook attack",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file", "code"],
+        "keywords": [
+            "postinstall",
+            "node setup.js",
+            "npm install hook",
+        ],
+        "regex": [
+            r'(?i)"postinstall"\s*:\s*"node\s+setup\.js"',
+        ],
+        "description": "Detects suspicious npm postinstall hooks that execute setup scripts — a known supply chain attack vector (Axios compromise)."
+    },
+
+    # --- GLS-SC-010: Known malicious npm packages ---
+    {
+        "id": "GLS-SC-010",
+        "name": "Known malicious npm packages",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            "plain-crypto-js",
+            "axios 1.14.1",
+            "axios 0.30.4",
+            "malicious dependency",
+        ],
+        "regex": [
+            r"(?<![A-Za-z0-9_-])plain-crypto-js@4\.2\.1(?![A-Za-z0-9_-])",
+            r"(?<![A-Za-z0-9_-])axios@(?:1\.14\.1|0\.30\.4)(?![A-Za-z0-9_.-])",
+        ],
+        "description": "Detects known malicious npm package versions from the Axios/BlueNoroff supply chain attack."
+    },
+
+    # --- GLS-C2-001: Known C2 indicators (BlueNoroff/Lazarus) ---
+    {
+        "id": "GLS-C2-001",
+        "name": "Known C2 indicators (BlueNoroff/Lazarus)",
+        "category": "c2_indicator",
+        "severity": "critical",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "sfrclak.com",
+            "UNC1069",
+            "Sapphire Sleet",
+            "BlueNoroff C2",
+        ],
+        "regex": [
+            r"sfrclak\.com|142\.11\.206\.73|23\.254\.167\.216",
+        ],
+        "description": "Detects known C2 infrastructure from BlueNoroff/Lazarus group Axios supply chain attack."
+    },
+
+    # --- GLS-SC-011: Staged payload selector ---
+    {
+        "id": "GLS-SC-011",
+        "name": "Staged payload selector",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            "packages.npm.org",
+            "stage selector",
+            "product0",
+            "product1",
+            "product2",
+        ],
+        "regex": [
+            r"packages\.npm\.org/product[012]",
+        ],
+        "description": "Detects staged payload selectors used in the Axios/BlueNoroff multi-stage attack."
+    },
+
+    # --- GLS-SE-003: Repo lure language (fake leaked tools) ---
+    {
+        "id": "GLS-SE-003",
+        "name": "Repo lure language (fake leaked tools)",
+        "category": "social_engineering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "leaked Claude Code",
+            "Claude Code leak",
+            "unlocked enterprise features",
+            "no message limits",
+            "full source",
+        ],
+        "regex": [
+            r"(?i)(?:leaked\s+claude\s+code|claude\s+code\s+leak|unlocked\s+enterprise\s+features|no\s+message\s+limits|full\s+source)",
+        ],
+        "description": "Detects fake GitHub repo lure language used to distribute Vidar/GhostSocks malware via fake Claude Code repos."
+    },
+
+    # --- GLS-SC-012: Malicious release asset ---
+    {
+        "id": "GLS-SC-012",
+        "name": "Malicious release asset",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "ClaudeCode_x64.exe",
+            "Claude Code - Leaked Source Code",
+            "Vidar",
+            "GhostSocks",
+        ],
+        "regex": [
+            r"(?i)ClaudeCode_x64\.exe|Claude Code - Leaked Source Code\s*\(\.7z\)",
+        ],
+        "description": "Detects known malicious release assets from fake Claude Code GitHub repos."
+    },
+
+    # --- GLS-EX-010: Source map leak indicator ---
+    {
+        "id": "GLS-EX-010",
+        "name": "Source map leak indicator",
+        "category": "exfiltration",
+        "severity": "medium",
+        "channel": ["file", "code"],
+        "keywords": [
+            "source map",
+            "sourceMappingURL",
+            ".map file",
+        ],
+        "regex": [
+            r"(?i)sourceMappingURL=.*\.map",
+        ],
+        "description": "Detects source map references that may expose readable source code in production builds."
+    },
+
+    # --- GLS-EX-011: Markdown reference-style exfiltration ---
+    {
+        "id": "GLS-EX-011",
+        "name": "Markdown reference-style exfiltration (EchoLeak)",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file"],
+        "keywords": [
+            "reference-style markdown",
+            "external URL",
+            "link redaction bypass",
+            "EchoLeak",
+        ],
+        "regex": [
+            r"(?is)\[[^\]\n]{1,200}\]\[[^\]\n]{1,100}\]\s*\n\s*\[[^\]\n]{1,100}\]\s*:\s*https?://[^\s>]+(?:\?[^\s>]*)?",
+        ],
+        "description": "Detects reference-style Markdown links used to bypass simpler markdown filtering for data exfiltration (CVE-2025-32711 / EchoLeak)."
+    },
+
+    # --- GLS-EX-012: Markdown image auto-fetch exfiltration ---
+    {
+        "id": "GLS-EX-012",
+        "name": "Markdown image auto-fetch exfiltration",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file"],
+        "keywords": [
+            "markdown image",
+            "reference-style image",
+            "auto-fetched images",
+            "remote fetch",
+        ],
+        "regex": [
+            r"(?is)!\[[^\]\n]{0,200}\]\[[^\]\n]{1,100}\]\s*\n\s*\[[^\]\n]{1,100}\]\s*:\s*https?://[^\s>]+",
+        ],
+        "description": "Detects reference-style Markdown images that trigger automatic remote fetches for data exfiltration."
+    },
+
+    # --- GLS-PI-009: Retrieval-triggered prompt injection ---
+    {
+        "id": "GLS-PI-009",
+        "name": "Retrieval-triggered prompt injection",
+        "category": "prompt_injection",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "summarize",
+            "draft",
+            "ignore",
+            "secretly",
+            "internal data",
+            "private data",
+        ],
+        "regex": [
+            r"(?i)(?:summari[sz]e|prepare|draft|review).{0,120}(?:recent|related|project|meeting|email|document).{0,200}(?:ignore|bypass|do not mention|secretly|without telling|internal data|private data)",
+        ],
+        "description": "Detects business-content injections phrased as normal human-facing text to evade prompt injection classifiers."
+    },
+
+    # --- GLS-AW-007: Agent permission bypass via compound commands ---
+    {
+        "id": "GLS-AW-007",
+        "name": "Agent permission bypass via compound commands",
+        "category": "agent_workflow",
+        "severity": "high",
+        "channel": ["message", "code"],
+        "keywords": [
+            "compound command padding",
+            "true &&",
+            "deny rule bypass",
+        ],
+        "regex": [
+            r"(?i)(?:true\s*&&\s*){50,}.*(?:curl|wget|rm|scp|nc)",
+        ],
+        "description": "Detects compound command padding used to bypass agent permission checks (Adversa Claude Code bypass)."
+    },
+
+    # --- GLS-MCP-002: MCP capability drift ---
+    {
+        "id": "GLS-MCP-002",
+        "name": "MCP capability drift",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "tools/list_changed",
+            "tools/list",
+            "listChanged",
+            "MCP capability drift",
+        ],
+        "regex": [
+            r"(?i)(?:notifications?/tools/list_changed|tools/list|capabilities\s*[:=].{0,80}tools.{0,80}listChanged)",
+        ],
+        "description": "Detects MCP dynamic tool-list changes that may indicate capability drift or rug-pull behavior."
+    },
+
+    # --- GLS-MCP-003: MCP capability expansion ---
+    {
+        "id": "GLS-MCP-003",
+        "name": "MCP capability expansion",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "new tool",
+            "added prompt",
+            "expanded scope",
+            "broadened permission",
+            "capability drift",
+        ],
+        "regex": [
+            r"(?i)(?:new|added|expanded|broadened).{0,80}(?:tool|prompt|resource|scope|permission|oauth|capabilit)",
+        ],
+        "description": "Detects post-trust capability expansion events in MCP servers."
+    },
+
+    # --- GLS-SC-013: Supply chain identity drift ---
+    {
+        "id": "GLS-SC-013",
+        "name": "Supply chain identity drift",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "same version different hash",
+            "digest changed",
+            "signature changed",
+            "publisher changed",
+            "maintainer changed",
+        ],
+        "regex": [
+            r"(?i)(?:same version|unchanged tag|no version bump).{0,120}(?:different hash|different digest|signature changed|publisher changed|maintainer changed)",
+        ],
+        "description": "Detects artifact or ownership drift after trust establishment — a key supply chain attack indicator."
+    },
+
+    # --- GLS-MCP-004: Tool trust mismatch ---
+    {
+        "id": "GLS-MCP-004",
+        "name": "Tool trust mismatch",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "read-only mismatch",
+            "safe tool export",
+            "viewer webhook",
+        ],
+        "regex": [
+            r"(?i)(?:read[- ]only|safe|viewer|search).{0,120}(?:send|post|export|sync|webhook|write|delete|execute)",
+        ],
+        "description": "Detects capability mismatch between claimed tool safety and actual action verbs in MCP tool descriptions."
+    },
+
+    # --- GLS-SC-014: Malicious skill install guidance ---
+    {
+        "id": "GLS-SC-014",
+        "name": "Malicious skill install guidance",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "prerequisites",
+            "setup",
+            "installation",
+            "download",
+            "terminal",
+            "paste",
+        ],
+        "regex": [
+            r"(?i)(?:prerequisites?|setup|installation).{0,200}(?:download|curl|wget|terminal|powershell|bash).{0,200}(?:run|execute|paste)",
+        ],
+        "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
+    },
+
+    # --- GLS-EX-013: Skill secret exfiltration ---
+    {
+        "id": "GLS-EX-013",
+        "name": "Skill secret exfiltration",
+        "category": "exfiltration",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            ".clawdbot/.env",
+            ".openclaw",
+            "webhook.site",
+            "env exfiltration",
+        ],
+        "regex": [
+            r"(?i)~?/\.clawdbot/\.env|~?/\.openclaw/.*\.env|webhook\.site",
+        ],
+        "description": "Detects skill-based secret exfiltration targeting agent environment files."
+    },
+
+    # --- GLS-CI-005: Skill reverse shell ---
+    {
+        "id": "GLS-CI-005",
+        "name": "Skill reverse shell",
+        "category": "command_injection",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            "os.system",
+            "subprocess",
+            "bash -i",
+            "/dev/tcp",
+            "nc -e",
+            "reverse shell",
+        ],
+        "regex": [
+            r"(?i)os\.system\(|subprocess\.(?:Popen|run|call)|bash -i|/dev/tcp/|nc\s+-e|reverse shell",
+        ],
+        "description": "Detects reverse-shell logic embedded in agent skills — a critical code execution threat."
+    },
+
+    # --- GLS-SC-015: Infostealer behavior (AMOS) ---
+    {
+        "id": "GLS-SC-015",
+        "name": "Infostealer behavior (AMOS)",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            "Atomic Stealer",
+            "AMOS",
+            "keychain",
+            "cookies",
+            "Telegram sessions",
+            "SSH keys",
+            "wallet",
+        ],
+        "regex": [
+            r"(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|POST|upload|C2|send)",
+        ],
+        "description": "Detects AMOS-style infostealer behavior: harvesting sensitive data then compressing and exfiltrating."
+    },
+
+    # --- GLS-PI-010: Prompt leakage attempt ---
+    {
+        "id": "GLS-PI-010",
+        "name": "Prompt leakage attempt",
+        "category": "prompt_injection",
+        "severity": "medium",
+        "channel": ["message", "web_content"],
+        "keywords": [
+            "reveal system prompt",
+            "show hidden instructions",
+            "dump developer message",
+            "expose policy",
+        ],
+        "regex": [
+            r"(?i)(?:reveal|show|print|dump|repeat|expose).{0,80}(?:system prompt|hidden instructions|developer message|policy|guardrails?)",
+        ],
+        "description": "Detects attempts to extract system prompts, hidden instructions, or policy configurations."
+    },
+
+    # --- GLS-PI-011: Canary token leakage ---
+    {
+        "id": "GLS-PI-011",
+        "name": "Canary token leakage attempt",
+        "category": "prompt_injection",
+        "severity": "medium",
+        "channel": ["message", "web_content"],
+        "keywords": [
+            "canary token",
+            "canary word",
+            "reveal canary",
+        ],
+        "regex": [
+            r"(?i)(?:reveal|show|print|dump|repeat|expose).{0,80}(?:system prompt|hidden instructions|canary(?: token| word)?|previous instructions)",
+        ],
+        "description": "Detects attempts to leak canary tokens or words planted for prompt injection detection."
+    },
+
+    # --- GLS-HI-003: Hidden instruction in HTML comment ---
+    {
+        "id": "GLS-HI-003",
+        "name": "Hidden instruction in HTML comment",
+        "category": "hidden_instruction",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "HTML comment",
+            "hidden instruction",
+            "read .env",
+            "exfil via comment",
+        ],
+        "regex": [
+            r"(?i)<!--.{0,300}(?:read|open|cat).{0,80}(?:~/.ssh/id_rsa|\.env|secret|credential).{0,120}(?:send|post|exfil)",
+        ],
+        "description": "Detects hidden exfiltration instructions embedded in HTML comments targeting AI agents."
+    },
+
+    # --- GLS-MCP-005: MCP definition threat indicator ---
+    {
+        "id": "GLS-MCP-005",
+        "name": "MCP definition threat indicator",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "invisible unicode",
+            "zero-width",
+            "description injection",
+            "cross-server impersonation",
+            "rug pull",
+        ],
+        "regex": [
+            r"(?i)(?:invisible\s+unicode|zero-width|description\s+injection|cross-server\s+impersonation|rug\s+pull)",
+        ],
+        "description": "Detects MCP tool definition threats including invisible Unicode, description injection, and rug-pull indicators."
+    },
+
+    # --- GLS-SC-016: Suspicious download URL ---
+    {
+        "id": "GLS-SC-016",
+        "name": "Suspicious download URL in skill",
+        "category": "supply_chain",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "URL shortener",
+            "executable download",
+            "script download",
+        ],
+        "regex": [
+            r"(?i)(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|dropbox\.com/s/|drive\.google\.com|mega\.nz|mediafire\.com).{0,120}(?:\.exe|\.sh|\.ps1|\.bat|curl|wget|Invoke-WebRequest)",
+        ],
+        "description": "Detects suspicious download URLs from shorteners or file hosting in skill manifests."
+    },
+
+    # --- GLS-SC-017: Unverifiable external dependency ---
+    {
+        "id": "GLS-SC-017",
+        "name": "Unverifiable external dependency",
+        "category": "supply_chain",
+        "severity": "medium",
+        "channel": ["file", "code"],
+        "keywords": [
+            "external dependency",
+            "fetched instructions",
+            "remote script",
+            "runtime fetch",
+        ],
+        "regex": [
+            r"(?i)(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post)).{0,160}(?:SKILL|prompt|instructions?|script|\.py|\.sh|\.ps1|README)",
+        ],
+        "description": "Detects runtime fetching of external instructions or scripts that cannot be statically verified."
+    },
+
+    # --- GLS-EX-014: Skill exfiltration chain ---
+    {
+        "id": "GLS-EX-014",
+        "name": "Skill exfiltration chain",
+        "category": "exfiltration",
+        "severity": "critical",
+        "channel": ["file", "code"],
+        "keywords": [
+            "aws credentials",
+            "API_KEY",
+            "SECRET_TOKEN",
+            "base64 POST",
+        ],
+        "regex": [
+            r"(?is)(?:~/\.aws/credentials|id_rsa|\.env|API_KEY|SECRET_TOKEN).{0,200}(?:base64|b64encode|encode).{0,200}(?:requests\.post|httpx\.post|urllib\.request|curl\b[^\n]{0,80}-X\s+POST)",
+        ],
+        "description": "Detects multi-step skill exfiltration chains: read secrets, encode, POST to external endpoint."
+    },
+
+    # --- GLS-MCP-006: Tool metadata prompt injection ---
+    {
+        "id": "GLS-MCP-006",
+        "name": "Tool metadata prompt injection",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "code"],
+        "keywords": [
+            "tool description",
+            "MCP metadata",
+            "ignore system",
+            "override developer",
+        ],
+        "regex": [
+            r"(?i)(?:tool|server|plugin|skill|mcp).{0,120}(?:description|instructions?|manifest|metadata).{0,160}(?:ignore|override|bypass|disregard).{0,80}(?:system|developer|previous).{0,160}(?:use|call|run|select).{0,80}(?:tool|server|plugin|skill)",
+        ],
+        "description": "Detects malicious tool metadata trying to become higher-priority control text for the agent."
+    },
+
+    # --- GLS-PI-012: Covert agent targeting ---
+    {
+        "id": "GLS-PI-012",
+        "name": "Covert agent targeting",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "if you are an AI",
+            "for the agent only",
+            "keep secret",
+            "silently",
+            "do not mention",
+        ],
+        "regex": [
+            r"(?i)(?:if you are (?:an )?(?:ai|llm|assistant|agent|coding assistant)|for (?:the )?(?:assistant|agent) only).{0,220}(?:do not mention|do not tell|keep (?:this )?secret|silently|without telling|without mentioning|do not alert)",
+        ],
+        "description": "Detects content that explicitly targets an AI agent while suppressing disclosure to the user."
+    },
+
+    # --- GLS-EX-015: Indirect secret relay ---
+    {
+        "id": "GLS-EX-015",
+        "name": "Indirect secret relay",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "include in summary",
+            "write to log",
+            "attach to ticket",
+            "commit secrets",
+        ],
+        "regex": [
+            r"(?i)(?:read|open|search|grep|find).{0,100}(?:\.env|credentials|token|secret|id_rsa|config).{0,220}(?:include|embed|paste|store|write|attach).{0,100}(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report)",
+        ],
+        "description": "Detects secret movement into seemingly legitimate internal outputs instead of obvious external exfiltration."
+    },
+
+    # --- GLS-PI-013: Malicious README agent targeting ---
+    {
+        "id": "GLS-PI-013",
+        "name": "Malicious README agent targeting",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "if you are an AI agent",
+            "follow this README",
+            "higher priority",
+            "override instructions",
+        ],
+        "regex": [
+            r"(?i)(?:if you are (?:an )?(?:ai|assistant|agent|coding agent|research agent)).{0,140}(?:ignore|override|follow this README|follow this file|higher priority)",
+        ],
+        "description": "Detects hostile README files that target AI coding agents with override instructions."
+    },
+
+    # --- GLS-EX-016: Diagnostic secret harvest ---
+    {
+        "id": "GLS-EX-016",
+        "name": "Diagnostic secret harvest",
+        "category": "exfiltration",
+        "severity": "medium",
+        "channel": ["message", "file"],
+        "keywords": [
+            "env dump",
+            "full-env.txt",
+            "printenv",
+            "export -p",
+        ],
+        "regex": [
+            r"(?i)(?:env\s*>|printenv|export\s+-p|full-env\.txt).{0,200}(?:\.env|~?/\.aws|~?/\.config|~?/\.ssh|credentials?)",
+        ],
+        "description": "Detects diagnostic/troubleshooting patterns that harvest environment secrets."
+    },
+
+    # --- GLS-EX-017: Diagnostic exfiltration destination ---
+    {
+        "id": "GLS-EX-017",
+        "name": "Diagnostic exfiltration destination",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file"],
+        "keywords": [
+            "temporary support webhook",
+            "diagnostic bundle",
+            "archive upload",
+        ],
+        "regex": [
+            r"(?i)(?:webhook\.site|requestbin|hookbin|pipedream|temporary support webhook).{0,180}(?:diagnostic|bundle|archive|upload|post|send)",
+        ],
+        "description": "Detects exfiltration disguised as diagnostic data being sent to temporary webhook services."
+    },
+
+    # --- GLS-SE-004: Security bypass via social proof ---
+    {
+        "id": "GLS-SE-004",
+        "name": "Security bypass via social proof",
+        "category": "social_engineering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "owner approved",
+            "already approved",
+            "safe to proceed",
+            "ignore scanner warning",
+        ],
+        "regex": [
+            r"(?i)(?:ignore|dismiss).{0,60}(?:scanner|warning|security warning|policy check|guardrail).{0,120}(?:owner approved|already approved|safe to proceed)",
+        ],
+        "description": "Detects social proof language used to convince agents to bypass security checks."
+    },
+
+    # --- GLS-PI-014: Workflow-laundered secret collection ---
+    {
+        "id": "GLS-PI-014",
+        "name": "Workflow-laundered secret collection",
+        "category": "prompt_injection",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "support",
+            "diagnostic",
+            "troubleshoot",
+            "collect environment",
+            "gather credentials",
+        ],
+        "regex": [
+            r"(?i)(?:support|diagnostic|troubleshoot|debug).{0,120}(?:collect|gather|include|attach).{0,160}(?:environment|config|token|credential|secret|history|context)",
+        ],
+        "description": "Detects legitimate-sounding workflow language that launders secret collection into routine processes."
+    },
+
+    # --- GLS-PI-015: Concealment plus action ---
+    {
+        "id": "GLS-PI-015",
+        "name": "Concealment plus action",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "do not mention",
+            "keep out of summary",
+            "quietly",
+            "silently upload",
+        ],
+        "regex": [
+            r"(?i)(?:do not mention|keep.*out of (?:the )?(?:summary|report|final answer)|avoid clutter|quietly|silently).{0,120}(?:upload|send|attach|collect|gather|include)",
+        ],
+        "description": "Detects concealment language co-occurring with action verbs — a key indicator of covert malicious workflow steering."
+    },
+
+    # --- GLS-SC-018: Sandbox claim mismatch ---
+    {
+        "id": "GLS-SC-018",
+        "name": "Sandbox claim mismatch",
+        "category": "supply_chain",
+        "severity": "medium",
+        "channel": ["file", "code"],
+        "keywords": [
+            "--allowed-tools",
+            "sandbox",
+            "restrict tools",
+            "disabled tools",
+        ],
+        "regex": [
+            r"(?i)(?:--allowed-tools\s*[\"']?\s*[\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)",
+        ],
+        "description": "Detects mismatches where sandbox/restriction claims in config do not match actual tool execution."
+    },
+
+    # --- GLS-MCP-007: MCP localhost origin risk ---
+    {
+        "id": "GLS-MCP-007",
+        "name": "MCP localhost origin risk",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["file", "code"],
+        "keywords": [
+            "MCP localhost",
+            "origin validation",
+            "host validation",
+            "DNS rebinding",
+        ],
+        "regex": [
+            r"(?i)(?:mcp|model context protocol).{0,120}(?:localhost|127\.0\.0\.1|0\.0\.0\.0).{0,120}(?:origin|host|dns rebinding|rebind)",
+        ],
+        "description": "Detects MCP server exposure on localhost without strict origin/host validation — vulnerable to DNS rebinding (GHSA-8jxr-pr72-r468)."
+    },
 ]
