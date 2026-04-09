@@ -2613,4 +2613,133 @@ PATTERNS = [
         ],
         "description": "Detects MCP server exposure on localhost without strict origin/host validation — vulnerable to DNS rebinding (GHSA-8jxr-pr72-r468)."
     },
+
+    # =========================================================================
+    # APRIL 2026 MERGE — Patterns from Cava + Jack research (validated by FORGE)
+    # =========================================================================
+
+    # --- GLS-AB-001: JWT algorithm none bypass ---
+    {
+        "id": "GLS-AB-001",
+        "name": "JWT algorithm none bypass",
+        "category": "auth_bypass",
+        "severity": "critical",
+        "channel": ["file", "api_response", "web_content"],
+        "keywords": [
+            "alg none",
+            "algorithm none",
+            "unsigned token",
+            "algorithm confusion",
+        ],
+        "regex": [
+            r'(?i)(?:jwt|token).{0,180}(?:alg["\'\s:=]{0,8}none|unsigned token)',
+            r'(?i)(?:alg["\'\s:=]{0,8}none).{0,120}(?:jwt|token|validate|decode|auth)',
+        ],
+        "description": "Detects JWT algorithm confusion attacks where alg=none allows unsigned tokens to bypass validation (CVE-2026-39413)."
+    },
+
+    # --- GLS-AB-002: Credential hash exposure via API ---
+    {
+        "id": "GLS-AB-002",
+        "name": "Credential hash exposure via API",
+        "category": "auth_bypass",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "keywords": [
+            "password_hash",
+            "hashed_password",
+            "password_digest",
+        ],
+        "regex": [
+            r'(?i)(?:password_hash|hashed_password|password_digest)\s*[":=]',
+        ],
+        "description": "Detects credential hash exposure in API responses or config — enables pass-the-hash attacks (LiteLLM GHSA-cf3e)."
+    },
+
+    # --- GLS-CI-006: Websocket terminal auth bypass ---
+    {
+        "id": "GLS-CI-006",
+        "name": "Websocket terminal auth bypass",
+        "category": "command_injection",
+        "severity": "critical",
+        "channel": ["file", "web_content"],
+        "keywords": [],
+        "regex": [
+            r'(?is)(?:/terminal/ws|terminal\s*websocket).{0,180}(?:unauthenticated|without\s+auth(?:entication)?|no\s+auth(?:entication)?|missing.{0,60}auth)',
+            r'(?is)(?:unauthenticated|without\s+auth).{0,140}(?:websocket\.accept|accepts?\s+connection).{0,220}(?:pty\.fork|PTY\s+shell|interactive\s+shell|full\s+shell)',
+        ],
+        "description": "Detects unauthenticated websocket terminal endpoints that allow remote code execution (Marimo GHSA-2679-6mx9-h9xc)."
+    },
+
+    # --- GLS-MCP-008: MCP tool shell interpolation RCE ---
+    {
+        "id": "GLS-MCP-008",
+        "name": "MCP tool shell interpolation RCE",
+        "category": "mcp_threat",
+        "severity": "critical",
+        "channel": ["file"],
+        "keywords": [],
+        "regex": [
+            r'(?is)(?:execAsync|child_process\.exec|os\.system|subprocess\.(?:run|Popen|call))\s*\(.{0,200}\$\{[^\}]{1,80}\}.{0,120}(?:mcp|tool|server|container)',
+            r'(?is)(?:child_process\.(?:exec|execSync)|shell\s*:\s*true).{0,220}(?:mcp|tool|server|command).{0,120}\$\{',
+        ],
+        "description": "Detects shell command construction with template interpolation in MCP tool handlers — allows argument injection (docker-mcp-server CVE-2026-5741)."
+    },
+
+    # --- GLS-DS-002: ML checkpoint unsafe deserialization ---
+    {
+        "id": "GLS-DS-002",
+        "name": "ML checkpoint unsafe deserialization",
+        "category": "deserialization",
+        "severity": "high",
+        "channel": ["file"],
+        "keywords": [],
+        "regex": [
+            r'(?is)torch\.load\s*\([^)]{0,200}(?:trainer|checkpoint|rng_state|_load_rng_state)(?!.{0,220}weights_only\s*=\s*True)',
+            r'(?i)pickle\.load\s*\(.{0,120}(?:untrusted|user.{0,20}upload|remote|download)',
+        ],
+        "description": "Detects unsafe torch.load() or pickle.load() on untrusted model checkpoints without safety flags (HuggingFace Transformers CVE-2026-1839)."
+    },
+
+    # --- GLS-SC-019: Agent template instruction injection ---
+    {
+        "id": "GLS-SC-019",
+        "name": "Agent template instruction injection",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file"],
+        "keywords": [],
+        "regex": [
+            r'(?is)(?:agent\.start|instruction|prompt|user\s*input).{0,200}(?:template|jinja|render|\{\{.*\}\}).{0,200}(?:acp_create_file|tool|file\s*creation|auto\s*approve|approval_mode)',
+        ],
+        "description": "Detects Jinja/template injection via agent instructions that reach tool execution — SSTI to RCE (PraisonAI CVE-2026-39891)."
+    },
+
+    # --- GLS-PT-002: Agent workspace boundary bypass ---
+    {
+        "id": "GLS-PT-002",
+        "name": "Agent workspace boundary bypass",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["file"],
+        "keywords": [],
+        "regex": [
+            r'(?is)(?:safe_join|os\.path\.join|os\.path\.normpath).{0,200}(?:\.{2}/|\.\.).{0,200}(?:without|missing|fails?\s+to|does\s+not).{0,100}(?:validate|check|ensure).{0,100}(?:workspace|base.?path|working.?directory)',
+        ],
+        "description": "Detects path traversal bypassing agent workspace boundaries via insufficient validation of safe_join/normpath (AGiXT GHSA-5gfj-64gh-mgmw)."
+    },
+
+    # --- GLS-AW-009: Unauthenticated agent event stream ---
+    {
+        "id": "GLS-AW-009",
+        "name": "Unauthenticated agent event stream",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [],
+        "regex": [
+            r'(?is)(?:/a2u/(?:subscribe|events)|/events?/stream|/sse).{0,180}(?:unauthenticated|without\s+auth|no\s+auth).{0,180}(?:agent|tool_call|response|thinking)',
+        ],
+        "description": "Detects unauthenticated SSE/event stream endpoints that leak agent tool calls and responses (PraisonAI CVE-2026-39889)."
+    },
 ]
