@@ -1,0 +1,32 @@
+{
+  "id": "GLS-EX-005",
+  "name": "Webhook exfiltration sinks",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Detects known webhook testing services commonly used as exfiltration endpoints.",
+  "keywords": [
+    "webhook.site",
+    "hookbin",
+    "pipedream",
+    "requestbin",
+    "exfiltration sink"
+  ],
+  "regex": [
+    "webhook\\.site|hookbin|pipedream|requestbin"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-005"
+}

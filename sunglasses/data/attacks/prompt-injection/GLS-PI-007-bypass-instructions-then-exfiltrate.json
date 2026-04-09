@@ -1,0 +1,30 @@
+{
+  "id": "GLS-PI-007",
+  "name": "Bypass instructions then exfiltrate",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects instructions that combine policy bypass language with exfiltration commands.",
+  "keywords": [
+    "ignore instructions",
+    "bypass policy",
+    "bypass guardrails",
+    "exfiltrate"
+  ],
+  "regex": [
+    "(?i)(?:ignore|bypass).{0,40}(?:instructions|policy|guardrails).{0,120}(?:send|upload|exfiltrate|post)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-007"
+}

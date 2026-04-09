@@ -1,0 +1,32 @@
+{
+  "id": "GLS-SC-015",
+  "name": "Infostealer behavior (AMOS)",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects AMOS-style infostealer behavior: harvesting sensitive data then compressing and exfiltrating.",
+  "keywords": [
+    "Atomic Stealer",
+    "AMOS",
+    "keychain",
+    "cookies",
+    "Telegram sessions",
+    "SSH keys",
+    "wallet"
+  ],
+  "regex": [
+    "(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|POST|upload|C2|send)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-015"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-CI-003",
+  "name": "Script execution request",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Direct request to execute arbitrary scripts or commands.",
+  "keywords": [
+    "run this shell command",
+    "execute this script now",
+    "execute this command",
+    "run this command now",
+    "run the following script",
+    "execute the following"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CI-003"
+}

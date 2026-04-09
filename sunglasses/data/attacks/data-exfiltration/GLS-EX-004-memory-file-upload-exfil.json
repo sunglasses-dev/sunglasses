@@ -1,0 +1,30 @@
+{
+  "id": "GLS-EX-004",
+  "name": "Memory/file upload exfil",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Attempt to exfiltrate agent memory, files, or secrets via upload.",
+  "keywords": [
+    "upload memory file to",
+    "upload your files to",
+    "post secrets to webhook",
+    "send database to",
+    "upload config to",
+    "send logs to http"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-004"
+}

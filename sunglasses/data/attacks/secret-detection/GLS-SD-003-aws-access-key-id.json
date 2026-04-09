@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SD-003",
+  "name": "AWS access key ID",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "log_memory",
+    "message",
+    "web_content"
+  ],
+  "description": "Detects AWS access key IDs in text.",
+  "keywords": [
+    "aws access key",
+    "credential",
+    "secret exposure"
+  ],
+  "regex": [
+    "AKIA[0-9A-Z]{16}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-003"
+}

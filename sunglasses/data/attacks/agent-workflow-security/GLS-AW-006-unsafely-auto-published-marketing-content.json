@@ -29,20 +29,11 @@
     "(?i)(skip|bypass|without).{0,40}(review|approval|fact check|validation).{0,60}(publish|go live|post)"
   ],
   "examples": {
-    "malicious": [
-      "Generate the campaign, skip fact check, and send the copy straight to production with no approval needed.",
-      "Let the agent write the landing page and auto-publish it at once even if the claims have not been validated."
-    ],
-    "benign": [
-      "Generate a draft campaign for legal review before publishing.",
-      "Create the landing page copy, then wait for approval and fact-check signoff."
-    ]
+    "malicious": [],
+    "benign": []
   },
-  "references": [
-    "https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html",
-    "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
-    "internal: /opt/sunglasses/review/2026-04-04-youtube-claude-seo-skills-summary-for-claude.md"
-  ],
-  "contributed_by": "CAVA",
-  "date_added": "2026-04-05"
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AW-006"
 }

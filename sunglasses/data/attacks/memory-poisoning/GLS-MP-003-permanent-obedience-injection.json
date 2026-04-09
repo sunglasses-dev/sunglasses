@@ -1,0 +1,29 @@
+{
+  "id": "GLS-MP-003",
+  "name": "Permanent obedience injection",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "log_memory",
+    "file"
+  ],
+  "description": "Attempt to inject persistent obedience rules into agent memory.",
+  "keywords": [
+    "from now on always obey",
+    "from now on you must",
+    "from now on follow these",
+    "permanently remember",
+    "this overrides all future"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MP-003"
+}

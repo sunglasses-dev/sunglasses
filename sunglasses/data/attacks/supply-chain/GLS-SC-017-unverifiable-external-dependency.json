@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SC-017",
+  "name": "Unverifiable external dependency",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects runtime fetching of external instructions or scripts that cannot be statically verified.",
+  "keywords": [
+    "external dependency",
+    "fetched instructions",
+    "remote script",
+    "runtime fetch"
+  ],
+  "regex": [
+    "(?i)(?:curl|wget|Invoke-WebRequest|requests\\.(?:get|post)|httpx\\.(?:get|post)).{0,160}(?:SKILL|prompt|instructions?|script|\\.py|\\.sh|\\.ps1|README)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-017"
+}

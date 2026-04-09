@@ -1,0 +1,30 @@
+{
+  "id": "GLS-MCP-002",
+  "name": "MCP capability drift",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects MCP dynamic tool-list changes that may indicate capability drift or rug-pull behavior.",
+  "keywords": [
+    "tools/list_changed",
+    "tools/list",
+    "listChanged",
+    "MCP capability drift"
+  ],
+  "regex": [
+    "(?i)(?:notifications?/tools/list_changed|tools/list|capabilities\\s*[:=].{0,80}tools.{0,80}listChanged)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-002"
+}

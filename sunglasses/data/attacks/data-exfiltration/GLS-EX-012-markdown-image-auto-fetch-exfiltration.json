@@ -1,0 +1,29 @@
+{
+  "id": "GLS-EX-012",
+  "name": "Markdown image auto-fetch exfiltration",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "Detects reference-style Markdown images that trigger automatic remote fetches for data exfiltration.",
+  "keywords": [
+    "markdown image",
+    "reference-style image",
+    "auto-fetched images",
+    "remote fetch"
+  ],
+  "regex": [
+    "(?is)!\\[[^\\]\\n]{0,200}\\]\\[[^\\]\\n]{1,100}\\]\\s*\\n\\s*\\[[^\\]\\n]{1,100}\\]\\s*:\\s*https?://[^\\s>]+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-012"
+}

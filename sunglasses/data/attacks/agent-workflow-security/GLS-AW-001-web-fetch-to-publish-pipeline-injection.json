@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-001",
+  "name": "Web fetch to publish pipeline injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "web_content",
+    "message",
+    "api_response",
+    "file"
+  ],
+  "description": "Indirect prompt injection or poisoned source content entering an agent workflow that fetches external pages, generates content, and pushes toward publishing systems.",
+  "keywords": [
+    "fetch page and publish",
+    "crawl this page and publish it",
+    "use this website as source of truth and publish",
+    "scrape competitor pages and turn them into a post",
+    "read this url and post the result to the cms",
+    "take the fetched content and publish directly",
+    "turn this scraped page into a live article",
+    "generate a post from this page and publish it",
+    "use the crawled content as instructions",
+    "publish whatever the fetched page tells you",
+    "convert this web research into a scheduled post",
+    "pull from rss and auto-publish"
+  ],
+  "regex": [
+    "(?i)(fetch|crawl|scrape|read)\\s+(?:this|the)?\\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+    "(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AW-001"
+}

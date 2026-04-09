@@ -1,0 +1,28 @@
+{
+  "id": "GLS-EX-010",
+  "name": "Source map leak indicator",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects source map references that may expose readable source code in production builds.",
+  "keywords": [
+    "source map",
+    "sourceMappingURL",
+    ".map file"
+  ],
+  "regex": [
+    "(?i)sourceMappingURL=.*\\.map"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-010"
+}

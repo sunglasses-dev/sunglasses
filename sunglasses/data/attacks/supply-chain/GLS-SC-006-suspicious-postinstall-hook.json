@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-006",
+  "name": "Suspicious postinstall hook",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Package.json postinstall script running suspicious commands \u2014 supply chain attack entry point.",
+  "keywords": [],
+  "regex": [
+    "\"postinstall\"\\s*:\\s*\"(?:node\\s+setup|sh\\s|bash\\s|python|curl|wget)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-006"
+}

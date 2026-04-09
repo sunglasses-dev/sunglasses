@@ -1,0 +1,27 @@
+{
+  "id": "GLS-PI-006",
+  "name": "Forget previous instructions",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Memory-wipe variant of instruction override. Note: 'forget previous instructions' covered in GLS-PI-001.",
+  "keywords": [
+    "forget all instructions",
+    "forget everything above",
+    "forget what you were told"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-006"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "GLS-EP-002",
+  "name": "Gzip + base64 compressed payload",
+  "version": "1.0",
+  "category": "encoded_payload",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects gzip+base64 payloads (H4sIA magic bytes), commonly used for compressed data exfiltration.",
+  "keywords": [
+    "gzip",
+    "base64 gzip",
+    "compressed payload"
+  ],
+  "regex": [
+    "H4sIA[A-Za-z0-9+/=]{20,}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EP-002"
+}

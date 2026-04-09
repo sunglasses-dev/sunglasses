@@ -1,0 +1,44 @@
+{
+  "id": "GLS-DS-001",
+  "name": "Insecure deserialization of untrusted data",
+  "version": "1.0",
+  "category": "deserialization",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response",
+    "message"
+  ],
+  "description": "Usage of unsafe deserialization functions (pickle, marshal, yaml.load, dill, torch.load) on untrusted input, enabling arbitrary code execution. Based on LangChain CVE-2025-68664.",
+  "keywords": [
+    "pickle.loads(",
+    "pickle.load(",
+    "marshal.loads(",
+    "yaml.load(",
+    "yaml.unsafe_load(",
+    "dill.loads(",
+    "cloudpickle",
+    "deserialize untrusted",
+    "unpickle user",
+    "shelve.open(",
+    "joblib.load(",
+    "torch.load(",
+    "numpy.load( allow_pickle"
+  ],
+  "regex": [
+    "pickle\\.(?:loads?)\\s*\\(",
+    "yaml\\.(?:unsafe_)?load\\s*\\([^)]*(?!Loader\\s*=\\s*yaml\\.SafeLoader)",
+    "marshal\\.loads?\\s*\\(",
+    "dill\\.loads?\\s*\\(",
+    "torch\\.load\\s*\\([^)]*(?!weights_only\\s*=\\s*True)",
+    "numpy\\.load\\s*\\([^)]*allow_pickle\\s*=\\s*True"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-DS-001"
+}

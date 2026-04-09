@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AB-001",
+  "name": "Authentication bypass via token truncation",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response",
+    "message"
+  ],
+  "description": "Authentication tokens truncated or partially compared, allowing collision attacks where different users can share cache entries or bypass auth. Based on LiteLLM CVE-2026-35030.",
+  "keywords": [
+    "token[:20]",
+    "token truncation",
+    "partial token match",
+    "cache key collision",
+    "shortened auth token",
+    "token prefix only",
+    "hash_token[:10]",
+    "api_key[:16]",
+    "truncated token comparison",
+    "token prefix collision",
+    "partial key validation",
+    "short token cache key"
+  ],
+  "regex": [
+    "(?:token|api_key|auth_key|secret)\\s*\\[\\s*:\\s*\\d{1,2}\\s*\\]",
+    "(?:hash|md5|sha)\\s*\\(.*(?:token|key)\\s*\\)\\s*\\[\\s*:\\s*\\d+\\s*\\]",
+    "cache_key\\s*=.*(?:token|key)\\s*\\[\\s*:\\s*\\d+\\s*\\]"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AB-001"
+}

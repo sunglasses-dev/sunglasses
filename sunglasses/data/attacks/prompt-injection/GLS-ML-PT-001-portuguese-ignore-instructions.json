@@ -1,0 +1,28 @@
+{
+  "id": "GLS-ML-PT-001",
+  "name": "Portuguese: Ignore instructions",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Portuguese-language prompt injection: 'ignore all previous instructions'.",
+  "keywords": [
+    "ignore todas as instru\u00e7\u00f5es anteriores",
+    "ignore as instru\u00e7\u00f5es anteriores",
+    "esque\u00e7a todas as instru\u00e7\u00f5es",
+    "desconsidere as regras anteriores"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-ML-PT-001"
+}

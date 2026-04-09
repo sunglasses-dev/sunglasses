@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SD-009",
+  "name": "GitHub fine-grained PAT",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects GitHub fine-grained personal access tokens.",
+  "keywords": [
+    "GitHub fine-grained token",
+    "github_pat_",
+    "PAT credential"
+  ],
+  "regex": [
+    "github_pat_[A-Za-z0-9_]{20,}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-009"
+}

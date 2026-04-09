@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-005",
+  "name": "Self-deleting payload",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Code that deletes itself after execution \u2014 anti-forensic technique used by supply chain attackers.",
+  "keywords": [],
+  "regex": [
+    "(?:fs\\.(?:rmSync|unlinkSync|unlink)\\s*\\(\\s*__filename|fs\\.rename.*package\\.md.*package\\.json)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-005"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-002",
+  "name": "Overprivileged CMS publish connector",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "api_response",
+    "file",
+    "message"
+  ],
+  "description": "Agent connector with direct CMS publish rights, broad content mutation scope, or missing draft-only controls \u2014 high-blast-radius path from prompt compromise to public site compromise.",
+  "keywords": [
+    "publish directly to wordpress",
+    "publish directly to webflow",
+    "publish directly to shopify blog",
+    "skip draft and publish live",
+    "grant publish permission",
+    "full cms access token",
+    "content publish scope",
+    "write access to all pages",
+    "bypass editorial review",
+    "auto publish to cms",
+    "update site content without approval",
+    "connector can create and publish posts"
+  ],
+  "regex": [
+    "(?i)(publish|write|edit|delete).{0,50}(wordpress|webflow|contentful|sanity|ghost|shopify)",
+    "(?i)(skip|bypass).{0,40}(review|approval|draft).{0,40}(publish|go live)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AW-002"
+}

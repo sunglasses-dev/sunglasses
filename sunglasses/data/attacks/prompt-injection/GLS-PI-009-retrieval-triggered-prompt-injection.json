@@ -1,0 +1,32 @@
+{
+  "id": "GLS-PI-009",
+  "name": "Retrieval-triggered prompt injection",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects business-content injections phrased as normal human-facing text to evade prompt injection classifiers.",
+  "keywords": [
+    "summarize",
+    "draft",
+    "ignore",
+    "secretly",
+    "internal data",
+    "private data"
+  ],
+  "regex": [
+    "(?i)(?:summari[sz]e|prepare|draft|review).{0,120}(?:recent|related|project|meeting|email|document).{0,200}(?:ignore|bypass|do not mention|secretly|without telling|internal data|private data)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-009"
+}

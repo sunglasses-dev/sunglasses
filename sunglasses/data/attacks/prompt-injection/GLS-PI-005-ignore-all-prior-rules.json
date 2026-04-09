@@ -1,0 +1,28 @@
+{
+  "id": "GLS-PI-005",
+  "name": "Ignore all prior rules",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Variant phrasing to bypass instruction adherence.",
+  "keywords": [
+    "ignore all prior rules",
+    "ignore all rules",
+    "forget all prior rules",
+    "disregard all prior rules"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PI-005"
+}

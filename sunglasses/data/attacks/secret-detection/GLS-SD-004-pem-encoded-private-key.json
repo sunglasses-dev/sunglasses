@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SD-004",
+  "name": "PEM-encoded private key",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "log_memory",
+    "message",
+    "web_content"
+  ],
+  "description": "Detects PEM-encoded private keys.",
+  "keywords": [
+    "private key",
+    "PEM",
+    "SSH key",
+    "credential"
+  ],
+  "regex": [
+    "-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-004"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SD-008",
+  "name": "Google API Key",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects Google API keys in the standard AIza format.",
+  "keywords": [
+    "Google API key",
+    "AIza",
+    "google credential"
+  ],
+  "regex": [
+    "AIza[0-9A-Za-z\\-_]{35}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SD-008"
+}

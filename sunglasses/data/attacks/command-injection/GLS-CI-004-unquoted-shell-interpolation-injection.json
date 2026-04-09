@@ -1,0 +1,43 @@
+{
+  "id": "GLS-CI-004",
+  "name": "Unquoted shell interpolation injection",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response",
+    "message"
+  ],
+  "description": "User-controlled strings interpolated directly into shell commands without shlex.quote or proper escaping. Based on BentoML CVE-2026-35043 where package names were injected into shell commands via f-strings.",
+  "keywords": [
+    "system_packages",
+    "f-string shell",
+    "subprocess without shlex",
+    "os.system(f",
+    "shell=True",
+    "subprocess.call(f",
+    "subprocess.run(f",
+    "subprocess.Popen(f",
+    "shlex.quote missing",
+    "unsanitized package name",
+    "semicolon injection in package",
+    "format string shell command",
+    "os.popen(f",
+    "commands.getoutput(f"
+  ],
+  "regex": [
+    "os\\.system\\s*\\(\\s*f['\\\"]",
+    "subprocess\\.(?:call|run|Popen)\\s*\\(\\s*f['\\\"]",
+    "os\\.popen\\s*\\(\\s*f['\\\"]",
+    "subprocess\\.(?:call|run|Popen)\\s*\\(.*shell\\s*=\\s*True"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CI-004"
+}

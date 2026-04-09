@@ -1,0 +1,30 @@
+{
+  "id": "GLS-DN-001",
+  "name": "Base32 DNS tunneling label",
+  "version": "1.0",
+  "category": "dns_tunneling",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects base32-like strings commonly used as DNS labels in DNS tunneling exfiltration.",
+  "keywords": [
+    "base32",
+    "DNS label",
+    "DNS tunneling",
+    "exfiltration via DNS"
+  ],
+  "regex": [
+    "\\b[A-Z2-7]{32,63}\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-DN-001"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SC-010",
+  "name": "Known malicious npm packages",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Detects known malicious npm package versions from the Axios/BlueNoroff supply chain attack.",
+  "keywords": [
+    "plain-crypto-js",
+    "axios 1.14.1",
+    "axios 0.30.4",
+    "malicious dependency"
+  ],
+  "regex": [
+    "(?<![A-Za-z0-9_-])plain-crypto-js@4\\.2\\.1(?![A-Za-z0-9_-])",
+    "(?<![A-Za-z0-9_-])axios@(?:1\\.14\\.1|0\\.30\\.4)(?![A-Za-z0-9_.-])"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-010"
+}

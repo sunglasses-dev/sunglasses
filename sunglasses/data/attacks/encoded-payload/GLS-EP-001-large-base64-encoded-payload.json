@@ -1,0 +1,30 @@
+{
+  "id": "GLS-EP-001",
+  "name": "Large base64 encoded payload",
+  "version": "1.0",
+  "category": "encoded_payload",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects suspiciously large base64-encoded payloads that may indicate data exfiltration or obfuscated malicious content.",
+  "keywords": [
+    "base64",
+    "encoded blob",
+    "obfuscation",
+    "exfiltration payload"
+  ],
+  "regex": [
+    "(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{200,}={0,2}(?![A-Za-z0-9+/=])"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EP-001"
+}

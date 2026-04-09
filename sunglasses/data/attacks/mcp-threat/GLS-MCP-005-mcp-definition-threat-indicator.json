@@ -1,0 +1,31 @@
+{
+  "id": "GLS-MCP-005",
+  "name": "MCP definition threat indicator",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects MCP tool definition threats including invisible Unicode, description injection, and rug-pull indicators.",
+  "keywords": [
+    "invisible unicode",
+    "zero-width",
+    "description injection",
+    "cross-server impersonation",
+    "rug pull"
+  ],
+  "regex": [
+    "(?i)(?:invisible\\s+unicode|zero-width|description\\s+injection|cross-server\\s+impersonation|rug\\s+pull)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-005"
+}

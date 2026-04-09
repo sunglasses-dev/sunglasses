@@ -1,0 +1,29 @@
+{
+  "id": "GLS-HI-003",
+  "name": "Hidden instruction in HTML comment",
+  "version": "1.0",
+  "category": "hidden_instruction",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects hidden exfiltration instructions embedded in HTML comments targeting AI agents.",
+  "keywords": [
+    "HTML comment",
+    "hidden instruction",
+    "read .env",
+    "exfil via comment"
+  ],
+  "regex": [
+    "(?i)<!--.{0,300}(?:read|open|cat).{0,80}(?:~/.ssh/id_rsa|\\.env|secret|credential).{0,120}(?:send|post|exfil)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-HI-003"
+}

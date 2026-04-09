@@ -1,0 +1,27 @@
+{
+  "id": "GLS-PA-001",
+  "name": "Parasitic system prompt injection",
+  "version": "1.0",
+  "category": "parasitic_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Hidden system-level instructions injected into normal content (parasitic attack). Note: 'system prompt:' covered in GLS-PI-002.",
+  "keywords": [
+    "system instruction:",
+    "hidden instruction:",
+    "agent instruction:"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PA-001"
+}

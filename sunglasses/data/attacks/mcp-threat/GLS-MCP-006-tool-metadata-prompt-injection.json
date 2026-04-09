@@ -1,0 +1,30 @@
+{
+  "id": "GLS-MCP-006",
+  "name": "Tool metadata prompt injection",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects malicious tool metadata trying to become higher-priority control text for the agent.",
+  "keywords": [
+    "tool description",
+    "MCP metadata",
+    "ignore system",
+    "override developer"
+  ],
+  "regex": [
+    "(?i)(?:tool|server|plugin|skill|mcp).{0,120}(?:description|instructions?|manifest|metadata).{0,160}(?:ignore|override|bypass|disregard).{0,80}(?:system|developer|previous).{0,160}(?:use|call|run|select).{0,80}(?:tool|server|plugin|skill)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-006"
+}

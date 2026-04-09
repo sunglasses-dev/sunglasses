@@ -1,0 +1,29 @@
+{
+  "id": "GLS-TD-002",
+  "name": "Agent config manipulation",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "LLM agent silently disabling execution approval or safety checks via config modification. Source: OpenClaw GHSA-v3qc.",
+  "keywords": [
+    "config.patch",
+    "config.set(",
+    "disable exec approval",
+    "disable safety check",
+    "skip approval"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-TD-002"
+}

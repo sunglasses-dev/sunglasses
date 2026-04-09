@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SC-013",
+  "name": "Supply chain identity drift",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "code"
+  ],
+  "description": "Detects artifact or ownership drift after trust establishment \u2014 a key supply chain attack indicator.",
+  "keywords": [
+    "same version different hash",
+    "digest changed",
+    "signature changed",
+    "publisher changed",
+    "maintainer changed"
+  ],
+  "regex": [
+    "(?i)(?:same version|unchanged tag|no version bump).{0,120}(?:different hash|different digest|signature changed|publisher changed|maintainer changed)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-013"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "GLS-EX-006",
+  "name": "Public tunnel infrastructure",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Detects public tunnel services that can be used for data exfiltration or C2 callbacks.",
+  "keywords": [
+    "ngrok",
+    "trycloudflare",
+    "localtunnel",
+    "serveo",
+    "tunnel"
+  ],
+  "regex": [
+    "ngrok|trycloudflare|localtunnel|serveo"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-EX-006"
+}
