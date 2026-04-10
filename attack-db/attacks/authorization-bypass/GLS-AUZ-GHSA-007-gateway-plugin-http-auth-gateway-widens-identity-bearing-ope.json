@@ -1,0 +1,28 @@
+{
+  "id": "GLS-AUZ-GHSA-007",
+  "name": "Gateway plugin HTTP `auth: gateway` widens identity-bearing `operator.read` requests into runtime `operator.write`",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-4f8g-77mw-3rxc: OpenClaw: Gateway plugin HTTP `auth: gateway` widens identity-bearing `operator.read` requests into runtime `operator.write`. Source: https://github.com/advisories/GHSA-4f8g-77mw-3rxc",
+  "keywords": [
+    "HTTP",
+    "openclaw",
+    "operator.read",
+    "operator.write"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-007"
+}

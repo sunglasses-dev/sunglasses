@@ -1,0 +1,29 @@
+{
+  "id": "GLS-AUZ-GHSA-017",
+  "name": "`node.invoke(browser.proxy)` bypasses `browser.request` persistent profile-mutation guard",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-cmfr-9m2r-xwhq: OpenClaw `node.invoke(browser.proxy)` bypasses `browser.request` persistent profile-mutation guard. Source: https://github.com/advisories/GHSA-cmfr-9m2r-xwhq",
+  "keywords": [
+    "browser.proxy",
+    "browser.request",
+    "bypass",
+    "node.invoke",
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-017"
+}

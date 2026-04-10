@@ -1,0 +1,28 @@
+{
+  "id": "GLS-CMD-GHSA-005",
+  "name": "Host-Exec Environment Variable Injection",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-w9j9-w4cp-6wgr: OpenClaw Host-Exec Environment Variable Injection. Source: https://github.com/advisories/GHSA-w9j9-w4cp-6wgr",
+  "keywords": [
+    "exec",
+    "host-exec",
+    "injection",
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CMD-GHSA-005"
+}

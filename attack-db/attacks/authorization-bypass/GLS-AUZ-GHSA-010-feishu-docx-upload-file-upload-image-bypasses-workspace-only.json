@@ -1,0 +1,27 @@
+{
+  "id": "GLS-AUZ-GHSA-010",
+  "name": "Feishu docx upload_file/upload_image Bypasses Workspace-Only Filesystem Policy (GHSA-qf48-qfv4-jjm9 Incomplete Fix)",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-5fc7-f62m-8983: OpenClaw: Feishu docx upload_file/upload_image Bypasses Workspace-Only Filesystem Policy (GHSA-qf48-qfv4-jjm9 Incomplete Fix). Source: https://github.com/advisories/GHSA-5fc7-f62m-8983",
+  "keywords": [
+    "GHSA",
+    "bypass",
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-010"
+}

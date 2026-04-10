@@ -1,0 +1,26 @@
+{
+  "id": "GLS-AUZ-GHSA-022",
+  "name": "Authenticated `/hooks/wake` and mapped `wake` payloads are promoted into the trusted `System:` prompt channel",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-jf56-mccx-5f3f: OpenClaw: Authenticated `/hooks/wake` and mapped `wake` payloads are promoted into the trusted `System:` prompt channel. Source: https://github.com/advisories/GHSA-jf56-mccx-5f3f",
+  "keywords": [
+    "openclaw",
+    "wake"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-022"
+}

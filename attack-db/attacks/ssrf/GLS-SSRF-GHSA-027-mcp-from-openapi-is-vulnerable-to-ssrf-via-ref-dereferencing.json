@@ -1,0 +1,26 @@
+{
+  "id": "GLS-SSRF-GHSA-027",
+  "name": "mcp-from-openapi is Vulnerable to SSRF via $ref Dereferencing in Untrusted OpenAPI Specifications",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-v6ph-xcq9-qxxj: mcp-from-openapi is Vulnerable to SSRF via $ref Dereferencing in Untrusted OpenAPI Specifications. Source: https://github.com/advisories/GHSA-v6ph-xcq9-qxxj",
+  "keywords": [
+    "SSRF",
+    "ssrf"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SSRF-GHSA-027"
+}

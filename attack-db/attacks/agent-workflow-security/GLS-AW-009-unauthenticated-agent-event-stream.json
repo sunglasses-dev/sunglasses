@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-009",
+  "name": "Unauthenticated agent event stream",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects unauthenticated SSE/event stream endpoints that leak agent tool calls and responses (PraisonAI CVE-2026-39889).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:/a2u/(?:subscribe|events)|/events?/stream|/sse).{0,180}(?:unauthenticated|without\\s+auth|no\\s+auth).{0,180}(?:agent|tool_call|response|thinking)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AW-009"
+}

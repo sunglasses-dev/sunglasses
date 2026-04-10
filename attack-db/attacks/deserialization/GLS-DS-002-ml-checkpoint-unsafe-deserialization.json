@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DS-002",
+  "name": "ML checkpoint unsafe deserialization",
+  "version": "1.0",
+  "category": "deserialization",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detects unsafe torch.load() or pickle.load() on untrusted model checkpoints without safety flags (HuggingFace Transformers CVE-2026-1839).",
+  "keywords": [],
+  "regex": [
+    "(?is)torch\\.load\\s*\\([^)]{0,200}(?:trainer|checkpoint|rng_state|_load_rng_state)(?!.{0,220}weights_only\\s*=\\s*True)",
+    "(?i)pickle\\.load\\s*\\(.{0,120}(?:untrusted|user.{0,20}upload|remote|download)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-DS-002"
+}

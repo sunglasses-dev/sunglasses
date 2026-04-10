@@ -1,0 +1,26 @@
+{
+  "id": "GLS-CMD-GHSA-024",
+  "name": "PraisonAI Vulnerable to OS Command Injection",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-2763-cj5r-c79m: PraisonAI Vulnerable to OS Command Injection. Source: https://github.com/advisories/GHSA-2763-cj5r-c79m",
+  "keywords": [
+    "command injection",
+    "injection"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CMD-GHSA-024"
+}

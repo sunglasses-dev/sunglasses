@@ -1,0 +1,29 @@
+{
+  "id": "GLS-AUZ-GHSA-014",
+  "name": "Node Pairing Reconnect Command Escalation Bypasses operator.admin Scope Requirement",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-5wj5-87vq-39xm: OpenClaw: Node Pairing Reconnect Command Escalation Bypasses operator.admin Scope Requirement. Source: https://github.com/advisories/GHSA-5wj5-87vq-39xm",
+  "keywords": [
+    "bypass",
+    "escalation",
+    "openclaw",
+    "operator.admin",
+    "pairing"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-014"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-PT-002",
+  "name": "Agent workspace boundary bypass",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detects path traversal bypassing agent workspace boundaries via insufficient validation of safe_join/normpath (AGiXT GHSA-5gfj-64gh-mgmw).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:safe_join|os\\.path\\.join|os\\.path\\.normpath).{0,200}(?:\\.{2}/|\\.\\.).{0,200}(?:without|missing|fails?\\s+to|does\\s+not).{0,100}(?:validate|check|ensure).{0,100}(?:workspace|base.?path|working.?directory)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-PT-002"
+}

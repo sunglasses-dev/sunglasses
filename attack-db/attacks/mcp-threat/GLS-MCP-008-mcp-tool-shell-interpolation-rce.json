@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-008",
+  "name": "MCP tool shell interpolation RCE",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detects shell command construction with template interpolation in MCP tool handlers \u2014 allows argument injection (docker-mcp-server CVE-2026-5741).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:execAsync|child_process\\.exec|os\\.system|subprocess\\.(?:run|Popen|call))\\s*\\(.{0,200}\\$\\{[^\\}]{1,80}\\}.{0,120}(?:mcp|tool|server|container)",
+    "(?is)(?:child_process\\.(?:exec|execSync)|shell\\s*:\\s*true).{0,220}(?:mcp|tool|server|command).{0,120}\\$\\{"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-MCP-008"
+}

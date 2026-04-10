@@ -1,0 +1,30 @@
+{
+  "id": "GLS-SSRF-GHSA-004",
+  "name": "`fetchWithSsrFGuard` replays unsafe request bodies across cross-origin redirects",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-qx8j-g322-qj6m: OpenClaw: `fetchWithSsrFGuard` replays unsafe request bodies across cross-origin redirects. Source: https://github.com/advisories/GHSA-qx8j-g322-qj6m",
+  "keywords": [
+    "cross-origin",
+    "fetchWithSsrFGuard",
+    "fetchwithssrfguard",
+    "openclaw",
+    "redirect",
+    "ssrf"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SSRF-GHSA-004"
+}

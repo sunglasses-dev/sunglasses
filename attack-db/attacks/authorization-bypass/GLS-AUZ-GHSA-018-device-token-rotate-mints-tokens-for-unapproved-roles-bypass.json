@@ -1,0 +1,28 @@
+{
+  "id": "GLS-AUZ-GHSA-018",
+  "name": "`device.token.rotate` mints tokens for unapproved roles, bypassing device role-upgrade pairing",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-whf9-3hcx-gq54: OpenClaw `device.token.rotate` mints tokens for unapproved roles, bypassing device role-upgrade pairing. Source: https://github.com/advisories/GHSA-whf9-3hcx-gq54",
+  "keywords": [
+    "bypass",
+    "device.token.rotate",
+    "openclaw",
+    "pairing"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-018"
+}

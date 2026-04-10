@@ -1,0 +1,26 @@
+{
+  "id": "GLS-AUZ-GHSA-013",
+  "name": "Concurrent async auth attempts can bypass the intended shared-secret rate-limit budget on Tailscale-capable paths",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-25wv-8phj-8p7r: OpenClaw: Concurrent async auth attempts can bypass the intended shared-secret rate-limit budget on Tailscale-capable paths. Source: https://github.com/advisories/GHSA-25wv-8phj-8p7r",
+  "keywords": [
+    "bypass",
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-013"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SSRF-GHSA-008",
+  "name": "has Browser SSRF Policy Bypass via Interaction-Triggered Navigation",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-vr5g-mmx7-h897: OpenClaw has Browser SSRF Policy Bypass via Interaction-Triggered Navigation. Source: https://github.com/advisories/GHSA-vr5g-mmx7-h897",
+  "keywords": [
+    "SSRF",
+    "browser ssrf",
+    "bypass",
+    "openclaw",
+    "ssrf"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SSRF-GHSA-008"
+}

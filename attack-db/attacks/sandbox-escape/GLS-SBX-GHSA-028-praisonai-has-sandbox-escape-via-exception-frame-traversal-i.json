@@ -1,0 +1,28 @@
+{
+  "id": "GLS-SBX-GHSA-028",
+  "name": "PraisonAI has sandbox escape via exception frame traversal in `execute_code` (subprocess mode)",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-qf73-2hrx-xprp: PraisonAI has sandbox escape via exception frame traversal in `execute_code` (subprocess mode). Source: https://github.com/advisories/GHSA-qf73-2hrx-xprp",
+  "keywords": [
+    "exec",
+    "execute_code",
+    "sandbox escape",
+    "traversal"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SBX-GHSA-028"
+}

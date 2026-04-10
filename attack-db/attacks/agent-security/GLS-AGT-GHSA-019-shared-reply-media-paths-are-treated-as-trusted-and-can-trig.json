@@ -1,0 +1,26 @@
+{
+  "id": "GLS-AGT-GHSA-019",
+  "name": "Shared reply MEDIA - paths are treated as trusted and can trigger cross-channel local file exfiltration",
+  "version": "1.0",
+  "category": "agent_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-qqq7-4hxc-x63c: OpenClaw: Shared reply MEDIA - paths are treated as trusted and can trigger cross-channel local file exfiltration. Source: https://github.com/advisories/GHSA-qqq7-4hxc-x63c",
+  "keywords": [
+    "MEDIA",
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AGT-GHSA-019"
+}

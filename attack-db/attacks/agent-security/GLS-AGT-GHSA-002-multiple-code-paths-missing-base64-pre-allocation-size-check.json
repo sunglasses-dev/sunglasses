@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AGT-GHSA-002",
+  "name": "Multiple Code Paths Missing Base64 Pre-Allocation Size Checks",
+  "version": "1.0",
+  "category": "agent_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-ccx3-fw7q-rr2r: OpenClaw: Multiple Code Paths Missing Base64 Pre-Allocation Size Checks. Source: https://github.com/advisories/GHSA-ccx3-fw7q-rr2r",
+  "keywords": [
+    "openclaw"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AGT-GHSA-002"
+}

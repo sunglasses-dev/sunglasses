@@ -1,0 +1,34 @@
+{
+  "id": "GLS-CMD-GHSA-021",
+  "name": "HGRCPATH, CARGO_BUILD_RUSTC_WRAPPER, RUSTC_WRAPPER, and MAKEFLAGS missing from exec env denylist \u2014 RCE via build tool en",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-7437-7hg8-frrw: OpenClaw: HGRCPATH, CARGO_BUILD_RUSTC_WRAPPER, RUSTC_WRAPPER, and MAKEFLAGS missing from exec env denylist \u2014 RCE via build tool env injection (GHSA-cm8v-2vh9-cxf3 class). Source: https://github.com/advisories/GHSA-7437-7hg8-frrw",
+  "keywords": [
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "GHSA",
+    "HGRCPATH",
+    "MAKEFLAGS",
+    "RUSTC_WRAPPER",
+    "denylist",
+    "exec",
+    "injection",
+    "openclaw",
+    "rce"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CMD-GHSA-021"
+}

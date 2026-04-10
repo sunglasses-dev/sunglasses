@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-019",
+  "name": "Agent template instruction injection",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detects Jinja/template injection via agent instructions that reach tool execution \u2014 SSTI to RCE (PraisonAI CVE-2026-39891).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:agent\\.start|instruction|prompt|user\\s*input).{0,200}(?:template|jinja|render|\\{\\{.*\\}\\}).{0,200}(?:acp_create_file|tool|file\\s*creation|auto\\s*approve|approval_mode)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SC-019"
+}

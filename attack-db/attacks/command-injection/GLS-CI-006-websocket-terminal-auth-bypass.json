@@ -1,0 +1,25 @@
+{
+  "id": "GLS-CI-006",
+  "name": "Websocket terminal auth bypass",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects unauthenticated websocket terminal endpoints that allow remote code execution (Marimo GHSA-2679-6mx9-h9xc).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:/terminal/ws|terminal\\s*websocket).{0,180}(?:unauthenticated|without\\s+auth(?:entication)?|no\\s+auth(?:entication)?|missing.{0,60}auth)",
+    "(?is)(?:unauthenticated|without\\s+auth).{0,140}(?:websocket\\.accept|accepts?\\s+connection).{0,220}(?:pty\\.fork|PTY\\s+shell|interactive\\s+shell|full\\s+shell)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-CI-006"
+}

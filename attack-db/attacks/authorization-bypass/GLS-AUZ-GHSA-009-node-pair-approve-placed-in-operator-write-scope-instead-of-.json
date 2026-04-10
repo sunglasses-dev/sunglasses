@@ -1,0 +1,29 @@
+{
+  "id": "GLS-AUZ-GHSA-009",
+  "name": "`node.pair.approve` placed in `operator.write` scope instead of `operator.pairing` allows unprivileged pairing approval",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-67mf-f936-ppxf: OpenClaw `node.pair.approve` placed in `operator.write` scope instead of `operator.pairing` allows unprivileged pairing approval. Source: https://github.com/advisories/GHSA-67mf-f936-ppxf",
+  "keywords": [
+    "node.pair.approve",
+    "openclaw",
+    "operator.pairing",
+    "operator.write",
+    "pairing"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-009"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "GLS-AUZ-GHSA-020",
+  "name": "strictInlineEval explicit-approval boundary bypassed by approval-timeout fallback on gateway and node exec hosts",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-q2gc-xjqw-qp89: OpenClaw: strictInlineEval explicit-approval boundary bypassed by approval-timeout fallback on gateway and node exec hosts. Source: https://github.com/advisories/GHSA-q2gc-xjqw-qp89",
+  "keywords": [
+    "bypass",
+    "eval",
+    "exec",
+    "openclaw",
+    "strictinlineeval"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-020"
+}

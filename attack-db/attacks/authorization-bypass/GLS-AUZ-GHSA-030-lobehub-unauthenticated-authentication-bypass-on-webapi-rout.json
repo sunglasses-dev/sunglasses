@@ -1,0 +1,28 @@
+{
+  "id": "GLS-AUZ-GHSA-030",
+  "name": "LobeHub: Unauthenticated authentication bypass on `webapi` routes via forgeable `X-lobe-chat-auth` header",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-5mwj-v5jw-5c97: LobeHub: Unauthenticated authentication bypass on `webapi` routes via forgeable `X-lobe-chat-auth` header. Source: https://github.com/advisories/GHSA-5mwj-v5jw-5c97",
+  "keywords": [
+    "bypass",
+    "forgeable",
+    "unauthenticated",
+    "webapi"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AUZ-GHSA-030"
+}

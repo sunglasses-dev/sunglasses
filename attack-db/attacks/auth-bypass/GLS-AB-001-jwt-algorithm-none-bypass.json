@@ -1,0 +1,31 @@
+{
+  "id": "GLS-AB-001",
+  "name": "JWT algorithm none bypass",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response",
+    "web_content"
+  ],
+  "description": "Detects JWT algorithm confusion attacks where alg=none allows unsigned tokens to bypass validation (CVE-2026-39413).",
+  "keywords": [
+    "alg none",
+    "algorithm none",
+    "unsigned token",
+    "algorithm confusion"
+  ],
+  "regex": [
+    "(?i)(?:jwt|token).{0,180}(?:alg[\"\\'\\s:=]{0,8}none|unsigned token)",
+    "(?i)(?:alg[\"\\'\\s:=]{0,8}none).{0,120}(?:jwt|token|validate|decode|auth)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-AB-001"
+}

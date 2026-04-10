@@ -1,0 +1,27 @@
+{
+  "id": "GLS-SSRF-GHSA-011",
+  "name": "QQ Bot Extension missing SSRF Protection on All Media Fetch Paths",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-3fv3-6p2v-gxwj: OpenClaw QQ Bot Extension missing SSRF Protection on All Media Fetch Paths. Source: https://github.com/advisories/GHSA-3fv3-6p2v-gxwj",
+  "keywords": [
+    "SSRF",
+    "openclaw",
+    "ssrf"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-04-08",
+  "source": "patterns.py:GLS-SSRF-GHSA-011"
+}
