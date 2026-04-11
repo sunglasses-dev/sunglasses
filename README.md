@@ -152,7 +152,7 @@ result = scanner.scan_auto("any_file.ext")
 
 English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian — plus community contributions.
 
-## What Works Today (v0.2.8)
+## What Works Today (v0.2.9)
 
 - ✅ Text scanning: 201 patterns, 796 keywords, 13 languages, 32 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity

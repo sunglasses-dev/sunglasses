@@ -2618,9 +2618,9 @@ PATTERNS = [
     # APRIL 2026 MERGE — Patterns from Cava + Jack research (validated by FORGE)
     # =========================================================================
 
-    # --- GLS-AB-001: JWT algorithm none bypass ---
+    # --- GLS-AB-006: JWT algorithm none bypass (renamed from duplicate AB-001) ---
     {
-        "id": "GLS-AB-001",
+        "id": "GLS-AB-006",
         "name": "JWT algorithm none bypass",
         "category": "auth_bypass",
         "severity": "critical",
