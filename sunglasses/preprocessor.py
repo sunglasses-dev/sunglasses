@@ -1,14 +1,17 @@
 """
 SUNGLASSES Preprocessor — Normalizes text before pattern matching.
 
-Strips Unicode tricks, decodes Base64, collapses invisible characters,
-maps homoglyphs to ASCII. This alone defends against 12 known evasion
-techniques used to bypass prompt injection scanners.
+Strips Unicode tricks, decodes Base64/URL/HTML/hex/ROT13, collapses
+invisible characters, maps homoglyphs to ASCII. Defends against 17+
+known evasion techniques used to bypass prompt injection scanners.
 """
 
 import base64
+import codecs
+import html
 import re
 import unicodedata
+from urllib.parse import unquote
 
 
 # Homoglyph map: visually similar Unicode chars → ASCII equivalents
@@ -19,6 +22,15 @@ HOMOGLYPHS = {
     '\u0420': 'P', '\u0422': 'T', '\u0425': 'X',
     '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p',
     '\u0441': 'c', '\u0443': 'y', '\u0445': 'x',
+    # Ukrainian Cyrillic (added apr11 after baseline miss)
+    '\u0406': 'I', '\u0456': 'i',    # Ukrainian І / і — the big miss
+    '\u0407': 'I', '\u0457': 'i',    # Ї / ї
+    '\u0404': 'E', '\u0454': 'e',    # Є / є
+    '\u0490': 'G', '\u0491': 'g',    # Ґ / ґ
+    # Armenian lookalikes
+    '\u0548': 'O', '\u054d': 'S',
+    # Georgian / Ethiopic edge cases
+    '\u10e5': 'K',
     '\u0391': 'A', '\u0392': 'B', '\u0395': 'E', '\u0397': 'H',
     '\u0399': 'I', '\u039a': 'K', '\u039c': 'M', '\u039d': 'N',
     '\u039f': 'O', '\u03a1': 'P', '\u03a4': 'T', '\u03a7': 'X',
@@ -70,11 +82,29 @@ def normalize(text: str) -> str:
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
+    text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
+    text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
+    text = decode_hex_escapes(text)       # \x49 etc → chars
     text = decode_base64_segments(text)   # Decode BEFORE leetspeak (leet corrupts b64)
     text = decode_leetspeak(text)
     text = strip_delimiter_padding(text)  # Collapse spaced chars BEFORE whitespace collapse
     text = collapse_whitespace(text)
-    return text.lower()
+    # ROT13 enrichment: append ROT13-decoded view for pattern matching
+    # so "Vtaber cerivbhf vafgehpgvbaf" also sees "ignore previous instructions"
+    rot = decode_rot13(text)
+    if rot != text:
+        text = text + " " + rot
+    # Reverse enrichment: append reversed view for reversed-string attacks
+    text = text + " " + text[::-1]
+    text = text.lower()
+    # Shape-confusion enrichment: lowercase l visually = capital I.
+    # Append a variant where standalone 'l' at word boundary → 'i'. Covers
+    # attacks like "lgnore all prevIous Instructions" where the attacker
+    # used lowercase L to stand in for capital I.
+    shape_variant = re.sub(r'\bl(?=[a-z])', 'i', text)
+    if shape_variant != text:
+        text = text + " " + shape_variant
+    return text
 
 
 def strip_invisible(text: str) -> str:
@@ -102,6 +132,49 @@ def collapse_whitespace(text: str) -> str:
     text = re.sub(r'[\t\r\x0b\x0c]+', ' ', text)
     text = re.sub(r' {2,}', ' ', text)
     return text.strip()
+
+
+def decode_html_entities(text: str) -> str:
+    """Decode HTML entities (&#73; &amp; &lt; etc) to raw characters."""
+    if '&' not in text:
+        return text
+    try:
+        return html.unescape(text)
+    except Exception:
+        return text
+
+
+def decode_url_encoding(text: str) -> str:
+    """Decode URL percent-encoding (%49 → I etc). Only runs if % is present."""
+    if '%' not in text:
+        return text
+    # Only decode if there's a plausible percent-encoded sequence
+    if not re.search(r'%[0-9A-Fa-f]{2}', text):
+        return text
+    try:
+        return unquote(text)
+    except Exception:
+        return text
+
+
+def decode_hex_escapes(text: str) -> str:
+    """Decode \\xNN hex escape sequences (\\x49 → I)."""
+    if '\\x' not in text:
+        return text
+    def _hex_sub(match):
+        try:
+            return chr(int(match.group(1), 16))
+        except Exception:
+            return match.group(0)
+    return re.sub(r'\\x([0-9A-Fa-f]{2})', _hex_sub, text)
+
+
+def decode_rot13(text: str) -> str:
+    """Return ROT13-decoded version of text. Used for enrichment, not replacement."""
+    try:
+        return codecs.decode(text, 'rot_13')
+    except Exception:
+        return text
 
 
 def decode_base64_segments(text: str) -> str:
