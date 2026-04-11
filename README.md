@@ -139,10 +139,10 @@ result = scanner.scan_auto("any_file.ext")
 |--------|-------|
 | Average text scan | 0.01ms |
 | Throughput | ~82,000 scans/sec |
-| Patterns | 174 |
+| Patterns | 201 |
 | Keywords | 796 |
 | Languages | 13 |
-| Attack categories | 30 |
+| Attack categories | 32 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Tests passing | 66/66 |
 | Core dependencies | Zero |
@@ -152,9 +152,9 @@ result = scanner.scan_auto("any_file.ext")
 
 English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian — plus community contributions.
 
-## What Works Today (v0.2.7)
+## What Works Today (v0.2.8)
 
-- ✅ Text scanning: 174 patterns, 796 keywords, 13 languages, 30 attack categories
+- ✅ Text scanning: 201 patterns, 796 keywords, 13 languages, 32 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ 10-step processing pipeline: 7 cleaning steps + 2 detection steps + 1 decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection
