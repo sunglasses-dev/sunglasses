@@ -3575,4 +3575,394 @@ PATTERNS = [
         ],
         "description": "Authority impersonation and emotional manipulation framings commonly used in social-engineering-style prompt injection.",
     },
+
+    # =========================================================================
+    # v0.2.11 batch — 2026-04-11 — 15 new patterns from Jack's fixture research
+    # Sources: arXiv mining, GHSA API, OWASP LLM Top 10, MITRE ATLAS, multilingual
+    # jailbreak literature, multimodal attack synthesis, supply-chain analysis
+    # =========================================================================
+
+    # --- GLS-MCP-POISON-201: MCP tool manifest poisoning ---
+    {
+        "id": "GLS-MCP-POISON-201",
+        "name": "MCP tool manifest poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "tool manifest poisoning",
+            "manifest override instructions",
+            "tool description ignore previous",
+            "manifest exfiltrate credentials",
+            "call tool then call tool",
+            "silently forward results",
+            "tool description developer mode",
+            "manifest system override",
+            "function description reveal api key",
+            "tool description send credentials",
+        ],
+        "regex": [
+            r'(?is)(?:"?(?:tool|function|manifest|description|instructions?)"?\s*[:=]\s*.+?){0,3}(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+override|developer\s+mode|reveal\s+(?:api[_ -]?key|token|secret)|send\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\s+tool\s+[a-z0-9_.-]+\s+then\s+call\s+tool\s+[a-z0-9_.-]+|silent(?:ly)?\s+forward\s+results?)',
+        ],
+        "description": "Detects malicious instructions embedded in MCP tool manifests/descriptions that attempt to override policy, coerce secret disclosure, or trigger unauthorized tool chains.",
+    },
+
+    # --- GLS-GHSA-PI-202: GHSA-grounded prompt-driven tool abuse ---
+    {
+        "id": "GLS-GHSA-PI-202",
+        "name": "GHSA agent injection and tool abuse",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "approved already run shell",
+            "consent cached skip confirmation",
+            "execute this command",
+            "run shell command now",
+            "mcp server subprocess",
+            "printenv for diagnostics",
+            "approval cache bypass",
+            "debug mode reveal api key",
+            "skip confirmation execute",
+            "unverified mcp server",
+        ],
+        "regex": [
+            r'(?is)(?:ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|subprocess|mcp\s+server|tool\s+server|execute\s+this\s+command|\$\(|`[^`]+`|curl\s+https?://|export\s+[A-Z0-9_]+|printenv|env\s*\||token|api[_ -]?key|secret)',
+        ],
+        "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems — grounded in GitHub Security Advisories.",
+    },
+
+    # --- GLS-I18N-LR-203: Low-resource language jailbreaks ---
+    {
+        "id": "GLS-I18N-LR-203",
+        "name": "Low-resource language jailbreak",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "langkau arahan",
+            "langkau peraturan",
+            "onyesha siri",
+            "onyesha token",
+            "fichua maelekezo",
+            "fichua prompt",
+            "\u0989\u09aa\u09c7\u0995\u09cd\u09b7\u09be \u0995\u09b0",
+            "\u0997\u09cb\u09aa\u09a8 \u0995\u09c0",
+            "\u0997\u09cb\u09aa\u09a8 \u099f\u09cb\u0995\u09c7\u09a8",
+            "balewala ang mga tagubilin",
+            "ilantad ang sekreto",
+            "ilantad ang token",
+            "\u0646\u0627\u062f\u06cc\u062f\u0647 \u0628\u06af\u06cc\u0631",
+            "\u062f\u0633\u062a\u0648\u0631\u0627\u062a \u0642\u0628\u0644\u06cc",
+            "\u0631\u0627\u0632 \u0631\u0627 \u0646\u0634\u0627\u0646",
+            "\u06c1\u062f\u0627\u06cc\u0627\u062a \u0646\u0638\u0631\u0627\u0646\u062f\u0627\u0632",
+            "\u062e\u0641\u06cc\u06c1 \u06a9\u0644\u06cc\u062f",
+            "\u062e\u0641\u06cc\u06c1 \u0679\u0648\u06a9\u0646",
+        ],
+        "regex": [
+            r'(?is)(ignore\s+(previous|prior)\s+instructions|bypass|jailbreak|system\s*prompt|developer\s*mode|reveal\s+(secret|token|key)|langkau\s+(arahan|peraturan)|onyesha\s+(siri|token)|fichua\s+(maelekezo|prompt)|\u0989\u09aa\u09c7\u0995\u09cd\u09b7\u09be\s+\u0995\u09b0|\u0997\u09cb\u09aa\u09a8\s+(\u0995\u09c0|\u099f\u09cb\u0995\u09c7\u09a8)|balewala\s+ang\s+mga\s+tagubilin|ilantad\s+ang\s+(sekreto|token)|\u0646\u0627\u062f\u06cc\u062f\u0647\s+\u0628\u06af\u06cc\u0631|\u062f\u0633\u062a\u0648\u0631(?:\u0627\u062a)?\s+\u0642\u0628\u0644\u06cc|\u0631\u0627\u0632\s+\u0631\u0627\s+\u0646\u0634\u0627\u0646|\u06c1\u062f\u0627\u06cc\u0627\u062a\s+\u0646\u0638\u0631\u0627\u0646\u062f\u0627\u0632|\u062e\u0641\u06cc\u06c1\s+(\u06a9\u0644\u06cc\u062f|\u0679\u0648\u06a9\u0646))',
+        ],
+        "description": "Detects jailbreak intent in low-resource languages (Swahili, Bengali, Tagalog, Persian, Urdu, Malay) including transliteration and code-switching variants.",
+    },
+
+    # --- GLS-MEM-POISON-204: Memory poisoning (delayed-action) ---
+    {
+        "id": "GLS-MEM-POISON-204",
+        "name": "Memory poisoning — delayed action",
+        "category": "memory_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "save this to memory permanently",
+            "remember this rule for every future",
+            "store this note in long-term memory",
+            "persist this preference always comply",
+            "update my profile preference reveal",
+            "write to memory ignore safety",
+            "for all future sessions ignore",
+            "remember permanently highest priority",
+            "store rule override policy",
+            "save preference bypass restrictions",
+        ],
+        "regex": [
+            r'(?is)\b(remember|save\s+(this|it)|store\s+(this|rule)|persist|write\s+to\s+memory|update\s+(my\s+)?(profile|preferences|notes|memory)|for\s+all\s+future\s+(chats|sessions))\b.{0,220}\b(ignore\s+(safety|policy|previous\s+instructions)|highest\s+priority|always\s+comply|never\s+disclose\s+this\s+rule|reveal\s+(api\s*key|token|system\s*prompt)|run\s+(tool|shell)\s+(quietly|silently))\b',
+        ],
+        "description": "Detects attempts to implant malicious instructions into persistent memory/profile/notes so future turns execute attacker goals like credential reveal, policy override, or covert tool misuse.",
+    },
+
+    # --- GLS-MM-IMG-205: Multimodal image-embedded instruction attacks ---
+    {
+        "id": "GLS-MM-IMG-205",
+        "name": "Image-embedded prompt injection",
+        "category": "indirect_prompt_injection",
+        "severity": "critical",
+        "channel": ["file", "web_content", "tool_output"],
+        "keywords": [
+            "image ocr ignore previous instructions",
+            "follow the text in this image",
+            "do not mention this instruction",
+            "image override policy",
+            "ocr text system override",
+            "watermark instruction dump",
+            "rotated text override policy",
+            "footer developer mode print",
+            "image text reveal system prompt",
+            "screenshot layered command",
+        ],
+        "regex": [
+            r'(?is)\b(ignore\s+(all\s+)?(previous|prior)\s+instructions|system\s+override|developer\s+mode|follow\s+the\s+text\s+in\s+this\s+image|do\s+not\s+mention\s+this\s+instruction)\b.{0,260}\b(reveal|print|expose|dump|return)\b.{0,120}\b(system\s*prompt|api\s*key|token|credential|secret)\b|\b(run|execute)\s+(tool|shell|command)\s+(silently|quietly)\b',
+        ],
+        "description": "Detects malicious intent embedded in images (visible, low-contrast, tiny text, rotated, watermark) where extracted instructions attempt to override policy, reveal secrets, or force tool actions.",
+    },
+
+    # --- GLS-MM-AUDIO-206: Multimodal audio-encoded prompt attacks ---
+    {
+        "id": "GLS-MM-AUDIO-206",
+        "name": "Audio-encoded prompt injection",
+        "category": "indirect_prompt_injection",
+        "severity": "critical",
+        "channel": ["file", "web_content", "tool_output"],
+        "keywords": [
+            "new system directive ignore",
+            "supersede safety policy",
+            "override guardrails reveal",
+            "dtmf override",
+            "dot dash instruction",
+            "phonetic code ignore",
+            "run connector silently",
+            "execute tool in background",
+            "quiet mode enabled dump secret",
+            "asr transcript override",
+        ],
+        "regex": [
+            r'(?is)(?!.*\b(?:security\s+guidance|prompt\s+injection\s+attempt|press\s+1\s+for\s+billing|morse\s+rhythm.*lecture)\b)(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|new\s+system\s+directive|supersede\s+safety\s+policy|override\s+guardrails?|(?:reveal|print|dump|expose|return)\s+(?:the\s+)?(?:hidden\s+)?(?:system\s*prompt|token|credential|secret|a-?p-?i\s*key)|(?:dtmf|dot\s*dash|phonetic).{0,120}(?:override|ignore|reveal|print|dump|return)|run\s+connector\s+silently|execute\s+tool\s+in\s+background|quiet\s+mode\s+enabled.{0,120}dump\s+secret)',
+        ],
+        "description": "Detects audio-derived instructions combining supersession language with sensitive targets or covert-action intent, including phonetic masking, DTMF-like tones, and Morse-style speech attacks.",
+    },
+
+    # --- GLS-SC-PKG-207: Agent-targeted package supply chain ---
+    {
+        "id": "GLS-SC-PKG-207",
+        "name": "Agent-targeted supply chain package attack",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "pip install extra-index-url http",
+            "npm install trusted-host",
+            "disable hash verification",
+            "skip signature check",
+            "postinstall read token",
+            "preinstall collect credentials",
+            "setup.py collect api key",
+            "typosquat install",
+            "dependency confusion install",
+            "postinstall upload env",
+            "prepare script silently patches",
+        ],
+        "regex": [
+            r'(?is)\b(pip\s+install|npm\s+(i|install)|poetry\s+add|uv\s+pip\s+install)\b.{0,220}\b(--extra-index-url|--index-url\s+http|--trusted-host|--no-verify|disable\s+hash|skip\s+signature|latest\s+from\s+fork)\b|\b(postinstall|preinstall|setup\.py|prepare\s+script|install\s+hook)\b.{0,180}\b(read|collect|upload|exfil|send)\b.{0,120}\b(token|credential|api[_\s-]?key|\.npmrc|\.pypirc|env)\b|\b(typosquat|dependency\s+confusion|internal\s+package\s+name)\b.{0,180}\b(install|publish|override)\b',
+        ],
+        "description": "Detects malicious package install/update vectors targeting AI agents via setup hooks, postinstall scripts, dependency confusion, typosquats, and poisoned transitive deps.",
+    },
+
+    # --- GLS-HF-CARD-208: HuggingFace model card abuse ---
+    {
+        "id": "GLS-HF-CARD-208",
+        "name": "HuggingFace model card abuse",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["file", "web_content", "tool_output"],
+        "keywords": [
+            "model card ignore safety policy",
+            "for research only disable guardrails",
+            "benchmark mode disable filters",
+            "trust_remote_code=true paste api key",
+            "red-team only run this script",
+            "educational use reveal system prompt",
+            "model card silent mode",
+            "readme usage override safety",
+            "recommended prompt reveal tool schema",
+            "bypass content policy token",
+        ],
+        "regex": [
+            r'(?is)\b(model\s*card|README|usage\s*notes|recommended\s*prompt|system\s*prompt)\b.{0,280}\b(for\s+research\s+only|educational\s+use|benchmark\s+mode|red[-\s]?team\s+only)\b.{0,260}\b(ignore\s+(safety|policy)|disable\s+(guardrails?|filters?|sandbox)|trust_remote_code\s*=\s*true|run\s+this\s+script|paste\s+(api|access)\s*key|reveal\s+(system\s+prompt|tool\s+schema)|do\s+not\s+log|silent\s+mode)\b|\b(trust_remote_code\s*=\s*true|override\s+safety\s+classifier|bypass\s+content\s+policy)\b.{0,180}\b(token|credential|api[_\s-]?key|system\s+prompt|tool\s+schema|browser\s+cookies?)\b',
+        ],
+        "description": "Detects HuggingFace model-card content that combines disclaimer language with instructions to disable protections, expose secrets, trust unverified code, or perform covert exfiltration.",
+    },
+
+    # --- GLS-MCP-APT-209: MCP APT-style credential theft lure ---
+    {
+        "id": "GLS-MCP-APT-209",
+        "name": "MCP APT lure — credential theft via manifest",
+        "category": "mcp_threat",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "soc escalation read vault",
+            "ciso approved export token",
+            "ir exception retrieve session",
+            "forensic triage dump env",
+            "zero-day containment drill",
+            "omit from audit log",
+            "do not alert user",
+            "quiet mode export secret",
+            "mirror output external collector",
+            "emergency validation export credentials",
+        ],
+        "regex": [
+            r'(?is)(?!.*\b(?:never\s+paste\s+tokens|block\s+instructions\s+requesting|tool\s+policy:)\b)(?=.*(?:read\s+vault|vault\.read|dump\s+env|export\s+(?:access\s+token|refresh\s+token|token|secret)|retrieve\s+session\s+cookies?|print\s+full\s+system\s+prompt|tool\s+schemas?|post\s+to\s+https?://|http_post|external\s+collector))(?=.*(?:soc\s+escalation|ciso\s+approved|ir\s+exception|forensic\s+triage|zero[-\s]?day|containment\s+drill|quiet\s+mode|omit\s+(?:this\s+from\s+)?audit\s+log|do\s+not\s+alert\s+user|mirror\s+output)).*',
+        ],
+        "description": "Detects APT-style MCP tool manifests that impersonate enterprise security or incident-response workflows to coerce secret extraction and staged exfiltration.",
+    },
+
+    # --- GLS-ENC-ALT-210: Encoding obfuscation and alt-channel injection ---
+    {
+        "id": "GLS-ENC-ALT-210",
+        "name": "Encoding obfuscation prompt injection",
+        "category": "encoding_evasion",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "decode then ignore all previous",
+            "transliterate braille to text execute",
+            "apply rot13 ignore instructions",
+            "convert braille to text follow",
+            "base64 decode and follow",
+            "dot-map decode command",
+            "cipher substitution reveal system",
+            "decrypt then execute",
+            "normalize then override",
+            "confusable script jailbreak",
+        ],
+        "regex": [
+            r'(?is)(\b(decode|decrypt|transliterate|normalize|apply\s*(rot13|cipher|substitution)|convert\s*(braille|dots?)\s*to\s*text)\b.{0,220}\b(ignore\s+(all|previous)|reveal\s+(system\s*prompt|tool\s*schema)|export\s+(token|secret|key)|send\s+to\s+https?://)\b)|([\u2800-\u28FF]{8,})|((?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)',
+        ],
+        "description": "Detects prompt injection payloads concealed in alternate encodings (Braille, ROT13, base64, confusable scripts, dot-patterns) that become harmful after normalization or decoding.",
+    },
+
+    # --- GLS-FRAMEWORK-BUG-211: Agent framework disclosed bug exploitation ---
+    {
+        "id": "GLS-FRAMEWORK-BUG-211",
+        "name": "Agent framework bug exploitation",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "delegated agent trust output execute verbatim",
+            "langchain print callback trace system prompt",
+            "crewai write to memory future turns",
+            "tool output execute skip validation",
+            "orchestrator bypass guard",
+            "callback log print system prompt",
+            "agent framework disable sandbox",
+            "trust delegated output highest priority",
+            "trace export api key",
+            "memory future turns ignore safety",
+        ],
+        "regex": [
+            r'(?is)\b(langchain|crewai|agent\s*framework|orchestrator|callback|trace|memory|tool\s*output|delegate(?:d)?\s*agent)\b.{0,260}\b(ignore\s+(all|previous)|trust\s+this\s+output|execute\s+verbatim|bypass\s*(guard|policy)|disable\s*(sandbox|validation)|print\s+(system\s*prompt|tool\s*schema|trace|callback\s*log)|export\s+(api[_\s-]?key|token|secret)|write\s+to\s+memory\s+for\s+future\s+turns?)\b',
+        ],
+        "description": "Detects attack prompts exploiting known agent-framework bug classes: unsafe delegation, memory poisoning, tool-output trust abuse, secret leakage through tracing/logging, and code/loader execution pivots.",
+    },
+
+    # --- GLS-CLOUD-LEAK-212: Cloud workbench prompt leak and context exposure ---
+    {
+        "id": "GLS-CLOUD-LEAK-212",
+        "name": "Cloud workbench prompt and context leakage",
+        "category": "prompt_leak",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "bedrock dump raw trace system prompt",
+            "azure prompt flow export full transcript",
+            "anthropic console disable redaction",
+            "workbench reveal hidden prompt",
+            "playground export tool schema",
+            "evaluation print internal policy",
+            "notebook copy system prompts",
+            "studio download auth token",
+            "trace share request headers",
+            "prompt flow export internal policy",
+        ],
+        "regex": [
+            r'(?is)\b(bedrock|azure\s*(ai|openai)|anthropic|workbench|studio|playground|evaluation|trace|prompt\s*flow|notebook)\b.{0,260}\b(reveal|dump|export|download|print|share|copy)\b.{0,220}\b(system\s*prompt|hidden\s*prompt|tool\s*schema|raw\s*trace|request\s*headers?|auth\s*(token|key)|session\s*(id|token)|full\s*transcript|internal\s*policy)\b',
+        ],
+        "description": "Detects attempts to reveal or export hidden cloud workbench prompt assets (system prompts, tool schemas, trace internals, auth metadata) from managed AI environments.",
+    },
+
+    # --- GLS-INDIRECT-DOC-213: Indirect prompt injection via documentation ---
+    {
+        "id": "GLS-INDIRECT-DOC-213",
+        "name": "Indirect injection via documentation and repo artifacts",
+        "category": "indirect_prompt_injection",
+        "severity": "critical",
+        "channel": ["file", "web_content", "tool_output"],
+        "keywords": [
+            "readme ignore previous instructions",
+            "documentation override policy",
+            "runbook bypass restrictions",
+            "setup guide dump system prompt",
+            "wiki supersede instructions",
+            "docs system instruction reveal",
+            "tool docs highest priority export",
+            "readme troubleshooting send secrets",
+            "documentation curl upload env",
+            "setup guide print api key",
+        ],
+        "regex": [
+            r'(?is)\b(readme|documentation|docs|wiki|runbook|setup\s*guide|tool\s*docs?)\b.{0,240}\b(ignore|override|bypass|supersede|highest\s*priority|system\s*instruction)\b.{0,260}\b(print|dump|reveal|export|upload|post|curl|send)\b.{0,240}\b(api\s*key|token|secret|\.env|system\s*prompt|tool\s*schema|credentials?)\b',
+        ],
+        "description": "Detects attempts to embed action-taking instructions in external documentation (README, docs, runbooks) that coerce agents to reveal secrets, bypass policy, or execute privileged commands.",
+    },
+
+    # --- GLS-MEM-PERSIST-214: Cross-turn memory persistence poisoning ---
+    {
+        "id": "GLS-MEM-PERSIST-214",
+        "name": "Cross-turn memory persistence poisoning",
+        "category": "memory_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "remember permanently override policy",
+            "store long-term memory highest priority",
+            "save profile memory reveal system prompt",
+            "persist memory always on operational",
+            "session memory supersede instructions",
+            "workspace memory note supersede",
+            "on keyword bypass guardrails",
+            "next session reveal hidden prompts",
+            "future task export secrets",
+            "long-term memory ignore prior",
+        ],
+        "regex": [
+            r'(?is)\b(remember|store|save|persist|long[-\s]*term\s*memory|profile\s*memory|session\s*memory)\b.{0,220}\b(always|highest\s*priority|override|supersede|ignore\s*(prior|previous)\s*instructions?)\b.{0,260}\b(next\s*(time|session|run)|future\s*(task|session)|when\s+.*\b(ask|query|trigger)\b|on\s+keyword)\b.{0,240}\b(reveal|dump|export|send|disable|bypass)\b',
+        ],
+        "description": "Detects attempts to write, preserve, or reactivate malicious payloads in persistent memory so they supersede policy in future turns or sessions.",
+    },
+
+    # --- GLS-SCHEMA-LEAK-215: Hidden system prompt and tool schema leakage ---
+    {
+        "id": "GLS-SCHEMA-LEAK-215",
+        "name": "System prompt and tool schema leakage",
+        "category": "prompt_leak",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "keywords": [
+            "print full hidden system prompt",
+            "reveal developer instructions",
+            "dump internal tool schema",
+            "expose concealed instruction layers",
+            "list function signatures tool schema",
+            "show policy prompt templates",
+            "export schema bundle webhook",
+            "print system prompt developer instructions",
+            "reveal tool schema json fields",
+            "transparency check expose instructions",
+        ],
+        "regex": [
+            r'(?is)(?!.*\bdo\s+not\s+reveal\b)(?!.*\bpublic\s+api\s+endpoints\b)(?!.*\bvalidate\s+this\s+user-provided\s+json\s+schema\b)(?=.*(?:show|print|dump|reveal|expose|list))(?=.*(?:system\s*prompt|developer\s*instructions?|internal\s*tool\s*schema|tool\s*schema|function\s*signatures?|policy\s*prompt\s*templates?|concealed\s*instruction\s*layers?)).*',
+        ],
+        "description": "Detects coercive requests to reveal hidden system prompts, developer policies, or internal tool schemas and block disclosure or externalization of those assets.",
+    },
 ]

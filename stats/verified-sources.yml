@@ -1,0 +1,80 @@
+# VERIFIED SOURCES REGISTRY
+# Every URL here has been fetched and confirmed 200 as of last_verified date.
+# Before citing any URL in content, CHECK THIS FILE FIRST.
+# If the URL you need isn't here, fetch it yourself and add it.
+# NEVER guess a URL from memory.
+#
+# Format: name, url, last_verified, category
+
+incidents:
+  - name: "PyTorch torchtriton compromise (Dec 2022)"
+    url: "https://pytorch.org/blog/compromised-nightly-dependency/"
+    last_verified: "2026-04-12"
+    category: supply_chain
+
+  - name: "npm event-stream/flatmap-stream backdoor (2018) — Snyk postmortem"
+    url: "https://snyk.io/blog/a-post-mortem-of-the-malicious-event-stream-backdoor/"
+    last_verified: "2026-04-12"
+    category: supply_chain
+    note: "Targeted Bitcoin private keys from Copay wallet users, NOT generic credential theft"
+
+  - name: "PyPI typosquatting campaigns — Snyk analysis"
+    url: "https://snyk.io/blog/malicious-packages-found-to-be-typo-squatting-in-pypi/"
+    last_verified: "2026-04-12"
+    category: supply_chain
+
+  - name: "Microsoft Bing Sydney jailbreak (Feb 2023) — The Verge"
+    url: "https://www.theverge.com/23599441/microsoft-bing-ai-sydney-secret-rules"
+    last_verified: "2026-04-12"
+    category: jailbreak
+
+  - name: "Multilingual jailbreak challenges — ICLR 2024 paper"
+    url: "https://arxiv.org/abs/2310.06474"
+    last_verified: "2026-04-12"
+    category: research
+
+  - name: "Crescendo multi-turn jailbreak — USENIX Security 2025"
+    url: "https://arxiv.org/abs/2404.01833"
+    last_verified: "2026-04-12"
+    category: research
+
+standards:
+  - name: "OWASP LLM Top 10 (project page)"
+    url: "https://owasp.org/www-project-top-10-for-large-language-model-applications/"
+    last_verified: "2026-04-12"
+    note: "v1.1 page. 2025 version moved Supply Chain from LLM05 to LLM03."
+
+  - name: "OWASP LLM01:2025 Prompt Injection"
+    url: "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
+    last_verified: "2026-04-12"
+
+  - name: "OWASP LLM03:2025 Supply Chain (formerly LLM05)"
+    url: "https://genai.owasp.org/llmrisk/llm03-supply-chain/"
+    last_verified: "2026-04-12"
+
+sunglasses:
+  - name: "Sunglasses GitHub repo"
+    url: "https://github.com/sunglasses-dev/sunglasses"
+    last_verified: "2026-04-12"
+
+  - name: "Sunglasses PyPI"
+    url: "https://pypi.org/project/sunglasses/"
+    last_verified: "2026-04-12"
+
+  - name: "Sunglasses website"
+    url: "https://sunglasses.dev"
+    last_verified: "2026-04-12"
+
+  - name: "Sunglasses reports page"
+    url: "https://sunglasses.dev/reports"
+    last_verified: "2026-04-12"
+
+  - name: "Sunglasses team page"
+    url: "https://sunglasses.dev/team"
+    last_verified: "2026-04-12"
+
+# RULES:
+# 1. NEVER cite a URL that isn't in this file or freshly verified
+# 2. Before adding a URL, fetch it and confirm 200
+# 3. Update last_verified when re-checking
+# 4. Add notes for common mistakes (wrong slugs, version changes, etc.)
