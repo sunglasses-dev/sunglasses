@@ -24,6 +24,7 @@ import time
 from .engine import SunglassesEngine
 from .reporter import ProtectedEngine, generate_report
 from .mailer import set_email, get_email, send_report
+from .sarif import to_sarif
 
 
 # ANSI colors for terminal output
@@ -370,6 +371,11 @@ def cmd_scan(args):
         print("Error: provide text, --file, or --stdin")
         sys.exit(1)
 
+    if args.output == "sarif":
+        sarif_log = to_sarif([result], source=source)
+        print(json.dumps(sarif_log, indent=2))
+        sys.exit(0 if result.is_clean else 1)
+
     if args.json:
         output = result.to_dict()
         output["source"] = source
@@ -526,6 +532,12 @@ def main():
     scan_parser.add_argument("--deep", action="store_true", help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    scan_parser.add_argument(
+        "--output", "-o",
+        choices=["human", "json", "sarif"],
+        default="human",
+        help="Output format: human (default), json, or sarif (SARIF 2.1.0 for GitHub Advanced Security / CI)",
+    )
     scan_parser.set_defaults(func=cmd_scan)
 
     # check

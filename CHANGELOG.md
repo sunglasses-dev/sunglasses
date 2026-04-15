@@ -2,6 +2,15 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.13] — 2026-04-15
+
+### Added
+- **SARIF 2.1.0 output support.** `sunglasses scan --output sarif` emits a fully spec-conformant SARIF log, compatible with GitHub Advanced Security code scanning, CI/CD gates, and any SARIF-aware dashboard.
+- `to_sarif()` and `to_sarif_json()` public API in `sunglasses.sarif` for programmatic use.
+- Per-finding `security-severity` scores (0.0–10.0) for GitHub Advanced Security severity triage.
+- Rule deduplication: identical rules across multiple scan results appear only once in `tool.driver.rules`.
+- `columnKind: utf16CodeUnits` for correct GitHub GHAS column rendering.
+
 ## [0.2.3] — 2026-04-04
 
 ### Added
