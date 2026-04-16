@@ -1,8 +1,8 @@
 {
-  "version": "0.2.13",
-  "patterns": 248,
-  "keywords": 1447,
-  "categories": 35,
+  "version": "0.2.14",
+  "patterns": 253,
+  "keywords": 1475,
+  "categories": 40,
   "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_avg_ms": 0.261,
@@ -16,7 +16,7 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-04-15T15:50:00-07:00",
+  "last_updated": "2026-04-16T17:40:00-07:00",
   "last_updated_by": "claude-code-ship-flow",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else."
 }

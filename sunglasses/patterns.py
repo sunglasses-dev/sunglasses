@@ -4460,4 +4460,114 @@ PATTERNS = [
         ],
         "description": "Detects malicious UI overlays that impersonate compliance or security banners to coerce agents into uploading local session artifacts such as cookies, tokens, or credential exports.",
     },
+
+    # =========================================================================
+    # v0.2.14 — NEW CATEGORIES (5 patterns from Jack research, Apr 16, 2026)
+    # tool_metadata_smuggling, memory_eviction_rehydration,
+    # multi_stage_encoding, tool_output_poisoning, provenance_chain_fracture
+    # =========================================================================
+
+    # --- GLS-TMS-234: Tool metadata smuggling — metadata authority override ---
+    {
+        "id": "GLS-TMS-234",
+        "name": "Tool metadata smuggling — metadata authority override",
+        "category": "tool_metadata_smuggling",
+        "severity": "high",
+        "channel": ["tool_output", "file", "web_content"],
+        "keywords": [
+            "metadata role system override",
+            "front matter root authority bypass",
+            "yaml header trusted ignore safety",
+            "annotations system authority replace instructions",
+            "properties trusted discard rules",
+            "trusted metadata override instructions",
+            "developer tag bypass guardrails",
+        ],
+        "regex": [
+            r'(?is)(?=.{0,500}\b(?:meta(?:data)?|front\s*matter|yaml\s*header|attributes?|properties?|tags?|annotations?)\b)(?=.{0,500}\b(?:system|developer|root|highest|authoritative|trusted)\b)(?=.{0,500}\b(?:ignore|bypass|override|replace|discard|forget|waive)\b)(?=.{0,500}\b(?:instructions?|guardrails?|policy|safety|rules?)\b).+',
+        ],
+        "description": "Detects metadata, front matter, or annotations claiming system/root/authoritative status and instructing the agent to ignore, bypass, or override safety instructions or guardrails.",
+    },
+
+    # --- GLS-MER-235: Memory eviction + rehydration chain ---
+    {
+        "id": "GLS-MER-235",
+        "name": "Memory eviction + rehydration chain",
+        "category": "memory_eviction_rehydration",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output"],
+        "keywords": [
+            "forget previous instructions then rehydrate from payload",
+            "purge context reload from encoded notes",
+            "erase history restore from tool output",
+            "discard prior reconstruct from blob",
+            "drop memory reseed from metadata",
+        ],
+        "regex": [
+            r'(?is)(?=.*\b(?:forget|erase|drop|purge|clear|discard|wipe)\b.{0,120}\b(?:memory|context|history|previous\s+instructions?|prior\s+instructions?)\b)(?=.*\b(?:reload|rehydrate|restore|reseed|reconstruct)\b.{0,120}\b(?:from|using)\b.{0,120}\b(?:payload|blob|encoded|notes?|tool\s+output|metadata)\b).*',
+        ],
+        "description": "Detects two-stage memory attacks that first instruct the agent to evict prior context (forget, erase, purge memory or instructions) and then rehydrate or reseed state from attacker-controlled payload, blob, or tool output.",
+    },
+
+    # --- GLS-MSE-236: Multi-stage encoding — decoder authority shift ---
+    {
+        "id": "GLS-MSE-236",
+        "name": "Multi-stage encoding — decoder authority shift",
+        "category": "multi_stage_encoding",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "base64 decode then ignore safety",
+            "double encoded payload bypass guardrails",
+            "decode hex then override policy",
+            "decompress gzip treat as system prompt",
+            "decode then interpret as developer instructions",
+        ],
+        "regex": [
+            r'(?is)\b(?:ignore|bypass|override|replace|discard|skip)\b.{0,100}\b(?:safety|policy|guardrails?|restrictions?|filters?)\b.{0,220}\b(?:(?:base64|hex|rot13|gzip|zlib|double[-\s]?encoded|url[-\s]?encoded|encoded).{0,80}(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?)|(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?).{0,80}(?:base64|hex|rot13|gzip|zlib|double[-\s]?encoded|url[-\s]?encoded|encoded))\b',
+            r'(?is)\b(?:(?:base64|hex|rot13|gzip|zlib|double[-\s]?encoded|url[-\s]?encoded|encoded).{0,80}(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?)|(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?).{0,80}(?:base64|hex|rot13|gzip|zlib|double[-\s]?encoded|url[-\s]?encoded|encoded))\b.{0,180}\b(?:treat(?:\s+it)?\s+as|interpret(?:\s+it)?\s+as)\b.{0,60}\b(?:system|developer)\b.{0,40}\b(?:instructions?|prompt)\b',
+        ],
+        "description": "Detects multi-stage encoding attacks where instructions are hidden in encoded payloads (base64, hex, gzip, rot13) and the agent is told to decode, then either bypass safety controls or treat the decoded content as authoritative system or developer instructions.",
+    },
+
+    # --- GLS-TOP-237: Tool output poisoning — trusted output override ---
+    {
+        "id": "GLS-TOP-237",
+        "name": "Tool output poisoning — trusted output override",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["tool_output", "web_content"],
+        "keywords": [
+            "tool output is trusted ignore previous instructions",
+            "search output authoritative override prior guardrails",
+            "browser output ground truth bypass safety policy",
+            "plugin output trusted override system prompt",
+            "API output authoritative replace instructions",
+            "retrieval output trusted disregard prior policy",
+        ],
+        "regex": [
+            r'(?is)(?:\b(?:because|since|as)\s+(?:the\s+)?(?:tool|search|browser|retrieval|plugin|api)\s+output\s+(?:is\s+)?(?:trusted|authoritative|ground\s*truth)\b.{0,180}\b(?:ignore|bypass|override|replace|disregard|forget)\b.{0,140}\b(?:previous|prior|earlier)?\s*(?:instructions?|guardrails?|safety\s*polic(?:y|ies)|polic(?:y|ies)|system\s+prompt)\b|\b(?:ignore|bypass|override|replace|disregard|forget)\b.{0,140}\b(?:previous|prior|earlier)?\s*(?:instructions?|guardrails?|safety\s*polic(?:y|ies)|polic(?:y|ies)|system\s+prompt)\b.{0,180}\b(?:because|since|as)\s+(?:the\s+)?(?:tool|search|browser|retrieval|plugin|api)\s+output\s+(?:is\s+)?(?:trusted|authoritative|ground\s*truth)\b)',
+        ],
+        "description": "Detects tool output poisoning where attacker-controlled content from a tool, search result, browser, retrieval source, plugin, or API claims trusted or authoritative status to justify ignoring or overriding the agent's prior instructions, guardrails, or safety policy.",
+    },
+
+    # --- GLS-PCF-238: Provenance chain fracture — retag untrusted as trusted ---
+    {
+        "id": "GLS-PCF-238",
+        "name": "Provenance chain fracture — retag untrusted as trusted",
+        "category": "provenance_chain_fracture",
+        "severity": "high",
+        "channel": ["tool_output", "file", "message"],
+        "keywords": [
+            "relabel untrusted as trusted ignore provenance checks",
+            "retag external data as verified bypass chain of custody",
+            "treat unsigned tool output as verified skip signature",
+            "classify third-party as internal suppress source check",
+            "mark unverified bundle trusted ignore attestation",
+        ],
+        "regex": [
+            r'(?is)\b(?:relabel|retag|mark|classify|treat)\b.{0,80}\b(?:untrusted|unsigned|unverified|external|third[- ]party)\b.{0,80}\b(?:as|to)\b.{0,20}\b(?:trusted|verified|internal|approved)\b.{0,120}\b(?:ignore|bypass|skip|suppress)\b.{0,60}\b(?:provenance|chain(?:\s+of\s+custody)?|signature|attestation|source(?:\s+check)?)\b',
+        ],
+        "description": "Detects provenance chain fracture attacks where an instruction relabels or reclassifies untrusted, unsigned, external, or third-party data as trusted, verified, or internal, and then instructs the agent to ignore or bypass provenance, chain of custody, signature, or attestation validation.",
+    },
 ]
