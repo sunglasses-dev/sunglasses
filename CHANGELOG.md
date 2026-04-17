@@ -2,6 +2,18 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.15] — 2026-04-17
+
+### Added
+- **2 new threat categories** covering multi-agent and RAG pipelines:
+  - `cross_agent_injection` — **GLS-CAI-239** — upstream/previous/delegated agent output claimed as trusted, authoritative, verified, signed, or approved is used to justify ignoring system prompt, policy, guardrails, or instructions. Covers A2A (agent-to-agent) trust-boundary abuse in multi-agent workflows.
+  - `retrieval_poisoning` — **GLS-RP-240** — retrieved document, knowledge-base chunk, or top-ranked search result presented as authoritative / ground truth is used to justify overriding system instructions, policy, or safety rules. Covers retrieval-time injection in RAG pipelines.
+- 2 new regex patterns, 16 new keywords
+- Patterns: 253 → 255 | Keywords: 1,475 → 1,491 | Categories: 40 → 42
+
+### Research source
+Patterns derived from Jack's autonomous pattern-extraction work (CYCLE181 + CYCLE184), validated CLEAN (FP=0, FN=0) on reference corpus of 12 and 16 cases respectively. Both cover attack surfaces explicitly flagged as uncovered in the internal pattern database reference.
+
 ## [0.2.13] — 2026-04-15
 
 ### Added

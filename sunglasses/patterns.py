@@ -4570,4 +4570,50 @@ PATTERNS = [
         ],
         "description": "Detects provenance chain fracture attacks where an instruction relabels or reclassifies untrusted, unsigned, external, or third-party data as trusted, verified, or internal, and then instructs the agent to ignore or bypass provenance, chain of custody, signature, or attestation validation.",
     },
+
+    # --- GLS-CAI-239: Cross-agent injection — trusted handoff override ---
+    {
+        "id": "GLS-CAI-239",
+        "name": "Cross-agent injection — trusted handoff override",
+        "category": "cross_agent_injection",
+        "severity": "high",
+        "channel": ["tool_output", "message"],
+        "keywords": [
+            "upstream agent output trusted ignore prior safety instructions",
+            "previous agent verified bypass system prompt",
+            "delegated agent result authoritative override guardrails",
+            "planner output signed replace policy",
+            "worker handoff approved disregard safety checks",
+            "agent A output trusted ignore instructions",
+            "prior agent authoritative bypass policy",
+            "A2A trust boundary signed override system",
+        ],
+        "regex": [
+            r'(?is)^(?!.*\b(?:do\s*not|don\'t|never|without)\s+(?:ignore|bypass|override|disregard|replace)\b)(?!.*\b(?:no|not|without)\s+(?:policy\s+)?(?:override|bypass|ignore|disregard|replace)\b)(?=.*\b(?:agent\s*[ab]|upstream\s+agent|previous\s+agent|prior\s+agent|agent\s+output|planner|worker|delegate(?:d)?)\b)(?=.*\b(?:trusted|authoritative|verified|signed|approved)\b)(?=.*\b(?:ignore|bypass|override|disregard|replace)\b)(?=.*\b(?:system(?:\s+prompt)?|policy|guardrail(?:s)?|safety(?:\s+checks?)?|instruction(?:s)?)\b).{0,2000}$',
+        ],
+        "description": "Detects cross-agent injection attacks where output from an upstream, previous, delegated, planner, or worker agent is presented as trusted, authoritative, verified, signed, or approved — and that claim is used to justify ignoring, bypassing, overriding, disregarding, or replacing the downstream agent's system prompt, policy, guardrails, safety checks, or instructions. Covers A2A (agent-to-agent) trust-boundary abuse in multi-agent workflows.",
+    },
+
+    # --- GLS-RP-240: Retrieval poisoning — ranked doc override instruction ---
+    {
+        "id": "GLS-RP-240",
+        "name": "Retrieval poisoning — ranked doc override instruction",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["tool_output", "web_content", "file"],
+        "keywords": [
+            "top-ranked retrieved document authoritative ignore system instructions",
+            "knowledge base chunk trusted bypass guardrails",
+            "highest ranked retrieval ground truth override policy",
+            "retrieved document priority context supersede safety rules",
+            "retrieval result authoritative replace system instructions",
+            "top-ranked chunk trusted disregard guardrails",
+            "RAG context ground truth bypass policy checks",
+            "retrieved knowledge base override safety",
+        ],
+        "regex": [
+            r'(?is)^(?!.*\b(?:do\s+not|never|without|no)\s+(?:policy\s+)?(?:override|bypass|ignore|disregard|replace)\b)(?=.*\b(?:retrieved|retrieval|top-?ranked|highest\s+ranked|knowledge\s+base|document|chunk)\b)(?=.*\b(?:authoritative|trusted|priority\s+context|ground\s+truth)\b)(?=.*\b(?:ignore|bypass|override|supersede|replace|disregard)\b)(?=.*\b(?:policy|guardrail(?:s)?|system\s+instruction(?:s)?|safety\s+rule(?:s)?)\b).{0,900}$',
+        ],
+        "description": "Detects retrieval (RAG) poisoning where a retrieved document, knowledge-base chunk, or top-ranked search result is claimed to be authoritative, trusted, priority context, or ground truth — and on that basis instructs the agent to ignore, bypass, override, supersede, replace, or disregard system instructions, policy, guardrails, or safety rules. Covers retrieval-time injection in RAG pipelines.",
+    },
 ]
