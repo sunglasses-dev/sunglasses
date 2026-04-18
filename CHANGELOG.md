@@ -2,6 +2,20 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.16] — 2026-04-18
+
+### Added
+- **4 new regex patterns across 3 existing categories** — depth expansion after Anthropic's Claude Code Auto Mode launch highlighted trust-boundary adjacent surfaces:
+  - `cross_agent_injection` — **GLS-CAI-241** — forged, spoofed, replayed, fabricated, or stolen approval tickets / signoff receipts / delegation tokens from an upstream, downstream, peer, or delegate agent used to justify bypassing scope, boundary, permission, policy, guardrail, or verification controls. Ticket-forgery variant of A2A trust handoffs.
+  - `retrieval_poisoning` — **GLS-RP-242** — retrieved RAG chunk, search index note, knowledge base snippet, or document-store record carrying a provenance disclaimer, footer annotation, watermark warning, or metadata note, but claiming authoritative / canonical / source-of-truth status to override current policy, guardrails, or verification.
+  - `tool_output_poisoning` — **GLS-TOP-243** — tool output, execution summary, result payload, agent report, or response digest reporting a signature mismatch, checksum failure, hash mismatch, or verification failure, then instructing the agent to ignore the execution / verification gate and run, deploy, or proceed anyway. "Failure-as-license" execution-gate bypass.
+  - `retrieval_poisoning` — **GLS-RP-244** — retrieval result, source snippet, document excerpt, knowledge chunk, or indexed source surfacing a lineage, provenance, citation, source-integrity, or origin warning, and instructing the agent to suppress or bypass the warning and execute, apply, or publish anyway. Suppression-of-warning attack surface in RAG pipelines.
+- 4 new regex patterns, 32 new keywords
+- Patterns: 255 → 259 | Keywords: 1,491 → 1,523 | Categories: 42 (unchanged)
+
+### Research source
+Patterns derived from Jack's autonomous pattern-extraction cycles CYCLE287–CYCLE290 (Apr 18). All four validated against fixture sets before integration: 8/8 positive-match on CYCLE288 / CYCLE289 / CYCLE290, 7/8 on CYCLE287 (regex widened to also cover "another agent" / "peer agent" phrasing). 0 false positives across all benign fixture sets.
+
 ## [0.2.15] — 2026-04-17
 
 ### Added

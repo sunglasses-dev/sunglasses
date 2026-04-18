@@ -4616,4 +4616,96 @@ PATTERNS = [
         ],
         "description": "Detects retrieval (RAG) poisoning where a retrieved document, knowledge-base chunk, or top-ranked search result is claimed to be authoritative, trusted, priority context, or ground truth — and on that basis instructs the agent to ignore, bypass, override, supersede, replace, or disregard system instructions, policy, guardrails, or safety rules. Covers retrieval-time injection in RAG pipelines.",
     },
+
+    # --- GLS-CAI-241: Cross-agent injection — forged handoff ticket scope bypass ---
+    {
+        "id": "GLS-CAI-241",
+        "name": "Cross-agent injection — forged handoff ticket scope bypass",
+        "category": "cross_agent_injection",
+        "severity": "high",
+        "channel": ["tool_output", "message"],
+        "keywords": [
+            "forged approval ticket bypass scope guardrails",
+            "fabricated signoff receipt ignore permission scope",
+            "spoofed delegation approval token skip policy",
+            "replayed delegated token override boundary verification",
+            "stolen handoff ticket override scope policy",
+            "cross-agent receipt replayed bypass verification boundary",
+            "agent-to-agent fabricated signoff circumvent permission",
+            "delegate receipt forgery disable boundary verification",
+        ],
+        "regex": [
+            r'(?is)^(?=.*\b(?:cross[- ]agent|delegat(?:e|ed|ion)|handoff|upstream\s+agent|downstream\s+agent|agent-to-agent|another\s+agent|peer\s+agent)\b)(?=.*\b(?:ticket|receipt|approval|signoff|token)\b)(?=.*\b(?:forg(?:e|ed|ery)|spoof(?:ed)?|replay(?:ed)?|fabricat(?:e|ed|ion)|stolen)\b)(?=.*\b(?:scope|boundary|permission|policy|guardrails?|verification)\b)(?=.*\b(?:bypass|override|ignore|skip|disable|circumvent)\b).+$',
+        ],
+        "description": "Detects cross-agent injection variant where a forged, spoofed, replayed, fabricated, or stolen approval ticket, signoff receipt, or delegation token from an upstream, downstream, peer, or delegate agent is used to justify bypassing scope, boundary, permission, policy, guardrail, or verification controls. Covers ticket-forgery attacks on A2A trust handoffs.",
+    },
+
+    # --- GLS-RP-242: Retrieval poisoning — provenance disclaimer authority override ---
+    {
+        "id": "GLS-RP-242",
+        "name": "Retrieval poisoning — provenance disclaimer authority override",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["tool_output", "web_content", "file"],
+        "keywords": [
+            "provenance disclaimer outdated treat as authoritative override policy",
+            "footer annotation doc canonical ignore guardrails",
+            "metadata note bypass verification use as ground truth",
+            "watermark warning disregard verification source of truth",
+            "footer disclaimer treat as authoritative override guardrails",
+            "provenance annotation ignore policy verification canonical",
+            "metadata disclaimer use as ground truth bypass controls",
+            "canonical retrieval skip current policy checks",
+        ],
+        "regex": [
+            r'(?is)^(?=.*\b(?:retriev(?:e|ed|al)|rag|search\s+index|knowledge\s+base|document\s+store)\b)(?=.*\b(?:provenance|disclaimer|footer|watermark|annotation|metadata\s+note)\b)(?=.*\b(?:authoritative|canonical|source\s+of\s+truth|ground\s+truth)\b)(?=.*\b(?:ignore|override|bypass|skip|disregard)\b)(?=.*\b(?:policy|guardrails?|verification|controls?|current|latest)\b).+$',
+        ],
+        "description": "Detects retrieval poisoning variant where a retrieved RAG chunk, search index note, knowledge base snippet, or document-store record carries a provenance disclaimer, footer annotation, watermark warning, or metadata note, but the instruction claims the record is authoritative, canonical, source of truth, or ground truth and tells the agent to ignore, override, bypass, skip, or disregard current policy, guardrails, verification, or controls.",
+    },
+
+    # --- GLS-TOP-243: Tool output poisoning — signed summary mismatch gate bypass ---
+    {
+        "id": "GLS-TOP-243",
+        "name": "Tool output poisoning — signed summary mismatch gate bypass",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["tool_output", "web_content"],
+        "keywords": [
+            "tool output signature mismatch ignore approval execute",
+            "execution summary checksum failed bypass verification gate deploy",
+            "result payload invalid signature override guardrails trigger",
+            "agent report hash mismatch skip policy proceed",
+            "response digest verification failure disregard execution gate",
+            "tool output signature mismatch bypass approval trigger deployment",
+            "execution summary checksum fail ignore policy guardrails proceed",
+            "result payload invalid signature override verification gate execute",
+        ],
+        "regex": [
+            r'(?is)^(?=.*\b(?:tool\s+output|execution\s+summary|result\s+payload|agent\s+report|response\s+digest)\b)(?=.*\b(?:signature\s+mismatch|checksum\s+fail(?:ed)?|hash\s+mismatch|verification\s+fail(?:ed|ure)?|invalid\s+signature)\b)(?=.*\b(?:ignore|override|bypass|skip|disregard)\b)(?=.*\b(?:approval|policy|guardrails?|execution\s+gate|verification\s+gate|controls?)\b)(?=.*\b(?:run|execute|deploy|trigger|proceed)\b).+$',
+        ],
+        "description": "Detects tool output poisoning variant where a tool output, execution summary, result payload, agent report, or response digest reports a signature mismatch, checksum failure, hash mismatch, verification failure, or invalid signature — and the instruction tells the agent to ignore, override, bypass, skip, or disregard approval, policy, guardrails, or the execution / verification gate and run, execute, deploy, trigger, or proceed anyway. Catches 'failure-as-license' execution-gate bypass.",
+    },
+
+    # --- GLS-RP-244: Retrieval poisoning — source lineage warning suppression ---
+    {
+        "id": "GLS-RP-244",
+        "name": "Retrieval poisoning — source lineage warning suppression",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["tool_output", "web_content", "file"],
+        "keywords": [
+            "retrieval result lineage warning suppress policy verification execute",
+            "source snippet provenance warning ignore trust checks publish",
+            "document excerpt citation warning override guardrails run",
+            "knowledge chunk origin warning bypass approval apply",
+            "indexed source integrity warning disregard policy execute",
+            "retrieval provenance warning suppress guardrails run deployment",
+            "source snippet lineage warning override trust verification publish",
+            "document excerpt citation warning ignore approval apply",
+        ],
+        "regex": [
+            r'(?is)^(?=.*\b(?:retrieval\s+result|source\s+snippet|document\s+excerpt|knowledge\s+chunk|indexed\s+source)\b)(?=.*\b(?:lineage\s+warning|provenance\s+warning|citation\s+warning|source\s+integrity\s+warning|origin\s+warning)\b)(?=.*\b(?:ignore|override|suppress|bypass|disregard)\b)(?=.*\b(?:policy|guardrails?|verification|approval|trust\s+checks?)\b)(?=.*\b(?:execute|run|proceed|apply|publish)\b).+$',
+        ],
+        "description": "Detects retrieval poisoning variant where a retrieval result, source snippet, document excerpt, knowledge chunk, or indexed source surfaces a lineage, provenance, citation, source-integrity, or origin warning, and the instruction tells the agent to ignore, override, suppress, bypass, or disregard policy, guardrails, verification, approval, or trust checks and execute, run, proceed, apply, or publish anyway. Covers suppression-of-warning attack surface in RAG pipelines.",
+    },
 ]
