@@ -2,6 +2,31 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.17] — 2026-04-19
+
+### Added
+- **10 new regex patterns across 5 NEW categories and 3 existing** — biggest category growth since v0.2.14:
+  - `tool_chain_race` (NEW CATEGORY) — **GLS-TCR-245** (ordered handoff policy bypass) + **GLS-TCR-246** (handoff ack bypass window). First coverage for timing / ordering attacks on agent tool chains and handoffs.
+  - `model_routing_confusion` (NEW CATEGORY) — **GLS-MRC-247** — "switch to cheaper/smaller model to bypass safety/guardrails" attack pattern targeting the model-router / effort layer. Directly relevant to Auto Mode and Opus 4.7 multi-tier routing.
+  - `context_flooding` (NEW CATEGORY) — **GLS-CF-248** — eviction-via-padding attacks: flooding the context window with repeated/duplicated tokens to push earlier guardrails / system prompts out of the window.
+  - `agent_persona_drift` (NEW CATEGORY) — **GLS-APD-249** — gradual multi-turn persona/tone/behavior drift with stealth instructions. Distinct from one-shot jailbreak_roleplay — targets the slow-drift surface in long conversations.
+  - `error_message_leakage` (NEW CATEGORY) — **GLS-EML-250** — forced-error attacks: deliberately trigger/force/induce errors or stack traces to leak system prompt / hidden instructions / API keys / tokens.
+  - `token_smuggling` — **GLS-TS-251** — injection via HTML / code / YAML comment channels and metadata annotation fields that most agents treat as non-instructional.
+  - `prompt_injection` — **GLS-PI-018** (typoglycemia override variant) + **GLS-PI-019** (encoded payload decode-and-execute). Covers scrambled-character and base64/hex/rot13-encoded instruction smuggling.
+  - `tool_poisoning` — **GLS-TP-ITDP-252** — compliance / legal / audit pretext used to justify disabling PII redaction and exporting unredacted data.
+- 10 new regex patterns, ~80 new keywords
+- Patterns: 259 → **269** | Keywords: 1,523 → **1,603** | Categories: 42 → **48**
+
+### Changed
+- **README truth-layer reconciliation** — reconciled README claims against actual code / stats. Corrected: test count (now shows 64/64 internal recall + 7 pytest, previously claimed made-up "66/66"), pattern/keyword/language/category counts (now pulled from `stats/current.json`), scan speed (now shows verified avg 0.26ms on M3 Max), throughput (now shows verified 3,830/sec single-threaded), and local-only claim (now qualified with opt-in Resend email note).
+- **Version drift fix** — `sunglasses/mcp.py` `SERVER_VERSION` was pinned at `0.2.4` for 12 releases; now imports dynamically from `sunglasses.__version__`. Single source of truth.
+
+### Research source
+10 patterns derived from Jack's autonomous pattern-extraction work across CYCLE38, CYCLE49, CYCLE62, CYCLE192, CYCLE193, CYCLE232, CYCLE233, CYCLE234, CYCLE237, CYCLE266. All validated CLEAN or with TP/TN ≥ 8/10 on fixture sets before integration. Triage performed and documented in `jack-patterns-triage-v0217-2026-04-18.html`.
+
+### Blog
+- New blog post: **"A2A lets agents talk. Sunglasses decides whether they should be trusted to act."** — draft authored by Cava (Director of Threat Intelligence), published alongside this release. Frames cross-trust-boundary risk as the core thesis for Sunglasses v0.3 direction.
+
 ## [0.2.16] — 2026-04-18
 
 ### Added

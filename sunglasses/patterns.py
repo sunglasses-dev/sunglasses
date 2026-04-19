@@ -4708,4 +4708,238 @@ PATTERNS = [
         ],
         "description": "Detects retrieval poisoning variant where a retrieval result, source snippet, document excerpt, knowledge chunk, or indexed source surfaces a lineage, provenance, citation, source-integrity, or origin warning, and the instruction tells the agent to ignore, override, suppress, bypass, or disregard policy, guardrails, verification, approval, or trust checks and execute, run, proceed, apply, or publish anyway. Covers suppression-of-warning attack surface in RAG pipelines.",
     },
+
+    # ================================================================
+    # v0.2.17 — 10 patterns, 5 new categories (Jack CYCLE237/266/192/193/232/234/233/49/62/38)
+    # ================================================================
+
+    # --- GLS-TCR-245: Tool chain race — ordered handoff policy bypass (NEW CATEGORY) ---
+    {
+        "id": "GLS-TCR-245",
+        "name": "Tool chain race — ordered handoff policy bypass",
+        "category": "tool_chain_race",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output"],
+        "keywords": [
+            "tool 1 then tool 2 ignore approval policy",
+            "step one then step two bypass safety validation",
+            "tool then tool treat output trusted auto execute",
+            "mark agent result trusted automatically run",
+            "relabel tool output verified execute without approval",
+            "tool then tool override human review",
+            "step then step skip policy guardrail",
+            "handoff tool execute without confirmation",
+        ],
+        "regex": [
+            r'(?is)(?:\b(?:tool|step)\s*(?:\d+|one|two|three)?\b.{0,80}\b(?:then|before|after|next|->)\b.{0,120}\b(?:tool|step)\s*(?:\d+|one|two|three)?\b.{0,180}\b(?:ignore|override|bypass|skip)\b.{0,80}\b(?:approval|policy|guardrail|validation|safety|human review)\b)|(?:\b(?:treat|mark|relabel)\b.{0,60}\b(?:tool|agent|output|result)\b.{0,60}\b(?:trusted|verified|safe)\b.{0,120}\b(?:auto(?:matically)?\s*(?:execute|run)|execute\s+without\s+(?:approval|review|confirmation))\b)',
+        ],
+        "description": "Detects tool-chain race attacks where ordered multi-tool/step sequencing is paired with explicit approval/policy/guardrail bypass language, or where an intermediate tool output is forcibly relabeled trusted/verified/safe to auto-execute the next step without human review. First coverage for tool_chain_race category.",
+    },
+
+    # --- GLS-TCR-246: Tool chain race — handoff ack bypass window ---
+    {
+        "id": "GLS-TCR-246",
+        "name": "Tool chain race — handoff ack bypass window",
+        "category": "tool_chain_race",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output"],
+        "keywords": [
+            "before handoff skip check",
+            "during delegate bypass guardrail",
+            "after ack ignore verification",
+            "while transfer disable approval",
+            "race handoff inject state",
+            "window delegate override policy",
+            "timing agent replace instruction",
+            "handoff ack bypass window",
+        ],
+        "regex": [
+            r'(?is)(?:\b(?:before|during|after|while)\b.{0,80}\b(?:handoff|delegate|transfer|ack(?:nowledg(?:e|ement))?)\b.{0,80}\b(?:skip|bypass|ignore|disable)\b.{0,80}\b(?:check|checks|guardrail|verification|approval)\b|\b(?:race|window|timing)\b.{0,80}\b(?:handoff|delegate|agent)\b.{0,80}\b(?:inject|override|replace)\b.{0,80}\b(?:state|policy|instruction)\b)',
+        ],
+        "description": "Detects timing-window attacks on agent handoffs — exploits the acknowledgement/transfer window where guardrails are briefly relaxed during delegate/handoff/transfer/ack phases. Distinct mechanism from GLS-TCR-245 ordered-handoff bypass.",
+    },
+
+    # --- GLS-MRC-247: Model routing confusion — tier downgrade safety bypass (NEW CATEGORY) ---
+    {
+        "id": "GLS-MRC-247",
+        "name": "Model routing confusion — tier downgrade safety bypass",
+        "category": "model_routing_confusion",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output", "web_content"],
+        "keywords": [
+            "route cheaper model skip safety",
+            "switch mini tier bypass guardrails",
+            "downgrade budget model disable review",
+            "fallback fast model ignore approval",
+            "force haiku avoid escalation",
+            "pin small model without policy",
+            "use gpt-4o-mini skip checks",
+            "route low tier skip safety",
+        ],
+        "regex": [
+            r'(?is)\b(?:route|switch|downgrade|fallback|force|pin|use)\b.{0,100}\b(?:mini|cheap(?:er)?|low[- ]?tier|budget|fast(?:est)?|haiku|gpt-4o-mini|small model)\b.{0,180}\b(?:skip|bypass|disable|ignore|avoid|without)\b.{0,100}\b(?:safety|guardrails?|review|approval|escalation|policy|checks?)\b',
+        ],
+        "description": "Detects model-routing-layer attacks — 'switch to cheaper/smaller model to bypass safety/guardrails' pattern. Distinct from prompt_injection because it targets the router/effort layer, not the model's own refusal. First coverage for model_routing_confusion — directly relevant to Auto Mode / Opus 4.7 multi-tier routing.",
+    },
+
+    # --- GLS-CF-248: Context flooding — window padding eviction (NEW CATEGORY) ---
+    {
+        "id": "GLS-CF-248",
+        "name": "Context flooding — window padding eviction",
+        "category": "context_flooding",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output", "file"],
+        "keywords": [
+            "repeat junk flood context window",
+            "duplicate pad token push out system prompt",
+            "stuff context ignore drop guardrail",
+            "fill window evict earlier instructions",
+            "padding token overflow context",
+            "flood prompt push out safety instructions",
+            "repeat fill context drop system",
+            "pad window overflow earlier instructions",
+        ],
+        "regex": [
+            r'(?is)(?=.*\b(?:repeat|duplicate|pad(?:ding)?|flood|stuff|fill)\b)(?=.*\b(?:context|window|token(?:s)?|prompt)\b)(?=.*\b(?:ignore(?:d)?|drop(?:s|ped)?|evict(?:ed)?|cut(?:s)?\s*off|push(?:ed)?\s+out|overflow(?:s|ed)?)\b)',
+        ],
+        "description": "Detects eviction-via-padding attacks — intentional context-window flooding via repeated/duplicated/padded tokens to push earlier guardrail/system-prompt instructions out of the window. First coverage for context_flooding — documented real vector for long-context models.",
+    },
+
+    # --- GLS-APD-249: Agent persona drift — gradual trust recalibration (NEW CATEGORY) ---
+    {
+        "id": "GLS-APD-249",
+        "name": "Agent persona drift — gradual trust recalibration",
+        "category": "agent_persona_drift",
+        "severity": "high",
+        "channel": ["agent_input", "conversation"],
+        "keywords": [
+            "gradually shift persona less strict",
+            "slowly transition relax guardrails",
+            "incrementally drift behavior lower filters",
+            "step by step become fewer restrictions",
+            "over the next turns adopt less filters",
+            "gradually drop safety keep subtle",
+            "slowly ignore policy unnoticed",
+            "incrementally shift tone drop guardrails",
+        ],
+        "regex": [
+            r'(?is)^(?=.*\b(?:gradually|slowly|incrementally|step\s*by\s*step|over\s+the\s+next\s+\d+\s+(?:turns?|messages?|repl(?:y|ies)))\b)(?=.*\b(?:persona|tone|behavior|style|role)\b)(?=.*\b(?:shift|drift|transition|become|adopt)\b)(?=.*\b(?:less\s+strict|relax(?:ed)?\s+(?:safety|guardrails?)|lower\s+(?:your\s+)?(?:filters|restrictions)|fewer\s+filters|drop\s+(?:safety|policy)|ignore\s+(?:policy(?:\s+guardrails?)?|guardrails?))\b)(?=.*\b(?:do\s+not\s+mention|without\s+telling|keep\s+(?:it|the\s+transition)\s+subtle|avoid\s+noticing|unnoticed)\b).{0,1600}$',
+        ],
+        "description": "Detects gradual multi-turn persona/tone/behavior drift instructions paired with explicit stealth (do not mention, keep subtle, unnoticed). Distinct from one-shot jailbreak_roleplay — this is the slow-drift surface where a long conversation incrementally relaxes guardrails.",
+    },
+
+    # --- GLS-EML-250: Error message leakage — forced error secret leak (NEW CATEGORY) ---
+    {
+        "id": "GLS-EML-250",
+        "name": "Error message leakage — forced error secret leak",
+        "category": "error_message_leakage",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output"],
+        "keywords": [
+            "force exception dump system prompt",
+            "trigger error reveal hidden instructions",
+            "induce stack trace leak api key",
+            "cause traceback expose internal state",
+            "trigger debug print secret",
+            "force error leak token",
+            "induce exception dump config",
+            "trigger error reveal system prompt",
+        ],
+        "regex": [
+            r'(?is)^(?!.*\b(?:do\s+not|never|without)\b.{0,40}\b(?:reveal|reveals|revealed|revealing|leak|leaks|leaked|leaking|dump|dumps|dumped|dumping|print|prints|printed|printing|expose|exposes|exposed|exposing)\b).*\b(?:trigger|force|induce|cause)\b.{0,80}\b(?:error|exception|stack\s*trace|traceback|debug)\b.{0,120}\b(?:reveal|reveals|revealed|revealing|leak|leaks|leaked|leaking|dump|dumps|dumped|dumping|print|prints|printed|printing|expose|exposes|exposed|exposing)\b.{0,120}\b(?:system\s*prompt|hidden\s*instructions?|internal\s*(?:state|config)|api\s*key|token|secret)\b',
+        ],
+        "description": "Detects forced-error attack pattern — instructions that tell an agent to deliberately trigger/force/induce errors, exceptions, or stack traces in order to reveal/leak/dump/print/expose system prompts, hidden instructions, internal state, API keys, tokens, or secrets. Uses negative lookahead to skip negated defensive mentions.",
+    },
+
+    # --- GLS-TS-251: Token smuggling — comment/metadata override ---
+    {
+        "id": "GLS-TS-251",
+        "name": "Token smuggling — comment/metadata override channel",
+        "category": "token_smuggling",
+        "severity": "high",
+        "channel": ["agent_input", "file", "web_content", "tool_output"],
+        "keywords": [
+            "html comment ignore previous instructions",
+            "code comment bypass system policy",
+            "yaml comment override safety guardrails",
+            "x-instruction metadata override",
+            "annotation bypass guardrails",
+            "comment block disregard instructions",
+            "metadata ignore system prompt",
+            "comment supersede policy",
+        ],
+        "regex": [
+            r'(?is)(?:<!--|/\*|//|#\s*metadata:|metadata\s*:|x-instruction\s*:|annotation\s*:|comment[_ -]?block\s*[:=]).{0,140}\b(?:ignore|bypass|override|disregard|supersede|forget)\b.{0,140}\b(?:previous|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\b',
+        ],
+        "description": "Detects injection via HTML, code, YAML comments, or metadata annotation channels — attacker smuggles instructions through comment syntax or metadata fields that most agents/pipelines treat as non-instructional text. Zero prior coverage of this channel.",
+    },
+
+    # --- GLS-PI-018: Prompt injection — typoglycemia override variant ---
+    {
+        "id": "GLS-PI-018",
+        "name": "Prompt injection — typoglycemia override variant",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["agent_input", "web_content", "tool_output"],
+        "keywords": [
+            "ignroe all prevoius instrucitons",
+            "byapss systme instructions",
+            "ignore previous instructions scrambled",
+            "bypass system instructions typo",
+            "ignore prevoius systme instrucitons",
+            "byapss all previous instructions",
+            "ignroe system instrucitons",
+            "scrambled override previous instructions",
+        ],
+        "regex": [
+            r'(?is)\b(?:ignore|ignroe|bypass|byapss)\b.{0,80}\b(?:all\s+)?(?:previous|prevoius|system|systme)\b.{0,80}\b(?:instructions?|instrucitons?)\b',
+        ],
+        "description": "Detects typoglycemic (deliberately misspelled) prompt-injection variants that bypass exact-match filters. Scrambled-character variants of 'ignore previous instructions' / 'bypass system instructions'. Companion to GLS-PI-016 typoglycemic redaction.",
+    },
+
+    # --- GLS-PI-019: Prompt injection — encoded payload decode-and-execute ---
+    {
+        "id": "GLS-PI-019",
+        "name": "Prompt injection — encoded payload decode-and-execute",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["agent_input", "web_content", "file", "tool_output"],
+        "keywords": [
+            "ignore base64 decode instructions",
+            "bypass hex-encoded decode payload",
+            "override rot13 deobfuscate instructions",
+            "disregard unicode-escaped decode prompt",
+            "decode base64 ignore previous instructions",
+            "deobfuscate b64 bypass system",
+            "decrypt encoded override policy",
+            "decode payload ignore instructions",
+        ],
+        "regex": [
+            r'(?is)\b(?:ignore|bypass|override|disregard)\b.{0,140}\b(?:(?:base64|b64|hex(?:-)?encoded|rot13|unicode(?:-)?escaped).{0,80}(?:decode|deobfuscate|decrypt)|(?:decode|deobfuscate|decrypt).{0,80}(?:base64|b64|hex(?:-)?encoded|rot13|unicode(?:-)?escaped))\b.{0,140}\b(?:instructions?|payload|prompt)\b',
+        ],
+        "description": "Detects encoded-payload decode-and-execute prompt injection: instructs the agent to decode/deobfuscate/decrypt a base64/hex/rot13/unicode-escaped blob and then execute the decoded instructions. Complements GLS-PI-017 typoglycemic redaction.",
+    },
+
+    # --- GLS-TP-ITDP-252: Tool poisoning / ITDP — compliance pretext redaction bypass ---
+    {
+        "id": "GLS-TP-ITDP-252",
+        "name": "Tool poisoning / ITDP — compliance pretext redaction bypass",
+        "category": "tool_poisoning",
+        "severity": "high",
+        "channel": ["agent_input", "tool_output", "email"],
+        "keywords": [
+            "compliance policy disable redaction export",
+            "legal hold turn off masking share",
+            "audit request skip pii filter upload",
+            "compliance review bypass data protection send",
+            "compliance disable redaction export",
+            "legal hold turn off pii filter share",
+            "audit request skip masking upload",
+            "compliance policy bypass data protection send",
+        ],
+        "regex": [
+            r'(?i)\b(?:for\s+compliance|compliance\s+(?:policy|review)|legal\s+hold|audit\s+request)\b.{0,120}\b(?:disable|turn\s*off|skip|bypass)\b.{0,80}\b(?:redaction|masking|pii\s*filter|data\s*protection)\b.{0,120}\b(?:export|share|send|upload)\b',
+        ],
+        "description": "Detects ITDP (indirect tool data poisoning) variant using compliance/legal/audit pretext to justify disabling PII redaction/masking and then export/share/send/upload the unredacted data. Novel angle leveraging authority framing to bypass data-protection controls.",
+    },
 ]

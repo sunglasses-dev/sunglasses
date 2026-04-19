@@ -21,13 +21,14 @@ _pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
 
+from sunglasses import __version__
 from sunglasses.engine import SunglassesEngine
 from sunglasses.scanner import SunglassesScanner
 
 # Protocol constants
 JSONRPC = "2.0"
 SERVER_NAME = "sunglasses"
-SERVER_VERSION = "0.2.4"
+SERVER_VERSION = __version__
 PROTOCOL_VERSION = "2024-11-05"
 
 

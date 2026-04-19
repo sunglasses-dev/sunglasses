@@ -31,7 +31,7 @@ SUNGLASSES is a free, open-source input defense layer. It filters everything bef
 **What it doesn't do:**
 - Doesn't touch authentication (OAuth, cookies, tokens, headers)
 - Doesn't monitor agent behavior (that's SHIELD — coming later)
-- Doesn't send your data anywhere — runs 100% locally
+- Runs 100% locally — no cloud, no API keys, no telemetry for scanning
 
 **Email cleaning:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, the parasitic text gets stripped and your agent reads what the sender actually meant. Like sunglasses filtering UV. You don't even notice they're working.
 
@@ -103,7 +103,7 @@ print(result.decision)     # "block"
 print(result.severity)     # "high"
 print(result.findings)     # list of matched threats
 print(result.is_clean)     # False
-print(result.latency_ms)   # ~0.01ms
+print(result.latency_ms)   # <1ms (avg 0.26ms, M3 Max)
 ```
 
 ## Scan Images, Audio, Video, PDFs, QR Codes
@@ -137,37 +137,45 @@ result = scanner.scan_auto("any_file.ext")
 
 | Metric | Value |
 |--------|-------|
-| Average text scan | 0.01ms |
-| Throughput | ~82,000 scans/sec |
-| Patterns | 201 |
-| Keywords | 796 |
-| Languages | 13 |
-| Attack categories | 32 |
+| Average text scan | <1ms (avg 0.26ms on M3 Max, single-threaded) |
+| Throughput | ~3,800 scans/sec (single-threaded, M3 Max) |
+| Patterns | 259 |
+| Keywords | 1,523 |
+| Languages | 23 |
+| Attack categories | 42 |
+| Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
-| Tests passing | 66/66 |
-| Core dependencies | Zero |
+| Internal recall (attack-db fixture set) | 64/64 — 100% recall |
+| pytest (unit tests shipped in repo) | 7 passing |
+| False-positive rate | ~8.3% (known, actively tuning) |
+| Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-## 13 Languages
+_All performance numbers verified against `stats/current.json` (v0.2.16, updated Apr 18, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
-English, Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian — plus community contributions.
+## 23 Languages
 
-## What Works Today (v0.2.9)
+English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-- ✅ Text scanning: 201 patterns, 796 keywords, 13 languages, 32 attack categories
+## What Works Today (v0.2.16)
+
+- ✅ Text scanning: 259 patterns, 1,523 keywords, 23 languages, 42 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
-- ✅ 10-step processing pipeline: 7 cleaning steps + 2 detection steps + 1 decision
-- ✅ Image scanning: OCR + EXIF metadata + hidden text detection
+- ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
+- ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)
 - ✅ PDF scanning: page text + metadata + annotations
-- ✅ QR code scanning: decode and scan content
-- ✅ Audio scanning: Whisper transcription → text scan (experimental, needs `--deep`)
-- ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental)
-- ✅ CLI: `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`
+- ✅ QR code scanning: decode and scan content (requires pyzbar)
+- ✅ Audio scanning: Whisper transcription → text scan (experimental, needs `--deep`, requires Whisper)
+- ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental, requires FFmpeg + Whisper)
+- ✅ CLI: `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`, `sunglasses report`
 - ✅ Python API: `SunglassesEngine` for text, `SunglassesScanner` for media
+- ✅ Bridge/quarantine layer for secure file handoff into agent workflows (`sunglasses.bridge`)
 - ✅ LangChain + CrewAI integrations
-- ✅ Daily protection report (local HTML)
-- ✅ 66/66 tests passing
+- ✅ MCP server for agent frameworks (`sunglasses.mcp`)
+- ✅ SARIF 2.1.0 output for CI integration
+- ✅ 64/64 internal recall on shipped attack fixture set — 100% recall
 - ✅ 100% local — zero network calls, zero telemetry
+- ✅ Daily protection report (local HTML)
 - ✅ MIT License
 
 ## Roadmap
