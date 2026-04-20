@@ -1,7 +1,7 @@
 {
-  "version": "0.2.17",
-  "patterns": 269,
-  "keywords": 1603,
+  "version": "0.2.18",
+  "patterns": 303,
+  "keywords": 1919,
   "categories": 48,
   "languages": 23,
   "normalization_techniques": 17,
@@ -16,7 +16,7 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-04-19T16:20:00-07:00",
+  "last_updated": "2026-04-20T13:18:00-07:00",
   "last_updated_by": "claude-code-ship-flow",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else."
 }

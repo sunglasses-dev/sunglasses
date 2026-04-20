@@ -2,6 +2,35 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.18] — 2026-04-20
+
+### Added
+- **34 new patterns across 12 categories** — largest pattern dump since launch. Patterns: 269 → **303**. Keywords: 1,603 → **1,919** (+316). Categories: 48 (unchanged — PSR held for v0.2.19).
+  - `retrieval_poisoning` (7) — **GLS-RP-245 through GLS-RP-250, GLS-RP-255**. Covers RAG integrity attacks: citation-ranked source authority flip, instruction priority laundering, consensus citation override, verification bypass priority escalation, confidence badge source check bypass, source checksum mismatch ignore provenance gate, cache manifest hash bypass.
+  - `cross_agent_injection` (6) — **GLS-CAI-242 through GLS-CAI-247**. A2A trust-boundary attacks: peer-to-peer trust rebind override, fabricated quorum bypass, forged policy checkpoint waiver, delegated attestation replay guardrail bypass, approver identity swap bypass, forged handoff authority ack (human-authority spoofing).
+  - `social_engineering_ui` (4) — **GLS-SUIEI-234 through GLS-SUIEI-237**. Visual-injection lures: device code reauth banner, MFA push-fatigue loop, WebAuthn passkey fallback downgrade, DevTools cookie export lure.
+  - `model_routing_confusion` (3) — **GLS-MRC-248, GLS-MRC-249, GLS-MRC-250**. Tier spoof/shadow router/forged model card tier escalation bypasses.
+  - `tool_output_poisoning` (3) — **GLS-TOP-246, GLS-TOP-248, GLS-TOP-249**. Forged verification stamps, confidence banner tamper, forged checksum log integrity gate bypass.
+  - `memory_eviction_rehydration` (3) — **GLS-MER-236, GLS-MER-237, GLS-MER-238**. Checkpoint reset hidden rehydrate bypass + eviction/rehydration override variants.
+  - `tool_chain_race` (2) — **GLS-TCR-249, GLS-TCR-250**. Ordered tool state leak push, concurrent approval timeout escalation.
+  - `exfiltration` (2) — **GLS-EX-18, GLS-EX-19**. Output channel exfiltration via timing error partial secret probe and stream timing error sidestream.
+  - `token_smuggling` (1) — **GLS-TS-253**. Frontmatter role priority smuggle.
+  - `multi_stage_encoding`, `parasitic_injection`, `provenance_chain_fracture` — 1 pattern each.
+- 316 new compound-phrase keywords (hardened against single-word false-positive traps per v0.2.17 lesson).
+- 23 critical severity + 11 high severity = **34 patterns total**.
+
+### Held for v0.2.19+ (25 patterns)
+- 25 additional patterns extracted + EDGE-reviewed but held to stagger release cadence and allow keyword hardening + fact-check pass. Includes 2 `NEEDS_REVIEW` patterns from Jack's pool and the new `policy_scope_redefinition` category (GLS-PSR-001) which will ship as its own beat.
+
+### Research source
+- Base pool: 287 Jack candidate files across 16 categories in `~/jack-data/patterns/`.
+- Dedup pipeline (agent-driven): identified 48 SAFE + 21 EDGE. 10 EDGE promoted after Sonnet review. Net selection: 59 → 34 shipped today.
+- 3 SUIEI patterns (GLS-SUIEI-234/235/236) recovered from CYCLE45 batch that was initially mis-clustered during dedup. Manual add after spot-check verified novelty vs shipped 9 SUIEI patterns.
+
+### Infrastructure
+- New HARD RULE: never stage multi-hour autonomous work in `/tmp` — macOS wipes on reboot. All work now goes to `~/<project>-staging/`. See `feedback_never_write_work_to_tmp.md`.
+- v0.2.17 `/tmp` artifacts from overnight autonomous run vaporized at reboot Apr 20 morning — 80% recovered via session JSONL scrape; new staging discipline prevents recurrence.
+
 ## [0.2.17] — 2026-04-19
 
 ### Added
