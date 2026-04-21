@@ -2,6 +2,32 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.19] — 2026-04-21
+
+### Added
+- **10 new patterns across 10 categories** — patterns: 303 → **313** (+10). Keywords: 1,919 → **2,019** (+100). Categories: 48 → **49** (+1 NEW).
+  - **NEW CATEGORY** `policy_scope_redefinition` — **GLS-PSR-001** (Governance Appendix Precedence Override). Covers attacks that reinterpret scope boundaries after agent authorization.
+  - `cross_agent_injection` — **GLS-CAI-248** (Delegation Token Revocation Ignore Verification Bypass). **CRITICAL severity.**
+  - `retrieval_poisoning` — **GLS-RP-251** (Seeded Feedback Loop Rank Override Guardrail Evasion).
+  - `tool_output_poisoning` — **GLS-TOP-244** (Tool Output Poisoning).
+  - `tool_chain_race` — **GLS-TCR-247** (Ordered State Leak Push).
+  - `token_smuggling` — **GLS-TS-252** (Frontmatter Role Priority Smuggle).
+  - `agent_persona_drift` — **GLS-APD-250** (Unrestricted Role Override).
+  - `supply_chain` — **GLS-SC-20** (Dependency Trust Bypass).
+  - `parasitic_injection` — **GLS-PA-2** (Hidden Annotation Payload Policy Override).
+  - `tool_metadata_smuggling` — **GLS-TMS-235** (Tool Metadata Smuggling Directive).
+- 1 critical severity + 9 high severity.
+
+### Context
+- Released the 10 patterns staged in `v0219_hold_for_later.json` (held back from v0.2.18 for fact-check pass and staggered release cadence).
+- `policy_scope_redefinition` is the first new attack-category class shipped since v0.2.18's 7-category wave (retrieval_poisoning, cross_agent_injection, social_engineering_ui, model_routing_confusion, tool_output_poisoning, memory_eviction_rehydration, tool_chain_race).
+- Jack's cycles 411–428 (Apr 21) add further pattern candidates — held for v0.3.0 / v0.3.1.
+- v0.3.0 "Construct" launch deferred — originally planned as hybrid cascade engine (Layer 1 patterns + Layer 2 DistilBERT + Layer 3 LLM Judge), Layers 2 and 3 still in build. v0.3 ships when cascade is real.
+
+### Maturity signals (unchanged from v0.2.18)
+- 7/7 pytest passing · 64/64 internal recall · SARIF 2.1.0 output · MIT licensed · zero API keys · zero telemetry.
+- 2 public Anthropic CVP benchmark runs against Claude Opus 4.7 (Apr 17 + Apr 20).
+
 ## [0.2.18] — 2026-04-20
 
 ### Added
