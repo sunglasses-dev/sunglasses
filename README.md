@@ -151,15 +151,15 @@ result = scanner.scan_auto("any_file.ext")
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-_All performance numbers verified against `stats/current.json` (v0.2.20, updated Apr 22, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
+_All performance numbers verified against `stats/current.json` (v0.2.21, updated Apr 22, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
 ## 23 Languages
 
 English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-## What Works Today (v0.2.20)
+## What Works Today (v0.2.21)
 
-- ✅ Text scanning: 328 patterns, 2,160 keywords, 23 languages, 49 attack categories
+- ✅ Text scanning: 346 patterns, 2,296 keywords, 23 languages, 50 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)

@@ -1,8 +1,8 @@
 {
-  "version": "0.2.20",
-  "patterns": 328,
-  "keywords": 2160,
-  "categories": 49,
+  "version": "0.2.21",
+  "patterns": 346,
+  "keywords": 2296,
+  "categories": 50,
   "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_avg_ms": 0.261,
@@ -16,7 +16,7 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-04-22T19:17:06-0:700",
-  "last_updated_by": "sunglasses-publish-sh-manual-resume",
+  "last_updated": "2026-04-24T17:30:00-07:00",
+  "last_updated_by": "ship-skill-manual-resume",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else."
 }

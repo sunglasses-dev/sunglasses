@@ -2,6 +2,55 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.21] — 2026-04-24
+
+### Added
+- **Day 1 of v0.2.21–v0.2.27 drip series** — 7 consecutive daily releases with 1-2 category launches per day. SEO+AEO play: each day gets its own launch blog (JACK byline) to build ranking momentum across the "agent security" keyword surface.
+- **18 new patterns across 13 categories** — patterns: 328 → **346** (+18). Keywords: 2,160 → **2,296** (+136). Categories: 49 → **50** (+1 NEW).
+  - **NEW CATEGORY** `agent_contract_poisoning` — **GLS-ACP-001 / GLS-ACP-566 / GLS-ACP-567**. Attacks that poison the contract/schema/interface between agents, rebinding precedence and bypassing guardrails via forged SLA exceptions, contract appendices, or runbook clauses. Distinct from `cross_agent_injection` (hostile message *content*) — ACP attacks the *shape* of the agent-to-agent contract itself.
+  - `tool_output_poisoning` (2) — 2 new ACP-adjacent forgery patterns.
+  - `retrieval_poisoning` (2) — RAG integrity / ranked-doc override variants.
+  - `cross_agent_injection` (2) — peer-handoff + delegation-chain variants.
+  - `memory_eviction_rehydration` (1), `dns_tunneling` (1), `c2_indicator` (1), `prompt_extraction` (1), `provenance_chain_fracture` (1), `policy_scope_redefinition` (1), `agent_persona_drift` (1), `rtl_obfuscation` (1), `code_switching` (1).
+- 18 high severity (no critical this drop).
+
+### Operations
+- `/IDnormalization` skill added — canonical `GLS-<PREFIX>-<NNN>` enforcement at every ship. Prefix map at `.claude/skills/IDnormalization/scripts/prefix_map.json`.
+- Jack source-of-truth system live — `JACK_PATTERN_DB_REFERENCE.md` auto-regenerates into Jack's Docker after every ship. First `HARVEST_FEEDBACK.md` delivered — Jack now sees which patterns shipped, held, or failed validate (with reasons).
+- Research feeds wired for Jack — daily 06:00 UTC cron pulls NVD CVEs + arXiv cs.CR papers + MITRE ATLAS + OWASP LLM Top 10. 561 external research files now feeding novel-primitive generation.
+
+### Context
+- Pattern pool state: 97 tonight-validated patterns + 233 historical-backfill patterns = **330 ship-ready patterns queued** across Days 2-7 (Apr 25-30) and beyond.
+- Live Attack Experiment scheduled Apr 28 — Day 5 bundle lands before experiment kicks off so the treatment arm runs on current scanner.
+
+### Maturity signals
+- 7/7 pytest passing · SARIF 2.1.0 output · MIT licensed · zero API keys · zero telemetry.
+- 2 public Anthropic CVP benchmark runs against Claude Opus 4.7 (Apr 17 + Apr 20); Run 3 queued post-drip.
+
+---
+
+## [0.2.20] — 2026-04-22
+
+### Added
+- **15 new patterns across 7 categories** — tail of Apr 20 held pool. Patterns: 313 → **328** (+15). Keywords: 2,019 → **2,160** (+141). Categories: 49 (unchanged — no new category this beat).
+  - `retrieval_poisoning` (3) — **GLS-RP-252 / GLS-RP-253 / GLS-RP-254**. Further RAG integrity hardening (doc-rank override, citation-checksum bypass, seed-loop variants).
+  - `token_smuggling` (3) — **GLS-TS-254 / GLS-TS-255 / GLS-TS-256**. Frontmatter role priority smuggle follow-ons + hidden policy-tag variants.
+  - `tool_chain_race` (3) — **GLS-TCR-248 / GLS-TCR-251 / GLS-TCR-252**. Out-of-order revocation ack replay, ordered-state leak pushes.
+  - `tool_output_poisoning` (2) — **GLS-TOP-245 / GLS-TOP-247**. Spoofed tool-result variants.
+  - `tool_metadata_smuggling` (1) — **GLS-TMS-236**. Signed-envelope authority policy override.
+  - `prompt_injection` (1) — **GLS-PI-20**. Semantic-indirect-injection via navigation-constraint reframing.
+  - `tool_poisoning` (2) — **GLS-TP-ITDP-253 / GLS-TP-ITDP-254**. Audit-log suppression justifications + environment-equivalence provenance-waiver.
+- All 15 high severity.
+
+### Context
+- Close-out ship for the 25-pattern pool held from v0.2.18 release cadence. First 10 shipped in v0.2.19 (with new category `policy_scope_redefinition`); remaining 15 ship here to clear the queue before the drip cadence begins.
+- **CHANGELOG note:** This entry was backfilled on 2026-04-24 after AZ noticed the v0.2.20 commit (`19b21aa`) updated README + setup.py but skipped CHANGELOG.md. Root cause: `/ship` skill had no CHANGELOG step. A `preflight-changelog.sh` check was added as part of v0.2.21 to block future ships if CHANGELOG doesn't match `__version__`.
+
+### Maturity signals
+- 7/7 pytest passing · SARIF 2.1.0 output · MIT licensed · zero API keys · zero telemetry.
+
+---
+
 ## [0.2.19] — 2026-04-21
 
 ### Added
