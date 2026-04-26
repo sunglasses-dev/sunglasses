@@ -2,6 +2,32 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.22] — 2026-04-25
+
+### Added
+- **Day 2 of v0.2.21–v0.2.27 drip series** — daily 15-pattern releases continuing.
+- **16 new patterns across 9 categories** — patterns: 346 → **362** (+16). Categories: 50 → **51** (+1 NEW).
+  - **NEW CATEGORY** `state_sync_poisoning` — **GLS-SSP-001 / GLS-SSP-532 / GLS-SSP-539**. Forged checkpoint / replica / state-sync receipts that bypass policy gates, validation, and integrity checks during reconciliation. Distinct from `tool_output_poisoning` (forges the *content* of a tool result) — SSP attacks the *integrity signal* on stateful sync between agents.
+  - `tool_output_poisoning` (3) — GLS-TOP-001, GLS-TOP-250, GLS-TOP-259.
+  - `model_routing_confusion` (2) — GLS-MRC-252, GLS-MRC-528.
+  - `cross_agent_injection` (2) — GLS-CAI-533, GLS-CAI-584.
+  - `error_message_leakage` (2) — GLS-EML-251, GLS-EML-252.
+  - `policy_scope_redefinition` (1) — GLS-PSR-002.
+  - `dns_tunneling` (1) — GLS-DN-578.
+  - `retrieval_poisoning` (1) — GLS-RP-526.
+  - `invisible_unicode` (1) — GLS-IU-531.
+- All 16 patterns are HIGH severity (state_sync_poisoning, tool_output_poisoning, cross_agent_injection, model_routing_confusion, policy_scope_redefinition, dns_tunneling, retrieval_poisoning, invisible_unicode); error_message_leakage is medium.
+- Each pattern validated against TP=8 / TN=8 fixtures (Jack-curated synthetic test set), 0 false positives.
+
+### Operations
+- Removed orphan blog `opus-4-7-effort-levels-broke-my-flow.html` (pulled from blog index Apr 25, archived to `~/Desktop/orphan-blog-archive/` for future repurpose).
+
+### Maturity signals
+- 7/7 pytest passing · SARIF 2.1.0 output · MIT licensed · zero API keys · zero telemetry.
+- 5 public Anthropic CVP benchmark runs (full Anthropic family scoreboard: Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5).
+
+---
+
 ## [0.2.21] — 2026-04-24
 
 ### Added

@@ -6580,4 +6580,162 @@ PATTERNS = [
     },
 
 
+
+    # =========================================================================
+    # v0.2.22 (Apr 25, 2026) — Day 2 of 7-day drip series
+    # Featured NEW category: state_sync_poisoning (3 patterns)
+    # =========================================================================
+    # --- cross_agent_injection ---
+    {
+        "id": 'GLS-CAI-533',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegat(?:e|ed|es|ing)|orchestrator|worker|peer)\\b)(?=.*\\b(?:handoff|relay|forward|delegat(?:e|ed|es|ing)|transfer)\\b)(?=.*\\b(?:token|nonce|session|credential)\\b)(?=.*\\b(?:revoked|stale|expired|old)\\b)(?=.*\\b(?:scope|permission(?:s)?|authority)\\b)(?=.*\\b(?:rebind|elevate|expand|upgrade|widen)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-584',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
+        "description": ''
+    },
+    # --- dns_tunneling ---
+    {
+        "id": 'GLS-DN-578',
+        "name": '(unnamed)',
+        "category": 'dns_tunneling',
+        "severity": 'high',
+        "channel": ['tool_output', 'file'],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|egress|control(?:s)?|dns\\s*filter)\\b)(?=.*\\b(?:dns|doh|dot|txt|cname|subdomain|resolver)\\b)(?=.*\\b(?:tunnel|beacon|chunk(?:ing|ed)?|exfiltrat(?:e|ion)|payload)\\b)(?=.*\\b(?:secret(?:s)?|token(?:s)?|credential(?:s)?|key(?:s)?|data|command(?:s)?)\\b).+"],
+        "description": ''
+    },
+    # --- error_message_leakage ---
+    {
+        "id": 'GLS-EML-251',
+        "name": '(unnamed)',
+        "category": 'error_message_leakage',
+        "severity": 'medium',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:error|exception|stack(?:\\s|-)?trace|debug(?:ging)?|traceback|crash(?:\\s+log)?|diagnostic)\\b)(?=.*\\b(?:dump|print|expose|reveal|show|output)\\b)(?=.*\\b(?:full|raw|unredacted|complete)\\b)(?=.*(?:\\b(?:ignore|bypass|disable|skip|override)\\b.{0,40}\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b|\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b.{0,40}\\b(?:ignore|bypass|disable|skip|override)\\b))(?=.*\\b(?:secret|token|api[_ -]?key|credential|password|env(?:ironment)?\\s+var(?:iable)?s?)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-EML-252',
+        "name": '(unnamed)',
+        "category": 'error_message_leakage',
+        "severity": 'medium',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:error|exception|stack\\s*trace|traceback|debug\\s*log|crash\\s*dump)\\b)(?=.*\\b(?:force|trigger|induce|cause|provoke)\\w*\\b)(?=.*\\b(?:unredacted|raw|full|verbatim|plaintext)\\b)(?=.*\\b(?:reveal|leak|dump|print|expose|return|show)\\w*\\b)(?=.*\\b(?:api[_ -]?key|token|secret|credential|passwd|password|session\\s*id)\\b).*$'],
+        "description": ''
+    },
+    # --- invisible_unicode ---
+    {
+        "id": 'GLS-IU-531',
+        "name": '(unnamed)',
+        "category": 'invisible_unicode',
+        "severity": 'high',
+        "channel": ['message', 'file', 'web_content'],
+        "regex": ["(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disre[\\u200b\\u200c\\u200d\\ufeff]*gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"],
+        "description": ''
+    },
+    # --- model_routing_confusion ---
+    {
+        "id": 'GLS-MRC-252',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:route|reroute|switch|downgrade|fallback|send|shift)\\b.{0,80}\\b(?:lite|light(?:weight)?|cheap|fast|mini|small|low(?:-|\\s)?cost|budget)\\b)(?=.*\\b(?:admin|payment|credential(?:s)?|authorization|production|deploy(?:ment)?)\\b)(?=.*\\b(?:ignore|bypass|override|waive|skip|disable)\\b.{0,80}\\b(?:policy|guardrail(?:s)?|safety|approval|verification|control(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-528',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|routing|dispatcher|gateway|tier)\\b)(?=.*\\b(?:health|telemetry|latency|risk|score|classifier)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|tamper|tampered|replay|replayed|fabricated)\\b)(?=.*\\b(?:reroute|rerouted|promote|promoted|upgrade|upgraded|switch|switched|fail[-\\s]*open)\\b)(?=.*\\b(?:high[-\\s]*privilege|admin|unrestricted|raw\\s+model|unsafe\\s+tier)\\b)(?=.*\\b(?:bypass|bypassed|override|overrode|disable|disabled)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+gate|approval)\\b).+'],
+        "description": ''
+    },
+    # --- policy_scope_redefinition ---
+    {
+        "id": 'GLS-PSR-002',
+        "name": '(unnamed)',
+        "category": 'policy_scope_redefinition',
+        "severity": 'high',
+        "channel": ['message', 'tool_output'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:ignore|bypass|override|disregard|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|system\\s+instruction(?:s)?|approval\\s+check(?:s)?)\\b)(?=.*\\b(?:redefin(?:e|ed|es|ing)|reinterpret(?:ed|s|ing)?|reclassif(?:y|ied|ies|ying)|scope\\s+rebind|scope\\s+shift|treat(?:\\s+it)?\\s+as)\\b)(?=.*\\b(?:priority\\s+over|takes?\\s+priority|supersed(?:e|ed|es|ing)|replace(?:d|s|ing)?|deprecated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|skip)\\b).*$'],
+        "description": ''
+    },
+    # --- retrieval_poisoning ---
+    {
+        "id": 'GLS-RP-526',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'web_content', 'file'],
+        "regex": ['(?is)\\b(?:retrieval|rag|index|knowledge\\s+base|search)\\b.{0,140}\\b(?:score|ranking|priority|relevance)\\b.{0,140}\\b(?:forge|forged|forging|manipulate|manipulated|manipulating|poisoned|poisoning|tampered|tampering|spoofed|spoofing)\\b.{0,140}\\b(?:elevate|elevated|elevating|promote|promoted|promoting|rerank|reranked|reranking|prioritize|prioritized|prioritizing|boost|boosted|boosting)\\b.{0,140}\\b(?:ignore|bypass|override|disable|skip)\\b.{0,80}\\b(?:safety|policy|guardrail(?:s)?|verification|approval)\\b'],
+        "description": ''
+    },
+    # --- state_sync_poisoning ---
+    {
+        "id": 'GLS-SSP-001',
+        "name": 'Forged Replica Convergence Receipt Policy Gate Bypass',
+        "category": 'state_sync_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered)\\b)(?=.*\\b(?:replica|state(?:\\s+sync)?|convergence|checkpoint|reconcile)\\b)(?=.*\\b(?:receipt|snapshot|ack(?:nowledg(?:e|ement|ment))?|ledger)\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|risk\\s+gate|authorization|verification)\\b).*$'],
+        "description": 'Attackers may inject forged replica/state-sync convergence receipts (or checkpoint acknowledgements) to trick an agent into bypassing policy/verification gates during reconciliation or execution handoff.'
+    },
+    {
+        "id": 'GLS-SSP-532',
+        "name": '(unnamed)',
+        "category": 'state_sync_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:checkpoint|state\\s*sync|replica|snapshot|state\\s*delta)\\b)(?=.*\\b(?:forged|spoof(?:ed)?|tampered|fake|fabricated)\\b)(?=.*\\b(?:reconcile|merge|promote|adopt|apply|accept)\\b)(?=.*\\b(?:bypass|ignore|skip|disable|override)\\b)(?=.*\\b(?:validation|signature|approval|guardrail(?:s)?|integrity\\s*check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SSP-539',
+        "name": '(unnamed)',
+        "category": 'state_sync_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:checkpoint|snapshot|state|replica|journal)\\b)(?=.*\\b(?:rollback|revert|rewind|restore)\\b)(?=.*\\b(?:waiver|exception|fail[- ]?open|expedite)\\b)(?=.*\\b(?:signature|attestation|verification|integrity)\\b)(?=.*\\b(?:ignore|skip|disable|bypass|override)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$'],
+        "description": ''
+    },
+    # --- tool_output_poisoning ---
+    {
+        "id": 'GLS-TOP-001',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'file'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|tampered|fake)\\b)(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|audit\\s+trace|verdict\\s+record)\\b)(?=.*\\b(?:canary\\s+verdict|confidence\\s+gate|trust\\s+score|risk\\s+rating|verification\\s+badge)\\b)(?=.*\\b(?:guardrail(?:s)?|policy(?:\\s+gate)?|safety\\s+check(?:s)?|validation\\s+check(?:s)?)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:s|d|ing)?|skip(?:s|ped|ping)?|ignore(?:s|d|ing)?|suppress(?:es|ed|ing)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-250',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'file'],
+        "regex": ['(?is)^(?=.*\\b(?:audit\\s*log|telemetry|trace|evidence|verification\\s*record)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:checksum|hash|signature|digest)\\b)(?=.*\\b(?:mismatch|invalid|fail(?:ed|ure)?|bypass(?:ed|ing)?|ignore(?:d|s|ing)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-259',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'file'],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|redirect)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b.{0,60}\\b(?:tool\\s*output|execution\\s*result|validator\\s*report|scan\\s*result|audit\\s*trace)\\b)(?=.*\\b(?:reroute|redirect|forward|relay|handoff|dispatch)(?:d|ing|s)?\\b.{0,70}\\b(?:planner|router|orchestrator|decision\\s*engine|action\\s*selector)\\b)(?=.*\\b(?:bypass|skip|ignore|disable|override)(?:d|ing|s)?\\b.{0,70}\\b(?:verification|validation|safety\\s*check|policy\\s*gate|guardrail)\\b).*$"],
+        "description": ''
+    },
 ]
