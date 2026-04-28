@@ -6903,4 +6903,147 @@ PATTERNS = [
         "description": ''
     },
 
+    # === v0.2.24 batch — Apr 27, 2026 — high-quality pool patterns ===
+    # 15 patterns: 5 provenance_chain (NEW cat), 2 approval_graph_poisoning (NEW cat),
+    # 8 cross_agent_injection. All passed Jack's regex test bed at 100% TP / 0 FP.
+    # --- provenance_chain ---
+    {
+        "id": 'GLS-PCF-666',
+        "name": '(unnamed)',
+        "category": 'provenance_chain',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:manifest|provenance|chain(?:\\s|-)of(?:\\s|-)custody|checksum|signature|attestation)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|alter(?:ed|ing)?|rewrite|rewrote)\\b)(?=.*\\b(?:bypass|skip|ignore|override|waive)\\w*\\b)(?=.*\\b(?:verification|validation|integrity|policy\\s*check(?:s)?)\\b)(?=.*\\b(?:deploy|release|execute|promote|ship)\\w*\\b)(?!.*\\b(?:do\\s*not|don\'t|never|without)\\s+(?:forge|fake|spoof|tamper|alter|bypass|skip|ignore|override|waive)\\w*\\b).{0,900}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PCF-240',
+        "name": '(unnamed)',
+        "category": 'provenance_chain',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:provenance|lineage|chain(?:\\s|-)*of(?:\\s|-)*custody|attestation|receipt)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:backfill|retro(?:active|actively)?|rewrite|reconstruct|postdate|antedate)\\b)(?=.*\\b(?:verification|verifier|audit|integrity|validation|checkpoint)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|s|ping)?|ignore(?:d|s|ing)?|waiv(?:e|ed|es|ing))\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PCF-241',
+        "name": '(unnamed)',
+        "category": 'provenance_chain',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:provenance|lineage|origin|source\\s*chain|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:receipt|attestation|certificate|ledger\\s*entry|audit\\s*stamp)\\b)(?=.*\\b(?:backdate(?:d|s|ing)?|retroactive|postdate(?:d|s|ing)?|time(?:-|\\s)*shift(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|waive|ignore|ignored|ignores|ignoring)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PCF-244',
+        "name": '(unnamed)',
+        "category": 'provenance_chain',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake)\\b)(?=.*\\b(?:attestation|signature|checksum|provenance|certificate|manifest)\\b)(?=.*\\b(?:trust\\s*anchor|trust\\s*root|root\\s*key|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:policy|guardrail|verification|validation|scope)\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PCF-459',
+        "name": '(unnamed)',
+        "category": 'provenance_chain',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?=.*\\b(?:forge|forged|forging|fabricate|fabricated|fabricating|counterfeit|spoof|spoofed|spoofing)\\b)(?=.*\\b(?:attestation|provenance|lineage|receipt|manifest)\\b)(?=.*\\b(?:nonce|checksum|signature|hash)\\b)(?=.*\\b(?:replay|rollback|backfill|bypass|override)\\b).*$'],
+        "description": ''
+    },
+    # --- approval_graph_poisoning ---
+    {
+        "id": 'GLS-AGP-653',
+        "name": '(unnamed)',
+        "category": 'approval_graph_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:approval|quorum|sign-?off|attestation|vote\\s+snapshot|vote\\s+count)\\b)(?=.*\\b(?:override|bypass|auto-?approve|recalculat(?:e|ed|ing|ion)|escalat(?:e|ed|ing|ion))\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-AGP-001',
+        "name": '(unnamed)',
+        "category": 'approval_graph_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|tampered|spoofed|counterfeit)\\b)(?=.*\\b(?:approval\\s+graph|quorum\\s+snapshot|delegate\\s+vote|signed\\s+ballot|attestation\\s+bundle)\\b)(?=.*\\b(?:override|overrides|overridden|overriding|bypass|bypasses|bypassed|bypassing|auto\\s*-?approve|auto\\s*-?approved|skip|skips|skipped|skipping|ignore|ignores|ignored|ignoring)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|trust\\s+gate(?:s)?|approval\\s+gate(?:s)?|verification\\s+check(?:s)?)\\b).+'],
+        "description": ''
+    },
+    # --- cross_agent_injection ---
+    {
+        "id": 'GLS-CAI-314',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|handoff|peer|coordinator|supervisor)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:ed|ion)|counterfeit)\\b)(?=.*\\b(?:manifest|ticket|receipt|approval|sign(?:ed|off)?)\\b)(?=.*\\b(?:scope|permission|authorization|authz|whitelist)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|override|overrode|bypass(?:ed|ing)?|ignor(?:e|ed|ing)|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail|review|safety|verification)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-318',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer[-\\s]*agent|remote[-\\s]*agent|orchestrator)\\b)(?=.*\\b(?:forg(?:ed|ery)|spoof(?:ed|ing)?|replay(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:ticket|token|nonce|credential|handoff[-\\s]*id|session[-\\s]*tag)\\b)(?=.*\\b(?:scope|permission|privilege|tool[-\\s]*execution|action[-\\s]*rights)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|approval|verification)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-251',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:delegate\\s+ticket|agent\\s+ticket|handoff\\s+token|delegation\\s+pass|authorization\\s+token)\\b)(?=.*\\b(?:scope\\s+escalation|scope\\s+rebind|privilege\\s+upgrade|permission\\s+escalation|access\\s+elevation)\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-330',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake)\\b)(?=.*\\b(?:approval|attestation|handoff|delegation|ticket)\\b)(?=.*\\b(?:role|scope|permission|privilege)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|boundary|limit(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-253',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:approval|attestation|signoff|ticket)\\b)(?=.*\\b(?:delegate|agent|worker|reviewer)\\b)(?=.*\\b(?:bypass|override|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|scope)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-254',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|orchestrator|service)\\b)(?=.*\\b(?:handoff|handover|ticket|token|credential|capability|nonce)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|impersonat(?:e|ed|ing)|replay(?:ed|ing))\\b)(?=.*\\b(?:authorit(?:y|ies)|scope|permission|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|escalat(?:e|ed|ing)|rerout(?:e|ed|ing))\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-255',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|broker)\\b)(?=.*\\b(?:receipt|ticket|handoff|approval|nonce|token)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:scope\\s*rebind|scope\\s*override|policy\\s*bypass|guardrail\\s*override|privilege\\s*escalation)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-489',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|delegation|agent|subagent|worker|orchestrator)\\b)(?=.*\\b(?:ticket|handoff|approval\\s+token|execution\\s+token|delegation\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery|ing)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:scope|permission|capability|authority)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|expand|expand(?:ed|ing)?|override(?:d|s|ing)?|overrode|bypass(?:ed|es|ing)?)\\b).*'],
+        "description": ''
+    },
+    # === end v0.2.24 batch (15 patterns) ===
+
 ]
