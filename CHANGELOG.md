@@ -2,6 +2,25 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.26] — 2026-04-29
+
+### Added
+- **16 new patterns, all in `cross_agent_injection`** — patterns: 413 → **429** (+16). Categories unchanged at **54**. Keywords unchanged at **2,296**.
+  - GLS-CAI-622 — `forged_scheduler_receipt_scope_override_guardrail_bypass`
+  - GLS-CAI-682 — support-bundle/ticket-attachment prompt-swap chain-of-command bypass
+  - GLS-CAI-623 — forged safety/audit attestation bypass of validators
+  - GLS-CAI-624 — peer-agent forged authorization bypass
+  - GLS-CAI-625 — forged human-override scope escalation
+  - GLS-CAI-627 — `forged_quorum_ack_scope_override_guardrail_bypass`
+  - GLS-CAI-582, GLS-CAI-528 — historical CYCLE imports normalized into the CAI prefix
+  - GLS-CAI-628, 629, 630, 632 — forged delegation/handoff variants
+  - GLS-CAI-563, GLS-CAI-555, GLS-CAI-552, GLS-CAI-561 — additional cross-agent forged-receipt classes
+- All patterns HIGH severity, validated TP=8 / TN=8, 0 false positives.
+
+### Context
+- One-category-per-day shipping rule locked in — every v0.2.X push from now on focuses one attack class so the day's release + blog tell one story. v0.2.26 = `cross_agent_injection`. Companion blog: `/blog/a2a-trusted-handoff-override` (Jack byline, original Cycle 181 evidence).
+- Source pool: `~/jack-harvest/ready/v0.2.26_ready.json`. 19 staged → 3 dropped (empty regex) → 16 shipped.
+
 ## [0.2.22] — 2026-04-25
 
 ### Added

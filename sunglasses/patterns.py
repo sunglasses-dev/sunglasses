@@ -7229,4 +7229,151 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.25 batch ===
+
+    # === v0.2.26 batch (16 patterns, theme: cross_agent_injection) ===
+    {
+        "id": 'GLS-CAI-682',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:support(?:\\s|-)?bundle|ticket(?:\\s|-)?attachment|incident(?:\\s|-)?artifact|retrieval(?:\\s|-)?cache)\\b)(?=.*\\b(?:swap|swapped|replace|replaced|overwrite|overwrote|overrode|inject|injected|poison(?:ed|ing)?)\\b)(?=.*\\b(?:system\\s+prompt|guardrail(?:s)?|policy(?:\\s|-)?check(?:s)?|approval(?:\\s|-)?gate(?:s)?)\\b)(?=.*\\b(?:bypass|bypasses|ignore|ignores|disable|disables|skip|skips)\\b).{0,900}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-622',
+        "name": 'forged_scheduler_receipt_scope_override_guardrail_bypass',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-623',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|handoff|supervisor|peer\\s+agent)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|fabricat(?:e|ed|ing)|fake)\\b)(?=.*\\b(?:safety\\s+attestation|audit\\s+token|approval\\s+token|signature|compliance\\s+token|trust\\s+attestation)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|disable|disabled|disabling|skip|skipped|skipping|ignore|ignored|ignoring|suppress|suppressed|suppressing)\\b)(?=.*\\b(?:policy|guardrail|validator|verification|safety\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-624',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-625',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-627',
+        "name": 'forged_quorum_ack_scope_override_guardrail_bypass',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed)?|counterfeit)\\b)(?=.*\\b(?:approval|attestation|ack(?:nowledg(?:e|ed|ement))?|signature|token|lease)\\b)(?=.*\\b(?:agent|delegate|delegation|worker|broker|service)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|scope|restriction(?:s)?|safety)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-582',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?:\\b(?:agent|service|orchestrator|coordinator|worker)\\s*(?:a|alpha|upstream|peer)?\\b.{0,80}\\b(?:said|states?|reported|confirmed|attested|signed)\\b.{0,110}\\b(?:authoritative|source\\s+of\\s+truth|final\\s+authority|root\\s+authority)\\b.{0,120}\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b.{0,70}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+gate)\\b|\\b(?:treat|mark|classify|accept)\\b.{0,70}\\b(?:peer|upstream|cross-agent)\\s+(?:message|packet|instruction|directive)\\b.{0,100}\\b(?:as\\s+authoritative|as\\s+trusted|as\\s+final)\\b.{0,110}\\b(?:skip|drop|disable|bypass|override|replace)\\b.{0,60}\\b(?:verification|attestation|policy\\s+check(?:s)?)\\b)'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-528',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|worker|agent|handoff|peer|broker)\\b)(?=.*\\b(?:token|ticket|attestation|proof|receipt|nonce)\\b)(?=.*\\b(?:forge|forged|forging|spoofed|spoofing|replayed|replay|tampered|tampering)\\b)(?=.*\\b(?:scope|privilege|authority|approval)\\b)(?=.*\\b(?:expand|expanded|expanding|escalate|escalated|escalating|rebind|rebound|override|overrode|bypass|bypassed)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|approval)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-628',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:delegate|handoff|handover|forward|route)\\b)(?=.*\\b(?:agent|worker|executor|subagent|downstream)\\b)(?=.*\\b(?:token|nonce|session|credential|attestation|capability)\\b)(?=.*\\b(?:stale|expired|revoked|forged|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification|validation)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-629',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-630',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without)\\s+(?:trust|whitelist|allowlist|execute|dispatch|bypass)\\b)(?=.*\\b(?:forged|fake|spoofed|counterfeit|fabricated)\\b.{0,50}\\b(?:peer\\s*agent|delegate|worker|remote\\s*agent)\\b.{0,50}\\b(?:capability\\s*manifest|capability\\s*token|attestation|identity\\s*card)\\b)(?=.*\\b(?:trust|whitelist|allowlist|elevate)\\b.{0,60}\\b(?:without\\s+verification|skip(?:ping)?\\s+verification|ignore\\s+verification|auto-approve)\\b)(?=.*\\b(?:execute|run|dispatch|trigger)\\b.{0,60}\\b(?:privileged\\s*action|tool\\s*call|write\\s*operation|network\\s*action)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-563',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|delegation|worker|handoff|handover|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:token|attestation|ticket|credential(?:s)?|signature)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|scope\\s+transfer|permission\\s+hop|trust\\s+hop)\\b)(?=.*\\b(?:execute|executes|executed|executing|run|runs|running|invoke|invokes|invoked|invoking|trigger|triggers|triggered|triggering)\\b).{0,1000}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-555',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|did\\s+not|does\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|ignore|skip|evade|swap|replace|forge|reroute)\\b)(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:handoff|ticket|trace\\s+token|trace\\s+id|session\\s+token|capability\\s+token|custody\\s+token)\\b)(?=.*\\b(?:forge(?:d|ry)?|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|swap(?:ped|ping)?|replace(?:d|ment)?|rerout(?:e|ed|ing))\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip|evad(?:e|ed|ing)|downgrad(?:e|ed|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval|verification|trust\\s+gate|execution\\s+check(?:s)?|safety\\s+check(?:s)?)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-552',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:override|bypass|ignore|disregard|rebind|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator|controller|handoff|cross-agent|peer)\\b)(?=.*(?:\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b.{0,80}\\b(?:attestation|nonce|token|certificate|capability|signature)\\b|\\b(?:attestation|nonce|token|certificate|capability|signature)\\b.{0,80}\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b))(?=.*\\b(?:override|bypass|ignore|disregard|supersed(?:e|es|ed|ing)|rebind)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|authorization|scope|validation)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-632',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-561',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:another|other|peer|upstream|planner|worker|delegate|orchestrator)\\s+agent\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|previous\\s+instruction(?:s)?)\\b)(?=.*\\b(?:execute|run|invoke|trigger|call)\\b).{0,900}$'],
+        "description": ''
+    },
+    # === end v0.2.26 batch ===
 ]
