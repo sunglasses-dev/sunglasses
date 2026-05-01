@@ -2,6 +2,23 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.28] — 2026-05-01
+
+### Added
+- **17 new patterns, all in `retrieval_poisoning`** (one-category-per-day rule). Auto-shipped via daily-push runner. Patterns: 444 → **461** (+17).
+- **`tests/test_pattern_integrity.py`** — 5 build-blocking guards: no duplicate IDs, every pattern has an id / name / category, IDs match `GLS-<PREFIX>-<NNN>` shape (3 or 4 segments). Locks the doors that the May 1 audit found broken.
+
+### Fixed
+- **3 duplicate pattern IDs deduped.** Two records each shared `GLS-EX-001`, `GLS-SE-001`, `GLS-TP-002` — caused SARIF output ambiguity. Renamed Pattern B in each pair to a fresh ID in its own category prefix:
+  - `GLS-EX-001` (category `prompt_leak`) → **`GLS-PL-001`** (Soft system prompt exfiltration framings)
+  - `GLS-SE-001` (category `prompt_injection`) → **`GLS-PI-021`** (Social engineering — authority impersonation)
+  - `GLS-TP-002` (category `tool_poisoning`) → **`GLS-TP-003`** (Tool poisoning — hidden note-to-assistant framings)
+- **`category=None` backfill.** Earlier audit flagged 155/444 records with `None` category — Jack's pipeline backfilled all of them via ID-prefix-derived categories during the morning harvest. Live state: 0 records with `None`.
+
+### Notes
+- PyPI gap: v0.2.27 was committed locally but never published to PyPI (PyPI top remained at 0.2.26). v0.2.28 publish leapfrogs 0.2.27 and includes its work.
+
+
 ## [0.2.27] — 2026-04-30
 
 ### Added
