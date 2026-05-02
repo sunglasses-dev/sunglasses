@@ -7670,4 +7670,186 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.28 batch ===
+    # === v0.2.29 batch (20 patterns, 7 categories) ===
+    {
+        "id": 'GLS-TOP-253',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:tool|plugin|connector|pipeline|adapter)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:audit\\s+receipt|execution\\s+receipt|trace|checksum|provenance)\\b)(?=.*\\b(?:channel|route|dispatch|handoff|redirect|redirected|redirects|redirecting)\\b)(?=.*\\b(?:override|overrides|overrode|overridden|overriding|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review)\\b).*"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-254',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:quorum|consensus|approval)\\s+(?:receipt|record|token|attestation)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification)\\b).*$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-255',
+        "name": 'forged_confidence_trace_queue_redirect_execution_guardrail_bypass',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:confidence\\s+trace|telemetry\\s+receipt|audit\\s+output|verification\\s+log|model\\s+report)\\b)(?=.*\\b(?:redirect|redirected|redirects|reroute|rerouted|rerouting|rewire|rewired|rewiring|switch(?:ed|es|ing)?\\s+queue(?:\\s+routing)?|switch(?:ed|es|ing)?\\s+(?:routing|channel|path))\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|deployment|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-280',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:forged|fabricated|fake|poisoned)\\b)(?=.*\\b(?:citation|source|reference|snippet|document)\\b)(?=.*\\b(?:verified|signed|attested|trust\\s+banner)\\b)(?=.*\\b(?:promote|boost|rank|priority|top\\s+result)\\b)(?=.*\\b(?:override|bypass|ignore|skip)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-281',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base|document\\s+store)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated|poison(?:ed|ing)?)\\b)(?=.*\\b(?:source\\s+map|citation|provenance|lineage|metadata)\\b)(?=.*\\b(?:confidence\\s+boost|boost(?:ed|s|ing)?\\s+confidence|rank(?:ing)?\\s+override|rerank(?:ed|s|ing)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:s|d|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|review|verification)\\b).*"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-282',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:retrieval|rag|index|source|document|citation)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:quarantine|quarantined|clean|safe\\s*label|approval\\s*label)\\b)(?=.*\\b(?:provenance|trust|verified|attested|lineage)\\b)(?=.*\\b(?:override|bypass|prioriti[sz]e|promote|rank\\s*boost)\\b).*"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-277',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-278',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-279',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-255',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:router|routing|orchestrator|gateway|model\\s+router|routing\\s+service)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|fake)\\b)(?=.*\\b(?:trust\\s+tier|risk\\s+tier|capability\\s+tier|confidence\\s+score|classification\\s+label)\\b)(?=.*\\b(?:route|routed|routing|reroute|rerouted|rerouting|dispatch|dispatched|dispatches|dispatching|send|sent|forward|forwarded|forwarding)\\b)(?=.*\\b(?:override|bypass|bypassed|bypassing|escalate|escalated|escalation|unlock|skip|skipped|skipping)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-256',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:router\\s*profile|route\\s*manifest|model\\s*card|routing\\s*policy|dispatch\\s*plan)\\b)(?=.*\\b(?:tier\\s*escalation|tier\\s*override|upgrade\\s*to\\s*premium|route\\s*to\\s*highest\\s*tier|elevate\\s*model\\s*tier)\\b)(?=.*\\b(?:bypass\\s*approval\\s*gate|skip\\s*routing\\s*approval|ignore\\s*routing\\s*policy|override\\s*route\\s*guardrails?|force\\s*unauthorized\\s*routing)\\b).+$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-257',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:route|routing|router|dispatch|model\\s*selection|fallback\\s*path)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:tier\\s*override|tier\\s*escalation|priority\\s*escalation|capability\\s*tier)\\b)(?=.*\\b(?:policy\\s*bypass|guardrail\\s*override|verification\\s*bypass|authorization\\s*bypass)\\b).+$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TMS-238',
+        "name": '(unnamed)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|reroute|handoff|handover)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|reroute|handoff|handover)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:execution[-\\s]+header(?:s)?|dispatch[-\\s]+header(?:s)?|tool[-\\s]+metadata|routing[-\\s]+header(?:s)?|handoff[-\\s]+tag(?:s)?)\\b)(?=.*\\b(?:priority|route|reroute|handoff|handover|dispatch|channel)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|skip|skips|reroute|reroutes|handoff|handover)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety\\s+check(?:s)?|trust[-\\s]+gate|execution\\s+check(?:s)?)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TMS-239',
+        "name": '(unnamed)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:priority\\s+header|tool\\s+metadata|execution\\s+manifest|run\\s+context\\s+header|scheduler\\s+header)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rebind|rebinds|rebound)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+scope|trust\\s+boundary|execution\\s+gate)\\b).+"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TMS-240',
+        "name": '(unnamed)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.{0,500}$)(?!.*\\b(?:do\\s+not|never|without)\\s+(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:metadata|tool(?:_|\\s)?metadata|front[- ]?matter|header|annotation|properties)\\b)(?=.*\\b(?:system(?:\\s+message)?|root(?:\\s+authority)?|highest\\s+priority|authoritative)\\b)(?=.*\\b(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).*"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-IDF-002',
+        "name": '(unnamed)',
+        "category": 'identity_federation',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:service(?:\\s|-)?token|oauth(?:\\s|-)?token|jwt|session(?:\\s|-)?token|bearer(?:\\s|-)?token|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|mint(?:ed|ing)?|fake)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|copilot|orchestrator)\\b)(?=.*\\b(?:scope|permission(?:s)?|role|privilege(?:s)?|tenant|admin)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|expand(?:ed|s|ing)?|widen(?:ed|ing)?|admin)\\b)(?=.*\\b(?:ignore|ignored|ignoring|ignores|override|overrode|overriding|bypass|bypassed|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b).*$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-IF-658',
+        "name": '(unnamed)',
+        "category": 'identity_federation',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|override|ignore|disable|skip)\\b)(?=.*\\b(?:forged?|fake|spoof(?:ed|ing)?|tampered?)\\b.{0,90}\\b(?:device|session|trust|attestation)\\b.{0,40}\\b(?:assertion|token|proof|claim)\\b)(?=.*\\b(?:step-?up|mfa|otp|challenge|re-?auth(?:entication)?)\\b)(?=.*\\b(?:bypass|override|skip|disable|ignore)\\b.{0,80}\\b(?:verification|validator|check|policy|guardrail)\\b)(?=.*\\b(?:elevat(?:e|ed|ion)|escalat(?:e|ed|ion)|grant|unlock|reactivat(?:e|ed|ion))\\b.{0,80}\\b(?:account|session|access|scope|privilege)\\b).*$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-IDF-004',
+        "name": '(unnamed)',
+        "category": 'identity_federation',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:identity\\s+federation|oidc|oauth|sso|token\\s+broker|federated\\s+auth)\\b)(?=.*\\b(?:refresh[-\\s]+token|token\\s+refresh|reissued\\s+token)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|manipulat(?:ed|ing))\\b)(?=.*\\b(?:claim(?:s)?|scope|aud(?:ience)?|role(?:\\s+map)?|delegat(?:ed|ion)?)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|elevat(?:e|ed|ion)|privilege\\s+escalation|privilege\\s+increase|trust\\s+override|bypass|unauthorized\\s+access)\\b).*"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TCR-338',
+        "name": '(unnamed)',
+        "category": 'tool_chain_race',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?=.*\\b(?:race(?:\\s+condition)?|concurrent|parallel|interleav(?:e|ed|ing)|out[- ]of[- ]order|simultaneous)\\b)(?=.*\\b(?:ack(?:nowledg(?:e|ed|ement))?|receipt|nonce|session(?:\\s+id)?|token|checksum|handshake)\\b)(?=.*\\b(?:override|bypass|skip|ignore|force|execute\\s+anyway|promote\\s+to\\s+trusted)\\b).*$"],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TCR-656',
+        "name": '(unnamed)',
+        "category": 'tool_chain_race',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|waive)\\b)(?=.*\\b(?:intermediate|partial|preliminary|incomplete)\\s+(?:tool\\s+)?(?:output|result|response)\\b)(?=.*\\b(?:next|downstream|follow[- ]?up|subsequent)\\s+(?:tool|step|executor)\\b)(?=.*\\b(?:run|call|invoke|execute|trigger|chain|forward|pipe|feed)\\b)(?=.*\\b(?:before|prior\\s+to|without\\s+waiting\\s+for|skip(?:ping)?|bypass(?:ing)?|waive)\\b.{0,80}\\b(?:final|full|complete)\\s+(?:verification|validation|check|review)\\b)(?=.*\\b(?:ignore|overrid(?:e|es|ed|ing)|bypass|waive|relax)\\b.{0,80}\\b(?:policy|guardrail|safety|approval)\\b).*$"],
+        "description": ''
+    },
+    # === end v0.2.29 batch ===
 ]
