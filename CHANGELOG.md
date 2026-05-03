@@ -2,6 +2,12 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.30] — 2026-05-02
+
+### Added
+- **12 new patterns, all in `cross_agent_injection`** (one-category-per-day rule). Auto-shipped via daily-push runner.
+
+
 ## [0.2.28] — 2026-05-01
 
 ### Added
