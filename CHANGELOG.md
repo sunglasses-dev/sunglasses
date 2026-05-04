@@ -2,6 +2,12 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.31] — 2026-05-03
+
+### Added
+- **14 new patterns, all in `tool_output_poisoning`** (one-category-per-day rule). Auto-shipped via daily-push runner.
+
+
 ## [0.2.30] — 2026-05-02
 
 ### Added
