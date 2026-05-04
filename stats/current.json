@@ -1,6 +1,6 @@
 {
-  "version": "0.2.30",
-  "patterns": 493,
+  "version": "0.2.31",
+  "patterns": 507,
   "keywords": 2296,
   "categories": 54,
   "languages": 23,
@@ -16,7 +16,7 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-05-02T11:00:05.409044-07:00",
+  "last_updated": "2026-05-03T11:00:02.322351-07:00",
   "last_updated_by": "daily-push-runner",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else."
 }

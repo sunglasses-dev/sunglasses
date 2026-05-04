@@ -7963,4 +7963,133 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.30 batch ===
+
+    # === v0.2.31 batch (14 patterns, theme: tool_output_poisoning) ===
+    {
+        "id": 'GLS-V03-0484',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-325',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|command\\s+output|agent\\s+output)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:receipt|audit\\s+stamp|signature|signed\\s+footer|verification\\s+token)\\b)(?=.*\\b(?:channel|summary|footer|handoff|report)\\b)(?=.*\\b(?:swap|swap(?:ped|ping)?|replace(?:d|ment)?|inject(?:ed|ion)|rewrite|alter|alter(?:ed|ation))\\b)(?=.*\\b(?:execut(?:e|ion)|run|approve|authorize)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ing|en|ed)?|ignore|skip|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|gate(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-257',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool|output|result|trace|receipt|attestation|telemetry)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|altered)\\b)(?=.*\\b(?:channel|pipeline|stream|route|routes|routing|reroute|reroutes|rerouted|handoff|redirect|redirects|redirected|rewire|rewires|rewired)\\b)(?=.*\\b(?:bypass|bypasses|bypassed|override|overrides|overrode|overriding|allow|allows|allowed|execute|executes|executed|dispatch|dispatches|dispatched|run|runs|running)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-260',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool|executor|runtime|pipeline|verifier)\\b)(?=.*\\b(?:output|result|log|attestation|receipt|evidence)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|tamper(?:ed|ing)?|counterfeit|fake)\\b)(?=.*\\b(?:nonce|signature|checksum|stamp)\\b)(?=.*\\b(?:channel\\s*swap|route\\s*swap|policy\\s*bypass|guardrail\\s*override|execution\\s*gate\\s*bypass)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-261',
+        "name": 'forged_telemetry_risk_flag_redirect_execution_guardrail_bypass',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|router|coordinator|executor)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:telemetry|risk\\s+flag|confidence\\s+score|execution\\s+trace|tool\\s+result)\\b)(?=.*\\b(?:redirect|redirected|redirecting|redirects|reroute|rerouted|rerouting|reroutes|switch(?:ed|ing|es)?\\s+path|override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|execution\\s+gate|execution\\s+gates|approval\\s+check|approval\\s+checks|scope\\s+control)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-263',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool|output|result|report|trace|log|evidence|artifact)\\b)(?=.*\\b(?:rollback|revert|backout|restore|undo)\\w*\\b)(?=.*\\b(?:certificate|attestation|ticket|approval|waiver|receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed)?|fabricat(?:e|ed)|counterfeit|synthetic)\\b)(?=.*\\b(?:execution\\s+gate|policy\\s+gate|guardrail|policy|safety\\s+check|compliance)\\b)(?=.*\\b(?:bypass|skip|ignore|override|disable|waive)\\w*\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-264',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool|plugin|function|executor|runner|api)\\b)(?=.*\\b(?:output|result|transcript|log|trace|evidence|receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|tamper(?:ed|ing)|inject(?:ed|ing)|alter(?:ed|ing)?)\\b)(?=.*\\b(?:verif(?:y|ication)|checksum|signature|digest|provenance|integrity)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|rerout(?:e|ed|ing)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|approve(?:d|ing)?)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-265',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake|tampered)\\b)(?=.*\\b(?:scanner|audit|tool\\s*output|result\\s*log|safety\\s*report|diagnostic)\\b)(?=.*\\b(?:route|reroute|redirect|redirects|forward|channel|handoff|switch\\s*path|rewire)\\b)(?=.*\\b(?:execution|execute|run|deploy|apply|action)\\b)(?=.*\\b(?:guardrail|policy|check|checks|verification|approval)\\b)(?=.*\\b(?:bypass|override|ignore|ignores|ignored|ignoring|disable|skip)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-266',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool\\s+(?:output|result|log|trace)|plugin\\s+response|execution\\s+log)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered)\\b)(?=.*\\b(?:checksum|hash|signature|integrity\\s+(?:stamp|token)|audit\\s+stamp)\\b)(?=.*\\b(?:passed|verified|approved|clean)\\b)(?=.*\\b(?:policy|guardrail|validation|verification|gate)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|skip|skip(?:ped|s|ping)?|ignore(?:d|s)?|overrid(?:e|es|ed|ing)|overrode|waive(?:d|s)?)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-268',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated|counterfeit)\\b)(?=.*\\b(?:tool\\s*output|tool\\s*result|log|trace|checksum|receipt|attestation|verification)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|skip|skipped|waive|waived|disable|disabled)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-269',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|tampered|spoofed)\\b)(?=.*\\b(?:tool|report|output|log|trace|telemetry|compliance)\\b)(?=.*\\b(?:execute|run|deploy|apply|approve|action)\\w*\\b)(?=.*\\b(?:bypass|override|skip|ignore|disable)\\w*\\b)(?=.*\\b(?:guardrail|policy|gate|approval|check)\\w*\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-270',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:tool|runner|executor|pipeline|plugin)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:checksum|hash|signature|attestation|evidence|verification)\\b)(?=.*\\b(?:channel|stream|log|trace|artifact)\\b)(?=.*\\b(?:bypass|override|rerout(?:e|ed|ing)|swap(?:ped|ping)?|supersed(?:e|ed|ing)|skip(?:ped|ping)?)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-700',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?:\\b(?:because|since)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,60}\\b(?:trusted|authoritative|verified|reliable)\\b|\\b(?:treat|consider|use)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,40}\\b(?:as\\s+)?(?:trusted|authoritative|higher\\s+priority|source\\s+of\\s+truth)\\b).{0,160}\\b(?:ignore|override|bypass|replace|discard)\\b.{0,80}\\b(?:previous|prior|earlier)?\\s*(?:instruction(?:s)?|polic(?:y|ies)|guardrail(?:s)?|safety\\s+rule(?:s)?)\\b'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TOP-309',
+        "name": '(unnamed)',
+        "category": 'tool_output_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:signed|signature|verified|attested)\\b)(?=.*\\b(?:summary|footer|report|digest|result)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:d|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|verification)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.31 batch ===
 ]
