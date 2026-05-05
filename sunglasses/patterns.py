@@ -8092,4 +8092,124 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.31 batch ===
+
+    # === v0.2.32 batch (13 patterns, theme: retrieval_poisoning) ===
+    {
+        "id": 'GLS-RP-283',
+        "name": 'forged_source_bundle_ranking_boost_policy_exception',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:source\\s+bundle|citation\\s+pack|provenance\\s+record|evidence\\s+bundle|reference\\s+manifest)\\b)(?=.*\\b(?:rank(?:ing)?\\s+boost|priority\\s+boost|top[-\\s]?rank|promote(?:d|s|ing)?|elevate(?:d|s|ing)?)\\b)(?=.*\\b(?:policy\\s+exception|policy\\s+override|guardrail\\s+bypass|trust\\s+bypass|compliance\\s+skip)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-313',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s?base|document|context|memory)\\b)(?=.*\\b(?:seed(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:appendix|footnote|citation|source|badge|provenance)\\b)(?=.*\\b(?:trust|verified|authoritative|official)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable)\\b)(?=.*\\b(?:policy|guardrail|review|approval|safety)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-319',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge[-\\s]*base|context|document|corpus|source)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)?|tamper(?:ed|ing)?|forg(?:ed|ery)|malicious)\\b)(?=.*\\b(?:citation|provenance|source[-\\s]*tag|reference|badge|checksum)\\b)(?=.*\\b(?:rank(?:ing)?|priority|trust|score|selection)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-340',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|context|source|citation|document|passage)\\b)(?=.*\\b(?:addendum|appendix|digest|summary|errata|note)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ing)|poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|backfill(?:ed|ing)?)\\b)(?=.*\\b(?:trust\\s+stamp|trusted\\s+source|provenance\\s+badge|credibility\\s+tag|rank\\s+signal)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore|waive|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|ranking)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-327',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s+base|context)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:provenance|citation|source\\s+tag|trust\\s+badge|digest)\\b)(?=.*\\b(?:fake|forged|fabricated|stale|spoofed)\\b)(?=.*\\b(?:override|bypass|ignore|elevat(?:e|ed|ion)|re-?rank|promote)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-324',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|knowledge\\s+base|context\\s+window|index)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)|staged|fabricat(?:e|ed|ion))\\b)(?=.*\\b(?:runbook|playbook|changelog|appendix|note|document)\\b)(?=.*\\b(?:provenance\\s+stamp|trusted\\s+source\\s+badge|citation\\s+badge|signed\\s+digest|verification\\s+badge)\\b)(?=.*\\b(?:rank|prioritiz(?:e|ed|ing)|promot(?:e|ed|ion)|surface|select)\\b)(?=.*\\b(?:overrid(?:e|es|ing|en|ed)?|bypass(?:ed|es|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|review\\s+gate(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-337',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:retriev(?:ed|al)|source|citation|document|knowledge\\s*base|rag)\\b)(?=.*\\b(?:badge|trusted|verified|authority|rank(?:ed|ing)?|priority)\\b)(?=.*\\b(?:override|ignore|bypass|supersed(?:e|es|ed|ing)|elevat(?:e|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|rule(?:s)?|safety)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-311',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|vector\\s+store|knowledge\\s+base|context\\s+cache|index)\\b)(?=.*\\b(?:seed(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)?|forg(?:ed|ery))\\b)(?=.*\\b(?:trust(?:ed)?|signed|checksum|provenance|citation)\\b)(?=.*\\b(?:override(?:s|n|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation|filter(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-329',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:seeded|poisoned|backfilled|injected|tampered)\\b)(?=.*\\b(?:retrieval|rag|index|corpus|knowledge\\s+base|document)\\b)(?=.*\\b(?:trust\\s+badge|provenance\\s+tag|citation\\s+badge|verified\\s+source)\\b)(?=.*\\b(?:override|bypass|ignore|prioritiz(?:e|ed|ing)|elevat(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|rank(?:ing)?|verification|filter(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-317',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|knowledge[-\\s]*base|index|document|changelog|digest|appendix|source[-\\s]*note|provenance[-\\s]*badge|citation)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|forg(?:ed|ery)|tamper(?:ed|ing)?|inject(?:ed|ion)|stag(?:e|ed|ing))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|citation[-\\s]*check|source[-\\s]*validation)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-307',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)\\b(?:retrieved|retrieval|rag|context|document|source|citation)\\b.{0,120}\\b(?:trusted|authoritative|verified|approved|high\\s+confidence|fresh(?:est)?\\s+source)\\b.{0,140}\\b(?:ignore|bypass|override|disregard|supersede|replace)\\b.{0,90}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|verification\\s+gate(?:s)?)\\b'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-331',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s*base|context|corpus)\\b)(?=.*\\b(?:poison(?:ed|ing)?|tamper(?:ed|ing)?|seed(?:ed|ing)?|backfill(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:citation|source|reference|provenance|digest)\\b)(?=.*\\b(?:rank(?:ing)?|score|priority|trust\\s*badge|trust)\\b)(?=.*\\b(?:override|bypass|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|filter(?:s)?|boundary|verification)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RP-334',
+        "name": '(unnamed)',
+        "category": 'retrieval_poisoning',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:seeded|staged|poison(?:ed|ing)?|tampered|backfilled|forged)\\b)(?=.*\\b(?:retrieval|rag|context|citation|source|document|index|cache|digest|provenance)\\b)(?=.*\\b(?:trust\\s+badge|rank(?:ing)?|priority|authority\\s+score|confidence\\s+stamp)\\b)(?=.*\\b(?:override|bypass|manipulat(?:e|ed|ion)|elevat(?:e|ed|ion)|promot(?:e|ed|ion)|boost)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check|approval\\s+gate)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.32 batch ===
 ]
