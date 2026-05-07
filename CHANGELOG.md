@@ -2,16 +2,10 @@
 
 All notable changes to Sunglasses are documented here.
 
-## [0.2.34] — 2026-05-06
+## [0.2.33] — 2026-05-06
 
 ### Added
-- **1 new patterns, all in `cross_agent_injection`** (one-category-per-day rule). Auto-shipped via daily-push runner.
-
-
-## [0.2.33] — 2026-05-05
-
-### Added
-- **12 new patterns, all in `model_routing_confusion`** (one-category-per-day rule). Auto-shipped via daily-push runner.
+- **13 new patterns**: 12 in `model_routing_confusion` + 1 in `cross_agent_injection`. Combined ship — daily-push runner accumulated patterns over May 5–6 while AZ was offline (move-day); shipped together as one release. One-category-per-day rule preserved (only the new MRC category was introduced today).
 
 
 ## [0.2.32] — 2026-05-04

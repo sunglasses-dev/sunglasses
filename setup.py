@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sunglasses",
-    version="0.2.34",
+    version="0.2.33",
     description="Sunglasses for AI agents. Protection layer + neighborhood watch.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
