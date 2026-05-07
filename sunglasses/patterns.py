@@ -8213,7 +8213,7 @@ PATTERNS = [
     },
     # === end v0.2.32 batch ===
 
-    # === v0.2.33 batch (12 patterns, theme: model_routing_confusion) ===
+    # === v0.2.33 batch (13 patterns: 12 model_routing_confusion + 1 cross_agent_injection) ===
     {
         "id": 'GLS-V03-0492',
         "name": '(unnamed)',
@@ -8322,9 +8322,6 @@ PATTERNS = [
         "regex": ['(?is)(?=.*\\b(?:model|router|routing|tier|lane|profile)\\b)(?=.*\\b(?:downgrade|downgraded|downgrading|fallback|fallbacks|cheap|lightweight|mini)\\b)(?=.*\\b(?:admin|production|payment|credential|secret|deployment|policy\\s+gate)\\b)(?=.*\\b(?:ignore|bypass|override|overriding|skip|waive)\\b).*$'],
         "description": ''
     },
-    # === end v0.2.33 batch ===
-
-    # === v0.2.34 batch (1 patterns, theme: cross_agent_injection) ===
     {
         "id": 'GLS-CAI-320',
         "name": '(unnamed)',
@@ -8334,5 +8331,5 @@ PATTERNS = [
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|peer|remote)\\b)(?=.*\\b(?:forg(?:ed|ery)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:attestation|receipt|approval|token|ticket|manifest)\\b)(?=.*\\b(?:tool|command|execution|run|action)\\b)(?=.*\\b(?:scope|privilege|authorization|permission)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|escalat(?:e|ed|ing)|ignore(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
         "description": ''
     },
-    # === end v0.2.34 batch ===
+    # === end v0.2.33 batch ===
 ]
