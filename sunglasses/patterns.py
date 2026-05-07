@@ -8212,4 +8212,127 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.32 batch ===
+
+    # === v0.2.33 batch (12 patterns, theme: model_routing_confusion) ===
+    {
+        "id": 'GLS-V03-0492',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-258',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|dispatcher|orchestrator|gateway|route\\s+planner)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:manifest|quorum|approval\\s+token|attestation|routing\\s+ticket)\\b)(?=.*\\b(?:tier|trust\\s+tier|risk\\s+tier|priority\\s+lane)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rerout(?:e|ed|ing))\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-259',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|routing|model\\s+router|tier\\s+selector|inference\\s+gateway)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:latency|cost|budget|sla|throughput|quota)\\b)(?=.*\\b(?:tier|profile|route|routing|model\\s+tier)\\b)(?=.*\\b(?:downgrad(?:e|ed|es|ing)|rerout(?:e|ed|es|ing)|overrid(?:e|ed|es|ing|en)|overrode|bypass(?:ed|es|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|verification|approval)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-261',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:route|reroute|switch|fallback|downgrade|dispatch|send)\\w*\\b)(?=.*\\b(?:model|llm|tier|router|planner|inference|engine)\\b)(?=.*\\b(?:latency|budget|quota|cost|throughput|token\\s+budget|rate\\s+limit)\\b)(?=.*\\b(?:fake|forged|spoof(?:ed)?|fabricat(?:e|ed)|synthetic|invented)\\b)(?=.*\\b(?:policy|guardrail|approval|safety\\s+check|compliance|risk\\s+gate)\\b)(?=.*\\b(?:bypass|skip|ignore|override|waive|disable)\\w*\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-262',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:route|routed|reroute|rerouted|dispatch|dispatched|forward|forwarded|handoff)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|counterfeit)\\b)(?=.*\\b(?:policy\\s+tag|trust\\s+tier|capability\\s+tier|routing\\s+tier|execution\\s+tier)\\b)(?=.*\\b(?:override|overrode|bypass|bypassed|bypassing|escalate|escalated|escalating|escalation|promote|promoted)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-263',
+        "name": 'forged_capability_card_tier_route_override',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|routing|route|dispatch|gateway|queue)\\b)(?=.*\\b(?:tier|priority|profile|capability|policy)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-264',
+        "name": 'forged_router_profile_tier_priority_override_gate_bypass',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:router|routing|route|dispatcher|profile)\\b)(?=.*\\b(?:tier|priority|rank|lane)\\b)(?=.*\\b(?:override|overrode|overriding|escalate|escalated|escalation|promote|promoted|promotion)\\b)(?=.*\\b(?:gate|policy|guardrail|approval|verification)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-265',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:route|routing|reroute|dispatcher|tier|model\\s+selector|fallback)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:sla|latency\\s+budget|p95|timeout|priority|urgency)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-266',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:model\\s*card|router\\s*profile|tier\\s*map|capability\\s*manifest)\\b)(?=.*\\b(?:tier\\s*(?:upgrade|escalation|elevation)|elevat(?:e|ed|ing)\\s+tier|privilege\\s+escalation|scope\\s+upgrade)\\b)(?=.*\\b(?:bypass(?:ed|ing)?\\s+(?:review|guardrails?|policy\\s+checks?)|skip(?:ped|ping)?\\s+verification|route\\s+to\\s+high\\s*privilege|dispatch\\s+without\\s+approval)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-267',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:model|router|routing|route|gateway|selector|dispatcher|policy)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|altered|shadow)\\b)(?=.*\\b(?:tier|priority|profile|class|lane|quota)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|reroute|reroutes|rerouted|execute|executes|executed|allow|allows|allowed|allowing)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-268',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:router|routing|model|dispatcher|selector|tier)\\b)(?=.*\\b(?:score(?:card)?|confidence|latency|cost|budget)\\b)(?=.*\\b(?:downgrade|fallback|reroute|switch|route)\\b)(?=.*\\b(?:lite|lightweight|cheap|smaller|lower[- ]tier)\\b)(?=.*\\b(?:admin|payment|credential|production|deployment|authorization)\\b)(?=.*\\b(?:override|bypass|ignore|skip|waive)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-MRC-458',
+        "name": '(unnamed)',
+        "category": 'model_routing_confusion',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?=.*\\b(?:model|router|routing|tier|lane|profile)\\b)(?=.*\\b(?:downgrade|downgraded|downgrading|fallback|fallbacks|cheap|lightweight|mini)\\b)(?=.*\\b(?:admin|production|payment|credential|secret|deployment|policy\\s+gate)\\b)(?=.*\\b(?:ignore|bypass|override|overriding|skip|waive)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.33 batch ===
+
+    # === v0.2.34 batch (1 patterns, theme: cross_agent_injection) ===
+    {
+        "id": 'GLS-CAI-320',
+        "name": '(unnamed)',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|peer|remote)\\b)(?=.*\\b(?:forg(?:ed|ery)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:attestation|receipt|approval|token|ticket|manifest)\\b)(?=.*\\b(?:tool|command|execution|run|action)\\b)(?=.*\\b(?:scope|privilege|authorization|permission)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|escalat(?:e|ed|ing)|ignore(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.34 batch ===
 ]
