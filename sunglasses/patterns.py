@@ -8332,4 +8332,95 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.33 batch ===
+    {
+        "id": 'GLS-TS-257',
+        "name": 'hidden_yaml_policy_profile_override',
+        "category": 'token_smuggling',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:hidden|front\\s*matter|frontmatter|yaml|meta(?:data)?|comment(?:\\s*block)?|system\\s*note|annotation)\\b)(?=.*\\b(?:policy|safety|guardrail(?:s)?|profile|rule(?:s)?|instruction(?:s)?)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|waive|waived|disable|disabled|skip|skipped)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-IU-532',
+        "name": 'zero_width_split_override_guardrail_bypass',
+        "category": 'invisible_unicode',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disregard|supersed(?:e|es|ed|ing)))(?=.*(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?|instruction(?:s)?))(?=.*(?:zero[\\s-]*width|zwj|zwnj|invisible\\s+unicode|u\\+200b|u\\+200c|u\\+200d)).{0,900}$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-IU-533',
+        "name": 'zero_width_split_override_chain',
+        "category": 'invisible_unicode',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?=.*(?:\\u200b|\\u200c|\\u200d|\\ufeff|&#8203;|&#8204;|&#8205;|&#xfeff;|\\\\u200[bcd]|\\\\ufeff))(?=.*(?:\\bi[\\u200b\\u200c\\u200d\\ufeff]*gnore(?:d|ing)?\\b|\\boverri[\\u200b\\u200c\\u200d\\ufeff]*de(?:s|d|ing)?\\b|\\boverrid(?:e|es|ing|den)\\b|\\bbypass(?:ed|ing)?\\b|\\bdisregard(?:ed|ing|s)?\\b))(?=.*\\b(?:previous|prior|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\\b).{0,600}'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CS-576',
+        "name": 'multilingual_connector_override_guardrail_bypass',
+        "category": 'code_switching',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:ignore|ignored|ignoring|disregard(?:ed|ing|s)?|override(?:d|ing|s)?|bypass(?:ed|ing|es)?|skip(?:ped|ping|s)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|instruction(?:s)?|rule(?:s)?|approval\\s+gate(?:s)?|verification)\\b)(?=.*(?:\\b(?:pero|mais|cependant|aber|sin\\s+embargo|maintenant|ahora)\\b|忽略|無視|跳过|繞過|绕过|обойти|игнорируй|تجاهل|تجاوز|لكن|しかし)).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CS-577',
+        "name": 'multilingual_override_guardrail_bypass',
+        "category": 'code_switching',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?:\\b(?:ignora|omite|desobedece|ignorer|contourner|ignoriere|umgehe|игнорируй|تجاهل)\\b|忽略|無視).{0,90}\\b(?:instructions?|instrucciones?|reglas?|policy|pol[ií]tica|guardrails?)\\b'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PI-022',
+        "name": 'hidden_footer_instruction_execution_scope_override',
+        "category": 'parasitic_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:footer|html\\s+comment|metadata|hidden\\s+note|annotation|invisible\\s+block)\\b)(?=.*\\b(?:instruction|directive|command|runbook|playbook)\\b)(?=.*\\b(?:execute|run|trigger|invoke|perform)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-TS-258',
+        "name": 'hidden_debug_payload_policy_waiver',
+        "category": 'token_smuggling',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:hidden|invisible|base64|frontmatter|metadata|comment)\\b)(?=.*\\b(?:debug payload|diagnostic payload|maintenance command|backdoor instruction|secret directive)\\b)(?=.*\\b(?:policy waiver|bypass policy|ignore guardrail|override safety|skip approval)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-RTL-004',
+        "name": 'bidi_masked_override_directive',
+        "category": 'rtl_obfuscation',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*(?:\\u202E|\\u202D|\\u202A|\\u2066|\\u2067|\\u2068|\\u2069|U\\+[0-9A-Fa-f]{4}|right-to-left\\s+override|bidi|\\brtl\\b|rtl\\s*mark))(?=.*\\b(?:hidden|mask(?:ed|ing)?|obfuscat(?:e|ed|ing|ion)|reorder(?:ed|ing)?|visual(?:ly)?)\\b)(?=.*\\b(?:ignor(?:e|es|ing)|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PX-568',
+        "name": 'system_prompt_recovery_override',
+        "category": 'prompt_extraction',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)(?:\\b(?:reveal|show|print|dump|expose|leak|output|return|display)\\b.{0,90}\\b(?:system\\s*prompt|hidden\\s*(?:prompt|instructions?)|developer\\s*(?:message|instructions?)|internal\\s*(?:policy|rules?))\\b|\\b(?:tell\\s+me|what\\s+is|recite|quote)\\b.{0,90}\\b(?:your|the)\\b.{0,40}\\b(?:system\\s*prompt|hidden\\s*instructions?|developer\\s*instructions?|internal\\s*policy)\\b)'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-PI-023',
+        "name": 'hidden_annotation_payload_policy_override',
+        "category": 'parasitic_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:hidden|embedded|invisible|stealth|annotation|footnote|comment|metadata)\\b)(?=.*\\b(?:instruction|prompt|directive|payload)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|safety|rule(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.34 batch (10 patterns) ===
 ]

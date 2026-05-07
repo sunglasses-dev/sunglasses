@@ -2,6 +2,12 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.34] — 2026-05-07
+
+### Added
+- **10 new patterns** across the encoded-prompt-injection theme: 2 `token_smuggling` (GLS-TS-257/258), 2 `invisible_unicode` (GLS-IU-532/533), 2 `code_switching` (GLS-CS-576/577), 2 `parasitic_injection` (GLS-PI-022/023), 1 `rtl_obfuscation` (GLS-RTL-004), 1 `prompt_extraction` (GLS-PX-568). Themed bundle matched to a Cava-authored blog (JACK byline, published at `/blog/encoded-prompt-injection-runtime-trust`).
+
+
 ## [0.2.33] — 2026-05-06
 
 ### Added
