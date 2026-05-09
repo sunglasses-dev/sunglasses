@@ -2,6 +2,12 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.35] — 2026-05-08
+
+### Added
+- **34 new patterns** across two categories: 21 `cross_agent_injection` + 13 `sandbox_escape`. Themed bundle matched to a Cava-authored runtime-trust blog (JACK byline, published at `/blog/ai-agent-security-after-access-control`). Total catalog: 577 patterns / 54 categories / 2,296 keywords.
+
+
 ## [0.2.34] — 2026-05-07
 
 ### Added
