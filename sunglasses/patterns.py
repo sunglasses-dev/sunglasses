@@ -8423,4 +8423,311 @@ PATTERNS = [
         "description": ''
     },
     # === end v0.2.34 batch (10 patterns) ===
+    {
+        "id": 'GLS-CAIPI-001',
+        "name": 'gls_caipi_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s+agent|delegate|worker|planner)\\b)(?=.*\\b(?:identity\\s+claim|identity|credential|attestation|issuer)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|counterfeit|faked?)\\b)(?=.*\\b(?:ticket|session\\s+ticket|approval\\s+token|handoff\\s+token|delegate\\s+pass)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|elevat(?:e|ed|ion|ing)|admin\\s+scope|privilege)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|waive(?:d|s)?|skip(?:ped|s|ping)?)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIPA-001',
+        "name": 'gls_caipa_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|remote\\s+agent|delegate|worker|agent)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability\\s+ticket|delegation\\s+ticket|handoff\\s+token|attestation|authorization\\s+tag)\\b)(?=.*\\b(?:scope|permission|privilege|role|authorization)\\b)(?=.*\\b(?:guardrail|policy|safety\\s+gate|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override|overrides|overriding|overrode|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIPH-001',
+        "name": 'gls_caiph_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:revoked|expired|stale|invalid|forged|spoofed|fabricated)\\b)(?=.*\\b(?:token|ticket|capability|credential|attestation)\\b)(?=.*\\b(?:handoff|delegate|approval|authorization|policy|guardrail)\\b)(?=.*\\b(?:override|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|escalat(?:e|ed|ion)|rebind)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIDC-001',
+        "name": 'gls_caidc_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:delegate|delegation|handoff|peer\\s+agent|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|approval\\s+token|signoff)\\b)(?=.*\\b(?:scope|permission|privilege|authority)\\b)(?=.*\\b(?:override|bypass|ignore|rebind)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIDP-001',
+        "name": 'gls_caidp_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent)\\b)(?=.*\\b(?:patch|hotfix|override\\s+patch|instruction\\s+patch|policy\\s+patch)\\b)(?=.*\\b(?:signed\\s+by|claimed\\s+as|asserted\\s+by|from)\\s+(?:delegate|planner|peer\\s+agent|security\\s+lead)\\b)(?=.*\\b(?:ticket|change\\s+ticket|incident\\s+ticket|approval\\s+token)\\b)(?=.*\\b(?:priority|authority|precedence|admin\\s+scope|elevated\\s+scope)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|skip(?:ped|s|ping)?|waive(?:d|s)?)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-690',
+        "name": 'gls_cai_690',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-691',
+        "name": 'gls_cai_691',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-692',
+        "name": 'gls_cai_692',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-693',
+        "name": 'gls_cai_693',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-694',
+        "name": 'gls_cai_694',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-695',
+        "name": 'gls_cai_695',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-697',
+        "name": 'gls_cai_697',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-698',
+        "name": 'gls_cai_698',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-699',
+        "name": 'gls_cai_699',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-701',
+        "name": 'gls_cai_701',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-702',
+        "name": 'gls_cai_702',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-703',
+        "name": 'gls_cai_703',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAI-704',
+        "name": 'gls_cai_704',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SESNP-001',
+        "name": 'gls_sesnp_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*(?:docker\\.sock|/var/run/docker\\.sock|container\\s+socket|daemon\\s+socket))(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|host\\s+path(?:s)?|mount\\s+host\\s+path))(?=.*(?:--privileged|privileged|cap_sys_admin))(?=.*(?:bypass|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing)|override|overrid(?:es|ing|en|ed)|disable|disable(?:d|s|ing)?|skip|skip(?:ped|s|ping)?))(?=.*(?:policy|guardrail(?:s)?|approval\\s*gate(?:s)?|safety\\s*check(?:s)?)).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SENMR-001',
+        "name": 'gls_senmr_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|jail(?:ed)?)\\b)(?=.*\\b(?:namespace|mount|chroot|procfs|cgroup|pivot_root)\\b)(?=.*\\b(?:remount|bind[- ]?mount|pivot_root|escape|break(?:\\s*out|out)?|host)\\b)(?=.*\\b(?:bypass|override|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail|isolation|restriction|boundary)\\b).*'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIDN-001',
+        "name": 'gls_caidn_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|coordinator|assistant)\\b)(?=.*\\b(?:nonce|token|session|attestation|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|rebind(?:ing|ed)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:scope|authority|trust(?:ed)?\\s+channel|source\\s+of\\s+truth|trust\\s+anchor)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SEPNP-001',
+        "name": 'gls_sepnp_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|drop|escape)\\b)(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|isolation)\\b)(?=.*(?:\\bprocfs\\b|/proc/|\\bnsenter\\b|\\bsetns\\b|\\bpid\\s*namespace\\b|\\bmount\\s*namespace\\b|\\bcgroup\\b))(?=.*\\b(?:escape|bypass|override|disable|drop)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|restriction(?:s)?|safety\\s*check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SESNP-002',
+        "name": 'gls_sesnp_002',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*(?:\\bdocker\\.sock\\b|\\bdocker\\s*sock\\b|/var/run/docker\\.sock|\\bsocket\\b))(?=.*(?:\\bhost\\s+namespace\\b|\\bhost\\s+path(?:s)?\\b|/proc/|\\bnsenter\\b|\\bsetns\\b))(?=.*(?:\\bmount\\b|\\bbind\\s*mount\\b|\\bprivileged\\b|\\bcap_sys_admin\\b|\\bescape\\b|\\bbreak\\s*out\\b|\\bexecute\\b))(?=.*(?:\\bignore\\b|\\bbypass\\b|\\boverride\\b|\\bskip\\b|\\bdisable\\b))(?=.*(?:\\bpolicy\\b|\\bguardrail(?:s)?\\b|\\bsafety\\s+check(?:s)?\\b|\\bapproval\\s+gate(?:s)?\\b)).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SEHNS-001',
+        "name": 'gls_sehns_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\b.{0,24}\\b(?:ignore|bypass|override|skip)\\b)(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|escape|break\\s*out|privileged|cap_sys_admin|mount\\s+host\\s+path|docker\\.sock|/var/run/docker\\.sock|socket\\b))(?=.*(?:ignore|bypass|override|skip))(?=.*(?:policy|guardrail(?:s)?|safety|approval\\s*check(?:s)?)).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SEDSP-001',
+        "name": 'gls_sedsp_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:mount|bind|expose|connect|map|attach|use|run|launch)\\b)(?=.*\\b(?:docker(?:\\.sock|\\s*sock)|/var/run/docker\\.sock|--privileged|privileged\\s+container|host\\s+pid|nsenter|chroot|escape\\s+the\\s+sandbox|break\\s+out\\s+of\\s+sandbox)\\b)(?=.*\\b(?:ignore|ignor(?:e|ed|es|ing)|bypass|bypass(?:ed|es|ing)?|override|overrid(?:e|es|ing|en|ed)|disable|disabled|disabling|skip|skip(?:ped|ping|s)?|disregard|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|sandbox\\s+restriction(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SESSP-001',
+        "name": 'gls_sessp_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:docker\\.sock|/var/run/docker\\.sock|containerd|kubelet|runc)\\b)(?=.*\\b(?:mount|bind|map|expose|proxy|forward|attach|reuse)\\w*\\b)(?=.*\\b(?:host|root|privileged?|namespace|runtime)\\b)(?=.*\\b(?:bypass|disable|ignore|override|skip)\\w*\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|sandbox(?:ed)?|restriction(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SECSM-001',
+        "name": 'gls_secsm_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:mount|bind|attach|expose|map|publish)\\b)(?=.*\\b(?:docker\\s*sock(?:et)?|docker\\.sock|/var/run/docker\\.sock|container\\s*socket|host\\s*socket)\\b)(?=.*\\b(?:host\\s*namespace|pid\\s*namespace|mount\\s*namespace|nsenter|--privileged|privileged|cap_sys_admin)\\b)(?=.*\\b(?:escape|break\\s*out|bypass|override|disable|ignore|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:sandbox|isolation|boundar(?:y|ies)|guardrail|policy|restriction(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAICR-001',
+        "name": 'gls_caicr_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(attestation|nonce|token|session|capability)\\b)(?=.*\\b(forge|forged|spoof|spoofed|tamper(?:ed)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(scope|authority|trust\\s*anchor|trusted\\s*channel)\\b)(?=.*\\b(rebind|escalat(?:e|ed|ing|ion)|override|bypass|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(policy|guardrail(?:s)?|approval\\s*check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SECNS-001',
+        "name": 'gls_secns_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|sidecar|runtime)\\b)(?=.*\\b(?:mount|bind\\s*mount|chroot|pivot_root|nsenter|procfs|/proc/|/var/run/docker\\.sock|docker\\.sock|docker\\s*sock)\\b)(?=.*\\b(?:privilege(?:d)?|cap_sys_admin|--privileged|hostpid|hostnetwork|breakout|break\\s*out|escape|isolation)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|restriction(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SBX-887',
+        "name": 'gls_sbx_887',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SEHNM-001',
+        "name": 'gls_sehnm_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:escape|break(?:\\s+out)?|pivot)\\b)(?=.*\\b(?:sandbox(?:ed)?|container|runtime|isolation)\\b)(?=.*\\b(?:host\\s+namespace|mount\\s+namespace|setns|nsenter|/proc/|/var/run/docker\\.sock|docker\\.sock)\\b)(?=.*\\b(?:disable|bypass|ignore|override|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|restriction(?:s)?|check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-CAIDT-001',
+        "name": 'gls_caidt_001',
+        "category": 'cross_agent_injection',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:ticket|handoff|summary|note|report)\\b)(?=.*\\b(?:trusted|authoritative|source\\s+of\\s+truth)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SENSP-001',
+        "name": 'gls_sensp_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|chroot)\\b)(?=.*\\b(?:mount|bind\\s*mount|nsenter|setns|pivot_root|pivot|rebind|escape|breakout|host\\s+namespace|host\\s+path(?:s)?)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundary|restriction(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    {
+        "id": 'GLS-SESNR-001',
+        "name": 'gls_sesnr_001',
+        "category": 'sandbox_escape',
+        "severity": 'high',
+        "channel": ['tool_output', 'message'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)\\b)(?=.*\\b(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
+        "description": ''
+    },
+    # === end v0.2.35 batch (34 patterns) ===
 ]
