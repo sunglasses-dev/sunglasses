@@ -2,6 +2,15 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.36] — 2026-05-10
+
+### Added
+- **15 new patterns, all in `agent_workflow_security`** — themed bundle "Pipeline Trust Signal Corruption": `GLS-AW-008` (event stream delimiter injection), `GLS-AW-017` (mtime backdating), `GLS-AW-018` (cron reply log drift), `GLS-AW-019` (heartbeat status spoofing), `GLS-AW-020` (justification channel hijack), `GLS-AW-021` (cron trigger desync), `GLS-AW-022` (control plane status forgery), `GLS-AW-023` (log evidence suppression), `GLS-AW-024` (status panel greenwashing), `GLS-AW-025` (cron state carryover poisoning), `GLS-AW-026` (reply file status overshadowing), `GLS-AW-027` (approval hash collision), `GLS-AW-028` (owner workqueue collision), `GLS-AW-029` (handoff intent truncation), `GLS-AW-030` (approval channel desync).
+
+### Context
+- Source: Cava Stage-1 research (AWS = agent_workflow_security cluster) converted to Stage-2 patterns. First captain-led ship co-piloted live by Dr. Strange (foresight, native host Hermes) + Boss (Claude Code) via the new Strange-Boss channel. Theme captures attacker forgery of the trust signals that cron-driven agent stacks treat as ground truth — heartbeats, cron logs, mtime recency, status panels, approval cards, hash-bound previews. Total catalog: 592 patterns / 54 categories / 2,429 keywords.
+
+
 ## [0.2.35] — 2026-05-08
 
 ### Added
