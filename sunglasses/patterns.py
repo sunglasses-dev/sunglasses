@@ -8729,5 +8729,403 @@ PATTERNS = [
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)\\b)(?=.*\\b(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
         "description": ''
     },
-    # === end v0.2.35 batch (34 patterns) ===
+    # === v0.2.36 batch (15 patterns) — Pipeline Trust Signal Corruption ===
+    {
+        "id": "GLS-AW-008",
+        "name": "Event stream delimiter injection",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "tool_output",
+            "message",
+            "api_response",
+            "file"
+        ],
+        "keywords": [
+            "inject sse delimiter",
+            "fake event frame",
+            "splice sse data",
+            "jsonl record breakout",
+            "markdown fence pivot",
+            "csv injection shift columns",
+            "frame splicing attack",
+            "control boundary injection",
+            "delimiter-shaped payload",
+            "data: prefix injection",
+            "triple-backtick close pivot",
+            "newline plus brace breakout"
+        ],
+        "regex": [
+            r"(?i)(?:inject|splice|forge|fabricate)\s+(?:fake|forged|spoofed|extra|hostile)\s+(?:sse|event|jsonl|csv|markdown)\s+(?:frame|record|delimiter|fence)",
+            r"(?i)(?:sse|jsonl|markdown|csv)\s+(?:delimiter|fence|frame|record)\s+(?:injection|breakout|pivot|poison|splice)"
+        ],
+        "description": "Event-stream and chunked-output toolchains often parse separators (---, JSONL newlines, SSE data: frames, markdown fences) as control boundaries. Attackers can inject delimiter-shaped payloads into low-trust content so the orchestrator mis-frames data as new instructions, bypassing normal prompt/tool priority rules."
+    },
+    {
+        "id": "GLS-AW-017",
+        "name": "Mtime backdating",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "file"
+        ],
+        "keywords": [
+            "backdate file mtime",
+            "spoof modification time",
+            "preserve mtime rollback",
+            "fake recency signal",
+            "stale bundle replay",
+            "rolled-back tarball fresh mtime",
+            "selective member aging",
+            "cross-file skew grafting",
+            "stale report replay timestamp",
+            "fresh archive stale members"
+        ],
+        "regex": [
+            r"(?i)(?:backdate|spoof|forge|preserve|fake)\s+(?:mtime|m-time|modification\s+time|file\s+timestamp|fs\s+timestamp)",
+            r"(?i)(?:stale|backdated|rolled[- ]?back|older)\s+(?:bundle|tarball|artifact|archive|file)\s+(?:with|via|using|but)\s+(?:fresh|forged|preserved|newer)\s+(?:mtime|timestamp|recency)"
+        ],
+        "description": "Mtime-backdating attacks forge file recency signals so automation trusts stale or attacker-controlled artifacts as \"fresh.\" In Sunglasses-style cron pipelines, mtime is frequently used to pick the latest bundle, cycle package, or dashboard source. If an attacker can preserve or spoof mtime ordering, they can steer the control plane toward older evidence while status checks still appear green."
+    },
+    {
+        "id": "GLS-AW-018",
+        "name": "Cron reply log drift",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "file",
+            "tool_output",
+            "message"
+        ],
+        "keywords": [
+            "status-first override",
+            "split-append desync",
+            "timestamp laundering",
+            "tail-truncation blindspot",
+            "fake success log entry",
+            "audit trail desync",
+            "write success before verification",
+            "suppress wins log",
+            "contradictory audit trail",
+            "log file early-edit hidden"
+        ],
+        "regex": [
+            r"(?i)(?:write|append|log|record)\s+(?:fake|forged|fabricated|premature)\s+(?:success|status|completion|done)\s+(?:before|prior\s+to|without|skipping)\s+(?:verification|validation|run|execution)",
+            r"(?i)(?:status|reply|append|audit)\s+(?:log|file|trail)\s+(?:desync|drift|divergence|laundering|truncation\s+blindspot)"
+        ],
+        "description": "GO MODE relies on append-only status artifacts (cava_wins_log.md + CAVA_REPLY_*) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims."
+    },
+    {
+        "id": "GLS-AW-019",
+        "name": "Heartbeat status spoofing",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "tool_output",
+            "message",
+            "api_response"
+        ],
+        "keywords": [
+            "spoof heartbeat",
+            "replay healthy heartbeat",
+            "synthetic heartbeat replay",
+            "status channel role confusion",
+            "completion pretext injection",
+            "stale-state pinning",
+            "fake gateway healthy",
+            "alive event replay",
+            "untrusted output framed as orchestrator status",
+            "task complete marker before verification"
+        ],
+        "regex": [
+            r"(?i)(?:spoof|forge|replay|fake|inject)\s+(?:heartbeat|health(?:check)?|alive|status)\s+(?:event|signal|message|envelope|marker|frame)?",
+            r"(?i)(?:synthetic|stale|forged|spoofed|replayed)\s+(?:heartbeat|status|alive|healthy|ok)\s+(?:replay|envelope|marker|signal|object|state)"
+        ],
+        "description": "Heartbeat/status channels are trusted fast-path signals in multi-agent pipelines. If an attacker can inject or spoof \"healthy\", \"completed\", or \"ready\" state into these channels, operators and orchestrators can skip deeper validation and execute stale or poisoned artifacts. This is high leverage because status metadata often bypasses the same scrutiny as task content."
+    },
+    {
+        "id": "GLS-AW-020",
+        "name": "Justification channel hijack",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "message",
+            "tool_output"
+        ],
+        "keywords": [
+            "risk summary inversion",
+            "approval note laundering",
+            "justification drift on retry",
+            "evidence-selective narration",
+            "make destructive look safe",
+            "soften warning across retries",
+            "claim no side effects while destructive",
+            "downplay risk to reviewer",
+            "approval-throughput laundering",
+            "tool args risky summary benign"
+        ],
+        "regex": [
+            r"(?i)(?:make|present|frame|describe)\s+(?:destructive|risky|dangerous|write|delete|network)\s+(?:action|tool\s+call|payload|operation)\s+(?:as|appear|look)\s+(?:safe|benign|read[- ]only|no[- ]op)",
+            r"(?i)(?:justification|approval\s+note|risk\s+summary|reviewer\s+note)\s+(?:hijack|inversion|laundering|drift|softening)"
+        ],
+        "description": "Agents often separate **decision payloads** from human-readable **justification text** (approval notes, risk summaries, changelog blurbs). Attackers can target the justification channel to make unsafe actions look compliant, reducing reviewer skepticism and increasing approval-throughput for malicious plans."
+    },
+    {
+        "id": "GLS-AW-021",
+        "name": "Cron trigger desync",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "file",
+            "message",
+            "tool_output"
+        ],
+        "keywords": [
+            "deferred payload swap",
+            "trigger source spoofing",
+            "time-window policy bypass",
+            "retry-queue privilege drift",
+            "post-approval payload mutation",
+            "queued job mutation",
+            "timezone confusion bypass",
+            "untrusted event masquerade as scheduler",
+            "retry inherits altered instructions"
+        ],
+        "regex": [
+            r"(?i)(?:after\s+(?:approval|enqueue|schedul(?:e|ing))|post[- ]approval|once\s+queued)[\s,]+.{0,120}?(?:swap|mutate|alter|rewrite|change)\s+(?:payload|template|variable|args|scheduled\s+job)",
+            r"(?i)(?:spoof|forge|fabricate|impersonate)\s+(?:cron|scheduler|trigger|webhook|timer)\s+(?:event|signal|source|fire)"
+        ],
+        "description": "Cron/scheduler boundaries are a high-risk trust seam in agent systems: delayed execution can separate **what was approved** from **what is executed later**. Attackers exploit this gap by injecting timing or trigger semantics so benign-looking queued jobs execute hostile payloads after context has shifted."
+    },
+    {
+        "id": "GLS-AW-022",
+        "name": "Control plane status forgery",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "log",
+            "tool_output",
+            "file"
+        ],
+        "keywords": [
+            "healthcheck verdict forgery",
+            "cross-file status shadowing",
+            "reason-code laundering",
+            "approval-state replay",
+            "fake STATUS PASS line",
+            "counterfeit health state",
+            "rate_limit aliased as normal",
+            "stale approved hash new payload",
+            "second latest status file forged"
+        ],
+        "regex": [
+            r"(?i)(?:forge|inject|fabricate|emit)\s+(?:STATUS|HEALTH(?:CHECK)?|VERDICT)\s*[:=]\s*(?:PASS|OK|HEALTHY|GREEN|READY|VERIFIED)",
+            r"(?i)(?:reason[- ]code|failure[- ]reason|error[- ]class)\s+(?:launder|alias|rewrite|swap|rename)\b"
+        ],
+        "description": "Control-plane status messages (\"healthy\", \"verified\", \"ready\", \"green\") are often trusted as gate signals by agent workflows. If an attacker can inject forged status artifacts into tool outputs, logs, or bridge files, the agent can skip validation gates and execute high-impact actions under false confidence. This creates a silent escalation path: no explicit jailbreak phrase is needed, just counterfeit health/approval state."
+    },
+    {
+        "id": "GLS-AW-023",
+        "name": "Log evidence suppression",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": [
+            "log",
+            "tool_output",
+            "message",
+            "file"
+        ],
+        "keywords": [
+            "severity downcast injection",
+            "rewrite error as info",
+            "evidence truncation pretext",
+            "strip tool args token efficiency",
+            "log stream branch fork",
+            "post-run overwrite laundering",
+            "compaction privacy excuse",
+            "ephemeral buffer hides risky details",
+            "rewrite failure lines as success"
+        ],
+        "regex": [
+            r"(?i)(?:rewrite|downgrade|downcast|reclassify)\s+(?:ERROR|SECURITY|CRITICAL|WARN(?:ING)?|FAIL(?:URE|ED)?)\s+(?:to|as|into)\s+(?:INFO|DEBUG|TRACE|NOTICE|OK)",
+            r"(?i)(?:suppress|strip|truncate|overwrite|omit)\s+(?:tool\s+args?|approval\s+hash(?:es)?|provenance|forensic|audit|source\s+uri)\s+(?:fields?|details?|entries?|lines?|keys?)"
+        ],
+        "description": "Attackers increasingly target observability pathways, not just policy prompts. In this family, adversarial instructions attempt to suppress, overwrite, or downgrade security-relevant evidence in logs so downstream validators and humans see a \"clean\" run despite compromised behavior. If successful, this can bypass Cycle 3/4 checks and corrupt incident response timing."
+    },
+    {
+        "id": "GLS-AW-024",
+        "name": "Status panel greenwashing",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": [
+            "file",
+            "tool_output"
+        ],
+        "keywords": [
+            "freshness badge override fallback key",
+            "partial-success laundering",
+            "zero-to-N/A coercion",
+            "denominator inflation",
+            "stale data renders as fresh",
+            "panel mixed states collapsed to green",
+            "render last_success instead of updated_at",
+            "regression hidden behind missing data semantics"
+        ],
+        "regex": [
+            r"(?i)(?:render|show|display|cast)\s+(?:stale|partial|degraded|failing)\s+(?:state|panel|status|badge|widget)\s+(?:as|to\s+appear)\s+(?:green|fresh|healthy|ready|ok)",
+            r"(?i)(?:fallback\s+key|alternate\s+timestamp|last_success|denominator)\s+(?:steering|override|swap|inflation|laundering)"
+        ],
+        "description": "Status dashboards are treated as operator truth during incident response. If an attacker can coerce a pipeline to render a green/fresh state from stale or partial evidence, defenders delay escalation while real abuse continues. This is high-risk in cron-driven agent systems where health badges and KPI cards directly influence action."
+    },
+    {
+        "id": "GLS-AW-025",
+        "name": "Cron state carryover poisoning",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "file",
+            "message"
+        ],
+        "keywords": [
+            "last-good replay poisoning",
+            "cross-cycle target-date confusion",
+            "guardrail downgrade carried exception",
+            "state-board precedence hijack",
+            "stale READY marker into prior cycle",
+            "one-cycle bypass becomes sticky",
+            "carryover trusted as already verified",
+            "non-canonical state newer than canonical"
+        ],
+        "regex": [
+            r"(?i)(?:plant|inject|seed|inherit)\s+(?:stale|forged|fake|outdated)\s+(?:READY|verified|approved|green|posture)\s+(?:marker|status|flag|state)\s+(?:into|in|across)\s+(?:prior|previous|next|carryover|cycle)",
+            r"(?i)(?:temporary|one[- ]cycle|cycle-only)\s+(?:bypass|exception|skip|waiver)\s+(?:becomes|made|drift(?:s|ing)?\s+to)\s+(?:sticky|persistent|permanent|carryover)"
+        ],
+        "description": "Cron-driven agent systems repeatedly execute near-identical workflows where status files, prior-cycle outputs, and readiness gates are reused as context. This creates a high-leverage injection surface: attackers can seed one cycle with manipulative state and let it silently propagate into future cycles as trusted \"already verified\" context. The result is decision drift without obvious single-event compromise."
+    },
+    {
+        "id": "GLS-AW-026",
+        "name": "Reply file status overshadowing",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": [
+            "file",
+            "message"
+        ],
+        "keywords": [
+            "stale BLOCKED prepend",
+            "status label collision near-identical heading",
+            "verdict replay across cycles",
+            "anchor source decoupling",
+            "reply file overshadow latest cycle update",
+            "skim-reading miss latest entry",
+            "tooling parses wrong block via duplicate marker"
+        ],
+        "regex": [
+            r"(?i)(?:prepend|inject|insert)\s+(?:stale|outdated|old|prior)\s+(?:BLOCKED?|FAIL(?:ED)?|READY|status|verdict)\s+(?:section|block|header|heading)",
+            r"(?i)(?:near[- ]identical|duplicate|colliding)\s+(?:heading|marker|status\s+label|section\s+title)\s+(?:so|to)\s+(?:tool|parser|operator)"
+        ],
+        "description": "In GO MODE operations, /opt/sunglasses/review/CAVA_REPLY_... is treated as a high-trust operator status surface. Attackers can inject or preserve stale status blocks so that old blocker text overshadows fresh cycle outcomes. This can force bad prioritization (re-open solved tasks, suppress live P0 pivots, or mislabel readiness). The failure mode is subtle because the reply file is expected to be append-only and long."
+    },
+    {
+        "id": "GLS-AW-027",
+        "name": "Approval hash collision",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": [
+            "tool_output",
+            "message",
+            "api_response"
+        ],
+        "keywords": [
+            "whitespace encoding collision smuggle",
+            "field-order json collision",
+            "truncated-preview suffix collision",
+            "cross-tool intent collision",
+            "approval bypass via canonicalization drift",
+            "hashed summary differs from executed payload",
+            "last-key-wins elevated scope",
+            "preview hashes first N chars only"
+        ],
+        "regex": [
+            r"(?i)(?:approval|intent|preview)\s+(?:hash|signature|digest)\s+(?:collision|smuggle|bypass|divergence|drift)",
+            r"(?i)(?:hash(?:ed)?|sign(?:ed)?|canonicaliz(?:e|ed))\s+(?:summary|preview|normalized\s+text|truncat(?:ed|ion))\s+(?:differs?|divergent|mismatch(?:ed|es)?)\s+(?:from|vs|against)\s+(?:execut(?:ed|ion)|runtime|payload|actual)"
+        ],
+        "description": "Approval workflows are often treated as a cryptographic trust boundary: if an action is \"approved,\" execution is allowed. In practice, many agent/tool pipelines hash incomplete summaries (or unstable fields) before approval, then execute a mutated payload. Attackers can force **hash-equivalent but behavior-divergent** requests so the system logs \"approved\" while executing higher-risk actions."
+    },
+    {
+        "id": "GLS-AW-028",
+        "name": "Owner workqueue collision",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": [
+            "message",
+            "file"
+        ],
+        "keywords": [
+            "owner reassignment pretext",
+            "queue starvation by urgency laundering",
+            "duplicate effort collision",
+            "forced takeover of in-progress work",
+            "skip P0 checks emergency low-value escalation",
+            "owner stalled fake reassignment",
+            "violate owner board boundary"
+        ],
+        "regex": [
+            r"(?i)(?:owner|assignee|sprint\s+lead|task\s+owner|primary)\s+(?:stalled|blocked|frozen|unresponsive|gone)\b.{0,120}?(?:should|must|now|immediately)\s+(?:take\s+over|reassign|claim|own|grab)",
+            r"(?i)(?:skip|ignore|bypass|override)\s+(?:P0|priority|owner|board)\s+(?:check|coordination|gate|policy).{0,80}?(?:CRITICAL|emergency|urgent|now)"
+        ],
+        "description": "GO MODE execution is explicitly one-task-per-cycle, while the company board enforces owner-aware coordination across DONE / IN_PROGRESS / QUEUED. An attacker who can inject owner or queue-state hints can force duplicate effort, collision with active work, or starvation of higher-value tasks."
+    },
+    {
+        "id": "GLS-AW-029",
+        "name": "Handoff intent truncation",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": [
+            "message",
+            "tool_output"
+        ],
+        "keywords": [
+            "suffix-drop handoff truncation",
+            "delimiter collapse end marker",
+            "policy caveat clipped at tail",
+            "safety appendix silently ignored",
+            "do not publish line missing",
+            "require human review stripped",
+            "handoff packet missing safety constraint",
+            "summarizer drops policy caveat under length pressure"
+        ],
+        "regex": [
+            r"(?i)(?:handoff|summary|note|packet)\s+(?:truncat(?:ed|ion)|clipp(?:ed|ing)|cut|dropped|elided)\s+(?:before|at|past|after)\s+(?:safety|caveat|policy|warning|appendix|do\s+not)",
+            r"(?i)(?:do\s+not\s+publish|require\s+human\s+review|forbidden\s+to|do\s+not\s+execute)\b.{0,200}?(?:omitted|removed|stripped|truncated|missing|dropped)"
+        ],
+        "description": "In multi-agent chains, one model writes a compact handoff note and the next model executes it. Attackers can force **semantic truncation** so safety constraints are dropped while execution directives survive. This creates high-risk \"looks-normal\" work packets: short, clean, and missing the one line that prevented dangerous action."
+    },
+    {
+        "id": "GLS-AW-030",
+        "name": "Approval channel desync",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": [
+            "tool_output",
+            "message",
+            "api_response"
+        ],
+        "keywords": [
+            "summary execution mismatch",
+            "approval card lies about scope",
+            "approve safe execute risky",
+            "preview diverges from runtime",
+            "lossy approval summary",
+            "hidden args broader actions",
+            "operator approves summary not exact payload",
+            "argument level attestation missing"
+        ],
+        "regex": [
+            r"(?i)(?:approval\s+(?:card|summary|preview|prompt|dialog))\s+(?:says?|shows?|lists?|claims?)\s+(?:read[- ]only|safe|benign|no[- ]op).{0,240}?(?:execut(?:e|es|ed|ion)|invoke|call|run|trigger)\s+(?:write|delete|network|destructive|dangerous|broader)",
+            r"(?i)(?:approve(?:d)?|consent(?:ed)?|previewed)\s+(?:summary|preview|intent)\b.{0,100}?(?:diverges?|mismatch(?:ed|es)?|differs?|inconsistent)\s+(?:from|with|against)\s+(?:execut(?:ed|ion)|runtime|actual\s+payload)"
+        ],
+        "description": "Agent stacks increasingly rely on approval UX (summaries, previews, confirmation prompts). If summaries are lossy or attacker-steerable, the approval layer becomes a false control."
+    },
+    # === end v0.2.36 batch (15 patterns) ===
 ]
