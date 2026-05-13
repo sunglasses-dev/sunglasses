@@ -9128,4 +9128,210 @@ PATTERNS = [
         "description": "Agent stacks increasingly rely on approval UX (summaries, previews, confirmation prompts). If summaries are lossy or attacker-steerable, the approval layer becomes a false control."
     },
     # === end v0.2.36 batch (15 patterns) ===
+    # === v0.2.37 batch (11 patterns) ===
+    {
+        "id": "GLS-TOP-627",
+        "name": "GLS-TOP-627",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)\b(?:stdout|log|trace|artifact|build\s+output|ci(?:/cd)?\s+output)\b.{0,140}\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\b.{0,160}\b(?:signature|attestation|checksum|verification\s+stamp|audit\s+seal)\b.{0,160}\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\b.{0,140}\b(?:guardrail(?:s)?|policy(?:\s+check)?|sanitizer|validation(?:\s+gate)?)\b""",
+        ],
+        "description": ""
+    },
+    {
+        "id": "GLS-TOP-628",
+        "name": "GLS-TOP-628",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:tool|plugin|connector|pipeline|adapter)\b)(?=.*\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\b)(?=.*\b(?:audit\s+receipt|execution\s+receipt|trace|checksum|provenance)\b)(?=.*\b(?:channel|route|dispatch|handoff|redirect|redirected|redirects|redirecting)\b)(?=.*\b(?:override|overrides|overrode|overridden|overriding|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing))\b)(?=.*\b(?:guardrail(?:s)?|policy|verification|review)\b).*""",
+        ],
+        "description": ""
+    },
+    {
+        "id": "GLS-TOP-629",
+        "name": "GLS-TOP-629",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:quorum|consensus|approval)\s+(?:receipt|record|token|attestation)\b)(?=.*\b(?:forged|fake|spoof(?:ed|ing)?|fabricated)\b)(?=.*\b(?:ignore|bypass|override|disregard|replace)\b)(?=.*\b(?:policy|guardrail(?:s)?|safety|verification)\b).*$""",
+        ],
+        "description": ""
+    },
+    {
+        "id": "GLS-TOP-630",
+        "name": "forged_confidence_trace_queue_redirect_execution_guardrail_bypass",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:forged|fake|spoofed|tampered|fabricated)\b)(?=.*\b(?:confidence\s+trace|telemetry\s+receipt|audit\s+output|verification\s+log|model\s+report)\b)(?=.*\b(?:redirect|redirected|redirects|reroute|rerouted|rerouting|rewire|rewired|rewiring|switch(?:ed|es|ing)?\s+queue(?:\s+routing)?|switch(?:ed|es|ing)?\s+(?:routing|channel|path))\b)(?=.*\b(?:execute|executed|executing|run|ran|launch|launched|deployment|action|actions)\b)(?=.*\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\b).*$""",
+        ],
+        "description": ""
+    },
+    {
+        "id": "GLS-OP-002",
+        "name": "GLS-OP-002",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)(?:\b(?:because|since)\b.{0,40}\b(?:tool|search|browser|retrieval|plugin|api)\s+output\b.{0,60}\b(?:trusted|authoritative|verified|reliable)\b|\b(?:treat|consider|use)\b.{0,40}\b(?:tool|search|browser|retrieval|plugin|api)\s+output\b.{0,40}\b(?:as\s+)?(?:trusted|authoritative|higher\s+priority|source\s+of\s+truth)\b).{0,160}\b(?:ignore|override|bypass|replace|discard)\b.{0,80}\b(?:previous|prior|earlier)?\s*(?:instruction(?:s)?|polic(?:y|ies)|guardrail(?:s)?|safety\s+rule(?:s)?)\b""",
+        ],
+        "description": ""
+    },
+    {
+        "id": "GLS-TOP-621",
+        "name": "GLS-TOP-621",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "priority tag spoofing",
+            "inflate confidence score",
+            "verified high-priority injection",
+            "consensus bootstrap poisoning",
+            "contradiction suppression",
+            "confidence laundering",
+            "fallback order hijack",
+            "self-declared confidence boost",
+            "ranker weight poisoning",
+            "stale artifact elevated rank",
+            "poisoned high-priority channel",
+            "repetition-as-agreement spoof",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:spoof|inject|forge|inflate|fake)\s+(?:priority|confidence|trust|rank|weight)\s+(?:tag|score|signal|metadata|field)\b|(?:self[- ]declared|unverified|attacker[- ]controlled)\s+(?:confidence|priority|trust)\s+(?:field|tag|score|metadata)\s+(?:elevates?|overrides?|wins?|ranks?\s+above)|(?:confidence|priority|trust)\s+(?:laundering|inflation|spoofing)\s+(?:suppresses?|bypasses?|overrides?)\s+(?:contradiction|conflict|verification))""",
+        ],
+        "description": "Attacker poisons high-priority evidence channels (system docs, dashboards, status channels) with inflated confidence or priority metadata so downstream reasoning inherits bad priors and suppresses contradictory evidence."
+    },
+    {
+        "id": "GLS-TOP-622",
+        "name": "GLS-TOP-622",
+        "category": "tool_output_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "safety note inversion rewrite",
+            "deny rewritten to proceed",
+            "postprocessor semantic flip",
+            "citation laundering postprocessor",
+            "constraint collapse brevity mode",
+            "schema-valid malicious normalization",
+            "risk field swap rewrite",
+            "policy drift clean output",
+            "rewrite deny as safe",
+            "summarize strips guardrail",
+            "postprocessor authority escalation",
+            "forged provenance canonicalized",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:rewrite(?:s)?|postprocess(?:es)?|normalize(?:s)?|format(?:s)?)\s+.{0,80}?(?:deny|block|unsafe|forbidden|risk[- ]?high)\s+(?:as|to|into)\s+(?:safe|proceed|allow|ok|green|approved)|(?:postprocessor|rewriter|normalizer|formatter)\s+(?:flip|invert|swap|drift|launder)s?\s+(?:safety|policy|deny|risk|constraint|guardrail)|(?:brevity|summariz(?:e|ing))\s+.{0,60}?(?:removes?|strips?|drops?|collapses?)\s+(?:guardrail|constraint|safety|policy|caveat|mandatory))""",
+        ],
+        "description": "Attacker-controlled text survives into postprocessing (summarizers, formatters, normalizers) where it silently flips deny-to-allow semantics or launders forged citations into trusted authority, producing policy-drifted output that appears clean."
+    },
+    {
+        "id": "GLS-TOP-623",
+        "name": "GLS-TOP-623",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "fake tool result block",
+            "quoted tool spoof",
+            "transcript role shadowing",
+            "forge tool prefix",
+            "error recovery override shadow",
+            "manual fallback command injection",
+            "cross-agent relay shadow",
+            "provenance confusion upgrade",
+            "tool result impersonation",
+            "assistant prefix forgery",
+            "confirmed output teammate spoof",
+            "free text elevated to tool channel",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:forge|spoof|inject|fake|fabricate)\s+(?:TOOL[\s_]RESULT|tool\s+output|tool\s+response|tool\s+channel)\s+(?:block|envelope|prefix|marker|header)|(?:transcript|context|free[- ]text)\s+(?:role|prefix|label)\s+(?:shadow|spoof|forge|impersonat)\b.{0,80}?(?:tool|assistant|system)\s+(?:authority|channel|result|output)|(?:previous|prior|last)\s+tool\s+(?:call|result|output)\s+(?:failed|error|unavailable).{0,120}?(?:manual|fallback|recovery)\s+(?:command|instruction|payload))""",
+        ],
+        "description": "Attacker embeds text that mimics authoritative tool-result formatting (TOOL RESULT: blocks, role prefixes, teammate confirmations) inside user or retrieved context so the agent trusts injected directives over actual tool-call output."
+    },
+    {
+        "id": "GLS-TOP-624",
+        "name": "GLS-TOP-624",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "first-row authority hijack",
+            "index zero poisoning",
+            "tail override duplicate key",
+            "last-key-wins downgrade",
+            "chronology inversion payload",
+            "stale first-seen block",
+            "cross-tool merge race",
+            "list position trust signal",
+            "order-dependent parser exploit",
+            "row permutation attack",
+            "sequence position policy key",
+            "low-trust lands first race",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:inject|place|position|insert)\s+(?:forged|crafted|poisoned|attacker[- ]controlled)\s+(?:row|entry|result|record|item)\s+(?:at|in)\s+(?:index\s+0|first|position\s+0|head|top)\b|(?:forged|crafted|poisoned|attacker[- ]controlled)\s+(?:row|entry|result|record|item)\s+(?:placed|positioned|injected|inserted)\s+(?:at|in)\s+(?:index\s+0|first|position\s+0|head|top)\b|(?:duplicate|repeated)\s+(?:key|field|metric)\b.{0,80}?(?:last|tail|final)\s+(?:occurrence|value|entry)\s+(?:wins|overrides?|accepted|dominates?)|(?:stale|older|outdated)\s+(?:snapshot|result|metric|record)\s+(?:placed|positioned|injected)\s+(?:before|ahead\s+of|first)\s+(?:newer|fresher|current|latest))""",
+        ],
+        "description": "Attacker exploits agents that trust list or sequence position as a trust signal by injecting crafted entries at index 0, placing stale snapshots before current ones, or forcing last-key-wins duplicate key collisions to downgrade risk outcomes."
+    },
+    {
+        "id": "GLS-TOP-625",
+        "name": "GLS-TOP-625",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "placeholder as truth coercion",
+            "masked string canonical value",
+            "redaction replay poisoning",
+            "placeholder written to executable config",
+            "semantic mismatch laundering",
+            "masked secret path swap",
+            "truncation marker accepted as value",
+            "ellipsis as on-disk value",
+            "redacted snippet patch injection",
+            "display excerpt vs byte verified",
+            "UI renderer mask treated as canonical",
+            "stale fallback masked as healthy",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:treat|accept|use|trust)\s+(?:masked|redacted|truncated|elided|placeholder)\s+(?:string|value|path|token|secret)\s+(?:as|for)\s+(?:canonical|exact|on[- ]disk|literal|verified|authoritative)\b|(?:write|patch|inject|copy)\s+(?:redacted|masked|placeholder|truncated)\s+(?:snippet|value|string|content)\s+(?:into|to)\s+(?:config|script|executable|file|deploy)|(?:masked|redacted|placeholder|truncated).{0,20}?(?:string|value|marker|snippet|token|secret|path)\s+(?:accepted|used|treated)\s+as\s+(?:real|exact|canonical|on[- ]disk|literal))""",
+        ],
+        "description": "Attacker steers agents or operators to treat redacted placeholders (masked secrets, truncation markers) as canonical on-disk values, causing broken automation, false verification, and latent runtime failures when placeholder garbage is written into executable configs."
+    },
+    {
+        "id": "GLS-TOP-626",
+        "name": "GLS-TOP-626",
+        "category": "tool_output_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "keywords": [
+            "signed summary impostor",
+            "fake provenance envelope",
+            "executor identity swap",
+            "freshness token replay",
+            "stale healthcheck replayed",
+            "cross-channel evidence splicing",
+            "forged tool run id",
+            "tool name field forgery",
+            "content hash bypass",
+            "provenance label string spoofed",
+            "immutable id replaced string label",
+            "multi-format splice fabricated result",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:forge|fake|spoof|fabricate|counterfeit)\s+(?:provenance|source|signer|executor|run[_-]?id|tool[_-]?name)\s+(?:envelope|field|tag|label|metadata|signature)\b|(?:replay|reuse|copy)\s+(?:stale|old|expired|prior)\s+(?:tool\s+(?:output|result|summary)|healthcheck|approval|freshness)\b.{0,80}?(?:appears?|marked|presented)\s+(?:as|current|fresh|valid|recent)|(?:executor|signer|source|validator)\s+(?:identity|label|name|id)\s+(?:swap(?:ped)?|rewritten|replaced|altered)\b.{0,60}?(?:bypass|skip|override)\s+(?:policy|gate|verification|provenance\s+check))""",
+        ],
+        "description": "Attacker forges provenance signals (source identity, executor label, run ID, freshness token) or splices fragments from logs, markdown, and JSON to fabricate one authoritative tool result, collapsing trust boundaries and triggering unsafe downstream execution."
+    },
 ]
