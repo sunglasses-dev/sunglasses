@@ -2,6 +2,15 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.37] — 2026-05-13
+
+### Added
+- **11 new patterns, all in `tool_output_poisoning`** — themed bundle "Tool Output Trust Forgery": `GLS-TOP-621` (Tool Result Prioritization Poisoning — priority/confidence tag spoofing), `GLS-TOP-622` (Postprocessor Rewrite Hijack — deny-to-allow semantic flips in summarizers/normalizers), `GLS-TOP-623` (Tool Output Shadowing — forged TOOL_RESULT prefixes/role shadowing), `GLS-TOP-624` (Tool Result Order Dependency Poisoning — index-0 hijack + last-key-wins downgrades), `GLS-TOP-625` (Tool Output Redaction Drift — masked placeholders treated as canonical on-disk values), `GLS-TOP-626` (Tool Result Provenance Forgery — forged signer/executor/run-id + freshness replay), `GLS-TOP-627` (forged CI log signature guardrail bypass), `GLS-TOP-628` (forged audit receipt channel redirect override), `GLS-TOP-629` (forged quorum receipt emergency policy bypass), `GLS-TOP-630` (forged confidence trace queue redirect execution guardrail bypass), `GLS-OP-002` (trusted output override).
+
+### Context
+- Source: Jack staged (5) + Cava research_files regex-engineered (6) = 11 patterns. Theme captures attackers forging tool-output trust signals — receipts, provenance envelopes, postprocessor outputs, order/rank metadata, redaction markers — that downstream agents trust as authoritative. Matched to a Cava-drafted blog "Agent Link Safety Is Not Enough: The Runtime-Trust Checks AI Workflows Still Need Before They Act" (JACK byline, published at `/blog/agent-link-safety-runtime-trust`). Total catalog: 603 patterns / 54 categories / 2,501 keywords.
+
+
 ## [0.2.36] — 2026-05-10
 
 ### Added
