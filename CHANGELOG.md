@@ -2,6 +2,14 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.38] — 2026-05-13
+
+### Added
+- **12 new patterns, all in `agent_workflow_security`** — first batch from Cava's 253-pattern research bundle: `GLS-AW-031` through `GLS-AW-042`. Theme: Model-routing hijacks, policy scope redefinition, and workflow trust chain manipulation — the runtime-trust attack surface that guardrails leave open. Patterns detect model-routing directive injection (`preferred_model` field spoofing, A/B routing overrides), policy reframing mid-workflow (cost-gate downgrade pretexts, capability spoof escalation), and content-originated model directives that steer agents toward less-safe model tiers.
+
+### Context
+- Source: Cava 253-pattern research bundle (`cava_converted_2026-05-13.json`), first 12 of 175 `agent_workflow_security` patterns. Matched to Cava-drafted blog "AI Agent Guardrails vs Runtime Trust: Trusted Access Is Not the Last Security Decision" (JACK byline, published at `/blog/ai-agent-guardrails-vs-runtime-trust`). Total catalog: 615 patterns / 54 categories / 2,645 keywords.
+
 ## [0.2.37] — 2026-05-13
 
 ### Added
