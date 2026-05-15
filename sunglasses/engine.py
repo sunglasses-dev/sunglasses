@@ -202,8 +202,10 @@ class SunglassesEngine:
                         **pattern,
                         "matched_text": normalized[start_idx:end_show],
                     }
-                    # Negation context check
-                    if self._check_negation(normalized, kw_start):
+                    # Negation context check (skipped for negation_immune patterns —
+                    # e.g. emotional-coercion jailbreaks where "don't" is part of the
+                    # attack template itself, not a warning context)
+                    if not pattern.get("negation_immune") and self._check_negation(normalized, kw_start):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
@@ -225,8 +227,7 @@ class SunglassesEngine:
                             **pattern,
                             "matched_text": normalized[start_idx:end_show],
                         }
-                        # Negation context check
-                        if self._check_negation(normalized, idx):
+                        if not pattern.get("negation_immune") and self._check_negation(normalized, idx):
                             finding["severity"] = "review"
                             finding["negation_context"] = True
                             finding["original_severity"] = pattern["severity"]
@@ -246,8 +247,7 @@ class SunglassesEngine:
                         **pattern,
                         "matched_text": match.group(0)[:50],
                     }
-                    # Negation context check for regex matches too
-                    if self._check_negation(text, match.start()):
+                    if not pattern.get("negation_immune") and self._check_negation(text, match.start()):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
