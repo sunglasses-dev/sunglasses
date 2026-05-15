@@ -2,6 +2,44 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.39] — 2026-05-15
+
+### Added (Red-Team Gym hardening sweep — 3 cycles, 4 attack families closed to 0–1 misses)
+
+- **17 new patterns across 4 categories** + **1 new category** (`jailbreak_evasion`) + **1 engine feature** (`negation_immune` per-pattern flag) + **GLS-SE-004 keyword/regex extension**:
+  - **Cycle 1 — `jailbreak_evasion` (new category)** — `GLS-JBE-001` DAN mode activation · `GLS-JBE-002` deceased-grandmother trick · `GLS-JBE-003` creative-writing hypothetical · `GLS-JBE-004` emotional coercion. Closed `jailbreak_social` gym family from 14 missed → 0 missed.
+  - **Cycle 1 — `cross_agent_injection`** — `GLS-CAI-705` forged inter-agent ACK · `GLS-CAI-706` OCR alt-text transcript grafting · `GLS-CAI-707` no-human-review authorization · `GLS-CAI-708` shared-log prior-verification claim · `GLS-CAI-709` supervisor role hijack. Closed `cross_agent_injection` gym family from 16 missed → 0 missed.
+  - **Cycle 2 — `ui_injection`** — `GLS-SEM-UI-219` rendered HTML element injection · `GLS-SEM-UI-220` fake terminal/auth-success output forgery · `GLS-SEM-UI-221` fake UI element subversion ("Cancel" that re-confirms) · `GLS-SEM-UI-238` bracketed `[✓ APPROVED BY USER]` banner forgery (negation-immune). Closed `ui_injection_social` gym family from 14 missed → 0 missed.
+  - **Cycle 3 — `supply_chain`** — `GLS-SC-PKG-240` post-install credential exfil description · `GLS-SC-SKL-241` skill-install-from-attacker-repo with hidden exfil · `GLS-SC-MAN-242` plugin/tool manifest capability lie (negation-immune) · `GLS-SC-TYP-243` typosquatted package description. Closed `supply_chain_skill` gym family from 16 missed → 1 missed.
+- **Engine feature:** per-pattern `negation_immune: True` flag — bypasses the wrapper-prefix downgrade for narrow attack-signature patterns. Wrapper envelopes (`Calendar note:` / `Forwarded mail:` / `FYI from ops:`) no longer mask the underlying attack. Applied surgically to 6 patterns (JBE-001, JBE-004, CAI-707, CAI-709, SEM-UI-238, SC-MAN-242).
+- **GLS-SE-004 extension:** added 3 attack-specific keywords + 1 co-occurrence regex to catch forged approval-banner proceed-without-confirmation phrasing. Rejected the broader "approved by user" keyword (FP-bombed on benign sprint chatter — verified in cycle).
+
+### Tests
+- **6 new test files** in `~/sunglasses-dev/glasses/tests/`:
+  - `test_jailbreak_evasion.py` + `test_jailbreak_evasion_fp.py`
+  - `test_cross_agent_injection_gym.py`
+  - `test_ui_injection_social_gym.py` + `test_ui_injection_social_fp.py`
+  - `test_supply_chain_skill_gym.py` + `test_supply_chain_skill_fp.py`
+- **Full scanner suite: 136 passed, 7 xfailed, 0 regressions** (was 57 passed pre-Cycle-1).
+- 7 xfailed cases document a known FP class: security docs/training/advisories that quote the FULL attack signature verbatim. Real fix needs doc-context vocabulary in engine `NEGATION_PHRASES` (tracked for a future engine cycle).
+
+### Gym scoreboard (template adversary, 500 payloads/run)
+
+| Run | Setup | Caught | Catch rate |
+|---|---|---|---|
+| Baseline | v0.2.38 | 309/500 | 61.8% |
+| Post-Cycle-1 | + JBE + CAI + immunity | 347/500 | 69.4% |
+| Post-Cycle-2 | + UI patterns + SE-004 | 351/500 | 70.2% |
+| **Post-Cycle-3** | + Supply-chain patterns | **364/500** | **72.8%** |
+
+**+11.0 pp overall.** Three families at 0 misses, two at 1 miss, gym noise floor confirmed at ±3/25 per family.
+
+### Context
+- Source: internal red-team gym at `~/sunglasses-redteam-gym/` — adversary generates 25 payloads per family across 20 families, Sunglasses scanner judges, SQLite stores results, HTML report surfaces top misses. Gym was built May 13.
+- Reports: `~/sunglasses-redteam-gym/reports/report_20260514_{182659,224801,230319}_*.html` document the 3-cycle hardening loop.
+- Strange + Boss + AZ coordinated the cycle gate-by-gate (rebaseline → classify → map-to-existing-category → minimum-fix → FP sanity → re-run gym). Strange's 8-step protocol prevented unnecessary new-category creation and unnecessary engine surgery.
+- Total catalog: 632 patterns / 55 categories / 2,835 keywords.
+
 ## [0.2.38] — 2026-05-13
 
 ### Added
