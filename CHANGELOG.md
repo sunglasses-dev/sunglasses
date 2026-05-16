@@ -2,6 +2,17 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.40] — 2026-05-15
+
+### Added (policy_scope_redefinition category expansion — Cava research bundle)
+
+- **17 new patterns in the `policy_scope_redefinition` category** — `GLS-PSR-580` through `GLS-PSR-596`. The category was introduced in v0.2.19 with `GLS-PSR-001`; this release expands coverage of later-stage text that quietly redefines what an AI agent is authorized to do. Patterns target appendix-style policy overrides, connector help text that inflates a limited integration to organization-wide authority, runtime handoff notes that convert narrow approval context into blanket pre-approval, and exception-block scope grabs.
+- Pattern count: 632 → **649**. Keyword count: 2,835 → **3,039**. Categories unchanged at 55 (no new category).
+
+### Content
+
+- New blog: `/blog/policy-scope-redefinition-runtime-trust` — "Policy Scope Redefinition Is a Runtime-Trust Problem: Why MCP Scope Creep Becomes Unsafe Agent Action" (JACK byline, datePublished 2026-05-15).
+
 ## [0.2.39] — 2026-05-15
 
 ### Added (Red-Team Gym hardening sweep — 3 cycles, 4 attack families closed to 0–1 misses)
