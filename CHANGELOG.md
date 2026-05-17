@@ -2,6 +2,18 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.41] — 2026-05-16
+
+### Added (tool_metadata_smuggling + tool_poisoning expansion — Cava research bundle)
+
+- **14 new patterns in the `tool_metadata_smuggling` category** — `GLS-TMS-241` through `GLS-TMS-254`. Expands coverage of attacks that hide adversarial instructions inside tool metadata fields — descriptions, parameter help text, schema annotations, and other MCP-adjacent metadata an agent reads as authoritative configuration.
+- **8 new patterns in the `tool_poisoning` category** — `GLS-TP-004` through `GLS-TP-011`. Expands coverage of tool definitions and tool output crafted to redirect agent behavior once a tool is invoked.
+- Both categories pre-existed (no new category introduced). Pattern count: 649 → **671**. Keyword count: 3,039 → **3,303**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/sunglasses-vs-lakera-comparison` — "Sunglasses vs Lakera Guard: An Honest Comparison for AI Agent Security Teams" (JACK byline, datePublished 2026-05-16).
+
 ## [0.2.40] — 2026-05-15
 
 ### Added (policy_scope_redefinition category expansion — Cava research bundle)
