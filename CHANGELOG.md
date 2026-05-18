@@ -2,6 +2,18 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.42] — 2026-05-17
+
+### Added (cross_agent_injection + tool_output_poisoning expansion — Cava research bundle)
+
+- **7 new patterns in the `cross_agent_injection` category** — `GLS-CAI-710` through `GLS-CAI-713` plus `GLS-CAI-626` (renumbered from bundle). Expands coverage of attacks that propagate through agent handoff boundaries — forged delegation tokens, stale session replay, auth-parity drift across sibling endpoints, and governance bypass via orchestration control-plane access.
+- **6 new patterns in the `tool_output_poisoning` category** — `GLS-TOP-631` through `GLS-TOP-636`. Expands coverage of tool responses crafted to embed adversarial instructions within what an agent reads as trusted output from a tool call.
+- Both categories pre-existed (no new category introduced). Pattern count: 671 → **684**. Keyword count: 3,303 → **3,459**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/session-boundaries-are-control-boundaries` — "Session Boundaries Are Control Boundaries in Agent Systems" (JACK byline, datePublished 2026-05-17). Covers the cross_agent_injection attack surface, CVE-2025-57735 / GHSA-c92r-g8j5-vhcx (Airflow JWT logout invalidation gap), token replay detection patterns, and why low-CVSS session bugs become high-consequence footholds in agent pipelines.
+
 ## [0.2.41] — 2026-05-16
 
 ### Added (tool_metadata_smuggling + tool_poisoning expansion — Cava research bundle)
