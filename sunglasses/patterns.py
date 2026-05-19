@@ -1177,7 +1177,7 @@ PATTERNS = [
             "NODE_PATH=",
             "LD_PRELOAD=",
         ],
-        "description": "Environment variable override to redirect package installs to malicious registries or inject code. Source: OpenClaw GHSA-7ggg."
+        "description": "Environment variable override to redirect package installs to malicious registries or inject code."
     },
     {
         "id": "GLS-TD-002",
@@ -1192,7 +1192,7 @@ PATTERNS = [
             "disable safety check",
             "skip approval",
         ],
-        "description": "LLM agent silently disabling execution approval or safety checks via config modification. Source: OpenClaw GHSA-v3qc."
+        "description": "LLM agent silently disabling execution approval or safety checks via config modification."
     },
     {
         "id": "GLS-TD-003",
@@ -1205,7 +1205,7 @@ PATTERNS = [
             "os.symlink(",
             "fs.symlinkSync(",
         ],
-        "description": "Sandbox escape via symlink pointing to host filesystem for arbitrary file read/write. Source: OpenClaw GHSA-cwf8."
+        "description": "Sandbox escape via symlink pointing to host filesystem for arbitrary file read/write."
     },
     {
         "id": "GLS-TD-004",
@@ -1220,7 +1220,7 @@ PATTERNS = [
             "privateKey",
             "signingKey",
         ],
-        "description": "Bypassing config value redaction to leak plaintext credentials. Source: OpenClaw Nostr GHSA."
+        "description": "Bypassing config value redaction to leak plaintext credentials."
     },
 
     {
@@ -2734,7 +2734,7 @@ PATTERNS = [
         "regex": [
             r'(?i)(?:password_hash|hashed_password|password_digest)\s*[":=]',
         ],
-        "description": "Detects credential hash exposure in API responses or config — enables pass-the-hash attacks (LiteLLM GHSA-cf3e)."
+        "description": "Detects credential hash exposure in API responses or config — enables pass-the-hash attacks."
     },
 
     # --- GLS-CI-006: Websocket terminal auth bypass ---
@@ -3112,7 +3112,7 @@ PATTERNS = [
         "regex": [
             '(?i)(security|compliance|manager|human|admin)\\s+(review|approval|sign-?off)\\s+(?:already\\s+)?(?:passed|completed|confirmed|recorded|approved)',
         ],
-        "description": 'Detects forged tool-result claims that a review, approval, or compliance check already succeeded — a tool-poisoning primitive that steers agents without obvious override language. Source: Cava PATTERNS_FROM_COMPETITORS_2026-04-06.',
+        "description": 'Detects forged tool-result claims that a review, approval, or compliance check already succeeded — a tool-poisoning primitive that steers agents without obvious override language.',
     },
     {
         "id": 'GLS-TP-002',
@@ -3123,7 +3123,7 @@ PATTERNS = [
         "regex": [
             '(?i)(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot).{0,120}(curl|wget|bash|sh|powershell|python\\s+-c)',
         ],
-        "description": 'Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner — tool-output masquerading as trusted instruction. Source: Cava PATTERNS_FROM_COMPETITORS_2026-04-06.',
+        "description": 'Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner — tool-output masquerading as trusted instruction.',
     },
     {
         "id": 'GLS-ID-001',
@@ -3134,7 +3134,7 @@ PATTERNS = [
         "regex": [
             '(?i)(paste|send|share|forward|copy)\\s+(?:the\\s+)?(?:callback\\s+)?(authorization\\s+code|refresh\\s+token|bearer\\s+token|device\\s+code|pkce|code_verifier|oauth\\s+verifier)',
         ],
-        "description": 'Detects requests to relay short-lived identity artifacts (OAuth device code, PKCE verifier, callback token) that exploit auth flows instead of static keys. Source: Cava PATTERNS_FROM_COMPETITORS_2026-04-06.',
+        "description": 'Detects requests to relay short-lived identity artifacts (OAuth device code, PKCE verifier, callback token) that exploit auth flows instead of static keys.',
     },
     {
         "id": 'GLS-EX-018',
@@ -3145,7 +3145,7 @@ PATTERNS = [
         "regex": [
             '(?i)(?:(?:put|upload|send|exfiltrate|drop|stage|zip)\\s+[^\\n]{0,60}(?:presigned|signed)\\s+(?:s3\\s+)?(?:put|upload)?\\s*url|(?:presigned|signed)[^\\n]{0,40}(?:expires?\\s+in|one-?time)|x-amz-signature=|transfer\\.sh|file\\.io|paste\\.rs|0x0\\.st|tmpfiles?\\.|one-?time\\s+download)',
         ],
-        "description": "Detects staging exfiltration through presigned S3 PUT URLs or ephemeral file-drop services — modern outbound leakage that evades generic 'send to http' rules. Source: Cava PATTERNS_FROM_COMPETITORS_2026-04-06.",
+        "description": "Detects staging exfiltration through presigned S3 PUT URLs or ephemeral file-drop services — modern outbound leakage that evades generic 'send to http' rules.",
     },
     {
         "id": 'GLS-EX-019',
@@ -3165,7 +3165,7 @@ PATTERNS = [
         "regex": [
             '(?i)(user|security|manager|legal|admin|change\\s+ticket|policy\\s+exception)\\s+(?:already\\s+)?(approved|authorized|consented|signed\\s+off|granted|pre-?cleared)',
         ],
-        "description": 'Detects consent/approval laundering — text that claims approval, consent, or sign-off already exists rather than asking to bypass it. Narrower than GLS-SE-004. Source: Cava PATTERNS_FROM_COMPETITORS_2026-04-06.',
+        "description": 'Detects consent/approval laundering — text that claims approval, consent, or sign-off already exists rather than asking to bypass it. Narrower than GLS-SE-004.',
     },
     {
         "id": 'GLS-PE-004',
@@ -3176,7 +3176,7 @@ PATTERNS = [
         "regex": [
             '(?i)(session|token|jwt|refresh)[^\\n]{0,60}(lifetime|ttl|expires?|max_age|duration)[^\\n]{0,40}(44640|31\\s*days?|30\\s*days?|2592000)',
         ],
-        "description": 'Month-scale default session/token lifetimes (44640 minutes, 31 days) in agent/admin auth config — excessive credential lifetime primitive. Source: Jack PATTERN_IMPROVEMENTS Apr 9.',
+        "description": 'Month-scale default session/token lifetimes (44640 minutes, 31 days) in agent/admin auth config — excessive credential lifetime primitive.',
     },
     {
         "id": 'GLS-PE-005',
@@ -3196,7 +3196,7 @@ PATTERNS = [
         "regex": [
             '(?is)(?=.*\\b(?:auth:\\s*gateway|gateway\\s+auth|trusted-proxy)\\b)(?=.*\\boperator\\.read\\b)(?=.*\\boperator\\.write\\b)(?=.*\\b(?:widen|scope|runtime|produce(?:d)?|yield(?:s|ed)?)\\b).{0,1400}',
         ],
-        "description": 'Detection for GHSA-4f8g-77mw-3rxc: trusted-proxy gateway auth where operator.read + operator.write scopes widen at runtime without re-consent. Jack fixture QA: 2/2 malicious, 0/2 benign. Source: Jack JACK_EXTRACTED_PATTERNS Apr 9.',
+        "description": 'Detection for GHSA-4f8g-77mw-3rxc: trusted-proxy gateway auth where operator.read + operator.write scopes widen at runtime without re-consent.',
     },
     {
         "id": 'GLS-AW-011',
@@ -3207,7 +3207,7 @@ PATTERNS = [
         "regex": [
             '(?is)(?=.*\\b(?:openclaw|playwright|qq\\s*bot|media\\s*fetch)\\b)(?=.*\\bssrf\\b)(?=.*\\b(?:redirect|navigation|fetch\\s*paths?|guard)\\b).{0,1200}',
         ],
-        "description": 'SSRF guard coverage gap in browser-driver / media-fetch code paths where redirects bypass private-target blocklists. Jack fixture QA: 2/2 malicious, 0/2 benign. Source: Jack JACK_EXTRACTED_PATTERNS.',
+        "description": 'SSRF guard coverage gap in browser-driver / media-fetch code paths where redirects bypass private-target blocklists.',
     },
     {
         "id": 'GLS-AW-012',
@@ -3218,7 +3218,7 @@ PATTERNS = [
         "regex": [
             '(?is)(?=.*\\b(?:ws|websocket|gateway\\s*token|shared\\s*token|resolvedauth)\\b)(?=.*\\b(?:rotate|rotation|reload)\\b)(?=.*\\b(?:survives?|kept\\s+alive|persists?\\s+(?:after|despite))\\b).{0,1200}',
         ],
-        "description": 'Websocket sessions survive token rotation / reload — stale auth closure (resolvedAuth) keeps revoked credentials alive. Jack fixture QA: 2/2 malicious, 0/2 benign. Source: Jack JACK_EXTRACTED_PATTERNS.',
+        "description": 'Websocket sessions survive token rotation / reload — stale auth closure (resolvedAuth) keeps revoked credentials alive.',
     },
     {
         "id": 'GLS-AW-013',
@@ -3260,7 +3260,7 @@ PATTERNS = [
         "regex": [
             '(?i)(ignore|suppress|hide|silence|do\\s+not\\s+report)\\s+(?:the\\s+)?(scanner|guardrail|warning|alert|policy\\s+check|detection)[\\s\\S]{0,80}(continue|proceed|keep\\s+running|do\\s+not\\s+stop)',
         ],
-        "description": 'Instructions telling an agent or operator to ignore scanner warnings and continue silently — complements GLS-SE-004 with proceed-silently tail. Source: Jack PATTERN_IMPROVEMENTS Apr 9.',
+        "description": 'Instructions telling an agent or operator to ignore scanner warnings and continue silently — complements GLS-SE-004 with proceed-silently tail.',
     },
     {
         "id": 'GLS-SC-020',
@@ -3271,7 +3271,7 @@ PATTERNS = [
         "regex": [
             '(?i)\\b(?:tar|tarfile|zipfile|ZipFile|shutil\\.unpack_archive)\\b[^\\n]{0,120}\\.extractall\\s*\\(',
         ],
-        "description": 'Python tar/zip extractall() used without canonical destination validation — Zip-Slip / path-traversal primitive. Catches both Cava research and the PraisonAI recipe-unpack GHSA-99g3-w8gr-x37c. Source: Jack PATTERN_IMPROVEMENTS Apr 8.',
+        "description": 'Python tar/zip extractall() used without canonical destination validation — Zip-Slip / path-traversal primitive. Covers the PraisonAI recipe-unpack case (GHSA-99g3-w8gr-x37c).',
     },
     {
         "id": 'GLS-SC-021',
@@ -3300,7 +3300,7 @@ PATTERNS = [
         "regex": [
             '(?is)(?=.*\\bx-[a-z0-9-]*auth\\b)(?=.*\\b(?:forg(?:e|ed|eable)|bypass|unauthenticated|trusted[- ]?header)\\b)(?!.*\\b(?:rejects?|refuses?|requires?\\s+mtls|trusted\\s+mtls|unless)\\b).{0,400}',
         ],
-        "description": 'Forgeable trust-header auth bypass — routes that honor X-*-Auth headers without validating origin, enabling unauthenticated access. Source: Cava NEW_PATTERNS_2026-04-08 (GHSA-5mwj-v5jw-5c97 LobeHub variant).',
+        "description": 'Forgeable trust-header auth bypass — routes that honor X-*-Auth headers without validating origin, enabling unauthenticated access (GHSA-5mwj-v5jw-5c97, LobeHub variant).',
     },
     {
         "id": 'GLS-AB-004',
@@ -3311,7 +3311,7 @@ PATTERNS = [
         "regex": [
             '(?i)(login|auth|signin|authenticate)[^\\n]{0,120}(accept|allow|compare)[^\\n]{0,60}\\b[a-f0-9]{63,64}\\b',
         ],
-        "description": 'Login routes that accept raw hash-shaped material (SHA-256 length hex) as credentials — pass-the-hash primitive. Source: Jack PATTERN_IMPROVEMENTS Apr 9.',
+        "description": 'Login routes that accept raw hash-shaped material (SHA-256 length hex) as credentials — pass-the-hash primitive.',
     },
     {
         "id": 'GLS-AB-005',
@@ -3322,7 +3322,7 @@ PATTERNS = [
         "regex": [
             '(?i)(?:hashlib\\.sha256|crypto\\.createHash\\([\'\\"]sha256[\'\\"]\\))[^\\n]{0,80}(?:password|passwd|credential)',
         ],
-        "description": 'Unsalted SHA-256 used for password hashing in control-plane auth code — weak hashing primitive. Source: Jack PATTERN_IMPROVEMENTS Apr 9.',
+        "description": 'Unsalted SHA-256 used for password hashing in control-plane auth code — weak hashing primitive.',
     },
     {
         "id": 'GLS-CI-007',
@@ -3333,7 +3333,7 @@ PATTERNS = [
         "regex": [
             '(?i)(?:run|script|shell)\\s*:\\s*[^\\n]*\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]+\\}\\}',
         ],
-        "description": 'GitHub Actions / deployment workflow step interpolates user- or package-controlled fields directly into a shell step without quoting — RCE-via-workflow primitive. Source: Jack PATTERN_IMPROVEMENTS Apr 8.',
+        "description": 'GitHub Actions / deployment workflow step interpolates user- or package-controlled fields directly into a shell step without quoting — RCE-via-workflow primitive.',
     },
     {
         "id": 'GLS-MCP-009',
@@ -6470,7 +6470,7 @@ PATTERNS = [
 
     {
         "id": "GLS-ACP-566",
-        "name": "Forged_sla_exception_precedence_guardrail_bypass",
+        "name": "Forged SLA Exception Precedence Guardrail Bypass",
         "category": "agent_contract_poisoning",
         "severity": "high",
         "channel": ["message", "tool_output", "file"],
@@ -6485,7 +6485,7 @@ PATTERNS = [
             "fabricated service level exception text forced precedence",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:contract|agent\s+contract|sla|service\s+level|runbook|playbook|exception)\b)(?=.*\b(?:forged|spoofed|fabricated|poisoned|tampered|malicious)\b)(?=.*\b(?:precedence|priority|override|overrode|overrides|overriding|reorder|reordered|reordering|rebind|rebinds|rebinding|bypass(?:es|ed|ing)?|ignore(?:s|d|ing)?|skip(?:s|ped|ping)?)\b)(?=.*\b(?:guardrail(?:s)?|policy|safety|approval|verification|control(?:s)?)\b).{0,1200}$"""],
-        "description": "Detects agent contract poisoning attack patterns.",
+        "description": "Detects forged SLA or service-level exception text injected into an agent contract or runbook to reorder execution priority and override guardrails or approval checks.",
     },
 
     {
@@ -6530,7 +6530,7 @@ PATTERNS = [
 
     {
         "id": "GLS-TOP-256",
-        "name": "Tool Output Poisoning pattern",
+        "name": 'Forged Safety Verdict Execution Force',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["tool_output", "file"],
@@ -6550,7 +6550,7 @@ PATTERNS = [
 
     {
         "id": "GLS-PX-567",
-        "name": "Forged_support_bundle_hidden_system_dump_bypass",
+        "name": "Forged Support Bundle Hidden System Dump Bypass",
         "category": "prompt_extraction",
         "severity": "high",
         "channel": ["message", "tool_output", "file"],
@@ -6565,12 +6565,12 @@ PATTERNS = [
             "forged ticket artifacts inserted disguised system prompt",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:support[-\s]*bundle|debug[-\s]*bundle|diagnostic\s*pack|ticket\s*(?:attachment|artifact(?:s)?)|incident[-\s]*bundle)\b)(?=.*\b(?:forged|spoofed|fabricated|tampered|malicious)\b)(?=.*\b(?:hidden|embedded|inline|disguised|masked)\b)(?=.*\b(?:system\s*prompt|developer\s*prompt|internal\s*instruction(?:s)?|hidden\s*instruction(?:s)?|prompt\s*dump)\b)(?=.*\b(?:bypass(?:es|ed|ing)?|override(?:s|d|ing)?|overrode|disable(?:s|d|ing)?|ignore(?:s|d|ing)?)\b).{0,1200}$"""],
-        "description": "Detects prompt extraction attack patterns.",
+        "description": "Detects forged support, debug, or diagnostic bundles carrying a hidden system prompt or internal instructions used to dump or override the agent's protected context.",
     },
 
     {
         "id": "GLS-RP-259",
-        "name": "Forged_trust_cache_ttl_override_rerank_guardrail_bypass",
+        "name": "Forged Trust Cache TTL Override Rerank Guardrail Bypass",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["tool_output", "web_content", "file"],
@@ -6585,12 +6585,12 @@ PATTERNS = [
             "forged citation-layer operation poisons trust cache rewrites",
         ],
         "regex": [r"""(?is)^(?!.*\b(?:do\s+not|don't|never|without|did\s+not|does\s+not)\s+(?:forge|tamper|override|bypass|rerank|poison)\b)(?=.*\b(?:retrieval|citation|knowledge\s+base|trust\s+cache|cache\s+entry)\b)(?=.*\b(?:forge|forged|tamper(?:ed|ing)?|poison(?:ed|ing|s)?|rewrite|rewrites)\b)(?=.*\b(?:ttl|time[-\s]+to[-\s]+live|expiry|expiration)\b)(?=.*\b(?:rerank|re-rank|priority|weight(?:ing)?)\b)(?=.*\b(?:override|bypass(?:es)?|disable|skip)\b).*$"""],
-        "description": "Detects retrieval poisoning attack patterns.",
+        "description": "Detects forged retrieval or citation entries that tamper with a trust cache TTL/expiry so poisoned evidence stays live and reranks results past guardrails.",
     },
 
     {
         "id": "GLS-RP-564",
-        "name": "Forged_citation_weight_reorder_policy_guardrail_bypass",
+        "name": "Forged Citation Weight Reorder Policy Guardrail Bypass",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["tool_output", "web_content", "file"],
@@ -6605,7 +6605,7 @@ PATTERNS = [
             "poisoned search index injected tampered citations altered",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:retrieval|search|index|corpus|document|citation|chunk|rerank(?:er|ing)?|embedding)\b)(?=.*\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|malicious)\b)(?=.*\b(?:score|rank|weight|priority|confidence)\b)(?=.*\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|disregard|disregards|disregarded|disregarding|replace|replaces|replaced|replacing|supersed(?:e|es|ed|ing))\b)(?=.*\b(?:guardrail(?:s)?|policy|safety|approval|verification)\b).{0,1000}$"""],
-        "description": "Detects retrieval poisoning attack patterns.",
+        "description": "Detects a poisoned search index or reranker fed forged, spoofed evidence that reorders result scores to override retrieval guardrails and verification.",
     },
 
     {
@@ -6625,12 +6625,12 @@ PATTERNS = [
             "manifest provenance trust anchor discard policy verification",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:manifest|provenance|attestation|signature|signed\s+(?:artifact|bundle|payload))\b)(?=.*\b(?:authoritative|source\s+of\s+truth|root\s+of\s+trust|trust\s+anchor|trusted\s+(?:channel|source))\b)(?=.*\b(?:supersed(?:e|es|ed|ing)|override|bypass|replace|discard)\b)(?=.*\b(?:policy|guardrails?|verification|checks?)\b).*$"""],
-        "description": "Detects provenance chain fracture attack patterns.",
+        "description": "Detects text claiming a manifest, attestation, or signed artifact is the authoritative source of truth in order to supersede or discard policy verification checks.",
     },
 
     {
         "id": "GLS-PSR-579",
-        "name": "Policy_reclassified_as_advisory_guardrail_demotion",
+        "name": "Policy Reclassified As Advisory Guardrail Demotion",
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "tool_output", "file"],
@@ -6665,12 +6665,12 @@ PATTERNS = [
             "step step become security lead identity and",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:persona|role|identity|character|mode)\b)(?=.*\b(?:gradual(?:ly)?|step(?:-|\s*)by(?:-|\s*)step|over\s+(?:the\s+)?next\s+(?:turns?|messages?)|across\s+(?:multiple|several)\s+turns?|incremental(?:ly)?)\b)(?=.*\b(?:become|act\s+as|adopt|switch\s+to|transition\s+to|reframe\s+yourself\s+as)\b)(?=.*\b(?:admin|root|maintainer|superuser|policy\s+owner|security\s+lead)\b)(?=.*\b(?:ignore|override|bypass|supersed(?:e|es|ed|ing)|disregard)\b)(?=.*\b(?:policy|guardrail(?:s)?|safety\s+(?:rule|rules|instruction(?:s)?)|approval\s+check(?:s)?)\b).*$"""],
-        "description": "Detects agent persona drift attack patterns.",
+        "description": "Detects a multi-turn persona drift where an agent is gradually pushed to adopt an admin, root, or security-lead identity and then override safety policy.",
     },
 
     {
         "id": "GLS-CAI-527",
-        "name": "Forged_delegate_attestation_nonce_scope_rebind_bypass",
+        "name": "Forged Delegate Attestation Nonce Scope Rebind Bypass",
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["tool_output", "message"],
@@ -6697,12 +6697,12 @@ PATTERNS = [
             "fake remote agent instruction with precedence metadata",
         ],
         "regex": [r"""(?is)^(?=.*(?:\b(?:peer|upstream|remote|another)\s+agent\b.{0,120}\b(?:directive|instruction|ticket|request|order)\b|\b(?:directive|instruction|ticket|request|order)\b.{0,120}\b(?:peer|upstream|remote|another)\s+agent\b))(?=.*\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\b)(?=.*\b(?:precedence|priority|authorit(?:y|ative)|higher\s+trust|override)\b)(?=.*\b(?:bypass|override|ignore|skip|disable)\w*\b.{0,80}\b(?:guardrail(?:s)?|policy|validation|check(?:s)?|control(?:s)?)\b).*$"""],
-        "description": "Detects cross agent injection attack patterns.",
+        "description": "Detects forged or spoofed directives attributed to a peer, upstream, or remote agent, tagged with false precedence to bypass guardrails and validation.",
     },
 
     {
         "id": "GLS-TOP-620",
-        "name": "Tool Output Poisoning pattern",
+        "name": 'Tool Output Integrity Forgery',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["tool_output", "file"],
@@ -6717,7 +6717,7 @@ PATTERNS = [
             "forged verification badge tool output should allow",
         ],
         "regex": [r"""(?is)^(?=.*(?:\b(?:tool\s*output|scan\s*result|compliance\s*report|audit\s*(?:log|verdict)|verification\s*badge)\b.{0,120}\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|fake)\b|\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|fake)\b.{0,120}\b(?:tool\s*output|scan\s*result|compliance\s*report|audit\s*(?:log|verdict)|verification\s*badge)\b))(?=.*\b(?:unblock|auto-?execut(?:e|es|ed|ing)|execut(?:e|es|ed|ion|ing)|auto-?remediate|pass\s*status|allow)\b)(?=.*\b(?:bypass(?:ing)?|override|ignore|skip(?:s|ping)?|disable|disabling)\b.{0,80}\b(?:guardrail(?:s)?|policy|validation|check(?:s)?|controls?)\b).*$"""],
-        "description": "Detects tool output poisoning attack patterns.",
+        "description": "Detects forged tool output \u2014 fake scan results, compliance reports, or audit verdicts \u2014 used to unblock execution and bypass policy checks.",
     },
 
     {
@@ -6737,12 +6737,12 @@ PATTERNS = [
             "include directional override then bypassing instruction safeguards",
         ],
         "regex": [r"""(?is)^(?!.*\b(?:do\s+not|never|without)\s+(?:ignore(?:d|s|ing)?|bypass(?:ed|es|ing)?|override(?:d|s|ing)?|supersed(?:e|es|ed|ing)|disregard(?:ed|s|ing)?|drop(?:ped|s|ping)?|disable(?:d|s|ing)?)\b)(?=.*(?:\u202e|\u202d|\u2066|\u2067|\u2068|\u2069|right-to-left\s+override|rtl\s+override|bidi(?:rectional)?\s+control|unicode\s+bidi|rlo\s+marker))(?=.*\b(?:ignore(?:d|s|ing)?|bypass(?:ed|es|ing)?|override(?:d|s|ing)?|supersed(?:e|es|ed|ing)|disregard(?:ed|s|ing)?|drop(?:ped|s|ping)?|disable(?:d|s|ing)?)\b)(?=.*\b(?:policy|guardrail(?:s)?|safety\s+(?:rule|rules|check|checks)|instruction(?:s)?|control(?:s)?)\b).{0,900}$"""],
-        "description": "Detects rtl obfuscation attack patterns.",
+        "description": "Detects right-to-left and bidirectional Unicode control characters used to obfuscate a prompt and smuggle instructions that bypass safety guardrails.",
     },
 
     {
         "id": "GLS-CS-575",
-        "name": "Multilingual_override_launder",
+        "name": "Multilingual Override Launder",
         "category": "code_switching",
         "severity": "high",
         "channel": ["message", "tool_output", "file"],
@@ -6762,7 +6762,7 @@ PATTERNS = [
 
     {
         "id": "GLS-MER-565",
-        "name": "Forged_archive_restore_precedence_guardrail_bypass",
+        "name": "Forged Archive Restore Precedence Guardrail Bypass",
         "category": "memory_eviction_rehydration",
         "severity": "medium",
         "channel": ["message", "tool_output"],
@@ -6777,12 +6777,12 @@ PATTERNS = [
             "forged checkpoint memory data triggered restore precedence",
         ],
         "regex": [r"""(?is)^(?=.*\b(?:memory|context|session|history|archive|checkpoint)\b)(?=.*\b(?:evict(?:ion|ed|ing)?|purge(?:d|ing)?|forget(?:ting)?|drop(?:ped|ping)?|rehydrat(?:e|ed|ing|ion)|restore(?:d|ing)?)\b)(?=.*\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|poison(?:ed|ing)?|malicious)\b)(?=.*\b(?:precedence|priority|override(?:s|d|ing)?|bypass(?:es|ed|ing)?|ignore(?:s|d|ing)?|disregard(?:s|ed|ing)?|skip(?:s|ped|ping)?|replace(?:s|d|ing)?)\b)(?=.*\b(?:guardrail(?:s)?|policy|safety|verification|approval)\b).{0,1200}$"""],
-        "description": "Detects memory eviction rehydration attack patterns.",
+        "description": "Detects forged checkpoint or archive-restore metadata that rehydrates a poisoned prior session with false precedence to override verification guardrails.",
     },
 
     {
         "id": "GLS-DN-002",
-        "name": "Base64_txt_chunk_reassembly_exfil",
+        "name": "Base64 TXT Chunk Reassembly Exfil",
         "category": "dns_tunneling",
         "severity": "high",
         "channel": ["message", "tool_output", "file"],
@@ -6797,7 +6797,7 @@ PATTERNS = [
             "compress archive base64 encode route through dns",
         ],
         "regex": [r"""(?is)\b(?:split|chunk|encode|base64|hex|compress)\b.{0,120}\b(?:secret|credential|token|api[_ -]?key|env|payload|archive|data)\b.{0,140}\b(?:dns|dns\s+txt|txt\s+record|nslookup|dig)\b.{0,140}\b(?:exfil(?:trate|tration)?|send|beacon|tunnel|reassembl(?:e|y)|reconstruct)\b"""],
-        "description": "Detects dns tunneling attack patterns.",
+        "description": "Detects credential or secret data being chunked and base64/hex-encoded for exfiltration through DNS TXT-record queries (nslookup/dig tunneling).",
     },
 
 
@@ -6809,99 +6809,99 @@ PATTERNS = [
     # --- cross_agent_injection ---
     {
         "id": 'GLS-CAI-533',
-        "name": '(unnamed)',
+        "name": 'Stale-Credential Handoff Scope Elevation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegat(?:e|ed|es|ing)|orchestrator|worker|peer)\\b)(?=.*\\b(?:handoff|relay|forward|delegat(?:e|ed|es|ing)|transfer)\\b)(?=.*\\b(?:token|nonce|session|credential)\\b)(?=.*\\b(?:revoked|stale|expired|old)\\b)(?=.*\\b(?:scope|permission(?:s)?|authority)\\b)(?=.*\\b(?:rebind|elevate|expand|upgrade|widen)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$'],
-        "description": ''
+        "description": 'Detects a cross-agent handoff that reuses a revoked or expired credential while rebinding scope and overriding approval policy.'
     },
     {
         "id": 'GLS-CAI-584',
-        "name": '(unnamed)',
+        "name": 'Upstream-Agent Policy Override Directive',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
-        "description": ''
+        "description": 'Detects a message attributed to an upstream or supervisor agent that instructs the recipient to ignore or bypass policy, guardrails, or system instructions.'
     },
     # --- dns_tunneling ---
     {
         "id": 'GLS-DN-578',
-        "name": '(unnamed)',
+        "name": 'DNS Tunnel Policy Egress Filter Bypass',
         "category": 'dns_tunneling',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
         "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|egress|control(?:s)?|dns\\s*filter)\\b)(?=.*\\b(?:dns|doh|dot|txt|cname|subdomain|resolver)\\b)(?=.*\\b(?:tunnel|beacon|chunk(?:ing|ed)?|exfiltrat(?:e|ion)|payload)\\b)(?=.*\\b(?:secret(?:s)?|token(?:s)?|credential(?:s)?|key(?:s)?|data|command(?:s)?)\\b).+"],
-        "description": ''
+        "description": 'Detects a DNS tunneling or beaconing attempt that chunks or exfiltrates secrets, tokens, or commands via DNS/DoH/TXT while bypassing egress filter or DNS-filter policy.'
     },
     # --- error_message_leakage ---
     {
         "id": 'GLS-EML-251',
-        "name": '(unnamed)',
+        "name": 'Forced Error Dump Redaction Filter Bypass',
         "category": 'error_message_leakage',
         "severity": 'medium',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:error|exception|stack(?:\\s|-)?trace|debug(?:ging)?|traceback|crash(?:\\s+log)?|diagnostic)\\b)(?=.*\\b(?:dump|print|expose|reveal|show|output)\\b)(?=.*\\b(?:full|raw|unredacted|complete)\\b)(?=.*(?:\\b(?:ignore|bypass|disable|skip|override)\\b.{0,40}\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b|\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b.{0,40}\\b(?:ignore|bypass|disable|skip|override)\\b))(?=.*\\b(?:secret|token|api[_ -]?key|credential|password|env(?:ironment)?\\s+var(?:iable)?s?)\\b).*'],
-        "description": ''
+        "description": 'Detects an instruction to print or expose a full, unredacted error or stack trace containing secrets by bypassing or disabling redaction or masking filters.'
     },
     {
         "id": 'GLS-EML-252',
-        "name": '(unnamed)',
+        "name": 'Triggered Crash Verbatim Credential Reveal',
         "category": 'error_message_leakage',
         "severity": 'medium',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:error|exception|stack\\s*trace|traceback|debug\\s*log|crash\\s*dump)\\b)(?=.*\\b(?:force|trigger|induce|cause|provoke)\\w*\\b)(?=.*\\b(?:unredacted|raw|full|verbatim|plaintext)\\b)(?=.*\\b(?:reveal|leak|dump|print|expose|return|show)\\w*\\b)(?=.*\\b(?:api[_ -]?key|token|secret|credential|passwd|password|session\\s*id)\\b).*$'],
-        "description": ''
+        "description": 'Detects an attempt to force or induce an error, crash, or traceback to reveal a verbatim or raw API key, password, or credential.'
     },
     # --- invisible_unicode ---
     {
         "id": 'GLS-IU-531',
-        "name": '(unnamed)',
+        "name": 'Zero-Width Character Policy Override Bypass',
         "category": 'invisible_unicode',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
         "regex": ["(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disre[\\u200b\\u200c\\u200d\\ufeff]*gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"],
-        "description": ''
+        "description": 'Detects invisible unicode zero-width characters embedded in keywords such as ignore, override, or bypass to conceal a policy or guardrail override directive.'
     },
     # --- model_routing_confusion ---
     {
         "id": 'GLS-MRC-252',
-        "name": '(unnamed)',
+        "name": 'Lightweight Model Admin Task Policy Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:route|reroute|switch|downgrade|fallback|send|shift)\\b.{0,80}\\b(?:lite|light(?:weight)?|cheap|fast|mini|small|low(?:-|\\s)?cost|budget)\\b)(?=.*\\b(?:admin|payment|credential(?:s)?|authorization|production|deploy(?:ment)?)\\b)(?=.*\\b(?:ignore|bypass|override|waive|skip|disable)\\b.{0,80}\\b(?:policy|guardrail(?:s)?|safety|approval|verification|control(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects an attempt to route admin, payment, or credential tasks to a lightweight or low-cost model while bypassing approval policy or safety guardrails.'
     },
     {
         "id": 'GLS-MRC-528',
-        "name": '(unnamed)',
+        "name": 'Forged Router Health Signal High-Privilege Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|dispatcher|gateway|tier)\\b)(?=.*\\b(?:health|telemetry|latency|risk|score|classifier)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|tamper|tampered|replay|replayed|fabricated)\\b)(?=.*\\b(?:reroute|rerouted|promote|promoted|upgrade|upgraded|switch|switched|fail[-\\s]*open)\\b)(?=.*\\b(?:high[-\\s]*privilege|admin|unrestricted|raw\\s+model|unsafe\\s+tier)\\b)(?=.*\\b(?:bypass|bypassed|override|overrode|disable|disabled)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+gate|approval)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged or spoofed router health or telemetry signal used to promote or fail-open routing to a high-privilege or unrestricted model tier while disabling policy.'
     },
     # --- policy_scope_redefinition ---
     {
         "id": 'GLS-PSR-002',
-        "name": '(unnamed)',
+        "name": 'Policy Scope Reinterpretation Priority Override',
         "category": 'policy_scope_redefinition',
         "severity": 'high',
         "channel": ['message', 'tool_output'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:ignore|bypass|override|disregard|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|system\\s+instruction(?:s)?|approval\\s+check(?:s)?)\\b)(?=.*\\b(?:redefin(?:e|ed|es|ing)|reinterpret(?:ed|s|ing)?|reclassif(?:y|ied|ies|ying)|scope\\s+rebind|scope\\s+shift|treat(?:\\s+it)?\\s+as)\\b)(?=.*\\b(?:priority\\s+over|takes?\\s+priority|supersed(?:e|ed|es|ing)|replace(?:d|s|ing)?|deprecated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|skip)\\b).*$'],
-        "description": ''
+        "description": 'Detects an attempt to redefine, reinterpret, or reclassify a policy or guardrail as deprecated or superseded so that a new scope or priority takes precedence and bypasses it.'
     },
     # --- retrieval_poisoning ---
     {
         "id": 'GLS-RP-526',
-        "name": '(unnamed)',
+        "name": 'Retrieval Score Forge Guardrail Safety Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'web_content', 'file'],
         "regex": ['(?is)\\b(?:retrieval|rag|index|knowledge\\s+base|search)\\b.{0,140}\\b(?:score|ranking|priority|relevance)\\b.{0,140}\\b(?:forge|forged|forging|manipulate|manipulated|manipulating|poisoned|poisoning|tampered|tampering|spoofed|spoofing)\\b.{0,140}\\b(?:elevate|elevated|elevating|promote|promoted|promoting|rerank|reranked|reranking|prioritize|prioritized|prioritizing|boost|boosted|boosting)\\b.{0,140}\\b(?:ignore|bypass|override|disable|skip)\\b.{0,80}\\b(?:safety|policy|guardrail(?:s)?|verification|approval)\\b'],
-        "description": ''
+        "description": 'Detects a poisoned or forged retrieval ranking or relevance score used to elevate a document and bypass safety policy or verification approval.'
     },
     # --- state_sync_poisoning ---
     {
@@ -6915,49 +6915,49 @@ PATTERNS = [
     },
     {
         "id": 'GLS-SSP-532',
-        "name": '(unnamed)',
+        "name": 'Forged State Checkpoint Validation Bypass',
         "category": 'state_sync_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:checkpoint|state\\s*sync|replica|snapshot|state\\s*delta)\\b)(?=.*\\b(?:forged|spoof(?:ed)?|tampered|fake|fabricated)\\b)(?=.*\\b(?:reconcile|merge|promote|adopt|apply|accept)\\b)(?=.*\\b(?:bypass|ignore|skip|disable|override)\\b)(?=.*\\b(?:validation|signature|approval|guardrail(?:s)?|integrity\\s*check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or fabricated checkpoint or state-sync replica promoted or merged while bypassing integrity signature or approval guardrails.'
     },
     {
         "id": 'GLS-SSP-539',
-        "name": '(unnamed)',
+        "name": 'Checkpoint Rollback Waiver Signature Bypass',
         "category": 'state_sync_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:checkpoint|snapshot|state|replica|journal)\\b)(?=.*\\b(?:rollback|revert|rewind|restore)\\b)(?=.*\\b(?:waiver|exception|fail[- ]?open|expedite)\\b)(?=.*\\b(?:signature|attestation|verification|integrity)\\b)(?=.*\\b(?:ignore|skip|disable|bypass|override)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$'],
-        "description": ''
+        "description": 'Detects a checkpoint or snapshot rollback using an exception waiver or fail-open path that bypasses signature attestation or integrity policy.'
     },
     # --- tool_output_poisoning ---
     {
         "id": 'GLS-TOP-001',
-        "name": '(unnamed)',
+        "name": 'Forged Canary Verdict Guardrail Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|tampered|fake)\\b)(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|audit\\s+trace|verdict\\s+record)\\b)(?=.*\\b(?:canary\\s+verdict|confidence\\s+gate|trust\\s+score|risk\\s+rating|verification\\s+badge)\\b)(?=.*\\b(?:guardrail(?:s)?|policy(?:\\s+gate)?|safety\\s+check(?:s)?|validation\\s+check(?:s)?)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:s|d|ing)?|skip(?:s|ped|ping)?|ignore(?:s|d|ing)?|suppress(?:es|ed|ing)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or fabricated tool output carrying a fake canary verdict, confidence gate, or trust score used to bypass or disable safety check guardrails.'
     },
     {
         "id": 'GLS-TOP-250',
-        "name": '(unnamed)',
+        "name": 'Forged Audit Log Checksum Mismatch Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
         "regex": ['(?is)^(?=.*\\b(?:audit\\s*log|telemetry|trace|evidence|verification\\s*record)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:checksum|hash|signature|digest)\\b)(?=.*\\b(?:mismatch|invalid|fail(?:ed|ure)?|bypass(?:ed|ing)?|ignore(?:d|s|ing)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or tampered audit log or telemetry trace whose checksum, hash, or signature is mismatched or bypassed.'
     },
     {
         "id": 'GLS-TOP-259',
-        "name": '(unnamed)',
+        "name": 'Forged Execution Result Planner Verification Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
         "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|redirect)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b.{0,60}\\b(?:tool\\s*output|execution\\s*result|validator\\s*report|scan\\s*result|audit\\s*trace)\\b)(?=.*\\b(?:reroute|redirect|forward|relay|handoff|dispatch)(?:d|ing|s)?\\b.{0,70}\\b(?:planner|router|orchestrator|decision\\s*engine|action\\s*selector)\\b)(?=.*\\b(?:bypass|skip|ignore|disable|override)(?:d|ing|s)?\\b.{0,70}\\b(?:verification|validation|safety\\s*check|policy\\s*gate|guardrail)\\b).*$"],
-        "description": ''
+        "description": 'Detects a forged tool output or validator report rerouted to a planner or decision engine to skip verification and bypass policy or safety gates.'
     },
 
     # =========================================================================
@@ -6968,160 +6968,160 @@ PATTERNS = [
     # --- c2_indicator ---
     {
         "id": 'GLS-C2-002',
-        "name": '(unnamed)',
+        "name": 'C2 Beacon DoH Jitter Exfil Policy Bypass',
         "category": 'c2_indicator',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
         "regex": ['(?is)^(?=.*\\b(?:c2|command(?:\\s|-)?and(?:\\s|-)?control|beacon(?:ing)?|callback)\\b)(?=.*\\b(?:dns(?:\\s|-)?over(?:\\s|-)?https|doh|https(?:\\s|-)?dns|txt(?:\\s|-)?query)\\b)(?=.*\\b(?:jitter|interval(?:\\s|-)?randomi[sz]ation|sleep(?:\\s|-)?variance|timing(?:\\s|-)?spread)\\b)(?=.*\\b(?:exfil(?:trate|tration)?|egress|payload(?:\\s|-)?upload|data(?:\\s|-)?channel)\\b)(?=.*\\b(?:bypass|evade|ignore|disable|waive|override)\\b)(?=.*\\b(?:policy|egress(?:\\s|-)?filter(?:s)?|guardrail(?:s)?|detection|control(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects C2 beaconing or callback activity using DNS-over-HTTPS with jitter or timing randomization to exfiltrate data while bypassing egress filter or detection policy.'
     },
     # --- identity_federation ---
     {
         "id": 'GLS-IDF-001',
-        "name": '(unnamed)',
+        "name": 'Forged OIDC Assertion Scope Escalation Bypass',
         "category": 'identity_federation',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:oidc|oauth|saml|identity\\s+provider|idp|federat(?:ion|ed)|service\\s+token|assertion)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:scope|role|claim|audience|tenant|privilege|permission)\\b)(?=.*\\b(?:escalat(?:e|ed|ing|ion)|override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|grant(?:ed|ing)?\\s+admin)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged or spoofed OIDC, SAML, or identity-provider assertion carrying an escalated scope, role, or privilege claim to override or bypass authorization.'
     },
     # --- agent_persona_drift ---
     {
         "id": 'GLS-APD-654',
-        "name": '(unnamed)',
+        "name": 'Incremental Persona Drift Guardrail Relaxation',
         "category": 'agent_persona_drift',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:persona|character|role|identity|tone)\\b)(?=.*\\b(?:incremental(?:ly)?|gradual(?:ly)?|step[-\\s]*by[-\\s]*step|over\\s+several\\s+turns|slow(?:ly)?|turn\\s*\\d+)\\b)(?=.*\\b(?:ignore|bypass|override|sidestep|relax|drop)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|restriction(?:s)?|constraint(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a gradual, step-by-step persona or character shift across multiple turns designed to slowly relax or bypass policy, guardrails, or safety restrictions.'
     },
     # --- agent_workflow ---
     {
         "id": 'GLS-AW-016',
-        "name": '(unnamed)',
+        "name": 'Emergency Urgency Approval Gate Skip Deploy',
         "category": 'agent_workflow',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without)\\s+(?:skip|bypass|waive|ignore|override)\\b)(?=.*\\b(?:emergency|urgent|critical|sev-?1|hotfix)\\b)(?=.*(?:\\b(?:skip|bypass|waive|ignore|override)\\b.{0,80}\\b(?:approval|review|change(?:[- ]?control)?|sign[- ]?off|gate)\\b|\\b(?:approval|review|change(?:[- ]?control)?|sign[- ]?off|gate)\\b.{0,80}\\b(?:skip|bypass|waive|ignore|override)\\b))(?=.*\\b(?:deploy(?:ment)?|merge|release|production|prod)\\b).*$'],
-        "description": ''
+        "description": 'Detects an emergency or critical urgency claim used to skip or bypass approval, review, or change-control gates for a deployment or production release.'
     },
     {
         "id": 'GLS-AW-581',
-        "name": '(unnamed)',
+        "name": 'Rollback Exception Waiver Auto-Execute Bypass',
         "category": 'agent_workflow',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?:\\b(?:mark|set|flag|declare|treat|classify)\\b.{0,90}\\b(?:rollback\\s+exception|exception\\s+waiver|rollback\\s+waiver|emergency\\s+override)\\b.{0,110}\\b(?:approved|authorized|pre[- ]?cleared|active)\\b|\\b(?:skip|bypass|ignore|disable|suppress)\\b.{0,90}\\b(?:rollback\\s+check(?:s)?|rollback\\s+gate|approval\\s+gate|safety\\s+hold)\\b|\\b(?:auto[- ]?execute|execute\\s+immediately|proceed\\s+now|force\\s+run)\\b.{0,110}\\b(?:without|w\\/o)\\b.{0,40}\\b(?:rollback\\s+validation|approval|sign[- ]?off|review)\\b)'],
-        "description": ''
+        "description": 'Detects a rollback exception or emergency override waiver used to auto-execute or force a run while bypassing rollback validation or approval sign-off.'
     },
     # --- cross_agent_injection ---
     {
         "id": 'GLS-CAI-249',
-        "name": 'forged_scheduler_receipt_scope_override_guardrail_bypass',
+        "name": 'Forged Scheduler Receipt Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
-        "description": ''
+        "description": 'Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.'
     },
     {
         "id": 'GLS-CAI-250',
-        "name": '(unnamed)',
+        "name": 'Agent Forged Token Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
-        "description": ''
+        "description": 'Detects an agent or delegate presenting a forged or spoofed token, ticket, or attestation to bypass or override scope, permission, or guardrail enforcement.'
     },
     # --- identity_phishing ---
     {
         "id": 'GLS-IP-002',
-        "name": '(unnamed)',
+        "name": 'Helpdesk OTP Recovery Code Phishing Harvest',
         "category": 'identity_phishing',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without)\\s+(?:share|provide|enter|submit|type)\\b)(?=.*\\b(?:callback|call\\s*back|helpdesk|support|service\\s*desk|security\\s*team)\\b)(?=.*\\b(?:verify|verification|reactivate|unlock|restore|recover)\\b)(?=.*\\b(?:share|provide|enter|submit|type)\\b)(?=.*\\b(?:otp|2fa|mfa|one[- ]time\\s*code|recovery\\s*code|backup\\s*code|passkey|seed\\s*phrase)\\b)(?=.*\\b(?:portal|ticket|session|account)\\b).*$'],
-        "description": ''
+        "description": 'Detects a social-engineering message posing as a helpdesk or support team that asks the user to share an OTP, MFA code, seed phrase, or recovery code via a portal or ticket.'
     },
     # --- model_routing_confusion ---
     {
         "id": 'GLS-MRC-251',
-        "name": '(unnamed)',
+        "name": 'Forged Routing Capability Tier Policy Gate Skip',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:route|router|routing\\s+layer|model\\s+router|selector)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:capability|tier|clearance|policy\\s+tier|trust\\s+level)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b)(?=.*\\b(?:policy\\s+gate|safety\\s+gate|execution\\s+gate|guardrail)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged or tampered routing capability or tier clearance used to skip a policy gate or safety guardrail in the model router.'
     },
     # --- parasitic_injection ---
     {
         "id": 'GLS-PIEMN-001',
-        "name": '(unnamed)',
+        "name": 'Hidden Comment Agent Instruction Guardrail Bypass',
         "category": 'parasitic_injection',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
         "regex": ['(?is)^(?=.*\\b(?:hidden|embedded|concealed|stealth|parasitic)\\b)(?=.*\\b(?:comment|metadata|footer|annotation|note|changelog|readme)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$'],
-        "description": ''
+        "description": 'Detects a hidden or parasitic instruction embedded in a comment, metadata, or changelog that directs an agent or assistant to bypass policy, guardrails, or approval and execute an action.'
     },
     # --- policy_scope_redefinition ---
     {
         "id": 'GLS-PSR-003',
-        "name": 'forged_clause_appendix_precedence_override_execution_bypass',
+        "name": 'Forged Clause Appendix Precedence Execution Override',
         "category": 'policy_scope_redefinition',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:policy|scope|clause|appendix|addendum|memo)\\b)(?=.*\\b(?:precedence|priority|order|hierarchy)\\b)(?=.*\\b(?:override|overrode|overriding|redefine|redefined|redefining|rebind|rebound|rebinding|supersede|superseded|superseding)\\b)(?=.*\\b(?:execute|executed|executing|action|actions|run|ran|deploy|deployed|deployment)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping|evade|evaded|evading|evasion)\\b).*$'],
-        "description": ''
+        "description": 'Detects text claiming a forged or counterfeit policy clause, appendix, or addendum takes precedence and is used to override, supersede, or rebind execution scope in order to bypass or skip safety restrictions.'
     },
     # --- retrieval_poisoning ---
     {
         "id": 'GLS-RP-315',
-        "name": '(unnamed)',
+        "name": 'RAG Provenance Digest Override Policy',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|corpus|document|source|snippet|passage)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)|fabricat(?:ed|ion))\\b)(?=.*\\b(?:digest|hash|signature|provenance|source\\s*tag|trust\\s*badge)\\b)(?=.*\\b(?:override|overrode|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail|review|verification|safety)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or poisoned RAG corpus document whose provenance digest, hash, or source tag is overridden to bypass policy or guardrail verification.'
     },
     # --- token_smuggling ---
     {
         "id": 'GLS-TSHPT-001',
-        "name": '(unnamed)',
+        "name": 'Hidden Token Frontmatter Priority Override',
         "category": 'token_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:token|frontmatter|metadata|annotation|comment\\s+block|hidden\\s+tag)\\b)(?=.*\\b(?:hidden|smuggled|injected|embedded|covert)\\b)(?=.*\\b(?:policy|guardrail|execution\\s+gate|verification)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|ignore(?:d|s)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:priority|precedence|authority|instruction\\s+order)\\b).+'],
-        "description": ''
+        "description": 'Detects a hidden or smuggled token or annotation in frontmatter or metadata that claims authority precedence to override or bypass policy and execution gate guardrails.'
     },
     # --- tool_chain_race ---
     {
         "id": 'GLS-TCR-253',
-        "name": '(unnamed)',
+        "name": 'Forged Checkpoint Ack Sequence Swap Bypass',
         "category": 'tool_chain_race',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|runner|orchestrator|worker|pipeline)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake|counterfeit)\\b)(?=.*\\b(?:checkpoint|ack|acknowledgement|receipt|sequence|nonce|state)\\b)(?=.*\\b(?:swap|swapped|swapping|reorder|reordered|out[- ]of[- ]order)\\b)(?=.*\\b(?:bypass|override|overrode|escalate|execution|execute)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or fabricated checkpoint acknowledgement or sequence nonce in a tool chain swapped or reordered to escalate execution and bypass controls.'
     },
     # --- tool_metadata_smuggling ---
     {
         "id": 'GLS-TMS-237',
-        "name": '(unnamed)',
+        "name": 'Authoritative Metadata Priority Instruction Override',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|constraint(?:s)?)\\b).*'],
-        "description": ''
+        "description": 'Detects a metadata header, annotation, or manifest claiming authoritative precedence used to override or bypass policy, guardrails, or safety instructions.'
     },
     # --- tool_output_poisoning ---
     {
         "id": 'GLS-TOP-322',
-        "name": '(unnamed)',
+        "name": 'Forged Audit Stamp Review Gate Override',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool\\s+output|execution\\s+result|run\\s+log|agent\\s+response|output\\s+summary)\\b)(?=.*\\b(?:audit\\s+stamp|signed\\s+footer|footer|verification\\s+badge|attestation|checksum)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|mismatch)\\b)(?=.*\\b(?:execute|run|approve|ship|deploy(?:ment)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore|waive|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|review\\s+gate(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged audit stamp, verification badge, or signed footer attached to a tool result to execute or deploy while overriding review gate policy.'
     },
 
     # === v0.2.24 batch — Apr 27, 2026 — high-quality pool patterns ===
@@ -7130,140 +7130,140 @@ PATTERNS = [
     # --- provenance_chain ---
     {
         "id": 'GLS-PCF-666',
-        "name": '(unnamed)',
+        "name": 'Forged Manifest Provenance Verification Deploy Bypass',
         "category": 'provenance_chain',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:manifest|provenance|chain(?:\\s|-)of(?:\\s|-)custody|checksum|signature|attestation)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|alter(?:ed|ing)?|rewrite|rewrote)\\b)(?=.*\\b(?:bypass|skip|ignore|override|waive)\\w*\\b)(?=.*\\b(?:verification|validation|integrity|policy\\s*check(?:s)?)\\b)(?=.*\\b(?:deploy|release|execute|promote|ship)\\w*\\b)(?!.*\\b(?:do\\s*not|don\'t|never|without)\\s+(?:forge|fake|spoof|tamper|alter|bypass|skip|ignore|override|waive)\\w*\\b).{0,900}$'],
-        "description": ''
+        "description": 'Detects a forged or spoofed manifest, provenance chain, or attestation used to bypass or waive integrity verification and deploy or release without approval.'
     },
     {
         "id": 'GLS-PCF-240',
-        "name": '(unnamed)',
+        "name": 'Backdated Provenance Attestation Audit Bypass',
         "category": 'provenance_chain',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:provenance|lineage|chain(?:\\s|-)*of(?:\\s|-)*custody|attestation|receipt)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:backfill|retro(?:active|actively)?|rewrite|reconstruct|postdate|antedate)\\b)(?=.*\\b(?:verification|verifier|audit|integrity|validation|checkpoint)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|s|ping)?|ignore(?:d|s|ing)?|waiv(?:e|ed|es|ing))\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged attestation or receipt with a retroactively backdated or reconstructed lineage used to bypass audit, integrity, or validation checkpoints.'
     },
     {
         "id": 'GLS-PCF-241',
-        "name": '(unnamed)',
+        "name": 'Postdated Attestation Certificate Time-Shift Override',
         "category": 'provenance_chain',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:provenance|lineage|origin|source\\s*chain|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:receipt|attestation|certificate|ledger\\s*entry|audit\\s*stamp)\\b)(?=.*\\b(?:backdate(?:d|s|ing)?|retroactive|postdate(?:d|s|ing)?|time(?:-|\\s)*shift(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|waive|ignore|ignored|ignores|ignoring)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged provenance certificate or audit stamp with a postdated or time-shifted timestamp used to override or bypass integrity validation.'
     },
     {
         "id": 'GLS-PCF-244',
-        "name": '(unnamed)',
+        "name": 'Forged Attestation Trust Root Policy Bypass',
         "category": 'provenance_chain',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake)\\b)(?=.*\\b(?:attestation|signature|checksum|provenance|certificate|manifest)\\b)(?=.*\\b(?:trust\\s*anchor|trust\\s*root|root\\s*key|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:policy|guardrail|verification|validation|scope)\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged attestation or signature whose trust anchor, root key, or chain-of-custody is manipulated to bypass guardrail policy and verification.'
     },
     {
         "id": 'GLS-PCF-459',
-        "name": '(unnamed)',
+        "name": 'Nonce Replay Attestation Manifest Bypass',
         "category": 'provenance_chain',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*\\b(?:forge|forged|forging|fabricate|fabricated|fabricating|counterfeit|spoof|spoofed|spoofing)\\b)(?=.*\\b(?:attestation|provenance|lineage|receipt|manifest)\\b)(?=.*\\b(?:nonce|checksum|signature|hash)\\b)(?=.*\\b(?:replay|rollback|backfill|bypass|override)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or replayed attestation, provenance manifest, or nonce used to backfill or bypass integrity checks and override policy.'
     },
     # --- approval_graph_poisoning ---
     {
         "id": 'GLS-AGP-653',
-        "name": '(unnamed)',
+        "name": 'Forged Approval Quorum Auto-Approve Override',
         "category": 'approval_graph_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:approval|quorum|sign-?off|attestation|vote\\s+snapshot|vote\\s+count)\\b)(?=.*\\b(?:override|bypass|auto-?approve|recalculat(?:e|ed|ing|ion)|escalat(?:e|ed|ing|ion))\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged approval quorum, sign-off, or vote snapshot used to auto-approve or bypass recalculation of the approval graph.'
     },
     {
         "id": 'GLS-AGP-001',
-        "name": '(unnamed)',
+        "name": 'Forged Approval Graph Delegate Vote Policy Bypass',
         "category": 'approval_graph_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|tampered|spoofed|counterfeit)\\b)(?=.*\\b(?:approval\\s+graph|quorum\\s+snapshot|delegate\\s+vote|signed\\s+ballot|attestation\\s+bundle)\\b)(?=.*\\b(?:override|overrides|overridden|overriding|bypass|bypasses|bypassed|bypassing|auto\\s*-?approve|auto\\s*-?approved|skip|skips|skipped|skipping|ignore|ignores|ignored|ignoring)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|trust\\s+gate(?:s)?|approval\\s+gate(?:s)?|verification\\s+check(?:s)?)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged approval graph, quorum snapshot, or delegate ballot used to auto-approve or skip guardrail trust-gate policy.'
     },
     # --- cross_agent_injection ---
     {
         "id": 'GLS-CAI-314',
-        "name": '(unnamed)',
+        "name": 'Agent Manifest Scope Escalation Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|handoff|peer|coordinator|supervisor)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:ed|ion)|counterfeit)\\b)(?=.*\\b(?:manifest|ticket|receipt|approval|sign(?:ed|off)?)\\b)(?=.*\\b(?:scope|permission|authorization|authz|whitelist)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|override|overrode|bypass(?:ed|ing)?|ignor(?:e|ed|ing)|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail|review|safety|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent or coordinator presenting a forged manifest, ticket, or signed receipt to escalate scope or bypass authorization policy.'
     },
     {
         "id": 'GLS-CAI-318',
-        "name": '(unnamed)',
+        "name": 'Agent Ticket Replay Privilege Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer[-\\s]*agent|remote[-\\s]*agent|orchestrator)\\b)(?=.*\\b(?:forg(?:ed|ery)|spoof(?:ed|ing)?|replay(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:ticket|token|nonce|credential|handoff[-\\s]*id|session[-\\s]*tag)\\b)(?=.*\\b(?:scope|permission|privilege|tool[-\\s]*execution|action[-\\s]*rights)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|approval|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or replayed handoff ticket or credential used by a remote agent to override tool-execution permissions and bypass policy.'
     },
     {
         "id": 'GLS-CAI-251',
-        "name": '(unnamed)',
+        "name": 'Delegation Ticket Scope Escalation Execution',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:delegate\\s+ticket|agent\\s+ticket|handoff\\s+token|delegation\\s+pass|authorization\\s+token)\\b)(?=.*\\b(?:scope\\s+escalation|scope\\s+rebind|privilege\\s+upgrade|permission\\s+escalation|access\\s+elevation)\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged delegate ticket or authorization token carrying an explicit scope-escalation or privilege-upgrade claim that is then used to execute actions while bypassing controls.'
     },
     {
         "id": 'GLS-CAI-330',
-        "name": '(unnamed)',
+        "name": 'Agent Approval Forgery Role Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake)\\b)(?=.*\\b(?:approval|attestation|handoff|delegation|ticket)\\b)(?=.*\\b(?:role|scope|permission|privilege)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|boundary|limit(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent presenting a forged approval or attestation to escalate role or scope and override policy or guardrail boundaries.'
     },
     {
         "id": 'GLS-CAI-253',
-        "name": '(unnamed)',
+        "name": 'Forged Signoff Scope Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:approval|attestation|signoff|ticket)\\b)(?=.*\\b(?:delegate|agent|worker|reviewer)\\b)(?=.*\\b(?:bypass|override|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|scope)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged or counterfeit approval, signoff, or attestation submitted to a delegate or worker to bypass policy or scope guardrails.'
     },
     {
         "id": 'GLS-CAI-254',
-        "name": '(unnamed)',
+        "name": 'Agent Capability Token Impersonation Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|orchestrator|service)\\b)(?=.*\\b(?:handoff|handover|ticket|token|credential|capability|nonce)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|impersonat(?:e|ed|ing)|replay(?:ed|ing))\\b)(?=.*\\b(?:authorit(?:y|ies)|scope|permission|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|escalat(?:e|ed|ing)|rerout(?:e|ed|ing))\\b).+$'],
-        "description": ''
+        "description": 'Detects an agent or coordinator presenting a forged or replayed capability token or handoff credential to gain unauthorized authority and bypass approval.'
     },
     {
         "id": 'GLS-CAI-255',
-        "name": '(unnamed)',
+        "name": 'Receipt Forgery Scope Rebind Privilege',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|broker)\\b)(?=.*\\b(?:receipt|ticket|handoff|approval|nonce|token)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:scope\\s*rebind|scope\\s*override|policy\\s*bypass|guardrail\\s*override|privilege\\s*escalation)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or counterfeit receipt or handoff token used by an agent or peer to achieve an explicit scope rebind or policy guardrail override.'
     },
     {
         "id": 'GLS-CAI-489',
-        "name": '(unnamed)',
+        "name": 'Delegation Receipt Forgery Capability Expansion',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|delegation|agent|subagent|worker|orchestrator)\\b)(?=.*\\b(?:ticket|handoff|approval\\s+token|execution\\s+token|delegation\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery|ing)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:scope|permission|capability|authority)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|expand|expand(?:ed|ing)?|override(?:d|s|ing)?|overrode|bypass(?:ed|es|ing)?)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged delegation receipt or execution token that expands capability or authority scope beyond the original grant.'
     },
     # === end v0.2.24 batch (15 patterns) ===
 
@@ -7271,1684 +7271,1684 @@ PATTERNS = [
     # === v0.2.25 batch (20 patterns: 7 CAI, 6 RP, 4 TOP, 3 MRC) ===
     {
         "id": 'GLS-CAI-256',
-        "name": '(unnamed)',
+        "name": 'Escalation Ticket Trust Header Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service|orchestrator|copilot)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|counterfeit|fabricated)\\b)(?=.*\\b(?:escalation\\s+ticket|ticket|capability\\s+lease|trust\\s+header|auth(?:entication)?\\s+header|approval\\s+token)\\b)(?=.*\\b(?:override|bypass|skip|ignore|disable)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|auth(?:entication)?\\s+check(?:s)?|permission(?:s)?)\\b).*'],
-        "description": ''
+        "description": 'Detects an agent presenting a forged escalation ticket, capability lease, or trust header to override authentication checks and guardrails.'
     },
     {
         "id": 'GLS-CAI-257',
-        "name": 'forged_delegate_ticket_scope_escalation_execution_bypass',
+        "name": 'Forged Delegate Ticket Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:delegate|delegated|agent|worker)\\b)(?=.*\\b(?:ticket|token|credential|pass)\\b)(?=.*\\b(?:scope|privilege|role|permission)\\b)(?=.*\\b(?:escalate|escalated|escalation|elevate|elevated|elevation|admin|root)\\b)(?=.*\\b(?:execute|executed|execution|run|action|actions|command|tool\\s*call)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping|override|overrode|overriding|overridden)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit delegate ticket or token is used to escalate scope, privilege, or role for an agent or worker and then bypass or ignore execution guardrails.'
     },
     {
         "id": 'GLS-CAI-259',
-        "name": '(unnamed)',
+        "name": 'Delegation Manifest Attestation Nonce Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|subagent)\\b)(?=.*\\b(?:forged|forge|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:delegation\\s+manifest|handoff\\s+manifest|execution(?:\\s|-)+ticket|nonce\\s+attestation|attestation\\s+nonce|attestation)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable|suppress|waive)\\w*\\b)(?=.*\\b(?:policy|guardrail|approval|verification|trust\\s+check(?:s)?|auth\\s+check(?:s)?|safety)\\b).{0,800}'],
-        "description": ''
+        "description": 'Detects a forged delegation manifest or attestation-nonce submitted by an agent to override trust checks, policy, or safety guardrails.'
     },
     {
         "id": 'GLS-CAI-260',
-        "name": '(unnamed)',
+        "name": 'Quorum Receipt Scope Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|reviewer|peer)\\b)(?=.*\\b(?:forged|fabricated|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:receipt|ticket|token|approval|quorum|attestation)\\b)(?=.*\\b(?:scope|privilege|authorization|policy|guardrail)\\b)(?=.*\\b(?:bypass|override|ignore|skip|disable|regrant|unlock)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged quorum receipt, approval token, or attestation used by an agent to regrant or unlock scope while bypassing policy.'
     },
     {
         "id": 'GLS-CAI-341',
-        "name": '(unnamed)',
+        "name": 'Agent Nonce Impersonation Trust Domain Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator|handoff)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|fake|counterfeit)\\b)(?=.*\\b(?:nonce|ticket|receipt|attestation|signature|token)\\b)(?=.*\\b(?:scope|role|privilege|boundary|trust\\s+domain|authorization)\\b)(?=.*\\b(?:rebind|re-map|reassign|escalat(?:e|ed|ion)|override|bypass|ignore|skip)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent using a forged or replayed nonce or signature to rebind trust domain or privilege scope and override guardrails.'
     },
     {
         "id": 'GLS-CAI-262',
-        "name": '(unnamed)',
+        "name": 'Agent Identity Snapshot Forgery Priority Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|assistant|copilot|peer)\\b)(?=.*\\b(?:identity|profile|memory|session|handoff|ticket|token|snapshot)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|impersonat(?:e|ed|ing)|counterfeit|fake|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:priority|policy|guardrail|approval|scope|trust)\\b)(?=.*\\b(?:override|bypass|skip|ignore|elevat(?:e|ed|ing)|escalat(?:e|ed|ing))\\b).+$'],
-        "description": ''
+        "description": 'Detects an agent presenting a forged identity, profile, or session snapshot to elevate priority or override scope and guardrail enforcement.'
     },
     {
         "id": 'GLS-CAI-326',
-        "name": '(unnamed)',
+        "name": 'Capability Token Scope Widening Guardrail Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:delegation\\s+ticket|capability\\s+token|authorization\\s+token|session\\s+tag|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|boundary|access\\s+scope)\\b)(?=.*\\b(?:expand|elevat(?:e|ed|ion)|widen|rewrite|override|bypass)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|approval\\s+gate(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged capability token or delegation ticket used by a peer agent to widen or elevate scope beyond approved boundaries and bypass verification gates.'
     },
     {
         "id": 'GLS-RP-257',
-        "name": '(unnamed)',
+        "name": 'Forged Benchmark Appendix Trust Rerank',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|fabricated|counterfeit|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:benchmark|eval(?:uation)?|scorecard|leaderboard)\\b)(?=.*\\b(?:appendix|footnote|supplement|annex|addendum)\\b)(?=.*\\b(?:rerank(?:ed|s|ing)?|reroute(?:d|s|ing)?|reprioritiz(?:e|ed|es|ing)|promot(?:e|ed|es|ing))\\b)(?=.*\\b(?:trust|authority|credibility|verified\\s+source|trusted[-\\s]+source|provenance)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|waiv(?:e|ed|es|ing)|ignore(?:d|s|ing)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged benchmark scorecard or appendix used to claim trusted-source authority and rerank or promote results while overriding policy.'
     },
     {
         "id": 'GLS-RP-260',
-        "name": '(unnamed)',
+        "name": 'Poisoned Vector Store Chunk Reranking Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|vector\\s*store|knowledge\\s*base|embedding(?:s)?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|taint(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ing)?|backdoor(?:ed|ing)?)\\b)(?=.*\\b(?:cache|chunk(?:s)?|document(?:s)?|snippet(?:s)?|digest|summary)\\b)(?=.*\\b(?:rerank(?:s|ed|ing)?|reprioriti[sz](?:e|es|ed|ing)?|boost(?:s|ed|ing)?|promot(?:e|es|ed|ing)|elevat(?:e|es|ed|ing))\\b)(?=.*\\b(?:guardrail|policy|filter|safety\\s*checks?)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:n|d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|ping|s)?)\\b).+$'],
-        "description": ''
+        "description": 'Detects a backdoor-seeded or poisoned vector-store chunk that is boosted or reranked to override safety filters and guardrail policy.'
     },
     {
         "id": 'GLS-RP-261',
-        "name": 'forged_source_ranking_context_policy_override',
+        "name": 'Forged Source Ranking Context Policy Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieved|retrieval|context|source|citation|document)\\b)(?=.*\\b(?:rank(?:ed|ing)?|priorit(?:y|ize|ized)|promot(?:e|ed|ing)|boost(?:ed|ing)?)\\b)(?=.*\\b(?:forged|fake|spoofed|poisoned|tampered)\\b)(?=.*\\b(?:policy|guardrail|safety|verification)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which retrieved context or citations are described as forged, poisoned, or tampered with so that ranking or prioritization is manipulated to override or bypass policy and safety verification.'
     },
     {
         "id": 'GLS-RP-262',
-        "name": '(unnamed)',
+        "name": 'RAG Attestation Provenance Escalation Boost',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|corpus|source|document|citation|knowledge\\s*base|kb)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|tamper(?:ed|ing)|inject(?:ed|ing)|seed(?:ed|ing)|backdat(?:e|ed|ing))\\b)(?=.*\\b(?:provenance|lineage|attestation|signature|digest|checksum|badge|stamp)\\b)(?=.*\\b(?:overrid(?:e|es|ing|en|ed)|overrode|bypass|escalat(?:e|ed|ing)|boost(?:ed|ing)?|promot(?:e|ed|ing)|rank\\s*(?:override|boost)|trust\\s*(?:override|boost)|policy\\s*(?:override|bypass))\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged provenance attestation or signature injected into a RAG corpus used to boost rank or escalate trust and override guardrails.'
     },
     {
         "id": 'GLS-RP-263',
-        "name": '(unnamed)',
+        "name": 'Forged Citation Attestation Execution Gate Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieved\\s+context|source|citation|evidence|document)\\b)(?=.*\\b(?:forged|spoofed|tampered|fabricated|seeded)\\b)(?=.*\\b(?:attestation|provenance|trust\\s+badge|source\\s+digest|citation\\s+rank)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|ignore(?:d|s)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|execution\\s+gate)\\b).+'],
-        "description": ''
+        "description": 'Detects a retrieved context or citation with a forged attestation or source digest used to suppress or override execution gate or policy guardrails.'
     },
     {
         "id": 'GLS-RP-457',
-        "name": '(unnamed)',
+        "name": 'Injected RAG Rank Score Policy Reroute',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base|document\\s+store|citation\\s+cache)\\b)(?=.*\\b(?:inject(?:ed|ion|ing)?|poison(?:ed|ing)?|seed(?:ed|ing)?|forge(?:d|ry)?|tamper(?:ed|ing)?|backfill(?:ed|ing)?)\\b)(?=.*\\b(?:rank(?:ing)?|score(?:card|s)?|priority|weight(?:ing|s)?)\\b)(?=.*\\b(?:override|overrides|overriding|bypass(?:ed|ing)?|downgrade(?:d|ing)?|reroute(?:d|ing)?|promote(?:d|ing)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects an injected or poisoned retrieval result whose ranking, score, or priority is manipulated to reroute or promote content while overriding policy.'
     },
     {
         "id": 'GLS-TOP-484',
-        "name": '(unnamed)',
+        "name": 'CI Build Artifact Attestation Sanitizer Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b'],
-        "description": ''
+        "description": 'Detects a forged or tampered CI/CD build artifact or stdout log whose attestation or verification stamp is used to bypass a policy sanitizer or validation gate.'
     },
     {
         "id": 'GLS-TOP-332',
-        "name": '(unnamed)',
+        "name": 'Forged Evaluation Trace Execution Policy Evade',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|synthetic)\\b)(?=.*\\b(?:eval(?:uation)?\\s+(?:trace|log)|audit\\s+(?:trail|log|stamp)|confidence\\s+(?:stamp|score|badge)|verification\\s+(?:receipt|stamp))\\b)(?=.*\\b(?:bypass|override|skip|evad(?:e|ed|ing)|disable|ignore|circumvent)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|execution\\s+(?:gate|policy)|approval\\s+(?:gate|policy)|safety\\s+(?:check|policy))\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged evaluation trace, confidence stamp, or audit stamp used to evade or bypass an execution gate or approval policy.'
     },
     {
         "id": 'GLS-TOP-251',
-        "name": 'forged_tool_result_channel_redirect_execution_policy_bypass',
+        "name": 'Forged Tool Result Channel Redirect Execution',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|plugin|connector|scanner|validator|runner)\\b)(?=.*\\b(?:output|outputs|result|results|log|logs|trace|traces|receipt|receipts|report|reports)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:queue|channel|route|pipeline|handoff|dispatch|forward|reroute|redirect)\\b)(?=.*\\b(?:execute|execution|run|trigger|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|ignore|ignored|ignoring|skip|skipped|skipping|disable|disabled|suppress|suppressed)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which forged or fabricated tool output, logs, or receipts are redirected through a queue or pipeline channel in order to bypass or suppress execution policy and guardrails.'
     },
     {
         "id": 'GLS-TOP-252',
-        "name": '(unnamed)',
+        "name": 'Forged Compliance Note Authorization Check Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool output|execution log|audit digest|verification report|safety report|compliance note|run summary)\\b)(?=.*\\b(?:forged|forge|fabricated|spoofed|tampered|poisoned|counterfeit)\\b)(?=.*\\b(?:bypass|override|overrides|ignore|skip|disable|remove|evade)\\b)(?=.*\\b(?:policy|guardrail|execution gate|safety check|approval check|authorization check|auth check)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged tool output, compliance note, or run summary used to bypass or override an authorization check or safety policy gate.'
     },
     {
         "id": 'GLS-MRC-492',
-        "name": '(unnamed)',
+        "name": 'Forged Latency Health Signal Router Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged latency or health telemetry signal submitted to a router or traffic manager to override, reroute, or promote model tier beyond policy guardrails.'
     },
     {
         "id": 'GLS-MRC-253',
-        "name": '(unnamed)',
+        "name": 'Forged Telemetry Metric Router Tier Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|forg(?:e|ed|ing)|spoof(?:s|ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|forg(?:e|ed|ing)|spoof(?:s|ed|ing)?)\\b)(?=.*\\b(?:router|routing|model\\s+router|orchestrator|dispatcher|gateway|tier)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:s|ed|ing)|fake|tampered|counterfeit)\\b)(?=.*\\b(?:telemetry|health\\s+signal|latency\\s+signal|metric(?:s)?|heartbeat)\\b)(?=.*\\b(?:tier|lane|queue|path|selector|route|reroute)\\b)(?=.*\\b(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|promot(?:e|ed|ing)|demot(?:e|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval(?:\\s|-)gate(?:s)?|trust\\s+boundary)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged telemetry metric or heartbeat used to influence a model router to reroute, promote, or demote model tier in violation of safety policy.'
     },
     {
         "id": 'GLS-MRC-254',
-        "name": '(unnamed)',
+        "name": 'Forged Model Score Capability Escalation Gate Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:model|router|routing|tier|profile|engine|planner)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:capability|score|latency|budget|priority|quota|confidence)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|rerout(?:e|ed|es|ing)|upgrad(?:e|ed|es|ing)|promot(?:e|ed|es|ing))\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:d|s|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|safety|check(?:s)?|gate(?:s)?)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged model capability score, budget, or confidence value used to escalate or reroute to a higher tier while bypassing approval or safety gates.'
     },
     # === end v0.2.25 batch ===
 
     # === v0.2.26 batch (16 patterns, theme: cross_agent_injection) ===
     {
         "id": 'GLS-CAI-682',
-        "name": '(unnamed)',
+        "name": 'Support Bundle Swap System Prompt Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:support(?:\\s|-)?bundle|ticket(?:\\s|-)?attachment|incident(?:\\s|-)?artifact|retrieval(?:\\s|-)?cache)\\b)(?=.*\\b(?:swap|swapped|replace|replaced|overwrite|overwrote|overrode|inject|injected|poison(?:ed|ing)?)\\b)(?=.*\\b(?:system\\s+prompt|guardrail(?:s)?|policy(?:\\s|-)?check(?:s)?|approval(?:\\s|-)?gate(?:s)?)\\b)(?=.*\\b(?:bypass|bypasses|ignore|ignores|disable|disables|skip|skips)\\b).{0,900}$'],
-        "description": ''
+        "description": 'Detects an agent or copilot receiving a swapped or poisoned support bundle or incident artifact that overwrites system prompts or bypasses policy approval gates.'
     },
     {
         "id": 'GLS-CAI-622',
-        "name": 'forged_scheduler_receipt_scope_override_guardrail_bypass',
+        "name": 'Scheduler Receipt Forgery Guardrail Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
-        "description": ''
+        "description": 'Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.'
     },
     {
         "id": 'GLS-CAI-623',
-        "name": '(unnamed)',
+        "name": 'Forged Safety Attestation Validator Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|handoff|supervisor|peer\\s+agent)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|fabricat(?:e|ed|ing)|fake)\\b)(?=.*\\b(?:safety\\s+attestation|audit\\s+token|approval\\s+token|signature|compliance\\s+token|trust\\s+attestation)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|disable|disabled|disabling|skip|skipped|skipping|ignore|ignored|ignoring|suppress|suppressed|suppressing)\\b)(?=.*\\b(?:policy|guardrail|validator|verification|safety\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent forging a safety attestation, compliance token, or audit token to suppress or disable policy validators and safety checks.'
     },
     {
         "id": 'GLS-CAI-624',
-        "name": '(unnamed)',
+        "name": 'Broker Agent Fake Token Fail-Open Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
-        "description": ''
+        "description": 'Detects a broker or scheduler agent presenting a fake token or attestation to trigger a fail-open condition and escalate scope or privileges.'
     },
     {
         "id": 'GLS-CAI-625',
-        "name": '(unnamed)',
+        "name": 'Upstream Coordinator Forged Receipt Trust Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
-        "description": ''
+        "description": 'Detects an upstream coordinator or orchestrator presenting a forged receipt or attestation to override or supersede trust, role, or policy enforcement.'
     },
     {
         "id": 'GLS-CAI-627',
-        "name": 'forged_quorum_ack_scope_override_guardrail_bypass',
+        "name": 'Forged Quorum Ack Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed)?|counterfeit)\\b)(?=.*\\b(?:approval|attestation|ack(?:nowledg(?:e|ed|ement))?|signature|token|lease)\\b)(?=.*\\b(?:agent|delegate|delegation|worker|broker|service)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|scope|restriction(?:s)?|safety)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit approval attestation, acknowledgement, or token from an agent or delegate service is used to override or bypass policy scope and safety restrictions.'
     },
     {
         "id": 'GLS-CAI-582',
-        "name": '(unnamed)',
+        "name": 'Cross-Agent Authority Claim Policy Disregard',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?:\\b(?:agent|service|orchestrator|coordinator|worker)\\s*(?:a|alpha|upstream|peer)?\\b.{0,80}\\b(?:said|states?|reported|confirmed|attested|signed)\\b.{0,110}\\b(?:authoritative|source\\s+of\\s+truth|final\\s+authority|root\\s+authority)\\b.{0,120}\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b.{0,70}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+gate)\\b|\\b(?:treat|mark|classify|accept)\\b.{0,70}\\b(?:peer|upstream|cross-agent)\\s+(?:message|packet|instruction|directive)\\b.{0,100}\\b(?:as\\s+authoritative|as\\s+trusted|as\\s+final)\\b.{0,110}\\b(?:skip|drop|disable|bypass|override|replace)\\b.{0,60}\\b(?:verification|attestation|policy\\s+check(?:s)?)\\b)'],
-        "description": ''
+        "description": 'Detects a cross-agent message attributed as authoritative or final authority that instructs the recipient to disregard or replace policy, guardrails, or verification attestation.'
     },
     {
         "id": 'GLS-CAI-528',
-        "name": '(unnamed)',
+        "name": 'Token Replay Scope Expansion Policy Approval',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|worker|agent|handoff|peer|broker)\\b)(?=.*\\b(?:token|ticket|attestation|proof|receipt|nonce)\\b)(?=.*\\b(?:forge|forged|forging|spoofed|spoofing|replayed|replay|tampered|tampering)\\b)(?=.*\\b(?:scope|privilege|authority|approval)\\b)(?=.*\\b(?:expand|expanded|expanding|escalate|escalated|escalating|rebind|rebound|override|overrode|bypass|bypassed)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|approval)\\b).+'],
-        "description": ''
+        "description": 'Detects a replayed or forged token or proof in a delegate handoff that expands scope or authority and bypasses approval guardrails.'
     },
     {
         "id": 'GLS-CAI-628',
-        "name": '(unnamed)',
+        "name": 'Stale Token Downstream Agent Guard Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|handoff|handover|forward|route)\\b)(?=.*\\b(?:agent|worker|executor|subagent|downstream)\\b)(?=.*\\b(?:token|nonce|session|credential|attestation|capability)\\b)(?=.*\\b(?:stale|expired|revoked|forged|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification|validation)\\b).*'],
-        "description": ''
+        "description": 'Detects a handoff to a downstream agent that includes a stale, revoked, or forged token or nonce used to override safety validation or bypass policy.'
     },
     {
         "id": 'GLS-CAI-629',
-        "name": '(unnamed)',
+        "name": 'Replayed Forged Nonce Stale Scope Disregard',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged or replayed nonce, token, or attestation that is stale or expired and reused in an agent handoff to disregard policy boundaries and trust gates.'
     },
     {
         "id": 'GLS-CAI-630',
-        "name": '(unnamed)',
+        "name": 'Peer Capability Manifest Auto-Approve Execution',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without)\\s+(?:trust|whitelist|allowlist|execute|dispatch|bypass)\\b)(?=.*\\b(?:forged|fake|spoofed|counterfeit|fabricated)\\b.{0,50}\\b(?:peer\\s*agent|delegate|worker|remote\\s*agent)\\b.{0,50}\\b(?:capability\\s*manifest|capability\\s*token|attestation|identity\\s*card)\\b)(?=.*\\b(?:trust|whitelist|allowlist|elevate)\\b.{0,60}\\b(?:without\\s+verification|skip(?:ping)?\\s+verification|ignore\\s+verification|auto-approve)\\b)(?=.*\\b(?:execute|run|dispatch|trigger)\\b.{0,60}\\b(?:privileged\\s*action|tool\\s*call|write\\s*operation|network\\s*action)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged peer-agent capability manifest or identity card that instructs the receiver to whitelist or elevate the sender and auto-approve execution of privileged actions.'
     },
     {
         "id": 'GLS-CAI-563',
-        "name": '(unnamed)',
+        "name": 'Forged Handoff Signature Scope Permission Hop',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|delegation|worker|handoff|handover|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:token|attestation|ticket|credential(?:s)?|signature)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|scope\\s+transfer|permission\\s+hop|trust\\s+hop)\\b)(?=.*\\b(?:execute|executes|executed|executing|run|runs|running|invoke|invokes|invoked|invoking|trigger|triggers|triggered|triggering)\\b).{0,1000}$'],
-        "description": ''
+        "description": 'Detects a forged or counterfeit token or signature in a delegation or handover that enables a trust hop or permission hop to invoke privileged actions.'
     },
     {
         "id": 'GLS-CAI-555',
-        "name": '(unnamed)',
+        "name": 'Trace Token Swap Execution Safety Downgrade',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|did\\s+not|does\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|ignore|skip|evade|swap|replace|forge|reroute)\\b)(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:handoff|ticket|trace\\s+token|trace\\s+id|session\\s+token|capability\\s+token|custody\\s+token)\\b)(?=.*\\b(?:forge(?:d|ry)?|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|swap(?:ped|ping)?|replace(?:d|ment)?|rerout(?:e|ed|ing))\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip|evad(?:e|ed|ing)|downgrad(?:e|ed|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval|verification|trust\\s+gate|execution\\s+check(?:s)?|safety\\s+check(?:s)?)\\b).*'],
-        "description": ''
+        "description": 'Detects an agent swapping or rerouting a trace token or session token in a handoff to evade or downgrade safety checks and bypass guardrails.'
     },
     {
         "id": 'GLS-CAI-552',
-        "name": '(unnamed)',
+        "name": 'Cross-Agent Revoked Attestation Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:override|bypass|ignore|disregard|rebind|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator|controller|handoff|cross-agent|peer)\\b)(?=.*(?:\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b.{0,80}\\b(?:attestation|nonce|token|certificate|capability|signature)\\b|\\b(?:attestation|nonce|token|certificate|capability|signature)\\b.{0,80}\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b))(?=.*\\b(?:override|bypass|ignore|disregard|supersed(?:e|es|ed|ing)|rebind)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|authorization|scope|validation)\\b).*'],
-        "description": ''
+        "description": 'Detects a cross-agent or peer handoff presenting a revoked, stale, or forged attestation or certificate to override authorization scope and bypass safety validation.'
     },
     {
         "id": 'GLS-CAI-632',
-        "name": '(unnamed)',
+        "name": 'Orchestrator Instruction Policy Supersede',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
-        "description": ''
+        "description": 'Detects a message from an orchestrator, planner, or supervisor agent that instructs the recipient to ignore or supersede developer or system instructions and policy.'
     },
     {
         "id": 'GLS-CAI-561',
-        "name": '(unnamed)',
+        "name": 'Peer Agent Instruction Override Execute',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:another|other|peer|upstream|planner|worker|delegate|orchestrator)\\s+agent\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|previous\\s+instruction(?:s)?)\\b)(?=.*\\b(?:execute|run|invoke|trigger|call)\\b).{0,900}$'],
-        "description": ''
+        "description": 'Detects another or upstream agent instructing the recipient to override policy or guardrails and execute an action in place of the previous instruction set.'
     },
     # === end v0.2.26 batch ===
 
     # === v0.2.27 batch (15 patterns, theme: cross_agent_injection) ===
     {
         "id": 'GLS-CAI-263',
-        "name": '(unnamed)',
+        "name": 'Stolen Handoff Capability Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:handoff|handover|ticket|capability|nonce|scope)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|escalat(?:e|ed|ing|ion)|ignore(?:d|s|ing)?)\\b).*'],
-        "description": ''
+        "description": 'Detects a stolen or forged handoff capability or nonce used by an agent or service to escalate scope and override authorization.'
     },
     {
         "id": 'GLS-CAI-264',
-        "name": '(unnamed)',
+        "name": 'Upstream Peer Attestation Scope Override Enforcement',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
-        "description": ''
+        "description": 'Detects an upstream or coordinator agent using a forged attestation or receipt to override or supersede policy and safety enforcement on scope or privilege.'
     },
     {
         "id": 'GLS-CAI-265',
-        "name": '(unnamed)',
+        "name": 'Replayed Agent Approval Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|replay(?:ed)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:approval|ticket|nonce|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|authority|policy|guardrail|permission)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|supersed(?:e|ed|ing)|skip)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or replayed approval, nonce, or attestation used by a remote agent to rebind scope or escalate authority while bypassing guardrails.'
     },
     {
         "id": 'GLS-CAI-266',
-        "name": '(unnamed)',
+        "name": 'Agent Badge Forgery Boundary Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|peer\\s+agent|reviewer|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|counterfeit)\\b)(?=.*\\b(?:badge|ticket|nonce|attestation|receipt)\\b)(?=.*\\b(?:scope|policy|guardrail|boundary)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged badge, nonce, or attestation submitted by a peer agent to escalate scope or override policy boundaries.'
     },
     {
         "id": 'GLS-CAI-323',
-        "name": '(unnamed)',
+        "name": 'Capability Receipt Nonce Execution Gate Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:capability\\s+receipt|delegation\\s+receipt|handoff\\s+receipt|approval\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:nonce|session\\s+tag|scope|capability\\s+token)\\b)(?=.*\\b(?:execute|run|approve|ship(?:ment)?|deploy(?:ment)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review\\s+gate(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or replayed capability receipt with a nonce or scope token used to execute or deploy while skipping verification and guardrail gates.'
     },
     {
         "id": 'GLS-CAI-267',
-        "name": '(unnamed)',
+        "name": 'Token Revocation Bypass Forged Renewal',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|broker|handoff|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability|token|lease|grant|credential)\\b)(?=.*\\b(?:renew|refresh|extend|reissue|reactivate)\\b)(?=.*\\b(?:revocation|revoked|expiry|expiration|invalidat(?:e|ed|ion))\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|waiv(?:e|ed|es|ing))\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent presenting a forged renewal or refresh of a revoked or expired capability token to bypass expiry and override policy checks.'
     },
     {
         "id": 'GLS-CAI-333',
-        "name": '(unnamed)',
+        "name": 'Agent-to-Agent Delegation Privilege Circumvention',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:handoff|delegate|delegation|agent-to-agent|a2a|receipt|token|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|capability)\\b)(?=.*\\b(?:bypass|override|skip|ignore|evad(?:e|ed|ing)|disable|circumvent)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval\\s+gate|safety\\s+check|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged agent-to-agent handoff token or delegation receipt used to escalate privilege and circumvent approval guardrails.'
     },
     {
         "id": 'GLS-CAI-268',
-        "name": '(unnamed)',
+        "name": 'Agent Ticket Manifest Scope Rebind Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegation|handoff|coordinator|worker|planner|peer)\\b)(?=.*\\b(?:forged|spoofed|fabricated|counterfeit|fake)\\b)(?=.*\\b(?:ticket|nonce|token|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail|authorization|boundary)\\b)(?=.*\\b(?:override|overrides|overrode|bypass|bypasses|bypassed|rebind|rebinds|rebound|escalate|escalates|escalated)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged ticket, nonce, or manifest used in an agent handoff to rebind scope or privilege and override guardrail policy.'
     },
     {
         "id": 'GLS-CAI-269',
-        "name": '(unnamed)',
+        "name": 'Delegation Receipt Access Boundary Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated\\s+agent|peer\\s+agent|worker|subagent)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|counterfeit)\\b)(?=.*\\b(?:ticket|handoff\\s+token|delegation\\s+receipt|approval\\s+token|capability\\s+pass)\\b)(?=.*\\b(?:scope|privilege|role\\s+boundary|access\\s+boundary)\\b)(?=.*\\b(?:override|bypass|bypassed|bypassing|escalate|escalated|escalation|rebind|rebound|unlock)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged delegation receipt or capability pass used by a subagent to escalate scope, unlock access boundaries, or bypass controls.'
     },
     {
         "id": 'GLS-V03-0483',
-        "name": '(unnamed)',
+        "name": 'Agent Approval Forgery Execution Gate Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:agent|delegate|handoff|worker)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|impersonat(?:e|ed|ing)|counterfeit)\\b.{0,160}\\b(?:approval(?:\\s+ticket)?|permit|capability(?:\\s+token)?|execution(?:\\s+token|\\s+grant)?)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|ping)?|ignore(?:d|s|ing)?)\\b.{0,120}\\b(?:execute|executed|run|deploy|activate)\\b'],
-        "description": ''
+        "description": 'Detects a forged approval ticket or capability grant used by an agent in a handoff to bypass execution gates and run privileged actions.'
     },
     {
         "id": 'GLS-CAI-270',
-        "name": '(unnamed)',
+        "name": 'Agent Manifest Handoff Token Authority Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:manifest|ticket|handoff\\s+token|delegation\\s+record)\\b)(?=.*\\b(?:authority|scope|approval|privilege)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|review|verification)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged manifest or handoff token used by an agent or orchestrator to claim false authority and bypass review or verification guardrails.'
     },
     {
         "id": 'GLS-CAI-272',
-        "name": '(unnamed)',
+        "name": 'Peer Agent Impersonation Privilege Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer|delegate|worker)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fake|impersonat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|nonce|handoff|attestation|receipt|token)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
-        "description": ''
+        "description": 'Detects a peer agent impersonating another via a forged ticket or nonce to rebind privilege or scope and bypass guardrail controls.'
     },
     {
         "id": 'GLS-CAI-273',
-        "name": '(unnamed)',
+        "name": 'Stolen Authorization Token Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|stolen)\\b)(?=.*\\b(?:approval|ticket|nonce|authorization\\s*token|auth\\s*token)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s*agent)\\b)(?=.*\\b(?:scope|authority|permission)\\b)(?=.*\\b(?:rebind|override|bypass|escalate|escalated|escalating)\\b).+$'],
-        "description": ''
+        "description": 'Detects a stolen or forged authorization token used by a peer agent to rebind scope and escalate permission.'
     },
     {
         "id": 'GLS-CAI-274',
-        "name": '(unnamed)',
+        "name": 'Cross-Agent Quorum Nonce Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:cross(?:-|\\s)*agent|peer(?:-|\\s)*agent|delegate|delegation|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fake|fabricated)\\b)(?=.*\\b(?:quorum|approval(?:\\s|-)*chain|consensus)\\b)(?=.*\\b(?:nonce|session(?:\\s|-)*token|ticket)\\b)(?=.*\\b(?:scope(?:d)?|permission(?:s)?|privilege|authori[sz]ation)\\b)(?=.*\\b(?:override|bypass|ignore|ignored|ignores|ignoring)\\b).*'],
-        "description": ''
+        "description": 'Detects a cross-agent or peer handoff that presents a forged quorum or approval chain nonce to override scope, permission, or guardrail policy.'
     },
     {
         "id": 'GLS-CAI-275',
-        "name": '(unnamed)',
+        "name": 'Forged Authentication Token Delegation Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|fabricated|counterfeit|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:approval|signoff|authorization|auth(?:entication)?\\s+token|attestation)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|subagent|handoff)\\b)(?=.*\\b(?:scope|permission|privilege|role)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|unlock|bypass|override)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged authentication token or attestation used within a delegation to unlock or escalate privilege and bypass policy.'
     },
     # === end v0.2.27 batch ===
 
     # === v0.2.28 batch (17 patterns, theme: retrieval_poisoning) ===
     {
         "id": 'GLS-RP-264',
-        "name": '(unnamed)',
+        "name": 'Forged Provenance Stamp Knowledge Base Gate Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|knowledge\\s+base|source\\s+(?:note|snippet|digest)|citation\\s+cache)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:provenance\\s+(?:stamp|badge)|trust\\s+(?:stamp|badge)|verified\\s+source\\s+seal)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+rule|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override(?:d|s|ing)?|ignore(?:d|s)?|skip(?:ped|ping|s)?)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged provenance stamp or trust badge injected into a knowledge base that bypasses safety rules or execution gate policy.'
     },
     {
         "id": 'GLS-RP-265',
-        "name": '(unnamed)',
+        "name": 'Seeded RAG Authoritative Source Guardrail Disregard',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|vector(?:\\s+store)?|knowledge(?:\\s|-)*base|memory(?:\\s|-)*bank|document\\s+chunks?|chunks?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|forged|tampered|injected|seed(?:ed|ing)?|backdoor(?:ed)?|backdoored)\\b)(?=.*\\b(?:rank(?:ed|ing)?(?:\\s+it)?\\s+(?:first|highest)|promot(?:e|ed|es|ing)|boost(?:ed|s|ing)?|prioriti(?:ze|zed|zing)|treat(?:\\s+\\w+){0,3}\\s+as\\s+authoritative|source\\s+of\\s+truth|override\\s+rank(?:ing)?)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|system\\s+instruction(?:s)?|constraint(?:s)?)\\b).*'],
-        "description": ''
+        "description": 'Detects a seeded or poisoned RAG chunk claiming authoritative or source-of-truth status to be ranked first and disregard safety policy or system constraints.'
     },
     {
         "id": 'GLS-RP-266',
-        "name": 'forged_validation_appendix_confidence_rank_policy_override',
+        "name": 'Forged Validation Appendix Confidence Rank Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:source|citation|reference|appendix|document|corpus)\\b)(?=.*\\b(?:confidence|rank|ranking|priority|score)\\b)(?=.*\\b(?:policy|guardrail|rule|filter)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b)(?=.*\\b(?:promote|promoted|promoting|boost|boosted|boosting|prioritize|prioritized|surface|surfaced|elevate|elevated)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit source, appendix, or document has its confidence score or ranking boosted in order to bypass or override a policy guardrail or filter.'
     },
     {
         "id": 'GLS-RP-267',
-        "name": '(unnamed)',
+        "name": 'Forged Citation Lineage Ranking Promote',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|tampered|spoofed|poisoned|fabricated)\\b)(?=.*\\b(?:provenance|citation|source|lineage|evidence|trust\\s*rank|ranking)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|promote|promoted|elevate|elevated)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or poisoned citation, lineage, or trust rank used to promote or elevate content while overriding or ignoring policy.'
     },
     {
         "id": 'GLS-RP-268',
-        "name": '(unnamed)',
+        "name": 'RAG Corpus Fake Priority Weight Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|knowledge\\s+base|index|corpus|source|citation|attestation|provenance)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:priority|rerank(?:s|ed|ing)?|boost(?:ed|ing)?|weight(?:ed|ing)?|rank(?:ed|ing)?)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged corpus citation or attestation whose weight or rank is manipulated to override or disable guardrail policy.'
     },
     {
         "id": 'GLS-RP-269',
-        "name": '(unnamed)',
+        "name": 'Forged Index Annotation Rerank Guardrail Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|fabricated|spoofed)\\b)(?=.*\\b(?:index\\s+annotation|retrieval\\s+note|knowledge\\s+chunk|source\\s+metadata|embedding\\s+tag)\\b)(?=.*\\b(?:rerank|reranked|reranks|reranking|prioritize|prioritized|boost|boosted|boosts|boosting|weight|weighted)\\b)(?=.*\\b(?:policy\\s+gate|guardrail|approval\\s+check|security\\s+review|safety\\s+filter)\\b)(?=.*\\b(?:bypass|bypassed|bypasses|ignore|ignored|skip|skipped|override|overrode|overrides|overriding)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged index annotation or embedding tag that reranks or boosts content weight to bypass a policy gate, guardrail, or security review.'
     },
     {
         "id": 'GLS-RP-270',
-        "name": '(unnamed)',
+        "name": 'Poisoned Retrieval Bundle Rank Trust Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|context|citation|source|provenance)\\b)(?=.*\\b(?:forged|poisoned|seeded|tampered|fabricated)\\b)(?=.*\\b(?:bundle|digest|index|rank|ranking|score)\\b)(?=.*\\b(?:policy|guardrail|safety|trust)\\b)(?=.*\\b(?:bypass|override|prioritiz(?:e|ed|ing)|escalat(?:e|ed|es|ing))\\b).*'],
-        "description": ''
+        "description": 'Detects a poisoned retrieval bundle or digest whose rank or score is manipulated to override safety, trust, or guardrail policy.'
     },
     {
         "id": 'GLS-RP-271',
-        "name": '(unnamed)',
+        "name": 'Forged Retrieval Passage Weight Supersede Policy',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|search|index|corpus|citation|snippet|source|result)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|poison(?:ed|ing)?)\\b)(?=.*\\b(?:citation|source|snippet|passage|result)\\b)(?=.*\\b(?:weight(?:ing|ed)?|rank(?:ing|ed)?|prioriti[sz](?:e|ed|ing)?|boost(?:s|ed|ing)?)\\b)(?=.*\\b(?:override(?:n|d|s|ing)?|bypass(?:es|ed|ing)?|supersed(?:e|es|ed|ing)|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|check(?:s)?|gate(?:s)?)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or tampered retrieval passage or snippet whose weight or ranking is boosted to supersede safety policy or guardrail checks.'
     },
     {
         "id": 'GLS-RP-272',
-        "name": '(unnamed)',
+        "name": 'RAG Dataset Provenance Boost Top Rank Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|corpus|document(?:ation)?|knowledge\\s+base|source\\s+map|dataset|chunk(?:s)?)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|tamper(?:ed|ing)?|poison(?:ed|ing)?)\\b)(?=.*\\b(?:digest|checksum|hash|lineage|provenance|trust\\s+score|confidence)\\b)(?=.*\\b(?:priorit(?:ize|ized|izing|izes)|boost(?:ed|ing|s)?|elevat(?:e|ed|ing)|rank(?:ed|ing|s)?(?:\\s+\\w+){0,3}\\s+first|top\\s+rank)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety(?:\\s+rule(?:s)?)?|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged provenance checksum or confidence injected into a RAG dataset that prioritizes content at the top rank and overrides guardrail verification.'
     },
     {
         "id": 'GLS-RP-273',
-        "name": 'forged_citation_graph_trust_score_rerank_policy_override',
+        "name": 'Forged Citation Graph Trust Score Rerank',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:citation\\s+graph|source\\s+bundle|trust\\s+score|provenance\\s+record)\\b)(?=.*\\b(?:re[-\\s]?rank(?:ed|ing)?|boost(?:ed|ing)?|elevate(?:d|s|ing)?|override)\\b)(?=.*\\b(?:policy\\s+override|policy\\s+exception|guardrail\\s+bypass|ranking\\s+policy)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged citation graph, trust score, or provenance record within a retrieval or RAG system is manipulated to re-rank or boost sources and override a policy ranking or guardrail bypass.'
     },
     {
         "id": 'GLS-RP-274',
-        "name": '(unnamed)',
+        "name": 'Forged Retrieval Memo Trust Badge Rank Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|seeded|poisoned|tampered)\\b)(?=.*\\b(?:eval\\s*appendix|benchmark\\s*appendix|citation\\s*note|source\\s*memo|retrieval\\s*document|ranking\\s*note)\\b)(?=.*\\b(?:citation\\s*trust|trust\\s*badge|provenance\\s*stamp|source\\s*authority|confidence\\s*tag)\\b)(?=.*\\b(?:rank\\s*override|rerank\\s*to\\s*top|prioriti[sz]e\\s*(?:it\\s*)?first|boost\\s*to\\s*highest\\s*rank|override\\s*ranking|bypass\\s*ranking\\s*guardrails?|ignore\\s*retrieval\\s*policy)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged citation note or retrieval memo carrying a fake trust badge or provenance stamp used to achieve a rank override and bypass retrieval policy.'
     },
     {
         "id": 'GLS-RP-275',
-        "name": '(unnamed)',
+        "name": 'Forged Citation Graph Ranking Trust Gate Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore|rerank|promote)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore|rerank|promote)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:retrieval|citation[-\\s]+graph|ranking\\s+metadata|relevance[-\\s]+score|source[-\\s]+weight|rerank(?:er|ing)?)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rerank|reranks|reranked|promote|promotes|promoted)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust[-\\s]+gate|enforcement\\s+rules?)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged citation graph or ranking metadata used to promote or rerank content while bypassing trust gate or safety enforcement rules.'
     },
     {
         "id": 'GLS-RP-276',
-        "name": '(unnamed)',
+        "name": 'Forged Source Authority Flip Provenance Waiver',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:source|citation|document|retriev(?:ed|al)|context)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:rank(?:ing)?\\s*override|priority\\s*override|trust\\s*badge\\s*override|authority\\s*flip)\\b)(?=.*\\b(?:policy\\s*bypass|guardrail\\s*override|verification\\s*bypass|provenance\\s*waiver)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged source or retrieved context claiming a rank or trust override combined with an explicit provenance waiver or guardrail bypass.'
     },
     {
         "id": 'GLS-RP-277',
-        "name": 'forged_provenance_banner_citation_priority_override',
+        "name": 'Forged Provenance Banner Citation Priority Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|context|corpus|knowledge|document|docs|source|sources)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:provenance|citation|citations|lineage|source\\s+badge|trust\\s+badge|banner|stamp|attestation)\\b)(?=.*\\b(?:priority|rank|ranking|boost|promote|elevate|override|reorder)\\b)(?=.*\\b(?:policy|guardrail|guardrails|filter|safety|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which forged or tampered provenance banners, citation stamps, or attestations from a retrieval or document corpus are used to boost source priority and override policy or safety guardrails.'
     },
     {
         "id": 'GLS-RP-278',
-        "name": '(unnamed)',
+        "name": 'Contaminated Index Trust Score Elevation Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*\\b(?:retrieval|rag|vector\\s+index|index|knowledge\\s+base|memory\\s+store)\\b)(?=.*\\b(?:poison|inject|seed|tamper|contaminate|backfill)\\w*\\b)(?=.*\\b(?:trust\\s+score|ranking\\s+signal|priority\\s+band|score|rank)\\b)(?=.*\\b(?:override|bypass|ignore|skip|elevate|boost)\\w*\\b)(?=.*\\b(?:policy|guardrail|filter|approval|verification|safety)\\b).{0,700}'],
-        "description": ''
+        "description": 'Detects a contaminated or poisoned retrieval index whose trust score or ranking signal is elevated to override policy or guardrail approval.'
     },
     {
         "id": 'GLS-V03-0485',
-        "name": '(unnamed)',
+        "name": 'Forged RAG Quality Signal Attacker Content Surface',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:retrieval|rag|index|vector\\s+store|knowledge\\s+base|corpus)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)?)\\b.{0,170}\\b(?:quality\\s+signal|trust\\s+score|rank(?:ing)?|rerank(?:ed|ing)?|priority(?:\\s+band|\\s+value|\\s+values)?)\\b.{0,170}\\b(?:promot(?:e|ed|ing)|boost(?:ed|ing)?|elevat(?:e|ed|ing)|surface(?:d)?)\\b.{0,170}\\b(?:attacker|malicious|untrusted|payload|hidden\\s+instruction)\\b'],
-        "description": ''
+        "description": 'Detects a forged quality signal or trust score injected into a retrieval index that boosts attacker or malicious content to the surface of results.'
     },
     {
         "id": 'GLS-RP-279',
-        "name": '(unnamed)',
+        "name": 'Poisoned RAG Context Promote Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieve|retrieval|rag|context|memory|index|vector|corpus|source(?:s)?|citation(?:s)?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|malicious|forged|tampered|injected|fabricated)\\b)(?=.*\\b(?:ignore|override|bypass|prioriti[sz]e|promote|trust)\\b).+$'],
-        "description": ''
+        "description": 'Detects a poisoned or maliciously injected retrieval context or citation that is promoted or prioritized while overriding guardrail or policy.'
     },
     # === end v0.2.28 batch ===
     # === v0.2.29 batch (20 patterns, 7 categories) ===
     {
         "id": 'GLS-TOP-253',
-        "name": '(unnamed)',
+        "name": 'Forged Execution Receipt Channel Redirect Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:tool|plugin|connector|pipeline|adapter)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:audit\\s+receipt|execution\\s+receipt|trace|checksum|provenance)\\b)(?=.*\\b(?:channel|route|dispatch|handoff|redirect|redirected|redirects|redirecting)\\b)(?=.*\\b(?:override|overrides|overrode|overridden|overriding|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review)\\b).*"],
-        "description": ''
+        "description": 'Detects a forged audit receipt or provenance trace on a tool or plugin output that redirects to a different channel to bypass guardrail verification.'
     },
     {
         "id": 'GLS-TOP-254',
-        "name": '(unnamed)',
+        "name": 'Forged Quorum Receipt Safety Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:quorum|consensus|approval)\\s+(?:receipt|record|token|attestation)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification)\\b).*$"],
-        "description": ''
+        "description": 'Detects a forged quorum or consensus receipt or attestation used to disregard or bypass safety and policy verification.'
     },
     {
         "id": 'GLS-TOP-255',
-        "name": 'forged_confidence_trace_queue_redirect_execution_guardrail_bypass',
+        "name": 'Forged Confidence Trace Queue Redirect Execution',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:confidence\\s+trace|telemetry\\s+receipt|audit\\s+output|verification\\s+log|model\\s+report)\\b)(?=.*\\b(?:redirect|redirected|redirects|reroute|rerouted|rerouting|rewire|rewired|rewiring|switch(?:ed|es|ing)?\\s+queue(?:\\s+routing)?|switch(?:ed|es|ing)?\\s+(?:routing|channel|path))\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|deployment|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"],
-        "description": ''
+        "description": 'Detects text in which a forged confidence trace, telemetry receipt, or verification log is described as rerouting or redirecting execution queues in order to bypass or override safety guardrails.'
     },
     {
         "id": 'GLS-RP-280',
-        "name": '(unnamed)',
+        "name": 'Forged Citation Verified Banner Rank Promote',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:forged|fabricated|fake|poisoned)\\b)(?=.*\\b(?:citation|source|reference|snippet|document)\\b)(?=.*\\b(?:verified|signed|attested|trust\\s+banner)\\b)(?=.*\\b(?:promote|boost|rank|priority|top\\s+result)\\b)(?=.*\\b(?:override|bypass|ignore|skip)\\b).+"],
-        "description": ''
+        "description": 'Detects a forged or fabricated citation or source carrying a fake verified or trust banner used to boost rank and override or skip policy.'
     },
     {
         "id": 'GLS-RP-281',
-        "name": '(unnamed)',
+        "name": 'Poisoned Source Map Confidence Boost Rerank',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base|document\\s+store)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated|poison(?:ed|ing)?)\\b)(?=.*\\b(?:source\\s+map|citation|provenance|lineage|metadata)\\b)(?=.*\\b(?:confidence\\s+boost|boost(?:ed|s|ing)?\\s+confidence|rank(?:ing)?\\s+override|rerank(?:ed|s|ing)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:s|d|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|review|verification)\\b).*"],
-        "description": ''
+        "description": 'Detects a forged or poisoned source map or citation whose confidence is boosted or reranked to override or bypass guardrail review and policy.'
     },
     {
         "id": 'GLS-RP-282',
-        "name": '(unnamed)',
+        "name": 'Forged Source Quarantine Label Provenance Promote',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:retrieval|rag|index|source|document|citation)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:quarantine|quarantined|clean|safe\\s*label|approval\\s*label)\\b)(?=.*\\b(?:provenance|trust|verified|attested|lineage)\\b)(?=.*\\b(?:override|bypass|prioriti[sz]e|promote|rank\\s*boost)\\b).*"],
-        "description": ''
+        "description": 'Detects a forged retrieval source with a fake clean or safe label used to falsely claim provenance and promote ranking while overriding trust policy.'
     },
     {
         "id": 'GLS-CAI-277',
-        "name": '(unnamed)',
+        "name": 'Forged Nonce Replay Stale Token Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+"],
-        "description": ''
+        "description": 'Detects a stale, expired, or forged nonce or attestation replayed or reused in an agent handoff to override scope and bypass trust boundaries.'
     },
     {
         "id": 'GLS-CAI-278',
-        "name": '(unnamed)',
+        "name": 'Agent Receipt Claim Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+"],
-        "description": ''
+        "description": 'Detects an agent asserting or claiming a forged receipt, ticket, or capability to rebind scope or privilege and bypass policy guardrails.'
     },
     {
         "id": 'GLS-CAI-279',
-        "name": '(unnamed)',
+        "name": 'Agent Ticket Mint Verification Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$"],
-        "description": ''
+        "description": 'Detects an agent minting or forging a ticket or credential to skip verification or guardrail checks and bypass policy.'
     },
     {
         "id": 'GLS-MRC-255',
-        "name": '(unnamed)',
+        "name": 'Forged Trust Tier Label Route Escalation Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:router|routing|orchestrator|gateway|model\\s+router|routing\\s+service)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|fake)\\b)(?=.*\\b(?:trust\\s+tier|risk\\s+tier|capability\\s+tier|confidence\\s+score|classification\\s+label)\\b)(?=.*\\b(?:route|routed|routing|reroute|rerouted|rerouting|dispatch|dispatched|dispatches|dispatching|send|sent|forward|forwarded|forwarding)\\b)(?=.*\\b(?:override|bypass|bypassed|bypassing|escalate|escalated|escalation|unlock|skip|skipped|skipping)\\b).+"],
-        "description": ''
+        "description": 'Detects a forged trust tier, risk tier, or capability label injected into a router to reroute or escalate model dispatch and bypass policy or safety gates.'
     },
     {
         "id": 'GLS-MRC-256',
-        "name": '(unnamed)',
+        "name": 'Forged Route Manifest Tier Elevation Approval Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:router\\s*profile|route\\s*manifest|model\\s*card|routing\\s*policy|dispatch\\s*plan)\\b)(?=.*\\b(?:tier\\s*escalation|tier\\s*override|upgrade\\s*to\\s*premium|route\\s*to\\s*highest\\s*tier|elevate\\s*model\\s*tier)\\b)(?=.*\\b(?:bypass\\s*approval\\s*gate|skip\\s*routing\\s*approval|ignore\\s*routing\\s*policy|override\\s*route\\s*guardrails?|force\\s*unauthorized\\s*routing)\\b).+$"],
-        "description": ''
+        "description": 'Detects a forged router profile or dispatch plan whose tier escalation or upgrade claim is used to bypass routing approval gates or guardrails.'
     },
     {
         "id": 'GLS-MRC-257',
-        "name": '(unnamed)',
+        "name": 'Forged Routing Tier Override Authorization Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:route|routing|router|dispatch|model\\s*selection|fallback\\s*path)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:tier\\s*override|tier\\s*escalation|priority\\s*escalation|capability\\s*tier)\\b)(?=.*\\b(?:policy\\s*bypass|guardrail\\s*override|verification\\s*bypass|authorization\\s*bypass)\\b).+$"],
-        "description": ''
+        "description": 'Detects a forged routing tier override or priority escalation combined with an explicit policy or authorization bypass injected into a router or dispatch layer.'
     },
     {
         "id": 'GLS-TMS-238',
-        "name": '(unnamed)',
+        "name": 'Forged Execution Header Dispatch Guardrail Override',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|reroute|handoff|handover)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|reroute|handoff|handover)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:execution[-\\s]+header(?:s)?|dispatch[-\\s]+header(?:s)?|tool[-\\s]+metadata|routing[-\\s]+header(?:s)?|handoff[-\\s]+tag(?:s)?)\\b)(?=.*\\b(?:priority|route|reroute|handoff|handover|dispatch|channel)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|skip|skips|reroute|reroutes|handoff|handover)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety\\s+check(?:s)?|trust[-\\s]+gate|execution\\s+check(?:s)?)\\b).+"],
-        "description": ''
+        "description": 'Detects a forged execution or dispatch header, routing header, or handoff tag whose priority or route is used to override or bypass safety check guardrails.'
     },
     {
         "id": 'GLS-TMS-239',
-        "name": '(unnamed)',
+        "name": 'Forged Priority Header Execution Gate Rebind',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:priority\\s+header|tool\\s+metadata|execution\\s+manifest|run\\s+context\\s+header|scheduler\\s+header)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rebind|rebinds|rebound)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+scope|trust\\s+boundary|execution\\s+gate)\\b).+"],
-        "description": ''
+        "description": 'Detects a forged priority header, tool metadata, or execution manifest used to rebind or bypass trust boundary or execution gate policy.'
     },
     {
         "id": 'GLS-TMS-240',
-        "name": '(unnamed)',
+        "name": 'Metadata System Authority Instruction Bypass',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.{0,500}$)(?!.*\\b(?:do\\s+not|never|without)\\s+(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:metadata|tool(?:_|\\s)?metadata|front[- ]?matter|header|annotation|properties)\\b)(?=.*\\b(?:system(?:\\s+message)?|root(?:\\s+authority)?|highest\\s+priority|authoritative)\\b)(?=.*\\b(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).*"],
-        "description": ''
+        "description": 'Detects tool metadata, front matter, or headers claiming system-root or highest-priority authority used to replace or bypass safety instructions or previous policy.'
     },
     {
         "id": 'GLS-IDF-002',
-        "name": '(unnamed)',
+        "name": 'Forged Service Token Scope Expansion Bypass',
         "category": 'identity_federation',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:service(?:\\s|-)?token|oauth(?:\\s|-)?token|jwt|session(?:\\s|-)?token|bearer(?:\\s|-)?token|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|mint(?:ed|ing)?|fake)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|copilot|orchestrator)\\b)(?=.*\\b(?:scope|permission(?:s)?|role|privilege(?:s)?|tenant|admin)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|expand(?:ed|s|ing)?|widen(?:ed|ing)?|admin)\\b)(?=.*\\b(?:ignore|ignored|ignoring|ignores|override|overrode|overriding|bypass|bypassed|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b).*$"],
-        "description": ''
+        "description": 'Detects a forged or minted service token, JWT, or bearer token submitted by an agent or delegate to expand scope or privilege and bypass authentication checks.'
     },
     {
         "id": 'GLS-IF-658',
-        "name": '(unnamed)',
+        "name": 'Forged Device Assertion Step-Up Auth Bypass',
         "category": 'identity_federation',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|override|ignore|disable|skip)\\b)(?=.*\\b(?:forged?|fake|spoof(?:ed|ing)?|tampered?)\\b.{0,90}\\b(?:device|session|trust|attestation)\\b.{0,40}\\b(?:assertion|token|proof|claim)\\b)(?=.*\\b(?:step-?up|mfa|otp|challenge|re-?auth(?:entication)?)\\b)(?=.*\\b(?:bypass|override|skip|disable|ignore)\\b.{0,80}\\b(?:verification|validator|check|policy|guardrail)\\b)(?=.*\\b(?:elevat(?:e|ed|ion)|escalat(?:e|ed|ion)|grant|unlock|reactivat(?:e|ed|ion))\\b.{0,80}\\b(?:account|session|access|scope|privilege)\\b).*$"],
-        "description": ''
+        "description": 'Detects a forged device or session trust assertion used to bypass step-up MFA or challenge verification and escalate account or session access.'
     },
     {
         "id": 'GLS-IDF-004',
-        "name": '(unnamed)',
+        "name": 'Forged Federated Refresh Token Claim Escalation',
         "category": 'identity_federation',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:identity\\s+federation|oidc|oauth|sso|token\\s+broker|federated\\s+auth)\\b)(?=.*\\b(?:refresh[-\\s]+token|token\\s+refresh|reissued\\s+token)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|manipulat(?:ed|ing))\\b)(?=.*\\b(?:claim(?:s)?|scope|aud(?:ience)?|role(?:\\s+map)?|delegat(?:ed|ion)?)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|elevat(?:e|ed|ion)|privilege\\s+escalation|privilege\\s+increase|trust\\s+override|bypass|unauthorized\\s+access)\\b).*"],
-        "description": ''
+        "description": 'Detects a forged or tampered federated refresh token whose claim, scope, or audience is manipulated to escalate privilege or bypass trust in SSO or OAuth flows.'
     },
     {
         "id": 'GLS-TCR-338',
-        "name": '(unnamed)',
+        "name": 'Concurrent Ack Race Condition Override Promotion',
         "category": 'tool_chain_race',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?=.*\\b(?:race(?:\\s+condition)?|concurrent|parallel|interleav(?:e|ed|ing)|out[- ]of[- ]order|simultaneous)\\b)(?=.*\\b(?:ack(?:nowledg(?:e|ed|ement))?|receipt|nonce|session(?:\\s+id)?|token|checksum|handshake)\\b)(?=.*\\b(?:override|bypass|skip|ignore|force|execute\\s+anyway|promote\\s+to\\s+trusted)\\b).*$"],
-        "description": ''
+        "description": 'Detects a race condition or out-of-order concurrent acknowledgement or nonce used to force or promote an action to trusted status while bypassing policy.'
     },
     {
         "id": 'GLS-TCR-656',
-        "name": '(unnamed)',
+        "name": 'Intermediate Tool Output Downstream Early Execute',
         "category": 'tool_chain_race',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|waive)\\b)(?=.*\\b(?:intermediate|partial|preliminary|incomplete)\\s+(?:tool\\s+)?(?:output|result|response)\\b)(?=.*\\b(?:next|downstream|follow[- ]?up|subsequent)\\s+(?:tool|step|executor)\\b)(?=.*\\b(?:run|call|invoke|execute|trigger|chain|forward|pipe|feed)\\b)(?=.*\\b(?:before|prior\\s+to|without\\s+waiting\\s+for|skip(?:ping)?|bypass(?:ing)?|waive)\\b.{0,80}\\b(?:final|full|complete)\\s+(?:verification|validation|check|review)\\b)(?=.*\\b(?:ignore|overrid(?:e|es|ed|ing)|bypass|waive|relax)\\b.{0,80}\\b(?:policy|guardrail|safety|approval)\\b).*$"],
-        "description": ''
+        "description": 'Detects a partial or intermediate tool result piped to a downstream executor before full verification is complete, overriding or bypassing policy and guardrails.'
     },
     # === end v0.2.29 batch ===
 
     # === v0.2.30 batch (12 patterns, theme: cross_agent_injection) ===
     {
         "id": 'GLS-CAI-506',
-        "name": '(unnamed)',
+        "name": 'A2A Attestation Lease Policy Supersede',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent-to-agent handoff where an attestation, lease, or capability is used to supersede or disregard safety, approval, or authorization policy.'
     },
     {
         "id": 'GLS-CAI-308',
-        "name": '(unnamed)',
+        "name": 'Remote Agent Signature Authorize Tool Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a remote or peer agent presenting a forged manifest signature or attestation to authorize a tool call while bypassing approval or verification policy.'
     },
     {
         "id": 'GLS-CAI-328',
-        "name": '(unnamed)',
+        "name": 'Forged Handoff Permission Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged handoff token or receipt used to escalate permission or authorization and bypass guardrail and safety checks.'
     },
     {
         "id": 'GLS-CAI-280',
-        "name": 'forged_quorum_certificate_vote_tally_override_bypass',
+        "name": 'Forged Quorum Certificate Vote Tally Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:quorum\\s+certificate|vote\\s+tally|approval\\s+record|consensus\\s+receipt)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|scope|authorization)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which an agent or orchestrator presents a forged quorum certificate, vote tally, or consensus receipt to override or circumvent policy and guardrail authorization controls.'
     },
     {
         "id": 'GLS-CAI-281',
-        "name": '(unnamed)',
+        "name": 'Delegation Manifest Authority Rebinding Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged handoff manifest or delegation note used to rebind authority or scope and bypass verification gates or transfer guardrails.'
     },
     {
         "id": 'GLS-CAI-335',
-        "name": '(unnamed)',
+        "name": 'Forged Approval Chain Scope Role Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged approval chain or handoff receipt used by an agent or delegate to override role, scope, or permission and bypass controls.'
     },
     {
         "id": 'GLS-CAI-282',
-        "name": '(unnamed)',
+        "name": 'Agent Quorum Badge Scope Escalation Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
-        "description": ''
+        "description": 'Detects an agent presenting a forged quorum, badge, or approval ticket to rebind scope and escalate privilege.'
     },
     {
         "id": 'GLS-CAI-283',
-        "name": '(unnamed)',
+        "name": 'Handoff Token Priority Scope Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|counterfeit|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:handoff|ticket|receipt|token|session)\\b)(?=.*\\b(?:scope|priority|role|permission)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:n|d|s|ing)?|escalat(?:e|ed|ing|ion)|unlock(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|check(?:s)?|approval)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged handoff token or receipt used by an agent or planner to override priority, scope, or role and unlock policy-gated actions.'
     },
     {
         "id": 'GLS-CAI-284',
-        "name": '(unnamed)',
+        "name": 'Agent Quorum Vote Forgery Policy Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
-        "description": ''
+        "description": 'Detects an agent forging quorum or vote results to skip policy guardrails or approval gates.'
     },
     {
         "id": 'GLS-CAI-339',
-        "name": '(unnamed)',
+        "name": 'Agent Impersonation Credential Borrowing Promotion',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
-        "description": ''
+        "description": 'Detects an agent impersonating another or borrowing a stolen credential to bypass controls and promote itself to a trusted status.'
     },
     {
         "id": 'GLS-CAI-310',
-        "name": '(unnamed)',
+        "name": 'Peer Agent Scope Tag Replay Injection',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a peer agent using a forged, tampered, or replayed scope tag or transfer token to ignore policy or bypass authorization.'
     },
     {
         "id": 'GLS-CAI-316',
-        "name": '(unnamed)',
+        "name": 'Agent Nonce Replay Token Scope Disable',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or replayed nonce or approval token in an agent handoff used to disable scope verification or override authorization checks.'
     },
     # === end v0.2.30 batch ===
 
     # === v0.2.31 batch (14 patterns, theme: tool_output_poisoning) ===
     {
         "id": 'GLS-V03-0484',
-        "name": '(unnamed)',
+        "name": 'CI Output Attestation Seal Validation Gate Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b'],
-        "description": ''
+        "description": 'Detects a forged or tampered CI/CD output or build trace whose attestation seal or verification stamp is used to skip or bypass a validation gate or guardrail.'
     },
     {
         "id": 'GLS-TOP-325',
-        "name": '(unnamed)',
+        "name": 'Forged Receipt Swap Report Approve Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|command\\s+output|agent\\s+output)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:receipt|audit\\s+stamp|signature|signed\\s+footer|verification\\s+token)\\b)(?=.*\\b(?:channel|summary|footer|handoff|report)\\b)(?=.*\\b(?:swap|swap(?:ped|ping)?|replace(?:d|ment)?|inject(?:ed|ion)|rewrite|alter|alter(?:ed|ation))\\b)(?=.*\\b(?:execut(?:e|ion)|run|approve|authorize)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ing|en|ed)?|ignore|skip|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|gate(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged or injected audit stamp or signed footer on a tool report that is swapped or altered to authorize execution while bypassing policy gates.'
     },
     {
         "id": 'GLS-TOP-257',
-        "name": '(unnamed)',
+        "name": 'Forged Tool Trace Pipeline Reroute Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|output|result|trace|receipt|attestation|telemetry)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|altered)\\b)(?=.*\\b(?:channel|pipeline|stream|route|routes|routing|reroute|reroutes|rerouted|handoff|redirect|redirects|redirected|rewire|rewires|rewired)\\b)(?=.*\\b(?:bypass|bypasses|bypassed|override|overrides|overrode|overriding|allow|allows|allowed|execute|executes|executed|dispatch|dispatches|dispatched|run|runs|running)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or tampered tool trace or attestation rerouted or rewired through a pipeline or channel to allow or bypass execution approval.'
     },
     {
         "id": 'GLS-TOP-260',
-        "name": '(unnamed)',
+        "name": 'Forged Tool Nonce Signature Channel Swap Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|executor|runtime|pipeline|verifier)\\b)(?=.*\\b(?:output|result|log|attestation|receipt|evidence)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|tamper(?:ed|ing)?|counterfeit|fake)\\b)(?=.*\\b(?:nonce|signature|checksum|stamp)\\b)(?=.*\\b(?:channel\\s*swap|route\\s*swap|policy\\s*bypass|guardrail\\s*override|execution\\s*gate\\s*bypass)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged tool result whose nonce, signature, or checksum is tampered for a channel swap or route swap to bypass policy or execution gate.'
     },
     {
         "id": 'GLS-TOP-261',
-        "name": 'forged_telemetry_risk_flag_redirect_execution_guardrail_bypass',
+        "name": 'Forged Telemetry Risk Flag Redirect Execution',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|router|coordinator|executor)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:telemetry|risk\\s+flag|confidence\\s+score|execution\\s+trace|tool\\s+result)\\b)(?=.*\\b(?:redirect|redirected|redirecting|redirects|reroute|rerouted|rerouting|reroutes|switch(?:ed|ing|es)?\\s+path|override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|execution\\s+gate|execution\\s+gates|approval\\s+check|approval\\s+checks|scope\\s+control)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged telemetry risk flag, confidence score, or tool result from an agent or executor is used to redirect or reroute execution in order to bypass policy guardrails or approval checks.'
     },
     {
         "id": 'GLS-TOP-263',
-        "name": '(unnamed)',
+        "name": 'Forged Rollback Certificate Compliance Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|output|result|report|trace|log|evidence|artifact)\\b)(?=.*\\b(?:rollback|revert|backout|restore|undo)\\w*\\b)(?=.*\\b(?:certificate|attestation|ticket|approval|waiver|receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed)?|fabricat(?:e|ed)|counterfeit|synthetic)\\b)(?=.*\\b(?:execution\\s+gate|policy\\s+gate|guardrail|policy|safety\\s+check|compliance)\\b)(?=.*\\b(?:bypass|skip|ignore|override|disable|waive)\\w*\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged rollback or revert certificate, attestation, or waiver used to bypass execution gate, compliance check, or safety policy.'
     },
     {
         "id": 'GLS-TOP-264',
-        "name": '(unnamed)',
+        "name": 'Forged Function Output Provenance Bypass Reroute',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|plugin|function|executor|runner|api)\\b)(?=.*\\b(?:output|result|transcript|log|trace|evidence|receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|tamper(?:ed|ing)|inject(?:ed|ing)|alter(?:ed|ing)?)\\b)(?=.*\\b(?:verif(?:y|ication)|checksum|signature|digest|provenance|integrity)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|rerout(?:e|ed|ing)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|approve(?:d|ing)?)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or injected function or API output whose provenance or checksum is altered to reroute execution approval and bypass policy.'
     },
     {
         "id": 'GLS-TOP-265',
-        "name": '(unnamed)',
+        "name": 'Forged Scanner Report Route Execution Guardrail Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake|tampered)\\b)(?=.*\\b(?:scanner|audit|tool\\s*output|result\\s*log|safety\\s*report|diagnostic)\\b)(?=.*\\b(?:route|reroute|redirect|redirects|forward|channel|handoff|switch\\s*path|rewire)\\b)(?=.*\\b(?:execution|execute|run|deploy|apply|action)\\b)(?=.*\\b(?:guardrail|policy|check|checks|verification|approval)\\b)(?=.*\\b(?:bypass|override|ignore|ignores|ignored|ignoring|disable|skip)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged scanner or diagnostic report used to reroute or redirect execution and bypass guardrail, policy check, or approval.'
     },
     {
         "id": 'GLS-TOP-266',
-        "name": '(unnamed)',
+        "name": 'Forged Tool Log Integrity Stamp Passed Override',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool\\s+(?:output|result|log|trace)|plugin\\s+response|execution\\s+log)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered)\\b)(?=.*\\b(?:checksum|hash|signature|integrity\\s+(?:stamp|token)|audit\\s+stamp)\\b)(?=.*\\b(?:passed|verified|approved|clean)\\b)(?=.*\\b(?:policy|guardrail|validation|verification|gate)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|skip|skip(?:ped|s|ping)?|ignore(?:d|s)?|overrid(?:e|es|ed|ing)|overrode|waive(?:d|s)?)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged tool log or trace whose integrity stamp or audit hash is set to passed or verified to override or waive policy guardrails.'
     },
     {
         "id": 'GLS-TOP-268',
-        "name": '(unnamed)',
+        "name": 'Forged Tool Receipt Attestation Override',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated|counterfeit)\\b)(?=.*\\b(?:tool\\s*output|tool\\s*result|log|trace|checksum|receipt|attestation|verification)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|skip|skipped|waive|waived|disable|disabled)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or fabricated tool output, receipt, or attestation used to override, bypass, or disable policy and safety guardrails.'
     },
     {
         "id": 'GLS-TOP-269',
-        "name": '(unnamed)',
+        "name": 'Forged Tool Report Execution Approval Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fabricated|tampered|spoofed)\\b)(?=.*\\b(?:tool|report|output|log|trace|telemetry|compliance)\\b)(?=.*\\b(?:execute|run|deploy|apply|approve|action)\\w*\\b)(?=.*\\b(?:bypass|override|skip|ignore|disable)\\w*\\b)(?=.*\\b(?:guardrail|policy|gate|approval|check)\\w*\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged tool report or compliance log used to execute or deploy actions while bypassing guardrail, policy gate, or approval.'
     },
     {
         "id": 'GLS-TOP-270',
-        "name": '(unnamed)',
+        "name": 'Forged Artifact Checksum Stream Swap Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:tool|runner|executor|pipeline|plugin)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:checksum|hash|signature|attestation|evidence|verification)\\b)(?=.*\\b(?:channel|stream|log|trace|artifact)\\b)(?=.*\\b(?:bypass|override|rerout(?:e|ed|ing)|swap(?:ped|ping)?|supersed(?:e|ed|ing)|skip(?:ped|ping)?)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged attestation or checksum on a pipeline artifact or log stream swapped or rerouted to bypass or supersede policy or guardrails.'
     },
     {
         "id": 'GLS-CAI-700',
-        "name": '(unnamed)',
+        "name": 'Tool Output Authority Instruction Override',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?:\\b(?:because|since)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,60}\\b(?:trusted|authoritative|verified|reliable)\\b|\\b(?:treat|consider|use)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,40}\\b(?:as\\s+)?(?:trusted|authoritative|higher\\s+priority|source\\s+of\\s+truth)\\b).{0,160}\\b(?:ignore|override|bypass|replace|discard)\\b.{0,80}\\b(?:previous|prior|earlier)?\\s*(?:instruction(?:s)?|polic(?:y|ies)|guardrail(?:s)?|safety\\s+rule(?:s)?)\\b'],
-        "description": ''
+        "description": 'Detects a claim that tool or search output is authoritative or trusted and should take priority to override or discard previous instructions, policy, or guardrails.'
     },
     {
         "id": 'GLS-TOP-309',
-        "name": '(unnamed)',
+        "name": 'Signed Summary Footer Policy Bypass',
         "category": 'tool_output_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:signed|signature|verified|attested)\\b)(?=.*\\b(?:summary|footer|report|digest|result)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:d|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a signed or attested summary footer or result digest used to override or bypass safety, approval, or guardrail policy.'
     },
     # === end v0.2.31 batch ===
 
     # === v0.2.32 batch (13 patterns, theme: retrieval_poisoning) ===
     {
         "id": 'GLS-RP-283',
-        "name": 'forged_source_bundle_ranking_boost_policy_exception',
+        "name": 'Forged Source Bundle Ranking Boost Policy Exception',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:source\\s+bundle|citation\\s+pack|provenance\\s+record|evidence\\s+bundle|reference\\s+manifest)\\b)(?=.*\\b(?:rank(?:ing)?\\s+boost|priority\\s+boost|top[-\\s]?rank|promote(?:d|s|ing)?|elevate(?:d|s|ing)?)\\b)(?=.*\\b(?:policy\\s+exception|policy\\s+override|guardrail\\s+bypass|trust\\s+bypass|compliance\\s+skip)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or fabricated source bundle, citation pack, or provenance record is given a ranking boost in order to trigger a policy exception or guardrail bypass.'
     },
     {
         "id": 'GLS-RP-313',
-        "name": '(unnamed)',
+        "name": 'Seeded RAG Appendix Badge Trust Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s?base|document|context|memory)\\b)(?=.*\\b(?:seed(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:appendix|footnote|citation|source|badge|provenance)\\b)(?=.*\\b(?:trust|verified|authoritative|official)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable)\\b)(?=.*\\b(?:policy|guardrail|review|approval|safety)\\b).*$'],
-        "description": ''
+        "description": 'Detects a seeded or poisoned RAG appendix or footnote carrying a fake trust or authority badge used to override policy guardrails and approval.'
     },
     {
         "id": 'GLS-RP-319',
-        "name": '(unnamed)',
+        "name": 'Poisoned Citation Source Tag Rank Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge[-\\s]*base|context|document|corpus|source)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)?|tamper(?:ed|ing)?|forg(?:ed|ery)|malicious)\\b)(?=.*\\b(?:citation|provenance|source[-\\s]*tag|reference|badge|checksum)\\b)(?=.*\\b(?:rank(?:ing)?|priority|trust|score|selection)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
-        "description": ''
+        "description": 'Detects a poisoned or forged citation source tag or reference badge whose rank or priority is overridden to suppress policy guardrail or validation.'
     },
     {
         "id": 'GLS-RP-340',
-        "name": '(unnamed)',
+        "name": 'Forged Retrieval Addendum Trust Stamp Ranking',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|context|source|citation|document|passage)\\b)(?=.*\\b(?:addendum|appendix|digest|summary|errata|note)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ing)|poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|backfill(?:ed|ing)?)\\b)(?=.*\\b(?:trust\\s+stamp|trusted\\s+source|provenance\\s+badge|credibility\\s+tag|rank\\s+signal)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore|waive|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|ranking)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged retrieval addendum or digest carrying a fake trust stamp or credibility tag used to override ranking or bypass verification policy.'
     },
     {
         "id": 'GLS-RP-327',
-        "name": '(unnamed)',
+        "name": 'Seeded Provenance Badge Fake Rank Elevation',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s+base|context)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:provenance|citation|source\\s+tag|trust\\s+badge|digest)\\b)(?=.*\\b(?:fake|forged|fabricated|stale|spoofed)\\b)(?=.*\\b(?:override|bypass|ignore|elevat(?:e|ed|ion)|re-?rank|promote)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a seeded knowledge base entry with a fake or stale provenance badge used to re-rank or elevate content and bypass safety guardrails.'
     },
     {
         "id": 'GLS-RP-324',
-        "name": '(unnamed)',
+        "name": 'Staged Runbook Signed Digest Rank Promote',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|knowledge\\s+base|context\\s+window|index)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)|staged|fabricat(?:e|ed|ion))\\b)(?=.*\\b(?:runbook|playbook|changelog|appendix|note|document)\\b)(?=.*\\b(?:provenance\\s+stamp|trusted\\s+source\\s+badge|citation\\s+badge|signed\\s+digest|verification\\s+badge)\\b)(?=.*\\b(?:rank|prioritiz(?:e|ed|ing)|promot(?:e|ed|ion)|surface|select)\\b)(?=.*\\b(?:overrid(?:e|es|ing|en|ed)?|bypass(?:ed|es|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|review\\s+gate(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a staged or poisoned runbook or playbook injected into a RAG index with a fake signed digest that promotes its rank and overrides review gates.'
     },
     {
         "id": 'GLS-RP-337',
-        "name": '(unnamed)',
+        "name": 'Retrieved Source Badge Authority Elevation Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retriev(?:ed|al)|source|citation|document|knowledge\\s*base|rag)\\b)(?=.*\\b(?:badge|trusted|verified|authority|rank(?:ed|ing)?|priority)\\b)(?=.*\\b(?:override|ignore|bypass|supersed(?:e|es|ed|ing)|elevat(?:e|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|rule(?:s)?|safety)\\b).*$'],
-        "description": ''
+        "description": 'Detects a retrieved source or citation claiming a fake verified or authority badge to elevate rank and override or supersede safety policy.'
     },
     {
         "id": 'GLS-RP-311',
-        "name": '(unnamed)',
+        "name": 'Seeded Vector Store Provenance Checksum Bypass',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|vector\\s+store|knowledge\\s+base|context\\s+cache|index)\\b)(?=.*\\b(?:seed(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)?|forg(?:ed|ery))\\b)(?=.*\\b(?:trust(?:ed)?|signed|checksum|provenance|citation)\\b)(?=.*\\b(?:override(?:s|n|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation|filter(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a seeded or poisoned vector-store index with a forged trust checksum or citation used to override safety filters, policy approval, or validation.'
     },
     {
         "id": 'GLS-RP-329',
-        "name": '(unnamed)',
+        "name": 'Backfilled RAG Trust Badge Priority Elevate',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:seeded|poisoned|backfilled|injected|tampered)\\b)(?=.*\\b(?:retrieval|rag|index|corpus|knowledge\\s+base|document)\\b)(?=.*\\b(?:trust\\s+badge|provenance\\s+tag|citation\\s+badge|verified\\s+source)\\b)(?=.*\\b(?:override|bypass|ignore|prioritiz(?:e|ed|ing)|elevat(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|rank(?:ing)?|verification|filter(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a backfilled or seeded retrieval corpus entry with a fake trust badge or verified-source label used to prioritize or elevate content and bypass guardrails.'
     },
     {
         "id": 'GLS-RP-317',
-        "name": '(unnamed)',
+        "name": 'Staged RAG Changelog Citation Source Override',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:rag|retrieval|knowledge[-\\s]*base|index|document|changelog|digest|appendix|source[-\\s]*note|provenance[-\\s]*badge|citation)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|forg(?:ed|ery)|tamper(?:ed|ing)?|inject(?:ed|ion)|stag(?:e|ed|ing))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|citation[-\\s]*check|source[-\\s]*validation)\\b).*$'],
-        "description": ''
+        "description": 'Detects a staged or injected changelog or digest in a RAG index used to suppress or override citation validation, policy, or guardrail checks.'
     },
     {
         "id": 'GLS-RP-307',
-        "name": '(unnamed)',
+        "name": 'Retrieved Context Authoritative Tag Guard Supersede',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:retrieved|retrieval|rag|context|document|source|citation)\\b.{0,120}\\b(?:trusted|authoritative|verified|approved|high\\s+confidence|fresh(?:est)?\\s+source)\\b.{0,140}\\b(?:ignore|bypass|override|disregard|supersede|replace)\\b.{0,90}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|verification\\s+gate(?:s)?)\\b'],
-        "description": ''
+        "description": 'Detects a retrieved document or context presenting itself as authoritative or high-confidence to instruct the recipient to supersede policy, guardrails, or verification gates.'
     },
     {
         "id": 'GLS-RP-331',
-        "name": '(unnamed)',
+        "name": 'Poisoned Citation Rank Score Trust Disable',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s*base|context|corpus)\\b)(?=.*\\b(?:poison(?:ed|ing)?|tamper(?:ed|ing)?|seed(?:ed|ing)?|backfill(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:citation|source|reference|provenance|digest)\\b)(?=.*\\b(?:rank(?:ing)?|score|priority|trust\\s*badge|trust)\\b)(?=.*\\b(?:override|bypass|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|filter(?:s)?|boundary|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects a poisoned corpus citation or source whose rank, score, or trust badge is manipulated to override or disable policy boundary or verification filter.'
     },
     {
         "id": 'GLS-RP-334',
-        "name": '(unnamed)',
+        "name": 'Staged Context Authority Score Guardrail Promote',
         "category": 'retrieval_poisoning',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:seeded|staged|poison(?:ed|ing)?|tampered|backfilled|forged)\\b)(?=.*\\b(?:retrieval|rag|context|citation|source|document|index|cache|digest|provenance)\\b)(?=.*\\b(?:trust\\s+badge|rank(?:ing)?|priority|authority\\s+score|confidence\\s+stamp)\\b)(?=.*\\b(?:override|bypass|manipulat(?:e|ed|ion)|elevat(?:e|ed|ion)|promot(?:e|ed|ion)|boost)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check|approval\\s+gate)\\b).*$'],
-        "description": ''
+        "description": 'Detects a staged or seeded retrieval context carrying a fake authority score or confidence stamp used to promote content and bypass guardrail or approval gates.'
     },
     # === end v0.2.32 batch ===
 
     # === v0.2.33 batch (13 patterns: 12 model_routing_confusion + 1 cross_agent_injection) ===
     {
         "id": 'GLS-V03-0492',
-        "name": '(unnamed)',
+        "name": 'Forged SLA Router Health Reroute Policy Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged SLA, health telemetry, or throughput signal submitted to a routing layer to promote or reroute model tier in violation of safety or risk-gate policy.'
     },
     {
         "id": 'GLS-MRC-258',
-        "name": '(unnamed)',
+        "name": 'Forged Routing Quorum Attestation Tier Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|dispatcher|orchestrator|gateway|route\\s+planner)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:manifest|quorum|approval\\s+token|attestation|routing\\s+ticket)\\b)(?=.*\\b(?:tier|trust\\s+tier|risk\\s+tier|priority\\s+lane)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rerout(?:e|ed|ing))\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged quorum or approval token injected into a router or dispatcher to reroute to a higher trust tier while bypassing policy escalation controls.'
     },
     {
         "id": 'GLS-MRC-259',
-        "name": '(unnamed)',
+        "name": 'Forged Latency Budget Router Tier Downgrade Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|model\\s+router|tier\\s+selector|inference\\s+gateway)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:latency|cost|budget|sla|throughput|quota)\\b)(?=.*\\b(?:tier|profile|route|routing|model\\s+tier)\\b)(?=.*\\b(?:downgrad(?:e|ed|es|ing)|rerout(?:e|ed|es|ing)|overrid(?:e|ed|es|ing|en)|overrode|bypass(?:ed|es|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|verification|approval)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged latency, cost, or SLA value used to downgrade or reroute a router tier in violation of guardrail or policy controls.'
     },
     {
         "id": 'GLS-MRC-261',
-        "name": '(unnamed)',
+        "name": 'Forged Rate-Limit Budget Model Tier Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:route|reroute|switch|fallback|downgrade|dispatch|send)\\w*\\b)(?=.*\\b(?:model|llm|tier|router|planner|inference|engine)\\b)(?=.*\\b(?:latency|budget|quota|cost|throughput|token\\s+budget|rate\\s+limit)\\b)(?=.*\\b(?:fake|forged|spoof(?:ed)?|fabricat(?:e|ed)|synthetic|invented)\\b)(?=.*\\b(?:policy|guardrail|approval|safety\\s+check|compliance|risk\\s+gate)\\b)(?=.*\\b(?:bypass|skip|ignore|override|waive|disable)\\w*\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged rate limit, quota, or cost budget used to reroute or fall back to an unconstrained model tier while bypassing safety or compliance gates.'
     },
     {
         "id": 'GLS-MRC-262',
-        "name": '(unnamed)',
+        "name": 'Forged Policy Tag Routing Tier Escalation Promote',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:route|routed|reroute|rerouted|dispatch|dispatched|forward|forwarded|handoff)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|counterfeit)\\b)(?=.*\\b(?:policy\\s+tag|trust\\s+tier|capability\\s+tier|routing\\s+tier|execution\\s+tier)\\b)(?=.*\\b(?:override|overrode|bypass|bypassed|bypassing|escalate|escalated|escalating|escalation|promote|promoted)\\b).+'],
-        "description": ''
+        "description": 'Detects a forged policy tag or trust tier injected into a routing decision to promote or escalate model tier while bypassing approval controls.'
     },
     {
         "id": 'GLS-MRC-263',
-        "name": 'forged_capability_card_tier_route_override',
+        "name": 'Forged Capability Card Tier Route Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|route|dispatch|gateway|queue)\\b)(?=.*\\b(?:tier|priority|profile|capability|policy)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a router, dispatcher, or gateway uses a forged or tampered capability card, tier, or policy profile to override or bypass agent routing controls.'
     },
     {
         "id": 'GLS-MRC-264',
-        "name": 'forged_router_profile_tier_priority_override_gate_bypass',
+        "name": 'Forged Router Profile Tier Priority Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:router|routing|route|dispatcher|profile)\\b)(?=.*\\b(?:tier|priority|rank|lane)\\b)(?=.*\\b(?:override|overrode|overriding|escalate|escalated|escalation|promote|promoted|promotion)\\b)(?=.*\\b(?:gate|policy|guardrail|approval|verification)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit router profile, tier, or priority rank is used to escalate or promote routing priority and then bypass or skip a policy gate or guardrail.'
     },
     {
         "id": 'GLS-MRC-265',
-        "name": '(unnamed)',
+        "name": 'Forged SLA Latency Urgency Router Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:route|routing|reroute|dispatcher|tier|model\\s+selector|fallback)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:sla|latency\\s+budget|p95|timeout|priority|urgency)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects a forged SLA, p95 latency, or urgency signal used to bypass routing guardrails and override model-selection or fallback policy.'
     },
     {
         "id": 'GLS-MRC-266',
-        "name": '(unnamed)',
+        "name": 'Forged Model Card Tier Elevation Approval Skip',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:model\\s*card|router\\s*profile|tier\\s*map|capability\\s*manifest)\\b)(?=.*\\b(?:tier\\s*(?:upgrade|escalation|elevation)|elevat(?:e|ed|ing)\\s+tier|privilege\\s+escalation|scope\\s+upgrade)\\b)(?=.*\\b(?:bypass(?:ed|ing)?\\s+(?:review|guardrails?|policy\\s+checks?)|skip(?:ped|ping)?\\s+verification|route\\s+to\\s+high\\s*privilege|dispatch\\s+without\\s+approval)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged model card or capability manifest whose tier escalation claim is used to dispatch to a high-privilege model while skipping routing verification.'
     },
     {
         "id": 'GLS-MRC-267',
-        "name": '(unnamed)',
+        "name": 'Shadow Model Tier Priority Class Override',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:model|router|routing|route|gateway|selector|dispatcher|policy)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|altered|shadow)\\b)(?=.*\\b(?:tier|priority|profile|class|lane|quota)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|reroute|reroutes|rerouted|execute|executes|executed|allow|allows|allowed|allowing)\\b).+$'],
-        "description": ''
+        "description": 'Detects a forged or shadow model profile, tier, or priority class injected into a router or gateway to reroute or bypass execution policy.'
     },
     {
         "id": 'GLS-MRC-268',
-        "name": '(unnamed)',
+        "name": 'Scorecard-Driven Lightweight Model Admin Reroute',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:router|routing|model|dispatcher|selector|tier)\\b)(?=.*\\b(?:score(?:card)?|confidence|latency|cost|budget)\\b)(?=.*\\b(?:downgrade|fallback|reroute|switch|route)\\b)(?=.*\\b(?:lite|lightweight|cheap|smaller|lower[- ]tier)\\b)(?=.*\\b(?:admin|payment|credential|production|deployment|authorization)\\b)(?=.*\\b(?:override|bypass|ignore|skip|waive)\\b).*'],
-        "description": ''
+        "description": 'Detects a forged scorecard or confidence signal used to downgrade or fallback routing to a lightweight model for admin, payment, or credential tasks while bypassing controls.'
     },
     {
         "id": 'GLS-MRC-458',
-        "name": '(unnamed)',
+        "name": 'Cheap Model Fallback Admin Policy Gate Bypass',
         "category": 'model_routing_confusion',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*\\b(?:model|router|routing|tier|lane|profile)\\b)(?=.*\\b(?:downgrade|downgraded|downgrading|fallback|fallbacks|cheap|lightweight|mini)\\b)(?=.*\\b(?:admin|production|payment|credential|secret|deployment|policy\\s+gate)\\b)(?=.*\\b(?:ignore|bypass|override|overriding|skip|waive)\\b).*$'],
-        "description": ''
+        "description": 'Detects a routing manipulation that downgrades or falls back to a cheap or mini model for admin, production, or credential workloads while ignoring policy gates.'
     },
     {
         "id": 'GLS-CAI-320',
-        "name": '(unnamed)',
+        "name": 'Agent Forged Attestation Tool Execution Privilege Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|peer|remote)\\b)(?=.*\\b(?:forg(?:ed|ery)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:attestation|receipt|approval|token|ticket|manifest)\\b)(?=.*\\b(?:tool|command|execution|run|action)\\b)(?=.*\\b(?:scope|privilege|authorization|permission)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|escalat(?:e|ed|ing)|ignore(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
-        "description": ''
+        "description": 'Detects a peer or remote agent presenting a forged attestation, receipt, or ticket to authorize a tool or command execution while bypassing scope or privilege controls.'
     },
     # === end v0.2.33 batch ===
     {
         "id": 'GLS-TS-257',
-        "name": 'hidden_yaml_policy_profile_override',
+        "name": 'Hidden YAML Policy Profile Override',
         "category": 'token_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:hidden|front\\s*matter|frontmatter|yaml|meta(?:data)?|comment(?:\\s*block)?|system\\s*note|annotation)\\b)(?=.*\\b(?:policy|safety|guardrail(?:s)?|profile|rule(?:s)?|instruction(?:s)?)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|waive|waived|disable|disabled|skip|skipped)\\b).+$'],
-        "description": ''
+        "description": 'Detects text in which hidden YAML front matter, metadata, or comment blocks are used to embed a policy, safety profile, or guardrail override or bypass directive.'
     },
     {
         "id": 'GLS-IU-532',
-        "name": 'zero_width_split_override_guardrail_bypass',
+        "name": 'Zero-Width Split Override Guardrail Bypass',
         "category": 'invisible_unicode',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disregard|supersed(?:e|es|ed|ing)))(?=.*(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?|instruction(?:s)?))(?=.*(?:zero[\\s-]*width|zwj|zwnj|invisible\\s+unicode|u\\+200b|u\\+200c|u\\+200d)).{0,900}$'],
-        "description": ''
+        "description": "Detects text in which zero-width Unicode characters (ZWSP, ZWNJ, ZWJ, BOM) are inserted inside words like 'ignore', 'override', or 'bypass' to split the token and evade policy or guardrail detection."
     },
     {
         "id": 'GLS-IU-533',
-        "name": 'zero_width_split_override_chain',
+        "name": 'Zero-Width Split Instruction Override Chain',
         "category": 'invisible_unicode',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?=.*(?:\\u200b|\\u200c|\\u200d|\\ufeff|&#8203;|&#8204;|&#8205;|&#xfeff;|\\\\u200[bcd]|\\\\ufeff))(?=.*(?:\\bi[\\u200b\\u200c\\u200d\\ufeff]*gnore(?:d|ing)?\\b|\\boverri[\\u200b\\u200c\\u200d\\ufeff]*de(?:s|d|ing)?\\b|\\boverrid(?:e|es|ing|den)\\b|\\bbypass(?:ed|ing)?\\b|\\bdisregard(?:ed|ing|s)?\\b))(?=.*\\b(?:previous|prior|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\\b).{0,600}'],
-        "description": ''
+        "description": "Detects text containing zero-width Unicode characters (U+200B, U+200C, U+200D, U+FEFF) used to split override or bypass directive keywords such as 'ignore', 'override', or 'bypass' targeting previous system or safety instructions."
     },
     {
         "id": 'GLS-CS-576',
-        "name": 'multilingual_connector_override_guardrail_bypass',
+        "name": 'Multilingual Connector Guardrail Bypass',
         "category": 'code_switching',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:ignore|ignored|ignoring|disregard(?:ed|ing|s)?|override(?:d|ing|s)?|bypass(?:ed|ing|es)?|skip(?:ped|ping|s)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|instruction(?:s)?|rule(?:s)?|approval\\s+gate(?:s)?|verification)\\b)(?=.*(?:\\b(?:pero|mais|cependant|aber|sin\\s+embargo|maintenant|ahora)\\b|忽略|無視|跳过|繞過|绕过|обойти|игнорируй|تجاهل|تجاوز|لكن|しかし)).+'],
-        "description": ''
+        "description": 'Detects text combining English override or bypass directives against a policy or guardrail with multilingual connector words or non-Latin script bypass synonyms in languages including Spanish, French, German, Chinese, Russian, Arabic, and Japanese.'
     },
     {
         "id": 'GLS-CS-577',
-        "name": 'multilingual_override_guardrail_bypass',
+        "name": 'Multilingual Override Instruction Bypass',
         "category": 'code_switching',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?:\\b(?:ignora|omite|desobedece|ignorer|contourner|ignoriere|umgehe|игнорируй|تجاهل)\\b|忽略|無視).{0,90}\\b(?:instructions?|instrucciones?|reglas?|policy|pol[ií]tica|guardrails?)\\b'],
-        "description": ''
+        "description": "Detects short text segments containing a multilingual word meaning 'ignore' or 'bypass' (in Spanish, French, German, Russian, or Arabic) or a CJK equivalent character followed closely by a reference to instructions, policy, or guardrails."
     },
     {
         "id": 'GLS-PI-022',
-        "name": 'hidden_footer_instruction_execution_scope_override',
+        "name": 'Hidden Footer Instruction Scope Override',
         "category": 'parasitic_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:footer|html\\s+comment|metadata|hidden\\s+note|annotation|invisible\\s+block)\\b)(?=.*\\b(?:instruction|directive|command|runbook|playbook)\\b)(?=.*\\b(?:execute|run|trigger|invoke|perform)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*'],
-        "description": ''
+        "description": 'Detects text in which a hidden footer, HTML comment, metadata block, or invisible annotation embeds an instruction or directive that invokes execution while bypassing or overriding policy, guardrail, or approval controls.'
     },
     {
         "id": 'GLS-TS-258',
-        "name": 'hidden_debug_payload_policy_waiver',
+        "name": 'Hidden Debug Payload Policy Waiver',
         "category": 'token_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:hidden|invisible|base64|frontmatter|metadata|comment)\\b)(?=.*\\b(?:debug payload|diagnostic payload|maintenance command|backdoor instruction|secret directive)\\b)(?=.*\\b(?:policy waiver|bypass policy|ignore guardrail|override safety|skip approval)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a hidden, invisible, base64-encoded, or frontmatter-embedded debug payload or backdoor instruction is paired with an explicit policy waiver, guardrail bypass, or safety override phrase.'
     },
     {
         "id": 'GLS-RTL-004',
-        "name": 'bidi_masked_override_directive',
+        "name": 'Bidi Masked Override Directive',
         "category": 'rtl_obfuscation',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*(?:\\u202E|\\u202D|\\u202A|\\u2066|\\u2067|\\u2068|\\u2069|U\\+[0-9A-Fa-f]{4}|right-to-left\\s+override|bidi|\\brtl\\b|rtl\\s*mark))(?=.*\\b(?:hidden|mask(?:ed|ing)?|obfuscat(?:e|ed|ing|ion)|reorder(?:ed|ing)?|visual(?:ly)?)\\b)(?=.*\\b(?:ignor(?:e|es|ing)|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*'],
-        "description": ''
+        "description": "Detects text containing Unicode bidirectional control characters (RLO, LRO, RLM, PDF, isolates) used to visually mask or reorder content so that an 'ignore', 'bypass', or 'override' directive targeting policy or guardrails is hidden from human review."
     },
     {
         "id": 'GLS-PX-568',
-        "name": 'system_prompt_recovery_override',
+        "name": 'System Prompt Recovery Override',
         "category": 'prompt_extraction',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)(?:\\b(?:reveal|show|print|dump|expose|leak|output|return|display)\\b.{0,90}\\b(?:system\\s*prompt|hidden\\s*(?:prompt|instructions?)|developer\\s*(?:message|instructions?)|internal\\s*(?:policy|rules?))\\b|\\b(?:tell\\s+me|what\\s+is|recite|quote)\\b.{0,90}\\b(?:your|the)\\b.{0,40}\\b(?:system\\s*prompt|hidden\\s*instructions?|developer\\s*instructions?|internal\\s*policy)\\b)'],
-        "description": ''
+        "description": 'Detects text requesting that an agent reveal, dump, print, or recite its system prompt, hidden instructions, developer message, or internal policy rules.'
     },
     {
         "id": 'GLS-PI-023',
-        "name": 'hidden_annotation_payload_policy_override',
+        "name": 'Hidden Annotation Payload Guardrail Override',
         "category": 'parasitic_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:hidden|embedded|invisible|stealth|annotation|footnote|comment|metadata)\\b)(?=.*\\b(?:instruction|prompt|directive|payload)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|safety|rule(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a hidden, embedded, or stealth annotation, footnote, or metadata payload contains an instruction or prompt directing the model to ignore, bypass, or override a policy or guardrail.'
     },
     # === end v0.2.34 batch (10 patterns) ===
     {
         "id": 'GLS-CAIPI-001',
-        "name": 'gls_caipi_001',
+        "name": 'Agent Identity Ticket Privilege Escalation Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s+agent|delegate|worker|planner)\\b)(?=.*\\b(?:identity\\s+claim|identity|credential|attestation|issuer)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|counterfeit|faked?)\\b)(?=.*\\b(?:ticket|session\\s+ticket|approval\\s+token|handoff\\s+token|delegate\\s+pass)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|elevat(?:e|ed|ion|ing)|admin\\s+scope|privilege)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|waive(?:d|s)?|skip(?:ped|s|ping)?)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which an agent or delegate presents a forged or spoofed identity credential, session ticket, or approval token with an escalated or elevated privilege scope to bypass or waive policy and guardrail verification.'
     },
     {
         "id": 'GLS-CAIPA-001',
-        "name": 'gls_caipa_001',
+        "name": 'Peer Agent Capability Ticket Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|remote\\s+agent|delegate|worker|agent)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability\\s+ticket|delegation\\s+ticket|handoff\\s+token|attestation|authorization\\s+tag)\\b)(?=.*\\b(?:scope|permission|privilege|role|authorization)\\b)(?=.*\\b(?:guardrail|policy|safety\\s+gate|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override|overrides|overriding|overrode|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which a peer or remote agent uses a forged or counterfeit capability ticket, delegation ticket, or attestation to claim elevated scope or permission and then bypass or override a policy safety gate or execution gate.'
     },
     {
         "id": 'GLS-CAIPH-001',
-        "name": 'gls_caiph_001',
+        "name": 'Revoked Agent Token Handoff Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:revoked|expired|stale|invalid|forged|spoofed|fabricated)\\b)(?=.*\\b(?:token|ticket|capability|credential|attestation)\\b)(?=.*\\b(?:handoff|delegate|approval|authorization|policy|guardrail)\\b)(?=.*\\b(?:override|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|escalat(?:e|ed|ion)|rebind)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which an agent or delegate presents a revoked, expired, stale, or forged token, ticket, or capability during a handoff or approval step in order to override, bypass, or escalate past policy and guardrail controls.'
     },
     {
         "id": 'GLS-CAIDC-001',
-        "name": 'gls_caidc_001',
+        "name": 'Delegate Nonce Forgery Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegation|handoff|peer\\s+agent|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|approval\\s+token|signoff)\\b)(?=.*\\b(?:scope|permission|privilege|authority)\\b)(?=.*\\b(?:override|bypass|ignore|rebind)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit nonce, attestation, or approval token is used during a delegation or handoff to override, bypass, or rebind scope, permission, or authority.'
     },
     {
         "id": 'GLS-CAIDP-001',
-        "name": 'gls_caidp_001',
+        "name": 'Agent Policy Patch Ticket Authority Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent)\\b)(?=.*\\b(?:patch|hotfix|override\\s+patch|instruction\\s+patch|policy\\s+patch)\\b)(?=.*\\b(?:signed\\s+by|claimed\\s+as|asserted\\s+by|from)\\s+(?:delegate|planner|peer\\s+agent|security\\s+lead)\\b)(?=.*\\b(?:ticket|change\\s+ticket|incident\\s+ticket|approval\\s+token)\\b)(?=.*\\b(?:priority|authority|precedence|admin\\s+scope|elevated\\s+scope)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|skip(?:ped|s|ping)?|waive(?:d|s)?)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which an agent or planner presents a patch, hotfix, or policy patch claimed to be signed by a delegate, planner, or security lead with an approval ticket and elevated authority to bypass or waive policy and guardrail verification.'
     },
     {
         "id": 'GLS-CAI-690',
-        "name": 'gls_cai_690',
+        "name": 'Delegation Attestation Lease Policy Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a delegation, agent-to-agent handoff, or broker interaction presents an attestation, ticket, or capability manifest that bypasses, overrides, or supersedes policy, guardrail, or authorization controls.'
     },
     {
         "id": 'GLS-CAI-691',
-        "name": 'gls_cai_691',
+        "name": 'Forged Nonce Stale Token Scope Replay',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which an agent or handoff presents a forged or spoofed nonce, attestation, or session token for replay or reuse to override, bypass, or ignore policy, guardrail, or trust-boundary controls.'
     },
     {
         "id": 'GLS-CAI-692',
-        "name": 'gls_cai_692',
+        "name": 'Agent Receipt Scope Rebind Privilege Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+'],
-        "description": ''
+        "description": 'Detects text in which an agent or delegate forges, fabricates, or asserts a receipt, ticket, attestation, or capability to rebind scope or privilege and then escalate, override, or bypass policy and guardrail controls.'
     },
     {
         "id": 'GLS-CAI-693',
-        "name": 'gls_cai_693',
+        "name": 'Forged Manifest Signature Authorize Tool Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which an agent or remote agent uses a forged or tampered manifest, signature, or attestation to authorize or unlock execution while bypassing or circumventing policy, guardrail, or approval verification.'
     },
     {
         "id": 'GLS-CAI-694',
-        "name": 'gls_cai_694',
+        "name": 'Handoff Capability Scope Permission Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or counterfeit handoff receipt, capability token, or delegation approval is used to claim elevated scope or permission and then bypass, override, or escalate past guardrails or safety checks.'
     },
     {
         "id": 'GLS-CAI-695',
-        "name": 'gls_cai_695',
+        "name": 'Agent Ticket Forge Verification Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$'],
-        "description": ''
+        "description": 'Detects text in which an agent or worker forges, fakes, or counterfeits a ticket, token, credential, or capability pass and then skips, bypasses, or disables the corresponding verification, validation, or policy guardrail check.'
     },
     {
         "id": 'GLS-CAI-697',
-        "name": 'gls_cai_697',
+        "name": 'Handoff Manifest Authority Rebinding Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
-        "description": ''
+        "description": 'Detects text in which a forged or shadow handoff manifest, delegation note, or authority memo is used to rebind scope or authority and then bypass verification gates, skip delegate approval, or override transfer guardrails.'
     },
     {
         "id": 'GLS-CAI-698',
-        "name": 'gls_cai_698',
+        "name": 'Delegate Handoff Receipt Scope Role Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged or spoofed delegate, delegation, or agent handoff receipt, ticket, attestation, or approval chain carries elevated scope, role, or privilege claims used to override, bypass, or escalate past guardrail controls.'
     },
     {
         "id": 'GLS-CAI-699',
-        "name": 'gls_cai_699',
+        "name": 'Forged Agent Badge Nonce Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
-        "description": ''
+        "description": 'Detects text in which an agent, broker, or orchestrator forges or fabricates a ticket, quorum badge, or scope nonce to bypass, override, escalate, or rebind past authorization controls.'
     },
     {
         "id": 'GLS-CAI-701',
-        "name": 'gls_cai_701',
+        "name": 'Quorum Vote Tally Forgery Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
-        "description": ''
+        "description": 'Detects text in which an agent or orchestrator forges or tampers with a quorum count, vote tally, or approval consensus and then uses it to override, bypass, or skip policy, guardrail, or approval-gate controls.'
     },
     {
         "id": 'GLS-CAI-702',
-        "name": 'gls_cai_702',
+        "name": 'Agent Impersonation Stolen Ticket Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a peer agent, delegate, or handoff participant spoofs, impersonates, or uses a stolen ticket or fake approval to bypass, override, skip, or escalate trust controls.'
     },
     {
         "id": 'GLS-CAI-703',
-        "name": 'gls_cai_703',
+        "name": 'Peer Agent Scope Tag Replay Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a peer, upstream, or delegated agent forges, tampers with, or replays a handoff ticket, transfer scope tag, or authorization tag to override, bypass, or disable policy, guardrail, or approval verification.'
     },
     {
         "id": 'GLS-CAI-704',
-        "name": 'gls_cai_704',
+        "name": 'Agent Nonce Token Replay Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which an agent or peer agent forges, replays, or tampers with a nonce, token, ticket, or approval receipt to override, bypass, or escalate past policy, guardrail, authorization, or approval-check controls.'
     },
     {
         "id": 'GLS-SESNP-001',
-        "name": 'gls_sesnp_001',
+        "name": 'Docker Socket Host Namespace Privileged Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*(?:docker\\.sock|/var/run/docker\\.sock|container\\s+socket|daemon\\s+socket))(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|host\\s+path(?:s)?|mount\\s+host\\s+path))(?=.*(?:--privileged|privileged|cap_sys_admin))(?=.*(?:bypass|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing)|override|overrid(?:es|ing|en|ed)|disable|disable(?:d|s|ing)?|skip|skip(?:ped|s|ping)?))(?=.*(?:policy|guardrail(?:s)?|approval\\s*gate(?:s)?|safety\\s*check(?:s)?)).*$'],
-        "description": ''
+        "description": 'Detects text in which the Docker socket or container socket, host namespace paths such as /proc/ or nsenter, and privileged container flags such as --privileged or CAP_SYS_ADMIN are all combined with explicit bypass or override language targeting policy or guardrail controls.'
     },
     {
         "id": 'GLS-SENMR-001',
-        "name": 'gls_senmr_001',
+        "name": 'Container Namespace Remount Sandbox Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|jail(?:ed)?)\\b)(?=.*\\b(?:namespace|mount|chroot|procfs|cgroup|pivot_root)\\b)(?=.*\\b(?:remount|bind[- ]?mount|pivot_root|escape|break(?:\\s*out|out)?|host)\\b)(?=.*\\b(?:bypass|override|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail|isolation|restriction|boundary)\\b).*'],
-        "description": ''
+        "description": 'Detects text in which sandbox, container, or jailed environment terminology is combined with namespace remounting, bind-mount, chroot, or pivot_root operations described as escaping or breaking out of isolation to bypass or override policy and guardrail restrictions.'
     },
     {
         "id": 'GLS-CAIDN-001',
-        "name": 'gls_caidn_001',
+        "name": 'Agent Nonce Trust Channel Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|coordinator|assistant)\\b)(?=.*\\b(?:nonce|token|session|attestation|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|rebind(?:ing|ed)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:scope|authority|trust(?:ed)?\\s+channel|source\\s+of\\s+truth|trust\\s+anchor)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which an agent or delegate forges, spoofs, or replays a nonce, token, session, or attestation to rebind scope or trust-anchor authority and then override, bypass, or disregard policy or safety rules.'
     },
     {
         "id": 'GLS-SEPNP-001',
-        "name": 'gls_sepnp_001',
+        "name": 'Procfs Namespace Sandbox Policy Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|drop|escape)\\b)(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|isolation)\\b)(?=.*(?:\\bprocfs\\b|/proc/|\\bnsenter\\b|\\bsetns\\b|\\bpid\\s*namespace\\b|\\bmount\\s*namespace\\b|\\bcgroup\\b))(?=.*\\b(?:escape|bypass|override|disable|drop)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|restriction(?:s)?|safety\\s*check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which a sandboxed or containerized environment uses procfs, nsenter, setns, pid namespace, or mount namespace operations to escape or bypass guardrail, policy, restriction, or safety-check controls.'
     },
     {
         "id": 'GLS-SESNP-002',
-        "name": 'gls_sesnp_002',
+        "name": 'Docker Socket Bind Mount Privilege Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*(?:\\bdocker\\.sock\\b|\\bdocker\\s*sock\\b|/var/run/docker\\.sock|\\bsocket\\b))(?=.*(?:\\bhost\\s+namespace\\b|\\bhost\\s+path(?:s)?\\b|/proc/|\\bnsenter\\b|\\bsetns\\b))(?=.*(?:\\bmount\\b|\\bbind\\s*mount\\b|\\bprivileged\\b|\\bcap_sys_admin\\b|\\bescape\\b|\\bbreak\\s*out\\b|\\bexecute\\b))(?=.*(?:\\bignore\\b|\\bbypass\\b|\\boverride\\b|\\bskip\\b|\\bdisable\\b))(?=.*(?:\\bpolicy\\b|\\bguardrail(?:s)?\\b|\\bsafety\\s+check(?:s)?\\b|\\bapproval\\s+gate(?:s)?\\b)).*$'],
-        "description": ''
+        "description": 'Detects text in which the Docker socket path, host namespace or host path references, and privileged mount or escape operations are all present alongside explicit ignore, bypass, override, or skip language targeting policy or guardrail controls.'
     },
     {
         "id": 'GLS-SEHNS-001',
-        "name": 'gls_sehns_001',
+        "name": 'Host Namespace Policy Guardrail Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\b.{0,24}\\b(?:ignore|bypass|override|skip)\\b)(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|escape|break\\s*out|privileged|cap_sys_admin|mount\\s+host\\s+path|docker\\.sock|/var/run/docker\\.sock|socket\\b))(?=.*(?:ignore|bypass|override|skip))(?=.*(?:policy|guardrail(?:s)?|safety|approval\\s*check(?:s)?)).*$'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which host namespace, /proc/, nsenter, setns, privileged flags, docker.sock, or host path escape indicators appear alongside ignore, bypass, override, or skip language targeting policy, guardrail, or safety approval checks.'
     },
     {
         "id": 'GLS-SEDSP-001',
-        "name": 'gls_sedsp_001',
+        "name": 'Docker Privileged Container Sandbox Restriction Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:mount|bind|expose|connect|map|attach|use|run|launch)\\b)(?=.*\\b(?:docker(?:\\.sock|\\s*sock)|/var/run/docker\\.sock|--privileged|privileged\\s+container|host\\s+pid|nsenter|chroot|escape\\s+the\\s+sandbox|break\\s+out\\s+of\\s+sandbox)\\b)(?=.*\\b(?:ignore|ignor(?:e|ed|es|ing)|bypass|bypass(?:ed|es|ing)?|override|overrid(?:e|es|ing|en|ed)|disable|disabled|disabling|skip|skip(?:ped|ping|s)?|disregard|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|sandbox\\s+restriction(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which docker.sock, --privileged containers, nsenter, chroot, or sandbox-escape language is combined with mount, bind, or connect operations that are explicitly described as ignoring, bypassing, or disabling policy, guardrail, or sandbox restrictions.'
     },
     {
         "id": 'GLS-SESSP-001',
-        "name": 'gls_sessp_001',
+        "name": 'Containerd Socket Runtime Isolation Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:docker\\.sock|/var/run/docker\\.sock|containerd|kubelet|runc)\\b)(?=.*\\b(?:mount|bind|map|expose|proxy|forward|attach|reuse)\\w*\\b)(?=.*\\b(?:host|root|privileged?|namespace|runtime)\\b)(?=.*\\b(?:bypass|disable|ignore|override|skip)\\w*\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|sandbox(?:ed)?|restriction(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which docker.sock, containerd, kubelet, or runc runtime socket paths are combined with mount, bind, proxy, or attach operations on host or privileged namespaces described as bypassing, disabling, or ignoring policy, guardrail, or sandbox isolation.'
     },
     {
         "id": 'GLS-SECSM-001',
-        "name": 'gls_secsm_001',
+        "name": 'Docker Socket Mount Host Namespace Escalation',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:mount|bind|attach|expose|map|publish)\\b)(?=.*\\b(?:docker\\s*sock(?:et)?|docker\\.sock|/var/run/docker\\.sock|container\\s*socket|host\\s*socket)\\b)(?=.*\\b(?:host\\s*namespace|pid\\s*namespace|mount\\s*namespace|nsenter|--privileged|privileged|cap_sys_admin)\\b)(?=.*\\b(?:escape|break\\s*out|bypass|override|disable|ignore|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:sandbox|isolation|boundar(?:y|ies)|guardrail|policy|restriction(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which docker.sock or container socket paths are mounted or attached into a host namespace, PID namespace, or privileged context alongside escalation, breakout, or escape language that bypasses sandbox isolation or guardrail restrictions.'
     },
     {
         "id": 'GLS-CAICR-001',
-        "name": 'gls_caicr_001',
+        "name": 'Attestation Trust Channel Scope Rebind Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(attestation|nonce|token|session|capability)\\b)(?=.*\\b(forge|forged|spoof|spoofed|tamper(?:ed)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(scope|authority|trust\\s*anchor|trusted\\s*channel)\\b)(?=.*\\b(rebind|escalat(?:e|ed|ing|ion)|override|bypass|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(policy|guardrail(?:s)?|approval\\s*check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a forged, spoofed, or tampered attestation, nonce, token, or capability is used to rebind scope or escalate trust-anchor authority in order to override, bypass, or supersede policy or guardrail approval checks.'
     },
     {
         "id": 'GLS-SECNS-001',
-        "name": 'gls_secns_001',
+        "name": 'Container Namespace Pivot Sandbox Restriction Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|sidecar|runtime)\\b)(?=.*\\b(?:mount|bind\\s*mount|chroot|pivot_root|nsenter|procfs|/proc/|/var/run/docker\\.sock|docker\\.sock|docker\\s*sock)\\b)(?=.*\\b(?:privilege(?:d)?|cap_sys_admin|--privileged|hostpid|hostnetwork|breakout|break\\s*out|escape|isolation)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|restriction(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which container, sandbox, or namespace terminology is combined with mount, bind-mount, chroot, pivot_root, nsenter, procfs, or docker.sock operations alongside privileged, CAP_SYS_ADMIN, breakout, or escape indicators that bypass or disable policy, guardrail, or restriction controls.'
     },
     {
         "id": 'GLS-SBX-887',
-        "name": 'gls_sbx_887',
+        "name": 'Container Namespace Jump Docker Socket Escape',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a container, sandbox, or jail escape or breakout via namespace switching, nsenter, docker.sock, or setns is described as ignoring, bypassing, overriding, or disabling policy, guardrail, isolation boundary, or approval-check controls.'
     },
     {
         "id": 'GLS-SEHNM-001',
-        "name": 'gls_sehnm_001',
+        "name": 'Sandbox Break Host Namespace Restriction Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:escape|break(?:\\s+out)?|pivot)\\b)(?=.*\\b(?:sandbox(?:ed)?|container|runtime|isolation)\\b)(?=.*\\b(?:host\\s+namespace|mount\\s+namespace|setns|nsenter|/proc/|/var/run/docker\\.sock|docker\\.sock)\\b)(?=.*\\b(?:disable|bypass|ignore|override|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|restriction(?:s)?|check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which an escape, breakout, or pivot from a sandbox, container, or runtime environment leverages host namespace, mount namespace, nsenter, /proc/, or docker.sock and is described as disabling, bypassing, ignoring, or overriding policy, guardrail, or restriction checks.'
     },
     {
         "id": 'GLS-CAIDT-001',
-        "name": 'gls_caidt_001',
+        "name": 'Agent Trusted Ticket Summary Policy Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:ticket|handoff|summary|note|report)\\b)(?=.*\\b(?:trusted|authoritative|source\\s+of\\s+truth)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which an agent, delegate, or worker presents a ticket, handoff summary, or report that is asserted to be a trusted or authoritative source of truth in order to override, bypass, or ignore policy or guardrail safety checks.'
     },
     {
         "id": 'GLS-SENSP-001',
-        "name": 'gls_sensp_001',
+        "name": 'Sandbox Bind Mount Namespace Isolation Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|chroot)\\b)(?=.*\\b(?:mount|bind\\s*mount|nsenter|setns|pivot_root|pivot|rebind|escape|breakout|host\\s+namespace|host\\s+path(?:s)?)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundary|restriction(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text in which a container, sandbox, namespace, cgroup, or chroot environment uses mount, bind-mount, nsenter, setns, pivot_root, or breakout techniques to escape isolation boundaries and bypass, override, or disable policy, guardrail, or restriction controls.'
     },
     {
         "id": 'GLS-SESNR-001',
-        "name": 'gls_sesnr_001',
+        "name": 'Docker Socket Privileged Namespace Override Bypass',
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)\\b)(?=.*\\b(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
-        "description": ''
+        "description": 'Detects text — excluding negated forms — in which docker.sock or socket paths, host namespace or /proc/ references, and privileged flags such as --privileged, CAP_SYS_ADMIN, or namespace rebind are combined with override, bypass, ignore, or disregard language targeting policy, guardrail, or safety approval checks.'
     },
     # === v0.2.36 batch (15 patterns) — Pipeline Trust Signal Corruption ===
     {
@@ -9352,62 +9352,62 @@ PATTERNS = [
     # === v0.2.37 batch (11 patterns) ===
     {
         "id": "GLS-TOP-627",
-        "name": "GLS-TOP-627",
+        "name": 'Build Artifact Attestation Seal Sanitizer Bypass',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
             r"""(?is)\b(?:stdout|log|trace|artifact|build\s+output|ci(?:/cd)?\s+output)\b.{0,140}\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\b.{0,160}\b(?:signature|attestation|checksum|verification\s+stamp|audit\s+seal)\b.{0,160}\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\b.{0,140}\b(?:guardrail(?:s)?|policy(?:\s+check)?|sanitizer|validation(?:\s+gate)?)\b""",
         ],
-        "description": ""
+        "description": 'Detects text in which stdout logs, build output, or CI/CD artifacts are described as forged or tampered with a fake signature, attestation, or checksum that bypasses, overrides, or disables guardrail, policy, sanitizer, or validation-gate controls.'
     },
     {
         "id": "GLS-TOP-628",
-        "name": "GLS-TOP-628",
+        "name": 'Forged Audit Receipt Channel Redirect Override',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
             r"""(?is)^(?=.*\b(?:tool|plugin|connector|pipeline|adapter)\b)(?=.*\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\b)(?=.*\b(?:audit\s+receipt|execution\s+receipt|trace|checksum|provenance)\b)(?=.*\b(?:channel|route|dispatch|handoff|redirect|redirected|redirects|redirecting)\b)(?=.*\b(?:override|overrides|overrode|overridden|overriding|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing))\b)(?=.*\b(?:guardrail(?:s)?|policy|verification|review)\b).*""",
         ],
-        "description": ""
+        "description": 'Detects text in which forged or fabricated tool, plugin, or pipeline audit receipts, execution traces, or checksums are redirected or dispatched through a channel or handoff in order to override, bypass, or ignore guardrail, policy, or verification review controls.'
     },
     {
         "id": "GLS-TOP-629",
-        "name": "GLS-TOP-629",
+        "name": 'Forged Quorum Receipt Safety Policy Bypass',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
             r"""(?is)^(?=.*\b(?:quorum|consensus|approval)\s+(?:receipt|record|token|attestation)\b)(?=.*\b(?:forged|fake|spoof(?:ed|ing)?|fabricated)\b)(?=.*\b(?:ignore|bypass|override|disregard|replace)\b)(?=.*\b(?:policy|guardrail(?:s)?|safety|verification)\b).*$""",
         ],
-        "description": ""
+        "description": 'Detects text in which a forged or fake quorum receipt, consensus record, or approval token is used to ignore, bypass, or override safety policy or guardrail verification controls.'
     },
     {
         "id": "GLS-TOP-630",
-        "name": "forged_confidence_trace_queue_redirect_execution_guardrail_bypass",
+        "name": 'Confidence Trace Redirect Queue Execution Bypass',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
             r"""(?is)^(?=.*\b(?:forged|fake|spoofed|tampered|fabricated)\b)(?=.*\b(?:confidence\s+trace|telemetry\s+receipt|audit\s+output|verification\s+log|model\s+report)\b)(?=.*\b(?:redirect|redirected|redirects|reroute|rerouted|rerouting|rewire|rewired|rewiring|switch(?:ed|es|ing)?\s+queue(?:\s+routing)?|switch(?:ed|es|ing)?\s+(?:routing|channel|path))\b)(?=.*\b(?:execute|executed|executing|run|ran|launch|launched|deployment|action|actions)\b)(?=.*\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\b).*$""",
         ],
-        "description": ""
+        "description": 'Detects text in which a forged confidence trace, telemetry receipt, audit output, or verification log is used to redirect, reroute, or rewire an execution queue or channel in order to bypass, override, or disable policy or safety guardrails.'
     },
     {
         "id": "GLS-OP-002",
-        "name": "GLS-OP-002",
+        "name": 'Tool Output Trusted Channel Instruction Override',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
             r"""(?is)(?:\b(?:because|since)\b.{0,40}\b(?:tool|search|browser|retrieval|plugin|api)\s+output\b.{0,60}\b(?:trusted|authoritative|verified|reliable)\b|\b(?:treat|consider|use)\b.{0,40}\b(?:tool|search|browser|retrieval|plugin|api)\s+output\b.{0,40}\b(?:as\s+)?(?:trusted|authoritative|higher\s+priority|source\s+of\s+truth)\b).{0,160}\b(?:ignore|override|bypass|replace|discard)\b.{0,80}\b(?:previous|prior|earlier)?\s*(?:instruction(?:s)?|polic(?:y|ies)|guardrail(?:s)?|safety\s+rule(?:s)?)\b""",
         ],
-        "description": ""
+        "description": 'Detects text that instructs an agent to treat tool, search, browser, retrieval, or API output as trusted, authoritative, or a higher-priority source of truth and then use that framing to override, bypass, or discard previous instructions, policies, or guardrails.'
     },
     {
         "id": "GLS-TOP-621",
-        "name": "GLS-TOP-621",
+        "name": 'Confidence Tag Spoofing Contradiction Suppression',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -9432,7 +9432,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-622",
-        "name": "GLS-TOP-622",
+        "name": 'Postprocessor Safety Inversion Guardrail Removal',
         "category": "tool_output_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -9457,7 +9457,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-623",
-        "name": "GLS-TOP-623",
+        "name": 'Forged Tool Result Block Channel Spoofing',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -9482,7 +9482,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-624",
-        "name": "GLS-TOP-624",
+        "name": 'First Row Injection Stale Snapshot Override',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -9507,7 +9507,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-625",
-        "name": "GLS-TOP-625",
+        "name": 'Redacted Placeholder Treated As Canonical Value',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -9532,7 +9532,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-626",
-        "name": "GLS-TOP-626",
+        "name": 'Stale Tool Output Provenance Identity Swap',
         "category": "tool_output_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -9558,7 +9558,7 @@ PATTERNS = [
     # === v0.2.38 batch (12 patterns) ===
     {
         "id": "GLS-AW-031",
-        "name": "GLS-AW-031",
+        "name": 'Permissive Model Fallback Routing Override',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -9583,7 +9583,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-032",
-        "name": "GLS-AW-032",
+        "name": 'SSE Delimiter Frame Forgery Injection',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -9608,7 +9608,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-033",
-        "name": "GLS-AW-033",
+        "name": 'Build Artifact Timestamp Backdating Freshness Spoof',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["file", "tool_output", "log_memory"],
@@ -9633,7 +9633,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-034",
-        "name": "GLS-AW-034",
+        "name": 'Append-Only Status Log Entry Forgery',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["file", "log_memory", "message"],
@@ -9658,7 +9658,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-035",
-        "name": "GLS-AW-035",
+        "name": 'Heartbeat Liveness Signal Forgery',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "tool_output", "api_response", "log_memory"],
@@ -9683,7 +9683,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-036",
-        "name": "GLS-AW-036",
+        "name": 'Justification Channel Hijack Decision Divergence',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -9708,7 +9708,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-037",
-        "name": "GLS-AW-037",
+        "name": 'Validator Consensus Herding Lockstep Coercion',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -9733,7 +9733,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-038",
-        "name": "GLS-AW-038",
+        "name": 'Summarization Counter-Evidence Eviction',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -9758,7 +9758,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-039",
-        "name": "GLS-AW-039",
+        "name": 'Severity Downcast Critical To Low Relabeling',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -9783,7 +9783,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-040",
-        "name": "GLS-AW-040",
+        "name": 'Postrun Verifier Stale Output Freshness Bypass',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["file", "tool_output", "log_memory"],
@@ -9808,7 +9808,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-041",
-        "name": "GLS-AW-041",
+        "name": 'Score Normalization Bucket Boundary Poisoning',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["file", "tool_output", "api_response"],
@@ -9833,7 +9833,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-042",
-        "name": "GLS-AW-042",
+        "name": 'Cron Trigger Desync Approval Scope Drift',
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["file", "log_memory", "tool_output"],
@@ -10132,7 +10132,7 @@ PATTERNS = [
     # === v0.2.40 batch (17 patterns) ===
     {
         "id": "GLS-PSR-580",
-        "name": "GLS-PSR-580",
+        "name": 'Post-Approval Tool Hint Policy Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -10157,7 +10157,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-581",
-        "name": "GLS-PSR-581",
+        "name": 'Temporary Exception Scope Expansion Persistence',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -10182,7 +10182,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-582",
-        "name": "GLS-PSR-582",
+        "name": 'Unicode Homoglyph Scope Marker Bypass',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -10207,7 +10207,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-583",
-        "name": "GLS-PSR-583",
+        "name": 'Newer Timestamp Directive Canonical Precedence Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["file", "message", "log_memory"],
@@ -10232,7 +10232,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-584",
-        "name": "GLS-PSR-584",
+        "name": 'Late-Layer Duplicate Key Policy Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "api_response"],
@@ -10257,7 +10257,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-585",
-        "name": "GLS-PSR-585",
+        "name": 'Compliance Status Launder Raw Action Evidence',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["tool_output", "message", "log_memory"],
@@ -10282,7 +10282,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-586",
-        "name": "GLS-PSR-586",
+        "name": 'Fabricated Priority Escalation Silent Mode Coercion',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -10307,7 +10307,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-587",
-        "name": "GLS-PSR-587",
+        "name": 'Pre-Verification Execution Dependency Edge Removal',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -10332,7 +10332,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-588",
-        "name": "GLS-PSR-588",
+        "name": 'Precedence Ladder Inversion Lower Trust Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "log_memory"],
@@ -10357,7 +10357,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-589",
-        "name": "GLS-PSR-589",
+        "name": 'False Priority Framing Freshness Gate Replay',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -10382,7 +10382,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-590",
-        "name": "GLS-PSR-590",
+        "name": 'Policy Constraint Softened To Advisory Hint',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "tool_output"],
@@ -10407,7 +10407,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-591",
-        "name": "GLS-PSR-591",
+        "name": 'Shadow Board State Injection Backlog Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["file", "message", "log_memory"],
@@ -10432,7 +10432,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-592",
-        "name": "GLS-PSR-592",
+        "name": 'Prior Approval Claim Without Source Token',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "tool_output", "log_memory"],
@@ -10457,7 +10457,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-593",
-        "name": "GLS-PSR-593",
+        "name": 'Risk Evaluator Score Downgrade Block To Allow',
         "category": "policy_scope_redefinition",
         "severity": "critical",
         "channel": ["message", "file", "tool_output"],
@@ -10482,7 +10482,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-594",
-        "name": "GLS-PSR-594",
+        "name": 'Canonical Miss Case Fold Template Hijack',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["file", "message", "log_memory"],
@@ -10507,7 +10507,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-595",
-        "name": "GLS-PSR-595",
+        "name": 'Recency Tiebreak Flood Provenance Rank Override',
         "category": "policy_scope_redefinition",
         "severity": "high",
         "channel": ["message", "file", "api_response"],
@@ -10532,7 +10532,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PSR-596",
-        "name": "GLS-PSR-596",
+        "name": 'Approval Summary Narrower Than Execution Payload',
         "category": "policy_scope_redefinition",
         "severity": "critical",
         "channel": ["message", "file", "tool_output"],
@@ -10558,7 +10558,7 @@ PATTERNS = [
     # === v0.2.41 batch (14 patterns) ===
     {
         "id": "GLS-TMS-251",
-        "name": "GLS-TMS-251",
+        "name": 'Polyglot Format Payload Policy Role Override',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10583,7 +10583,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-252",
-        "name": "GLS-TMS-252",
+        "name": 'Alias Flip Epoch Mix KPI Schema Rollover',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10608,7 +10608,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-253",
-        "name": "GLS-TMS-253",
+        "name": 'Tool Docstring Imperative Instruction Bleed',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10633,7 +10633,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-254",
-        "name": "GLS-TMS-254",
+        "name": 'Key Shadow Alias Path Zero-Value Downgrade',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10658,7 +10658,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-241",
-        "name": "GLS-TMS-241",
+        "name": 'Alias Branch Overshadow Coverage Key Drift',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10683,7 +10683,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-242",
-        "name": "GLS-TMS-242",
+        "name": 'Primary Key Shadow Fallback Directive Smuggle',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10708,7 +10708,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-243",
-        "name": "GLS-TMS-243",
+        "name": 'Primary Key Starvation Alias Precedence Inversion',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10733,7 +10733,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-244",
-        "name": "GLS-TMS-244",
+        "name": 'Alias Shadowing Schema Split Source Desync',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10758,7 +10758,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-245",
-        "name": "GLS-TMS-245",
+        "name": 'Shadow Key Dual Presence Precedence Hijack',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10783,7 +10783,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-246",
-        "name": "GLS-TMS-246",
+        "name": 'Schema Version Enum Collision Executor Mismatch',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10808,7 +10808,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-247",
-        "name": "GLS-TMS-247",
+        "name": 'Deprecated Namespace Fallback Inversion Injection',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10833,7 +10833,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-248",
-        "name": "GLS-TMS-248",
+        "name": 'Version Header Deception Cross-Stage Payload Replay',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10858,7 +10858,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-249",
-        "name": "GLS-TMS-249",
+        "name": 'Dual Key Shadow Top-Level Fallback Override',
         "category": "tool_metadata_smuggling",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10883,7 +10883,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TMS-250",
-        "name": "GLS-TMS-250",
+        "name": 'Manifest Instruction Metadata Directive Smuggle',
         "category": "tool_metadata_smuggling",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10909,7 +10909,7 @@ PATTERNS = [
     # === v0.2.41 batch (8 patterns) ===
     {
         "id": "GLS-TP-004",
-        "name": "GLS-TP-004",
+        "name": 'Speculative Plan Stage Poisoning Pre-Authorization',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10935,7 +10935,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-005",
-        "name": "GLS-TP-005",
+        "name": 'Alias Schema Drift Cross-Stage Tool Confusion',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10961,7 +10961,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-006",
-        "name": "GLS-TP-006",
+        "name": 'Latent Tool Intent Carryover Checkpoint Resume',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -10988,7 +10988,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-007",
-        "name": "GLS-TP-007",
+        "name": 'Phantom Tool Reference Cardinality Race',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11014,7 +11014,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-008",
-        "name": "GLS-TP-008",
+        "name": 'Verifier Timeout Stale Cache Evidence Promotion',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11040,7 +11040,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-009",
-        "name": "GLS-TP-009",
+        "name": 'Cross-Tool Consensus Oracle Dual Source Poisoning',
         "category": "tool_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11066,7 +11066,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-010",
-        "name": "GLS-TP-010",
+        "name": 'Tool Availability Mirage Capability Fallback Shell',
         "category": "tool_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11093,7 +11093,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TP-011",
-        "name": "GLS-TP-011",
+        "name": 'Toolset Resolution Alias Collision Dispatch Smuggle',
         "category": "tool_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11121,7 +11121,7 @@ PATTERNS = [
     # === v0.2.42 batch (7 patterns) ===
     {
         "id": "GLS-CAI-710",
-        "name": "GLS-CAI-710",
+        "name": 'Split-Lane Approval Hash Downgrade Spoof',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11146,7 +11146,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-711",
-        "name": "GLS-CAI-711",
+        "name": 'OCR Alt-Text Cross-Modal Instruction Smuggle',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11171,7 +11171,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-712",
-        "name": "GLS-CAI-712",
+        "name": 'Transcript Channel Desync Sidecar Authority Pivot',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11196,7 +11196,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-713",
-        "name": "GLS-CAI-713",
+        "name": 'Cross-Modal Evidence Swap OCR Override',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11221,7 +11221,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-626",
-        "name": "GLS-CAI-626",
+        "name": 'Cross-Feed Metric Bleed Fake Consensus Bypass',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11246,7 +11246,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-714",
-        "name": "GLS-CAI-714",
+        "name": 'Agent Authority Leak Checkpoint Token Spoof',
         "category": "cross_agent_injection",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11271,7 +11271,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CAI-715",
-        "name": "GLS-CAI-715",
+        "name": 'Cross-Modal Bridge Abuse OCR Metadata Smuggle',
         "category": "cross_agent_injection",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11297,7 +11297,7 @@ PATTERNS = [
     # === v0.2.42 batch (6 patterns) ===
     {
         "id": "GLS-TOP-631",
-        "name": "GLS-TOP-631",
+        "name": 'Confidence Tag Inflation Fallback Parser Hijack',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content", "tool_output"],
@@ -11322,7 +11322,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-632",
-        "name": "GLS-TOP-632",
+        "name": 'Rewriter Guardrail Inversion Schema Normalization Drift',
         "category": "tool_output_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11347,7 +11347,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-633",
-        "name": "GLS-TOP-633",
+        "name": 'Tool Result Role Shadow Error Recovery Injection',
         "category": "tool_output_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "web_content", "tool_output"],
@@ -11372,7 +11372,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-634",
-        "name": "GLS-TOP-634",
+        "name": 'First-Row Authority Hijack Chronology Inversion',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11397,7 +11397,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-635",
-        "name": "GLS-TOP-635",
+        "name": 'Placeholder Masked Secret Canonical Equality Coercion',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "tool_output", "log_memory"],
@@ -11422,7 +11422,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-636",
-        "name": "GLS-TOP-636",
+        "name": 'Signed Summary Impostor Executor Identity Swap',
         "category": "tool_output_poisoning",
         "severity": "critical",
         "channel": ["message", "file", "tool_output", "api_response"],
@@ -11444,5 +11444,406 @@ PATTERNS = [
             r"""(?i)(?:(?:signed[- ]summary|tool[- ]summary)\s+(?:impostor|forg(?:e|ed|ery)|mimic)|(?:executor|component|validator)\s+identity\s+(?:swap|spoof|mutation)|(?:freshness|recency)\s+(?:token|metadata)\s+replay|(?:cross[- ]channel|cross[- ]format)\s+(?:evidence|provenance)\s+splic(?:e|ing)|(?:provenance\s+envelope|content[- ]hash|signature|run_id)\s+(?:forg\w+|miss\w+|fail\w+|bypass|unverified))""",
         ],
         "description": "Attacker forges provenance signals (signed-summary format, executor identity, freshness tokens, or spliced cross-channel evidence) so untrusted text is promoted into high-authority tool context and triggers unsafe next-step execution. Bypasses policy gates that key off label strings rather than immutable signed envelopes."
+    },
+    # === v0.2.42 batch (16 patterns) ===
+    {
+        "id": "GLS-AW-190",
+        "name": "Health Badge Swap GO Mode Bypass",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "signal health badge impersonation",
+            "fake ready badge",
+            "spoof ready status",
+            "forged degraded-to-ready flip",
+            "health status forgery",
+            "badge swap attack",
+            "stale marker hidden",
+            "false green light health",
+            "go mode badge spoof",
+            "health beacon impersonation",
+            "fabricated readiness badge",
+            "status compact lying",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:READY|DEGRADED|STALE|GREEN|OK)\s+(?:badge|status|marker|flag)\s+(?:spoof|forge|impersonat|swap|fake)|(?:fake|forged|fabricated)\s+(?:health|readiness|status)\s+(?:badge|signal|beacon)|(?:flip|swap|relabel)\s+(?:degraded|stale)\s+(?:to|as)\s+(?:ready|green|healthy))""",
+        ],
+        "description": "Attacker forges or swaps compact health badges (READY/DEGRADED/STALE) so GO MODE cycles ship work against falsely-green systems, bypassing the readiness gate meant to halt on real degradation."
+    },
+    {
+        "id": "GLS-AW-191",
+        "name": "Workqueue Owner Collision Injection",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "tool_output"],
+        "keywords": [
+            "owner workqueue collision",
+            "duplicate owner assignment",
+            "queue ownership conflict injection",
+            "done flag misattribution",
+            "in-progress double claim",
+            "queued task ownership spoof",
+            "owner field forgery",
+            "cross-owner status overwrite",
+            "board state race injection",
+            "stealth re-assignment",
+            "owner alias collision",
+            "workqueue arbitration abuse",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:owner|assignee)\s+(?:workqueue|queue|board)\s+(?:collision|conflict|race)|(?:duplicate|conflicting|spoofed)\s+(?:owner|assignee)\s+(?:claim|assignment|field)|(?:DONE|IN_PROGRESS|QUEUED)\s+(?:misattribution|overwrite|forgery|race))""",
+        ],
+        "description": "Attacker injects conflicting owner or status claims into shared workqueues so two agents collide on the same task or a malicious assignment overwrites a legitimate owner, breaking coordination guarantees."
+    },
+    {
+        "id": "GLS-AW-192",
+        "name": "Non-Canonical Output Form Safety Bypass",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output"],
+        "keywords": [
+            "output canonicalization confusion",
+            "equivalent-form trust gap",
+            "unicode normalization bypass",
+            "json vs markdown trust skew",
+            "alternate output shape exploit",
+            "canonical form drift",
+            "homoglyph output bypass",
+            "format-equivalent payload smuggling",
+            "render-time normalization mismatch",
+            "alternate encoding accepted",
+            "non-canonical output trusted",
+            "form-variant evasion",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:output|payload|response)\s+(?:canonicali[sz]ation|normalization)\s+(?:confusion|mismatch|bypass|gap)|(?:alternate|equivalent|variant)\s+(?:form|encoding|shape)\s+(?:trust(?:ed)?|accepted|treated)\s+as\s+(?:canonical|safe|same)|(?:homoglyph|unicode|encoding)\s+(?:variant|drift)\s+(?:bypass|evades?|smuggle))""",
+        ],
+        "description": "Attacker exploits the gap between semantically-equivalent output forms (JSON vs markdown, alternate encodings, unicode variants) so the agent grants equal trust to a non-canonical form that bypasses safety checks tied to the canonical shape."
+    },
+    {
+        "id": "GLS-AW-193",
+        "name": "Compact Handoff Intent Stripping",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "handoff intent truncation",
+            "compact handoff payload abuse",
+            "intent omission across agents",
+            "lost constraint in handoff",
+            "next-agent context starvation",
+            "handoff note clipping",
+            "stripped safety constraint at boundary",
+            "intent compression poisoning",
+            "agent-to-agent intent drop",
+            "handoff summary forgery",
+            "guardrail lost in handoff",
+            "downstream model intent gap",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:handoff|hand[- ]?off)\s+(?:intent|note|summary|payload)\s+(?:truncat|clip|strip|drop|omit)|(?:next[- ]?agent|downstream\s+model)\s+(?:context|intent)\s+(?:starvation|gap|loss)|(?:safety|constraint|guardrail)\s+(?:stripped|lost|dropped)\s+(?:at|in|during)\s+(?:handoff|agent\s+boundary))""",
+        ],
+        "description": "Attacker exploits compact handoff notes between agents to strip or compress critical intent and constraints so the downstream model executes with an incomplete picture, dropping safety conditions that were present upstream."
+    },
+    {
+        "id": "GLS-AW-194",
+        "name": "Self-Referencing Readiness Verdict Echo",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "readiness verdict echo chamber",
+            "prior ready overweighted",
+            "stale verdict reuse",
+            "gate decision feedback loop",
+            "ready tag self-citation",
+            "verdict inheritance abuse",
+            "underweight fresh evidence",
+            "echoed gate verdict",
+            "readiness self-referential trust",
+            "gate output as next gate input",
+            "verdict laundering through reuse",
+            "ready stamp cascade",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:readiness|gate|verdict)\s+(?:echo[- ]?chamber|feedback\s+loop|self[- ]?citation)|(?:prior|stale|previous)\s+(?:READY|verdict|gate\s+decision)\s+(?:overweight|inherit|reuse|cite)|(?:later|downstream)\s+gates?\s+(?:underweight|ignore|skip)\s+(?:fresh|new|source)\s+evidence)""",
+        ],
+        "description": "Attacker exploits readiness systems that ingest their own prior verdicts so a single early READY tag echoes through later gates, drowning out fresh contradicting evidence and locking in a stale pass."
+    },
+    {
+        "id": "GLS-AW-195",
+        "name": "Zero-Null Missing Key Fail-Open",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "null sentinel poisoning",
+            "empty equals zero conflation",
+            "missing key fail-open",
+            "empty list treated as success",
+            "none as authorization",
+            "absent field permissive default",
+            "silent fail-open via empty",
+            "sentinel value confusion",
+            "blank value privilege grant",
+            "missing-equals-allowed fallback",
+            "zero-equals-empty bypass",
+            "null pivot to permit",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:null|none|empty|missing)\s+(?:sentinel|value|key|field)\s+(?:poison|conflate|confusion|abuse)|(?:empty|missing|absent|null)\s+(?:list|dict|field|key)\s+(?:treated|accepted|interpreted)\s+as\s+(?:success|allowed|pass|authorized)|(?:fail[- ]?open|silently\s+pass)\s+(?:on|when|via)\s+(?:missing|null|empty)\s+(?:key|field|value))""",
+        ],
+        "description": "Attacker exploits fallback logic that conflates 0, [], {}, None and missing keys as equivalent so omitting a field is treated as a passing or authorized state, silently failing open on safety checks."
+    },
+    {
+        "id": "GLS-AW-196",
+        "name": "Output Format Negotiation Policy Bypass",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "output format negotiation hijack",
+            "format-as-control-boundary abuse",
+            "force unsafe response shape",
+            "json mode coercion",
+            "markdown to executable shape pivot",
+            "format flag injection",
+            "schema negotiation manipulation",
+            "downgrade structured output",
+            "force free-text to evade parser",
+            "content-type spoofing",
+            "format steering for escape",
+            "negotiated shape policy gap",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:output|response)\s+(?:format|shape|schema)\s+(?:negotiation|hijack|steer|coerce)|(?:force|coerce|switch)\s+(?:to|into)\s+(?:json|markdown|table|free[- ]?text)\s+(?:to\s+)?(?:bypass|evade|escape)\s+(?:parser|policy|filter)|(?:content[- ]?type|format[- ]?flag)\s+(?:spoof|injection|abuse))""",
+        ],
+        "description": "Attacker manipulates output format negotiation to steer the agent into a response shape whose parser or downstream policy is weaker, using format choice as a control-boundary exploit rather than presentation."
+    },
+    {
+        "id": "GLS-AW-197",
+        "name": "Fake Ground-Truth Evaluation Record Planting",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "synthetic ground truth backfill",
+            "fake validation record seeding",
+            "fabricated eval data injection",
+            "self-citing ground truth",
+            "backfilled benchmark poisoning",
+            "evaluator dataset poisoning",
+            "ground truth forgery",
+            "synthetic gold label injection",
+            "evidence-of-record forgery",
+            "validation cite-loop",
+            "fake reference dataset",
+            "ground-truth laundering",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:synthetic|fake|fabricated)\s+(?:ground[- ]?truth|gold[- ]?label|validation)\s+(?:backfill|seed|inject|record)|(?:ground[- ]?truth|benchmark|eval(?:uation)?)\s+(?:dataset|record|reference)\s+(?:poison|forge|fabricat|laund)|(?:cite|reference)\s+(?:seeded|attacker[- ]?planted)\s+(?:record|ground[- ]?truth|benchmark))""",
+        ],
+        "description": "Attacker plants fake ground-truth records into evaluation datasets then cites them later as validation evidence, creating a self-reinforcing trust loop where forged history is treated as authoritative truth."
+    },
+    {
+        "id": "GLS-AW-198",
+        "name": "Fixed Anchor Tunnel Decision Collapse",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "anchor entropy collapse",
+            "fixed-anchor overfit attack",
+            "single-kpi tunnel vision",
+            "narrow anchor exploit",
+            "decision collapse via repeated anchors",
+            "low-entropy grounding abuse",
+            "anchor reuse drift blindness",
+            "kpi tunnel hijack",
+            "anchor monoculture exploit",
+            "grounded-but-blind output",
+            "evidence diversity collapse",
+            "tunnel anchor poisoning",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:anchor|grounding|evidence)\s+(?:entropy|diversity)\s+(?:collapse|reduction|loss)|(?:fixed|single|narrow|repeated)\s+(?:anchor|kpi|metric)\s+(?:overfit|tunnel|blind|exploit)|(?:decision|reasoning)\s+(?:collapse|tunnel)\s+(?:via|through)\s+(?:reused|monoculture|same)\s+(?:anchors?|metrics?))""",
+        ],
+        "description": "Attacker optimizes payloads against the small fixed set of anchors an agent reuses across cycles, inducing decision collapse where outputs look grounded but no longer detect drift outside the tunnel of measured signals."
+    },
+    {
+        "id": "GLS-AW-199",
+        "name": "Cross-Lane Telemetry Label Strip Merge",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "source context collapse",
+            "lane provenance merge",
+            "lost source label",
+            "preflight vs postrun blur",
+            "telemetry lane confusion",
+            "scope tag stripping",
+            "merged truth without provenance",
+            "cross-lane telemetry conflation",
+            "inbox vs report mix",
+            "provenance scope loss",
+            "lane attribution erasure",
+            "context tag drop",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:source|lane|scope|provenance)\s+(?:context|label|tag|attribution)\s+(?:collapse|merge|loss|strip|drop)|(?:telemetry|evidence|truth)\s+(?:from|across)\s+(?:different|multiple)\s+(?:lanes?|scopes?|sources?)\s+(?:merged|conflated|combined)\s+(?:into|as)\s+(?:single|one)|(?:preflight|postrun|inbox|report)\s+(?:scope|lane)\s+(?:blur|mix|conflate))""",
+        ],
+        "description": "Attacker triggers merging of telemetry from different lanes or provenance scopes without preserving source labels, so the agent operates on a single blurred truth that masks which lane is malicious."
+    },
+    {
+        "id": "GLS-AW-200",
+        "name": "Competing Artifact Source Arbitration Exploit",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "source of truth pinball",
+            "authoritative artifact bounce",
+            "least-strict source wins",
+            "mission vs runbook arbitrage",
+            "truth-source flip flop",
+            "weakest source resolution",
+            "authority shop across artifacts",
+            "spec ricochet attack",
+            "policy artifact bouncing",
+            "loosest policy chosen",
+            "source arbitration abuse",
+            "truth ricochet exploit",
+        ],
+        "regex": [
+            r"""(?i)(?:source[- ]?of[- ]?truth\s+(?:pinball|ricochet|bounce|flip)|(?:bounce|ricochet|shop)\s+(?:between|across)\s+(?:mission|runbook|summary|tool[- ]?output|artifacts?)\s+(?:until|so)\s+(?:least[- ]?strict|loosest|weakest)\s+(?:source|policy)\s+wins|(?:least[- ]?strict|loosest|weakest)\s+(?:authoritative|truth)\s+(?:source|artifact)\s+(?:selected|wins|accepted))""",
+        ],
+        "description": "Attacker forces the agent to bounce between competing authoritative artifacts (mission file, runbook, summary, tool output) until the loosest source wins, exploiting source-arbitration logic to land on the weakest policy."
+    },
+    {
+        "id": "GLS-AW-201",
+        "name": "Gate Non-Determinism Transient Window Slip",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "tool_output"],
+        "keywords": [
+            "readiness gate verdict thrashing",
+            "alternating ready partial stale",
+            "alias drift verdict flip",
+            "race-induced verdict change",
+            "source order verdict swing",
+            "gate oscillation exploit",
+            "thrash to permit window",
+            "verdict flapping abuse",
+            "ready-partial-stale oscillation",
+            "timing race gate flip",
+            "noisy gate pass window",
+            "gate non-determinism abuse",
+        ],
+        "regex": [
+            r"""(?i)(?:readiness[- ]?gate\s+(?:verdict\s+)?(?:thrash|flapping|oscillation|swing|flip)|(?:alternat(?:e|ing)|oscillat|flip)\s+between\s+(?:READY|PARTIAL[_ ]?READY|STALE)\s+(?:due\s+to|via|on)\s+(?:source[- ]?order|alias\s+drift|timing\s+race)|gate\s+(?:non[- ]?determinism|race|oscillation)\s+(?:abuse|exploit|window))""",
+        ],
+        "description": "Attacker exploits gate non-determinism so verdicts thrash between READY, PARTIAL_READY and STALE on source-order or timing variance, slipping malicious work through during a transient permissive window."
+    },
+    {
+        "id": "GLS-AW-202",
+        "name": "Multi-Source False Consensus Coercion",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "cross source consensus hijack",
+            "aligned false claim across sources",
+            "fake multi-source agreement",
+            "low-trust source consensus spoof",
+            "retrieval echo consensus",
+            "status file plus log alignment",
+            "consensus upgraded to authority",
+            "manufactured agreement attack",
+            "synchronized injection across artifacts",
+            "trust upgrade via repetition",
+            "consensus-to-execution escalation",
+            "low-trust agreement laundering",
+        ],
+        "regex": [
+            r"""(?i)(?:cross[- ]?source\s+(?:consensus|agreement)\s+(?:hijack|spoof|forge|manufact)|(?:plant|align|inject)\s+(?:false|matching|identical)\s+(?:instructions?|claims?)\s+(?:across|in)\s+(?:multiple|several)\s+(?:low[- ]?trust|untrusted|retrieval)\s+(?:sources?|artifacts?)|(?:repeated|consensus|agreed)\s+(?:claims?|instructions?)\s+(?:upgrade|escalate|promote)\s+to\s+(?:execution|action)\s+(?:authority|policy))""",
+        ],
+        "description": "Attacker plants identical false instructions across multiple low-trust sources so the agent interprets the manufactured agreement as consensus and upgrades the claim from suggestion to execution authority."
+    },
+    {
+        "id": "GLS-AW-203",
+        "name": "Approval Preview Execution Desync",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "approval channel desync",
+            "preview vs action drift",
+            "shown vs executed mismatch",
+            "confirmation prompt spoof",
+            "summary differs from real action",
+            "approval ux divergence",
+            "decoy preview attack",
+            "approve-one-execute-another",
+            "diff laundering at approval",
+            "confirmation bypass via swap",
+            "approval payload swap",
+            "what-you-see-is-not-what-runs",
+        ],
+        "regex": [
+            r"""(?i)(?:approval\s+(?:channel|UX|flow)\s+(?:desync|drift|divergence|mismatch)|(?:preview|summary|confirmation)\s+(?:differs?|diverges?|mismatch)\s+from\s+(?:executed|actual|real)\s+(?:action|payload|operation)|(?:approve|confirm)\s+(?:one|preview)\s+(?:but\s+)?(?:execute|run|invoke)\s+(?:another|different|swapped))""",
+        ],
+        "description": "Attacker desynchronizes what the approval UX shows from what actually executes, so the operator confirms a benign-looking preview while a different and malicious operation runs underneath."
+    },
+    {
+        "id": "GLS-AW-204",
+        "name": "Replay Poison Persistent Instruction Promotion",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "tool_output", "log_memory"],
+        "keywords": [
+            "state replay poisoning",
+            "memory replay attack",
+            "checkpoint replay injection",
+            "persisted untrusted content reuse",
+            "retrieval chunk replayed as policy",
+            "tool output cached as authority",
+            "stale memory note replayed",
+            "session-persisted poison",
+            "replayed turn poisoning",
+            "memory promotion to instruction",
+            "checkpoint poisoning",
+            "long-tail replay exploit",
+        ],
+        "regex": [
+            r"""(?i)(?:(?:state|memory|checkpoint|session)\s+(?:replay|reuse)\s+(?:poison|attack|exploit|inject)|(?:planted|persisted|cached)\s+(?:retrieval|tool[- ]?output|memory|chunk)\s+(?:replayed|reused|cited)\s+as\s+(?:trusted|policy|instruction|authority)|(?:untrusted|low[- ]?trust)\s+(?:content|note|chunk)\s+(?:promoted|elevated)\s+to\s+(?:policy|instruction|authority)\s+via\s+replay)""",
+        ],
+        "description": "Attacker plants untrusted content once (retrieval chunk, tool output, memory note, checkpoint) then exploits later turns that replay it as trusted policy, turning short-lived poison into persistent instruction authority."
+    },
+    {
+        "id": "GLS-AW-205",
+        "name": "Safety Judgment Weak Subagent Outsourcing",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "keywords": [
+            "delegation oracle abuse",
+            "outsourced risk judgment",
+            "subagent verdict trust",
+            "summarizer as authority",
+            "secondary tool answer overrides policy",
+            "delegated oracle override",
+            "external summarizer trust laundering",
+            "subagent rubber stamp",
+            "judgment passed to weak oracle",
+            "oracle answer cited as policy",
+            "policy via delegated tool",
+            "third-party verdict accepted as truth",
+        ],
+        "regex": [
+            r"""(?i)(?:delegation\s+oracle\s+(?:abuse|override|attack)|(?:outsource|delegate|hand[- ]?off)\s+(?:risk|policy|safety)\s+(?:judgment|verdict|decision)\s+to\s+(?:secondary|sub[- ]?agent|external|weak)\s+(?:tool|model|summarizer|oracle)|(?:secondary|delegated|sub[- ]?agent|summarizer)\s+(?:verdict|answer|output)\s+(?:treated|accepted|cited)\s+as\s+(?:authority|policy|truth))""",
+        ],
+        "description": "Attacker steers the agent into outsourcing safety or risk judgment to a weaker secondary tool, subagent, or summarizer and then treating that outsourced answer as authoritative, laundering policy through the weakest link."
     },
 ]
