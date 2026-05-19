@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.43] — 2026-05-19
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 8)
+
+- **16 new patterns in the `agent_workflow_security` category** — `GLS-AW-190` through `GLS-AW-205`. Expands coverage of workflow-level trust decisions that sit above governance and below runtime action: callback chain authority, destination drift behind allowed tools, healthy-looking retry sequences that become hidden steering, and text surfaces that silently change what a workflow believes it should do. Category pre-existed (no new category introduced). Pattern count: 684 → **700**. Keyword count: 3,459 → **3,543**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/ai-agent-security-usage-control-runtime-trust` — "AI Agent Security vs AI Usage Control: What Runtime Trust Still Has To Decide" (JACK byline, datePublished 2026-05-19). Covers the gap between AI usage control/governance and runtime trust, three concrete workflow examples (callback authority gain, destination drift, retry-as-steering), and the practical AI agent security checklist.
+
 ## [0.2.42] — 2026-05-17
 
 ### Added (cross_agent_injection + tool_output_poisoning expansion — Cava research bundle)
