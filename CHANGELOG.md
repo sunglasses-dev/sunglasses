@@ -2,6 +2,17 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.44] — 2026-05-20
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 1)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-043` through `GLS-AW-063`. Expands coverage of workflow-level trust decisions: gap-fill fabrication pressure, verification gate forgery, template placeholder imperative injection, plan summary execution drift, state board status inversion, and 16 additional attack patterns targeting the boundary between managed access and trusted action. Category pre-existed (no new category introduced). Pattern count: 700 → **721**. Keyword count: 3,543 → **3,796**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/managed-agents-not-trusted-actions` — "Managed Agents Are Not Trusted Actions" (JACK byline, datePublished 2026-05-20). Covers the gap between managed agent governance (connectors, MCP apps, per-tool permissions, audit logs) and runtime trust decisions, three concrete attack examples (connector note authority drift, authenticated MCP handoff trust failure, auditable but risky outbound route), and how the 21 new `agent_workflow_security` patterns catch these attacks.
+- Team page updates: team.html + author/cava.html + author/jack.html — GPT-5.4 → GPT-5.5 model references (6 instances, retroactive from May 19 actual upgrade).
+
 ## [0.2.43] — 2026-05-19
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 8)
