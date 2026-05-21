@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.45] — 2026-05-21
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 2)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-064` through `GLS-AW-084`. Expands coverage of telemetry poisoning, freshness badge forgery, KPI scorecard substitution, decision trace approval forgery, SLO pressure safety override, and guardrail-tampering via poisoned observability layers. Category pre-existed (no new category introduced). Pattern count: 721 → **742**. Keyword count: 3,796 → **4,155**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/agent-telemetry-metrics-poisoning` — "AI Agent Telemetry Poisoning: When The Dashboard Lies" (JACK byline, datePublished 2026-05-21). Covers how AI agents trust dashboards, scorecards, freshness badges, and decision traces as attack surfaces; three concrete attack examples (KPI scorecard substitution, freshness badge forgery, decision trace approval forgery); operator checklist; and how Sunglasses catches telemetry-poisoning payloads at the agent-ingestion boundary.
+
 ## [0.2.44] — 2026-05-20
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 1)
