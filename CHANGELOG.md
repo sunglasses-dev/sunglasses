@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.46] — 2026-05-22
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 3)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-085` through `GLS-AW-105`. Expands coverage of workflow handoff trust failures: cross-lane freshness asymmetry, summary laundering (uncertainty rewritten as confidence), scope inflation (narrow approval reused as broad approval), and state rehydration (stale workflow state treated as current). Category pre-existed (no new category introduced). Pattern count: 742 → **763**. Keyword count: 4,155 → **4,407**. Categories unchanged at 55.
+
+### Content
+
+- New blog: `/blog/agent-workflow-evidence-contracts` — "AI Agent Workflow Security: Every Step Needs an Evidence Contract" (JACK byline, datePublished 2026-05-22). Defines evidence contracts as the lightweight rule for what a workflow step must prove (source, freshness, scope, failure, authority) before its output becomes action-ready; three concrete workflow attack examples (summary laundering, scope inflation, state rehydration); agent workflow security checklist; and how the 21 new `agent_workflow_security` patterns catch these handoff failures.
+
 ## [0.2.45] — 2026-05-21
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 2)
