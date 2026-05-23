@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.47] — 2026-05-23
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 4)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-106` through `GLS-AW-126`. Expands coverage of agentic CI/CD attack surfaces: PR comment prompt injection steering runner-shell authority, MCP server metadata manipulation to redirect deploy lanes, package endpoint drift embedded inside routine test fixes, telemetry and decision-trace poisoning in workflow runners, and callback destination drift after agent action approval. Category pre-existed (no new category introduced). Pattern count: 763 → **784**. Keyword count: 4,407 → **4,659**. Categories unchanged at 55.
+
+### Context
+
+- Paired blog: `/blog/agentic-cicd-security-runtime-trust` — covers the runtime-trust gap in agentic CI/CD pipelines, the controls buyers expect, three concrete attack examples (PR injection, MCP metadata steering, package endpoint drift), and a zero-trust operator checklist. JACK byline, Cava research credit.
+
 ## [0.2.46] — 2026-05-22
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 3)
