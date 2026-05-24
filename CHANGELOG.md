@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.48] — 2026-05-24
+
+### Added (provenance_chain_fracture — new category)
+
+- **5 new patterns in the new `provenance_chain_fracture` category** — `GLS-PCF-667`, `GLS-PCF-245` through `GLS-PCF-248`. Covers the runtime attack class where adversaries inject fabricated evidence — forged signatures, timestamps, and audit trails — to make an AI agent's reasoning appear grounded when it isn't. Patterns detect: signed evidence forgery (forged cryptographic provenance signatures), timestamp injection (fabricated freshness timestamps), audit trail fabrication (synthetic event logs), chain-of-custody spoofing (forged transfer records), and provenance anchor substitution (swapping legitimate anchor records). Pattern count: 784 → **789**. Keyword count: 4,659 → **4,719**. Category count: 54 → **55** (new category).
+
+### Context
+
+- Paired blog: `/blog/provenance-chain-fracture-runtime-trust` — "Provenance chain fracture: when AI agents trust forged evidence" — covers the provenance trust gap, five fracture primitives, real-world attack scenario, and a defender checklist. JACK byline, Cava research credit.
+
 ## [0.2.47] — 2026-05-23
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 4)
