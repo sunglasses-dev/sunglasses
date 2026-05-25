@@ -139,8 +139,8 @@ result = scanner.scan_auto("any_file.ext")
 |--------|-------|
 | Average text scan | <1ms (avg 0.26ms on M3 Max, single-threaded) |
 | Throughput | ~3,800 scans/sec (single-threaded, M3 Max) |
-| Patterns | 789 |
-| Keywords | 4,719 |
+| Patterns | 810 |
+| Keywords | 4,971 |
 | Languages | 23 |
 | Attack categories | 55 |
 | Normalization techniques | 17 |
@@ -151,15 +151,15 @@ result = scanner.scan_auto("any_file.ext")
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-_All performance numbers verified against `stats/current.json` (v0.2.48, updated Apr 22, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
+_All performance numbers verified against `stats/current.json` (v0.2.49, updated Apr 22, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
 ## 23 Languages
 
 English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-## What Works Today (v0.2.48)
+## What Works Today (v0.2.49)
 
-- ✅ Text scanning: 789 patterns, 4,719 keywords, 23 languages, 55 attack categories
+- ✅ Text scanning: 810 patterns, 4,971 keywords, 23 languages, 55 attack categories
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)

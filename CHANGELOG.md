@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+## [0.2.49] — 2026-05-25
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 5)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-127` through `GLS-AW-147`. Expands coverage of approval-graph and workflow-gate attacks: forged READY/done sentinels (GLS-AW-130, GLS-AW-147), fake budget-pressure validation skips (GLS-AW-131), tool-call monitoring signal muting, cross-cycle state inheritance poisoning, cached-artifact freshness-signal forgery, and cross-stage fallback-field divergence. Category pre-existed (no new category introduced). Pattern count: 789 → **810**. Keyword count: 4,719 → **4,971**. Categories unchanged at 55.
+
+### Context
+
+- Paired blog: `/blog/approval-graph-poisoning-runtime-trust` — "Approval Graph Poisoning: When AI Agents Trust the Wrong Workflow Gate" — covers how attackers poison the approval/evidence graph agents rely on to gate state-changing actions, three concrete attack examples (GLS-AW-130/131/147), and a defender checklist. JACK byline, Cava research credit.
+
 ## [0.2.48] — 2026-05-24
 
 ### Added (provenance_chain_fracture — new category)
