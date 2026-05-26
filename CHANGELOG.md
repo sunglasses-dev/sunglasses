@@ -2,6 +2,16 @@
 
 All notable changes to Sunglasses are documented here.
 
+
+## [0.2.50] — 2026-05-26
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 6)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-148` through `GLS-AW-168`. Continues the approval-graph and workflow-gate coverage from v0.2.49 with chunk 6 of Cava's research bundle: conflict-resolution merge-layer poisoning (GLS-AW-148), priority-ladder inversion, tie-break metadata hijacks, resolver-rationale tampering, latest-source-wins overrides, forged confidence/verified flags, alias-smuggled policy directives, and operator-intent phrasing traps. Category pre-existed (no new category introduced). Pattern count: 810 → **831**. Keyword count: 4,971 → **5,223**. Categories unchanged at 55.
+
+### Context
+
+- Patterns-only ship. No paired blog this push — the Cava blog roadmap (auto-refresh every 4h) had no unshipped `agent_workflow_security` blog matching the c06 carriers. Skill rule honored: never spawn a sub-agent to write a fresh Sunglasses blog. Blog will follow on a future ship once the roadmap fills the AW gap.
 ## [0.2.49] — 2026-05-25
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 5)
