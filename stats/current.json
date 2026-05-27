@@ -1,7 +1,7 @@
 {
-  "version": "0.2.50",
-  "patterns": 831,
-  "keywords": 5223,
+  "version": "0.2.51",
+  "patterns": 852,
+  "keywords": 5475,
   "categories": 55,
   "languages": 23,
   "normalization_techniques": 17,
@@ -16,8 +16,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-05-26T11:32:52Z",
-  "last_updated_by": "daily-push-skill",
+  "last_updated": "2026-05-26T19:30:00Z",
+  "last_updated_by": "ship-v0.2.51",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-05-24"
+  "released": "2026-05-26"
 }
