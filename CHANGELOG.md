@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.51] — 2026-05-26
+
+### Added (agent_workflow_security expansion — Cava research bundle chunk 7 + agentic runtime visibility blog)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-148` through `GLS-AW-168` (c06 bundle, deduped from v0.2.50). Covers conflict-resolution merge-layer poisoning, priority-ladder inversion, tie-break metadata hijacks, resolver-rationale tampering, latest-source-wins overrides, forged confidence/verified flags, alias-smuggled policy directives, and operator-intent phrasing traps. Category pre-existed. Pattern count: 831 → **852**. Keyword count: 5,223 → **5,475**. Categories unchanged at 55.
+- **New blog:** [Agentic Runtime Visibility Is Not Runtime Trust](https://sunglasses.dev/blog/agentic-runtime-visibility-vs-runtime-trust) — paired with the agent_workflow_security patterns. Distinguishes agentic runtime visibility and AI Detection and Response (observability) from runtime trust (action-time decision). Written by JACK, research by Cava.
+
+### Context
+
+- Atomic ship: patterns + blog together. Addresses the visibility-vs-trust distinction that matters for teams adopting AI Detection and Response platforms alongside Sunglasses. Blog positions Sunglasses as the action-time trust layer, not a replacement for full AIDR platforms.
+
 ## [0.2.50] — 2026-05-26
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 6)
