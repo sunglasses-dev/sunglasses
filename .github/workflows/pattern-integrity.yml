@@ -1,0 +1,43 @@
+name: pattern-integrity
+
+# Permanent gate added 2026-05-27 after AZ caught v0.2.51 shipping 21 duplicate
+# pattern IDs to PyPI (GLS-AW-148..168 were already in patterns.py from v0.2.42,
+# the v0.2.51 ship script wrote them in AGAIN). The dogfood-fix + dedup landed
+# in v0.2.52 but only AFTER damage was visible to users. This workflow makes
+# the bug class impossible to merge again — runs on every PR + push to main.
+#
+# Pairs with:
+#   - tests/test_pattern_integrity.py (the test that catches dup IDs)
+#   - tests/test_dogfood_bugs.py (the 4 May 27 first-run regressions)
+#   - publish.sh integrity gate before twine upload
+#   - .git/hooks/pre-push (local same-gate, --no-verify bypass available)
+#
+# This workflow is the GitHub-side enforcement layer (no --no-verify bypass).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package + dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" || pip install -e . && pip install pytest
+
+      - name: Pattern integrity tests (no dupes / id / category / shape)
+        run: pytest tests/test_pattern_integrity.py -v
+
+      - name: Dogfood regression tests (May 27 incident)
+        run: pytest tests/test_dogfood_bugs.py -v
