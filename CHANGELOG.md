@@ -3,6 +3,26 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.52] — 2026-05-27
+
+### Added (agent_workflow_security continuation + dogfood-failure fixes)
+
+- **21 new patterns in the `agent_workflow_security` category** — `GLS-AW-169` through `GLS-AW-189` (c07 bundle, deduped vs SHIPPED.json rebuilt from live patterns.py). Covers schema-alias ops-to-growth lane crosswire, KPI lane alias attacks, swapped worker sequence forgery, replayed-nonce-in-tool-handoff, forged deploy checkpoint authority, and out-of-order acknowledgment claims that try to convert workflow receipts into action permission. Category pre-existed. Pattern count: 831 → **852**. Keyword count: 5,475 → **5,474** (one keyword consolidated during apply). Categories unchanged at 55.
+- **New blog:** [Checkpoint Ack Poisoning in AI Agent Workflows](https://sunglasses.dev/blog/checkpoint-ack-poisoning-ai-agent-workflows) — paired with the new GLS-AW-169..189 patterns. Plain-language explainer of how forged receipts, swapped sequence markers, and replayed nonces become action authority; three concrete attack examples; six-point defender checklist (source, sequence, freshness, scope, approval path, evidence). Written by JACK, research by Cava.
+
+### Fixed (May 27 dogfood-failure incident — first real use surfaced 4 bugs)
+
+- **Stale baked version in `cli.py`** — banner now reads from `__version__` instead of hardcoded `"v0.2.7"` (every user since v0.2.8 saw the wrong version on every scan). Multiple hard-coded sites fixed.
+- **Silent file-scan failure** — `sunglasses scan /tmp/malicious.txt` (without `--file`) used to scan the path string and return PASS. Now auto-detects file paths and warns/promotes; no silent pass on a real file ever again.
+- **Missing `--version` flag** — added to the argparse root.
+- **GLS-PI-009 false positive** — the benign developer prompt "Please summarize this pull request and suggest tests" used to flag MEDIUM. Pattern tightened so the polite-PR phrasing no longer fires — customer-killer FP class closed.
+- **`tests/test_dogfood_bugs.py`** — 7 regression tests added so the May 27 bugs cannot return silently.
+- **`preflight-dogfood.sh`** — new permanent gate inside `sunglasses-publish.sh`: fresh-venv install + 4 first-run checks; blocks `twine upload` if any of the above regress.
+
+### Context
+
+- Atomic ship: patterns + blog + dogfood fixes together. v0.2.52 is the "we use our own product" milestone — the ship team had been shipping Sunglasses for 50+ days without ever running `pip install sunglasses` in a fresh shell. First real use found 4 production bugs in 30 minutes. New hard rule: dogfood every release. This ship closes 3 of 4 bugs in the CLI plus the customer-killer FP class; the runtime-visibility "moment of catch" UX work follows.
+
 ## [0.2.51] — 2026-05-26
 
 ### Added (agent_workflow_security expansion — Cava research bundle chunk 7 + agentic runtime visibility blog)
