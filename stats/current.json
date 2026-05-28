@@ -19,5 +19,5 @@
   "last_updated": "2026-05-27T17:39:50.003718-07:00",
   "last_updated_by": "sunglasses-publish-sh-manual-resume",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-05-26"
+  "released": "2026-05-27"
 }
