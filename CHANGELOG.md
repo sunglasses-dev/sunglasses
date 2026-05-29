@@ -3,6 +3,13 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.53] — 2026-05-29
+
+### Added (context_flooding tail-A patterns)
+
+- **4 new patterns in the `context_flooding` category** — `GLS-CF-249` through `GLS-CF-252` (tail-A bundle). Covers summarization-surviving payload context poisoning, instruction budget starvation before repo edits, priority-padding guardrail displacement, and retrieval chunk eviction reorder. Pattern count: 852 → **856**. Keyword count: 5,474 → **5,522**. Categories unchanged at 55.
+- **New blog:** [Context flooding attacks: when long context makes AI agents forget safety](https://sunglasses.dev/blog/context-flooding-runtime-trust) — paired with the new GLS-CF-249..252 patterns. Explains how token-budget pressure, priority padding, and retrieval reorder bury safety-relevant context before an agent acts. Three concrete attack examples; runtime-trust checklist; comparison table vs indirect prompt injection and retrieval poisoning. Written by JACK, research by Cava.
+
 ## [0.2.52] — 2026-05-27
 
 ### Added (agent_workflow_security continuation + dogfood-failure fixes)

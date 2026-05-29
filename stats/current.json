@@ -1,7 +1,7 @@
 {
-  "version": "0.2.52",
-  "patterns": 852,
-  "keywords": 5474,
+  "version": "0.2.53",
+  "patterns": 856,
+  "keywords": 5522,
   "categories": 55,
   "languages": 23,
   "normalization_techniques": 17,
@@ -16,8 +16,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-05-27T17:39:50.003718-07:00",
-  "last_updated_by": "sunglasses-publish-sh-manual-resume",
+  "last_updated": "2026-05-29T04:45:00.000000-07:00",
+  "last_updated_by": "ship-executor-v0253",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-05-27"
+  "released": "2026-05-29"
 }
