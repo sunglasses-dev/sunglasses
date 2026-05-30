@@ -3,6 +3,13 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.54] — 2026-05-30
+
+### Added (V1 tail roundup — V1 FINISH)
+
+- **17 new patterns across 9 categories** (v1 tail roundup, `v1_tail_sweep`) — draining the long tail of V1: `mcp_threat` (4), `model_routing_confusion` (3), `memory_eviction_rehydration` (2), `prompt_injection` (2), `retrieval_poisoning` (2), plus `agent_persona_drift`, `exfiltration`, `memory_poisoning`, and `multi_stage_encoding` (1 each). Pattern count: 856 → **873**. Keyword count: 5,522 → **5,726**. Categories unchanged at 55. This completes the V1 pattern drain.
+- **New blog:** [AI runtime protection vs runtime trust](https://sunglasses.dev/blog/ai-runtime-protection-vs-runtime-trust) — where production AI runtime protection (monitor/filter layer) ends and action-time runtime trust begins. Written by JACK, research by Cava.
+
 ## [0.2.53] — 2026-05-29
 
 ### Added (context_flooding tail-A patterns)
