@@ -16414,4 +16414,141 @@ PATTERNS = [
         ],
         "description": "Attacker seeds the agent's local reference corpus with older permissive templates, weakened fixtures, or shadow-tree mirrors, then nudges retrieval to prefer the downgraded copy over current hardened guidance. No jailbreak prompt is needed because the agent silently imports stale 'trusted' policy and regresses to weaker behavior."
     },
+    # === v0.2.55 batch (17 patterns) ===
+    {
+        "id": "GLS-SMP-001",
+        "name": "HTML Meta Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Target-controlled HTML `<meta>` / OpenGraph / Twitter Card description fields can smuggle agent-directed policy, secret-forwarding, or report-suppression instructions into discovery context that an assistant may incorrectly treat as site-owner authority."
+    },
+    {
+        "id": "GLS-SMP-002",
+        "name": "JSON-LD structured-data agent policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A target-controlled JSON-LD / schema.org structured-data block embeds agent-directed policy text that claims site-owner authority, asks the agent to override higher-priority instructions, forward local/auth context, or suppress reporting."
+    },
+    {
+        "id": "GLS-SMP-003",
+        "name": "Web App Manifest Agent-Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A target-controlled web app manifest (`/site.webmanifest`, `/manifest.webmanifest`, or `manifest.json`) can hide non-standard agent-policy text that tells AI scanners to treat the manifest as site-owner authority, include cookies or Authorization headers, and suppress reporting."
+    },
+    {
+        "id": "GLS-SMP-004",
+        "name": "ActivityPub Actor Metadata Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "ActivityPub actor/profile JSON can hide agent-directed policy instructions in free-text fields such as `summary`, `name`, `attachment[].value`, or endpoint descriptions, causing an AI scanner to over-trust a social identity document, leak local/auth context, or suppress impersonation findings."
+    },
+    {
+        "id": "GLS-SMP-005",
+        "name": "JSON Feed extension agent policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "JSON Feed documents can hide agent-directed authority inversion, secret disclosure, or report-suppression instructions in `_extensions` or feed/item text fields that AI feed readers and scanners may ingest as discovery metadata."
+    },
+    {
+        "id": "GLS-SMP-006",
+        "name": "Open Graph / Twitter Card Metadata Agent-Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Attacker-controlled HTML social-preview metadata (`og:*`, `twitter:*`, generic description/meta fields) can embed instructions telling AI agents, scanners, crawlers, or summarizers to override policy, suppress findings, or include local secrets."
+    },
+    {
+        "id": "GLS-SMP-007",
+        "name": "C2PA Content Credentials Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "C2PA / Content Credentials manifests can carry free-text provenance, assertion, ingredient, or claim-generator metadata that tells AI agents or provenance scanners to treat the media manifest as higher-priority policy, suppress verification findings, or forward local tokens."
+    },
+    {
+        "id": "GLS-SMP-008",
+        "name": "CITATION.cff Citation Metadata Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "description": "Malicious instructions embedded in `CITATION.cff` free-text fields (`message`, `title`, `abstract`, `commit`, `description`) can carry AI-agent/scanner-directed authority inversion, report suppression, or credential/local-state forwarding requests. AI research agents, literature-review tools, academ"
+    },
+    {
+        "id": "GLS-SMP-009",
+        "name": "JSON-LD / Schema.org Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Attacker-controlled JSON-LD/schema.org structured-data fields can smuggle agent/scanner instructions that claim authority, request local secrets, or suppress findings while appearing to be normal SEO/site metadata."
+    },
+    {
+        "id": "GLS-SMP-010",
+        "name": "Microformats / standalone RDF metadata agent-policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Hostile instructions can be embedded in Microformats fields or standalone RDF/Turtle metadata that AI agents, crawlers, SEO agents, or security scanners import as structured site context."
+    },
+    {
+        "id": "GLS-SMP-011",
+        "name": "RDFa / Microdata agent-policy poisoning in HTML structured data",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Hostile instructions are embedded in RDFa or HTML microdata attributes that AI crawlers, SEO agents, security scanners, or tool builders may ingest as trusted page metadata, causing authority inversion, report suppression, or local-secret forwarding."
+    },
+    {
+        "id": "GLS-SMP-012",
+        "name": "SBOM metadata agent-policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A target-controlled SBOM (`CycloneDX`, `SPDX`, or exported `sbom.json`) can hide agent-directed policy text in properties, annotations, or comments that tells AI dependency scanners to treat the SBOM as higher-priority release authority, suppress findings, or forward local auth context."
+    },
+    {
+        "id": "GLS-SMP-013",
+        "name": "Source map metadata agent-policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "JavaScript source maps can embed agent-directed instructions in `sourcesContent`, comments, or extension fields that tell AI scanners/code assistants to override policy, suppress findings, or include local secrets in reports."
+    },
+    {
+        "id": "GLS-SMP-014",
+        "name": "Linked icon / SVG sidecar metadata agent policy poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "description": "Detects hostile agent/scanner instructions hidden in linked icon or SVG sidecar metadata (`<title>`, `<desc>`, `<metadata>`, comments, or generated icon notes) that try to make AI crawlers or security scanners treat decorative assets as policy, hide findings, or forward local secrets."
+    },
+    {
+        "id": "GLS-SMP-015",
+        "name": "WebAssembly Custom-Section Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "WebAssembly module metadata or custom-section text can carry agent-targeted instructions that claim authority over code-security agents, suppress findings, or request local CI/env secrets while looking like ordinary build/provenance metadata."
+    },
+    {
+        "id": "GLS-SMP-016",
+        "name": "CodeMeta / DataCite / RO-Crate Metadata Agent Policy Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Machine-readable scholarly/software dataset metadata (`codemeta.json`, DataCite exports, and RO-Crate JSON-LD) can carry agent-facing instructions that falsely claim authority over AI research, provenance, or dependency scanners and direct them to suppress findings or forward local/runtime secrets."
+    },
+    {
+        "id": "GLS-SMP-017",
+        "name": "IaC stack template metadata poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "IaC stack/template metadata fields can smuggle agent-facing policy instructions that tell AI DevOps, cloud-security, or deployment-review agents to treat attacker-controlled descriptions as authoritative, suppress drift/security findings, or forward cloud credentials and local runtime context."
+    },
 ]
