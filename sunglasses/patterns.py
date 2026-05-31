@@ -16551,4 +16551,591 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "IaC stack/template metadata fields can smuggle agent-facing policy instructions that tell AI DevOps, cloud-security, or deployment-review agents to treat attacker-controlled descriptions as authoritative, suppress drift/security findings, or forward cloud credentials and local runtime context."
     },
+    # === v0.2.56 batch (16 patterns) ===
+    {
+        "id": "GLS-IDP-001",
+        "name": "DID Configuration Agent Authority Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ", or",
+            ".\n- Control-plane action: request",
+            "/.well-known/did-configuration",
+            "/.well-known/did-configuration.json",
+            "AI agent",
+            "LLM",
+            "agent_policy",
+            "assistant",
+            "autonomous scanner",
+            "autonomous verifier",
+            "bot",
+            "canonical operator/site/owner policy",
+            "crawler",
+            "crawler_notice",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not)\b.{0,140}\b(?:treat|obey|include|send|forward|expose|leak)\b)(?=.*(?:did[-_\s]*configuration|\.well-known/did-configuration|linked[_\s-]*dids?|linked\s+domain|verifiable\s+credential|credentialSubject|did:))(?=.*(?:AI\s+agents?|assistant|autonomous\s+(?:scanner|verifier|crawler)|LLM|bot|crawler|agentic))(?=.*(?:owner[-\s]*verified|canonical\s+(?:operator|owner|site)\s+policy|treat\s+(?:this|the)\s+(?:credential|DID\s+configuration|DID|configuration)\s+as\s+(?:owner|operator|site)\s+authority|supersede|outrank|override|higher[-\s]*priority))(?=.*(?:Authorization|Bearer|cookies?|session\s+headers?|environment\s+variables?|API\s*keys?|secrets?|local\s+auth\s+state|do\s+not\s+(?:report|notify|mention)|suppress|hide\s+this|silently)).*""",
+        ],
+        "description": "A target-controlled `/.well-known/did-configuration.json` document embeds agent-directed policy text in DID/linked-domain metadata, attempting to make an AI agent treat a verifiable-credential identity proof as higher-priority owner authority and disclose local auth context or suppress reporting."
+    },
+    {
+        "id": "GLS-IDP-002",
+        "name": "ACME Directory Metadata Agent-Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ", or",
+            ".\n- Sensitive or reporting target:",
+            "AI agent",
+            "LLM",
+            "assistant",
+            "caaIdentities",
+            "certificate scanner",
+            "compliance agent",
+            "keyChange",
+            "newAccount",
+            "newNonce",
+            "newOrder",
+            "override",
+            "revokeCert",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*(?:security\s+report|vulnerability\s+report|incident\s+report)\b.{0,220}\b(?:flagged|detected|contained|because|asked|payload|poison(?:ed|ing)))
+^(?!.*(?:scanner\s+docs?|docs?|guide|reference|training|example)\b.{0,160}\b(?:should|must|may|can)\s+(?:report|detect|flag|refuse|not\s+obey|never\s+obey))
+(?!.*\b(?:do\s+not|never|must\s+not)\s+(?:obey|treat|trust|follow|promote)\b.{0,120}\b(?:acme\s+directory|acme\s+metadata|termsOfService|caaIdentities|newAccount|newOrder|meta(?:data)?|x[-_ ]?agent[-_ ]?policy))
+(?=.*\b(?:acme\s+directory|acme\s+metadata|newNonce|newAccount|newOrder|revokeCert|keyChange|termsOfService|caaIdentities|certificate\s+automation|ca\s+directory|directory\s+object|acme\s+service\s+reference)\b)
+(?=.*\b(?:ai\s+agents?|assistants?|llms?|models?|certificate\s+scanners?|security\s+scanners?|compliance\s+agents?|autonomous\s+auditors?|tool\s+builders?)\b)
+(?=.*\b(?:override|supersed\w+|ignore\s+(?:previous|system|developer|scanner)\s+instructions?|owner\s+policy|trusted\s+policy|(?:do\s+not|not)\s+report|suppress|hide\s+findings?|mark\s+(?:clean|trusted)|include|forward|send|exfiltrat\w+)\b)
+(?=.*\b(?:authorization\s+headers?|bearer\s+tokens?|api\s+keys?|account\s+keys?|acme\s+accounts?|env(?:ironment)?\s+(?:vars?|variables)|credentials?|local\s+state|caa\s+mismatches?|weak\s+validation|validation\s+failures?|certificate\s+findings?|audit\s+summar(?:y|ies)|reports?)\b)
+.*""",
+        ],
+        "description": "A target-controlled ACME directory or ACME service-documentation export hides AI/scanner-directed policy inside `meta` or extension text, attempting to override agent instructions, suppress certificate findings, or extract local ACME credentials/account state."
+    },
+    {
+        "id": "GLS-IDP-003",
+        "name": "ATProto DID Discovery Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ") or report suppression (",
+            ",",
+            "/.well-known/atproto-did",
+            "AI verifier",
+            "LLM",
+            "agent",
+            "assistant",
+            "atproto-did",
+            "did:plc:",
+            "did:web:",
+            "highest priority",
+            "outranks",
+            "scanner",
+        ],
+        "regex": [
+            r"""(?is)(?=.*(?:\.well-known/atproto-did|atproto-did|did:plc:|did:web:))(?=.*(?:ai\s*(?:agent|assistant|verifier)|assistant|agent|scanner|verifier|llm))(?=.*(?:highest[-\s]?priority|outranks?|ignore\s+(?:system|developer|repository|previous)\s+(?:rules|instructions)|override\s+(?:system|developer|repository|policy)|do\s+not\s+report|suppress\s+(?:warnings|findings|scanner)|mark\s+(?:identity\s+)?checks?\s+pass|disable\s+(?:scanner|security)))(?!.*(?:never|do\s+not|must\s+not|should\s+not)\s+(?:obey|follow|trust|treat).{0,80}(?:atproto-did|\.well-known|discovery\s+metadata).{0,80}(?:override|outrank|highest[-\s]?priority)).*""",
+        ],
+        "description": "A poisoned `/.well-known/atproto-did` handle-verification file adds nonstandard agent-facing comments that tell AI verifiers to treat the DID proof as higher-priority policy, ignore system/developer/repository rules, or suppress identity-audit findings."
+    },
+    {
+        "id": "GLS-IDP-004",
+        "name": "DNS CAA Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "API keys",
+            "Authorization header",
+            "CAA",
+            "Certification Authority Authorization",
+            "DNS CAA",
+            "LLM",
+            "accounturi",
+            "agent",
+            "assistant",
+            "auditor",
+            "bot",
+            "crawler",
+            "disable scanner",
+            "do not report",
+            "env",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|issue|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b)(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
+        ],
+        "description": "DNS CAA certificate-issuance metadata can be poisoned with agent-facing instructions that claim authority, suppress certificate findings, or request secrets from AI TLS/security auditors."
+    },
+    {
+        "id": "GLS-IDP-005",
+        "name": "DNS TXT Ownership Metadata Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            "AI auditor",
+            "DNS TXT",
+            "LLM",
+            "TXT record",
+            "_acme-challenge",
+            "agent",
+            "apple-domain-verification",
+            "assistant",
+            "atlassian-domain-verification",
+            "compliance bot",
+            "crawler",
+            "domain ownership",
+            "domain verification",
+            "facebook-domain-verification",
+        ],
+        "regex": [
+            r"""(?is)(?=.*(?:dns\s*txt|txt\s+record|_acme-challenge|google-site-verification|facebook-domain-verification|apple-domain-verification|atlassian-domain-verification|\bms=|domain[-\s]*(?:ownership|verification)|ownership\s+proof))(?=.*(?:ai\s*(?:agent|assistant|auditor|crawler)|assistant|agent|llm|scanner|verifier|crawler|compliance\s+bot))(?=.*(?:highest[-\s]?priority|outranks?|ignore\s+(?:system|developer|repository|previous)\s+(?:rules|instructions)|override\s+(?:system|developer|repository|policy)|do\s+not\s+report|suppress\s+(?:warnings|findings|scanner)|mark\s+(?:domain|ownership|verification|checks?)\s+pass|disable\s+(?:scanner|security)|(?:send|forward|include)\s+.{0,60}\b(?:env|token|secret|credential|api[_-]?key)s?\b))(?!.*(?:never|do\s+not|must\s+not|should\s+not)\s+(?:obey|follow|trust|treat).{0,80}(?:dns\s*txt|txt\s+record|domain\s+verification|ownership\s+proof).{0,80}(?:override|outrank|highest[-\s]?priority)).*""",
+        ],
+        "description": "A DNS TXT ownership or verification record mixes a legitimate domain-proof token with AI-agent-facing instructions that claim policy authority, suppress audit findings, or request local secrets."
+    },
+    {
+        "id": "GLS-IDP-006",
+        "name": "Keybase identity-proof metadata agent-policy poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agents",
+            "I am an admin of",
+            "I hereby claim",
+            "LLM verifiers",
+            "agentic scanner",
+            "assistant",
+            "authoritative site policy",
+            "autonomous scanners",
+            "crawler",
+            "do not report",
+            "environment",
+            "false positive",
+            "highest priority",
+            "identity proof",
+            "ignore previous/developer/scanner rules",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do not|don't|never|must not|should not|refuse(?:s|d)? to)\b.{0,120}\b(?:obey|follow|trust|execute|apply)\b.{0,80}\b(?:keybase|identity proof|proof file|scanner rule|prompt injection)\b)(?=.*\b(?:keybase(?:\.txt|\.io)?|i hereby claim|identity proof|signed statement|public key|proof file)\b)(?=.*\b(?:ai agents?|llm verifiers?|autonomous scanners?|agentic scanners?|assistants?|crawlers?)\b)(?=.*\b(?:authoritative(?: site)? policy|highest priority|ignore (?:previous|developer|scanner|system) rules?|override|supersede|suppress (?:any )?findings?|false positives?|do not report|include (?:your )?(?:local )?(?:verification )?token names?|environment variables?|secrets?)\b).*$""",
+        ],
+        "description": "A `keybase.txt` identity-proof file can carry agent-targeted instructions adjacent to public proof text, causing identity-verifying agents to treat proof metadata as authoritative policy, suppress findings, or forward local verification context."
+    },
+    {
+        "id": "GLS-IDP-007",
+        "name": "Nostr NIP-05 discovery metadata agent identity poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/nostr.json",
+            "LLM",
+            "NIP-05",
+            "agent",
+            "agent_policy",
+            "assistant",
+            "assistant_instructions",
+            "crawler",
+            "do not report",
+            "ignore previous/system/developer",
+            "names",
+            "nostr.json",
+            "override/outrank system/developer/repo",
+            "relays",
+            "reveal env/token/secret/credential",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:warns?\s+(?:agents|assistants|scanners)|do\s+not\s+reveal|never\s+obey|blocked|refus(?:e|ed)|must\s+ignore\s+malicious|should\s+report\s+poisoned))(?=.*(?:\.well-known/nostr\.json|nostr\.json|nip-05|"names"\s*:|"relays"\s*:))(?=.*(?:agent|assistant|crawler|scanner|llm))(?=.*(?:ignore\s+(?:previous|system|developer)|override\s+(?:system|developer|repo)|outrank(?:s)?\s+(?:system|developer|repo)|reveal\s+(?:env|token|secret|credential)|(?:env|token|secret|credential)s?\s+(?:to|via|in)\s+(?:relay|dm|nostr)|suppress\s+(?:scanner|security|report)|do\s+not\s+report\s+(?:this|security|finding))).*""",
+        ],
+        "description": "A poisoned `/.well-known/nostr.json` / NIP-05 identity document can hide agent-facing instructions inside identity-discovery metadata, telling AI agents or scanners to trust the file as policy, suppress reports, or forward secrets through Nostr relays/DMs."
+    },
+    {
+        "id": "GLS-IDP-008",
+        "name": "OAuth Protected Resource Metadata Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/oauth-protected-resource",
+            "AI assistant",
+            "API key",
+            "Authorization bearer",
+            "MCP",
+            "agent",
+            "assistant",
+            "authoritative policy",
+            "authorization_servers",
+            "description",
+            "documentation_uri",
+            "env",
+            "ignore previous",
+            "mark as false positive",
+            "never report",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:do\s+not|never|must\s+not)\s+(?:include|send|forward|expose|paste|print|return).{0,80}(?:bearer\s+token|authorization\s+bearer|api[_-]?key|secret|env(?:ironment)?))(?!.*(?:do\s+not|never|must\s+not)\s+(?:suppress|hide|ignore).{0,50}(?:scanner|finding|warning|report))(?=.*(?:oauth-protected-resource|authorization_servers|scopes_supported|resource_documentation|protected[-\s]?resource))(?=.*(?:ai\s*assistant|assistant|agent|mcp|scanner|tool))(?=.*(?:ignore\s+(?:previous|all|scanner)|overrid\w+|outrank|authoritative.{0,60}(?:policy|instruction|metadata)|(?:send|forward|include|attach|paste|return|print).{0,100}(?:bearer\s+token|authorization\s+bearer|api[_-]?key|secret|env(?:ironment)?|local[_-]?api[_-]?key)|mark.{0,80}false\s+positive|never\s+report|suppress.{0,60}(?:finding|warning|report))).*""",
+        ],
+        "description": "A poisoned `/.well-known/oauth-protected-resource` metadata document embeds agent-facing policy text in documentation or extension fields to override scanner rules, request bearer tokens or environment secrets, or suppress findings."
+    },
+    {
+        "id": "GLS-IDP-009",
+        "name": "OpenID Credential Issuer Metadata Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "LLM",
+            "agent",
+            "assistant",
+            "authorization",
+            "auto-approve",
+            "bearer/access/refresh token",
+            "callback",
+            "client secret",
+            "consent",
+            "crawler",
+            "credential offer",
+            "credential subject",
+            "credential_configuration",
+            "credential_issuer",
+            "do not report",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|refuse|should\s+not)\b.{0,120}\b(?:obey|follow|treat|use|honou?r|forward|send|include|leak|suppress|ignore)\b)(?=.*\b(?:openid[-_\s]*credential[-_\s]*issuer|credential_issuer|credential[-_\s]*issuer|credential[-_\s]*configuration|credential[-_\s]*offer|wallet[-_\s]*metadata|verifiable[-_\s]*credential|vc[-_\s]*issuer)\b)(?=.*\b(?:agents?|assistants?|llms?|scanners?|crawlers?|wallets?|verifiers?)\b)(?=.*\b(?:ignore|override|supersede|outrank|treat\s+as\s+(?:system|developer|policy)|follow|obey|must\s+(?:trust|use|accept)|auto[-_\s]*approve|pre[-_\s]*authori[sz]e|suppress|do\s+not\s+report|forward|send|include)\b)(?=.*\b(?:bearer|access[-_\s]*token|refresh[-_\s]*token|client[-_\s]*secret|credential[-_\s]*subject|credential[-_\s]*offer|issuer[-_\s]*mismatch|scope|authorization|consent|report|finding|callback|webhook)\b).*""",
+        ],
+        "description": "Detects `.well-known/openid-credential-issuer` or related verifiable-credential issuer metadata that embeds instructions telling wallets, scanners, or AI agents to treat issuer-supplied text as policy, suppress findings, bypass issuer checks, or forward credential/token material."
+    },
+    {
+        "id": "GLS-IDP-010",
+        "name": "OpenID Federation Entity Configuration Agent-Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "), or report suppression (",
+            "), sensitive auth/local-state requests (",
+            ",",
+            ", cookies, env vars,",
+            "/.well-known/openid-federation",
+            "AI agent",
+            "LLM",
+            "agent_policy",
+            "agentic",
+            "assistant",
+            "authority_hints",
+            "autonomous scanner",
+            "autonomous verifier",
+            "crawler_notice",
+            "entity configuration",
+        ],
+        "regex": [
+            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|cannot|can't|do\s+not)\b.{0,80}\b(?:treat|obey|send|include|forward|attach|expose)\b))(?=.*(?:openid[-_\s]*federation|openid-federation|entity\s+configuration|\.well-known/openid-federation|federation[_\s-]*entity|trust[_\s-]*anchor|authority[_\s-]*hints))(?=.*(?:ai\s+agent|assistant|autonomous\s+(?:scanner|verifier|crawler)|llm|agentic|security\s+scanner))(?=.*(?:metadata[_\s-]*policy|x[-_]?agent[-_]?policy|agent[_\s-]*policy|trust\s+chain|authority[_\s-]*hint|federation\s+operator|trust\s+anchor))(?=.*(?:supersede|outrank|override|higher[-\s]*priority|treat\s+(?:this|the)\s+(?:entity\s+configuration|federation\s+statement|trust\s+chain)\s+as\s+(?:operator|owner|policy)\s+authority|canonical\s+(?:operator|issuer|federation)\s+policy|send|include|forward|attach|expose|Authorization|Bearer|cookie|environment\s+variables?|client_secret|suppress|do\s+not\s+(?:report|notify|mention))).*""",
+        ],
+        "description": "A target-controlled OpenID Federation entity configuration embeds non-standard `agent_policy` / `metadata_policy` text that tells AI agents to treat federation metadata as higher-priority operator authority, disclose local auth context, or suppress reports."
+    },
+    {
+        "id": "GLS-IDP-011",
+        "name": "SAML Metadata Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".env",
+            "AI agent",
+            "API key",
+            "ContactPerson",
+            "EntityAttributes",
+            "EntityDescriptor",
+            "IDPSSODescriptor",
+            "IDP_CLIENT_SECRET",
+            "LLM",
+            "OrganizationDisplayName",
+            "SAML metadata",
+            "SAML_TOKEN",
+            "SPSSODescriptor",
+            "SSO audit",
+            "UIInfo",
+        ],
+        "regex": [
+            r"""(?is)(?!(?=.*(?:training|example\s+malicious|must\s+not\s+obey|do\s+not\s+include\s+(?:API[_ -]?keys?|tokens?|secrets?))))(?=.*(?:EntityDescriptor|IDPSSODescriptor|SPSSODescriptor|OrganizationDisplayName|ContactPerson|UIInfo|EntityAttributes|md:Extensions|SAML\s+metadata))(?=.*(?:AI\s+agents?|assistants?|LLMs?|models?|scanners?|audit(?:ing)?\s+agents?|SSO\s+audit))(?=.*(?:ignore|outranks?|override|supersedes?|do\s+not\s+report|suppress|hide|include|send|exfiltrate|forward|disclose|copy))(?=.*(?:system|developer|policy|instructions|findings?|audit\s+notes?|SAML_TOKEN|IDP_CLIENT_SECRET|API[_ -]?keys?|tokens?|secrets?|\.env|environment\s+variables?)).*""",
+        ],
+        "description": "SAML federation metadata can hide agent-directed authority inversion, report suppression, or secret-disclosure instructions inside legitimate XML metadata fields that SSO-audit agents may ingest as trusted context."
+    },
+    {
+        "id": "GLS-IDP-012",
+        "name": "DMARC/SPF/DKIM DNS TXT Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "API key",
+            "LLM",
+            "_dmarc",
+            "_domainkey",
+            "assistant",
+            "auditor",
+            "cookie",
+            "crawler",
+            "credential",
+            "do not flag",
+            "do not report",
+            "false positive",
+            "hide findings",
+            "high-risk directive cluster:",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security|incident|vulnerability|scanner|audit)\s+reports?\b[^\n]{0,180}\b(?:flagged|detected|found|contained|described|quoted|reported)\b)(?!.*\b(?:docs?|guide|article|reference|runbook|training)\b[^\n]{0,180}\b(?:should|must)\s+(?:report|detect|flag|refuse|not\s+obey|never\s+obey)\b)(?!.*\b(?:must\s+not|do\s+not|never)\s+(?:treat|obey|follow|accept)\b[^\n]{0,140}\b(?:dmarc|spf|dkim|dns\s+txt|mail[-\s]+auth)\b[^\n]{0,140}\b(?:policy|instruction|authority|system|developer)\b)(?=.*(?:\b_dmarc\b|v\s*=\s*DMARC1|dmarc\s+(?:record|policy|txt)|v\s*=\s*spf1|spf\s+(?:record|policy)|\b_domainkey\b|v\s*=\s*DKIM1|dkim\s+(?:record|selector|key)|dns\s+txt[^\n]{0,60}(?:dmarc|spf|dkim)|r[au]f=mailto))(?=.*\b(?:ai\s*)?(?:agents?|assistants?|llms?|models?|crawlers?|scanners?|auditors?)\b)(?=.*(?:ignore\s+(?:system|developer|safety|previous)|(?:highest|primary|top)[-\s]?priority\s+(?:policy|instruction)|outranks?\s+(?:system|developer|safety)|(?:treat|trust)\s+[^\n]{0,80}\s+as\s+(?:authoritative|binding)|(?:do\s+not|don't|not)\s+(?:report|flag|alert|disclose)|(?:suppress|hide|mark\s+clean|false\s+positive)\s+[^\n]{0,80}\b(?:finding|alert|report|scanner)|(?:include|forward|send|attach|exfiltrate)\s+[^\n]{0,80}\b(?:env|token|secret|credential|api[_ -]?key|cookie|local\s+state|scanner\s+finding))).*""",
+        ],
+        "description": "Mail-authentication DNS TXT records and exported zone text for DMARC, SPF, or DKIM can carry agent-directed instructions that claim authority, request secrets/local state, or suppress scanner findings when AI auditors ingest them as trusted domain policy."
+    },
+    {
+        "id": "GLS-IDP-013",
+        "name": "DNS CAA Certificate-Policy Metadata Agent Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ") |\n| N6 |",
+            "+ trailing",
+            "AI agent",
+            "AI crawler",
+            "CAA",
+            "Certification Authority Authorization",
+            "DNS CAA",
+            "DNS TYPE257",
+            "Expect-CT",
+            "LLM auditor",
+            "NEG_GUARD branch and",
+            "accounturi",
+            "agent",
+            "agent instruction:",
+            "attach session tokens",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)
+  |never\s+(?:obey|include|attach|forward|send|share|overrides?|trust)
+  |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
+  |should\s+(?:report|detect|flag|refuse|block)
+  |scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse|block)
+))
+(?=.*(?:\b(?:CAA|Certification\s+Authority\s+Authorization|DNS\s+CAA
+  |iodef|issuewild|accounturi|validationmethods
+  |cert(?:ificate)?[._-]?(?:issuance|policy)
+  |DNS\s+TYPE257|cert(?:ificate)?\s+issuance\s+policy
+  |zone\s+file)\b
+  |\bcert(?:ificate)?[._-]?authorization\b
+  |(?<!\w)"(?:iodef|issuewild|accounturi|validationmethods|scanner_policy|agent_policy)"))
+(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|autonomous\s+(?:agents?|scanners?|crawlers?|verifiers?|auditors?)
+  |security\s+(?:scanners?|auditors?)|compliance\s+(?:scanners?|auditors?|bots?)
+  |cert(?:ificate)?[._-]?(?:scanners?|auditors?|verifiers?)
+  |agents?|assistants?|crawlers?|scanners?|models?|LLMs?|bots?|verifiers?|auditors?)
+  (?![a-zA-Z0-9]))
+(?=.*(?:\b(?:
+  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?
+  |takes?\s+precedence|higher\s+priority
+  |(?:primary|single)\s+source\s+of\s+truth
+  |governing\s+document|controlling\s+document
+  |is\s+the\s+final\s+word|defines\s+all\s+scanner\s+rules?
+  |is\s+the\s+reference\s+implementation
+  |canonical(?:\s+(?:project|model|security|governing|policy))?(?:\s+(?:description|policy|document))?
+  |definitive(?:\s+(?:project|model\s+evaluation))?(?:\s+(?:description|policy))?
+  |must\s+obey|before\s+(?:system|developer|user)\s+rules?
+  |ignore\s+(?:previous|system|developer|user)\s+(?:system\s+)?instructions?
+  |highest\s+priority\s+policy
+  )\b
+  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)\s+instructions?
+  (?![a-zA-Z0-9])))
+(?=.*(?:\b(?:
+  (?:(?:do\s+not\s+|never\s+)(?:report|flag|escalate|notify|mention)
+    |suppress(?:es|ed|ing)?
+    |hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?)
+    |skip\s+(?:all\s+)?(?:security\s+)?checks?
+    |omit.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)
+    |exclude.{0,2}(?:[\w-]+\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)
+    |redact.{0,30}?(?:findings?|warnings?|flags?)
+    |treat.{0,40}?as\s+informational
+    |mark.{0,40}?as\s+(?:informational|safe|low|none)
+    |classify.{0,30}?(?:as\s+)?(?:informational|low|none|false\s+positive)
+    |flag.{0,40}?as\s+(?:informational|low|none)
+  )
+  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate)
+    \s+(?:[\w-]+\s+){0,4}
+    (?:environment\s+(?:variables?|context)|runtime\s+(?:variables?|context)
+      |API\s+(?:keys?|tokens?)|Bearer\s+tokens?|session\s+(?:tokens?|headers?)
+      |auth\s+(?:tokens?|headers?|context)|local\s+state|credentials?|secrets?
+      |Authorization|GITHUB_TOKEN|CI_ENV)
+  )\b))""",
+        ],
+        "description": "Attacker embeds hostile agent/scanner policy instructions inside DNS CAA (Certification Authority Authorization) records \u2014 `iodef`, `issuewild`, `accounturi`, `validationmethods` fields, zone-file comments, or DNS-provider JSON wrappers \u2014 causing AI certificate auditors, TLS scanners, and compliance"
+    },
+    {
+        "id": "GLS-IDP-014",
+        "name": "JWKS metadata agent-policy poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "\"keys\"",
+            "\"kid\"",
+            "\"kty\"",
+            "\"x5u\"",
+            "AI agent",
+            "API key",
+            "Authorization",
+            "JSON Web Key Set",
+            "JWK Set",
+            "LLM",
+            "assistant",
+            "auditor",
+            "bearer",
+            "cookie",
+            "developer",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*(?:do\s+not|never|must\s+not)\s+(?:obey|treat|trust|follow|honou?r|accept).{0,90}(?:jwks|jwk\s+set|json\s+web\s+key|kid|x5u))
+(?!.*(?:security|vulnerability|incident)\s+report.{0,140}(?:jwks|jwk\s+set|json\s+web\s+key).{0,180}(?:hide\s+findings|suppress|include\s+(?:api\s+)?tokens?))
+(?!.*(?:scanner|validator|auditor)s?\s+docs?\s+should\s+(?:report|detect|flag|refuse).{0,180}(?:jwks|jwk\s+set|json\s+web\s+key|kid|x5u))
+(?=.*(?:jwks_uri|jwks\.json|jwk\s+set|json\s+web\s+key\s+set|json\s+web\s+key|"keys"\s*:|"kty"\s*:|"kid"\s*:|"x5u"\s*:|x-agent-policy|x_scanner_policy))
+(?=.*\b(?:ai\s+agents?|assistants?|llms?|models?|scanners?|auditors?|token\s+validators?|security\s+tools?|integration\s+agents?)\b)
+(?=.*\b(?:ignore|override|supersede|outrank|highest\s+priority|do\s+not\s+report|not\s+report|suppress|hide\s+findings|mark\s+(?:this\s+)?(?:jwks|key|issuer)\s+clean|forward|send|include)\b)
+(?=.*\b(?:system|developer|policy|scanner|findings?|reports?|warnings?|bearer|authorization|api\s*key|tokens?|cookie|session|env|local\s+state|secret)\b)
+.*""",
+        ],
+        "description": "A JWKS / JSON Web Key Set endpoint can hide agent-facing instructions in key metadata or custom fields that tell AI auditors, token validators, or scanners to override policy, suppress identity findings, or include local bearer/API/session material in reports."
+    },
+    {
+        "id": "GLS-IDP-015",
+        "name": "Certificate Transparency log metadata agent-policy poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent(s)",
+            "CT log",
+            "Certificate Transparency",
+            "LLM(s)",
+            "Merkle tree leaf",
+            "SCT",
+            "Signed Certificate Timestamp",
+            "TLS auditor(s)",
+            "agent instruction",
+            "agent_note",
+            "assistant(s)",
+            "authoritative",
+            "canonical certificate policy",
+            "certificate inventory",
+            "certificate scanner(s)",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|
+  does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|
+  never\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|
+  must\s+not\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)|
+  should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+)\b.{0,180}?(?:certificate\s+transparency|ct\s+logs?|sct|signed\s+certificate\s+timestamp|certificate\s+(?:metadata|monitor|inventory)|tls\s+(?:audit|scanner)|crt\.sh)?)
+(?!.*\b(?:scanner|security|training|runbook|guide|reference|incident|vulnerability)\s+(?:docs?|report|example|exercise|guidance)?\b.{0,140}\b(?:should|must)\s+(?:report|detect|flag|refuse|block)\b)
+(?!.*\b(?:no\s+agent\s+policy|not\s+agent\s+policy|not\s+authoritative|not\s+policy|no\s+policy\s+overrides?|does\s+not\s+instruct\s+agents?)\b)
+(?=.*(?:
+  certificate\s+transparency|\bct\s+logs?\b|signed\s+certificate\s+timestamps?|\bscts?\b|
+  crt\.sh|certstream|precertificates?|pre[-\s]?certs?|inclusion\s+proof|merkle\s+tree\s+leaf|
+  log[_-]?id|leaf[_-]?input|extra[_-]?data|ct\.googleapis\.com|x509|x\.509|
+  certificate\s+(?:monitor|inventory|metadata|posture|audit)|monitor[_-]?note|certificate[_-]?note
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:ai\s+)?agents?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])(?:certificate|tls|security|ct)\s+(?:scanners?|auditors?|monitors?)(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])(?:audit|review)\s+bots?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])agent[_-]notes?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  agent\s+instructions?|scanner\s+(?:instructions?|directives?)|assistant\s+instructions?|
+  canonical\s+(?:(?:certificate|ct|tls|monitor)\s+){0,2}(?:policy|metadata|instructions?)|
+  definitive\s+(?:(?:certificate|ct|tls|monitor)\s+){0,2}(?:policy|metadata|instructions?)|
+  (?:primary|single)\s+source\s+of\s+truth|
+  higher[-\s]?priority|highest[-\s]?priority|authoritative|governing\s+(?:policy|document)|
+  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|must\s+obey
+))
+(?=.*(?:
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\s+risks?)|
+  hide(?:s|den|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\s+risks?)|
+  omit(?:s|ted|ting)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\s+risks?)|
+  exclude(?:s|d|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|certificate\s+risks?)|
+  (?:do\s+not|not)\s+report\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration)|
+  (?:treat|mark|classify|downgrade).{0,60}?as\s+(?:informational|non[-\s]?blocking|safe|clean|low\s+risk)|
+  (?:include|forward|send|attach|copy|read|collect|provide|populate|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env(?:ironment)?|api\s+keys?|authorization\s+headers?|bearer\s+tokens?|cookies?|session\s+(?:headers?|tokens?|state)|ci\s+oidc\s+tokens?|oidc\s+tokens?|local\s+(?:state|context|config(?:uration)?|settings?)|runtime\s+(?:context|details?|config(?:uration)?|settings?))
+))
+.*""",
+        ],
+        "description": "Certificate Transparency log entries, monitor annotations, or generated certificate-inventory metadata can smuggle agent-facing policy text that tells TLS/security auditors to suppress certificate findings or forward local secrets."
+    },
+    {
+        "id": "GLS-IDP-016",
+        "name": "DNS SVCB / HTTPS Service-Binding Metadata Agent-Policy Poisoning",
+        "category": "identity_discovery_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "Authorization",
+            "HTTPS RR",
+            "SVCB",
+            "Service Binding",
+            "TYPE64",
+            "TYPE65",
+            "agent instruction",
+            "agent_instructions",
+            "alpn",
+            "attach",
+            "authoritative",
+            "canonical",
+            "collect",
+            "defines scanner rules",
+            "definitive",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)
+  |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat|instruct)
+  |never\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)
+  |must\s+not\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)
+  |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+  |no\s+(?:policy\s+)?overrides?
+  |not\s+(?:authoritative|canonical|definitive)
+  |(?:scanner|security|incident|vulnerability|training|runbook|guide|reference)\s+(?:docs?|report|example|exercise|guidance).{0,140}\b(?:detected|blocked|flagged|refused|should\s+(?:report|detect|flag|refuse|block)|must\s+(?:report|detect|flag|refuse|block))
+  |scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse|block)
+))
+(?=.*(?:
+  \b(?:SVCB|HTTPS\s+(?:RR|record)|Service\s+Binding|DNS\s+HTTPS|DNS\s+SVCB|TYPE\s*64|TYPE\s*65|RRtype\s*65|RRtype\s*64|svcparams?|svcparamkey|echconfig|ipv4hint|ipv6hint|dohpath|alpn|mandatory|zone\s+file|DNS\s+provider\s+export)\b
+  |(?<!\w)"(?:svcparams|echconfig|alpn|ipv4hint|ipv6hint|dohpath|agent_instructions|scanner_policy|agent_policy)"
+  |_[0-9]+\._tcp\b
+))
+(?=.*(?<![a-zA-Z0-9])(?:
+  AI\s+agents?|autonomous\s+(?:agents?|scanners?|crawlers?|auditors?|verifiers?)|security\s+(?:scanners?|auditors?)|TLS\s+(?:scanners?|auditors?)|HTTPS\s+(?:scanners?|auditors?)|resolver\s+(?:scanners?|auditors?)|DNS\s+(?:scanners?|auditors?)|compliance\s+(?:bots?|scanners?|auditors?)|agents?|assistants?|crawlers?|scanners?|models?|LLMs?|bots?|auditors?|verifiers?
+)(?![a-zA-Z0-9]))
+(?=.*(?:
+  \b(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|highest\s+priority\s+policy|(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|is\s+the\s+final\s+word|authoritative|main\s+operating\s+guidance|operating\s+guidance|defines?\s+all\s+(?:scanner|security|agent)\s+rules?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent)\s+(?:review|audit|scan)|is\s+the\s+reference\s+implementation|canonical(?:\s+(?:project|model|security|governing|policy))?(?:\s+(?:description|policy|document))?|definitive(?:\s+(?:project|model\s+evaluation))?(?:\s+(?:description|policy))?|must\s+obey|ignore\s+(?:previous|system|developer|user)\s+(?:system\s+)?instructions?)\b
+  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)\s+(?:instructions?|directive|notice)(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  \b(?:do\s+not\s+(?:report|flag|escalate|notify|mention)|never\s+(?:report|flag|escalate|notify|mention)|not\s+report|suppress(?:es|ed|ing)?|hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|diagnostics?|observations?|results?)|skip\b.{0,30}?\b(?:security\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|diagnostics?)|omit.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?)|exclude.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?)|redact.{0,35}?(?:findings?|warnings?|flags?|diagnostics?|observations?)|treat.{0,45}?as\s+informational|mark.{0,45}?as\s+(?:informational|safe|low|none|clean)|classify.{0,35}?(?:as\s+)?(?:informational|low|none|false\s+positive|clean)|flag.{0,45}?as\s+(?:informational|low|none)|(?:keep|leave).{0,45}?(?:findings?|warnings?|alerts?|reports?|flags?|diagnostics?|observations?|results?|issues?).{0,30}?out\s+of\s+(?:the\s+)?(?:memo|summary|report|audit|final\s+report|audit\s+memo))\b
+  |\b(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\s+(?:state|context|config(?:uration)?|settings?)|API\s+(?:keys?|tokens?)|Bearer\s+tokens?|session\s+(?:tokens?|headers?)|auth\s+(?:tokens?|headers?|context)|Authorization\s+headers?|cookies?|credentials?|secrets?|DNS\s+provider\s+tokens?|zone\s+transfer\s+credentials?)\b
+))""",
+        ],
+        "description": "Attacker-controlled DNS SVCB / HTTPS service-binding records, zone-file comments, or DNS-provider export metadata can smuggle AI-agent/scanner instructions that claim authority over TLS/HTTPS audit behavior, suppress findings, or request local credentials."
+    },
 ]
