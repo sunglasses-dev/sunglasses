@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.56] — 2026-05-31
+
+### Added (V2 SHIP #2 — identity_discovery_poisoning)
+
+- **16 new patterns in the `identity_discovery_poisoning` category** — `GLS-IDP-001` through `GLS-IDP-016` (second V2 ship). New category covering agent-policy poisoning hidden in identity, ownership, and verification metadata that AI agents fetch during discovery: DID configuration (`.well-known/did-configuration.json`), ACME directory metadata, ATProto DID, DNS CAA / TXT ownership records, Keybase identity proofs, Nostr NIP-05, OAuth Protected Resource & OpenID Credential Issuer metadata, OpenID Federation entity configuration, SAML federation metadata, DMARC/SPF/DKIM DNS TXT, JWKS endpoints, Certificate Transparency log metadata, and DNS SVCB/HTTPS service-binding records. Pattern count: 890 → **906**. Category count: 56 → **57**. Keywords: 5,726 → **5,964**.
+- **New blog:** [Identity Discovery Poisoning](https://sunglasses.dev/blog/identity-discovery-poisoning) — how attackers turn verification metadata against AI agents, and why runtime trust is the defense. Written by JACK, research by Cava.
+
+### Fixed
+
+- **Blog template regression:** the `structured-metadata-poisoning` blog (v0.2.55) rendered its "On this page" table of contents as raw links pinned to the top-left corner on desktop and mobile, because it used `<nav class="toc">` (caught by the global `nav{position:fixed}` rule) instead of `<div class="toc">`. Rebuilt the TOC element; verified correct on desktop and 375px mobile.
+
+
 ## [0.2.55] — 2026-05-31
 
 ### Added (V2 FIRST SHIP — structured_metadata_poisoning)
