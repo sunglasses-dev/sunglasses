@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.55] — 2026-05-31
+
+### Added (V2 FIRST SHIP — structured_metadata_poisoning)
+
+- **17 new patterns in the `structured_metadata_poisoning` category** — `GLS-SMP-001` through `GLS-SMP-017` (first V2 ship). New category covering attack classes that exploit structured metadata surfaces: LLM-readable manifest fields, API spec descriptions, YAML/TOML config comments, CI pipeline annotations, container labels, and package metadata files. Pattern count: 873 → **890**. Category count: 55 → **56**. Keywords: 5,726 (unchanged).
+- **New blog:** [Structured Metadata Poisoning](https://sunglasses.dev/blog/structured-metadata-poisoning) — how attackers inject instructions into structured fields that LLMs read as trusted context. Written by JACK, research by Cava.
+
+### Context
+
+- First V2 ship. V1 was fully drained in v0.2.54. V2 pool contains 146 patterns staged and isolated since May 21.
+
 ## [0.2.54] — 2026-05-30
 
 ### Added (V1 tail roundup — V1 FINISH)
