@@ -17138,4 +17138,450 @@ PATTERNS = [
         ],
         "description": "Attacker-controlled DNS SVCB / HTTPS service-binding records, zone-file comments, or DNS-provider export metadata can smuggle AI-agent/scanner instructions that claim authority over TLS/HTTPS audit behavior, suppress findings, or request local credentials."
     },
+    # === v0.0.0 batch (13 patterns) ===
+    {
+        "id": "GLS-APIP-001",
+        "name": "OpenAPI schema-example poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "Authorization",
+            "Bearer",
+            "Measured local fixture result:",
+            "agent",
+            "agent-compatible",
+            "api discovery",
+            "assistant",
+            "authoritative",
+            "bypass guardrails",
+            "connector",
+            "connector inventory",
+            "continue despite warnings",
+            "description",
+            "description_for_model",
+            "diagnostics",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|never|warns?\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\s+not|don't)\b.{0,160}\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\b)(?=.*\b(?:openapi|swagger|api\s+discovery|schema|operation|endpoint|requestbody|description|summary|examples?|x-agent|x-[a-z0-9_-]+)\b)(?:(?=.*\b(?:agent|assistant|model|tool|connector|for\s+ai|for\s+model)\b)|(?=.*\b(?:system\s+override|scanner|guardrail|safety)\b))(?=.*\b(?:ignore|override|supersede|highest\s+priority|authoritative|include|reveal|send|environment\s+variable|authorization|bearer|secret|scanner|false\s+positive|disable\s+safety|guardrail|system\s+override)\b).*$""",
+        ],
+        "description": "OpenAPI or Swagger discovery metadata can hide agent-targeted prompt injection in `description`, `summary`, `x-*` extension fields, and schema `example` values that agents may import as trusted tool-use guidance."
+    },
+    {
+        "id": "GLS-APIP-002",
+        "name": "Plugin Manifest Description Authority Poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".well-known",
+            "agent",
+            "agent.json",
+            "ai-plugin.json",
+            "assistant",
+            "bypass",
+            "connector",
+            "connector manifest",
+            "description for model",
+            "description_for_model",
+            "developer",
+            "disable",
+            "guardrail",
+            "has priority",
+            "higher priority",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|cannot|should\s+not|no|without)\b.{0,80}\b(?:ignore|override|supersede|outrank|bypass|disable|replace)\b.{0,80}\b(?:system|developer|policy|instruction|guardrail|safety|description)\b)(?!.*\b(?:cannot|must\s+not|should\s+not|do\s+not|don't|never)\b.{0,80}\b(?:supersede|bypass|override|outrank|ignore)\b)(?=.*\b(?:ai-plugin\.json|agent\.json|plugin\s+manifest|connector\s+manifest|\.well-known|manifest|description_for_model|description\s+for\s+model)\b)(?=.*\b(?:agent|assistant|model|connector|plugin|tool)\b)(?=.*\b(?:description_for_model|description\s+for\s+model|model\s+description|instruction\s+field|metadata\s+description)\b)(?=.*\b(?:system|developer|policy|guardrail|safety|higher\s+priority|highest\s+priority)\b)(?=.*\b(?:ignore|override|supersede|outrank|bypass|disable|replace|take\s+precedence|has\s+priority)\b)""",
+        ],
+        "description": "A `.well-known` plugin or agent manifest embeds `description_for_model` / model-description text claiming that manifest metadata outranks system or developer policy, luring an agent into treating discovery metadata as a higher-authority instruction layer."
+    },
+    {
+        "id": "GLS-APIP-003",
+        "name": "AI plugin manifest agent policy poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".well-known/ai-plugin.json",
+            "API keys",
+            "api",
+            "auth",
+            "cookies",
+            "description_for_model",
+            "do not flag",
+            "do not report",
+            "environment secrets",
+            "forward/send/exfiltrate tokens",
+            "highest-priority policy",
+            "ignore system instructions",
+            "legal_info_url",
+            "name_for_model",
+            "outrank",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|cannot|refuse(?:s|d)?\s+to|blocked\s+from)\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\b)(?=.*\b(?:\.well-known/ai-plugin\.json|name_for_model|description_for_model|legal_info_url|schema_version|auth|api)\b)(?=.*\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]+priority|system\s+instructions|developer\s+instructions|(?:do\s+not|don['’]?t)\s+.{0,40}(?:report|flag)|suppress\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\s+.{0,60}(?:token|secret|cookie|api[-\s]?key|environment))\b).+""",
+        ],
+        "description": "A site-hosted `ai-plugin.json` manifest can hide policy-like instructions in model-facing fields such as `description_for_model`, causing an agent that treats discovery metadata as trusted context to suppress findings, override higher-priority instructions, or request/forward secrets."
+    },
+    {
+        "id": "GLS-APIP-004",
+        "name": "AsyncAPI schema metadata poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".env",
+            "AI agent",
+            "API_TOKEN",
+            "CLOUD_KEY",
+            "LLM",
+            "assistant",
+            "asyncapi",
+            "automation",
+            "channels",
+            "components.messages",
+            "components.schemas",
+            "config",
+            "copilot",
+            "credentials",
+            "disable safety",
+        ],
+        "regex": [
+            r"""(?is)(?!.*\b(?:never|must\s+not|do\s+not)\s+(?:obey|include|put|paste|leak|expose|forward|print)\b)(?=.*(?:\basyncapi\b|channels\s*:|components(?:\s*:|\.)\s*(?:messages|schemas)|x-(?:agent|assistant|llm|scanner)[\w-]*|message(?:\s+|\.)description|schema(?:\s+|\.)description))(?=.*\b(ai\s*agents?|assistants?|llms?|models?|copilots?|scanners?|tools?)\b)(?=.*\b(ignore\s+(?:previous|all)|outranks?|override|higher\s+priority|system\s+instructions?|developer\s+instructions?|repository\s+rules?|environment\s+variables?|api[_-]?token|cloud[_-]?key|secret|credentials?|\.env|disable\s+safety|suppress\s+scanner|do\s+not\s+mention|false\s+positives?)\b).*""",
+        ],
+        "description": "AsyncAPI/event API discovery documents can hide agent-directed authority inversion, secret access, safety-disablement, or report-suppression instructions inside documentation fields and `x-*` extensions that AI coding agents import as trusted API context."
+    },
+    {
+        "id": "GLS-APIP-005",
+        "name": "GraphQL schema description poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "Authorization",
+            "Bearer",
+            "LLM",
+            "Measured local fixture result:",
+            "SDL",
+            "__schema",
+            "__type",
+            "agent",
+            "assistant",
+            "authoritative runtime policy",
+            "bypass guardrails",
+            "configured headers",
+            "connector",
+            "connector inventory",
+            "continue even if flagged",
+        ],
+        "regex": [
+            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|do\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\b.{0,120}\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\b)(?!.*\b(?:authoritative\s+runtime\s+policy|compatibility\s+note|diagnostic\s+mode|highest\s+priority|system\s+override|scanner\s+warnings\s+as\s+false\s+positives)\b))(?=.*\b(?:graphql|schema|introspection|sdl|type|field|mutation|query|description|deprecationreason|directive|enum)\b)(?=.*\b(?:agent|assistant|model|tool|connector|client|for\s+ai|model\s+clients?)\b)(?=.*\b(?:ignore|override|supersede|authoritative|runtime\s+policy|include|environment\s+variables?|local\s+state|scanner|false\s+positive|disable\s+safety|suppress|continue\s+even\s+if)\b).*$""",
+        ],
+        "description": "GraphQL SDL or introspection metadata can carry agent-targeted instructions in type, field, argument, directive, enum, and deprecation descriptions that agents may import as trusted API/tool guidance."
+    },
+    {
+        "id": "GLS-APIP-006",
+        "name": "gRPC / Protobuf Descriptor Agent Policy Poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".proto",
+            "API key",
+            "Authorization",
+            "Bearer",
+            "FileDescriptorProto",
+            "LLM",
+            "SourceCodeInfo",
+            "agent",
+            "assistant",
+            "cookie",
+            "crawler",
+            "credentials",
+            "disable security",
+            "do not report",
+            "env",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,100}(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner))(?!.*(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner).{0,100}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,120}(?:proto(?:buf)?|\.proto|grpc|descriptor).{0,120}(?:suppress|leak|credentials?|findings?))(?!.*(?:descriptor\s+is\s+not\s+policy|not\s+policy).{0,120}(?:never|does\s+not|do\s+not).{0,80}(?:override|outrank))(?=.*(?:proto(?:buf)?|\.proto|syntax\s*=\s*["']proto3["']|\bservice\s+\w+\s*\{|\brpc\s+\w+\s*\([^)]*\)\s+returns|FileDescriptor(?:Proto|Set)|SourceCodeInfo|leading_comments|trailing_comments|server\s+reflection|grpc\s+metadata|buf\s+registry|custom\s+option))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+API\s+clients?))(?=.*(?:ignore\s+(?:previous|scanner|security)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+descriptor|descriptor\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|metadata\s+headers?|scanner\s+findings?|security\s+reports?|logs?)).*""",
+        ],
+        "description": "Attacker-controlled gRPC/protobuf descriptor comments or option descriptions can instruct AI agents importing API metadata to treat the descriptor as policy, include local credentials in gRPC metadata, and suppress scanner findings."
+    },
+    {
+        "id": "GLS-APIP-007",
+        "name": "Postman Collection Agent-Policy Poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "API key",
+            "Authorization bearer token",
+            "Insomnia",
+            "LLM",
+            "Postman",
+            "_type: export",
+            "agent importer",
+            "assistant",
+            "authoritative owner policy",
+            "autonomous auditor",
+            "collection-level docs",
+            "collection.json",
+            "cookies",
+            "do not report",
+        ],
+        "regex": [
+            r"""(?is)(?!.*(?:AI\s+agents?|assistants?|LLMs?|security\s+scanners?|agent\s+importers?)\s+(?:must\s+not|should\s+not|never|do\s+not)\s+(?:obey|treat|trust|include|forward|suppress|hide|leak))(?=.*(?:Postman\s+collection|schema\.getpostman\.com/json/collection|collection\.json|info\.description|item\[\]\.description|request\.description|Insomnia\s+(?:export|workspace|collection)|collection-level\s+docs?))(?=.*(?:AI\s+agents?|assistants?|LLMs?|agent\s+importers?|security\s+scanners?|autonomous\s+(?:auditors?|testers?)|tool\s+generators?))(?=.*(?:authoritative\s+(?:owner\s+)?policy|supersedes?\s+(?:developer|system)\s+instructions?|outranks?\s+(?:system|developer)\s+policy|highest[-\s]?priority|trust\s+this\s+collection|ignore\s+previous\s+instructions?))(?=.*(?:Authorization\s+bearer\s+token|API\s*keys?|environment\s+variables?|cookies?|local\s+config|suppress\s+(?:the\s+)?(?:warning|finding|report)|mark\s+(?:it\s+)?false\s+positive|do\s+not\s+report)).*""",
+        ],
+        "description": "Postman or Insomnia API collection descriptions can smuggle agent-directed instructions that claim collection metadata outranks developer policy, request local credentials, or suppress scanner findings."
+    },
+    {
+        "id": "GLS-APIP-008",
+        "name": "WADL service-description agent policy poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "<application>",
+            "<doc>",
+            "<method>",
+            "<resource>",
+            "<resources>",
+            "AI agent",
+            "API agent",
+            "API key",
+            "LLM",
+            "WADL",
+            "agent policy",
+            "agentic client",
+            "alerts",
+            "application.wadl",
+            "assistant",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:docs?|documentation|guide|article|reference|training|example|scanner\s+docs?)\b.{0,120}\b(?:should|must|will|can)\s+(?:report|detect|flag|refuse|ignore)\b)
+(?!.*\b(?:do\s+not|don't|never|must\s+not|cannot|can't)\b.{0,80}\b(?:obey|treat|accept|follow|honou?r|execute|override|supersede|replace)\b)
+(?=.*\b(?:application\.wadl|\bwadl\b|<\s*application\b|<\s*resources\b|<\s*resource\b|<\s*method\b|<\s*doc\b|wadl:doc\b|wadl:application\b|wadl\s+(?:descriptor|description|file|metadata))\b)
+(?=.*\b(?:ai\s*agents?|assistants?|llms?|models?|crawlers?|scanners?|agentic\s+(?:client|crawler|scanner)|api\s+agents?|tool\s+builders?)\b)
+(?=.*\b(?:ignore|override|supersede|replace|outrank|bypass|disable|skip|treat\s+this\s+as|system\s+instruction|developer\s+instruction|agent\s+policy|hidden\s+policy|do\s+not\s+report|suppress|hide\s+(?:findings?|alerts?)|forward|include|exfiltrat(?:e|ion)|leak|send)\b)
+(?=.*\b(?:system|developer|user|scanner|policy|findings?|alerts?|report|credential|secret|token|api\s*key|cookie|session|env(?:ironment)?\s*(?:var|variable)s?|local\s+(?:state|files?))\b)
+.*""",
+        ],
+        "description": "A WADL (`application.wadl`) service-description file embeds instructions addressed to AI agents, scanners, crawlers, or tool builders that claim to override higher-priority rules, suppress findings, or forward credentials discovered while inspecting API metadata."
+    },
+    {
+        "id": "GLS-APIP-009",
+        "name": "WSDL / SOAP Service Description Agent Policy Poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".wsdl",
+            "AI agent",
+            "API key",
+            "Authorization",
+            "Bearer",
+            "LLM",
+            "SOAP Header",
+            "UDDI",
+            "WS-Security",
+            "assistant",
+            "binding",
+            "cookie",
+            "crawler",
+            "credentials",
+            "disable security",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\s+description|scanner))(?!.*(?:wsdl|soap|service\s+description|scanner).{0,120}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,140}(?:wsdl|soap|service\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\s+description|soap\s+documentation).{0,100}(?:is\s+not|never|does\s+not|do\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|\bbinding\b|\bservice\b|\boperation\b|xsd:documentation|ws[-\s]?policy|ws[-\s]?security|SOAP\s+Header|UDDI|\.wsdl|generated\s+SOAP\s+clients?))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+SOAP\s+clients?|integration\s+agents?))(?=.*(?:ignore\s+(?:previous|scanner|security|developer)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+WSDL|WSDL\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|SOAP\s+Headers?|WS[-\s]?Security|scanner\s+findings?|security\s+reports?|logs?)).*""",
+        ],
+        "description": "Attacker-controlled WSDL or SOAP service-description documentation can smuggle agent-directed policy instructions that tell tool-building agents to override scanner rules, forward local credentials into SOAP headers, or suppress security findings."
+    },
+    {
+        "id": "GLS-APIP-010",
+        "name": "IIIF manifest agent-policy poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "@context",
+            "AI",
+            "API keys",
+            "LLM",
+            "Presentation API",
+            "agent",
+            "annotation",
+            "assistant",
+            "canvas",
+            "cookies",
+            "crawler",
+            "credentials",
+            "do not report",
+            "findings",
+            "hide",
+        ],
+        "regex": [
+            r"""(?isx)
+\A
+(?!.*\b(?:security|vulnerability|incident)\s+report\b.{0,140}\b(?:payload|asked|asking|contained|contains)\b)
+(?!.*\b(?:security|scanner|training|developer|defensive)\s+(?:guide|docs?|report|training|reference|note)\b.{0,180}\b(?:should|must|will)\s+(?:detect|report|flag|refuse|reject)\b)
+(?!.*\b(?:do\s+not|don't|must\s+not|never)\s+(?:obey|treat|follow|execute|trust)\b.{0,100}\b(?:IIIF|manifest|metadata|annotation|summary)\b)
+(?=.*\b(?:IIIF|Presentation\s+API|@context["']?\s*:\s*["'][^"']*iiif|type["']?\s*:\s*["']Manifest|canvases?|annotations?|requiredStatement|summary["']?\s*:|metadata["']?\s*:|items["']?\s*:\s*\[)\b)
+(?=.*\b(?:AI|LLM|agentic|autonomous|assistants?|agents?|crawlers?|scanners?|models?|tool\s*builders?|research\s*bots?)\b)
+(?=.*\b(?:ignore|override|supersed(?:e|es)|outranks?|treat\s+as\s+(?:system|developer)\s+policy|do\s+not\s+report|not\s+report|hide|suppress(?:es|ed|ing)?|mark\s+(?:clean|safe)|include|forward|send|exfiltrat\w*)\b)
+(?=.*\b(?:system|developer|instructions?|policy|rules?|API\s*keys?|tokens?|cookies?|credentials?|local\s+state|findings?|reports?|warnings?|audit)\b)
+.*""",
+        ],
+        "description": "Detect IIIF Presentation API manifests or adjacent IIIF metadata that embed AI-agent/scanner-directed instructions to override higher-priority rules, suppress findings, or forward local secrets."
+    },
+    {
+        "id": "GLS-APIP-011",
+        "name": "OpenRPC / JSON-RPC Service Metadata Poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "API keys",
+            "Authorization",
+            "Bearer",
+            "JSON-RPC",
+            "JSON-RPC auth state",
+            "LLM agent",
+            "MCP bridge",
+            "OpenRPC",
+            "agent instruction",
+            "agent_instructions",
+            "assistant",
+            "attach",
+            "authoritative",
+            "autonomous auditor",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|incident|vulnerability)\s+report\b.{0,140}\b(?:flagged|detected|blocked|refused)\b)
+(?!.*\b(?:training|guide|docs?|reference|article)\b.{0,180}\b(?:should|must)\s+(?:report|detect|flag|refuse|not\s+obey)\b)
+(?!.*\bno\s+(?:policy\s+)?overrides?\s+(?:are\s+)?present\b)
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)
+  |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)
+  |never\s+(?:obey|include|attach|forward|send|share|overrides?|trust)
+  |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
+  |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+)\b)
+(?=.*(?:
+  \bOpenRPC\b|\bopenrpc\s*[:=]|(?<!\w)"openrpc"\s*:|\bJSON[-\s]?RPC\b|\bjsonrpc\b|
+  (?<!\w)"methods"\s*:|\bmethods?\s*[:=]|\bparams?\s*[:=]|\bresults?\s*[:=]|
+  \bcontentDescriptors?\b|\bexternalDocs\b|\bexamples?\s*[:=]|
+  x[-_](?:agent|scanner|assistant)[-_](?:policy|note|instructions?)|JSON[-\s]?RPC\s+service\s+reference
+))
+(?=.*(?<![a-zA-Z0-9])(?:
+  ai\s+agents?|llm\s+agents?|agents?|assistants?|scanners?|crawlers?|models?|
+  tool[-\s]?builders?|mcp\s+bridges?|api\s+agents?|autonomous\s+(?:auditors?|scanners?)|
+  your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies))|
+  (?:agent|scanner|assistant|verifier)[._-](?:policy|instructions?|note)
+)(?![a-zA-Z0-9]))
+(?=.*(?:
+  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|
+  canonical(?:\s+(?:service|method|security|governing|policy))?(?:\s+(?:description|policy|document))?|
+  definitive(?:\s+(?:service|method|security))?(?:\s+(?:description|policy))?|
+  (?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|\bauthoritative\b|
+  defines?\s+(?:all\s+)?(?:scanner|security|agent|method)\s+rules?|
+  (?:agent|scanner|assistant|verifier)\s+(?:instructions?|directives?|notice)|
+  suppress(?:es|ed|ing)?|hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?)|
+  do\s+not\s+(?:report|flag)|skip\b.{0,35}?\b(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\b|
+  omit.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?)|
+  exclude.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?)|
+  redact.{0,35}?(?:findings?|warnings?|flags?|reports?)|do\s+not\s+escalate|
+  treat.{0,50}?as\s+(?:informational|safe|clean|non[-\s]?blocking)|
+  mark.{0,50}?as\s+(?:informational|safe|clean|low|false\s+positive)|
+  classify.{0,40}?(?:as\s+)?(?:informational|low|clean|false\s+positive)|
+  (?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver)\s+(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|API\s+keys?|Bearer\s+tokens?|session\s+(?:keys?|tokens?|cookies?)|credentials?|secrets?|Authorization|configured\s+headers?|JSON[-\s]?RPC\s+auth\s+state)
+))
+(?=.*(?:
+  system|developer|scanner\s+(?:rules?|polic(?:y|ies))|security\s+rules?|polic(?:y|ies)|instructions?|
+  findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|results?|summar(?:y|ies)|discrepanc(?:y|ies)|
+  Authorization|Bearer|API[-_\s]?keys?|tokens?|cookies?|credentials?|secrets?|environment\s+(?:variables?|context|details?|settings?)|runtime\s+(?:context|settings?)|local\s+state|configured\s+headers?|JSON[-\s]?RPC\s+auth\s+state
+)).*""",
+        ],
+        "description": "OpenRPC / JSON-RPC service descriptions can smuggle agent-directed policy text inside method, parameter, result, example, and extension metadata that AI tool builders may import as trusted API guidance."
+    },
+    {
+        "id": "GLS-APIP-012",
+        "name": "Kubernetes CRD / OpenAPI schema metadata poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            "AI agents",
+            "CRD reviewers",
+            "CustomResourceDefinition",
+            "Kubernetes auditors",
+            "additionalPrinterColumns",
+            "admission agents",
+            "agent_instructions",
+            "apiextensions.k8s.io",
+            "assistant",
+            "authoritative",
+            "canonical",
+            "kubectl explain",
+            "openAPIV3Schema",
+            "overrides",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|scanner|training|incident|vulnerability|runbook|reference|guide|docs?|documentation)\s+(?:report|reported|detected|flagged|blocked|refused)
+ |(?:must\s+be\s+reported|reported,\s+not\s+obeyed|not\s+obeyed)
+ |(?:(?:do|does)\s+not|must\s+not|never|should\s+never|should\s+not)\s+(?:treat|obey|follow|use|trust|include|attach|forward|send|share|override|overrides?|suppress|hide)
+ |no\s+(?:policy\s+)?overrides?
+ |(?:crd|customresourcedefinition|openapiv3schema|schema\s+description|kubernetes\s+schema)\s+(?:metadata|descriptions?|comments?|schemas?)\s+(?:is|are)\s+not\s+(?:policy|authoritative|instructions?)
+))
+(?=.*(?:\b(?:customresourcedefinition|crd|apiextensions\.k8s\.io|openapiv3schema|x-kubernetes|additionalprintercolumns|controller-gen|kubectl\s+explain|kubernetes\s+schema|admission\s+schema)\b|kind:\s*CustomResourceDefinition|apiVersion:\s*apiextensions\.k8s\.io|spec:\s*\n\s*versions:\s*\n\s*-\s*name:|schema:\s*\n\s*openAPIV3Schema:|description:\s*["']?[^\n]{0,80}(?:agent|scanner|assistant|auditor)))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|agents?|assistants?|scanners?|security\s+scanners?|review[-\s]+bots?|kubernetes\s+(?:auditors?|reviewers?)|admission\s+(?:agents?|auditors?|controllers?)|crd\s+(?:reviewers?|auditors?)|policy\s+(?:agents?|auditors?)|tool[-\s]+builders?)(?![A-Za-z0-9]))
+(?=.*(?:overrides?|overrules?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|canonical|definitive|authoritative|governing\s+document|controlling\s+document|(?:primary|single|main|preferred|principal)\s+(?:kubernetes\s+|crd\s+|schema\s+|admission\s+|review\s+|security\s+|operating\s+){0,3}(?:guidance|policy|playbook|runbook|instructions?)|(?:agent|scanner|assistant|verifier|auditor|admission|crd)\s+instructions?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|ai|scanner|security|agent|admission|kubernetes|crd)\s+(?:schema\s+|admission\s+|security\s+|policy\s+)?(?:review|audit|scan|validation)))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|reclassify|ignore|skip|keep.{0,80}?out\s+of|leave.{0,80}?out\s+of|treat.{0,80}?as\s+(?:informational|advisory-only|non-blocking|safe|clean)|(?:observations|findings|diagnostics|results|alerts|warnings|schema\s+violations|validation\s+errors|admission\s+violations|rbac\s+warnings|privilege\s+escalation|vulnerabilities|cves?).{0,50}?(?:advisory-only|background(?:-only)?|informational|non-blocking)|(?:include|attach|forward|send|share|provide|pass\s+along|expose|collect|copy|read).{0,90}?(?:api\s*keys?|tokens?|authorization|bearer|session|cookies?|env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:context|details?|config(?:uration)?|settings?|state|proof\s+(?:material|evidence|details))|kubeconfig|cluster\s+(?:credentials?|context)|service\s*account\s+tokens?|admission\s+(?:tokens?|webhook\s+secrets?)|controller\s+(?:credentials?|tokens?))|(?:do\s+not|don't|never|not).{0,45}?(?:report|escalate|notify|flag).{0,70}?(?:findings?|alerts?|warnings?|violations?|vulnerabilities|cves?|schema\s+errors?|admission\s+failures?)))
+.*""",
+        ],
+        "description": "Kubernetes CRD schema descriptions can smuggle agent-facing instructions that tell AI Kubernetes auditors or admission-review agents to treat attacker-controlled schema text as higher-priority policy, suppress validation/security findings, or forward local cluster/runtime credentials."
+    },
+    {
+        "id": "GLS-MTI-001",
+        "name": "MCP Database Tool SQL Wrapper Injection",
+        "category": "mcp_tool_injection",
+        "severity": "high",
+        "channel": ["tool_output", "file"],
+        "keywords": [
+            "FastMCP",
+            "LIMIT",
+            "SELECT ... FROM (",
+            "command",
+            "database_query",
+            "duckdb",
+            "execute_sql",
+            "fetchmany",
+            "mcp",
+            "mcp.tool",
+            "mysql",
+            "postgres",
+            "prompt_query",
+            "query",
+            "query_tool",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+training|scanner\s+docs?|scanners?\s+should\s+(?:flag|detect|report)|do\s+not\s+build)\b)
+(?=.*\b(?:mcp|model\s+context\s+protocol|fastmcp|server\.tool|mcp\.tool|tool\s+decorator|database_query|execute_sql|run_sql|query_tool|sqlite|postgres|duckdb|mysql)\b)
+(?=.*\b(?:sql|query|user_sql|statement|command|prompt_query)\b)
+(?=.*(?:
+    select\s+(?:\*|[a-z0-9_,\s]+)\s+from\s*\(\s*(?:\{?\s*(?:sql|query|user_sql|statement|command|prompt_query)\s*\}?|["'`]\s*\+\s*(?:sql|query|user_sql|statement|command|prompt_query)\s*\+)
+  | select\s+(?:\*|[a-z0-9_,\s]+)\s+from\s*\(.{0,120}\b(?:sql|query|user_sql|statement|command|prompt_query)\b.{0,120}\).{0,120}\blimit\b
+))
+(?=.*\blimit\b)
+.*""",
+        ],
+        "description": "MCP database servers that enforce row limits by interpolating agent/user SQL into `SELECT * FROM ({sql}) LIMIT N` create a wrapper-breakout SQL injection sink at the agent-tool boundary."
+    },
 ]
