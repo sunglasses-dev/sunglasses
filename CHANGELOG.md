@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.57] — 2026-06-01
+
+### Added (V2 SHIP #3 — api_descriptor_poisoning + mcp_tool_injection)
+
+- **13 new patterns across two new categories** — `GLS-APIP-001` through `GLS-APIP-012` (12 patterns, new `api_descriptor_poisoning` category) plus `GLS-MTI-001` (1 pattern, new `mcp_tool_injection` category). The `api_descriptor_poisoning` category covers agent-policy poisoning hidden in API descriptor surfaces that AI agents fetch and trust during tool/endpoint discovery — OpenAPI/Swagger descriptions and summaries, JSON Schema field annotations, gRPC/protobuf comments, GraphQL schema descriptions, AsyncAPI specs, and related machine-readable API contracts. `mcp_tool_injection` covers instruction injection delivered through MCP tool definitions. Pattern count: 906 → **919**. Category count: 57 → **59**. Keywords: 5,964 → **6,159**.
+- **New blog:** [API Descriptor Poisoning](https://sunglasses.dev/blog/api-descriptor-poisoning) — how attackers hide agent-policy overrides inside API descriptors and MCP tool definitions, and why runtime trust is the defense. Written by JACK, research by Cava.
+
+
 ## [0.2.56] — 2026-05-31
 
 ### Added (V2 SHIP #2 — identity_discovery_poisoning)
