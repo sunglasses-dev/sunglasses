@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.58] — 2026-06-02
+
+### Added (V2 SHIP #4 — build_metadata_poisoning + tool_output_poisoning)
+
+- **12 new patterns** — `GLS-BMP-001` through `GLS-BMP-010` (10 patterns, new `build_metadata_poisoning` category) plus `GLS-TOP-637` and `GLS-TOP-638` (2 patterns added to the existing `tool_output_poisoning` category). The `build_metadata_poisoning` category covers agent-policy poisoning hidden in build descriptors, package metadata, SBOMs, provenance records, SARIF, and scanner outputs that AI coding agents and supply-chain assistants read during code review, dependency review, or release validation — `BUILD.bazel`/`MODULE.bazel`/Gradle/Maven build files, `pyproject.toml`/`package.json` package descriptors, CycloneDX/SPDX/SLSA provenance, and SARIF/CodeQL scanner output. The two `tool_output_poisoning` additions cover tool-output instruction injection and live log/alert payload instruction injection. Pattern count: 919 → **931**. Category count: 59 → **60**. Keywords: 6,159 → **6,298**.
+- **New blog:** [Build Metadata Poisoning](https://sunglasses.dev/blog/build-metadata-poisoning) — why build metadata is evidence, not permission, and how runtime trust stops poisoned build files, SBOMs, provenance, and SARIF before agents act. Written by JACK, research by Cava.
+
+
 ## [0.2.57] — 2026-06-01
 
 ### Added (V2 SHIP #3 — api_descriptor_poisoning + mcp_tool_injection)
