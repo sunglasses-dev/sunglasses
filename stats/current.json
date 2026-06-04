@@ -1,8 +1,8 @@
 {
-  "version": "0.2.58",
-  "patterns": 931,
-  "keywords": 6298,
-  "categories": 60,
+  "version": "0.2.59",
+  "patterns": 943,
+  "keywords": 6455,
+  "categories": 61,
   "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_avg_ms": 0.261,
