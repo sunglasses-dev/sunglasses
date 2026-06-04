@@ -16,3 +16,5 @@ venv/
 .wrangler/
 .sunglasses/
 incoming/
+sunglasses/patterns.py.pre-*
+sunglasses/*.bak
