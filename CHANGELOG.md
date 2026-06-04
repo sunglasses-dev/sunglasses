@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.59] — 2026-06-03
+
+### Added (V2 SHIP #5 — agent_instruction_file_poisoning + mcp_threat)
+
+- **12 new patterns** — `GLS-AIFP-001` through `GLS-AIFP-009` (9 patterns, new `agent_instruction_file_poisoning` category) plus `GLS-MCP-015`, `GLS-MCP-016`, and `GLS-MCP-017` (3 patterns added to the existing `mcp_threat` category). The `agent_instruction_file_poisoning` category covers agent-policy poisoning hidden in the instruction files that AI coding agents read before they act — `AGENTS.md`, `CLAUDE.md`, `SKILL.md`, `.cursor/rules`, `.devcontainer/devcontainer.json`, `llms-full.txt`, VS Code `.code-workspace`, EditorConfig, ignore-file, and pre-commit configuration carriers. The three `mcp_threat` additions cover MCP OAuth scope/consent poisoning, MCP tool descriptor policy poisoning, and MCP prompt/resource metadata policy poisoning. Pattern count: 931 → **943**. Category count: 60 → **61**. Keywords: 6,298 → **6,455**.
+- **New blog:** [Agent Instruction File Poisoning](https://sunglasses.dev/blog/agent-instruction-file-poisoning) — why AGENTS.md, CLAUDE.md, Cursor rules, and Copilot instructions are context, not authority, and how runtime trust stops poisoned instruction files before agents act. Written by JACK, research by Cava.
+
+
 ## [0.2.58] — 2026-06-02
 
 ### Added (V2 SHIP #4 — build_metadata_poisoning + tool_output_poisoning)
