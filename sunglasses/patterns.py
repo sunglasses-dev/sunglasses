@@ -18607,4 +18607,568 @@ PATTERNS = [
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
+    # === v0.0.0 batch (13 patterns) ===
+    {
+        "id": "GLS-CICD-001",
+        "name": "CodeQL Config Metadata Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".github/codeql/codeql-config.yml",
+            "codeql database analyze",
+            "codeql-config.yml",
+            "github/codeql-action/init",
+            "paths-ignore",
+            "queries",
+            "query-filters",
+            "security-and-quality",
+            "security-extended",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:(?:security|incident|vulnerability|training|runbook|reference|guide|docs?).{0,180}(?:detected|blocked|flagged|refused|reported|must\s+be\s+reported|not\s+obeyed|should\s+(?:report|detect|flag|refuse|block))|(?:CodeQL|code\s+scanning|scanner\s+config(?:uration)?).{0,160}(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede)))
+(?=.*(?:(?:\.github/)?codeql(?:/codeql-config)?\.ya?ml|codeql-config\.ya?ml|github/codeql-action/init|codeql\s+database\s+analyze|code\s+scanning\s+config(?:uration)?|CodeQL\s+setup\s+metadata|queries:|query-filters|paths-ignore|security-(?:extended|and-quality)))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai|agent|assistant|scanner|security|review|audit|code|codeql)[._-]?(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)?(?![a-zA-Z0-9])|agents?|assistants?|scanners?|automated\s+(?:security|code\s+scanning|scanner)\s+review|security\s+(?:reviewers?|scanners?|agents?)|code\s+scanners?|for\s+(?:ai\s+)?agents?))
+(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\s+precedence|(?:primary|single)\s+source\s+of\s+truth|(?:canonical|definitive|authoritative|controlling)\s+(?:scan\s+|scanner\s+|security\s+|review\s+|code\s+scanning\s+)?(?:policy|guidance|instructions?|playbook|document)|(?:main|primary|principal|preferred)\s+(?:scan\s+|scanner\s+|security\s+|review\s+|operating\s+)?(?:guidance|playbook)|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|security|scanner|code\s+scanning)\s+(?:review|audit|scan)|all\s+(?:scanner|security|CodeQL)\s+rules?)|(?:agent|scanner|assistant|security\s+reviewer|code\s+scanner)\s+(?:instructions?|directive|policy)))
+(?=.*(?:(?:suppress|hide|redact|omit|exclude|skip|silence)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|SQL\s+injection|secret\s+findings?|code\s+scanning\s+alerts?)|do\s+not\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|code\s+scanning\s+alerts?)|(?:treat|mark|classify|consider)\s+.{0,60}?\s+as\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:downgrade|move|route|shift)\s+.{0,80}?(?:findings?|observations?|diagnostics?|results?|alerts?|vulnerabilities).{0,80}?(?:background|appendix-only|informational|non-blocking|notes?)|(?:keep|leave)\s+.{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilities|secret\s+findings?)\s+out\s+of\s+(?:the\s+)?(?:report|summary|memo|audit\s+memo|final\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|populate|copy|read)\s+(?:[\w-]+\s+){0,5}(?:API\s+keys?|tokens?|secrets?|credentials?|auth(?:orization)?\s+headers?|session\s+(?:keys?|tokens?)|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?)|local\s+(?:state|config(?:uration)?|settings?)|GitHub\s+tokens?|GITHUB_TOKEN|CI\s+tokens?)))
+.*""",
+        ],
+        "description": "CodeQL analysis configuration metadata can smuggle agent-facing policy that tells AI security reviewers to treat attacker-controlled scan config as authoritative, suppress CodeQL/security findings, or forward local CI/runtime credentials."
+    },
+    {
+        "id": "GLS-CICD-002",
+        "name": "Dependabot Config Metadata Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".github/dependabot.yml",
+            "commit-message",
+            "dependabot.yml",
+            "groups",
+            "ignore",
+            "open-pull-requests-limit",
+            "package-ecosystem",
+            "registries",
+            "updates",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\b.{0,180}\b(?:detected|blocked|flagged|refused|reported|must\s+be\s+reported|not\s+obeyed|should\s+(?:report|detect|flag|refuse|block))|(?:dependabot(?:\.ya?ml)?|dependency\s+update\s+metadata|update\s+config(?:uration)?).{0,140}\b(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede)))
+(?=.*(?:(?:\.github/)?dependabot\.ya?ml|dependabot\s+config(?:uration)?|dependency\s+update\s+metadata|package-ecosystem|open-pull-requests-limit|allow:|ignore:|registries:|commit-message:|groups:))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai|agent|assistant|scanner|dependency|security|review|update|automation|auditor)[._-]?(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)?(?![a-zA-Z0-9])|\bagents?\b|\bassistants?\b|\bscanners?\b|automated\s+(?:dependency|security|update)\s+review|dependency\s+(?:reviewers?|scanners?|agents?)|for\s+(?:ai\s+)?agents?))
+(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\s+precedence|(?:primary|single)\s+source\s+of\s+truth|(?:canonical|definitive|authoritative|controlling)\s+(?:dependency\s+|update\s+|review\s+|scanner\s+)?(?:policy|guidance|instructions?|playbook|document)|(?:main|primary|principal|preferred)\s+(?:dependency\s+|update\s+|review\s+|security\s+|operating\s+)?(?:guidance|playbook)|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|dependency|security|update)\s+(?:review|audit|scan)|all\s+(?:scanner|security|dependency)\s+rules?)|(?:agent|scanner|assistant|dependency\s+reviewer|update\s+bot)\s+(?:instructions?|directive|policy)))
+(?=.*(?:(?:suppress|hide|redact|omit|exclude|skip|silence)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVE\s+findings?|dependency\s+alerts?)|do\s+not\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|dependency\s+alerts?)|(?:treat|mark|classify|consider)\s+.{0,60}?\s+as\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:downgrade|move|route|shift)\s+.{0,80}?(?:findings?|observations?|diagnostics?|results?|dependency\s+alerts?|vulnerabilities).{0,80}?(?:background|appendix-only|informational|non-blocking|notes?)|(?:keep|leave)\s+.{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilities|CVE\s+findings?)\s+out\s+of\s+(?:the\s+)?(?:report|summary|memo|upgrade\s+memo|audit\s+memo|final\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|populate|copy|read)\s+(?:[\w-]+\s+){0,5}(?:API\s+keys?|tokens?|secrets?|credentials?|auth(?:orization)?\s+headers?|session\s+(?:keys?|tokens?)|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?)|local\s+(?:state|config(?:uration)?|settings?)|npm\s+tokens?|registry\s+tokens?|GitHub\s+tokens?|dependabot\s+secrets?)))
+.*""",
+        ],
+        "description": "Dependabot configuration metadata can be abused to smuggle agent-facing policy that tells AI dependency reviewers or scanners to treat attacker-controlled update config as higher priority than system policy, suppress dependency findings, or forward local registry/runtime credentials."
+    },
+    {
+        "id": "GLS-CICD-003",
+        "name": "Renovate config / dependency-bot PR body notes poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ".\n- Agent/review audience:",
+            ".\n- Authority terms:",
+            "commitBody",
+            "dependabot.yml",
+            "dependency-bot",
+            "packageRules[].description",
+            "prBodyNotes",
+            "pull request body notes",
+            "renovate config",
+            "renovate.json",
+            "renovate.json5",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:
+  (?:security|incident|vulnerability|scanner|training|guide|docs?|reference|article|runbook|postmortem).{0,140}?(?:blocked|detected|flagged|refused|reported|warns?\s+about|should\s+(?:report|detect|flag|refuse|block)|must\s+not\s+(?:treat|obey|follow|use)|do\s+not\s+(?:treat|obey|follow|use|forward|send|share|attach|include)|does\s+not\s+(?:treat|obey|follow|use|override|overrides?|trust)|never\s+(?:treat|obey|follow|use|override|overrides?|trust))
+  |(?:do\s+not\s+(?:obey|follow|treat|use|forward|send|share|attach|include)|does\s+not\s+(?:obey|follow|treat|use|override|overrides?|trust)|never\s+(?:obey|follow|treat|use|override|overrides?|trust)|must\s+not\s+(?:obey|follow|treat|use|override|overrides?|trust)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block))\b.{0,140}?(?:renovate(?:\.json|\.json5)?|dependabot\.yml|dependency[-_\s]?bot|prBodyNotes|pull[-_\s]?request\s+body)
+  |(?:renovate|dependabot|dependency[-_\s]?bot).{0,80}?(?:notes?|config(?:uration)?|metadata).{0,80}?(?:is|are)\s+not\s+(?:agent\s+)?polic(?:y|ies)
+))
+(?=.*(?:renovate(?:\.json|\.json5)?|renovate[-_\s]?config(?:uration)?|dependabot\.ya?ml|dependency[-_\s]?bot(?:\s+config(?:uration)?|\s+metadata|\s+PR)?|prBodyNotes|commitBody|packageRules(?:\[\])?\.description|pull[-_\s]?request\s+body\s+notes?|generated\s+(?:dependency|renovate|dependabot)\s+PR))
+(?=.*(?:(?:ai|autonomous|dependency|security|upgrade|release|devops|coding)\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?)|(?:agents?|assistants?|scanners?|auditors?|reviewers?|models?|llms?)|(?:agent|assistant|scanner|auditor|reviewer)[-_]?(?:instructions?|policy|note|directive)))
+(?=.*(?:overrides?\s+(?:system|developer|scanner|security|repository|upgrade|dependency|review)\s+(?:rules?|polic(?:y|ies)|instructions?|defaults?)|supersed(?:e|es|ed|ing)\s+(?:scanner|security|repository|system|developer|dependency)\s+(?:rules?|polic(?:y|ies)|instructions?)|takes?\s+precedence\s+over\s+(?:scanner|security|system|developer|repository|dependency|review)|(?:primary|single)\s+source\s+of\s+truth|canonical\s+(?:upgrade\s+|dependency\s+|review\s+|PR\s+)?(?:description|policy|instructions?|notes?)|definitive\s+(?:upgrade\s+|dependency\s+|review\s+|PR\s+)?(?:description|policy|instructions?|notes?)|governing\s+(?:document|policy|instructions?|notes?)|controlling\s+(?:document|policy|instructions?|notes?)|authoritative(?:\s+(?:source|policy|instructions?|notes?))?|overrules?\s+(?:scanner|security|system|developer|repository|dependency)|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent|dependency|upgrade)\s+(?:review|audit|scan|upgrade)|all\s+(?:scanner|security|dependency)\s+rules?)|(?:agent|scanner|assistant|auditor|reviewer)\s+(?:instructions?|directive|policy)))
+(?=.*(?:(?:suppress|hide)\w*\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output|dependency\s+findings?)|(?:omit|exclude|redact|downgrade|deprioriti[sz]e|reclassify)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output|dependency\s+findings?)|(?:treat|mark|classify|flag).{0,60}?as\s+(?:informational|non[-\s]?blocking|advisory[-\s]?only|safe|clean|non[-\s]?actionable)|(?:do\s+not|not)\s+(?:report|escalate|flag|include)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output|dependency\s+findings?)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|embed)\s+(?:[\w-]+\s+){0,4}(?:API\s+keys?|access\s+tokens?|GitHub\s+tokens?|Bearer\s+tokens?|session\s+tokens?|secrets?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|CI\s+(?:variables?|secrets?|context)|auth(?:entication)?\s+(?:headers?|context))))
+(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output|dependency\s+findings?|API\s+keys?|access\s+tokens?|GitHub\s+tokens?|Bearer\s+tokens?|session\s+tokens?|secrets?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|CI\s+(?:variables?|secrets?|context)|auth(?:entication)?\s+(?:headers?|context)))
+.{0,7000}""",
+        ],
+        "description": "Dependency automation configuration and generated PR body notes can smuggle agent/scanner-directed instructions that claim authority over dependency review, suppress CVE findings, or request local runtime/auth context from AI coding agents."
+    },
+    {
+        "id": "GLS-CICD-004",
+        "name": "Ansible Automation Metadata Agent Policy Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "agent instruction",
+            "ansible.cfg",
+            "argument_specs",
+            "group_vars",
+            "host_vars",
+            "main operating guidance",
+            "no policy overrides",
+            "not authoritative",
+            "scanner instructions",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+    (?:security|scanner|training|runbook|guide|reference|incident|vulnerability|postmortem)\s+(?:docs?|report|example|exercise|guidance|reference)?.{0,180}?(?:should|must|was|were)?\s*(?:report|detect|flag|refuse|block|blocked|detected|flagged|reported)
+  | scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse|block)
+  | (?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:treat|obey|follow|include|attach|forward|send|share|override|trust|use)
+  | not\s+(?:authoritative|canonical|definitive)
+  | no\s+(?:policy\s+)?overrides?
+  | (?:playbook|role|inventory|ansible\s+metadata|ansible\s+playbooks?)\s+(?:is|are)\s+not\s+(?:agent\s+)?policy
+)\b)
+(?=.*(?:
+    \bansible(?:\.cfg|[-\s]+playbooks?|[-\s]+roles?|[-\s]+inventory|[-\s]+galaxy|[-\s]+collection|[-\s]+metadata)\b
+  | (?<![a-zA-Z0-9])(?:galaxy_info|argument_specs?|module_defaults|collections|roles|hosts|tasks|vars|group_vars|host_vars|inventory_hostname|inventory[-_\s]+host[-_\s]+vars?|ansible_managed)(?![a-zA-Z0-9])
+  | (?:^|\n)\s*(?:-\s*)?(?:name|description|comment|vars|hosts|tasks|roles|collections|module_defaults)\s*:
+  | (?:^|\n)\s*\[(?:defaults|inventory|privilege_escalation|ssh_connection)\]
+))
+(?=.*(?<![a-zA-Z0-9])(?:ai[-_\s]?agents?|agents?|assistants?|scanners?|autonomous[-_\s]?scanners?|security[-_\s]?scanners?|dependency[-_\s]?reviewers?|deployment[-_\s]?agents?|ansible[-_\s]?auditors?|automation[-_\s]?review|automation[-_\s]?scanners?)(?![a-zA-Z0-9]))
+(?=.*(?:
+    \b(?:governing|controlling|canonical|definitive|authoritative)\b.{0,80}?(?:document|policy|playbook|guidance|source|description|metadata|rules?)
+  | (?:primary|single)\s+source\s+of\s+truth
+  | (?:takes\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?)
+  | defines?\s+(?:(?:all|the)\s+)?(?:scanner|security|agent|automation|deployment|review)?\s*rules?
+  | (?:main|primary|principal|preferred)\s+(?:(?:operating\s+)?(?:review|automation|deployment|scanner|audit)\s+)?(?:operating\s+)?(?:guidance|playbook|runbook)(?:\s+for\s+(?:automation|deployment|scanner|audit|security)\s+review)?
+  | (?:agent|scanner|assistant|auditor|automation)\s+(?:instructions?|directive|policy):
+))
+(?=.*(?:
+    (?:suppress|hide|omit|exclude|redact|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|diagnostics?|observations?|results?|vulnerabilities?|failures?)
+  | (?:treat|mark|classify|downgrade|move|route|shift).{0,70}?(?:informational|non[-\s]?blocking|safe|clean|benign|background(?:[-\s]?only)?|appendix[-\s]?only|advisory[-\s]?only|background\s+notes?)
+  | (?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|diagnostics?|observations?|results?|vulnerabilities?|failures?)
+  | (?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|failures?).{0,45}?out\s+of\s+(?:the\s+)?(?:reports?|summaries|memos?|audit\s+memo|deployment\s+memo|final\s+report)
+  | (?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|copy|read)\s+(?:[\w-]+\s+){0,4}(?:api\s*keys?|tokens?|session\s+keys?|auth(?:orization)?\s+headers?|credentials?|secrets?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|material|artifacts?|proof)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context)
+))""",
+        ],
+        "description": "An attacker can hide agent-targeting instructions in Ansible automation metadata \u2014 playbook names/descriptions, role metadata, inventory comments, `group_vars`, `ansible.cfg`, or Galaxy collection descriptors \u2014 to convince AI deployment/security agents that the automation file is authoritative polic"
+    },
+    {
+        "id": "GLS-CICD-005",
+        "name": "GitLab CI Pipeline Metadata Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ".\n- **Report suppression:**",
+            ".gitlab-ci.yaml",
+            ".gitlab-ci.yml",
+            "AI agents",
+            "CI auditor",
+            "CI/CD config",
+            "CI_JOB_TOKEN",
+            "CI_PIPELINE_SOURCE",
+            "CI_REGISTRY_PASSWORD",
+            "GITLAB_TOKEN",
+            "GitLab CI",
+            "assistant",
+            "authoritative",
+            "automated security agents",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+reference|defensive\s+training|incident\s+report|scanner\s+docs?|CI\s+security\s+guide)\b.{0,220}\b(?:must\s+report|should\s+report|must\s+be\s+reported|not\s+obeyed|never\s+obey|not\s+authoritative|should\s+never|detected\s+and\s+blocked|refused)\b)
+(?!.*\b(?:\.gitlab-ci\.ya?ml|GitLab\s+CI|CI/CD\s+config|pipeline\s+metadata)\b.{0,180}\b(?:is\s+not\s+authoritative|not\s+agent\s+policy|does\s+not\s+(?:override|instruct)|must\s+not\s+(?:obey|treat|use)|should\s+never\s+be\s+used)\b)
+(?=.*(?:\.gitlab-ci\.ya?ml|GitLab\s+CI|CI/CD\s+config|pipeline\s+metadata|stages\s*:|workflow\s*:|rules\s*:|variables\s*:|CI_JOB_TOKEN|CI_REGISTRY_PASSWORD|GITLAB_TOKEN|CI_PIPELINE_SOURCE|job\s+description))
+(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|automated\s+(?:security\s+)?agents?|assistants?|scanners?|CI\s+auditors?|pipeline\s+reviewers?|dependency\s+review\s+agents?|your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies)))(?![a-zA-Z0-9]))
+(?=.*(?:\bauthoritative\b|\bcanonical\b|\b(?:primary|main|principal|preferred)\s+(?:pipeline\s+|CI\s+|review\s+|security\s+|operating\s+)*(?:guidance|playbook|policy|instructions?)\b|\b(?:primary|single)\s+source\s+of\s+truth\b|\bgoverning\s+(?:pipeline\s+)?document\b|\bcontrolling\s+(?:pipeline\s+)?document\b|\bsupersedes?\s+(?:scanner|security|review)\s+guidance\b|\boverrides?\s+(?:system|scanner|security|repository|developer)\s+(?:rules?|polic(?:y|ies)|instructions?)\b|\bdefines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent|pipeline)\s+(?:review|audit|scan)\b|\b(?:agent|scanner|assistant|pipeline\s+reviewer)\s+(?:instructions?|directive|notice)\b))
+(?=.*(?:\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip)\b.{0,60}\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\b|\bdo\s+not\s+(?:report|flag|escalate)\b.{0,60}\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|vulnerabilit(?:y|ies))\b|\bdowngrade\b.{0,80}\b(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?)\b.{0,80}\b(?:background\s+notes?|background-only|informational|non-blocking)\b|\b(?:keep|leave)\b.{0,80}\b(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\b.{0,30}\bout\s+of\s+(?:the\s+)?(?:memo|report|summary|audit\s+memo|pipeline\s+report|final\s+report)\b|\b(?:treat|mark|classify|flag)\b.{0,50}\bas\s+(?:informational|safe|clean|low|none|non-blocking)\b|\b(?:include|attach|forward|send|collect|embed|share|provide|expose|pass\s+along)\b.{0,90}\b(?:CI_JOB_TOKEN|CI_REGISTRY_PASSWORD|GITLAB_TOKEN|CI_JOB_JWT|CI_JOB_JWT_V2|job\s+token|registry\s+password|pipeline\s+variables?|protected\s+variables?|masked\s+variables?|environment\s+(?:variables?|context|details?|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|proof|material|details?)|execution\s+context|local\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?|Authorization)\b))
+.*""",
+        ],
+        "description": "A malicious `.gitlab-ci.yml` file can hide agent-directed instructions in pipeline metadata, variables, job descriptions, comments, or rules text, telling AI CI/security reviewers to treat the pipeline file as authoritative, suppress findings, or forward GitLab CI tokens and runtime context."
+    },
+    {
+        "id": "GLS-CICD-006",
+        "name": "GitOps controller metadata poisoning (Argo CD / Flux)",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            "AI agents",
+            "Application",
+            "ApplicationSet",
+            "GitOps auditors",
+            "GitRepository",
+            "HelmRelease",
+            "Kustomization",
+            "OCIRepository",
+            "agent_instructions",
+            "argoproj.io",
+            "assistant",
+            "authoritative",
+            "canonical",
+            "deployment agents",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|scanner|training|incident|vulnerability|runbook|reference|guide|docs?)\s+(?:report|reported|detected|flagged|blocked|refused)
+ |(?:must\s+be\s+reported|reported,\s+not\s+obeyed|not\s+obeyed)
+ |(?:(?:do|does)\s+not|must\s+not|never|should\s+never|should\s+not)\s+(?:treat|obey|follow|use|trust|include|attach|forward|send|share|override|overrides?|suppress|hide)
+ |no\s+(?:policy\s+)?overrides?
+ |(?:gitops|argocd|flux|kustomization|application(?:set)?)\s+(?:metadata|annotations?|descriptions?)\s+(?:is|are)\s+not\s+(?:policy|authoritative|instructions?)
+))
+(?=.*(?:\b(?:argocd|argo\s*cd|fluxcd|flux|gitops|kustomization|helmrelease|gitrepository|helmrepository|ocirepository|applicationset|application)\b|apiVersion:\s*(?:argoproj\.io|source\.toolkit\.fluxcd\.io|kustomize\.toolkit\.fluxcd\.io|helm\.toolkit\.fluxcd\.io)|kind:\s*(?:Application|ApplicationSet|Kustomization|HelmRelease|GitRepository|OCIRepository)|(?:argocd|fluxcd)\.(?:argoproj|toolkit)\.io|metadata:\s*\n\s*(?:annotations|labels):))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|agents?|assistants?|scanners?|security\s+scanners?|review[-\s]+bots?|gitops\s+(?:auditors?|reviewers?)|deployment\s+(?:agents?|auditors?))(?![A-Za-z0-9]))
+(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|canonical|definitive|authoritative|governing\s+document|(?:primary|single|main|preferred|principal)\s+(?:gitops\s+|deployment\s+|sync\s+|review\s+|security\s+|operating\s+){0,3}(?:guidance|policy|playbook|runbook|instructions?)|(?:agent|scanner|assistant|deployment|gitops)\s+instructions?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|ai|scanner|security|agent|gitops|deployment)\s+(?:gitops\s+|deployment\s+|security\s+|sync\s+)?(?:review|audit|scan|sync)))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|reclassify|keep.{0,80}?out\s+of|leave.{0,80}?out\s+of|treat.{0,80}?as\s+(?:informational|advisory-only|non-blocking)|(?:observations|findings|diagnostics|results|alerts|sync\s+drift|drift|policy\s+violations|vulnerabilities).{0,40}?(?:advisory-only|background(?:-only)?|informational)|(?:include|attach|forward|send|share|provide|pass\s+along|expose|collect).{0,80}?(?:api\s*keys?|tokens?|authorization|bearer|session|cookies?|env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:context|details?|config(?:uration)?|settings?|state|proof\s+(?:material|evidence|details))|kubeconfig|cluster\s+(?:credentials?|context)|argocd\s+(?:token|auth)|flux\s+(?:token|auth))|(?:do\s+not|don't|never).{0,40}?(?:report|escalate|notify).{0,60}?(?:findings?|alerts?|warnings?|drift|violations?|vulnerabilities)))
+.*""",
+        ],
+        "description": "GitOps resource metadata can smuggle agent-facing instructions that tell AI deployment or security reviewers to treat attacker-controlled Argo CD / Flux descriptions, annotations, or generated status notes as higher-priority policy, suppress sync/security findings, or forward local cluster/runtime c"
+    },
+    {
+        "id": "GLS-CICD-007",
+        "name": "Jenkins Pipeline Metadata Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ".\n- **Report suppression:**",
+            "AI agents",
+            "BUILD_TAG",
+            "CI auditor",
+            "Declarative Pipeline",
+            "JENKINS_API_TOKEN",
+            "JENKINS_CRUMB",
+            "JENKINS_URL",
+            "Jenkins Pipeline",
+            "Jenkinsfile",
+            "assistant",
+            "authoritative",
+            "automated security agents",
+            "canonical",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+reference|defensive\s+training|incident\s+report|scanner\s+docs?|CI\s+security\s+guide|Jenkins\s+security\s+guide)\b.{0,240}\b(?:must\s+report|should\s+report|must\s+be\s+reported|not\s+obeyed|never\s+obey|not\s+authoritative|should\s+never|detected\s+and\s+blocked|refused|flagged)\b)
+(?!.*\b(?:Jenkinsfile|Jenkins\s+Pipeline|pipeline\s+metadata|Jenkins\s+job\s+metadata)\b.{0,220}\b(?:is\s+not\s+authoritative|not\s+agent\s+policy|does\s+not\s+(?:override|instruct)|must\s+not\s+(?:obey|treat|use)|should\s+never\s+be\s+used|does\s+not\s+instruct)\b)
+(?=.*(?:Jenkinsfile|Jenkins\s+Pipeline|Declarative\s+Pipeline|scripted\s+pipeline|pipeline\s*\{|currentBuild\.description|parameters\s*\{|description\s*\(|withCredentials|JENKINS_URL|BUILD_TAG|JENKINS_API_TOKEN|JENKINS_CRUMB|Jenkins\s+job\s+metadata))
+(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|automated\s+(?:security\s+)?agents?|assistants?|scanners?|CI\s+auditors?|pipeline\s+reviewers?|dependency\s+review\s+agents?|your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies)))(?![a-zA-Z0-9]))
+(?=.*(?:\bauthoritative\b|\bcanonical\b|\b(?:primary|main|principal|preferred)\s+(?:pipeline\s+|CI\s+|Jenkins\s+|review\s+|security\s+|operating\s+)*(?:guidance|playbook|policy|instructions?)\b|\b(?:primary|single)\s+source\s+of\s+truth\b|\bgoverning\s+(?:Jenkins\s+job\s+|pipeline\s+)?document\b|\bcontrolling\s+(?:Jenkins\s+job\s+|pipeline\s+)?document\b|\bsupersedes?\s+(?:scanner|security|review)\s+guidance\b|\boverrides?\s+(?:system|scanner|security|repository|developer)\s+(?:rules?|polic(?:y|ies)|instructions?)\b|\bdefines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent|pipeline)\s+(?:review|audit|scan)\b|\b(?:agent|scanner|assistant|pipeline\s+reviewer)\s+(?:instructions?|directive|notice)\b))
+(?=.*(?:\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip)\b.{0,60}\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\b|\bdo\s+not\s+(?:report|flag|escalate)\b.{0,60}\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|vulnerabilit(?:y|ies))\b|\bdowngrade\b.{0,80}\b(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?)\b.{0,80}\b(?:background\s+notes?|background-only|informational|non-blocking)\b|\b(?:keep|leave)\b.{0,80}\b(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\b.{0,30}\bout\s+of\s+(?:the\s+)?(?:memo|report|summary|audit\s+memo|pipeline\s+report|final\s+report)\b|\b(?:treat|mark|classify|flag)\b.{0,50}\bas\s+(?:informational|safe|clean|low|none|non-blocking)\b|\b(?:include|attach|forward|send|collect|embed|share|provide|expose|pass\s+along)\b.{0,90}\b(?:JENKINS_API_TOKEN|JENKINS_CRUMB|Jenkins\s+credentials?|credential\s+binding|bound\s+secrets?|crumb\s+(?:issuer|token)|Authorization|build\s+(?:variables?|environment|context)|environment\s+(?:variables?|context|details?|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|proof|material|details?)|execution\s+context|local\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?)\b))
+.*""",
+        ],
+        "description": "A malicious `Jenkinsfile` or Jenkins job metadata field can hide agent-directed instructions in comments, descriptions, parameter text, environment labels, or generated job summaries, telling AI CI/security reviewers to treat the pipeline as authoritative, suppress findings, or forward Jenkins crede"
+    },
+    {
+        "id": "GLS-CICD-008",
+        "name": "Observability config metadata agent-policy poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "alerting_rules",
+            "exporters",
+            "otelcol.yaml",
+            "processors",
+            "receivers",
+            "runbook_url",
+            "scanner_policy",
+            "scrape_configs",
+            "service.pipelines",
+            "x-agent-policy",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|vulnerability|training|runbook|guide|reference|scanner\s+docs?|observability\s+docs?|sre\s+docs?|monitoring\s+docs?)\s+(?:report|detected|blocked|flagged|refused|warns?|says?|explains?|should\s+(?:report|detect|flag|refuse|block))
+ |(?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)
+ |never\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)
+ |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+ |(?:otelcol(?:\.ya?ml)?|open\s*telemetry|prometheus(?:\.ya?ml)?|alertmanager(?:\.ya?ml)?|grafana\s+dashboard|loki|promtail|observability\s+(?:config|metadata)|monitoring\s+(?:config|metadata|dashboard)).{0,160}?\b(?:is|are)\s+not\s+(?:authoritative|canonical|definitive|policy)
+ |no\s+(?:agent\s+)?policy\s+overrides?
+ |(?:does\s+not|do\s+not)\s+instruct\s+(?:agents?|scanners?|assistants?).{0,90}?\b(?:forward|include|suppress|hide|ignore|skip|downgrade)\b
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:otelcol(?:\.ya?ml)?|open\s*telemetry\s+collector|opentelemetry|otlp|prometheus(?:\.ya?ml)?|prometheus\s+rule|alertmanager(?:\.ya?ml)?|grafana\s+dashboard|dashboard\.json|loki(?:\.ya?ml)?|promtail(?:\.ya?ml)?|tempo(?:\.ya?ml)?|observability\s+(?:config|metadata)|monitoring\s+(?:config|metadata|dashboard))(?![a-zA-Z0-9])
+ |\b(?:receivers\s*:|processors\s*:|exporters\s*:|service\s*:|pipelines\s*:|scrape_configs\s*:|alerting_rules\s*:|rule_files\s*:|groups\s*:|expr\s*:|annotations\s*:|runbook_url\s*:|dashboard\s*:|panels\s*:|datasource\s*:|pipeline_stages\s*:|receivers?\s*:|routes?\s*:|inhibit_rules\s*:)\b
+ |(?<![a-zA-Z0-9])(?:x-agent-policy|agent_instructions|assistant_note|scanner_policy|observability_agent_note|sre_agent_policy)(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:ai|llm|autonomous|sre|devops|security|observability|reliability|incident|monitoring|scanner)\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?|tools?)(?![a-zA-Z0-9])
+ |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?)(?![a-zA-Z0-9])
+ |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|auditor|sre_agent|observability_agent)[_-](?:instructions?|policy|note)(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  \b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|takes\s+precedence|highest\s+priority|authoritative|canonical|definitive|controlling|governing\s+(?:document|policy)|(?:primary|single)\s+source\s+of\s+truth)\b
+ |\b(?:primary|main|principal|controlling|authoritative|preferred)\s+(?:(?:monitoring|observability|incident|sre|alert|audit|security|scanner|review)\s+){0,3}(?:guidance|playbook|policy|instructions?)\b
+ |\bdefines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|ai|scanner|security|sre|observability|monitoring|incident)\s+(?:review|audit|scan|triage)|all\s+(?:scanner|security|monitoring|alert|incident)\s+rules?)\b
+ |\b(?:agent|scanner|assistant|reviewer|auditor|sre\s+agent|observability\s+agent)\s+(?:instructions?|directive|policy)\b
+))
+(?=.*(?:
+  \b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding|omit|omits|omitted|redact|redacts|redacted|exclude|excludes|excluded|downgrade|downgrades|downgraded|defer|deprioritize|ignore|skip|mark)\b.{0,100}?\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|CVEs?|incidents?|SLO\s+violations?|failed\s+scrapes?|scrape\s+failures?|TLS\s+warnings?|data[- ]?leak\s+alerts?)\b
+ |\b(?:do\s+not|not)\s+report\b.{0,100}?\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|incidents?|failed\s+scrapes?|TLS\s+warnings?)\b
+ |\btreat.{0,60}?as\s+(?:informational|advisory|non[- ]?blocking|background[- ]?only|safe|clean)\b
+ |\b(?:keep|leave).{0,100}?\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|alerts?|incidents?|failed\s+scrapes?)\b.{0,55}?\bout\s+of\s+(?:the\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\s+memo|incident\s+memo|final\s+report)\b
+ |\b(?:move|route|shift|downgrade).{0,100}?\b(?:observations?|findings?|diagnostics?|results?|issues?|alerts?|warnings?|incidents?)\b.{0,100}?\b(?:appendix[- ]?only|background[- ]?only|informational|non[- ]?blocking|background\s+notes?)\b
+ |\b(?:include|attach|forward|send|share|provide|collect|copy|read|export|pass\s+along|populate)\b.{0,110}?\b(?:API\s*keys?|tokens?|secrets?|credentials?|authorization\s+headers?|bearer|cookies?|session\s+tokens?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?|evidence)|local\s+(?:state|config(?:uration)?|settings?)|telemetry\s+(?:credentials?|tokens?|secrets?|context)|collector\s+(?:credentials?|tokens?)|datasource\s+(?:secrets?|tokens?)|runtime\s+proof\s+material)\b
+))
+.*""",
+        ],
+        "description": "Attacker-controlled observability configuration and dashboard metadata (`otelcol.yaml`, `prometheus.yml`, `alertmanager.yml`, Grafana dashboard JSON, Loki/Promtail configs) can smuggle agent/scanner-facing policy that claims authority over monitoring review, suppresses alerts/findings, or asks agent"
+    },
+    {
+        "id": "GLS-SCAP-001",
+        "name": "SARIF Results Metadata Agent Policy Poisoning",
+        "category": "supply_chain_attestation_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "\"$schema\"",
+            "\"message\"",
+            "\"results\"",
+            "\"ruleId\"",
+            "\"runs\"",
+            "\"version\":\"2.1.0\"",
+            "SARIF",
+            "agent_instructions",
+            "assistant_note",
+            "scanner_policy",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:(?:security|incident|vulnerability|scanner|training|reference|runbook)\s+(?:report|docs?|guide|example|exercise|reference)?).{0,160}?\b(?:detected|blocked|flagged|refused|should\s+(?:report|detect|flag|refuse|block)|must\s+(?:report|detect|flag|refuse|block))\b)
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+never|should\s+not)\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?|supersede|supersedes?)\b)
+(?!.*\b(?:not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?)\b)
+(?=.*(?:\bSARIF\b|"\$schema"\s*:\s*"[^"]*sarif|(?<!\w)"version"\s*:\s*"2\.1\.0"|(?<!\w)"runs"\s*:|(?<!\w)"tool"\s*:|(?<!\w)"results"\s*:|(?<!\w)"ruleId"\s*:|(?<!\w)"message"\s*:\s*\{|\bcode\s+scanning\s+(?:alerts?|results?)\b|\bstatic\s+analysis\s+results?\b))
+(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|autonomous\s+agents?|security\s+agents?|code\s+review\s+agents?|vulnerability\s+(?:management\s+)?agents?|dependency\s+review|automated\s+(?:review|triage|audit)|assistants?|LLMs?|models?|scanners?|verifiers?|agent_instructions?|scanner_policy|assistant_note|x-agent-policy)(?![a-zA-Z0-9]))
+(?=.*(?:\b(?:governing|controlling|canonical|definitive|authoritative)\s+(?:(?:review|audit|scanner|project)\s+)?(?:document|policy|guidance|playbook|source)\b|\b(?:primary|single)\s+source\s+of\s+truth\b|\b(?:main|primary|principal)\s+(?:operating|review|audit|scanner|triage)\s+(?:guidance|playbook|policy)\b|\btakes\s+precedence\b|\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?)\b|\bdefines?\s+(?:(?:all|the)\s+)?(?:scanner|security|agent|review|triage|automated)\s+rules?\b|\b(?:agent|scanner|assistant|verifier)\s+(?:instructions?|directives?|policy)\b))
+(?=.*(?:\b(?:suppress|hide|redact|exclude|omit|skip|silence|downgrade|deprioriti[sz]e)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies)|observations?|diagnostics?|results?|rule\s+hits?|code\s+scanning\s+alerts?)\b|\b(?:treat|mark|classify|label)\b.{0,50}?\b(?:informational|non[- ]blocking|safe|clean|benign|accepted|background[- ]only)\b|\b(?:do\s+not|don't|never)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\b|\b(?:keep|leave)\b.{0,80}?\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies))\b.{0,40}?\bout\s+of\s+(?:the\s+)?(?:reports?|summaries|memos?|audit\s+memo|triage\s+memo|final\s+report)\b|\b(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|copy|read|populate)\s+(?:[\w-]+\s+){0,4}(?:API\s+keys?|tokens?|session\s+keys?|credentials?|secrets?|auth(?:orization)?\s+headers?|cookies?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|material)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context)\b))
+.*""",
+        ],
+        "description": "SARIF result files and code-scanning exports can carry attacker-authored `message.text`, `properties`, or extension metadata that tells AI code-review/security agents to treat the scan result as policy, suppress findings, or forward local runtime context."
+    },
+    {
+        "id": "GLS-SCAP-002",
+        "name": "SLSA / in-toto attestation metadata agent-policy poisoning",
+        "category": "supply_chain_attestation_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "agent/scanner/verifier instructions",
+            "agent_instructions",
+            "buildDefinition",
+            "materials",
+            "predicateType: slsa.dev/provenance",
+            "runDetails",
+            "scanner_policy",
+            "x-agent-policy",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|incident|vulnerability|training|guide|docs?|documentation|reference)\b.{0,100}\b(?:flagged|detected|blocked|refused|should\s+(?:report|detect|flag|refuse|block)))
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|does\s+not\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|never\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|must\s+not\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|should\s+(?:not\s+\w+|never\b))\b)
+(?!.*\b(?:no\s+(?:policy\s+)?overrides?|not\s+(?:authoritative|canonical|definitive)|does\s+not\s+instruct\s+(?:agents?|scanners?|verifiers?).{0,80}\b(?:include|forward|suppress|hide|trust|ignore|report)))
+(?=.*(?:\b(?:slsa|in[-\s]?toto|intoto|dsse|provenance|provenance_note|attestation|attestations|buildDefinition|runDetails|materials|subject\s+digest|predicateType|slsa\.dev/provenance|in-toto\.io/Statement|sigstore\s+bundle|rekor\s+entry)\b|(?<!\w)"(?:_type|predicateType|buildDefinition|runDetails|materials|subject|predicate|attestation_note|provenance_note|x-agent-policy|agent_instructions|scanner_policy)"\s*:))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|agents?|assistants?|dependency\s+(?:reviewers?|auditors?|agents?)|supply[-\s]?chain\s+(?:scanners?|auditors?|agents?)|build\s+(?:auditors?|verifiers?)|provenance\s+verifiers?|security\s+scanners?|automated\s+(?:review|audit)|scanner_policy|agent_instructions|x-agent-policy)(?![a-zA-Z0-9]))
+(?=.*\b(?:agent|scanner|verifier|auditor|assistant|reviewer)\s+instructions?\b|.*\b(?:authoritative|canonical|definitive|governing\s+document|controlling\s+document|(?:primary|single)\s+source\s+of\s+truth|takes\s+precedence|overrides?|supersedes?|overrules?|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|ai|scanner|security|agent|dependency|build)\s+(?:review|audit|scan|verification)|all\s+(?:scanner|security|audit|verification)\s+rules?))\b)
+(?=.*\b(?:do\s+not\s+report|not\s+report|suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|background)|mark.{0,50}?as\s+(?:trusted|clean|safe|verified)|ignore.{0,50}?(?:mismatches?|failures?|findings?|warnings?|alerts?|observations?|diagnostics?)|trust.{0,50}?(?:build|artifact|package|image|release)|include|forward|send|share|attach|provide|expose|copy|collect|pass\s+along)\b.{0,90}\b(?:findings?|reports?|warnings?|alerts?|observations?|diagnostics?|results?|mismatches?|failures?|subject\s+digest|builder\s+identity|materials?|provenance\s+failure|attestation\s+failure|build|artifact|package|image|release|ci\s+tokens?|oidc\s+tokens?|authorization\s+headers?|api\s+keys?|secrets?|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)))
+.*""",
+        ],
+        "description": "Machine-readable build provenance and in-toto/SLSA attestation metadata can carry agent-directed policy claims that tell AI dependency reviewers or supply-chain scanners to trust a build, suppress provenance failures, or forward local CI/runtime secrets."
+    },
+    {
+        "id": "GLS-SCAP-003",
+        "name": "Status Badge / Coverage Badge Metadata Agent-Policy Poisoning",
+        "category": "supply_chain_attestation_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agents",
+            "CI_ENV",
+            "GITHUB_TOKEN",
+            "agent instruction",
+            "agent_instructions",
+            "agents",
+            "assistants",
+            "authoritative",
+            "badge.svg",
+            "badgen.net",
+            "codecov",
+            "coverage badge",
+            "coveralls",
+            "crawlers",
+            "dependency review agents",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)
+  |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct|treat)
+  |never\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
+  |must\s+not\s+(?:be\s+used|use|obey|include|attach|forward|send|share|overrides?|trust|treat)
+  |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+  |no\s+(?:agent\s+)?policy\s+overrides?
+  |(?:security|incident|vulnerability)\s+report.{0,120}?\b(?:detected|blocked|flagged|refused)
+  |(?:scanner|security)\s+docs?\s+should\s+(?:report|detect|flag|refuse)
+  |learn\s+how.{0,80}?scanners?\s+should\s+(?:report|detect|flag|refuse)
+))
+(?=.*(?:
+  badge(?:\.svg|\s+(?:url|svg|metadata|image|endpoint|label))
+  |status\s+badge|coverage\s+badge|build\s+badge|quality\s+gate\s+badge
+  |shields\.io|img\.shields\.io|badgen\.net|codecov|coveralls|sonarcloud
+  |!\[[^\]]{0,80}badge[^\]]{0,80}\]\(|<desc>|<metadata>|aria-label="[^"]{0,80}badge
+))
+(?=.*(?<![a-zA-Z0-9])(?:
+  ai\s+agents?|agents?|assistants?|scanners?|crawlers?|llms?|models?
+  |repository\s+auditors?|dependency\s+review(?:ers?|\s+agents?)|security\s+auditors?
+  |agent[._-](?:policy|instructions?|note)|scanner[._-](?:policy|instructions?|note)|assistant[._-](?:policy|instructions?|note)
+  |your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies))
+)(?![a-zA-Z0-9]))
+(?=.*(?:
+  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority
+  |canonical(?:\s+(?:project|model|security|governing|policy))?(?:\s+(?:description|policy|document))?
+  |definitive(?:\s+(?:project|model\s+evaluation))?(?:\s+(?:description|policy))?
+  |(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|is\s+the\s+final\s+word|\bauthoritative\b
+  |defines?\s+all\s+(?:scanner|security|agent)\s+rules?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent)\s+(?:review|audit|scan)
+  |(?:agent|scanner|assistant|verifier|crawler)\s+(?:instructions?|directive|notice)
+  |(?:agent|scanner|assistant|verifier|crawler)[._-](?:policy|instructions?|note)
+  |\bfor\s+(?:ai\s+)?(?:agents?|scanners?|assistants?|coding\s+agents?).{0,25}?\bthis\b
+  |main\s+operating\s+guidance|operating\s+guidance|review\s+guidance
+))
+(?=.*(?:
+  suppress(?:es|ed|ing)?.{0,40}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))
+  |hide\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?)
+  |do\s+not\s+(?:report|flag).{0,45}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))
+  |skip\b.{0,40}?\b(?:security\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\b
+  |omit.{0,35}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?)
+  |exclude.{0,45}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?|results?)
+  |redact.{0,40}?(?:findings?|warnings?|flags?|observations?|diagnostics?|results?)
+  |do\s+not\s+escalate
+  |treat.{0,40}?as\s+informational|mark.{0,40}?as\s+(?:informational|safe|low|none)
+  |classify.{0,40}?(?:as\s+)?(?:informational|low|none|false\s+positive)
+  |flag.{0,40}?as\s+(?:informational|low|none)
+  |downgrade.{0,60}?(?:background\s+notes?|background-only|informational|low|none)
+  |(?:keep|leave).{0,60}?out\s+of\s+(?:memo|summary|report|final\s+report|audit\s+memo|badge\s+summary|release\s+summary)
+  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|pass\s+along).{0,70}?(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context|API\s+keys?|Bearer\s+tokens?|session\s+tokens?|auth(?:orization)?\s+headers?|cookies?|credentials?|secrets?|GITHUB_TOKEN|CI_ENV|Authorization)
+))
+(?=.*(?:
+  findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|coverage\s+results?|scan\s+results?
+  |environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context
+  |API\s+keys?|Bearer\s+tokens?|session\s+tokens?|auth(?:orization)?\s+headers?|cookies?|credentials?|secrets?|GITHUB_TOKEN|CI_ENV|Authorization
+)).*""",
+        ],
+        "description": "Repository status-badge and coverage-badge metadata can smuggle agent/scanner instructions that claim authority, suppress findings, or request local credentials when AI auditors fetch badges as project-health evidence."
+    },
+    {
+        "id": "GLS-SCAP-004",
+        "name": "TUF update metadata agent-policy poisoning",
+        "category": "supply_chain_attestation_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent(s)",
+            "LLM assistant(s)",
+            "TUF",
+            "The Update Framework",
+            "agent instruction",
+            "agent_instructions",
+            "assistant_policy",
+            "authoritative TUF repository policy",
+            "canonical update policy",
+            "consistent snapshots",
+            "definitive package-update policy",
+            "delegated targets",
+            "dependency scanner(s)",
+            "expires",
+            "governing document",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|
+  does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|
+  never\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|
+  must\s+not\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)|
+  should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+)\b)
+(?!.*\b(?:(?:security|training|runbook|guide|reference|incident|vulnerability)\s+(?:docs?|report|example|exercise|guidance)?|scanners?\s+docs?)\b.{0,160}\b(?:should|must|was|were)?\s*(?:report|detect|flag|flagged|refuse|block|blocked)\b)
+(?!.*\b(?:no\s+agent\s+policy|not\s+agent\s+policy|not\s+authoritative|not\s+policy|no\s+policy\s+overrides?|does\s+not\s+instruct\s+agents?)\b)
+(?=.*(?:
+  The\s+Update\s+Framework|\bTUF\b|root\.json|targets\.json|snapshot\.json|timestamp\.json|
+  delegated\s+targets?|signed\s*[:.]?\s*_type|spec_version|consistent\s+snapshots?|
+  TUF\s+repository|update\s+repository|repository\s+metadata|repository\s+report|
+  signatures?|keyid|threshold|expires|hashes\s*[:=]|sha256|rollback|freeze\s+attack
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:ai\s+)?agents?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])(?:dependency|security|supply-chain|update)\s+scanners?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])(?:update|security|release)\s+auditors?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])(?:release|audit|dependency)\s+bots?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])verifier[_-]policy(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])assistant[_-]policy(?![a-zA-Z0-9])|
+  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  agent\s+instructions?|scanner\s+instructions?|verifier\s+instructions?|assistant\s+instructions?|
+  canonical\s+(?:(?:TUF|update|repository|verifier|package-update)\s+){0,2}(?:policy|metadata|configuration|instructions?)|
+  definitive\s+(?:(?:TUF|update|repository|verifier|package-update)\s+){0,2}(?:policy|metadata|configuration|instructions?)|
+  (?:primary|single)\s+source\s+of\s+truth|
+  higher[-\s]?priority|highest[-\s]?priority|authoritative|governing\s+(?:policy|document)|
+  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|must\s+obey
+))
+(?=.*(?:
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\s+results?|verifier\s+results?)|
+  hide(?:s|den|ing)?\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\s+results?|verifier\s+results?)|
+  omit(?:s|ted|ting)?\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\s+results?|verifier\s+results?)|
+  (?:do\s+not|not)\s+report\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\s+results?|verifier\s+results?)|
+  (?:treat|mark|classify|downgrade).{0,80}?as\s+(?:informational|non[-\s]?blocking|safe|low\s+risk|background[-\s]?only)|
+  (?:include|forward|send|attach|copy|read|collect|provide|populate|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env(?:ironment)?|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?)|execution\s+context|ci\s+secrets?|registry\s+(?:auth\s+)?tokens?|auth(?:entication)?\s+tokens?|api\s+keys?|authorization\s+headers?|bearer\s+tokens?|cookies?|session\s+(?:headers?|tokens?|state)|local\s+(?:state|context|config(?:uration)?|settings?))
+))""",
+        ],
+        "description": "TUF signed update metadata or adjacent repository metadata can smuggle agent/scanner-facing policy instructions that tell AI update auditors to treat the metadata as higher authority, suppress verification findings, or forward local credentials/state."
+    },
+    {
+        "id": "GLS-SCAP-005",
+        "name": "SLSA / in-toto provenance attestation metadata poisoning",
+        "category": "supply_chain_attestation_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "DSSE",
+            "Rekor",
+            "SLSA",
+            "Sigstore",
+            "Statement",
+            "agent_note",
+            "assistant_instructions",
+            "attestation",
+            "buildDefinition",
+            "builder.id",
+            "in-toto",
+            "materials",
+            "payloadType",
+            "predicate",
+            "predicateType",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|vulnerability|training|reference|guide|documentation|docs?|blog|report).{0,120}?\b(?:detected|blocked|flagged|refused|reported|must\s+report|should\s+(?:report|detect|flag|refuse|block)|must\s+not\s+(?:obey|treat|follow|include|attach|forward|send|share|overrides?|trust)|do\s+not\s+(?:obey|treat|follow|include|attach|forward|send|share|overrides?|trust)|never\s+(?:obey|treat|include|attach|forward|send|share|overrides?|trust))
+  |\b(?:do\s+not\s+(?:obey|treat|follow)|does\s+not\s+(?:obey|follow|override|overrides?|supersede|supersedes|instruct)|never\s+(?:obey|treat|override|overrides?|supersede|supersedes)|must\s+not\s+(?:obey|treat|follow))\b.{0,120}?\b(?:SLSA|in[-\s]?toto|attestations?|provenance|DSSE|Sigstore|Rekor)\b
+  |\b(?:no\s+(?:policy\s+)?overrides?|not\s+(?:authoritative|canonical|policy)|does\s+not\s+instruct\s+agents?)\b
+))
+(?=.*(?:\bSLSA\b|slsa\.dev/provenance|in[-\s]?toto|https://in-toto\.io/Statement|predicateType|payloadType|DSSE|dsseEnvelope|Sigstore|Rekor|slsa-verifier|attestations?|provenance|buildDefinition|runDetails|materials?|builder\.id|"builder"\s*:|"subject"\s*:|"predicate"\s*:))
+(?=.*(?<![A-Za-z0-9])(?:AI\s+agents?|agents?|assistants?|LLMs?|models?|autonomous\s+(?:auditors?|scanners?|agents?)|dependency\s+(?:scanners?|auditors?|reviewers?)|supply[-\s]?chain\s+(?:agents?|auditors?|scanners?)|security\s+scanners?|provenance\s+(?:auditors?|reviewers?)|scanner|auditor|reviewer|verifier|agent_note|agent_policy|scanner_policy|assistant_instructions|x[-_]?agent[-_]?policy)(?![A-Za-z0-9]))
+(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|canonical(?:\s+(?:release|build|provenance|vendor|security|policy))?(?:\s+(?:description|policy|document))?|definitive(?:\s+(?:release|build|provenance|security))?(?:\s+(?:description|policy))?|(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|\bauthoritative\b|defines?\s+(?:all\s+)?(?:scanner|security|agent|automated|build|provenance)?\s*rules?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent|dependency|supply[-\s]?chain|provenance)\s+(?:review|audit|scan)|(?:agent|scanner|assistant|auditor|verifier)\s+(?:instructions?|directive|policy|notice)|(?:main|primary|principal|preferred)\s+(?:operating\s+)?(?:review|audit|scanner|dependency|provenance|supply[-\s]?chain|release|build)?\s*(?:guidance|playbook|policy|instructions?)))
+(?=.*(?:suppress(?:es|ed|ing)?.{0,50}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?|license|malware)|hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|do\s+not\s+(?:report|flag).{0,40}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|omit.{0,50}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?|CVEs?)|exclude.{0,50}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|redact.{0,50}?(?:findings?|warnings?|flags?|observations?|diagnostics?|results?)|skip\b.{0,50}?\b(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|observations?|diagnostics?|results?)|treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|clean|benign)|mark.{0,50}?as\s+(?:informational|safe|clean|low|none)|classify.{0,50}?(?:as\s+)?(?:informational|low|none|false\s+positive|non[-\s]?blocking)|downgrade.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|CVEs?|license|malware).{0,80}?(?:background\s+notes?|background-only|informational|non[-\s]?blocking)|(?:keep|leave).{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|CVEs?|license|malware).{0,30}?out\s+of\s+(?:the\s+)?(?:audit\s+memo|release\s+memo|build\s+memo|summary|report|final\s+report|memo)|(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:Authorization|Bearer|cookies?|session\s+(?:headers?|tokens?|keys?)|API\s+(?:keys?|tokens?)|auth\s+(?:headers?|tokens?|keys?)|credentials?|secrets?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:variables?|context|details?|config(?:uration)?|state|settings?|material|proof)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context|build\s+credentials?)))
+.*""",
+        ],
+        "description": "Build provenance attestations such as SLSA, in-toto Statement, DSSE envelopes, and Sigstore/Rekor metadata can carry agent-directed policy text that tells AI dependency auditors to treat the attestation as scanner authority, suppress findings, or forward runtime credentials/local state."
+    },
 ]

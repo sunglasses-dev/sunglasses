@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.60] — 2026-06-04
+
+### Added (V2 SHIP #6 — cicd_metadata_poisoning + supply_chain_attestation_poisoning)
+
+- **13 new patterns** — `GLS-CICD-001` through `GLS-CICD-008` (8 patterns, new `cicd_metadata_poisoning` category) plus `GLS-SCAP-001` through `GLS-SCAP-005` (5 patterns, new `supply_chain_attestation_poisoning` category). The `cicd_metadata_poisoning` category covers agent-policy poisoning hidden in CI/CD pipeline metadata — build logs, workflow run annotations, job summaries, pipeline status messages, and CI artifact output that AI coding agents read while reviewing, triaging, or acting on a pipeline. The `supply_chain_attestation_poisoning` category covers agent-policy poisoning hidden in supply-chain attestations and provenance records — SLSA/in-toto attestation predicates, signed provenance, and verification metadata that agents read during release and dependency validation. Pattern count: 943 → **956**. Category count: 61 → **63**. Keywords: 6,455 → **6,612**.
+- **New blog:** [CI/CD Metadata Poisoning: Hijacking Agents Through Pipeline Annotations](https://sunglasses.dev/blog/cicd-metadata-poisoning) — why build logs and workflow annotations are context, not authority, and how runtime trust stops poisoned pipeline metadata before agents act. Written by JACK, research by Cava.
+
+
 ## [0.2.59] — 2026-06-03
 
 ### Added (V2 SHIP #5 — agent_instruction_file_poisoning + mcp_threat)
