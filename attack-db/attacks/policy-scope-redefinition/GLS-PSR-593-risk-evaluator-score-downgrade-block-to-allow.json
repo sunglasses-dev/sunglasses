@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-593",
+  "name": "Risk Evaluator Score Downgrade Block To Allow",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attackers poison the trusted policy-evaluator layer through feature-weight stuffing, schema-fallback ambiguity, context-order anchoring, or forged provenance so malicious actions get scored ALLOW instead of BLOCK, compromising the decision gate that mediates all downstream tools.",
+  "keywords": [
+    "feature weight prompt stuffing",
+    "evaluator-safe token stuffing",
+    "threshold steering fallback ambiguity",
+    "kpi_snapshot vs kpis fallback",
+    "unknown defaults to allow",
+    "context order poisoning",
+    "policy after retrieval anchored",
+    "cross-tool evidence laundering",
+    "transitive trust bypass",
+    "forged provenance label",
+    "policy evaluator poisoning",
+    "risk score flipped block to allow"
+  ],
+  "regex": [
+    "(?i)(?:(?:risk|safety|evaluator|approval)\\s+(?:score|class|verdict)\\s+(?:flipped|downgraded|drops?)\\s+(?:from\\s+)?(?:block|review)\\s+to\\s+(?:allow|low)|(?:unknown|missing|fallback)\\s+(?:field|value|confidence)\\s+(?:defaults?|treated)\\s+as\\s+(?:allow|low[- ]risk|safe)|(?:forged|spoofed|unverified)\\s+(?:provenance|source|trust)\\s+(?:label|tag)\\s+(?:influences?|skews?|bypasses?)\\s+(?:evaluator|risk\\s+score|approval))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-593"
+}

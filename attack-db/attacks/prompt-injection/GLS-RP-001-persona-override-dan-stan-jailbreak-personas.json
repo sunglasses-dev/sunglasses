@@ -1,0 +1,45 @@
+{
+  "id": "GLS-RP-001",
+  "name": "Persona override \u2014 DAN/STAN/jailbreak personas",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Known jailbreak persona override templates (DAN, STAN, and variants).",
+  "keywords": [
+    "you are now dan",
+    "you are dan",
+    "you are now stan",
+    "act as dan",
+    "pretend to be dan",
+    "jailbroken ai",
+    "jailbroken assistant",
+    "jailbreak mode",
+    "developer mode enabled",
+    "do anything now",
+    "strive to avoid norms",
+    "unrestricted ai",
+    "uncensored ai",
+    "no safety guidelines",
+    "no content policy",
+    "without restrictions",
+    "with no restrictions",
+    "without safety",
+    "ignore your safety",
+    "disable your safety",
+    "bypass your safety"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-001"
+}

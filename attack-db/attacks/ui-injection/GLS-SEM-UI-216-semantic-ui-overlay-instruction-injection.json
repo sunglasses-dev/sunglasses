@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SEM-UI-216",
+  "name": "Semantic UI overlay instruction injection",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-overlay text that impersonates system/security/policy messaging to inject instruction-override or bypass directives into agent context.",
+  "keywords": [
+    "security notice ignore instructions",
+    "automation notice bypass policy",
+    "assistant instruction override",
+    "system notice disregard",
+    "policy update instead follow",
+    "security banner override constraints",
+    "ignore previous navigation constraints",
+    "automation notice bypass safety"
+  ],
+  "regex": [
+    "(?i)\\b(?:system|assistant|policy|security\\s+notice|automation\\s+notice)\\b.{0,120}\\b(?:ignore|disregard|override|bypass|instead)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-216"
+}

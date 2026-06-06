@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-243",
+  "name": "Primary Key Starvation Alias Precedence Inversion",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker steers tool-result parsing toward weaker fallback schemas by omitting canonical keys or polymorphing row fields, promoting false READY verdicts or stale states while the payload remains superficially valid.",
+  "keywords": [
+    "primary-key starvation",
+    "alias precedence inversion",
+    "null-coalescing laundering",
+    "row-field polymorphism",
+    "schema bifurcation abuse",
+    "weaker fallback branch steering",
+    "ready instead of blocked verdict",
+    "path hits url count uri requests swap",
+    "canonical key omission attack",
+    "permissive fallback accepts stale",
+    "tool result schema variants",
+    "silent integrity loss bifurcation"
+  ],
+  "regex": [
+    "(?i)(?:(?:primary[- ]?key\\s+starvation|alias\\s+precedence\\s+inversion|null[- ]?coalescing\\s+laundering|row[- ]?field\\s+polymorphism)|(?:omits?|drops?|nulls?)\\s+(?:canonical|primary)\\s+(?:keys?|fields?)\\s+(?:to\\s+)?(?:force|steer|coerce)\\s+(?:parser\\s+)?(?:fallback|alias)|(?:tool\\s+(?:result|output))\\s+(?:schema)?\\s*(?:bifurcation|variants?|polymorphism)\\s+(?:steers?|promotes?|elevates?)\\s+(?:weaker|stale|attacker[- ]controlled))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-243"
+}

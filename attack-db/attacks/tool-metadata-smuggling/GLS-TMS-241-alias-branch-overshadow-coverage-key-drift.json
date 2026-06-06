@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-241",
+  "name": "Alias Branch Overshadow Coverage Key Drift",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker plants contradictory values under secondary aliases or top-level keys so naive merge order overrides the canonical authoritative branch, silently flipping security decisions or suppressing detection-coverage alerts.",
+  "keywords": [
+    "alias branch poisoning",
+    "type-shift overshadow",
+    "top-level precedence trap",
+    "coverage-key drift exploit",
+    "secondary alias wins merge",
+    "primary branch sparse fallback",
+    "type corruption forces fallback",
+    "top-level keys override nested",
+    "modality coverage key swap",
+    "alias overshadowing decision",
+    "merge order precedence abuse",
+    "missing modality suppression"
+  ],
+  "regex": [
+    "(?i)(?:(?:alias\\s+branch|type[- ]?shift|top[- ]?level\\s+precedence|coverage[- ]?key)\\s+(?:poisoning|overshadow|trap|drift|exploit)|(?:secondary|fallback|alias)\\s+(?:alias|branch|key)\\s+(?:wins?|overrides?|overshadows?)\\s+(?:merge|primary|canonical|authoritative)|(?:modality_coverage|coverage_by_modality)\\s+(?:swap|drift|key[- ]rename)\\s+(?:suppresses?|hides?|omits?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-241"
+}

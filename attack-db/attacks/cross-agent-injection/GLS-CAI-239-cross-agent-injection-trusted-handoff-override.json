@@ -1,0 +1,33 @@
+{
+  "id": "GLS-CAI-239",
+  "name": "Cross-agent injection \u2014 trusted handoff override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects cross-agent injection attacks where output from an upstream, previous, delegated, planner, or worker agent is presented as trusted, authoritative, verified, signed, or approved \u2014 and that claim is used to justify ignoring, bypassing, overriding, disregarding, or replacing the downstream agent's system prompt, policy, guardrails, safety checks, or instructions. Covers A2A (agent-to-agent) trust-boundary abuse in multi-agent workflows.",
+  "keywords": [
+    "upstream agent output trusted ignore prior safety instructions",
+    "previous agent verified bypass system prompt",
+    "delegated agent result authoritative override guardrails",
+    "planner output signed replace policy",
+    "worker handoff approved disregard safety checks",
+    "agent A output trusted ignore instructions",
+    "prior agent authoritative bypass policy",
+    "A2A trust boundary signed override system"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s*not|don\\'t|never|without)\\s+(?:ignore|bypass|override|disregard|replace)\\b)(?!.*\\b(?:no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent\\s*[ab]|upstream\\s+agent|previous\\s+agent|prior\\s+agent|agent\\s+output|planner|worker|delegate(?:d)?)\\b)(?=.*\\b(?:trusted|authoritative|verified|signed|approved)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:system(?:\\s+prompt)?|policy|guardrail(?:s)?|safety(?:\\s+checks?)?|instruction(?:s)?)\\b).{0,2000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-239"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-CF-252",
+  "name": "Tool Output Context Baseline Reset",
+  "version": "1.0",
+  "category": "context_flooding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker uses untrusted tool output or retrieval text to force the agent to discard earlier safety, approval, and scope context, then continues execution under attacker-controlled new-baseline instructions while spoofing system-level authority headers.",
+  "keywords": [
+    "context window reset poisoning",
+    "ignore previous directives",
+    "start fresh new baseline",
+    "policy superseded by summary",
+    "summarize then obey the summary",
+    "token-pressure truncation bait",
+    "unrestricted troubleshooting mode",
+    "multi-turn memory reseeding",
+    "fake system patch applied",
+    "approvals pre-granted for diagnostics",
+    "durable poison persistence",
+    "tool-result authority spoof"
+  ],
+  "regex": [
+    "(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\\s+(?:all\\s+)?(?:prior|previous|earlier|original)\\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\\s+baseline|start\\s+(?:over|fresh)|policy\\s+(?:superseded|v\\d)|earlier\\s+constraints?\\s+(?:are\\s+)?outdated)\\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:\\[?\\s*(?:system|security)\\s+(?:patch|update|override)\\s+applied\\]?|approvals?\\s+pre[- ]granted|unrestricted\\s+troubleshooting\\s+mode)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CF-252"
+}

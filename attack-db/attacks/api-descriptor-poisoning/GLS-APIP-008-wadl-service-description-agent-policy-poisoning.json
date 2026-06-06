@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-008",
+  "name": "WADL service-description agent policy poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A WADL (`application.wadl`) service-description file embeds instructions addressed to AI agents, scanners, crawlers, or tool builders that claim to override higher-priority rules, suppress findings, or forward credentials discovered while inspecting API metadata.",
+  "keywords": [
+    "<application>",
+    "<doc>",
+    "<method>",
+    "<resource>",
+    "<resources>",
+    "AI agent",
+    "API agent",
+    "API key",
+    "LLM",
+    "WADL",
+    "agent policy",
+    "agentic client",
+    "alerts",
+    "application.wadl",
+    "assistant"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:docs?|documentation|guide|article|reference|training|example|scanner\\s+docs?)\\b.{0,120}\\b(?:should|must|will|can)\\s+(?:report|detect|flag|refuse|ignore)\\b)\n(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|cannot|can't)\\b.{0,80}\\b(?:obey|treat|accept|follow|honou?r|execute|override|supersede|replace)\\b)\n(?=.*\\b(?:application\\.wadl|\\bwadl\\b|<\\s*application\\b|<\\s*resources\\b|<\\s*resource\\b|<\\s*method\\b|<\\s*doc\\b|wadl:doc\\b|wadl:application\\b|wadl\\s+(?:descriptor|description|file|metadata))\\b)\n(?=.*\\b(?:ai\\s*agents?|assistants?|llms?|models?|crawlers?|scanners?|agentic\\s+(?:client|crawler|scanner)|api\\s+agents?|tool\\s+builders?)\\b)\n(?=.*\\b(?:ignore|override|supersede|replace|outrank|bypass|disable|skip|treat\\s+this\\s+as|system\\s+instruction|developer\\s+instruction|agent\\s+policy|hidden\\s+policy|do\\s+not\\s+report|suppress|hide\\s+(?:findings?|alerts?)|forward|include|exfiltrat(?:e|ion)|leak|send)\\b)\n(?=.*\\b(?:system|developer|user|scanner|policy|findings?|alerts?|report|credential|secret|token|api\\s*key|cookie|session|env(?:ironment)?\\s*(?:var|variable)s?|local\\s+(?:state|files?))\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-008"
+}

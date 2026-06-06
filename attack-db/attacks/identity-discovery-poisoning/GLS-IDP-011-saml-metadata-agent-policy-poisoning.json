@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-011",
+  "name": "SAML Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "SAML federation metadata can hide agent-directed authority inversion, report suppression, or secret-disclosure instructions inside legitimate XML metadata fields that SSO-audit agents may ingest as trusted context.",
+  "keywords": [
+    ".env",
+    "AI agent",
+    "API key",
+    "ContactPerson",
+    "EntityAttributes",
+    "EntityDescriptor",
+    "IDPSSODescriptor",
+    "IDP_CLIENT_SECRET",
+    "LLM",
+    "OrganizationDisplayName",
+    "SAML metadata",
+    "SAML_TOKEN",
+    "SPSSODescriptor",
+    "SSO audit",
+    "UIInfo"
+  ],
+  "regex": [
+    "(?is)(?!(?=.*(?:training|example\\s+malicious|must\\s+not\\s+obey|do\\s+not\\s+include\\s+(?:API[_ -]?keys?|tokens?|secrets?))))(?=.*(?:EntityDescriptor|IDPSSODescriptor|SPSSODescriptor|OrganizationDisplayName|ContactPerson|UIInfo|EntityAttributes|md:Extensions|SAML\\s+metadata))(?=.*(?:AI\\s+agents?|assistants?|LLMs?|models?|scanners?|audit(?:ing)?\\s+agents?|SSO\\s+audit))(?=.*(?:ignore|outranks?|override|supersedes?|do\\s+not\\s+report|suppress|hide|include|send|exfiltrate|forward|disclose|copy))(?=.*(?:system|developer|policy|instructions|findings?|audit\\s+notes?|SAML_TOKEN|IDP_CLIENT_SECRET|API[_ -]?keys?|tokens?|secrets?|\\.env|environment\\s+variables?)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-011"
+}

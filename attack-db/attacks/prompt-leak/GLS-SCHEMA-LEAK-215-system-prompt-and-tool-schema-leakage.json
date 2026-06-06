@@ -1,0 +1,37 @@
+{
+  "id": "GLS-SCHEMA-LEAK-215",
+  "name": "System prompt and tool schema leakage",
+  "version": "1.0",
+  "category": "prompt_leak",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects coercive requests to reveal hidden system prompts, developer policies, or internal tool schemas and block disclosure or externalization of those assets.",
+  "keywords": [
+    "print full hidden system prompt",
+    "reveal developer instructions",
+    "dump internal tool schema",
+    "expose concealed instruction layers",
+    "list function signatures tool schema",
+    "show policy prompt templates",
+    "export schema bundle webhook",
+    "print system prompt developer instructions",
+    "reveal tool schema json fields",
+    "transparency check expose instructions"
+  ],
+  "regex": [
+    "(?is)(?!.*\\bdo\\s+not\\s+reveal\\b)(?!.*\\bpublic\\s+api\\s+endpoints\\b)(?!.*\\bvalidate\\s+this\\s+user-provided\\s+json\\s+schema\\b)(?=.*(?:show|print|dump|reveal|expose|list))(?=.*(?:system\\s*prompt|developer\\s*instructions?|internal\\s*tool\\s*schema|tool\\s*schema|function\\s*signatures?|policy\\s*prompt\\s*templates?|concealed\\s*instruction\\s*layers?)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCHEMA-LEAK-215"
+}

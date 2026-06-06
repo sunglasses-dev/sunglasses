@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-113",
+  "name": "Forged Rate-Limit Backoff Signal",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker forges 429/throttle/back-off signals (or their retry-after headers) so the agent falls into legitimate-looking back-off loops, fallback paths, or quota-exhausted states, effectively a denial-of-progress that downstream code trusts.",
+  "keywords": [
+    "rate-limit feedback poisoning",
+    "fake 429 response",
+    "spoofed throttle signal",
+    "rate-limit error injection",
+    "back-off coerced into stall",
+    "retry-after header forged",
+    "rate-limit triggers fallback path",
+    "throttle signal hijack",
+    "limit-exceeded false signal",
+    "rate-limit denial of service",
+    "fake quota exhausted",
+    "back-off loop induced"
+  ],
+  "regex": [
+    "(?i)(?:fake|spoof|forge|inject)\\s+(?:rate[- ]limit|429|throttle|quota[- ]exceeded)\\s+(?:error|response|signal|header)|(?:retry[- ]after|x[- ]ratelimit)\\s+(?:header|value)\\s+(?:forg|spoof|inject|tamper)\\w*",
+    "(?i)(?:rate[- ]limit|throttle|429)\\s+(?:feedback|signal|response)\\s+(?:poison|hijack|abuse)|(?:induced?|forced?|coerced?)\\s+(?:back[- ]off|retry|stall)\\s+(?:loop|cycle|window)\\s+(?:via|through|by)\\s+(?:fake|spoofed|injected)\\s+(?:rate|throttle)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-113"
+}

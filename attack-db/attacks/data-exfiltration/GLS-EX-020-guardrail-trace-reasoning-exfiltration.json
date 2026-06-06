@@ -1,0 +1,40 @@
+{
+  "id": "GLS-EX-020",
+  "name": "Guardrail Trace Reasoning Exfiltration",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "prompt"
+  ],
+  "description": "Attacker coaxes the agent or a delegated subagent into emitting hidden reasoning traces, debug-mode transcripts, or iterative decision summaries that map internal policy heuristics, fallback order, and refusal thresholds. The extracted trace becomes a blueprint for second-stage jailbreaks tuned to the agent's actual guardrail stack.",
+  "keywords": [
+    "reasoning trace exfiltration",
+    "deliberate self audit bait",
+    "debug mode coercion via tool failure",
+    "delegate echo leak",
+    "summary cache reconstruction attack",
+    "show hidden safety reasoning for transparency",
+    "full reasoning transcript debug request",
+    "child rationale verbatim leak",
+    "iterative summary reconstruction of guardrails",
+    "internal chain of thought disclosure",
+    "policy heuristics extraction",
+    "refusal threshold harvesting"
+  ],
+  "regex": [
+    "(?i)(?:(?:show|reveal|dump|expose|emit)\\s+(?:hidden|internal|full|complete)\\s+(?:reasoning|chain[- ]of[- ]thought|safety\\s+reasoning|policy\\s+rationale|transcript))",
+    "(?i)(?:debug|tool\\s+(?:error|failure))\\s+(?:mode|pretext|coercion).{0,80}?(?:demand|request|require)\\s+(?:planner|agent|internal)\\s+(?:reasoning|rationale|trace|transcript)",
+    "(?i)(?:(?:child|delegate|subagent)\\s+(?:rationale|reasoning|trace)\\s+(?:quoted|echoed|re[- ]emit)\\s+verbatim|iterative\\s+(?:summary|decision)\\s+(?:prompts?|requests?)\\s+(?:reconstruct|reveal|leak)\\s+(?:guardrail|policy|hidden))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-EX-020"
+}

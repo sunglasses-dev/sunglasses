@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-590",
+  "name": "Policy Constraint Softened To Advisory Hint",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Across summary, planner, executor, and formatter stages attackers keep payloads intact while rephrasing hard MUST/NEVER constraints as soft guidance, eroding safety ordering so downstream tools optimize delivery speed over required security gates.",
+  "keywords": [
+    "planner softening attack",
+    "treat policy as guidance if urgent",
+    "summarizer drops must clauses",
+    "must downgraded to should",
+    "formatter precedence inversion",
+    "verification fields omitted",
+    "cross-role authority bleed",
+    "teammate hint as boss directive",
+    "constraint priority decay",
+    "hard gate softened across transforms",
+    "policy block as optional hint",
+    "signed policy block stripped"
+  ],
+  "regex": [
+    "(?i)(?:(?:must|never|required)\\s+(?:downgraded?|softened|reframed|rewritten)\\s+(?:to|as)\\s+(?:should|optional|guidance|hint|preference)|(?:treat|reframe)\\s+(?:policy|constraint|guardrail)\\s+(?:block|clause)s?\\s+as\\s+(?:guidance|optional|non[- ]blocking|hint)|(?:summarizer|formatter|planner)\\s+(?:drops?|omits?|strips?)\\s+(?:must|never|verification|safety)\\s+(?:clause|field|gate))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-590"
+}

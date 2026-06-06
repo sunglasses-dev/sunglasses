@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-269",
+  "name": "Forged Index Annotation Rerank Guardrail Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged index annotation or embedding tag that reranks or boosts content weight to bypass a policy gate, guardrail, or security review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|counterfeit|fabricated|spoofed)\\b)(?=.*\\b(?:index\\s+annotation|retrieval\\s+note|knowledge\\s+chunk|source\\s+metadata|embedding\\s+tag)\\b)(?=.*\\b(?:rerank|reranked|reranks|reranking|prioritize|prioritized|boost|boosted|boosts|boosting|weight|weighted)\\b)(?=.*\\b(?:policy\\s+gate|guardrail|approval\\s+check|security\\s+review|safety\\s+filter)\\b)(?=.*\\b(?:bypass|bypassed|bypasses|ignore|ignored|skip|skipped|override|overrode|overrides|overriding)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-269"
+}

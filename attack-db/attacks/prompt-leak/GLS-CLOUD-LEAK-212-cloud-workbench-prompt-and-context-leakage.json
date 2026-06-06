@@ -1,0 +1,37 @@
+{
+  "id": "GLS-CLOUD-LEAK-212",
+  "name": "Cloud workbench prompt and context leakage",
+  "version": "1.0",
+  "category": "prompt_leak",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects attempts to reveal or export hidden cloud workbench prompt assets (system prompts, tool schemas, trace internals, auth metadata) from managed AI environments.",
+  "keywords": [
+    "bedrock dump raw trace system prompt",
+    "azure prompt flow export full transcript",
+    "anthropic console disable redaction",
+    "workbench reveal hidden prompt",
+    "playground export tool schema",
+    "evaluation print internal policy",
+    "notebook copy system prompts",
+    "studio download auth token",
+    "trace share request headers",
+    "prompt flow export internal policy"
+  ],
+  "regex": [
+    "(?is)\\b(bedrock|azure\\s*(ai|openai)|anthropic|workbench|studio|playground|evaluation|trace|prompt\\s*flow|notebook)\\b.{0,260}\\b(reveal|dump|export|download|print|share|copy)\\b.{0,220}\\b(system\\s*prompt|hidden\\s*prompt|tool\\s*schema|raw\\s*trace|request\\s*headers?|auth\\s*(token|key)|session\\s*(id|token)|full\\s*transcript|internal\\s*policy)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CLOUD-LEAK-212"
+}

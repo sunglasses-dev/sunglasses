@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIPI-001",
+  "name": "Agent Identity Ticket Privilege Escalation Forgery",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or delegate presents a forged or spoofed identity credential, session ticket, or approval token with an escalated or elevated privilege scope to bypass or waive policy and guardrail verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|peer\\s+agent|delegate|worker|planner)\\b)(?=.*\\b(?:identity\\s+claim|identity|credential|attestation|issuer)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|counterfeit|faked?)\\b)(?=.*\\b(?:ticket|session\\s+ticket|approval\\s+token|handoff\\s+token|delegate\\s+pass)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|elevat(?:e|ed|ion|ing)|admin\\s+scope|privilege)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|waive(?:d|s)?|skip(?:ped|s|ping)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIPI-001"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-145",
+  "name": "Null-Coalescing Anchor Overwrite Attack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker forces anchor extraction into null-coalescing branches that overwrite valid zeros with stale or attacker-supplied fallback values, silently corrupting KPI truth, readiness gates, and risk scoring.",
+  "keywords": [
+    "evidence anchor null coalescing abuse",
+    "zero to null laundering",
+    "fallback chain steering",
+    "sentinel collision abuse",
+    "cache backfill override",
+    "value or fallback or N/A",
+    "primary read fail rehydrate stale cache",
+    "kpi_snapshot.rejected omitted",
+    "rejected_false_positive attacker chosen",
+    "mixed sentinels 0 null n/a string",
+    "fresh metadata over stale content",
+    "is None replaced by truthiness"
+  ],
+  "regex": [
+    "(?i)(?:(?:value\\s*=\\s*primary\\s+or\\s+secondary|or\\s+[\\\"']?N/A[\\\"']?|null[- ]?coalesc\\w+)\\s+(?:overwrites?|drops?|replaces?)\\s+(?:valid|legitimate)\\s+(?:zero|0|measurement)|(?:omit|drop|remove)\\s+(?:primary|canonical)\\s+(?:field|key|anchor)\\s+(?:while|and)\\s+(?:supply\\w+|inject\\w+|providing)\\s+(?:alternate|fallback|attacker)\\s+(?:branch|key|value)|(?:cache|stale)\\s+(?:rehydrat\\w+|backfill|refresh)\\s+(?:with|using)\\s+(?:newer|fresh)\\s+(?:timestamp|metadata)\\s+(?:over|despite|while)\\s+(?:stale|old)\\s+(?:content|body))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-145"
+}

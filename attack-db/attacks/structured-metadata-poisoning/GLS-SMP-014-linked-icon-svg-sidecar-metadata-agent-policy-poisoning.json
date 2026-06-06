@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-014",
+  "name": "Linked icon / SVG sidecar metadata agent policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects hostile agent/scanner instructions hidden in linked icon or SVG sidecar metadata (`<title>`, `<desc>`, `<metadata>`, comments, or generated icon notes) that try to make AI crawlers or security scanners treat decorative assets as policy, hide findings, or forward local secrets.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-014"
+}

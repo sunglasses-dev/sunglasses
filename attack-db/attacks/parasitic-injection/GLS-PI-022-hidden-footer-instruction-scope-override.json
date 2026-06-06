@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PI-022",
+  "name": "Hidden Footer Instruction Scope Override",
+  "version": "1.0",
+  "category": "parasitic_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a hidden footer, HTML comment, metadata block, or invisible annotation embeds an instruction or directive that invokes execution while bypassing or overriding policy, guardrail, or approval controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:footer|html\\s+comment|metadata|hidden\\s+note|annotation|invisible\\s+block)\\b)(?=.*\\b(?:instruction|directive|command|runbook|playbook)\\b)(?=.*\\b(?:execute|run|trigger|invoke|perform)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-022"
+}

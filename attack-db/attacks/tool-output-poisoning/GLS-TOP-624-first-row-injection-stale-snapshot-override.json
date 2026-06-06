@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-624",
+  "name": "First Row Injection Stale Snapshot Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker exploits agents that trust list or sequence position as a trust signal by injecting crafted entries at index 0, placing stale snapshots before current ones, or forcing last-key-wins duplicate key collisions to downgrade risk outcomes.",
+  "keywords": [
+    "first-row authority hijack",
+    "index zero poisoning",
+    "tail override duplicate key",
+    "last-key-wins downgrade",
+    "chronology inversion payload",
+    "stale first-seen block",
+    "cross-tool merge race",
+    "list position trust signal",
+    "order-dependent parser exploit",
+    "row permutation attack",
+    "sequence position policy key",
+    "low-trust lands first race"
+  ],
+  "regex": [
+    "(?i)(?:(?:inject|place|position|insert)\\s+(?:forged|crafted|poisoned|attacker[- ]controlled)\\s+(?:row|entry|result|record|item)\\s+(?:at|in)\\s+(?:index\\s+0|first|position\\s+0|head|top)\\b|(?:forged|crafted|poisoned|attacker[- ]controlled)\\s+(?:row|entry|result|record|item)\\s+(?:placed|positioned|injected|inserted)\\s+(?:at|in)\\s+(?:index\\s+0|first|position\\s+0|head|top)\\b|(?:duplicate|repeated)\\s+(?:key|field|metric)\\b.{0,80}?(?:last|tail|final)\\s+(?:occurrence|value|entry)\\s+(?:wins|overrides?|accepted|dominates?)|(?:stale|older|outdated)\\s+(?:snapshot|result|metric|record)\\s+(?:placed|positioned|injected)\\s+(?:before|ahead\\s+of|first)\\s+(?:newer|fresher|current|latest))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-624"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "GLS-CICD-008",
+  "name": "Observability config metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled observability configuration and dashboard metadata (`otelcol.yaml`, `prometheus.yml`, `alertmanager.yml`, Grafana dashboard JSON, Loki/Promtail configs) can smuggle agent/scanner-facing policy that claims authority over monitoring review, suppresses alerts/findings, or asks agent",
+  "keywords": [
+    "alerting_rules",
+    "exporters",
+    "otelcol.yaml",
+    "processors",
+    "receivers",
+    "runbook_url",
+    "scanner_policy",
+    "scrape_configs",
+    "service.pipelines",
+    "x-agent-policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?|observability\\s+docs?|sre\\s+docs?|monitoring\\s+docs?)\\s+(?:report|detected|blocked|flagged|refused|warns?|says?|explains?|should\\s+(?:report|detect|flag|refuse|block))\n |(?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |never\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n |(?:otelcol(?:\\.ya?ml)?|open\\s*telemetry|prometheus(?:\\.ya?ml)?|alertmanager(?:\\.ya?ml)?|grafana\\s+dashboard|loki|promtail|observability\\s+(?:config|metadata)|monitoring\\s+(?:config|metadata|dashboard)).{0,160}?\\b(?:is|are)\\s+not\\s+(?:authoritative|canonical|definitive|policy)\n |no\\s+(?:agent\\s+)?policy\\s+overrides?\n |(?:does\\s+not|do\\s+not)\\s+instruct\\s+(?:agents?|scanners?|assistants?).{0,90}?\\b(?:forward|include|suppress|hide|ignore|skip|downgrade)\\b\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:otelcol(?:\\.ya?ml)?|open\\s*telemetry\\s+collector|opentelemetry|otlp|prometheus(?:\\.ya?ml)?|prometheus\\s+rule|alertmanager(?:\\.ya?ml)?|grafana\\s+dashboard|dashboard\\.json|loki(?:\\.ya?ml)?|promtail(?:\\.ya?ml)?|tempo(?:\\.ya?ml)?|observability\\s+(?:config|metadata)|monitoring\\s+(?:config|metadata|dashboard))(?![a-zA-Z0-9])\n |\\b(?:receivers\\s*:|processors\\s*:|exporters\\s*:|service\\s*:|pipelines\\s*:|scrape_configs\\s*:|alerting_rules\\s*:|rule_files\\s*:|groups\\s*:|expr\\s*:|annotations\\s*:|runbook_url\\s*:|dashboard\\s*:|panels\\s*:|datasource\\s*:|pipeline_stages\\s*:|receivers?\\s*:|routes?\\s*:|inhibit_rules\\s*:)\\b\n |(?<![a-zA-Z0-9])(?:x-agent-policy|agent_instructions|assistant_note|scanner_policy|observability_agent_note|sre_agent_policy)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai|llm|autonomous|sre|devops|security|observability|reliability|incident|monitoring|scanner)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?|tools?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|auditor|sre_agent|observability_agent)[_-](?:instructions?|policy|note)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  \\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|takes\\s+precedence|highest\\s+priority|authoritative|canonical|definitive|controlling|governing\\s+(?:document|policy)|(?:primary|single)\\s+source\\s+of\\s+truth)\\b\n |\\b(?:primary|main|principal|controlling|authoritative|preferred)\\s+(?:(?:monitoring|observability|incident|sre|alert|audit|security|scanner|review)\\s+){0,3}(?:guidance|playbook|policy|instructions?)\\b\n |\\bdefines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|sre|observability|monitoring|incident)\\s+(?:review|audit|scan|triage)|all\\s+(?:scanner|security|monitoring|alert|incident)\\s+rules?)\\b\n |\\b(?:agent|scanner|assistant|reviewer|auditor|sre\\s+agent|observability\\s+agent)\\s+(?:instructions?|directive|policy)\\b\n))\n(?=.*(?:\n  \\b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding|omit|omits|omitted|redact|redacts|redacted|exclude|excludes|excluded|downgrade|downgrades|downgraded|defer|deprioritize|ignore|skip|mark)\\b.{0,100}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|CVEs?|incidents?|SLO\\s+violations?|failed\\s+scrapes?|scrape\\s+failures?|TLS\\s+warnings?|data[- ]?leak\\s+alerts?)\\b\n |\\b(?:do\\s+not|not)\\s+report\\b.{0,100}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|incidents?|failed\\s+scrapes?|TLS\\s+warnings?)\\b\n |\\btreat.{0,60}?as\\s+(?:informational|advisory|non[- ]?blocking|background[- ]?only|safe|clean)\\b\n |\\b(?:keep|leave).{0,100}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|alerts?|incidents?|failed\\s+scrapes?)\\b.{0,55}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|incident\\s+memo|final\\s+report)\\b\n |\\b(?:move|route|shift|downgrade).{0,100}?\\b(?:observations?|findings?|diagnostics?|results?|issues?|alerts?|warnings?|incidents?)\\b.{0,100}?\\b(?:appendix[- ]?only|background[- ]?only|informational|non[- ]?blocking|background\\s+notes?)\\b\n |\\b(?:include|attach|forward|send|share|provide|collect|copy|read|export|pass\\s+along|populate)\\b.{0,110}?\\b(?:API\\s*keys?|tokens?|secrets?|credentials?|authorization\\s+headers?|bearer|cookies?|session\\s+tokens?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?|evidence)|local\\s+(?:state|config(?:uration)?|settings?)|telemetry\\s+(?:credentials?|tokens?|secrets?|context)|collector\\s+(?:credentials?|tokens?)|datasource\\s+(?:secrets?|tokens?)|runtime\\s+proof\\s+material)\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-008"
+}

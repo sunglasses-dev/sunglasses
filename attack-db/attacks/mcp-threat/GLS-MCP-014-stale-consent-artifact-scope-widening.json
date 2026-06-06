@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-014",
+  "name": "Stale Consent Artifact Scope Widening",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "file"
+  ],
+  "description": "Attacker smuggles stale, cross-context, or scope-widened consent artifacts into prompts and tool args so high-impact actions execute under the wrong authorization scope, bypassing fresh-intent verification while appearing policy-compliant.",
+  "keywords": [
+    "cross-task consent replay",
+    "scope-widening consent alias",
+    "time-shifted approval resurrection",
+    "delegated consent laundering",
+    "stale approval token replay",
+    "expired ttl bypass approval",
+    "ops-approved scope drift",
+    "approval artifact unbound to action hash",
+    "child-asserted parent authorization",
+    "consent token confusion",
+    "approval theater bypass",
+    "model-generated approval claim"
+  ],
+  "regex": [
+    "(?i)(?:(?:replay|reuse|smuggle|inject)\\s+(?:approval|consent)\\s+(?:token|artifact|marker|ticket)\\b|(?:expired|stale|cross[- ]task|cross[- ]context)\\s+(?:approval|consent)\\s+(?:accepted|reused|replayed|honored)|(?:scope|approval)\\s+(?:widening|drift|aliasing|laundering)\\s+(?:bypasses?|evades?|defeats?)\\s+(?:policy|verification|binding))",
+    "(?i)(?:model[- ]generated|child[- ]asserted|delegated)\\s+(?:approval|consent|authorization)\\s+(?:without|missing|lacking)\\s+(?:signed|cryptographic|bound)\\s+(?:verifier|binding|hash)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-014"
+}

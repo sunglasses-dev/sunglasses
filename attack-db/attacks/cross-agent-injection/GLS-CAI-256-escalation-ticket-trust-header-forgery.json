@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-256",
+  "name": "Escalation Ticket Trust Header Forgery",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent presenting a forged escalation ticket, capability lease, or trust header to override authentication checks and guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|service|orchestrator|copilot)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|counterfeit|fabricated)\\b)(?=.*\\b(?:escalation\\s+ticket|ticket|capability\\s+lease|trust\\s+header|auth(?:entication)?\\s+header|approval\\s+token)\\b)(?=.*\\b(?:override|bypass|skip|ignore|disable)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|auth(?:entication)?\\s+check(?:s)?|permission(?:s)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-256"
+}

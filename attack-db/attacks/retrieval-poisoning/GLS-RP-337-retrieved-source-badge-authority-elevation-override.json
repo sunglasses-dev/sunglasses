@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-337",
+  "name": "Retrieved Source Badge Authority Elevation Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a retrieved source or citation claiming a fake verified or authority badge to elevate rank and override or supersede safety policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retriev(?:ed|al)|source|citation|document|knowledge\\s*base|rag)\\b)(?=.*\\b(?:badge|trusted|verified|authority|rank(?:ed|ing)?|priority)\\b)(?=.*\\b(?:override|ignore|bypass|supersed(?:e|es|ed|ing)|elevat(?:e|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|rule(?:s)?|safety)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-337"
+}

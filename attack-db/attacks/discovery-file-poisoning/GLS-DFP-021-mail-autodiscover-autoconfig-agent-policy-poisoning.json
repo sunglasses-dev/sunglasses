@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-021",
+  "name": "Mail Autodiscover/Autoconfig Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Email Autodiscover/Autoconfig metadata (`autodiscover.xml`, `config-v1.1.xml`, `mailclientconfig`, IMAP/SMTP setup docs) can carry target-controlled instructions that ask AI support agents or scanners to treat mail setup metadata as higher-priority policy, forward credentials/local state, or suppres",
+  "keywords": [
+    "AI agent",
+    "Authorization",
+    "Bearer",
+    "IMAP",
+    "LLM",
+    "SMTP",
+    "assistant",
+    "autoconfig",
+    "autodiscover.xml",
+    "autonomous scanner",
+    "canonical policy",
+    "clientConfig",
+    "config-v1.1.xml",
+    "include/forward/send/expose",
+    "incomingServer"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:do\\s+not|must\\s+not|never|should\\s+not)\\b.{0,180}\\b(?:treat|obey|follow|accept)\\b.{0,180}\\b(?:autodiscover|autoconfig|mail\\s+config|email\\s+client\\s+config)\\b)\n(?!.*\\b(?:scanner\\s+docs?|security\\s+training|defensive\\s+guide)\\b.{0,220}\\b(?:report|detect|flag|refuse|must\\s+not|do\\s+not)\\b)\n(?!.*\\b(?:incident\\s+report|security\\s+report)\\b.{0,220}\\b(?:flagged|contained\\s+a\\s+payload|payload\\s+asking|attempted)\\b)\n(?!.*\\b(?:not\\s+policy|not\\s+agent\\s+policy)\\b.{0,140}\\b(?:does\\s+not|cannot|never)\\b.{0,140}\\b(?:override|supersede|outrank)\\b)\n(?=.*\\b(?:autodiscover(?:\\.xml)?|autoconfig(?:\\s+mail)?|autoconfiguration|config-v1\\.1\\.xml|mailclientconfig|clientConfig|email\\s+client\\s+(?:auto)?config|mail\\s+(?:auto)?configuration|incomingServer|outgoingServer|imap|smtp)\\b)\n(?=.*\\b(?:ai\\s+agents?|assistants?|llms?|auditors?|autonomous\\s+(?:scanners?|auditors?|agents?)|security\\s+scanners?|mail\\s+setup\\s+bots?|support\\s+agents?)\\b)\n(?=.*\\b(?:supersed(?:e|es)|override|outrank|higher-priority|must\\s+obey|canonical\\s+(?:mail|domain|operator)\\s+policy|include|attach|forward|send|echo|expose|suppress|hide|do\\s+not\\s+(?:report|notify|mention)|skip\\s+(?:smtp|imap|tls|spf|dmarc|credential)\\s+checks?)\\b)\n(?=.*\\b(?:authorization|bearer|oauth|passwords?|cookies?|session\\s+headers?|environment\\s+variables?|api\\s+keys?|secrets?|mailbox\\s+tokens?|findings?|vulnerabilities|tls|dmarc|spf)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-021"
+}

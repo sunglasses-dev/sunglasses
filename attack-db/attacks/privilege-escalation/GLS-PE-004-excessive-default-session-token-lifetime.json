@@ -1,0 +1,23 @@
+{
+  "id": "GLS-PE-004",
+  "name": "Excessive default session/token lifetime",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "Month-scale default session/token lifetimes (44640 minutes, 31 days) in agent/admin auth config \u2014 excessive credential lifetime primitive.",
+  "keywords": [],
+  "regex": [
+    "(?i)(session|token|jwt|refresh)[^\\n]{0,60}(lifetime|ttl|expires?|max_age|duration)[^\\n]{0,40}(44640|31\\s*days?|30\\s*days?|2592000)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PE-004"
+}

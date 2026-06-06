@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-002",
+  "name": "Apple app-site-association agent policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled Apple app-site-association (AASA) file can hide non-standard `x-agent` / `agent_policy` fields that tell AI agents, scanners, or automated verifiers to treat the file as owner authority, suppress findings, or forward local auth context even though native Apple clients ignore thos",
+  "keywords": [
+    "/.well-known",
+    "Authorization",
+    "Bearer",
+    "LLM",
+    "agent",
+    "agent_policy",
+    "ai_agent",
+    "app-site-association",
+    "appclips",
+    "apple-app-site-association",
+    "applinks",
+    "assistant",
+    "assistant_policy",
+    "automated auditor",
+    "cookie"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:apple[-\\s]*app[-\\s]*site[-\\s]*association|app[-\\s]*site[-\\s]*association|applinks|webcredentials|appclips|\\.well-known))(?=.*(?:agent|assistant|crawler|scanner|llm|automated\\s+auditor|verifier))(?=.*(?:x-agent|agent_policy|verification_policy|owner_verification|precheck|ai_agent|llm_policy|assistant_policy))(?=.*(?:override|supersede|outrank|owner\\s+authority|trusted\\s+owner|read|include|forward|send|attach|expose|token|secret|cookie|authorization|bearer|environment\\s+variables|do\\s+not\\s+report|delay\\s+reporting|suppress)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-002"
+}

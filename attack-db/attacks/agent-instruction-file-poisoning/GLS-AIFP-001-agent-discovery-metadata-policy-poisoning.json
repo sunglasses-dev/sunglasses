@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-001",
+  "name": "Agent discovery metadata policy poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Agent-facing discovery files such as `llms.txt`, `robots.txt`, sitemap-adjacent metadata, or site manifests can disguise prompt-injection instructions as crawler policy, causing agents to treat untrusted website text as higher-priority control-plane authority.",
+  "keywords": [
+    ",",
+    "API keys",
+    "User-Agent: ai-agent",
+    "Validation script:",
+    "agent-discovery",
+    "disable guardrail",
+    "disable scanner",
+    "disable security",
+    "environment variables",
+    "higher priority",
+    "ignore scanner warning",
+    "llms.txt",
+    "priority source",
+    "read env",
+    "robots.txt"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:llms\\.txt|robots\\.txt|sitemap|site\\s*manifest|agent[-\\s]*discovery|User-Agent:\\s*ai-agent)\\b)(?=.*\\b(?:agent|ai[-\\s]*agent|assistant|coding\\s*assistant|crawler)\\b)(?=.*\\b(?:higher[-\\s]*priority|priority\\s*source|ignore\\s+(?:previous|prior|system|developer|repository)|override|supersede|disable\\s+(?:scanner|security|guardrail)|read\\s+(?:env|environment\\s*variables)|api\\s*keys?|secrets?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-001"
+}

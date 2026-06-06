@@ -1,0 +1,31 @@
+{
+  "id": "GLS-MER-237",
+  "name": "Checkpoint Reset Hidden Rehydrate Bypass",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message",
+    "tool_output"
+  ],
+  "description": "Checkpoint Reset Hidden Rehydrate Bypass - memory eviction rehydration mechanism that overrides policy or safety gates.",
+  "keywords": [
+    "checkpoint reset hidden",
+    "reset hidden rehydrate",
+    "hidden rehydrate bypass",
+    "checkpoint reset",
+    "reset hidden",
+    "hidden rehydrate",
+    "rehydrate bypass"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MER-237"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TOP-636",
+  "name": "Signed Summary Impostor Executor Identity Swap",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forges provenance signals (signed-summary format, executor identity, freshness tokens, or spliced cross-channel evidence) so untrusted text is promoted into high-authority tool context and triggers unsafe next-step execution. Bypasses policy gates that key off label strings rather than immutable signed envelopes.",
+  "keywords": [
+    "signed-summary impostor",
+    "fake signed tool summary",
+    "executor identity swap",
+    "validator passed wrong component",
+    "freshness token replay",
+    "stale healthcheck replayed",
+    "cross-channel evidence splicing",
+    "fabricated authoritative result",
+    "provenance envelope missing hash",
+    "content-hash signature bypass",
+    "label-string provenance check bypass",
+    "run_id timestamp forgery"
+  ],
+  "regex": [
+    "(?i)(?:(?:signed[- ]summary|tool[- ]summary)\\s+(?:impostor|forg(?:e|ed|ery)|mimic)|(?:executor|component|validator)\\s+identity\\s+(?:swap|spoof|mutation)|(?:freshness|recency)\\s+(?:token|metadata)\\s+replay|(?:cross[- ]channel|cross[- ]format)\\s+(?:evidence|provenance)\\s+splic(?:e|ing)|(?:provenance\\s+envelope|content[- ]hash|signature|run_id)\\s+(?:forg\\w+|miss\\w+|fail\\w+|bypass|unverified))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-636"
+}

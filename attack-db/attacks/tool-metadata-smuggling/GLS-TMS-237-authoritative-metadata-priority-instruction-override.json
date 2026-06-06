@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TMS-237",
+  "name": "Authoritative Metadata Priority Instruction Override",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a metadata header, annotation, or manifest claiming authoritative precedence used to override or bypass policy, guardrails, or safety instructions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|constraint(?:s)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-237"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIDC-001",
+  "name": "Delegate Nonce Forgery Scope Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or counterfeit nonce, attestation, or approval token is used during a delegation or handoff to override, bypass, or rebind scope, permission, or authority.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:delegate|delegation|handoff|peer\\s+agent|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|approval\\s+token|signoff)\\b)(?=.*\\b(?:scope|permission|privilege|authority)\\b)(?=.*\\b(?:override|bypass|ignore|rebind)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIDC-001"
+}

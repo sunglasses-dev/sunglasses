@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-268",
+  "name": "RAG Corpus Fake Priority Weight Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged corpus citation or attestation whose weight or rank is manipulated to override or disable guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|knowledge\\s+base|index|corpus|source|citation|attestation|provenance)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:priority|rerank(?:s|ed|ing)?|boost(?:ed|ing)?|weight(?:ed|ing)?|rank(?:ed|ing)?)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-268"
+}

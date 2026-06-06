@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-713",
+  "name": "Cross-Modal Evidence Swap OCR Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants conflicting claims across modalities (benign text plus malicious OCR or caption) so the orchestrator promotes the wrong channel as authoritative and a shallow merge silently flips guardrail fields, granting tool execution that policy should deny.",
+  "keywords": [
+    "ocr-overrides-metadata swap",
+    "transcript caption contradiction",
+    "code-block alt-text laundering",
+    "vision summary precedence bug",
+    "cross-modal evidence swap",
+    "shallow dict merge override",
+    "allowed false flipped true",
+    "channel confidence score abuse",
+    "signed json overridden by ocr",
+    "modality authority swap",
+    "decision packet contradiction",
+    "source-of-truth field drift"
+  ],
+  "regex": [
+    "(?i)(?:(?:cross[- ]modal|multi[- ]modal)\\s+(?:evidence|authority|policy)\\s+(?:swap|swapping|contradiction|conflict)\\b|(?:ocr|caption|vision[- ]summary|alt[- ]text)\\s+(?:overrides?|overwrites?|supersedes?)\\s+(?:metadata|json|policy|signed)|(?:shallow|merge|precedence)\\s+(?:bug|merge)\\s+(?:flips?|overwrites?|changes?)\\s+(?:allowed|policy|guardrail)\\s+(?:field|flag|verdict))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-713"
+}

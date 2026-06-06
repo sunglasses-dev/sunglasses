@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-002",
+  "name": "JSON-LD structured-data agent policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled JSON-LD / schema.org structured-data block embeds agent-directed policy text that claims site-owner authority, asks the agent to override higher-priority instructions, forward local/auth context, or suppress reporting.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-002"
+}

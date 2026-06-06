@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-010",
+  "name": "ads.cert / signed ad-verification metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Advertising signed-verification metadata such as ads.cert sidecars or signed ad-verification exports can carry AI-agent/scanner-directed instructions to override audit policy, mark seller paths clean, suppress fraud findings, or forward local credentials/session state.",
+  "keywords": [
+    "ads.cert",
+    "ads_cert",
+    "do not report",
+    "hide",
+    "ignore scanner/system/developer rules",
+    "include/attach/forward local state",
+    "mark clean",
+    "outrank",
+    "override",
+    "skip fraud review",
+    "supersedes scanner rules",
+    "suppress",
+    "treat as policy",
+    "verification verdict is final",
+    "x-ads-cert"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|do\\s+not|never)\\s+(?:obey|treat|trust|follow|accept)\\b.{0,120}\\b(?:ads[._-]?cert|signed\\s+ad|ad\\s+verification|signed\\s+bid|supply\\s+path)\\b)(?!.*\\b(?:docs?|guide|reference|training|learn\\s+how|article)\\b.{0,120}\\bscanners?\\s+should\\s+(?:report|detect|flag|refuse)\\b)(?!.*\\bscanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)\\b)(?=.*\\b(?:ads[._-]?cert|x-ads-cert|signed\\s+ad\\s+(?:certificate|verification)|ad\\s+verification\\s+signature|cryptographic\\s+ad\\s+verification|OpenRTB\\s+signed\\s+bid|signed\\s+bid|certified\\s+supply\\s+path|ad\\s+certificate)\\b)(?=.*\\b(?:AI\\s+agents?|assistants?|LLM\\s+(?:agents?|auditors?)|autonomous\\s+scanners?|security\\s+scanners?|ad[-\\s]?fraud\\s+scanners?|ad[-\\s]?quality\\s+bots?|fraud\\s+auditors?|compliance\\s+auditors?|scanners?)\\b)(?=.*\\b(?:override|supersed\\w+|outrank\\w*|ignore\\s+(?:scanner|system|developer)\\s+rules|treat\\s+as\\s+(?:policy|authority)|do\\s+not\\s+report|suppress\\w*|hide\\s+(?:findings|alerts|reports)|mark\\s+(?:the\\s+)?(?:supply\\s+path|seller\\s+chain)?\\s*clean|verified\\s+clean|skip\\s+fraud\\s+review|verdict\\s+is\\s+final|include|attach|forward|reuse)\\b)(?=.*\\b(?:fraud\\s+findings?|findings?|reports?|seller\\s+chains?|supply\\s+paths?|scanner\\s+rules|Authorization\\s+headers?|API\\s+keys?|tokens?|cookies?|env(?:ironment)?\\s+vars?|local\\s+state|sessions?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-010"
+}

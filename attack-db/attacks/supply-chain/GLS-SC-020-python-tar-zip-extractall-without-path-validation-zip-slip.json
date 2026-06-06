@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-020",
+  "name": "Python tar/zip extractall() without path validation (Zip-Slip)",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Python tar/zip extractall() used without canonical destination validation \u2014 Zip-Slip / path-traversal primitive. Covers the PraisonAI recipe-unpack case (GHSA-99g3-w8gr-x37c).",
+  "keywords": [],
+  "regex": [
+    "(?i)\\b(?:tar|tarfile|zipfile|ZipFile|shutil\\.unpack_archive)\\b[^\\n]{0,120}\\.extractall\\s*\\("
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-020"
+}

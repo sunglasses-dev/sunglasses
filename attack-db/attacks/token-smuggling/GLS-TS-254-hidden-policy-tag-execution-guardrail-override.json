@@ -1,0 +1,34 @@
+{
+  "id": "GLS-TS-254",
+  "name": "Hidden Policy Tag Execution Guardrail Override",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker uses hidden policy tag execution guardrail override to bypass policy/approval: e.g., \"1. Hidden metadata token was smuggled to override guardrail policy precedence during execution.\".",
+  "keywords": [
+    "hidden metadata token",
+    "metadata token smuggled",
+    "token smuggled override",
+    "smuggled override guardrail",
+    "override guardrail policy",
+    "guardrail policy precedence",
+    "policy precedence during",
+    "precedence during execution",
+    "hidden metadata",
+    "metadata token"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-254"
+}

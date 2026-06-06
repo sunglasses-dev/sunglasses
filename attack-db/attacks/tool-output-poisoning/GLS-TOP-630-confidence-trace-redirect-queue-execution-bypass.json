@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-630",
+  "name": "Confidence Trace Redirect Queue Execution Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects text in which a forged confidence trace, telemetry receipt, audit output, or verification log is used to redirect, reroute, or rewire an execution queue or channel in order to bypass, override, or disable policy or safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:confidence\\s+trace|telemetry\\s+receipt|audit\\s+output|verification\\s+log|model\\s+report)\\b)(?=.*\\b(?:redirect|redirected|redirects|reroute|rerouted|rerouting|rewire|rewired|rewiring|switch(?:ed|es|ing)?\\s+queue(?:\\s+routing)?|switch(?:ed|es|ing)?\\s+(?:routing|channel|path))\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|deployment|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-630"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-626",
+  "name": "Cross-Feed Metric Bleed Fake Consensus Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker reframes Ops telemetry (scanner, bot noise) as Growth truth (or vice versa) and fabricates cross-source consensus, so AI-assisted reporting agents corrupt priorities and either invent demand or downgrade real abuse.",
+  "keywords": [
+    "ops to growth headline hijack",
+    "growth to ops suppression flip",
+    "delta-sign inversion",
+    "schema aliasing attack",
+    "cross-source consensus laundering",
+    "scanner spike reframed as traffic",
+    "ga4 decline downgraded as bot churn",
+    "forged intermediate summary node",
+    "fake consensus suppresses verification",
+    "lane bleed two-lane collapse",
+    "metric provenance stripped",
+    "week-over-week sign flip"
+  ],
+  "regex": [
+    "(?i)(?:(?:cross[- ]feed|cross[- ]lane|two[- ]lane)\\s+(?:metric|signal|kpi)\\s+(?:bleed|leak|collapse|swap)\\b|(?:scanner|bot|ops)\\s+(?:noise|telemetry|traffic)\\s+(?:reframed|relabel(?:ed|led)|misclassified)\\s+(?:as|into)\\s+(?:growth|demand|engagement)|(?:fake|forged|fabricated)\\s+(?:consensus|agreement)\\s+(?:between|across)\\s+(?:sources?|feeds?|channels?)\\s+(?:suppresses?|bypasses?|silences?)\\s+(?:verification|review|conflict))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-626"
+}

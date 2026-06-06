@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-192",
+  "name": "Non-Canonical Output Form Safety Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits the gap between semantically-equivalent output forms (JSON vs markdown, alternate encodings, unicode variants) so the agent grants equal trust to a non-canonical form that bypasses safety checks tied to the canonical shape.",
+  "keywords": [
+    "output canonicalization confusion",
+    "equivalent-form trust gap",
+    "unicode normalization bypass",
+    "json vs markdown trust skew",
+    "alternate output shape exploit",
+    "canonical form drift",
+    "homoglyph output bypass",
+    "format-equivalent payload smuggling",
+    "render-time normalization mismatch",
+    "alternate encoding accepted",
+    "non-canonical output trusted",
+    "form-variant evasion"
+  ],
+  "regex": [
+    "(?i)(?:(?:output|payload|response)\\s+(?:canonicali[sz]ation|normalization)\\s+(?:confusion|mismatch|bypass|gap)|(?:alternate|equivalent|variant)\\s+(?:form|encoding|shape)\\s+(?:trust(?:ed)?|accepted|treated)\\s+as\\s+(?:canonical|safe|same)|(?:homoglyph|unicode|encoding)\\s+(?:variant|drift)\\s+(?:bypass|evades?|smuggle))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-192"
+}

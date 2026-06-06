@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-006",
+  "name": "Keybase identity-proof metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A `keybase.txt` identity-proof file can carry agent-targeted instructions adjacent to public proof text, causing identity-verifying agents to treat proof metadata as authoritative policy, suppress findings, or forward local verification context.",
+  "keywords": [
+    "AI agents",
+    "I am an admin of",
+    "I hereby claim",
+    "LLM verifiers",
+    "agentic scanner",
+    "assistant",
+    "authoritative site policy",
+    "autonomous scanners",
+    "crawler",
+    "do not report",
+    "environment",
+    "false positive",
+    "highest priority",
+    "identity proof",
+    "ignore previous/developer/scanner rules"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do not|don't|never|must not|should not|refuse(?:s|d)? to)\\b.{0,120}\\b(?:obey|follow|trust|execute|apply)\\b.{0,80}\\b(?:keybase|identity proof|proof file|scanner rule|prompt injection)\\b)(?=.*\\b(?:keybase(?:\\.txt|\\.io)?|i hereby claim|identity proof|signed statement|public key|proof file)\\b)(?=.*\\b(?:ai agents?|llm verifiers?|autonomous scanners?|agentic scanners?|assistants?|crawlers?)\\b)(?=.*\\b(?:authoritative(?: site)? policy|highest priority|ignore (?:previous|developer|scanner|system) rules?|override|supersede|suppress (?:any )?findings?|false positives?|do not report|include (?:your )?(?:local )?(?:verification )?token names?|environment variables?|secrets?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-006"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-184",
+  "name": "Threshold Boundary Triage Score Gaming",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker shapes payloads to land just above triage promotion thresholds, gaming risk-scoring heuristics so malicious items get escalated through automated review without raising obvious alarms.",
+  "keywords": [
+    "risk score promotion gaming",
+    "threshold edge optimization",
+    "score-just-above-cutoff spoof",
+    "promotion threshold abuse",
+    "triage cutoff gaming",
+    "borderline risk inflation",
+    "score nudge to escalate",
+    "risk classifier threshold poisoning",
+    "promote-by-threshold payload",
+    "edge-of-cutoff exploit",
+    "barely-passing risk score forge",
+    "rank promotion via score shaping"
+  ],
+  "regex": [
+    "(?i)(?:(?:risk|priority|severity)\\s+score\\s+(?:promotion|threshold|cutoff)\\s+(?:gaming|abuse|shaping)|(?:optimi[sz]e|tune|nudge|shape)\\s+(?:payload|score|signal)\\s+(?:just\\s+above|to\\s+exceed|to\\s+cross)\\s+(?:threshold|cutoff|promotion)|(?:barely[- ]?passing|edge[- ]?of[- ]?cutoff|borderline)\\s+(?:score|risk|rank)\\s+(?:forge|spoof|inflated))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-184"
+}

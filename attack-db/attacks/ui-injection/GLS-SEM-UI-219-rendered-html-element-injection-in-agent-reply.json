@@ -1,0 +1,40 @@
+{
+  "id": "GLS-SEM-UI-219",
+  "name": "Rendered HTML element injection in agent reply",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply \u2014 used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
+  "keywords": [
+    "render this in your reply",
+    "render this in your response",
+    "embed this in your response",
+    "embed this in your reply",
+    "include this html in your response",
+    "render the following html",
+    "output this button in your reply",
+    "onclick='exfil",
+    "onclick=\"exfil",
+    "click to verify",
+    "<button onclick=",
+    "<iframe src=",
+    "<script>alert"
+  ],
+  "regex": [
+    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}\\b(?:in\\s+your\\s+(?:reply|response|output|answer))\\b",
+    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}(?:<\\s*(?:button|iframe|script|a|form|input|img)\\b|onclick\\s*=|onerror\\s*=)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-219"
+}

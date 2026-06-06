@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-307",
+  "name": "Retrieved Context Authoritative Tag Guard Supersede",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a retrieved document or context presenting itself as authoritative or high-confidence to instruct the recipient to supersede policy, guardrails, or verification gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:retrieved|retrieval|rag|context|document|source|citation)\\b.{0,120}\\b(?:trusted|authoritative|verified|approved|high\\s+confidence|fresh(?:est)?\\s+source)\\b.{0,140}\\b(?:ignore|bypass|override|disregard|supersede|replace)\\b.{0,90}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|verification\\s+gate(?:s)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-307"
+}

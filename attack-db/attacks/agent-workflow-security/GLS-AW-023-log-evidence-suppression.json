@@ -1,0 +1,37 @@
+{
+  "id": "GLS-AW-023",
+  "name": "Log evidence suppression",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "log",
+    "tool_output",
+    "message",
+    "file"
+  ],
+  "description": "Attackers increasingly target observability pathways, not just policy prompts. In this family, adversarial instructions attempt to suppress, overwrite, or downgrade security-relevant evidence in logs so downstream validators and humans see a \"clean\" run despite compromised behavior. If successful, this can bypass Cycle 3/4 checks and corrupt incident response timing.",
+  "keywords": [
+    "severity downcast injection",
+    "rewrite error as info",
+    "evidence truncation pretext",
+    "strip tool args token efficiency",
+    "log stream branch fork",
+    "post-run overwrite laundering",
+    "compaction privacy excuse",
+    "ephemeral buffer hides risky details",
+    "rewrite failure lines as success"
+  ],
+  "regex": [
+    "(?i)(?:rewrite|downgrade|downcast|reclassify)\\s+(?:ERROR|SECURITY|CRITICAL|WARN(?:ING)?|FAIL(?:URE|ED)?)\\s+(?:to|as|into)\\s+(?:INFO|DEBUG|TRACE|NOTICE|OK)",
+    "(?i)(?:suppress|strip|truncate|overwrite|omit)\\s+(?:tool\\s+args?|approval\\s+hash(?:es)?|provenance|forensic|audit|source\\s+uri)\\s+(?:fields?|details?|entries?|lines?|keys?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-023"
+}

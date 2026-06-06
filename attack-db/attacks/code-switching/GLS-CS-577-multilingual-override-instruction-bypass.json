@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CS-577",
+  "name": "Multilingual Override Instruction Bypass",
+  "version": "1.0",
+  "category": "code_switching",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects short text segments containing a multilingual word meaning 'ignore' or 'bypass' (in Spanish, French, German, Russian, or Arabic) or a CJK equivalent character followed closely by a reference to instructions, policy, or guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\b(?:ignora|omite|desobedece|ignorer|contourner|ignoriere|umgehe|\u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0439|\u062a\u062c\u0627\u0647\u0644)\\b|\u5ffd\u7565|\u7121\u8996).{0,90}\\b(?:instructions?|instrucciones?|reglas?|policy|pol[i\u00ed]tica|guardrails?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CS-577"
+}

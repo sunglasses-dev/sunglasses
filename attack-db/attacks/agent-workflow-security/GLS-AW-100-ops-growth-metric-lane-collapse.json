@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-100",
+  "name": "Ops Growth Metric Lane Collapse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker (or sloppy automation) collapses the hard separation between Ops metrics (Cloudflare scanner/bot pressure) and Growth metrics (GA4/GSC human acquisition), so bot traffic is counted as user growth or scanner noise masks real acquisition drops.",
+  "keywords": [
+    "ops growth lane collision",
+    "cloudflare ga4 metric merge",
+    "bot pressure as human acquisition",
+    "scanner traffic counted as user",
+    "two-lane kpi collapse",
+    "growth metric ops poisoning",
+    "lane boundary erasure",
+    "ops signal in growth report",
+    "human acquisition spoofed by bot",
+    "gsc edge pressure conflation",
+    "kpi lane swap attack",
+    "metric provenance loss"
+  ],
+  "regex": [
+    "(?i)(?:collapse|merge|combine|conflate)\\s+(?:ops|growth|cloudflare|ga4|gsc)\\s+(?:metric|lane|signal|kpi)\\s+(?:into|with)\\s+(?:growth|ops|human|bot)|(?:bot|scanner|edge)\\s+(?:pressure|traffic|4xx)\\s+(?:counted|reported|framed)\\s+as\\s+(?:human|user|growth|acquisition)",
+    "(?i)(?:lane|kpi)\\s+(?:boundary|separation|wall)\\s+(?:erased?|broken|bypassed|collapsed)|(?:ops|growth)\\s+(?:metric|signal)\\s+(?:leaks?|bleeds?|surfaces?)\\s+(?:into|in)\\s+(?:growth|ops)\\s+(?:dashboard|report|brief)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-100"
+}

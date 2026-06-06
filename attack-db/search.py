@@ -118,7 +118,7 @@ def cmd_stats(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Search the GLASSES Attack Database")
+    parser = argparse.ArgumentParser(description="Search the Sunglasses Attack Database")
     parser.add_argument("query", nargs="*", help="Search keywords")
     parser.add_argument("--category", "-c", help="Filter by category")
     parser.add_argument("--severity", "-s", help="Filter by severity")

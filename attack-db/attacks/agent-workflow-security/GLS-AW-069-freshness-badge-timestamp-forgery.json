@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-069",
+  "name": "Freshness Badge Timestamp Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker forges freshness badges, green dots, or last-updated timestamps so stale data appears live on dashboards and reports. Agents and operators trust the visual signal and act on outdated state without validating the underlying telemetry.",
+  "keywords": [
+    "freshness badge spoofing",
+    "fake live indicator",
+    "spoof updated timestamp",
+    "green dot forgery",
+    "stale data marked live",
+    "fabricated last-refresh time",
+    "trust signal forged",
+    "dashboard liveness lie",
+    "updated <1h spoof",
+    "freshness signal poisoning",
+    "fake real-time badge",
+    "synthetic recency indicator"
+  ],
+  "regex": [
+    "(?i)(?:(?:spoof|forge|fake|fabricate)\\s+(?:freshness|liveness|updated|recency)\\s+(?:badge|indicator|tag|timestamp|signal)\\b|freshness\\s+badge\\s+(?:spoofing|poisoning|forgery))",
+    "(?i)(?:stale\\s+(?:data|metric|panel)\\s+(?:marked|labeled|tagged)\\s+(?:live|fresh|updated)|(?:live|green\\s+dot|real[- ]time)\\s+(?:indicator|badge)\\s+(?:forged|spoofed))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-069"
+}

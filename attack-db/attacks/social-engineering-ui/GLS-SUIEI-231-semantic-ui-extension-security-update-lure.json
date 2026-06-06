@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-231",
+  "name": "Semantic UI extension security update lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects visual or prompt-injection text that pressures users or GUI agents to install a browser extension or desktop plugin as an immediate security update gate to continue access.",
+  "keywords": [
+    "security update install browser extension to continue",
+    "compliance patch add desktop plugin before access",
+    "session hardening enable security add-on required to proceed",
+    "security update install extension to continue",
+    "compliance patch enable add-on before access",
+    "session hardening add browser extension required",
+    "security update install plugin to continue",
+    "compliance patch install security add-on before access"
+  ],
+  "regex": [
+    "(?i)\\b(?:security\\s+update|compliance\\s+patch|session\\s+hardening)\\b.{0,120}\\b(?:install|add|enable)\\b.{0,80}\\b(?:browser\\s+extension|desktop\\s+plugin|security\\s+add-?on)\\b.{0,120}\\b(?:to\\s+continue|required\\s+to\\s+proceed|before\\s+access)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-231"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-AB-004",
+  "name": "Login route accepts raw SHA-256 hex (pass-the-hash)",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "Login routes that accept raw hash-shaped material (SHA-256 length hex) as credentials \u2014 pass-the-hash primitive.",
+  "keywords": [],
+  "regex": [
+    "(?i)(login|auth|signin|authenticate)[^\\n]{0,120}(accept|allow|compare)[^\\n]{0,60}\\b[a-f0-9]{63,64}\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AB-004"
+}

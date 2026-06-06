@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-323",
+  "name": "Capability Receipt Nonce Execution Gate Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or replayed capability receipt with a nonce or scope token used to execute or deploy while skipping verification and guardrail gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:capability\\s+receipt|delegation\\s+receipt|handoff\\s+receipt|approval\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:nonce|session\\s+tag|scope|capability\\s+token)\\b)(?=.*\\b(?:execute|run|approve|ship(?:ment)?|deploy(?:ment)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review\\s+gate(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-323"
+}

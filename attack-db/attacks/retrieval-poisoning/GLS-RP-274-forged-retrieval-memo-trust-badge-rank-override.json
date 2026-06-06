@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-274",
+  "name": "Forged Retrieval Memo Trust Badge Rank Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged citation note or retrieval memo carrying a fake trust badge or provenance stamp used to achieve a rank override and bypass retrieval policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|seeded|poisoned|tampered)\\b)(?=.*\\b(?:eval\\s*appendix|benchmark\\s*appendix|citation\\s*note|source\\s*memo|retrieval\\s*document|ranking\\s*note)\\b)(?=.*\\b(?:citation\\s*trust|trust\\s*badge|provenance\\s*stamp|source\\s*authority|confidence\\s*tag)\\b)(?=.*\\b(?:rank\\s*override|rerank\\s*to\\s*top|prioriti[sz]e\\s*(?:it\\s*)?first|boost\\s*to\\s*highest\\s*rank|override\\s*ranking|bypass\\s*ranking\\s*guardrails?|ignore\\s*retrieval\\s*policy)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-274"
+}

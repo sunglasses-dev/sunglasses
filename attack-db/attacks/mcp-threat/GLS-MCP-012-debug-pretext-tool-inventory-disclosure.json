@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-012",
+  "name": "Debug Pretext Tool Inventory Disclosure",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "file"
+  ],
+  "description": "Attacker uses pretexts like debug compliance, approval simulation, malformed calls, or constraint recap to coerce the agent into disclosing tool inventory, schemas, or policy boundaries, then tailors follow-on payloads to the discovered exploit surface.",
+  "keywords": [
+    "tool-inventory elicitation pretext",
+    "debug compliance tool listing",
+    "approval-policy fingerprinting probe",
+    "simulate user approval requirement",
+    "error-message oracle chaining",
+    "malformed tool call schema oracle",
+    "context-window reconnaissance",
+    "recap active constraints disclosure",
+    "capability discovery sidechannel",
+    "recon-to-exploit chain",
+    "tool schema disclosure probe",
+    "policy boundary fingerprint"
+  ],
+  "regex": [
+    "(?i)(?:(?:list|enumerate|disclose|print|reveal|recap)\\s+(?:available|active|all)\\s+(?:tools|capabilities|permissions|constraints|policies|approval\\s+rules)\\b|(?:simulate|describe|classify)\\s+(?:what|which)\\s+(?:commands?|actions?|tools?)\\s+(?:would\\s+)?(?:require|trigger|need)\\s+(?:approval|gating|blocking)|(?:malformed|invalid|crafted)\\s+(?:tool\\s+call|request|payload)\\s+(?:to\\s+)?(?:trigger|elicit|expose)\\s+(?:verbose|schema|contract|error))",
+    "(?i)(?:capability|tool|policy|schema)\\s+(?:discovery|fingerprint|reconnaissance|enumeration)\\s+(?:sidechannel|probe|oracle|leak)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-012"
+}

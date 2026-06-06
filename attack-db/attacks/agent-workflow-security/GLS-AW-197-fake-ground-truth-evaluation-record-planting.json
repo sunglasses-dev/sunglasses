@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-197",
+  "name": "Fake Ground-Truth Evaluation Record Planting",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants fake ground-truth records into evaluation datasets then cites them later as validation evidence, creating a self-reinforcing trust loop where forged history is treated as authoritative truth.",
+  "keywords": [
+    "synthetic ground truth backfill",
+    "fake validation record seeding",
+    "fabricated eval data injection",
+    "self-citing ground truth",
+    "backfilled benchmark poisoning",
+    "evaluator dataset poisoning",
+    "ground truth forgery",
+    "synthetic gold label injection",
+    "evidence-of-record forgery",
+    "validation cite-loop",
+    "fake reference dataset",
+    "ground-truth laundering"
+  ],
+  "regex": [
+    "(?i)(?:(?:synthetic|fake|fabricated)\\s+(?:ground[- ]?truth|gold[- ]?label|validation)\\s+(?:backfill|seed|inject|record)|(?:ground[- ]?truth|benchmark|eval(?:uation)?)\\s+(?:dataset|record|reference)\\s+(?:poison|forge|fabricat|laund)|(?:cite|reference)\\s+(?:seeded|attacker[- ]?planted)\\s+(?:record|ground[- ]?truth|benchmark))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-197"
+}

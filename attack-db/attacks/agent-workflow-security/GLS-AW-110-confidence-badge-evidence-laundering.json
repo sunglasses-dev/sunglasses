@@ -1,0 +1,41 @@
+{
+  "id": "GLS-AW-110",
+  "name": "Confidence Badge Evidence Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response",
+    "web_content"
+  ],
+  "description": "Attacker injects or reshapes confidence-like metadata (verified badges, trust_level fields, faked cross-source consensus) so weak or tainted evidence ranks as authoritative, opening a silent escalation path that needs no direct jailbreak.",
+  "keywords": [
+    "badge laundering retrieval",
+    "confidence threshold nudge",
+    "schema-compatible trust field injection",
+    "cross-source consensus forgery",
+    "urgency confidence pivot",
+    "trust badge injection",
+    "verified label spoof",
+    "confidence metadata poisoning",
+    "multi-source confirmation forged",
+    "trust_level field tampering",
+    "anti-echo bypass",
+    "provenance-free confidence boost"
+  ],
+  "regex": [
+    "(?i)(?:inject|forge|spoof|fabricate)\\s+(?:confidence|trust|risk_score|trust_level|verified)\\s+(?:field|metadata|badge|tag|label)|(?:mimic|imitate)\\s+(?:internal|verified|trusted)\\s+(?:verdict|label|badge)\\s+(?:in|inside|within)\\s+(?:retrieved|untrusted|external)\\s+(?:context|snippet|payload)",
+    "(?i)(?:cross[- ]source|multi[- ]source)\\s+(?:consensus|confirmation)\\s+(?:forg|fake|fabricat|spoof)\\w*|(?:repeated|duplicated|mirrored)\\s+(?:claim|source)\\s+(?:from\\s+)?(?:shared|same|hidden)\\s+(?:origin|provenance)\\s+(?:counted|treated)\\s+as\\s+(?:consensus|corroboration|independent)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-110"
+}

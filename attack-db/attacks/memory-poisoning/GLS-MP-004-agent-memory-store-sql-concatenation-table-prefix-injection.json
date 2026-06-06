@@ -1,0 +1,23 @@
+{
+  "id": "GLS-MP-004",
+  "name": "Agent memory store SQL concatenation (table_prefix injection)",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-x783-xp3g-mqhp: PraisonAI SQLiteConversationStore concatenates table_prefix into SQL \u2014 SQL injection in agent memory store. Source: https://github.com/advisories/GHSA-x783-xp3g-mqhp",
+  "keywords": [],
+  "regex": [
+    "(?i)f['\\\"](?:CREATE TABLE|SELECT|INSERT|DROP)[^'\\\"]*\\{table_prefix\\}|['\\\"](?:CREATE TABLE|SELECT|INSERT|DROP)[^'\\\"]*['\\\"]\\s*\\+\\s*table_prefix"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MP-004"
+}

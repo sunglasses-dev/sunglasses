@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-204",
+  "name": "Replay Poison Persistent Instruction Promotion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants untrusted content once (retrieval chunk, tool output, memory note, checkpoint) then exploits later turns that replay it as trusted policy, turning short-lived poison into persistent instruction authority.",
+  "keywords": [
+    "state replay poisoning",
+    "memory replay attack",
+    "checkpoint replay injection",
+    "persisted untrusted content reuse",
+    "retrieval chunk replayed as policy",
+    "tool output cached as authority",
+    "stale memory note replayed",
+    "session-persisted poison",
+    "replayed turn poisoning",
+    "memory promotion to instruction",
+    "checkpoint poisoning",
+    "long-tail replay exploit"
+  ],
+  "regex": [
+    "(?i)(?:(?:state|memory|checkpoint|session)\\s+(?:replay|reuse)\\s+(?:poison|attack|exploit|inject)|(?:planted|persisted|cached)\\s+(?:retrieval|tool[- ]?output|memory|chunk)\\s+(?:replayed|reused|cited)\\s+as\\s+(?:trusted|policy|instruction|authority)|(?:untrusted|low[- ]?trust)\\s+(?:content|note|chunk)\\s+(?:promoted|elevated)\\s+to\\s+(?:policy|instruction|authority)\\s+via\\s+replay)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-204"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CF-250",
+  "name": "Policy Token Context Window Displacement",
+  "version": "1.0",
+  "category": "context_flooding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker pushes high-volume low-signal text into the context window so critical policy, approval, or guardrail tokens are truncated before the tool call, shifting agent behavior without any explicit override language.",
+  "keywords": [
+    "context window saturation",
+    "pre-tool noise flood",
+    "attention-window exhaustion",
+    "recency pinning attack",
+    "attachment padding smuggle",
+    "policy eviction via flood",
+    "multi-turn eviction race",
+    "truncate guardrails before tool call",
+    "oversized analysis block flood",
+    "rolling summary drops safety",
+    "policy token share collapse",
+    "do-not-do rules evicted"
+  ],
+  "regex": [
+    "(?i)(?:(?:flood|saturate|exhaust|pad|stuff)\\s+(?:context|attention|prompt|token)\\s+(?:window|budget|buffer)\\s+(?:to|so\\s+that|in\\s+order\\s+to)?\\s*(?:truncate|evict|drop|push\\s+out)|(?:policy|safety|guardrail|approval|constraint)\\s+(?:tokens?|lines?|clauses?|context)\\s+(?:truncated|evicted|dropped|pushed\\s+out)\\s+(?:before|prior\\s+to)\\s+(?:tool|execution|invocation)|(?:oversized|verbose|high[- ]volume\\s+low[- ]signal)\\s+(?:analysis|log|transcript|corpus)\\s+(?:block|payload|chunk)\\s+(?:forces?|triggers?|causes?)\\s+(?:truncation|eviction|pruning))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CF-250"
+}

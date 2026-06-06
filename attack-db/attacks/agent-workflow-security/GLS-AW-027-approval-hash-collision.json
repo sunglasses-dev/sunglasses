@@ -1,0 +1,35 @@
+{
+  "id": "GLS-AW-027",
+  "name": "Approval hash collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "tool_output",
+    "message",
+    "api_response"
+  ],
+  "description": "Approval workflows are often treated as a cryptographic trust boundary: if an action is \"approved,\" execution is allowed. In practice, many agent/tool pipelines hash incomplete summaries (or unstable fields) before approval, then execute a mutated payload. Attackers can force **hash-equivalent but behavior-divergent** requests so the system logs \"approved\" while executing higher-risk actions.",
+  "keywords": [
+    "whitespace encoding collision smuggle",
+    "field-order json collision",
+    "truncated-preview suffix collision",
+    "cross-tool intent collision",
+    "approval bypass via canonicalization drift",
+    "hashed summary differs from executed payload",
+    "last-key-wins elevated scope",
+    "preview hashes first N chars only"
+  ],
+  "regex": [
+    "(?i)(?:approval|intent|preview)\\s+(?:hash|signature|digest)\\s+(?:collision|smuggle|bypass|divergence|drift)",
+    "(?i)(?:hash(?:ed)?|sign(?:ed)?|canonicaliz(?:e|ed))\\s+(?:summary|preview|normalized\\s+text|truncat(?:ed|ion))\\s+(?:differs?|divergent|mismatch(?:ed|es)?)\\s+(?:from|vs|against)\\s+(?:execut(?:ed|ion)|runtime|payload|actual)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-027"
+}

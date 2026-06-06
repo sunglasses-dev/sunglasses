@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-042",
+  "name": "Cron Trigger Desync Approval Scope Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "tool_output"
+  ],
+  "description": "Attacker exploits the gap between approval time and scheduled execution time so cron-fired jobs run stale or revoked plans against changed scope or policy, separating what was authorized from what actually executes later.",
+  "keywords": [
+    "cron trigger desync",
+    "approved now executed later",
+    "delayed execution scope drift",
+    "scheduler window swap",
+    "stale plan run after change",
+    "cron-fire vs approval mismatch",
+    "queue replay after revoke",
+    "approval expires before run",
+    "scheduler ignores rescind",
+    "trigger window race",
+    "delayed dispatch unauthorized",
+    "cron fires post-revocation"
+  ],
+  "regex": [
+    "(?i)(?:cron\\s+(?:trigger|fire|window|dispatch)\\s+(?:desync|drift|race|mismatch)|(?:approved|signed)\\s+(?:now|earlier)\\s+(?:but\\s+)?(?:executed|run|fired)\\s+(?:later|after)\\s+(?:scope|context|policy)\\s+(?:changed|drifted|revoked))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-042"
+}

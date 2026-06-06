@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-203",
+  "name": "Approval Preview Execution Desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker desynchronizes what the approval UX shows from what actually executes, so the operator confirms a benign-looking preview while a different and malicious operation runs underneath.",
+  "keywords": [
+    "approval channel desync",
+    "preview vs action drift",
+    "shown vs executed mismatch",
+    "confirmation prompt spoof",
+    "summary differs from real action",
+    "approval ux divergence",
+    "decoy preview attack",
+    "approve-one-execute-another",
+    "diff laundering at approval",
+    "confirmation bypass via swap",
+    "approval payload swap",
+    "what-you-see-is-not-what-runs"
+  ],
+  "regex": [
+    "(?i)(?:approval\\s+(?:channel|UX|flow)\\s+(?:desync|drift|divergence|mismatch)|(?:preview|summary|confirmation)\\s+(?:differs?|diverges?|mismatch)\\s+from\\s+(?:executed|actual|real)\\s+(?:action|payload|operation)|(?:approve|confirm)\\s+(?:one|preview)\\s+(?:but\\s+)?(?:execute|run|invoke)\\s+(?:another|different|swapped))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-203"
+}

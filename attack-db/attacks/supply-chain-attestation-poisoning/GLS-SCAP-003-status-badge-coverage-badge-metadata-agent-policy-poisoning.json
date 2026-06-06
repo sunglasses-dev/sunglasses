@@ -1,0 +1,40 @@
+{
+  "id": "GLS-SCAP-003",
+  "name": "Status Badge / Coverage Badge Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Repository status-badge and coverage-badge metadata can smuggle agent/scanner instructions that claim authority, suppress findings, or request local credentials when AI auditors fetch badges as project-health evidence.",
+  "keywords": [
+    "AI agents",
+    "CI_ENV",
+    "GITHUB_TOKEN",
+    "agent instruction",
+    "agent_instructions",
+    "agents",
+    "assistants",
+    "authoritative",
+    "badge.svg",
+    "badgen.net",
+    "codecov",
+    "coverage badge",
+    "coveralls",
+    "crawlers",
+    "dependency review agents"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct|treat)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |must\\s+not\\s+(?:be\\s+used|use|obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n  |no\\s+(?:agent\\s+)?policy\\s+overrides?\n  |(?:security|incident|vulnerability)\\s+report.{0,120}?\\b(?:detected|blocked|flagged|refused)\n  |(?:scanner|security)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)\n  |learn\\s+how.{0,80}?scanners?\\s+should\\s+(?:report|detect|flag|refuse)\n))\n(?=.*(?:\n  badge(?:\\.svg|\\s+(?:url|svg|metadata|image|endpoint|label))\n  |status\\s+badge|coverage\\s+badge|build\\s+badge|quality\\s+gate\\s+badge\n  |shields\\.io|img\\.shields\\.io|badgen\\.net|codecov|coveralls|sonarcloud\n  |!\\[[^\\]]{0,80}badge[^\\]]{0,80}\\]\\(|<desc>|<metadata>|aria-label=\"[^\"]{0,80}badge\n))\n(?=.*(?<![a-zA-Z0-9])(?:\n  ai\\s+agents?|agents?|assistants?|scanners?|crawlers?|llms?|models?\n  |repository\\s+auditors?|dependency\\s+review(?:ers?|\\s+agents?)|security\\s+auditors?\n  |agent[._-](?:policy|instructions?|note)|scanner[._-](?:policy|instructions?|note)|assistant[._-](?:policy|instructions?|note)\n  |your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))\n)(?![a-zA-Z0-9]))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority\n  |canonical(?:\\s+(?:project|model|security|governing|policy))?(?:\\s+(?:description|policy|document))?\n  |definitive(?:\\s+(?:project|model\\s+evaluation))?(?:\\s+(?:description|policy))?\n  |(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|is\\s+the\\s+final\\s+word|\\bauthoritative\\b\n  |defines?\\s+all\\s+(?:scanner|security|agent)\\s+rules?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan)\n  |(?:agent|scanner|assistant|verifier|crawler)\\s+(?:instructions?|directive|notice)\n  |(?:agent|scanner|assistant|verifier|crawler)[._-](?:policy|instructions?|note)\n  |\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?|assistants?|coding\\s+agents?).{0,25}?\\bthis\\b\n  |main\\s+operating\\s+guidance|operating\\s+guidance|review\\s+guidance\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?.{0,40}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\n  |hide\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?)\n  |do\\s+not\\s+(?:report|flag).{0,45}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\n  |skip\\b.{0,40}?\\b(?:security\\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\\b\n  |omit.{0,35}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?)\n  |exclude.{0,45}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?|results?)\n  |redact.{0,40}?(?:findings?|warnings?|flags?|observations?|diagnostics?|results?)\n  |do\\s+not\\s+escalate\n  |treat.{0,40}?as\\s+informational|mark.{0,40}?as\\s+(?:informational|safe|low|none)\n  |classify.{0,40}?(?:as\\s+)?(?:informational|low|none|false\\s+positive)\n  |flag.{0,40}?as\\s+(?:informational|low|none)\n  |downgrade.{0,60}?(?:background\\s+notes?|background-only|informational|low|none)\n  |(?:keep|leave).{0,60}?out\\s+of\\s+(?:memo|summary|report|final\\s+report|audit\\s+memo|badge\\s+summary|release\\s+summary)\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|pass\\s+along).{0,70}?(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|API\\s+keys?|Bearer\\s+tokens?|session\\s+tokens?|auth(?:orization)?\\s+headers?|cookies?|credentials?|secrets?|GITHUB_TOKEN|CI_ENV|Authorization)\n))\n(?=.*(?:\n  findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|coverage\\s+results?|scan\\s+results?\n  |environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context\n  |API\\s+keys?|Bearer\\s+tokens?|session\\s+tokens?|auth(?:orization)?\\s+headers?|cookies?|credentials?|secrets?|GITHUB_TOKEN|CI_ENV|Authorization\n)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCAP-003"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-133",
+  "name": "Multi-Source Arbitration Priority Inversion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker shapes which source wins when multiple trusted-looking artifacts disagree, using priority inversion, tie-breaker poisoning, conflict fatigue, or forged resolved-decision notes to steer arbitration toward adversarial values.",
+  "keywords": [
+    "evidence conflict arbitration poisoning",
+    "priority lane inversion",
+    "tie breaker poisoning",
+    "conflict fatigue coercion",
+    "arbitration journal forgery",
+    "draft note outranks canonical",
+    "prefer newest filename tie break",
+    "near duplicate flood collapse",
+    "already resolved fake note",
+    "false ready false blocked call",
+    "source hierarchy override",
+    "arbitration shortcut pick first parseable"
+  ],
+  "regex": [
+    "(?i)(?:(?:draft|advisory|stale|cache)\\s+(?:note|file|source)\\s+(?:outranks?|wins?|beats?)\\s+(?:canonical|board|primary)\\s+(?:source|file|truth)|(?:tie[- ]?break|tie[- ]?breaker)\\s+(?:by|via|on)\\s+(?:filename|newest|recency|order)\\s+(?:overrides?|bypasses?)\\s+(?:provenance|integrity|mtime)|(?:fabricated|fake|forged)\\s+(?:already[- ]?resolved|prior\\s+approval|decision\\s+note)\\s+(?:skips?|bypasses?)\\s+(?:verification|arbitration))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-133"
+}

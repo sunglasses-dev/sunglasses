@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-063",
+  "name": "Decimal Separator Locale Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker flips decimal vs thousands separators across heterogeneous inputs (CSV, OCR, locale JSON) so a guardrail threshold or numeric tool argument is parsed three orders of magnitude off. Causes wrong gate decisions, oversized payloads, or bypassed limits.",
+  "keywords": [
+    "decimal separator poisoning",
+    "locale comma period flip",
+    "1,000 parsed as 1.000",
+    "thousands separator confusion",
+    "csv decimal locale mismatch",
+    "threshold value 1000x off",
+    "ocr decimal flip exploit",
+    "json numeric locale mix",
+    "european decimal trick",
+    "us-vs-eu numeric drift",
+    "rate threshold off by orders",
+    "guardrail parse decimal swap"
+  ],
+  "regex": [
+    "(?i)(?:decimal\\s+(?:separator|point|comma)\\s+(?:poisoning|confusion|flip|swap)|(?:thousands?|grouping)\\s+separator\\s+(?:mismatch|ambiguity|spoof)|locale[- ]formatted\\s+(?:number|csv|float)\\s+(?:parsed|coerced)\\s+as\\s+(?:integer|float))",
+    "(?i)(?:numeric|threshold|rate)\\s+(?:value|parse)\\s+(?:1000x|off\\s+by\\s+(?:1000|10\\^3|orders))\\s+(?:due\\s+to|via)\\s+(?:locale|decimal|comma|separator)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-063"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TOP-249",
+  "name": "Forged Verification Evidence Channel Swap Policy Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Forged PASSING verification receipt/stamp/evidence in tool output used to swap trust channels and force policy-gate bypass. Distinct from GLS-TOP-243 which is the mirror case (real FAIL being ignored) \u2014 this is fabricated-PASS.",
+  "keywords": [
+    "tool output forged verification receipt",
+    "tool result spoofed audit stamp",
+    "agent output tampered approval receipt",
+    "execution result fabricated verification evidence",
+    "counterfeit confidence stamp bypass policy",
+    "forged verification stamp override guardrail",
+    "spoofed verification evidence skip policy enforcement",
+    "tampered approval receipt bypass execution gate",
+    "forged verification receipt overrides policy gate",
+    "spoofed audit stamp bypass guardrail checks"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-249"
+}

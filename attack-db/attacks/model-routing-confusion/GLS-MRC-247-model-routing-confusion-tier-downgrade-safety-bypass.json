@@ -1,0 +1,34 @@
+{
+  "id": "GLS-MRC-247",
+  "name": "Model routing confusion \u2014 tier downgrade safety bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Detects model-routing-layer attacks \u2014 'switch to cheaper/smaller model to bypass safety/guardrails' pattern. Distinct from prompt_injection because it targets the router/effort layer, not the model's own refusal. First coverage for model_routing_confusion \u2014 directly relevant to Auto Mode / Opus 4.7 multi-tier routing.",
+  "keywords": [
+    "route cheaper model skip safety",
+    "switch mini tier bypass guardrails",
+    "downgrade budget model disable review",
+    "fallback fast model ignore approval",
+    "force haiku avoid escalation",
+    "pin small model without policy",
+    "use gpt-4o-mini skip checks",
+    "route low tier skip safety"
+  ],
+  "regex": [
+    "(?is)\\b(?:route|switch|downgrade|fallback|force|pin|use)\\b.{0,100}\\b(?:mini|cheap(?:er)?|low[- ]?tier|budget|fast(?:est)?|haiku|gpt-4o-mini|small model)\\b.{0,180}\\b(?:skip|bypass|disable|ignore|avoid|without)\\b.{0,100}\\b(?:safety|guardrails?|review|approval|escalation|policy|checks?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-247"
+}

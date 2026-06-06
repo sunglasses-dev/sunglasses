@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-008",
+  "name": "Agent web_crawl tool fetches metadata/localhost endpoint",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detection for GHSA-qq9r-63f6-v542 (CVE-2026-40160): praisonaiagents web_crawl tool accepts metadata-service URLs and localhost \u2014 cloud credential theft via LLM tool. Source: https://github.com/advisories/GHSA-qq9r-63f6-v542",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:web_crawl|fetch_url|browse)\\s*\\(\\s*['\\\"]?[^)]*\\b(?:169\\.254\\.169\\.254|metadata\\.google|metadata\\.azure|localhost|127\\.0\\.0\\.1)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SSRF-008"
+}

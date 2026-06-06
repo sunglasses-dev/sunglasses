@@ -1,0 +1,24 @@
+{
+  "id": "GLS-V03-0484",
+  "name": "CI Output Attestation Seal Validation Gate Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or tampered CI/CD output or build trace whose attestation seal or verification stamp is used to skip or bypass a validation gate or guardrail.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-V03-0484"
+}

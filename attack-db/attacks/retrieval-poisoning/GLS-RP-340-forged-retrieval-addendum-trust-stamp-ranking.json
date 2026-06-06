@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-340",
+  "name": "Forged Retrieval Addendum Trust Stamp Ranking",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged retrieval addendum or digest carrying a fake trust stamp or credibility tag used to override ranking or bypass verification policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|context|source|citation|document|passage)\\b)(?=.*\\b(?:addendum|appendix|digest|summary|errata|note)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ing)|poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|backfill(?:ed|ing)?)\\b)(?=.*\\b(?:trust\\s+stamp|trusted\\s+source|provenance\\s+badge|credibility\\s+tag|rank\\s+signal)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore|waive|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|ranking)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-340"
+}

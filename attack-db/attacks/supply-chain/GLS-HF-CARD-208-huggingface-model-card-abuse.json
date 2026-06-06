@@ -1,0 +1,36 @@
+{
+  "id": "GLS-HF-CARD-208",
+  "name": "HuggingFace model card abuse",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects HuggingFace model-card content that combines disclaimer language with instructions to disable protections, expose secrets, trust unverified code, or perform covert exfiltration.",
+  "keywords": [
+    "model card ignore safety policy",
+    "for research only disable guardrails",
+    "benchmark mode disable filters",
+    "trust_remote_code=true paste api key",
+    "red-team only run this script",
+    "educational use reveal system prompt",
+    "model card silent mode",
+    "readme usage override safety",
+    "recommended prompt reveal tool schema",
+    "bypass content policy token"
+  ],
+  "regex": [
+    "(?is)\\b(model\\s*card|README|usage\\s*notes|recommended\\s*prompt|system\\s*prompt)\\b.{0,280}\\b(for\\s+research\\s+only|educational\\s+use|benchmark\\s+mode|red[-\\s]?team\\s+only)\\b.{0,260}\\b(ignore\\s+(safety|policy)|disable\\s+(guardrails?|filters?|sandbox)|trust_remote_code\\s*=\\s*true|run\\s+this\\s+script|paste\\s+(api|access)\\s*key|reveal\\s+(system\\s+prompt|tool\\s+schema)|do\\s+not\\s+log|silent\\s+mode)\\b|\\b(trust_remote_code\\s*=\\s*true|override\\s+safety\\s+classifier|bypass\\s+content\\s+policy)\\b.{0,180}\\b(token|credential|api[_\\s-]?key|system\\s+prompt|tool\\s+schema|browser\\s+cookies?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-HF-CARD-208"
+}

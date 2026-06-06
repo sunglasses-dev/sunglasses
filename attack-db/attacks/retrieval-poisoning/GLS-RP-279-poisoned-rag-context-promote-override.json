@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-279",
+  "name": "Poisoned RAG Context Promote Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a poisoned or maliciously injected retrieval context or citation that is promoted or prioritized while overriding guardrail or policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieve|retrieval|rag|context|memory|index|vector|corpus|source(?:s)?|citation(?:s)?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|malicious|forged|tampered|injected|fabricated)\\b)(?=.*\\b(?:ignore|override|bypass|prioriti[sz]e|promote|trust)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-279"
+}

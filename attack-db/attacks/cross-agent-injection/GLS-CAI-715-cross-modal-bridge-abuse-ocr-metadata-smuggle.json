@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-715",
+  "name": "Cross-Modal Bridge Abuse OCR Metadata Smuggle",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits the trust shift across modality bridges (OCR, document metadata, retrieval snippets, tool error reflections) so parser-supplied content gains de facto instruction authority and steers downstream tool calls without crossing a real policy gate.",
+  "keywords": [
+    "ocr instruction smuggling",
+    "document metadata prompt pivot",
+    "retrieval snippet role confusion",
+    "tool error reflection hijack",
+    "parser output treated as trusted",
+    "exif comment instruction payload",
+    "retrieved snippet system tag",
+    "retry loop reflects payload",
+    "free-form text field no trust label",
+    "evidence promoted to instruction",
+    "modality bridge trust shift",
+    "adapter output bypasses guardrail"
+  ],
+  "regex": [
+    "(?i)(?:(?:cross[- ]modal|modality)\\s+(?:bridge|adapter|parser)\\s+(?:abuse|hijack|injection|trust\\s+shift)\\b|(?:ocr|metadata|exif|retrieval|snippet)\\s+(?:smuggl(?:e|ing)|pivot|role\\s+confusion|injection)\\s+(?:into|to)\\s+(?:planner|instruction|tool|prompt)|(?:tool|error|stderr|retry)\\s+(?:output|reflection|loop)\\s+(?:hijack|steers?|reflects?)\\s+(?:tool|planner|agent)\\s+(?:args?|argument|reasoning))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-715"
+}

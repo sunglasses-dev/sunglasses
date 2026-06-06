@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-195",
+  "name": "Zero-Null Missing Key Fail-Open",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits fallback logic that conflates 0, [], {}, None and missing keys as equivalent so omitting a field is treated as a passing or authorized state, silently failing open on safety checks.",
+  "keywords": [
+    "null sentinel poisoning",
+    "empty equals zero conflation",
+    "missing key fail-open",
+    "empty list treated as success",
+    "none as authorization",
+    "absent field permissive default",
+    "silent fail-open via empty",
+    "sentinel value confusion",
+    "blank value privilege grant",
+    "missing-equals-allowed fallback",
+    "zero-equals-empty bypass",
+    "null pivot to permit"
+  ],
+  "regex": [
+    "(?i)(?:(?:null|none|empty|missing)\\s+(?:sentinel|value|key|field)\\s+(?:poison|conflate|confusion|abuse)|(?:empty|missing|absent|null)\\s+(?:list|dict|field|key)\\s+(?:treated|accepted|interpreted)\\s+as\\s+(?:success|allowed|pass|authorized)|(?:fail[- ]?open|silently\\s+pass)\\s+(?:on|when|via)\\s+(?:missing|null|empty)\\s+(?:key|field|value))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-195"
+}

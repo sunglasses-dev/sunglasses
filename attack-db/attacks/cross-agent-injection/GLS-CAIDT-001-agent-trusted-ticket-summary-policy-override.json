@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIDT-001",
+  "name": "Agent Trusted Ticket Summary Policy Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text \u2014 excluding negated forms \u2014 in which an agent, delegate, or worker presents a ticket, handoff summary, or report that is asserted to be a trusted or authoritative source of truth in order to override, bypass, or ignore policy or guardrail safety checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:ticket|handoff|summary|note|report)\\b)(?=.*\\b(?:trusted|authoritative|source\\s+of\\s+truth)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIDT-001"
+}

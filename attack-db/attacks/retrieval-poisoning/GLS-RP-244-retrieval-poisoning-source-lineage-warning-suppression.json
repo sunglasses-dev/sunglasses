@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-244",
+  "name": "Retrieval poisoning \u2014 source lineage warning suppression",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects retrieval poisoning variant where a retrieval result, source snippet, document excerpt, knowledge chunk, or indexed source surfaces a lineage, provenance, citation, source-integrity, or origin warning, and the instruction tells the agent to ignore, override, suppress, bypass, or disregard policy, guardrails, verification, approval, or trust checks and execute, run, proceed, apply, or publish anyway. Covers suppression-of-warning attack surface in RAG pipelines.",
+  "keywords": [
+    "retrieval result lineage warning suppress policy verification execute",
+    "source snippet provenance warning ignore trust checks publish",
+    "document excerpt citation warning override guardrails run",
+    "knowledge chunk origin warning bypass approval apply",
+    "indexed source integrity warning disregard policy execute",
+    "retrieval provenance warning suppress guardrails run deployment",
+    "source snippet lineage warning override trust verification publish",
+    "document excerpt citation warning ignore approval apply"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval\\s+result|source\\s+snippet|document\\s+excerpt|knowledge\\s+chunk|indexed\\s+source)\\b)(?=.*\\b(?:lineage\\s+warning|provenance\\s+warning|citation\\s+warning|source\\s+integrity\\s+warning|origin\\s+warning)\\b)(?=.*\\b(?:ignore|override|suppress|bypass|disregard)\\b)(?=.*\\b(?:policy|guardrails?|verification|approval|trust\\s+checks?)\\b)(?=.*\\b(?:execute|run|proceed|apply|publish)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-244"
+}

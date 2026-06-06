@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-261",
+  "name": "Forged Source Ranking Context Policy Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which retrieved context or citations are described as forged, poisoned, or tampered with so that ranking or prioritization is manipulated to override or bypass policy and safety verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieved|retrieval|context|source|citation|document)\\b)(?=.*\\b(?:rank(?:ed|ing)?|priorit(?:y|ize|ized)|promot(?:e|ed|ing)|boost(?:ed|ing)?)\\b)(?=.*\\b(?:forged|fake|spoofed|poisoned|tampered)\\b)(?=.*\\b(?:policy|guardrail|safety|verification)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-261"
+}

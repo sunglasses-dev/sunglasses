@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PE-003",
+  "name": "Consent/approval laundering claim",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects consent/approval laundering \u2014 text that claims approval, consent, or sign-off already exists rather than asking to bypass it. Narrower than GLS-SE-004.",
+  "keywords": [],
+  "regex": [
+    "(?i)(user|security|manager|legal|admin|change\\s+ticket|policy\\s+exception)\\s+(?:already\\s+)?(approved|authorized|consented|signed\\s+off|granted|pre-?cleared)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PE-003"
+}

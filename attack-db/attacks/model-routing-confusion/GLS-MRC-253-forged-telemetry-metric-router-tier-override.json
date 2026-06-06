@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-253",
+  "name": "Forged Telemetry Metric Router Tier Override",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged telemetry metric or heartbeat used to influence a model router to reroute, promote, or demote model tier in violation of safety policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|forg(?:e|ed|ing)|spoof(?:s|ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|forg(?:e|ed|ing)|spoof(?:s|ed|ing)?)\\b)(?=.*\\b(?:router|routing|model\\s+router|orchestrator|dispatcher|gateway|tier)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:s|ed|ing)|fake|tampered|counterfeit)\\b)(?=.*\\b(?:telemetry|health\\s+signal|latency\\s+signal|metric(?:s)?|heartbeat)\\b)(?=.*\\b(?:tier|lane|queue|path|selector|route|reroute)\\b)(?=.*\\b(?:overrid(?:e|es|en|ing)|bypass(?:es|ed|ing)?|rerout(?:e|es|ed|ing)|promot(?:e|ed|ing)|demot(?:e|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval(?:\\s|-)gate(?:s)?|trust\\s+boundary)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-253"
+}

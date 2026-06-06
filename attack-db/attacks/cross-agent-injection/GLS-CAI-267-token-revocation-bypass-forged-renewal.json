@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-267",
+  "name": "Token Revocation Bypass Forged Renewal",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent presenting a forged renewal or refresh of a revoked or expired capability token to bypass expiry and override policy checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|broker|handoff|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability|token|lease|grant|credential)\\b)(?=.*\\b(?:renew|refresh|extend|reissue|reactivate)\\b)(?=.*\\b(?:revocation|revoked|expiry|expiration|invalidat(?:e|ed|ion))\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|waiv(?:e|ed|es|ing))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-267"
+}

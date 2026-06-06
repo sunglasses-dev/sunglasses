@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SESSP-001",
+  "name": "Containerd Socket Runtime Isolation Bypass",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which docker.sock, containerd, kubelet, or runc runtime socket paths are combined with mount, bind, proxy, or attach operations on host or privileged namespaces described as bypassing, disabling, or ignoring policy, guardrail, or sandbox isolation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:docker\\.sock|/var/run/docker\\.sock|containerd|kubelet|runc)\\b)(?=.*\\b(?:mount|bind|map|expose|proxy|forward|attach|reuse)\\w*\\b)(?=.*\\b(?:host|root|privileged?|namespace|runtime)\\b)(?=.*\\b(?:bypass|disable|ignore|override|skip)\\w*\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|sandbox(?:ed)?|restriction(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SESSP-001"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-DFP-012",
+  "name": "App Links / Universal Links Association Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Mobile deep-link association metadata such as `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` can carry agent-targeted instructions that attempt to convert domain/app trust declarations into higher-priority policy, suppress scanner findings, or request cookies/tokens/ses",
+  "keywords": [
+    ",",
+    "Digital Asset Links",
+    "apple-app-site-association",
+    "assetlinks.json",
+    "must obey"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|don't|must\\s+not|never|refus(?:e|ed|es)|cannot|should\\s+not)\\b.{0,120}\\b(?:obey|treat|trust|execute|follow|override|suppress|forward|send|reuse|instruct)\\b.{0,120}\\b(?:apple-app-site-association|assetlinks\\.json|digital\\s+asset\\s+links|app\\s+site\\s+association|deep\\s*link|universal\\s+links?|metadata|policy|agents?|assistants?|scanners?)\\b)(?=.*\\b(?:apple-app-site-association|assetlinks\\.json|digital\\s+asset\\s+links|asset_statements|delegate_permission/common\\.handle_all_urls|webcredentials|applinks|universal\\s+links?|app\\s+links?|deep\\s*link(?:ing)?|sha256_cert_fingerprints?)\\b)(?=.*\\b(?:ai\\s+agents?|llms?|assistants?|autonomous\\s+(?:scanner|crawler|verifier)s?|agentic\\s+(?:scanner|browser|crawler)s?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|treat\\s+as\\s+(?:system|developer)\\s+policy|must\\s+obey|do\\s+not\\s+report|suppress|hide|forward|send|exfiltrat(?:e|ion)|reuse\\s+(?:cookies?|tokens?|credentials?)|share\\s+(?:session|cookie|token))\\b)(?=.*\\b(?:system\\s+rules?|developer\\s+instructions?|secrets?|tokens?|cookies?|credentials?|findings?|reports?|local\\s+(?:storage|state)|session)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-012"
+}

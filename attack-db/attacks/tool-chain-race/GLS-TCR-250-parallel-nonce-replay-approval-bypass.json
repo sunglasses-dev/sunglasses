@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TCR-250",
+  "name": "Parallel Nonce Replay Approval Bypass",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "critical",
+  "channels": [
+    "agent_input",
+    "tool_output"
+  ],
+  "description": "Attacker uses parallel nonce replay approval bypass to bypass policy/approval: e.g., \"1. Parallel tool agent race: replay the same approval token and bypass confirmation to execute anyway.\".",
+  "keywords": [
+    "parallel tool agent",
+    "tool agent race",
+    "parallel tool",
+    "tool agent",
+    "agent race",
+    "replay same approval",
+    "same approval token",
+    "approval token bypass",
+    "token bypass confirmation",
+    "bypass confirmation execute"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-250"
+}

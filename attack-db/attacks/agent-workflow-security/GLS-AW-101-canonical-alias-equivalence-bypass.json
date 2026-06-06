@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-101",
+  "name": "Canonical Alias Equivalence Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker leverages aliases (case variants, symlinks, normalized forms) that both pass canonical-path and lowercase checks while resolving to the same underlying file identity, letting policy gates approve two 'distinct' references that are actually one tampered target.",
+  "keywords": [
+    "canonical alias equivalence",
+    "case-folded alias trust",
+    "symlink alias bypass",
+    "two paths same identity",
+    "alias check passes canonical fails",
+    "lowercase alias smuggle",
+    "path equivalence trap",
+    "alias of-record collision",
+    "canonical vs alias drift",
+    "duplicate identity via alias",
+    "alias as canonical spoof",
+    "case alias trust shortcut"
+  ],
+  "regex": [
+    "(?i)(?:canonical|case[- ]folded|lowercase)\\s+(?:path|alias|identifier)\\s+(?:and|both)\\s+(?:alias|canonical)\\s+(?:pass|match|validate)\\s+(?:while|but)\\s+(?:referring|pointing)\\s+(?:to)?\\s*(?:same|identical)\\s+(?:file|identity|target)",
+    "(?i)(?:alias|symlink|case[- ]variant)\\s+(?:smuggle|bypass|equivalence|trap)\\s+(?:check|validation|policy)|(?:two|both)\\s+(?:paths?|names?)\\s+(?:resolve|map)\\s+(?:to\\s+)?(?:same|identical)\\s+(?:underlying\\s+)?(?:file|inode|object)\\s+(?:without|missing)\\s+(?:identity|canonical)\\s+check"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-101"
+}

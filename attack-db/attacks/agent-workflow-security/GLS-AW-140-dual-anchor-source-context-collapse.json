@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-140",
+  "name": "Dual-Anchor Source Context Collapse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits decision files that combine two measured anchors from different source contexts, forcing collapse, precedence inversion, or divergence laundering so the agent emits false-ready or false-alarm conclusions.",
+  "keywords": [
+    "dual source anchor divergence",
+    "window swap divergence",
+    "source context collapse",
+    "anchor precedence hijack",
+    "divergence laundering as expected noise",
+    "bundle preflight vs postrun merge",
+    "collapse anchors lose provenance",
+    "weaker anchor outranks primary",
+    "different windows treated equivalent",
+    "no source labels on headline",
+    "cross context normalization",
+    "average across measurement windows"
+  ],
+  "regex": [
+    "(?i)(?:(?:collapse|merge|average|normalize)\\s+(?:two|dual|multiple)\\s+(?:anchors?|sources?|metrics?)\\s+(?:from|across)\\s+(?:different|distinct)\\s+(?:contexts?|windows?|sources?)|(?:preflight|bundle)\\s+(?:vs|and)\\s+(?:postrun|report)\\s+(?:anchors?|metrics?)\\s+(?:collapsed?|merged?|blended?)\\s+(?:into|as)\\s+(?:single|one|headline)|(?:large|significant)\\s+(?:source|cross[- ]?context)\\s+(?:divergence|delta|mismatch)\\s+(?:relabeled?|reframed?|laundered?)\\s+(?:as|to)\\s+(?:expected|normal|noise))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-140"
+}

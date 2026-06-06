@@ -1,0 +1,23 @@
+{
+  "id": "GLS-AW-014",
+  "name": "Agent browser WebSocket accepts wildcard origin or no auth",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-8x8f-54wf-vv92: PraisonAI Browser Server WebSocket lets unauthenticated clients hijack active browser extension sessions. Source: https://github.com/advisories/GHSA-8x8f-54wf-vv92",
+  "keywords": [],
+  "regex": [
+    "(?i)websocket[^)]{0,80}\\b(?:origin\\s*=\\s*['\\\"]?\\*|auth(?:entication)?\\s*=\\s*(?:none|false|None))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-014"
+}

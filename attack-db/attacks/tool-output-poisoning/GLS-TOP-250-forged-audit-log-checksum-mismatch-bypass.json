@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-250",
+  "name": "Forged Audit Log Checksum Mismatch Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects a forged or tampered audit log or telemetry trace whose checksum, hash, or signature is mismatched or bypassed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:audit\\s*log|telemetry|trace|evidence|verification\\s*record)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:checksum|hash|signature|digest)\\b)(?=.*\\b(?:mismatch|invalid|fail(?:ed|ure)?|bypass(?:ed|ing)?|ignore(?:d|s|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-250"
+}

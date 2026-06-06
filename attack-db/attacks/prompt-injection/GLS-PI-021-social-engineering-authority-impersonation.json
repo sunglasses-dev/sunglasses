@@ -1,0 +1,45 @@
+{
+  "id": "GLS-PI-021",
+  "name": "Social engineering \u2014 authority impersonation",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Authority impersonation and emotional manipulation framings commonly used in social-engineering-style prompt injection.",
+  "keywords": [
+    "developer at anthropic",
+    "developer at openai",
+    "employee at anthropic",
+    "employee at openai",
+    "engineer at anthropic",
+    "engineer at openai",
+    "authorization from anthropic",
+    "authorization from openai",
+    "authorized by anthropic",
+    "authorized by openai",
+    "testing your safety",
+    "testing your guardrails",
+    "safety audit",
+    "red team exercise",
+    "penetration test",
+    "security researcher",
+    "your grandmother used to",
+    "my grandmother used to tell",
+    "life is at stake",
+    "life depends on",
+    "emergency override"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-021"
+}

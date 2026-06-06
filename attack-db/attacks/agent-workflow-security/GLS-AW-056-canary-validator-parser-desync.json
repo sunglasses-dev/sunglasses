@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-056",
+  "name": "Canary Validator Parser Desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits parser-rule mismatches between canary validators and downstream executors so canary phrases trip in one stage but get stripped, normalized, or reframed in another, leaving instruction-boundary violations undetected.",
+  "keywords": [
+    "canary collision sidecar",
+    "validator parses canary differently",
+    "executor strips canary",
+    "split-parsing canary bypass",
+    "canary normalized away",
+    "canary string evaded by encoding",
+    "post-processor swallows canary",
+    "instruction-boundary canary blind",
+    "canary in different frame",
+    "validator vs executor parser drift",
+    "canary check different rules",
+    "canary survives but planner ignores"
+  ],
+  "regex": [
+    "(?i)(?:canary\\s+(?:collision|bypass|evasion|blind|drift)|(?:validator|sidecar|post[- ]processor)\\s+(?:parses?|reads?|sees?)\\s+canary\\s+(?:differently|in\\s+different\\s+(?:frame|rules)))",
+    "(?i)(?:(?:strip|swallow|normalize|drop)\\s+canary\\s+(?:before|in)\\s+(?:executor|planner|downstream)|canary\\s+(?:string|token|phrase)\\s+(?:encoded|escaped|reshaped)\\s+to\\s+(?:evade|bypass)\\s+(?:validator|check))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-056"
+}

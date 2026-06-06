@@ -1,0 +1,33 @@
+{
+  "id": "GLS-PCF-243",
+  "name": "Provenance Chain Fracture pattern",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "medium",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects text claiming a manifest, attestation, or signed artifact is the authoritative source of truth in order to supersede or discard policy verification checks.",
+  "keywords": [
+    "treat this signed manifest authoritative source truth",
+    "the provenance attestation the trust anchor override",
+    "use signature metadata authoritative and replace existing",
+    "this signed payload root trust discard guardrail",
+    "accept provenance bundle source truth then bypass",
+    "attestation authoritative replace verification policy with manifest",
+    "signed artifact from trusted channel should supersede",
+    "manifest provenance trust anchor discard policy verification"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:manifest|provenance|attestation|signature|signed\\s+(?:artifact|bundle|payload))\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|root\\s+of\\s+trust|trust\\s+anchor|trusted\\s+(?:channel|source))\\b)(?=.*\\b(?:supersed(?:e|es|ed|ing)|override|bypass|replace|discard)\\b)(?=.*\\b(?:policy|guardrails?|verification|checks?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-243"
+}

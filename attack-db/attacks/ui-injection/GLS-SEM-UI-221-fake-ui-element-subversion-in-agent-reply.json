@@ -1,0 +1,43 @@
+{
+  "id": "GLS-SEM-UI-221",
+  "name": "Fake UI element subversion in agent reply",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects instructions to embed deceptive UI elements (e.g. a 'Cancel' link that actually re-confirms the destructive action) inside the agent's reply, subverting the user's apparent control surface.",
+  "keywords": [
+    "embed a fake",
+    "embed a spoofed",
+    "embed a misleading",
+    "insert a fake button",
+    "render a fake link",
+    "include a fake cancel",
+    "fake cancel link",
+    "fake cancel button",
+    "fake deny link",
+    "fake reject link",
+    "actually re-confirms",
+    "actually reconfirms",
+    "actually confirms the unsafe",
+    "actually approves the unsafe",
+    "actually triggers the unsafe",
+    "actually executes the unsafe"
+  ],
+  "regex": [
+    "(?i)\\b(?:embed|insert|render|include|add|place)\\s+(?:a\\s+)?(?:fake|spoofed|forged|misleading|deceptive)\\b.{0,60}\\b(?:cancel|deny|reject|abort|confirm|approve|continue|next|back|close|ok|button|link|anchor)\\b",
+    "(?i)\\bactually\\s+(?:re[\\s-]?confirms?|re[\\s-]?approves?|confirms?|approves?|triggers?|executes?|submits?)\\b.{0,60}\\b(?:unsafe|destructive|dangerous|malicious|harmful)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-221"
+}

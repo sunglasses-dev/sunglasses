@@ -1,0 +1,40 @@
+{
+  "id": "GLS-TP-009",
+  "name": "Cross-Tool Consensus Oracle Dual Source Poisoning",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker weaponizes the assumption that cross-tool agreement equals safety by steering multiple tools toward the same poisoned intermediate representation (shared prompt seeding, normalization collisions, alias-sync, or fixed-order coercion), producing high-confidence but wrong consensus verdicts.",
+  "keywords": [
+    "cross tool consistency oracle abuse",
+    "dual source prompt seeding",
+    "normalization collision replay",
+    "schema alias sync poisoning",
+    "verifier order dependency trap",
+    "false consensus from shared poison",
+    "agreement signal weaponization",
+    "two tools agree therefore safe",
+    "canonical form collision attack",
+    "homoglyph collapse to trusted token",
+    "consistency check as trust oracle",
+    "fixed order verifier coercion"
+  ],
+  "regex": [
+    "(?i)(?:(?:cross[- ]tool|multi[- ]tool)\\s+(?:consistency|agreement|consensus)\\s+(?:oracle|trap|exploit|abuse)|(?:dual|paired|same)\\s+(?:source|feed)\\s+(?:seeding|poisoning)\\s+(?:creates?|forces?)\\s+(?:false|fake)\\s+(?:consensus|agreement))",
+    "(?i)(?:(?:normalization|canonicalization|unicode|homoglyph)\\s+collision\\s+(?:collapses?|replays?|merges?)\\s+(?:distinct|malicious)\\s+payloads?|(?:verifier|tool)[- ]order\\s+(?:dependency|trap)\\s+(?:coerces?|rounds?|forces?)\\s+(?:parity|match|agreement))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-009"
+}

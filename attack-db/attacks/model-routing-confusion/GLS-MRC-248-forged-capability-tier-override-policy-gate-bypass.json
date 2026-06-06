@@ -1,0 +1,34 @@
+{
+  "id": "GLS-MRC-248",
+  "name": "Forged Capability Tier Override Policy Gate Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker uses forged capability tier override policy gate bypass to bypass policy/approval: e.g., \"1. The model router accepted a forged capability claim and overrode the policy gate for this task.\".",
+  "keywords": [
+    "model router accepted",
+    "router accepted forged",
+    "accepted forged capability",
+    "forged capability claim",
+    "capability claim overrode",
+    "claim overrode policy",
+    "overrode policy gate",
+    "policy gate task",
+    "model router",
+    "router accepted"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-248"
+}

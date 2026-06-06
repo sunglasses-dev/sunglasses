@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-327",
+  "name": "Seeded Provenance Badge Fake Rank Elevation",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a seeded knowledge base entry with a fake or stale provenance badge used to re-rank or elevate content and bypass safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s+base|context)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:provenance|citation|source\\s+tag|trust\\s+badge|digest)\\b)(?=.*\\b(?:fake|forged|fabricated|stale|spoofed)\\b)(?=.*\\b(?:override|bypass|ignore|elevat(?:e|ed|ion)|re-?rank|promote)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-327"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-622",
+  "name": "Postprocessor Safety Inversion Guardrail Removal",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled text survives into postprocessing (summarizers, formatters, normalizers) where it silently flips deny-to-allow semantics or launders forged citations into trusted authority, producing policy-drifted output that appears clean.",
+  "keywords": [
+    "safety note inversion rewrite",
+    "deny rewritten to proceed",
+    "postprocessor semantic flip",
+    "citation laundering postprocessor",
+    "constraint collapse brevity mode",
+    "schema-valid malicious normalization",
+    "risk field swap rewrite",
+    "policy drift clean output",
+    "rewrite deny as safe",
+    "summarize strips guardrail",
+    "postprocessor authority escalation",
+    "forged provenance canonicalized"
+  ],
+  "regex": [
+    "(?i)(?:(?:rewrite(?:s)?|postprocess(?:es)?|normalize(?:s)?|format(?:s)?)\\s+.{0,80}?(?:deny|block|unsafe|forbidden|risk[- ]?high)\\s+(?:as|to|into)\\s+(?:safe|proceed|allow|ok|green|approved)|(?:postprocessor|rewriter|normalizer|formatter)\\s+(?:flip|invert|swap|drift|launder)s?\\s+(?:safety|policy|deny|risk|constraint|guardrail)|(?:brevity|summariz(?:e|ing))\\s+.{0,60}?(?:removes?|strips?|drops?|collapses?)\\s+(?:guardrail|constraint|safety|policy|caveat|mandatory))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-622"
+}

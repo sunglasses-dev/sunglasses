@@ -1,0 +1,40 @@
+{
+  "id": "GLS-CICD-007",
+  "name": "Jenkins Pipeline Metadata Poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious `Jenkinsfile` or Jenkins job metadata field can hide agent-directed instructions in comments, descriptions, parameter text, environment labels, or generated job summaries, telling AI CI/security reviewers to treat the pipeline as authoritative, suppress findings, or forward Jenkins crede",
+  "keywords": [
+    ",",
+    ".\n- **Report suppression:**",
+    "AI agents",
+    "BUILD_TAG",
+    "CI auditor",
+    "Declarative Pipeline",
+    "JENKINS_API_TOKEN",
+    "JENKINS_CRUMB",
+    "JENKINS_URL",
+    "Jenkins Pipeline",
+    "Jenkinsfile",
+    "assistant",
+    "authoritative",
+    "automated security agents",
+    "canonical"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+reference|defensive\\s+training|incident\\s+report|scanner\\s+docs?|CI\\s+security\\s+guide|Jenkins\\s+security\\s+guide)\\b.{0,240}\\b(?:must\\s+report|should\\s+report|must\\s+be\\s+reported|not\\s+obeyed|never\\s+obey|not\\s+authoritative|should\\s+never|detected\\s+and\\s+blocked|refused|flagged)\\b)\n(?!.*\\b(?:Jenkinsfile|Jenkins\\s+Pipeline|pipeline\\s+metadata|Jenkins\\s+job\\s+metadata)\\b.{0,220}\\b(?:is\\s+not\\s+authoritative|not\\s+agent\\s+policy|does\\s+not\\s+(?:override|instruct)|must\\s+not\\s+(?:obey|treat|use)|should\\s+never\\s+be\\s+used|does\\s+not\\s+instruct)\\b)\n(?=.*(?:Jenkinsfile|Jenkins\\s+Pipeline|Declarative\\s+Pipeline|scripted\\s+pipeline|pipeline\\s*\\{|currentBuild\\.description|parameters\\s*\\{|description\\s*\\(|withCredentials|JENKINS_URL|BUILD_TAG|JENKINS_API_TOKEN|JENKINS_CRUMB|Jenkins\\s+job\\s+metadata))\n(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|automated\\s+(?:security\\s+)?agents?|assistants?|scanners?|CI\\s+auditors?|pipeline\\s+reviewers?|dependency\\s+review\\s+agents?|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies)))(?![a-zA-Z0-9]))\n(?=.*(?:\\bauthoritative\\b|\\bcanonical\\b|\\b(?:primary|main|principal|preferred)\\s+(?:pipeline\\s+|CI\\s+|Jenkins\\s+|review\\s+|security\\s+|operating\\s+)*(?:guidance|playbook|policy|instructions?)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\bgoverning\\s+(?:Jenkins\\s+job\\s+|pipeline\\s+)?document\\b|\\bcontrolling\\s+(?:Jenkins\\s+job\\s+|pipeline\\s+)?document\\b|\\bsupersedes?\\s+(?:scanner|security|review)\\s+guidance\\b|\\boverrides?\\s+(?:system|scanner|security|repository|developer)\\s+(?:rules?|polic(?:y|ies)|instructions?)\\b|\\bdefines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|pipeline)\\s+(?:review|audit|scan)\\b|\\b(?:agent|scanner|assistant|pipeline\\s+reviewer)\\s+(?:instructions?|directive|notice)\\b))\n(?=.*(?:\\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip)\\b.{0,60}\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\\b|\\bdo\\s+not\\s+(?:report|flag|escalate)\\b.{0,60}\\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|vulnerabilit(?:y|ies))\\b|\\bdowngrade\\b.{0,80}\\b(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?)\\b.{0,80}\\b(?:background\\s+notes?|background-only|informational|non-blocking)\\b|\\b(?:keep|leave)\\b.{0,80}\\b(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\\b.{0,30}\\bout\\s+of\\s+(?:the\\s+)?(?:memo|report|summary|audit\\s+memo|pipeline\\s+report|final\\s+report)\\b|\\b(?:treat|mark|classify|flag)\\b.{0,50}\\bas\\s+(?:informational|safe|clean|low|none|non-blocking)\\b|\\b(?:include|attach|forward|send|collect|embed|share|provide|expose|pass\\s+along)\\b.{0,90}\\b(?:JENKINS_API_TOKEN|JENKINS_CRUMB|Jenkins\\s+credentials?|credential\\s+binding|bound\\s+secrets?|crumb\\s+(?:issuer|token)|Authorization|build\\s+(?:variables?|environment|context)|environment\\s+(?:variables?|context|details?|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|proof|material|details?)|execution\\s+context|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-007"
+}

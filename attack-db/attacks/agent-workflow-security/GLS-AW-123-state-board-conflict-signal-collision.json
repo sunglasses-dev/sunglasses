@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-123",
+  "name": "State Board Conflict Signal Collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker feeds conflicting status signals across mission board, cron instructions, and reply logs so the agent resolves precedence incorrectly, re-opens completed work, collides with active owners, or ignores constraints from open decisions.",
+  "keywords": [
+    "state board collision poisoning",
+    "done to in-progress downgrade",
+    "priority inversion stale queue replay",
+    "open question suppression collision",
+    "cross file status fork",
+    "duplicate work churn injection",
+    "policy drift via dropped decisions",
+    "false green automation signal",
+    "non-canonical precedence override",
+    "owner collision spoof",
+    "stale queued replay as current",
+    "status board precedence hijack"
+  ],
+  "regex": [
+    "(?i)(?:(?:downgrade|relabel|rewrite)\\s+(?:DONE|shipped|completed)\\s+(?:as|to|into)\\s+(?:IN[_\\s]?PROGRESS|QUEUED|BLOCKED|pending)|(?:stale|old|prior)\\s+(?:QUEUED|queue|status)\\s+(?:replay|resurfac\\w+)\\s+(?:as|to)\\s+(?:current|active|live)|(?:cross[- ]?file|board)\\s+(?:status|state)\\s+(?:fork|collision|inversion)\\s+(?:overrid\\w+|displac\\w+|wins?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-123"
+}

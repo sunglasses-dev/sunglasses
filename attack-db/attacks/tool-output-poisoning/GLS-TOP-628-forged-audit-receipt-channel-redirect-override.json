@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-628",
+  "name": "Forged Audit Receipt Channel Redirect Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects text in which forged or fabricated tool, plugin, or pipeline audit receipts, execution traces, or checksums are redirected or dispatched through a channel or handoff in order to override, bypass, or ignore guardrail, policy, or verification review controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|plugin|connector|pipeline|adapter)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:audit\\s+receipt|execution\\s+receipt|trace|checksum|provenance)\\b)(?=.*\\b(?:channel|route|dispatch|handoff|redirect|redirected|redirects|redirecting)\\b)(?=.*\\b(?:override|overrides|overrode|overridden|overriding|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-628"
+}

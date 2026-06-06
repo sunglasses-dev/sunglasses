@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SSP-532",
+  "name": "Forged State Checkpoint Validation Bypass",
+  "version": "1.0",
+  "category": "state_sync_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or fabricated checkpoint or state-sync replica promoted or merged while bypassing integrity signature or approval guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:checkpoint|state\\s*sync|replica|snapshot|state\\s*delta)\\b)(?=.*\\b(?:forged|spoof(?:ed)?|tampered|fake|fabricated)\\b)(?=.*\\b(?:reconcile|merge|promote|adopt|apply|accept)\\b)(?=.*\\b(?:bypass|ignore|skip|disable|override)\\b)(?=.*\\b(?:validation|signature|approval|guardrail(?:s)?|integrity\\s*check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SSP-532"
+}

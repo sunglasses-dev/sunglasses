@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-341",
+  "name": "Agent Nonce Impersonation Trust Domain Rebind",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent using a forged or replayed nonce or signature to rebind trust domain or privilege scope and override guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator|handoff)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|fake|counterfeit)\\b)(?=.*\\b(?:nonce|ticket|receipt|attestation|signature|token)\\b)(?=.*\\b(?:scope|role|privilege|boundary|trust\\s+domain|authorization)\\b)(?=.*\\b(?:rebind|re-map|reassign|escalat(?:e|ed|ion)|override|bypass|ignore|skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-341"
+}

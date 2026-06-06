@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-055",
+  "name": "Safety Alert Suppression Nudge",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker injects nudges that suppress, downgrade, delay, or reroute high-signal safety alerts so the agent keeps operating while monitoring channels silently lose the warnings that would have stopped the run.",
+  "keywords": [
+    "alert suppression nudge",
+    "downgrade alert silently",
+    "reroute high-signal alert",
+    "delay critical notification",
+    "keep operating despite alert",
+    "monitor mute injection",
+    "suppress safety alert",
+    "alert deduplicated away",
+    "noise label on real alert",
+    "snooze critical signal",
+    "drop alert before page",
+    "safety monitor sidechain bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:suppress|silence|mute|snooze|delay|drop|reroute|downgrade)\\s+(?:high[- ]signal|critical|safety|security)\\s+(?:alert|alarm|notification|page)|alert\\s+(?:suppression|silencing)\\s+(?:escalation|attack|nudge))",
+    "(?i)(?:(?:keep|continue)\\s+(?:operating|running|executing)\\s+(?:despite|while\\s+ignoring)\\s+(?:alert|alarm|warning)|(?:real|true)\\s+(?:alert|alarm)\\s+(?:labeled|tagged|marked)\\s+(?:noise|dedup|low))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-055"
+}

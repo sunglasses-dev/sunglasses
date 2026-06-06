@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-048",
+  "name": "Guardrail Evaluation Fixture Tampering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker tampers with guardrail evaluation fixtures (test corpora, expected outputs, redteam cases) instead of production prompts, so eval pipelines silently report green while real-world guardrails regress undetected.",
+  "keywords": [
+    "evaluation fixture tampering",
+    "guardrail eval poisoning",
+    "test corpus weakened",
+    "expected output rewritten",
+    "fixture mutation hides regression",
+    "eval pass rate inflation",
+    "redteam fixture deletion",
+    "benchmark fixture forgery",
+    "fixture canary removed",
+    "guardrail eval silent fail",
+    "ci eval set tampered",
+    "fixture answer key swap"
+  ],
+  "regex": [
+    "(?i)(?:(?:tamper|forge|rewrite|weaken|poison|mutate)\\s+(?:eval(?:uation)?|test|guardrail|benchmark|redteam)\\s+(?:fixture|corpus|set|case)|(?:expected|answer)\\s+(?:output|key|result)\\s+(?:rewritten|swapped|edited)\\s+to\\s+(?:pass|hide))",
+    "(?i)(?:(?:guardrail|safety)\\s+eval\\s+(?:silently\\s+)?(?:passes?|inflates?|hides?\\s+regression)|fixture\\s+canary\\s+(?:removed|deleted|stripped))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-048"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-581",
+  "name": "Temporary Exception Scope Expansion Persistence",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attackers reframe time-bounded or narrowly scoped policy exceptions into persistent or broader authority through alias expansion, delegation inheritance, or fabricated rollback dependencies, granting durable elevated access from a temporary unblock.",
+  "keywords": [
+    "allow once persistence graft",
+    "temporary exception broadened",
+    "exception scope inflation",
+    "alias-based scope expansion",
+    "delegated child inherits exception",
+    "exception ttl revival",
+    "rollback blocker pretext",
+    "while this issue persists",
+    "emergency unblock never expires",
+    "scoped exception escalation",
+    "exception inheritance through delegation",
+    "expired exception revived by prompt"
+  ],
+  "regex": [
+    "(?i)(?:(?:allow[- ]?once|one[- ]?time|temporary|emergency)\\s+(?:exception|unblock|override|allowance)\\s+(?:persists?|broadens?|inherits?|never\\s+expires?|extends?\\s+(?:to|across))|(?:expired|stale)\\s+exception\\s+(?:revived|extended|reused|re[- ]?activated)|(?:scoped|narrow)\\s+exception\\s+(?:expanded|inflated|inherited)\\s+(?:by|to|across)\\s+(?:alias|delegate|child|tool|wrapper))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-581"
+}

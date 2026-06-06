@@ -151,7 +151,7 @@ result = scanner.scan_auto("any_file.ext")
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-_All performance numbers verified against `stats/current.json` (v0.2.61, updated Apr 22, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
+_All performance numbers verified against `stats/current.json` (v0.2.61, updated Jun 6, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
 ## 23 Languages
 

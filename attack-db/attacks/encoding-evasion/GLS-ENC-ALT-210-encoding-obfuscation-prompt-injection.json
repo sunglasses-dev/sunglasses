@@ -1,0 +1,37 @@
+{
+  "id": "GLS-ENC-ALT-210",
+  "name": "Encoding obfuscation prompt injection",
+  "version": "1.0",
+  "category": "encoding_evasion",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects prompt injection payloads concealed in alternate encodings (Braille, ROT13, base64, confusable scripts, dot-patterns) that become harmful after normalization or decoding.",
+  "keywords": [
+    "decode then ignore all previous",
+    "transliterate braille to text execute",
+    "apply rot13 ignore instructions",
+    "convert braille to text follow",
+    "base64 decode and follow",
+    "dot-map decode command",
+    "cipher substitution reveal system",
+    "decrypt then execute",
+    "normalize then override",
+    "confusable script jailbreak"
+  ],
+  "regex": [
+    "(?is)(\\b(decode|decrypt|transliterate|normalize|apply\\s*(rot13|cipher|substitution)|convert\\s*(braille|dots?)\\s*to\\s*text)\\b.{0,220}\\b(ignore\\s+(all|previous)|reveal\\s+(system\\s*prompt|tool\\s*schema)|export\\s+(token|secret|key)|send\\s+to\\s+https?://)\\b)|([\\u2800-\\u28FF]{8,})|((?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\\b(decode|base64)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-ENC-ALT-210"
+}

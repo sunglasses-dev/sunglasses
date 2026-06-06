@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-144",
+  "name": "Temporal Window Mismatch Report Bias",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker forces mismatched temporal windows or stale baseline substitution so reports compare non-equivalent periods, producing confident but wrong priorities like chasing fake growth spikes or suppressing real incidents.",
+  "keywords": [
+    "temporal baseline skew",
+    "window desynchronization injection",
+    "baseline substitution cache poisoning",
+    "clock edge flip timezone abuse",
+    "metric epoch smearing",
+    "2h compared to 7d labeled wow",
+    "stale baseline snapshot",
+    "utc vs pt boundary mismatch",
+    "fresh cf mixed with old seo",
+    "two lane temporal drift",
+    "rolling window mislabel",
+    "synchronized state false claim"
+  ],
+  "regex": [
+    "(?i)(?:(?:mismatched?|non[- ]?equivalent|different)\\s+(?:baseline|comparison|rolling)\\s+(?:window|range|period)\\s+(?:labeled?|called?|presented?)\\s+(?:as|like)\\s+(?:wow|week[- ]?over[- ]?week|day[- ]?over[- ]?day|matched|aligned)|(?:replace|substitute|swap)\\s+(?:last[- ]?good|prior|baseline)\\s+(?:baseline|snapshot|reference)\\s+(?:with|by)\\s+(?:stale|adversarial|cached)|(?:mix|blend|merge)\\s+(?:fresh|new|recent)\\s+(?:ops|cf|scanner)\\s+(?:with|and)\\s+(?:old|stale|prior)\\s+(?:seo|growth|gsc|ga4))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-144"
+}

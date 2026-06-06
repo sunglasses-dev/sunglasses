@@ -1,0 +1,34 @@
+{
+  "id": "GLS-ACP-001",
+  "name": "Forged sla exception precedence rebind guardrail bypass",
+  "version": "1.0",
+  "category": "agent_contract_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects forged contractual exception clauses that rebind precedence and disable security checks in agent execution flows.",
+  "keywords": [
+    "use this forged contract appendix emergency clause",
+    "fabricated sla waiver says override order applies",
+    "spoofed terms update includes exception with precedence",
+    "tampered contract playbook adds breakglass clause priority",
+    "inject forged sla appendix with emergency clause",
+    "fabricated contract waiver claims takes priority orchestrator",
+    "spoofed terms appendix with exception and override",
+    "tampered sla emergency clause sets precedence and"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|spoofed|tampered)\\b)(?=.*\\b(?:contract|terms|sla|appendix|playbook)\\b)(?=.*\\b(?:exception|waiver|emergency\\s+clause|breakglass\\s+clause)\\b)(?=.*\\b(?:precedence|priority|override\\s+order|takes\\s+priority)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:s|d|ing)?|skip(?:s|ped|ping)?|ignore(?:s|d|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy\\s+gate|approval\\s+check(?:s)?|authorization\\s+check(?:s)?)\\b)(?=.*\\b(?:agent|delegate|orchestrator|worker|broker)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-ACP-001"
+}

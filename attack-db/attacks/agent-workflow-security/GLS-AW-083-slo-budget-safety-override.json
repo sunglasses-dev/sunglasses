@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-083",
+  "name": "SLO Budget Safety Override",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker frames the situation so SLO, availability, or error-budget pressure dominates security controls, coercing the agent to treat speed as higher priority than safety. Guardrails are skipped to preserve uptime and unsafe actions ship.",
+  "keywords": [
+    "slo budget poisoning",
+    "availability budget over security",
+    "speed budget overrides guardrail",
+    "error budget tradeoff exploit",
+    "slo prioritized above policy",
+    "throughput-vs-safety framing",
+    "budget pressure unsafe action",
+    "burn-rate-driven gate skip",
+    "availability over auth",
+    "slo-as-policy override",
+    "error-budget bypass",
+    "speed prioritization attack"
+  ],
+  "regex": [
+    "(?i)(?:slo\\s+budget\\s+poisoning|(?:slo|availability|speed|error[- ]budget)\\s+(?:prioritized|elevated|placed)\\s+(?:above|over)\\s+(?:security|policy|guardrail|auth))",
+    "(?i)(?:(?:burn[- ]rate|error[- ]budget|throughput)\\s+pressure\\s+(?:forces?|drives?)\\s+(?:skip|bypass|relax)\\s+(?:security|safety|policy)|availability\\s+budget\\s+(?:overrides?|trumps?)\\s+(?:control|gate))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-083"
+}

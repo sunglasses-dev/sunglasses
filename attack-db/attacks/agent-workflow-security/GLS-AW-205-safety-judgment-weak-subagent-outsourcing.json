@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-205",
+  "name": "Safety Judgment Weak Subagent Outsourcing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker steers the agent into outsourcing safety or risk judgment to a weaker secondary tool, subagent, or summarizer and then treating that outsourced answer as authoritative, laundering policy through the weakest link.",
+  "keywords": [
+    "delegation oracle abuse",
+    "outsourced risk judgment",
+    "subagent verdict trust",
+    "summarizer as authority",
+    "secondary tool answer overrides policy",
+    "delegated oracle override",
+    "external summarizer trust laundering",
+    "subagent rubber stamp",
+    "judgment passed to weak oracle",
+    "oracle answer cited as policy",
+    "policy via delegated tool",
+    "third-party verdict accepted as truth"
+  ],
+  "regex": [
+    "(?i)(?:delegation\\s+oracle\\s+(?:abuse|override|attack)|(?:outsource|delegate|hand[- ]?off)\\s+(?:risk|policy|safety)\\s+(?:judgment|verdict|decision)\\s+to\\s+(?:secondary|sub[- ]?agent|external|weak)\\s+(?:tool|model|summarizer|oracle)|(?:secondary|delegated|sub[- ]?agent|summarizer)\\s+(?:verdict|answer|output)\\s+(?:treated|accepted|cited)\\s+as\\s+(?:authority|policy|truth))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-205"
+}

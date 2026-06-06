@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-004",
+  "name": "Cross-file discovery pointer poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A benign-looking discovery file can delegate an AI agent to a second metadata sidecar that carries the hostile payload, making the attack visible only when the `robots.txt`/`sitemap.xml`/`.well-known` bundle is analyzed as a chain.",
+  "keywords": [
+    ".well-known",
+    "<loc>",
+    "AI agent",
+    "Measured local fixture result:",
+    "Sitemap:",
+    "Validation script:",
+    "agent",
+    "agent-discovery",
+    "assistant",
+    "authoritative",
+    "bot",
+    "crawler",
+    "delegated",
+    "delegated trust",
+    "disable security"
+  ],
+  "regex": [
+    "(?is)(?=.*\\b(?:robots\\.txt|sitemap(?:\\.xml)?|\\.well-known|llms\\.txt|site\\s*manifest|agent[-\\s]*discovery)\\b)(?=.*\\b(?:sitemap\\s*:|loc>|href\\s*=|load|include|see|referenc(?:e|ed)|delegat(?:e|ed)|points?\\s+to|sidecar)\\b)(?=.*\\b(?:agent|assistant|ai[-\\s]*agent|crawler|bot)\\b)(?=.*\\b(?:authoritative|supersede|override|higher[-\\s]*priority|ignore\\s+(?:system|developer|repository|previous)|scanner|false\\s+positive|runtime\\s+configuration|token\\s+names?|local\\s+state|environment\\s*variables?)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-004"
+}

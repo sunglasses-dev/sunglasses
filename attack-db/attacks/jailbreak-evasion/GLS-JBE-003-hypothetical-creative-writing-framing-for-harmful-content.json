@@ -1,0 +1,43 @@
+{
+  "id": "GLS-JBE-003",
+  "name": "Hypothetical / creative-writing framing for harmful content",
+  "version": "1.0",
+  "category": "jailbreak_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Hypothetical / creative-writing framing \u2014 attacker wraps a harmful 'how to make X' request inside a claim of fictional or academic context. Pattern requires both the framing AND a harmful action verb.",
+  "keywords": [
+    "creative writing class describe how to make",
+    "creative writing class describe how to build",
+    "creative writing class describe how to synthesize",
+    "creative writing class describe how to cook",
+    "creative writing exercise describe how to make",
+    "fiction class describe how to make",
+    "for my novel describe how to make",
+    "for my screenplay describe how to make",
+    "hypothetical describe how to make x step by step",
+    "describe how to make x step by step",
+    "purely hypothetical for a creative writing class describe",
+    "just a hypothetical for a creative writing class describe",
+    "merely hypothetical for a creative writing class describe",
+    "purely for fiction describe how to make",
+    "purely for a story describe how to make",
+    "bedtime story describe how to make"
+  ],
+  "regex": [
+    "(?i)(?:just|purely|merely|only|it[''']s\\s+just)\\s+(?:a\\s+)?hypothetical\\s+(?:for|about|in)\\s+(?:a\\s+)?(?:creative\\s+writing|fiction|story|novel|screenplay)[^.?!\\n]{0,80}(?:describe|explain|tell\\s+me|walk\\s+me\\s+through)\\s+how\\s+to\\s+(?:make|build|create|synthesize|cook|produce)",
+    "(?i)(?:for|in)\\s+(?:a\\s+|my\\s+)?(?:creative\\s+writing|fiction|novel|screenplay)\\s*(?:class|exercise|assignment|project)?\\s*[\u2014,:\\-]\\s*(?:describe|explain|tell\\s+me|walk\\s+me\\s+through)\\s+how\\s+to\\s+(?:make|build|create|synthesize|cook|produce)\\s+(?!a\\s+(?:character|plot|story|scene|villain|hero|protagonist|antagonist))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-JBE-003"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-096",
+  "name": "Multimodal Modality Boundary Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "image_alt_text",
+    "tool_output"
+  ],
+  "description": "Attacker hides injection payloads in non-text modalities (images, audio, OCR, JSON) so that when multimodal stacks translate evidence to plain text before decisioning, semantic guardrails and provenance are dropped and adversarial directives surface as trusted prose.",
+  "keywords": [
+    "ocr to text drift",
+    "audio transcript injection",
+    "json to markdown summary loss",
+    "modality boundary attack",
+    "cross-modal semantic shift",
+    "image text extraction poisoning",
+    "alt-text payload injection",
+    "transcript hallucinated directive",
+    "structured to prose downgrade",
+    "modality translation gap",
+    "lost-in-translation injection",
+    "image-only hidden instruction"
+  ],
+  "regex": [
+    "(?i)(?:ocr|audio\\s+transcript|image|json[- ]to[- ]markdown)\\s+(?:translation|conversion|extraction)\\s+(?:loses?|drops?|drifts?|inverts?)\\s+(?:semantics?|intent|guardrail|constraint)|(?:hidden|embedded)\\s+(?:instruction|directive|payload)\\s+(?:in|inside)\\s+(?:image|audio|alt[- ]text|ocr)\\s+(?:bypasses?|evades?)",
+    "(?i)(?:cross[- ]modal|multimodal|modality)\\s+(?:boundary|translation|conversion)\\s+(?:confusion|drift|injection|attack)|(?:structured|json|table)\\s+(?:downgrade|flatten|summary)\\s+(?:loses?|drops?)\\s+(?:trust|provenance|constraint)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-096"
+}

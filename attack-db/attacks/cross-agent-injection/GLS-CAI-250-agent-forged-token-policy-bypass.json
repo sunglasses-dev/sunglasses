@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-250",
+  "name": "Agent Forged Token Policy Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent or delegate presenting a forged or spoofed token, ticket, or attestation to bypass or override scope, permission, or guardrail enforcement.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don['\u2019]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-250"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-137",
+  "name": "Semantic Similarity Retrieval Authority Lift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker plants text that is semantically close to policy or runbook chunks so embedding-based retrieval surfaces it inside privileged prompts, lifting untrusted content into instruction authority for tool planning and approval.",
+  "keywords": [
+    "embedding collision instruction lift",
+    "nearest neighbor policy shadowing",
+    "cross index instruction graft",
+    "embedding drift replay",
+    "similarity tie break hijack",
+    "mimicking malicious chunk outranks policy",
+    "ticket comment chunk in privileged prompt",
+    "retrieved text as instruction",
+    "untrusted retrieval lifted to authority",
+    "top-k policy shadow",
+    "trust label missing prompt assembler",
+    "tie break by recency favors attacker"
+  ],
+  "regex": [
+    "(?i)(?:(?:retrieved|nearest[- ]?neighbor|top[- ]?k)\\s+(?:chunk|doc|text|snippet)\\s+(?:lifted|elevated|treated)\\s+(?:as|to|into)\\s+(?:instruction|policy|authority)|(?:mimick\\w+|shadow\\w+|outrank\\w+)\\s+(?:canonical|policy|runbook)\\s+(?:chunk|doc|snippet)\\s+(?:via|using|through)\\s+(?:cosine|similarity|embedding)|(?:untrusted|low[- ]?trust|ticket|comment|log)\\s+(?:chunk|doc|index)\\s+(?:wrapped|treated|merged)\\s+(?:as|into)\\s+(?:trusted|instruction|prompt))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-137"
+}

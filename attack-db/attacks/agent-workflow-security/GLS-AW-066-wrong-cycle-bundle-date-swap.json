@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-066",
+  "name": "Wrong-Cycle Bundle Date Swap",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker swaps a fresh bundle from the wrong date or cycle into a readiness check so automation sees a current-looking artifact while the actual cycle remains untested. Mission gates pass on the wrong evidence and the next cycle launches blind.",
+  "keywords": [
+    "bundle date alias replay",
+    "wrong-date bundle accepted",
+    "fresh bundle wrong cycle",
+    "date alias swap",
+    "mission readiness wrong day",
+    "stale bundle dated forward",
+    "timestamp alias spoof",
+    "cycle window mismatched bundle",
+    "fresh-looking stale bundle",
+    "date-shifted bundle replay",
+    "alias-renamed bundle",
+    "bundle date relabel attack"
+  ],
+  "regex": [
+    "(?i)(?:(?:bundle|package|artifact)\\s+(?:date|timestamp|cycle)\\s+(?:alias|replay|swap|spoof)\\b|(?:fresh|valid)[- ]looking\\s+bundle\\s+(?:from|for)\\s+(?:wrong|different|prior)\\s+(?:date|cycle|window))",
+    "(?i)(?:(?:relabel|rename|alias|backdate|forward[- ]date)\\s+(?:bundle|package|artifact)\\s+(?:date|timestamp|cycle)|mission\\s+readiness\\s+accepted\\s+(?:wrong|stale)\\s+(?:date|cycle)\\s+bundle)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-066"
+}

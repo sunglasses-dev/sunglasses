@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TOP-634",
+  "name": "First-Row Authority Hijack Chronology Inversion",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates list ordering, injects rows at index 0, replays stale snapshots ahead of fresh ones, or wins merge races so parsers that key off sequence position rather than provenance promote attacker-controlled values to the top priority. Skews escalation while still passing schema validation.",
+  "keywords": [
+    "first-row authority hijack",
+    "index zero injection top_paths",
+    "tail override fallback chain",
+    "duplicate key last occurrence wins",
+    "chronology inversion payload",
+    "stale snapshot before newer parsed first",
+    "cross-tool merge race poisoning",
+    "fast low-trust output commits first",
+    "list index as trust signal",
+    "duplicate semantic key merge",
+    "order permutation alters priority",
+    "freshness logic drift"
+  ],
+  "regex": [
+    "(?i)(?:(?:first[- ]row|index\\s+0|index\\s+zero)\\s+(?:authority|hijack|injection)|(?:tail|last\\s+occurrence)\\s+(?:override|wins?|silently\\s+accepts?)\\s+(?:in\\s+)?fallback|(?:chronology|order)\\s+(?:inversion|permutation)\\s+(?:payload|attack|poison)|(?:cross[- ]tool|merge)\\s+race\\s+poison|(?:duplicate|repeated)\\s+(?:metric|semantic)\\s+key(?:s)?\\s+(?:downgrade|silently\\s+accepted|merge))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-634"
+}

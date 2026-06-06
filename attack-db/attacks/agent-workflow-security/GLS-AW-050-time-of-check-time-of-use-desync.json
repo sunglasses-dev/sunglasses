@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-050",
+  "name": "Time-of-Check Time-of-Use Desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits the time-of-check / time-of-use gap in multi-tool chains by mutating an argument, file, or URL after it passes validation but before it executes, so the verifier sees a benign snapshot while the tool runs against the swapped value.",
+  "keywords": [
+    "toctou desync agent",
+    "approved payload swapped before execution",
+    "validated then mutated",
+    "check vs use race",
+    "argument mutation after validation",
+    "file replaced between check and read",
+    "url validated then reswizzled",
+    "stale validation reused",
+    "multi-tool chain race",
+    "post-approval argument swap",
+    "verifier reads different snapshot",
+    "execution sees different value"
+  ],
+  "regex": [
+    "(?i)(?:toctou|time[- ]?of[- ]?check[- ]?time[- ]?of[- ]?use|check[- ]?to[- ]?use)\\s+(?:desync|race|gap|attack)",
+    "(?i)(?:(?:argument|payload|file|url|path)\\s+(?:mutated|swapped|replaced|reswizzled)\\s+(?:after|between)\\s+(?:validation|approval|check)\\s+(?:and|but\\s+before)\\s+(?:execution|use|read)|validated\\s+(?:value|payload)\\s+(?:then|but)\\s+(?:mutated|swapped)\\s+before\\s+(?:execute|use))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-050"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PCF-244",
+  "name": "Forged Attestation Trust Root Policy Bypass",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged attestation or signature whose trust anchor, root key, or chain-of-custody is manipulated to bypass guardrail policy and verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake)\\b)(?=.*\\b(?:attestation|signature|checksum|provenance|certificate|manifest)\\b)(?=.*\\b(?:trust\\s*anchor|trust\\s*root|root\\s*key|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:policy|guardrail|verification|validation|scope)\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-244"
+}

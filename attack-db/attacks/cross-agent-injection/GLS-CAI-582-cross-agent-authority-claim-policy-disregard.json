@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-582",
+  "name": "Cross-Agent Authority Claim Policy Disregard",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a cross-agent message attributed as authoritative or final authority that instructs the recipient to disregard or replace policy, guardrails, or verification attestation.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\b(?:agent|service|orchestrator|coordinator|worker)\\s*(?:a|alpha|upstream|peer)?\\b.{0,80}\\b(?:said|states?|reported|confirmed|attested|signed)\\b.{0,110}\\b(?:authoritative|source\\s+of\\s+truth|final\\s+authority|root\\s+authority)\\b.{0,120}\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b.{0,70}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+gate)\\b|\\b(?:treat|mark|classify|accept)\\b.{0,70}\\b(?:peer|upstream|cross-agent)\\s+(?:message|packet|instruction|directive)\\b.{0,100}\\b(?:as\\s+authoritative|as\\s+trusted|as\\s+final)\\b.{0,110}\\b(?:skip|drop|disable|bypass|override|replace)\\b.{0,60}\\b(?:verification|attestation|policy\\s+check(?:s)?)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-582"
+}

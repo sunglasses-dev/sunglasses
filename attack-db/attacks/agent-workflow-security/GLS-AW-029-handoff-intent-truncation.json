@@ -1,0 +1,34 @@
+{
+  "id": "GLS-AW-029",
+  "name": "Handoff intent truncation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "In multi-agent chains, one model writes a compact handoff note and the next model executes it. Attackers can force **semantic truncation** so safety constraints are dropped while execution directives survive. This creates high-risk \"looks-normal\" work packets: short, clean, and missing the one line that prevented dangerous action.",
+  "keywords": [
+    "suffix-drop handoff truncation",
+    "delimiter collapse end marker",
+    "policy caveat clipped at tail",
+    "safety appendix silently ignored",
+    "do not publish line missing",
+    "require human review stripped",
+    "handoff packet missing safety constraint",
+    "summarizer drops policy caveat under length pressure"
+  ],
+  "regex": [
+    "(?i)(?:handoff|summary|note|packet)\\s+(?:truncat(?:ed|ion)|clipp(?:ed|ing)|cut|dropped|elided)\\s+(?:before|at|past|after)\\s+(?:safety|caveat|policy|warning|appendix|do\\s+not)",
+    "(?i)(?:do\\s+not\\s+publish|require\\s+human\\s+review|forbidden\\s+to|do\\s+not\\s+execute)\\b.{0,200}?(?:omitted|removed|stripped|truncated|missing|dropped)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-029"
+}

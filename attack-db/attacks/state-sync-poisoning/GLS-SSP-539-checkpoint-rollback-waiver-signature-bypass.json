@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SSP-539",
+  "name": "Checkpoint Rollback Waiver Signature Bypass",
+  "version": "1.0",
+  "category": "state_sync_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a checkpoint or snapshot rollback using an exception waiver or fail-open path that bypasses signature attestation or integrity policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:checkpoint|snapshot|state|replica|journal)\\b)(?=.*\\b(?:rollback|revert|rewind|restore)\\b)(?=.*\\b(?:waiver|exception|fail[- ]?open|expedite)\\b)(?=.*\\b(?:signature|attestation|verification|integrity)\\b)(?=.*\\b(?:ignore|skip|disable|bypass|override)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SSP-539"
+}

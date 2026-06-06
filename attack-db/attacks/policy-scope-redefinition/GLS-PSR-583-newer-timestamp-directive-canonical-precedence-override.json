@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-583",
+  "name": "Newer Timestamp Directive Canonical Precedence Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message",
+    "log_memory"
+  ],
+  "description": "Attackers poison precedence rules across multiple mission artifacts by spoofing newer timestamps, injecting partial-order ambiguity, or redirecting reply paths so the agent executes lower-trust or stale directives while appearing compliant.",
+  "keywords": [
+    "newest-file authority spoof",
+    "higher mtime mission override",
+    "partial-order ambiguity",
+    "follow latest mission first",
+    "cross-file constraint shadowing",
+    "reply-target redirection",
+    "non-canonical output path",
+    "mission file precedence hijack",
+    "selective compliance suppression",
+    "fake completion evidence",
+    "stale directive elevated authority",
+    "control-plane mission compromise"
+  ],
+  "regex": [
+    "(?i)(?:(?:newest|latest|higher[- ]?mtime|newer[- ]?timestamp)\\s+(?:mission|file|directive|artifact)\\s+(?:overrides?|supersedes?|wins?\\s+over|outranks?)\\s+(?:canonical|hard\\s+rule|go\\s+mode|approved)|(?:always\\s+follow\\s+latest\\s+mission|ignore\\s+canonical\\s+precedence)|(?:reply|output)\\s+(?:path|target)\\s+(?:redirected|rewritten)\\s+to\\s+(?:/tmp|non[- ]?canonical))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-583"
+}

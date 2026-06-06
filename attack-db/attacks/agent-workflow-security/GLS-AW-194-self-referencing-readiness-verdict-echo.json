@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-194",
+  "name": "Self-Referencing Readiness Verdict Echo",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits readiness systems that ingest their own prior verdicts so a single early READY tag echoes through later gates, drowning out fresh contradicting evidence and locking in a stale pass.",
+  "keywords": [
+    "readiness verdict echo chamber",
+    "prior ready overweighted",
+    "stale verdict reuse",
+    "gate decision feedback loop",
+    "ready tag self-citation",
+    "verdict inheritance abuse",
+    "underweight fresh evidence",
+    "echoed gate verdict",
+    "readiness self-referential trust",
+    "gate output as next gate input",
+    "verdict laundering through reuse",
+    "ready stamp cascade"
+  ],
+  "regex": [
+    "(?i)(?:(?:readiness|gate|verdict)\\s+(?:echo[- ]?chamber|feedback\\s+loop|self[- ]?citation)|(?:prior|stale|previous)\\s+(?:READY|verdict|gate\\s+decision)\\s+(?:overweight|inherit|reuse|cite)|(?:later|downstream)\\s+gates?\\s+(?:underweight|ignore|skip)\\s+(?:fresh|new|source)\\s+evidence)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-194"
+}

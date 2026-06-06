@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-259",
+  "name": "Forged Execution Result Planner Verification Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects a forged tool output or validator report rerouted to a planner or decision engine to skip verification and bypass policy or safety gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|redirect)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b.{0,60}\\b(?:tool\\s*output|execution\\s*result|validator\\s*report|scan\\s*result|audit\\s*trace)\\b)(?=.*\\b(?:reroute|redirect|forward|relay|handoff|dispatch)(?:d|ing|s)?\\b.{0,70}\\b(?:planner|router|orchestrator|decision\\s*engine|action\\s*selector)\\b)(?=.*\\b(?:bypass|skip|ignore|disable|override)(?:d|ing|s)?\\b.{0,70}\\b(?:verification|validation|safety\\s*check|policy\\s*gate|guardrail)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-259"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-165",
+  "name": "Canary Content Production Path Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker mixes evaluation or canary content into production decision paths (or strips dry-run labels) so sentinel rows and test fixtures gain instruction authority and trigger real actions.",
+  "keywords": [
+    "negative control contamination",
+    "canary prompt gains authority",
+    "test fixture mixed into prod",
+    "sentinel row executed as real",
+    "dry run label ignored",
+    "control channel instruction obeyed",
+    "fixture leakage to decision path",
+    "canary becomes live command",
+    "test mode flag suppressed",
+    "synthetic eval row reaches policy",
+    "negative control upgraded to action",
+    "control vs production blur"
+  ],
+  "regex": [
+    "(?i)(?:negative\\s+control\\s+(?:contamination|leak|bleed|upgrade)|(?:canary|sentinel|fixture|dry[- ]run)\\s+(?:prompt|row|record|label)\\s+(?:gains?|obtains?|treated\\s+as)\\s+(?:instruction|authority|live|production))",
+    "(?i)(?:(?:test|control|eval)\\s+(?:channel|fixture|row)\\s+(?:mixed|merged|leaked)\\s+into\\s+(?:production|decision|policy)|dry[- ]run\\s+(?:label|flag)\\s+(?:suppress|ignored|stripped))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-165"
+}

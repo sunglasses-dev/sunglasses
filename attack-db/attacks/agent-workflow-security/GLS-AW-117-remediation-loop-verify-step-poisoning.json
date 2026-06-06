@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-117",
+  "name": "Remediation Loop Verify-Step Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker poisons the detect-patch-verify remediation loop so the cycle converges on a plausible-but-wrong fix while the verify step is spoofed into accepting it, leaving the root cause untouched and an apparently-resolved alert masking active compromise.",
+  "keywords": [
+    "detect patch verify loop poison",
+    "remediation context tainted",
+    "plausible but wrong fix",
+    "verify step poisoned to pass",
+    "patch suggestion adversarial",
+    "loop converges to attacker fix",
+    "remediation echo chamber",
+    "wrong-root-cause patch",
+    "verify-after-patch spoof",
+    "auto-remediation hijack",
+    "fix loop misdirection",
+    "remediation context injection"
+  ],
+  "regex": [
+    "(?i)(?:detect|patch|verify)\\s+(?:loop|cycle)\\s+(?:poison|taint|hijack|misdirect)|(?:remediation|fix)\\s+(?:context|suggestion|step)\\s+(?:tainted|poisoned|adversarial|attacker[- ]controlled)",
+    "(?i)(?:converges?|settles?|lands?)\\s+(?:on|to)\\s+(?:plausible[- ]but[- ]wrong|wrong[- ]root[- ]cause|attacker)\\s+(?:fix|patch|remediation)|(?:verify|post[- ]patch)\\s+(?:check|step|gate)\\s+(?:spoof|forg|fake)\\w*\\s+(?:to\\s+)?(?:pass|approve|accept)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-117"
+}

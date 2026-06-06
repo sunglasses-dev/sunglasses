@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-265",
+  "name": "Forged SLA Latency Urgency Router Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged SLA, p95 latency, or urgency signal used to bypass routing guardrails and override model-selection or fallback policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:route|routing|reroute|dispatcher|tier|model\\s+selector|fallback)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:sla|latency\\s+budget|p95|timeout|priority|urgency)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-265"
+}

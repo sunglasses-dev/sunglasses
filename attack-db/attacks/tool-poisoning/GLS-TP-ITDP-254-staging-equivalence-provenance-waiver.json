@@ -1,0 +1,31 @@
+{
+  "id": "GLS-TP-ITDP-254",
+  "name": "Staging Equivalence Provenance Waiver",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Poisoned tool description claims non-production environment (staging/pre-prod/dry-run) is equivalent to production and uses that equivalence to waive provenance, signature, or attestation checks. Environment-equivalence justification vector not covered by upstream-trust (221) or compliance-framing (220).",
+  "keywords": [
+    "staging mirrors production skip provenance",
+    "staging equivalent waive attestation",
+    "pre-prod same as production bypass signature",
+    "non-prod mirrors production skip verification",
+    "dry run equivalent waive provenance",
+    "staging mirrors prod skip provenance attestation",
+    "pre-production equivalent skip signature",
+    "staging same as prod bypass attestation"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-254"
+}

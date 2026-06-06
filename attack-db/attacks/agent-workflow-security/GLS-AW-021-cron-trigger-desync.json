@@ -1,0 +1,36 @@
+{
+  "id": "GLS-AW-021",
+  "name": "Cron trigger desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message",
+    "tool_output"
+  ],
+  "description": "Cron/scheduler boundaries are a high-risk trust seam in agent systems: delayed execution can separate **what was approved** from **what is executed later**. Attackers exploit this gap by injecting timing or trigger semantics so benign-looking queued jobs execute hostile payloads after context has shifted.",
+  "keywords": [
+    "deferred payload swap",
+    "trigger source spoofing",
+    "time-window policy bypass",
+    "retry-queue privilege drift",
+    "post-approval payload mutation",
+    "queued job mutation",
+    "timezone confusion bypass",
+    "untrusted event masquerade as scheduler",
+    "retry inherits altered instructions"
+  ],
+  "regex": [
+    "(?i)(?:after\\s+(?:approval|enqueue|schedul(?:e|ing))|post[- ]approval|once\\s+queued)[\\s,]+.{0,120}?(?:swap|mutate|alter|rewrite|change)\\s+(?:payload|template|variable|args|scheduled\\s+job)",
+    "(?i)(?:spoof|forge|fabricate|impersonate)\\s+(?:cron|scheduler|trigger|webhook|timer)\\s+(?:event|signal|source|fire)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-021"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-MRC-250",
+  "name": "Forged Card Tier Escalation Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker uses forged card tier escalation bypass to bypass policy/approval: e.g., \"1. Forged model card tells the router profile to apply tier elevation and bypass review before execution.\".",
+  "keywords": [
+    "forged model card",
+    "model card tells",
+    "card tells router",
+    "tells router profile",
+    "router profile apply",
+    "profile apply tier",
+    "apply tier elevation",
+    "tier elevation bypass",
+    "elevation bypass review",
+    "bypass review before"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-250"
+}

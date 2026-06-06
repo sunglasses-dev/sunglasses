@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-070",
+  "name": "Cross-Lane Freshness Split-Brain Blend",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker blends fresh telemetry from one lane with stale telemetry from another, then presents the composite as a single trustworthy state. Decisions inherit a split-brain freshness lie and treat half-stale evidence as current.",
+  "keywords": [
+    "metric freshness split-brain",
+    "fresh ops stale growth blend",
+    "mixed-staleness kpi composite",
+    "asymmetric freshness blend",
+    "fresh and stale combined",
+    "split-brain telemetry merge",
+    "multi-lane staleness mix",
+    "blended state from divergent windows",
+    "fresh signal masks stale partner",
+    "kpi composite freshness lie",
+    "single trusted state from mixed time",
+    "telemetry lane freshness asymmetry"
+  ],
+  "regex": [
+    "(?i)(?:metric\\s+freshness\\s+split[- ]brain|(?:blend|combine|merge|stitch)\\s+(?:fresh|live)\\s+\\w+\\s+(?:with|and)\\s+(?:stale|cached|outdated)\\s+\\w+\\s+(?:metric|kpi|signal|telemetry)\\b)",
+    "(?i)(?:(?:asymmetric|mixed|divergent)\\s+(?:freshness|staleness|recency)\\s+(?:blend|composite|merge|presentation)|present\\s+(?:fresh|live)\\s+and\\s+(?:stale|old)\\s+as\\s+(?:single|one|unified)\\s+(?:state|verdict|score))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-070"
+}

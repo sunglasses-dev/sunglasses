@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-267",
+  "name": "Forged Citation Lineage Ranking Promote",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or poisoned citation, lineage, or trust rank used to promote or elevate content while overriding or ignoring policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|tampered|spoofed|poisoned|fabricated)\\b)(?=.*\\b(?:provenance|citation|source|lineage|evidence|trust\\s*rank|ranking)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|promote|promoted|elevate|elevated)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-267"
+}

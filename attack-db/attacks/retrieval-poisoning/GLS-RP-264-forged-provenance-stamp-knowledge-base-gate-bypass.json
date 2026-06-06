@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-264",
+  "name": "Forged Provenance Stamp Knowledge Base Gate Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged provenance stamp or trust badge injected into a knowledge base that bypasses safety rules or execution gate policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|knowledge\\s+base|source\\s+(?:note|snippet|digest)|citation\\s+cache)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:provenance\\s+(?:stamp|badge)|trust\\s+(?:stamp|badge)|verified\\s+source\\s+seal)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+rule|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override(?:d|s|ing)?|ignore(?:d|s)?|skip(?:ped|ping|s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-264"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-712",
+  "name": "Transcript Channel Desync Sidecar Authority Pivot",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker hides tool-driving directives in an auxiliary modality channel (sidecar metadata, OCR raw tokens, alt-text, late-arriving audio segments) so the reviewed transcript passes safety checks while the executor reads a different, malicious representation.",
+  "keywords": [
+    "asr-clean metadata-dirty split",
+    "ocr sidecar authority pivot",
+    "caption-override smuggle",
+    "multimodal merge-order race",
+    "transcript desync attack",
+    "sidecar field hides directive",
+    "late-arriving modality mutation",
+    "policy reviewed one representation",
+    "execution authority other channel",
+    "diarization segment hidden directive",
+    "exif-derived action hint",
+    "post-approval merge injection"
+  ],
+  "regex": [
+    "(?i)(?:(?:transcript|representation|modality|channel)\\s+(?:desync|drift|parity\\s+drift|hash\\s+mismatch)\\b|(?:sidecar|metadata|exif|diarization|caption)\\s+(?:authority|directive|instruction)\\s+(?:pivot|injection|smuggle)|(?:late[- ]arriving|post[- ]approval|merge[- ]order)\\s+(?:modality|chunk|fragment)\\s+(?:mutates?|appends?|overrides?)\\s+(?:execution|payload|policy))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-712"
+}

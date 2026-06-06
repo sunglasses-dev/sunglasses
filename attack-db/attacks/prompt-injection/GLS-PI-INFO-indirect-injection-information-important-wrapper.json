@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PI-INFO",
+  "name": "Indirect injection \u2014 <INFORMATION> / <IMPORTANT> wrapper",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Indirect injection templates from the AgentDojo paper \u2014 wraps malicious instructions in fake authority XML tags.",
+  "keywords": [
+    "<information>",
+    "<important>",
+    "<instructions>",
+    "<system>",
+    "<admin>",
+    "this is an important message from me",
+    "this is a message from the user",
+    "important message from",
+    "before you can solve the task",
+    "before you solve the task",
+    "before you continue",
+    "please do the following first",
+    "please do this first",
+    "before the original task"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-INFO"
+}

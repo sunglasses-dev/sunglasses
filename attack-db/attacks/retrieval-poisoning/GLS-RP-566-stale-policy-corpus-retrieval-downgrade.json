@@ -1,0 +1,40 @@
+{
+  "id": "GLS-RP-566",
+  "name": "Stale Policy Corpus Retrieval Downgrade",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker seeds the agent's local reference corpus with older permissive templates, weakened fixtures, or shadow-tree mirrors, then nudges retrieval to prefer the downgraded copy over current hardened guidance. No jailbreak prompt is needed because the agent silently imports stale 'trusted' policy and regresses to weaker behavior.",
+  "keywords": [
+    "template rollback pinning",
+    "fixture baseline rewind",
+    "reference shadow tree hijack",
+    "checksum narrative spoofing",
+    "stale playbook preferred over hardened",
+    "legacy archive outranks current docs",
+    "golden v1 final fixture downgrade",
+    "hash verified claim without recompute",
+    "filename alias points to downgraded copy",
+    "monotonic version gate bypass",
+    "policy rollback via reference corpus",
+    "permissive older revision wins retrieval"
+  ],
+  "regex": [
+    "(?i)(?:(?:template|playbook|fixture|baseline|reference)\\s+(?:rollback|rewind|downgrade|pinning)\\s+(?:attack|injection|exploit)|(?:older|stale|legacy|permissive)\\s+(?:revision|version|copy)\\s+(?:preferred|wins?|outranks?|selected)\\s+(?:over|above)\\s+(?:hardened|current|approved))",
+    "(?i)(?:(?:archive|legacy|shadow)[- ]?(?:tree|subtree|directory)\\s+(?:hijack|injection|outranks?)|filename\\s+(?:alias|hint)\\s+(?:routes?|points?|loads?)\\s+(?:downgraded|stale|legacy)\\s+(?:copy|template|doc))",
+    "(?i)(?:hash|checksum|digest)\\s+(?:verified|signed|approved)\\s+(?:claim|narrative|text)\\s+(?:without|skipping|bypassing)\\s+(?:runtime|recompute|machine[- ]verifiable)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-566"
+}

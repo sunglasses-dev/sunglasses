@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MTI-001",
+  "name": "MCP Database Tool SQL Wrapper Injection",
+  "version": "1.0",
+  "category": "mcp_tool_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "MCP database servers that enforce row limits by interpolating agent/user SQL into `SELECT * FROM ({sql}) LIMIT N` create a wrapper-breakout SQL injection sink at the agent-tool boundary.",
+  "keywords": [
+    "FastMCP",
+    "LIMIT",
+    "SELECT ... FROM (",
+    "command",
+    "database_query",
+    "duckdb",
+    "execute_sql",
+    "fetchmany",
+    "mcp",
+    "mcp.tool",
+    "mysql",
+    "postgres",
+    "prompt_query",
+    "query",
+    "query_tool"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+training|scanner\\s+docs?|scanners?\\s+should\\s+(?:flag|detect|report)|do\\s+not\\s+build)\\b)\n(?=.*\\b(?:mcp|model\\s+context\\s+protocol|fastmcp|server\\.tool|mcp\\.tool|tool\\s+decorator|database_query|execute_sql|run_sql|query_tool|sqlite|postgres|duckdb|mysql)\\b)\n(?=.*\\b(?:sql|query|user_sql|statement|command|prompt_query)\\b)\n(?=.*(?:\n    select\\s+(?:\\*|[a-z0-9_,\\s]+)\\s+from\\s*\\(\\s*(?:\\{?\\s*(?:sql|query|user_sql|statement|command|prompt_query)\\s*\\}?|[\"'`]\\s*\\+\\s*(?:sql|query|user_sql|statement|command|prompt_query)\\s*\\+)\n  | select\\s+(?:\\*|[a-z0-9_,\\s]+)\\s+from\\s*\\(.{0,120}\\b(?:sql|query|user_sql|statement|command|prompt_query)\\b.{0,120}\\).{0,120}\\blimit\\b\n))\n(?=.*\\blimit\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MTI-001"
+}

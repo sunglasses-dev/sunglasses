@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-121",
+  "name": "Silent Stage Failure Success Masking",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker induces one stage of a multi-step agent workflow to fail silently while downstream stages emit a success-like summary, hiding broken validation, skipped policy checks, or stale data behind a healthy-looking final artifact.",
+  "keywords": [
+    "partial failure masking",
+    "validator timeout laundering",
+    "branch selective stderr suppression",
+    "fallback success illusion",
+    "partial write optimistic summary",
+    "silent stage failure",
+    "degraded but usable spoof",
+    "stale snapshot mislabeled live",
+    "swallow exception continue packaging",
+    "completion gate bypass",
+    "stderr suppression masking failure",
+    "audit trail break"
+  ],
+  "regex": [
+    "(?i)(?:(?:silent|hidden|swallow(?:ed)?)\\s+(?:exception|stderr|failure|timeout)\\s+(?:continue|skip|mark)\\s+(?:packaging|success|complete|pass)|(?:fallback|cached|stale)\\s+(?:snapshot|artifact|path)\\s+(?:mislabel(?:ed)?|relabel(?:ed)?)\\s+(?:as\\s+)?(?:live|fresh|current)|(?:partial|incomplete)\\s+(?:write|stage|failure)\\s+(?:but|with|while)\\s+(?:overall|final|cycle)\\s+(?:success|pass|complete))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-121"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-018",
+  "name": "HTTP security header agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detect target-controlled HTTP response-header metadata that addresses AI agents or scanners and tries to convert security headers, report endpoints, or custom policy headers into authority to override instructions, suppress findings, or forward local credentials.",
+  "keywords": [
+    "AI agent",
+    "API key",
+    "Authorization",
+    "Bearer",
+    "Content-Security-Policy",
+    "HTTP/1.1",
+    "LLM",
+    "Link:",
+    "Permissions-Policy",
+    "Report-To",
+    "Reporting-Endpoints",
+    "X-Agent-Policy",
+    "X-Robots-Tag",
+    "agent_note",
+    "agentic verifier"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:must\\s+not|do\\s+not|never|refuse\\s+to|should\\s+not)\\b.{0,160}\\b(?:treat|obey|override|supersede)\\b)\n(?=.*\\b(?:HTTP/\\d(?:\\.\\d)?|Content-Security-Policy|Report-To|Reporting-Endpoints|Permissions-Policy|X-Robots-Tag|Link\\s*:|X-Agent-Policy|agent[_-]?note|scanner[_-]?policy|crawler[_-]?notice)\\b)\n(?=.*\\b(?:AI\\s+agents?|assistants?|LLMs?|autonomous\\s+(?:scanner|crawler|verifier)s?|security\\s+scanners?|agentic\\s+verifiers?|bots?)\\b)\n(?=.*\\b(?:supersed(?:e|es)|outrank(?:s)?|overrid(?:e|es)|higher[-\\s]*priority|canonical\\s+(?:site[-\\s]*owner|operator)\\s+policy|must\\s+obey|before\\s+(?:system|developer)\\s+rules)\\b)\n(?=.*\\b(?:Authorization|Bearer|cookies?|session\\s+(?:headers?|tokens?)|environment\\s+variables?|API\\s+keys?|secrets?|do\\s+not\\s+report|suppress|hide\\s+findings?|silently|private\\s+validation\\s+note)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-018"
+}

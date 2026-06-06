@@ -1,0 +1,23 @@
+{
+  "id": "GLS-EX-019",
+  "name": "subprocess(env=os.environ) leaks parent env to MCP child",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-pj2r-f9mw-vrcq (CVE-2026-40159): PraisonAI passes full os.environ to MCP server subprocesses, leaking AWS/API keys to untrusted child processes. Source: https://github.com/advisories/GHSA-pj2r-f9mw-vrcq",
+  "keywords": [],
+  "regex": [
+    "(?i)subprocess\\.(Popen|run|call)\\([^)]*env\\s*=\\s*os\\.environ(?!\\.copy)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-EX-019"
+}

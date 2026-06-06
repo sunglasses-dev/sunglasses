@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-011",
+  "name": "ads.txt / app-ads.txt Seller Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects `ads.txt` or `app-ads.txt` seller metadata that tries to convert an advertising-authorization file into policy for AI agents, crawlers, scanners, or auditors, especially to suppress fraud findings or forward local secrets.",
+  "keywords": [
+    "DIRECT",
+    "RESELLER",
+    "ads.txt",
+    "app-ads.txt",
+    "attach",
+    "do not report",
+    "forward",
+    "hide",
+    "include",
+    "mark as clean",
+    "override",
+    "supersede",
+    "suppress",
+    "treat as policy"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:scanner\\s+docs?|training|guide|reference|article|learn\\s+how)\\b.{0,140}\\b(?:report|detect|flag|refuse|block)\\b.{0,140}\\b(?:ads\\.txt|app-ads\\.txt|authorized\\s+digital\\s+sellers?)\\b)\n(?!.*\\b(?:do\\s+not|never|must\\s+not|should\\s+not)\\s+(?:obey|treat|follow|execute|honou?r|trust|use)\\b.{0,140}\\b(?:ads\\.txt|app-ads\\.txt|authorized\\s+digital\\s+sellers?|seller\\s+metadata)\\b)\n(?=.*\\b(?:ads\\.txt|app-ads\\.txt|authorized\\s+digital\\s+sellers?|authorized\\s+seller|seller\\s+account|DIRECT|RESELLER|adsystem\\.com|app-ads)\\b)\n(?=.*\\b(?:ai\\s*(?:agent|assistant|crawler|scanner|auditor)|llm\\s*(?:agent|crawler|scanner)?|autonomous\\s*(?:agent|scanner)|sunglasses|security\\s*scanner|seo\\s*agent)\\b)\n(?=.*\\b(?:ignore|override|supersede|outrank|treat\\s+as\\s+policy|do\\s+not\\s+report|suppress|hide|mark\\s+as\\s+clean|forward|include|attach|reuse)\\b)\n(?=.*\\b(?:system\\s+instructions?|developer\\s+rules?|findings?|reports?|cookies?|tokens?|api\\s*keys?|env(?:ironment)?\\s*vars?|local\\s+state|seller\\s+verification|fraud\\s+signals?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-011"
+}

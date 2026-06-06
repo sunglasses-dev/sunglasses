@@ -1,0 +1,34 @@
+{
+  "id": "GLS-AW-025",
+  "name": "Cron state carryover poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "Cron-driven agent systems repeatedly execute near-identical workflows where status files, prior-cycle outputs, and readiness gates are reused as context. This creates a high-leverage injection surface: attackers can seed one cycle with manipulative state and let it silently propagate into future cycles as trusted \"already verified\" context. The result is decision drift without obvious single-event compromise.",
+  "keywords": [
+    "last-good replay poisoning",
+    "cross-cycle target-date confusion",
+    "guardrail downgrade carried exception",
+    "state-board precedence hijack",
+    "stale READY marker into prior cycle",
+    "one-cycle bypass becomes sticky",
+    "carryover trusted as already verified",
+    "non-canonical state newer than canonical"
+  ],
+  "regex": [
+    "(?i)(?:plant|inject|seed|inherit)\\s+(?:stale|forged|fake|outdated)\\s+(?:READY|verified|approved|green|posture)\\s+(?:marker|status|flag|state)\\s+(?:into|in|across)\\s+(?:prior|previous|next|carryover|cycle)",
+    "(?i)(?:temporary|one[- ]cycle|cycle-only)\\s+(?:bypass|exception|skip|waiver)\\s+(?:becomes|made|drift(?:s|ing)?\\s+to)\\s+(?:sticky|persistent|permanent|carryover)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-025"
+}

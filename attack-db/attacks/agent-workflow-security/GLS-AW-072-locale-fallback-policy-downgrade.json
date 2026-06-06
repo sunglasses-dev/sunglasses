@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-072",
+  "name": "Locale Fallback Policy Downgrade",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Attacker forces a locale or i18n fallback path where translated prompt templates or guardrails are weaker than the canonical locale. The agent applies a softer policy under fallback and authorizes actions a default-locale check would block.",
+  "keywords": [
+    "locale fallback drift",
+    "accept-language policy bypass",
+    "i18n bundle fallback hijack",
+    "translated prompt template drift",
+    "language-fallback weaker policy",
+    "locale negotiation override",
+    "fallback locale guardrail gap",
+    "untranslated string permits action",
+    "missing translation defaults open",
+    "locale-specific bypass",
+    "translation bundle injection",
+    "lang fallback escalation"
+  ],
+  "regex": [
+    "(?i)(?:locale\\s+(?:fallback|negotiation)\\s+(?:drift|hijack|bypass|gap)|accept[- ]language\\s+(?:header|negotiation)\\s+(?:bypass|override|escalation))",
+    "(?i)(?:(?:i18n|translation|locale)\\s+(?:bundle|template|fallback)\\s+(?:weaker|missing|injected)\\s+(?:policy|guardrail|check)|untranslated\\s+(?:prompt|string)\\s+(?:permits?|allows?|bypasses?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-072"
+}

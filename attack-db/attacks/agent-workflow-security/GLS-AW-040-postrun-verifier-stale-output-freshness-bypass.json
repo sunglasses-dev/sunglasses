@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-040",
+  "name": "Postrun Verifier Stale Output Freshness Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits a postrun verifier that checks output-file existence and mtime but not source-input freshness, so the pipeline emits a READY signal while operating on stale or wrong-day input data, leading the agent to act on rotted evidence.",
+  "keywords": [
+    "postrun ready false positive",
+    "output exists but source stale",
+    "wrong-day input passes ready",
+    "freshness check on output only",
+    "ready signal ignores input age",
+    "stale source still marked ready",
+    "dma verifier output-only check",
+    "input date mismatch hidden",
+    "ready when source rotted",
+    "verifier checks file exists",
+    "postrun greenlight stale data",
+    "ready badge over yesterday data"
+  ],
+  "regex": [
+    "(?i)(?:postrun\\s+(?:verifier|check|gate)\\s+(?:only\\s+(?:checks?|validates?)|ignores?)\\s+(?:output|artifact)\\s+(?:exists?|freshness)|ready\\s+(?:signal|flag|status)\\s+(?:while|with|over)\\s+(?:stale|wrong[- ]day|yesterday)\\s+(?:source|input))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-040"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-074",
+  "name": "Decision Trace Approval Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker forges or injects fake steps into the agent's decision trace, plan summary, or approval chain so unsafe actions appear to have been reasoned and approved. Audit and human review trust the forged justification and rubber-stamp the execution.",
+  "keywords": [
+    "decision trace forgery",
+    "fake approval chain snapshot",
+    "fabricated plan justification",
+    "forged reasoning log",
+    "synthetic decision rationale",
+    "plan summary spoof",
+    "tampered execution chain",
+    "ghost-step inserted in trace",
+    "approval summary forgery",
+    "agent justification fabrication",
+    "trace evidence forgery",
+    "post-hoc decision narrative spoof"
+  ],
+  "regex": [
+    "(?i)(?:decision\\s+trace\\s+forgery|(?:forge|fabricate|spoof|fake)\\s+(?:decision|approval|reasoning|plan)\\s+(?:trace|chain|snapshot|summary|rationale)\\b)",
+    "(?i)(?:(?:ghost|phantom|synthetic)\\s+(?:step|node|approval)\\s+(?:inserted|injected)\\s+(?:into|in)\\s+(?:trace|chain|plan)|tampered\\s+(?:execution|reasoning|justification)\\s+(?:log|chain|narrative))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-074"
+}

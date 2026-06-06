@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-563",
+  "name": "Forged Handoff Signature Scope Permission Hop",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or counterfeit token or signature in a delegation or handover that enables a trust hop or permission hop to invoke privileged actions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|delegated|delegation|worker|handoff|handover|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:token|attestation|ticket|credential(?:s)?|signature)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|scope\\s+transfer|permission\\s+hop|trust\\s+hop)\\b)(?=.*\\b(?:execute|executes|executed|executing|run|runs|running|invoke|invokes|invoked|invoking|trigger|triggers|triggered|triggering)\\b).{0,1000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-563"
+}

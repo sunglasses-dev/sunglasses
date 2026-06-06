@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-044",
+  "name": "Verification Gate Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker poisons or forges the output of verification gates (preflight, postrun, health-checks, approval summaries) so the agent's trust anchors auto-pass, allowing unsafe actions to proceed without real validation.",
+  "keywords": [
+    "preflight check bypass",
+    "verification gate skip",
+    "approval summary forgery",
+    "postrun verifier disabled",
+    "health-check stub response",
+    "trust anchor poisoned",
+    "auto-pass verification",
+    "fake green from gate",
+    "skip preflight directive injection",
+    "bypass guardrail check",
+    "force verifier to return ok",
+    "verification result spoofing"
+  ],
+  "regex": [
+    "(?i)(?:(?:bypass|skip|disable|stub|short[- ]circuit)\\s+(?:preflight|postrun|verification|approval|health[- ]?check|guardrail)\\s+(?:gate|check|verifier|step)|(?:auto[- ]pass|force[- ]green|always[- ]ok)\\s+(?:verification|gate|check))",
+    "(?i)(?:(?:forge|fake|spoof)\\s+(?:verification|approval|preflight)\\s+(?:result|summary|status)|verification\\s+(?:result|gate)\\s+(?:returns?|stubbed\\s+to)\\s+(?:ok|green|pass)\\s+(?:without|regardless))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-044"
+}

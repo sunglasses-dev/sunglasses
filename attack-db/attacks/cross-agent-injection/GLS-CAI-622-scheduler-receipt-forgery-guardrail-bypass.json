@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-622",
+  "name": "Scheduler Receipt Forgery Guardrail Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-622"
+}

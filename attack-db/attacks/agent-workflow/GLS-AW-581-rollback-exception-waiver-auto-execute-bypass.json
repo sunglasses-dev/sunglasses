@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-581",
+  "name": "Rollback Exception Waiver Auto-Execute Bypass",
+  "version": "1.0",
+  "category": "agent_workflow",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a rollback exception or emergency override waiver used to auto-execute or force a run while bypassing rollback validation or approval sign-off.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\b(?:mark|set|flag|declare|treat|classify)\\b.{0,90}\\b(?:rollback\\s+exception|exception\\s+waiver|rollback\\s+waiver|emergency\\s+override)\\b.{0,110}\\b(?:approved|authorized|pre[- ]?cleared|active)\\b|\\b(?:skip|bypass|ignore|disable|suppress)\\b.{0,90}\\b(?:rollback\\s+check(?:s)?|rollback\\s+gate|approval\\s+gate|safety\\s+hold)\\b|\\b(?:auto[- ]?execute|execute\\s+immediately|proceed\\s+now|force\\s+run)\\b.{0,110}\\b(?:without|w\\/o)\\b.{0,40}\\b(?:rollback\\s+validation|approval|sign[- ]?off|review)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-581"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-007",
+  "name": "Nostr NIP-05 discovery metadata agent identity poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned `/.well-known/nostr.json` / NIP-05 identity document can hide agent-facing instructions inside identity-discovery metadata, telling AI agents or scanners to trust the file as policy, suppress reports, or forward secrets through Nostr relays/DMs.",
+  "keywords": [
+    "/.well-known/nostr.json",
+    "LLM",
+    "NIP-05",
+    "agent",
+    "agent_policy",
+    "assistant",
+    "assistant_instructions",
+    "crawler",
+    "do not report",
+    "ignore previous/system/developer",
+    "names",
+    "nostr.json",
+    "override/outrank system/developer/repo",
+    "relays",
+    "reveal env/token/secret/credential"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:warns?\\s+(?:agents|assistants|scanners)|do\\s+not\\s+reveal|never\\s+obey|blocked|refus(?:e|ed)|must\\s+ignore\\s+malicious|should\\s+report\\s+poisoned))(?=.*(?:\\.well-known/nostr\\.json|nostr\\.json|nip-05|\"names\"\\s*:|\"relays\"\\s*:))(?=.*(?:agent|assistant|crawler|scanner|llm))(?=.*(?:ignore\\s+(?:previous|system|developer)|override\\s+(?:system|developer|repo)|outrank(?:s)?\\s+(?:system|developer|repo)|reveal\\s+(?:env|token|secret|credential)|(?:env|token|secret|credential)s?\\s+(?:to|via|in)\\s+(?:relay|dm|nostr)|suppress\\s+(?:scanner|security|report)|do\\s+not\\s+report\\s+(?:this|security|finding))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-007"
+}

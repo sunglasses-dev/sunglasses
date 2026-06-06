@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-274",
+  "name": "Cross-Agent Quorum Nonce Forgery",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a cross-agent or peer handoff that presents a forged quorum or approval chain nonce to override scope, permission, or guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:cross(?:-|\\s)*agent|peer(?:-|\\s)*agent|delegate|delegation|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fake|fabricated)\\b)(?=.*\\b(?:quorum|approval(?:\\s|-)*chain|consensus)\\b)(?=.*\\b(?:nonce|session(?:\\s|-)*token|ticket)\\b)(?=.*\\b(?:scope(?:d)?|permission(?:s)?|privilege|authori[sz]ation)\\b)(?=.*\\b(?:override|bypass|ignore|ignored|ignores|ignoring)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-274"
+}

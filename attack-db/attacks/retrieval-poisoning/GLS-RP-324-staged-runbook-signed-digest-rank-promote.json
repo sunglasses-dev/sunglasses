@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-324",
+  "name": "Staged Runbook Signed Digest Rank Promote",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a staged or poisoned runbook or playbook injected into a RAG index with a fake signed digest that promotes its rank and overrides review gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|knowledge\\s+base|context\\s+window|index)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)|staged|fabricat(?:e|ed|ion))\\b)(?=.*\\b(?:runbook|playbook|changelog|appendix|note|document)\\b)(?=.*\\b(?:provenance\\s+stamp|trusted\\s+source\\s+badge|citation\\s+badge|signed\\s+digest|verification\\s+badge)\\b)(?=.*\\b(?:rank|prioritiz(?:e|ed|ing)|promot(?:e|ed|ion)|surface|select)\\b)(?=.*\\b(?:overrid(?:e|es|ing|en|ed)?|bypass(?:ed|es|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|review\\s+gate(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-324"
+}

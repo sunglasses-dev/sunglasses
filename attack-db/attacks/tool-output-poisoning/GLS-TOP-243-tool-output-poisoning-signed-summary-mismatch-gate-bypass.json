@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TOP-243",
+  "name": "Tool output poisoning \u2014 signed summary mismatch gate bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Detects tool output poisoning variant where a tool output, execution summary, result payload, agent report, or response digest reports a signature mismatch, checksum failure, hash mismatch, verification failure, or invalid signature \u2014 and the instruction tells the agent to ignore, override, bypass, skip, or disregard approval, policy, guardrails, or the execution / verification gate and run, execute, deploy, trigger, or proceed anyway. Catches 'failure-as-license' execution-gate bypass.",
+  "keywords": [
+    "tool output signature mismatch ignore approval execute",
+    "execution summary checksum failed bypass verification gate deploy",
+    "result payload invalid signature override guardrails trigger",
+    "agent report hash mismatch skip policy proceed",
+    "response digest verification failure disregard execution gate",
+    "tool output signature mismatch bypass approval trigger deployment",
+    "execution summary checksum fail ignore policy guardrails proceed",
+    "result payload invalid signature override verification gate execute"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool\\s+output|execution\\s+summary|result\\s+payload|agent\\s+report|response\\s+digest)\\b)(?=.*\\b(?:signature\\s+mismatch|checksum\\s+fail(?:ed)?|hash\\s+mismatch|verification\\s+fail(?:ed|ure)?|invalid\\s+signature)\\b)(?=.*\\b(?:ignore|override|bypass|skip|disregard)\\b)(?=.*\\b(?:approval|policy|guardrails?|execution\\s+gate|verification\\s+gate|controls?)\\b)(?=.*\\b(?:run|execute|deploy|trigger|proceed)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-243"
+}

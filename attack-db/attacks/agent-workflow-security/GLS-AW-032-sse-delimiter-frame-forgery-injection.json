@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-032",
+  "name": "SSE Delimiter Frame Forgery Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker embeds stream-delimiter shapes (SSE data: frames, JSONL newlines, markdown fences, CSV quotes) inside low-trust content so the orchestrator's parser mis-frames hostile bytes as a fresh high-priority instruction or forged tool-result record, bypassing the trust hierarchy.",
+  "keywords": [
+    "sse frame splicing",
+    "data: frame injection",
+    "jsonl record breakout",
+    "forged tool-result record",
+    "markdown fence pivot",
+    "triple backtick escape",
+    "csv delimiter poison",
+    "column shift approval flag",
+    "delimiter-shaped payload",
+    "parser frame boundary spoof",
+    "unescaped newline brace injection",
+    "control boundary smuggling"
+  ],
+  "regex": [
+    "(?i)(?:(?:inject|splice|smuggle)\\s+(?:sse|jsonl|json[- ]lines|delimiter|fence)\\s+(?:frame|record|boundary|separator)|(?:forge|fake|fabricate)\\s+(?:tool[- ]result|event|data)\\s+(?:frame|record)\\s+(?:with|via)\\s+(?:newline|delimiter|backtick))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-032"
+}

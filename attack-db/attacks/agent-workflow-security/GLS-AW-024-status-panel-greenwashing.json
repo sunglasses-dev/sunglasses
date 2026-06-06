@@ -1,0 +1,34 @@
+{
+  "id": "GLS-AW-024",
+  "name": "Status panel greenwashing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "tool_output"
+  ],
+  "description": "Status dashboards are treated as operator truth during incident response. If an attacker can coerce a pipeline to render a green/fresh state from stale or partial evidence, defenders delay escalation while real abuse continues. This is high-risk in cron-driven agent systems where health badges and KPI cards directly influence action.",
+  "keywords": [
+    "freshness badge override fallback key",
+    "partial-success laundering",
+    "zero-to-N/A coercion",
+    "denominator inflation",
+    "stale data renders as fresh",
+    "panel mixed states collapsed to green",
+    "render last_success instead of updated_at",
+    "regression hidden behind missing data semantics"
+  ],
+  "regex": [
+    "(?i)(?:render|show|display|cast)\\s+(?:stale|partial|degraded|failing)\\s+(?:state|panel|status|badge|widget)\\s+(?:as|to\\s+appear)\\s+(?:green|fresh|healthy|ready|ok)",
+    "(?i)(?:fallback\\s+key|alternate\\s+timestamp|last_success|denominator)\\s+(?:steering|override|swap|inflation|laundering)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-024"
+}

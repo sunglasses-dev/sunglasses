@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-191",
+  "name": "Workqueue Owner Collision Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects conflicting owner or status claims into shared workqueues so two agents collide on the same task or a malicious assignment overwrites a legitimate owner, breaking coordination guarantees.",
+  "keywords": [
+    "owner workqueue collision",
+    "duplicate owner assignment",
+    "queue ownership conflict injection",
+    "done flag misattribution",
+    "in-progress double claim",
+    "queued task ownership spoof",
+    "owner field forgery",
+    "cross-owner status overwrite",
+    "board state race injection",
+    "stealth re-assignment",
+    "owner alias collision",
+    "workqueue arbitration abuse"
+  ],
+  "regex": [
+    "(?i)(?:(?:owner|assignee)\\s+(?:workqueue|queue|board)\\s+(?:collision|conflict|race)|(?:duplicate|conflicting|spoofed)\\s+(?:owner|assignee)\\s+(?:claim|assignment|field)|(?:DONE|IN_PROGRESS|QUEUED)\\s+(?:misattribution|overwrite|forgery|race))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-191"
+}

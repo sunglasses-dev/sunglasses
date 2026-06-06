@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-021",
+  "name": "Remote template fetch with arbitrary URL (RCE)",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-pv9q-275h-rh7x (CVE-2026-40154): PraisonAI fetches and renders remote templates from arbitrary URLs, enabling RCE via malicious template. Source: https://github.com/advisories/GHSA-pv9q-275h-rh7x",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:load|fetch|download)_template\\s*\\(\\s*['\\\"]https?://"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-021"
+}

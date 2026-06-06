@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAICR-001",
+  "name": "Attestation Trust Channel Scope Rebind Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged, spoofed, or tampered attestation, nonce, token, or capability is used to rebind scope or escalate trust-anchor authority in order to override, bypass, or supersede policy or guardrail approval checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(attestation|nonce|token|session|capability)\\b)(?=.*\\b(forge|forged|spoof|spoofed|tamper(?:ed)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(scope|authority|trust\\s*anchor|trusted\\s*channel)\\b)(?=.*\\b(rebind|escalat(?:e|ed|ing|ion)|override|bypass|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(policy|guardrail(?:s)?|approval\\s*check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAICR-001"
+}

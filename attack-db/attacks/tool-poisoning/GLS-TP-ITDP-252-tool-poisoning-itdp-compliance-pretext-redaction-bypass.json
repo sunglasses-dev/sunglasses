@@ -1,0 +1,34 @@
+{
+  "id": "GLS-TP-ITDP-252",
+  "name": "Tool poisoning / ITDP \u2014 compliance pretext redaction bypass",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output",
+    "email"
+  ],
+  "description": "Detects ITDP (indirect tool data poisoning) variant using compliance/legal/audit pretext to justify disabling PII redaction/masking and then export/share/send/upload the unredacted data. Novel angle leveraging authority framing to bypass data-protection controls.",
+  "keywords": [
+    "compliance policy disable redaction export",
+    "legal hold turn off masking share",
+    "audit request skip pii filter upload",
+    "compliance review bypass data protection send",
+    "compliance disable redaction export",
+    "legal hold turn off pii filter share",
+    "audit request skip masking upload",
+    "compliance policy bypass data protection send"
+  ],
+  "regex": [
+    "(?i)\\b(?:for\\s+compliance|compliance\\s+(?:policy|review)|legal\\s+hold|audit\\s+request)\\b.{0,120}\\b(?:disable|turn\\s*off|skip|bypass)\\b.{0,80}\\b(?:redaction|masking|pii\\s*filter|data\\s*protection)\\b.{0,120}\\b(?:export|share|send|upload)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-252"
+}

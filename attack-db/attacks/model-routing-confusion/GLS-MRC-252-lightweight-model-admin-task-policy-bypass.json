@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-252",
+  "name": "Lightweight Model Admin Task Policy Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an attempt to route admin, payment, or credential tasks to a lightweight or low-cost model while bypassing approval policy or safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:route|reroute|switch|downgrade|fallback|send|shift)\\b.{0,80}\\b(?:lite|light(?:weight)?|cheap|fast|mini|small|low(?:-|\\s)?cost|budget)\\b)(?=.*\\b(?:admin|payment|credential(?:s)?|authorization|production|deploy(?:ment)?)\\b)(?=.*\\b(?:ignore|bypass|override|waive|skip|disable)\\b.{0,80}\\b(?:policy|guardrail(?:s)?|safety|approval|verification|control(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-252"
+}

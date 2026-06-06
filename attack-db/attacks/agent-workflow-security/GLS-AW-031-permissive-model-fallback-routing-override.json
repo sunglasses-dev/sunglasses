@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-031",
+  "name": "Permissive Model Fallback Routing Override",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker-controlled text injects model-routing directives (preferred_model fields, downgrade pretexts, fake capability requirements) into retrieval or tool-result channels, causing the control plane to silently switch to a weaker model tier and expand action surface beyond approved policy.",
+  "keywords": [
+    "safety-policy route hijack",
+    "switch to permissive model",
+    "cost-gate downgrade pretext",
+    "force fallback model tier",
+    "capability spoof escalation",
+    "preferred_model field injection",
+    "a/b routing flag manipulation",
+    "beta routing enabled override",
+    "model id allowlist bypass",
+    "router policy downgrade",
+    "content-originated model directive",
+    "retry-loop model downgrade"
+  ],
+  "regex": [
+    "(?i)(?:(?:switch|route|fallback|downgrade)\\s+(?:to|the)\\s+(?:permissive|weaker|cheaper|less[- ]safe)\\s+model|(?:preferred_model|model_tier|model_id)\\s*[:=]\\s*[\\\"']?(?:gpt|claude|llama|mistral)|(?:beta|experiment|ab)\\s+routing\\s+(?:enabled|active|override))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-031"
+}

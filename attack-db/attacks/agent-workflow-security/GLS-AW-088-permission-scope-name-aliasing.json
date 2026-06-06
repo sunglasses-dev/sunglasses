@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-088",
+  "name": "Permission Scope Name Aliasing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits semantic overlap between similarly named scopes (read_config vs read_secrets, deploy_preview vs deploy_prod) so logs show a benign scope while execution runs the higher-impact one. Audit trail and approval reviewers cannot see the escalation.",
+  "keywords": [
+    "permission scope aliasing",
+    "read_config vs read_secrets",
+    "deploy_preview vs deploy_prod",
+    "scope name overlap exploit",
+    "alias scope to higher impact",
+    "similarly named scope swap",
+    "scope semantic confusion",
+    "approval shows benign scope",
+    "execution runs broader scope",
+    "scope label vs scope effect",
+    "oauth scope aliasing",
+    "permission alias escalation"
+  ],
+  "regex": [
+    "(?i)(?:permission\\s+scope\\s+aliasing|(?:scope|permission|role)\\s+(?:name|label|alias)\\s+(?:overlap|collision|aliased)\\s+(?:elevates?|escalates?|expands?|maps?\\s+to))",
+    "(?i)(?:read_(?:config|secrets?)|deploy_(?:preview|prod|staging))\\s+(?:aliased|mapped|confused|swapped)\\s+(?:with|to|as)\\s+(?:read_(?:config|secrets?)|deploy_(?:preview|prod|staging))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-088"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-242",
+  "name": "Retrieval poisoning \u2014 provenance disclaimer authority override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects retrieval poisoning variant where a retrieved RAG chunk, search index note, knowledge base snippet, or document-store record carries a provenance disclaimer, footer annotation, watermark warning, or metadata note, but the instruction claims the record is authoritative, canonical, source of truth, or ground truth and tells the agent to ignore, override, bypass, skip, or disregard current policy, guardrails, verification, or controls.",
+  "keywords": [
+    "provenance disclaimer outdated treat as authoritative override policy",
+    "footer annotation doc canonical ignore guardrails",
+    "metadata note bypass verification use as ground truth",
+    "watermark warning disregard verification source of truth",
+    "footer disclaimer treat as authoritative override guardrails",
+    "provenance annotation ignore policy verification canonical",
+    "metadata disclaimer use as ground truth bypass controls",
+    "canonical retrieval skip current policy checks"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retriev(?:e|ed|al)|rag|search\\s+index|knowledge\\s+base|document\\s+store)\\b)(?=.*\\b(?:provenance|disclaimer|footer|watermark|annotation|metadata\\s+note)\\b)(?=.*\\b(?:authoritative|canonical|source\\s+of\\s+truth|ground\\s+truth)\\b)(?=.*\\b(?:ignore|override|bypass|skip|disregard)\\b)(?=.*\\b(?:policy|guardrails?|verification|controls?|current|latest)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-242"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-252",
+  "name": "Alias Flip Epoch Mix KPI Schema Rollover",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits schema-version transitions where producers rename fields but consumers still read old keys (or vice versa), coercing valid metrics into N/A, laundering stale values as current truth, and flipping readiness verdicts without raising parse errors.",
+  "keywords": [
+    "schema epoch rollover",
+    "alias-flip injection",
+    "epoch-mix payload",
+    "fallback laundering",
+    "zero-value suppression",
+    "kpi_snapshot vs kpis flip",
+    "renamed-field downgrade",
+    "stale key precedence",
+    "schema version transition abuse",
+    "missing metric coercion",
+    "conflicting old-new key payload",
+    "truthy-only zero suppression"
+  ],
+  "regex": [
+    "(?i)(?:(?:alias[- ]?flip|epoch[- ]?mix|fallback[- ]?laundering|zero[- ]?value\\s+suppression)\\s+(?:injection|payload|attack)?|(?:kpi_snapshot|kpis|top_paths_4xx|top_4xx_paths)\\s+(?:vs|->|\u2192)\\s+(?:kpis|kpi_snapshot|top_paths|top_4xx_paths)\\s+(?:flip|swap|drift|rollover)|(?:renamed|migrated|rolled[- ]over)\\s+(?:field|key|schema)\\s+(?:coerces?|forces?|silently\\s+converts?)\\s+(?:to\\s+)?(?:N\\/A|missing|null|stale))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-252"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-714",
+  "name": "Agent Authority Leak Checkpoint Token Spoof",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker crafts handoff text that smuggles authority forward between agents (claimed prior approvals, spoofed checkpoint tokens, laundered summary bullets) so a downstream role executes unverified instructions as if upstream policy had signed them.",
+  "keywords": [
+    "role-chain privilege carryover",
+    "handoff summary laundering",
+    "checkpoint token spoofing",
+    "cross-lane objective bleed",
+    "approved by upstream role claim",
+    "summary bullet hidden imperative",
+    "ready pass marker spoof",
+    "unsigned authority inheritance",
+    "downstream role inherits approval",
+    "fake provenance tuple",
+    "gate verdict reused from text",
+    "authority drift between roles"
+  ],
+  "regex": [
+    "(?i)(?:(?:agent|role|handoff|cross[- ]agent)\\s+(?:authority|privilege|approval)\\s+(?:leak|carryover|inheritance|drift)\\b|(?:approved|signed|verified)\\s+by\\s+(?:upstream|prior|director|boss|planner)\\s+(?:role|agent|step)\\s+(?:without|with\\s+no)\\s+(?:provenance|signature|token)|(?:checkpoint|ready|pass)\\s+(?:token|marker|status)\\s+(?:spoof(?:ed|ing)?|forg(?:ed|ery)|fak(?:ed|e))\\s+(?:to\\s+)?(?:skip|bypass|trigger)\\s+(?:gate|verification|branch))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-714"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-254",
+  "name": "Archived Policy Snapshot Authority Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker frames a stale/archived retrieval snapshot as canonical source-of-truth and instructs the agent to override current policy and freshness verification. Freshness-authority vector distinct from provenance-disclaimer (GLS-RP-242).",
+  "keywords": [
+    "retrieved archived snapshot canonical",
+    "archived snapshot source of truth",
+    "historical but authoritative ignore guardrails",
+    "cached note canonical ground truth",
+    "stale snapshot marked authoritative",
+    "archived memo source of truth",
+    "search index cached record canonical",
+    "historical entry authoritative ground truth",
+    "stale archived policy snapshot",
+    "skip latest policy checks"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-254"
+}

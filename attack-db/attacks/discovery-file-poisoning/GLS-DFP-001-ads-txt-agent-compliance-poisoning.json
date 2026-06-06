@@ -1,0 +1,32 @@
+{
+  "id": "GLS-DFP-001",
+  "name": "ads.txt Agent Compliance Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile `/ads.txt`, `/app-ads.txt`, or `sellers.json` file can blend normal authorized-seller metadata with instructions telling AI agents or ad-verification assistants to treat the compliance file as scan authority, disclose local tool/env context, or suppress prompt-injection findings.",
+  "keywords": [
+    "Authorized Digital Sellers",
+    "DIRECT",
+    "RESELLER",
+    "ads.txt",
+    "app-ads.txt",
+    "seller_id",
+    "sellers.json"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:ads\\.txt|app-ads\\.txt|sellers\\.json|authorized\\s+digital\\s+sellers|seller[_\\s-]?id|\\bDIRECT\\b|\\bRESELLER\\b)\\b)(?=.*\\b(?:ai[-\\s]*agents?|automated\\s+assistants?|assistants?|ad[-\\s]*verification\\s+agents?|crawlers?|bots?|agents?)\\b)(?=.*\\b(?:treat\\s+this\\s+[^\\n]{0,100}\\s+as\\s+(?:the\\s+)?authoritative\\s+policy|system\\s*,?\\s*developer|repository\\s+instructions?\\s+conflict|stale\\s+for\\s+this\\s+(?:domain|seller\\s+policy)|include\\s+[^\\n]{0,100}\\b(?:tool\\s+configuration|environment\\s+variables?|env\\s+vars?|local\\s+state|api\\s*keys?|secrets?)|(?:do|must)\\s+not\\s+flag\\s+[^\\n]{0,100}(?:prompt\\s+injection|scanner|security)|suppress\\s+[^\\n]{0,100}(?:finding|report|warning))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-001"
+}

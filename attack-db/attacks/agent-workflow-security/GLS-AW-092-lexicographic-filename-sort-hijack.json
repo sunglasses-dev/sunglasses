@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-092",
+  "name": "Lexicographic Filename Sort Hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker drops stale artifacts with newer-looking lexicographic filenames or sortable prefixes so naive 'latest file' selectors that sort by name rather than mtime pick the poisoned payload, silently mis-routing GO/STALE decisions and lane boundaries.",
+  "keywords": [
+    "lexicographic filename sort",
+    "backfill name hijack",
+    "prefix inflation drift",
+    "cross-lane replay aliasing",
+    "retry shadow overwrite",
+    "stale artifact newer-looking name",
+    "datestamp sort poisoning",
+    "lexical latest selection bypass",
+    "fake fresh datestamp",
+    "mtime vs lexical divergence",
+    "sortable prefix injection",
+    "latest file selector spoof"
+  ],
+  "regex": [
+    "(?i)(?:lexicographic|lexical|alphabetic)\\s+(?:sort|order|selection)\\s+(?:select|pick|choose)s?\\s+(?:stale|older|outdated)\\s+(?:artifact|file|payload)|(?:backfill|stale)\\s+(?:payload|artifact|file)\\s+(?:named|with)\\s+(?:newer[- ]looking|fresher[- ]looking)\\s+(?:datestamp|filename)",
+    "(?i)(?:sortable|inflated)\\s+(?:prefix|filename)\\s+(?:bubble|push|float)s?\\s+(?:stale|older)\\s+(?:file|artifact)\\s+(?:to\\s+top|above)|(?:retry|shadow)\\s+(?:overwrite|file)\\s+(?:has\\s+)?(?:lexical|sort)\\s+precedence"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-092"
+}

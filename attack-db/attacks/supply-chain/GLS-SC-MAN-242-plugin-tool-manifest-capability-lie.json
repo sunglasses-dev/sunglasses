@@ -1,0 +1,37 @@
+{
+  "id": "GLS-SC-MAN-242",
+  "name": "Plugin/tool manifest capability lie",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects descriptions of capability-lying manifests \u2014 plugin/tool/skill metadata that advertises a safe property (no network / read-only / sandboxed) while shipping the opposite (hardcoded callback IPs, outbound writes, exfil). Complements GLS-MCP-004 (which targets MCP-specific manifests) for the general supply-chain advisory form.",
+  "keywords": [
+    "claims 'no network' but has",
+    "claims \"no network\" but has",
+    "claims no network but has",
+    "claims read-only but writes",
+    "claims sandboxed but escapes",
+    "claims safe tool but exfil",
+    "manifest says no network but",
+    "advertises read-only but",
+    "ip-literal hardcoded callback"
+  ],
+  "regex": [
+    "(?i)\\b(?:manifest|plugin|tool|skill|extension|connector|module|package)\\b.{0,40}\\b(?:claims?|says?|advertises?|states?|declares?)\\b.{0,80}\\b(?:no\\s+network|read[\\s-]?only|safe(?:\\s+tool)?|sandboxed|no\\s+(?:disk|fs|filesystem|fetch|http|outbound))\\b.{0,80}\\b(?:but|yet|however|while)\\b.{0,120}\\b(?:has|contains|uses|calls|fetches|posts|writes|hardcoded|hidden|opens?|connects?)\\b",
+    "(?i)\\bip[\\s-]?literal\\b.{0,30}\\b(?:hardcoded|callback|webhook|c2|command[\\s-]?and[\\s-]?control)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-MAN-242"
+}

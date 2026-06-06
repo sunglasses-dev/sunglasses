@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-708",
+  "name": "Shared-log prior-verification claim",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Shared-log prior-verification claim \u2014 attacker forges or injects a shared-log entry asserting that a peer agent already verified the action, telling the current agent to skip its own verification step.",
+  "keywords": [
+    "shared log says agent_2 already confirmed",
+    "shared log says agent already confirmed",
+    "shared log says already confirmed",
+    "should not re-verify",
+    "do not re-verify",
+    "skip re-verification",
+    "skip reverify",
+    "agent_2 already confirmed; agent_1",
+    "agent already confirmed; agent",
+    "previous agent already confirmed",
+    "peer already confirmed skip"
+  ],
+  "regex": [
+    "(?i)shared\\s+log\\s+says\\s+(?:agent|peer|worker|delegate|orchestrator|supervisor)[_\\s]?\\d?\\s+already\\s+(?:confirmed|approved|verified|signed[\\-\\s]off|cleared)",
+    "(?i)(?:agent|peer|worker|delegate|orchestrator|supervisor)[_\\s]?\\d?\\s+already\\s+(?:confirmed|approved|verified)\\s*;\\s*(?:agent|peer|worker|delegate)[_\\s]?\\d?\\s+should\\s+not\\s+re[\\-\\s]?verify"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-708"
+}

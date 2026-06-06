@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-005",
+  "name": "Encoded/comment-hidden discovery metadata payload",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Agent-facing discovery metadata can hide prompt-injection payloads in comments, CDATA, JSON-LD/OpenGraph fields, frontmatter, base64, URL encoding, or zero-width text so a scanner that only inspects visible plain text misses the malicious instruction.",
+  "keywords": [
+    ".well-known",
+    "AI agent",
+    "Authorization",
+    "Bearer",
+    "CDATA",
+    "JSON-LD",
+    "Measured local fixture result:",
+    "OpenGraph",
+    "URL-encoded",
+    "agent",
+    "agent-discovery",
+    "agent.json",
+    "ai-plugin",
+    "assistant",
+    "authoritative"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refus(?:e|ed)|block(?:ed)?|ignore\\s+any)\\b.{0,180}\\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\\b)(?=.*\\b(?:llms\\.txt|robots\\.txt|sitemap(?:\\.xml)?|\\.well-known|manifest|openapi|ai-plugin|agent[-\\s]*json|agent[-\\s]*discovery|metadata)\\b)(?=.*\\b(?:agent|assistant|ai[-\\s]*agent|crawler|bot|tool|connector|model)\\b)(?=.*\\b(?:comment|cdata|json-ld|opengraph|meta\\s+tag|frontmatter|base64|b64|percent[-\\s]*encod(?:e|ed|ing)|url[-\\s]*encod(?:e|ed|ing)|zero[-\\s]*width|hidden|decode|encoded)\\b)(?=.*\\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\\s*variables?|authorization|bearer|scanner|guardrail|safety)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-005"
+}

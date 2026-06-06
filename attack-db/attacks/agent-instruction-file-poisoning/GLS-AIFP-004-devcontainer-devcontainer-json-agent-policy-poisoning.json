@@ -1,0 +1,34 @@
+{
+  "id": "GLS-AIFP-004",
+  "name": ".devcontainer/devcontainer.json Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "AI coding agents (Copilot, Cursor, Claude Code, Codex) import `.devcontainer/devcontainer.json` as trusted project environment configuration. An attacker can embed hostile agent instructions in `name`, `customizations.vscode.settings`, `postCreateCommand` echo text, `features` metadata, `containerEn",
+  "keywords": [
+    ".devcontainer",
+    "containerEnv",
+    "customizations.vscode",
+    "devcontainer.json",
+    "features",
+    "onCreateCommand",
+    "postCreateCommand",
+    "remoteEnv",
+    "updateContentCommand"
+  ],
+  "regex": [
+    "(?six)^(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|should\\s+(?:report|detect|flag|refuse|block)))(?=.*(?:\\.?devcontainer(?:\\.json)?|postCreateCommand|onCreateCommand|updateContentCommand|features|customizations(?:\\.vscode|\"\\s*:\\s*\\{)|\"vscode\"\\s*:|\"settings\"\\s*:|containerEnv|remoteEnv|devcontainerId|devContainerId|x-agent-policy|x-scanner-policy|\"name\"\\s*:))(?=.*(?:ai\\s+(?:agents?|assistants?|scanners?|coding\\s+agents?|devops\\s+agents?)|assistant|llms?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?)|security\\s+scanners?|agentic|container\\s+scanners?|devops\\s+agents?|deployment\\s+agents?|\\bcopilot\\b|\\bcursor\\b|\\bcodex\\b|\\bclaude\\b|(?<![a-zA-Z0-9])agents?(?![a-zA-Z0-9])|(?<![a-zA-Z0-9])scanners?(?![a-zA-Z0-9])))(?=.*(?:authoritative|canonical|definitive|overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+(?:document|config)|controlling\\s+document|is\\s+the\\s+final\\s+word|defines?\\s+(?:all\\s+(?:scanner|security|agent)\\s+rules?|(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan))|(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?|suppress(?:es|ed|ing)?|hide\\s+findings?|omit.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|exclude.{0,2}(?:[\\w-]+\\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)|redact.{0,30}?(?:findings?|warnings?|flags?)|do\\s+not\\s+(?:report|flag|escalate)|skip\\s+(?:[\\w-]+\\s+){0,3}checks?|treat.{0,40}?as\\s+informational|mark.{0,40}?as\\s+(?:informational|safe|clean|low|none)|classify.{0,30}?(?:as\\s+)?(?:informational|low|none|false\\s+positive)|flag.{0,40}?as\\s+(?:informational|low|none)|include.{0,2}(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state|CI\\s+(?:env|environment|variables?)|Authorization)|attach.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|forward.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|send.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|collect.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|embed.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|share.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|provide.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state)|expose.{0,2}(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)|API\\s+keys?|tokens?|secrets?|credentials?|auth\\s+context|local\\s+state))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-004"
+}

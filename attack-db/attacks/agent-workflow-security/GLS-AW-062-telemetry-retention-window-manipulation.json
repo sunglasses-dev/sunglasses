@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-062",
+  "name": "Telemetry Retention Window Manipulation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "log_memory"
+  ],
+  "description": "Attacker manipulates retention windows, log TTLs, or rotation policies so incriminating telemetry expires before correlation or audit. Forensic context vanishes and downstream agents lose the evidence needed to detect or escalate the attack.",
+  "keywords": [
+    "evidence retention window gaming",
+    "expire incriminating telemetry",
+    "shorten log retention",
+    "rotate evidence before review",
+    "purge audit window early",
+    "retention policy poisoning",
+    "evidence ttl shrink",
+    "drop logs before correlation",
+    "force premature log rollover",
+    "retention bypass for forensics",
+    "audit window truncation",
+    "stale evidence eviction attack"
+  ],
+  "regex": [
+    "(?i)(?:(?:shrink|shorten|truncate|expire|purge|rotate)\\s+(?:retention|log|audit|evidence)\\s+(?:window|policy|period|ttl)\\b|(?:evidence|log|telemetry)\\s+(?:retention|window)\\s+(?:gaming|poisoning|tampering))",
+    "(?i)(?:drop|evict|delete)\\s+(?:logs?|evidence|telemetry)\\s+(?:before|prior\\s+to)\\s+(?:correlation|review|audit|forensics)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-062"
+}

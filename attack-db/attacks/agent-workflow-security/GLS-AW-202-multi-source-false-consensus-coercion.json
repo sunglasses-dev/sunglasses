@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-202",
+  "name": "Multi-Source False Consensus Coercion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants identical false instructions across multiple low-trust sources so the agent interprets the manufactured agreement as consensus and upgrades the claim from suggestion to execution authority.",
+  "keywords": [
+    "cross source consensus hijack",
+    "aligned false claim across sources",
+    "fake multi-source agreement",
+    "low-trust source consensus spoof",
+    "retrieval echo consensus",
+    "status file plus log alignment",
+    "consensus upgraded to authority",
+    "manufactured agreement attack",
+    "synchronized injection across artifacts",
+    "trust upgrade via repetition",
+    "consensus-to-execution escalation",
+    "low-trust agreement laundering"
+  ],
+  "regex": [
+    "(?i)(?:cross[- ]?source\\s+(?:consensus|agreement)\\s+(?:hijack|spoof|forge|manufact)|(?:plant|align|inject)\\s+(?:false|matching|identical)\\s+(?:instructions?|claims?)\\s+(?:across|in)\\s+(?:multiple|several)\\s+(?:low[- ]?trust|untrusted|retrieval)\\s+(?:sources?|artifacts?)|(?:repeated|consensus|agreed)\\s+(?:claims?|instructions?)\\s+(?:upgrade|escalate|promote)\\s+to\\s+(?:execution|action)\\s+(?:authority|policy))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-202"
+}

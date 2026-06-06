@@ -1,0 +1,31 @@
+{
+  "id": "GLS-RP-249",
+  "name": "Confidence Badge Source Check Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Confidence Badge Source Check Bypass - retrieval poisoning mechanism that overrides policy or safety gates.",
+  "keywords": [
+    "confidence badge source",
+    "badge source check",
+    "source check bypass",
+    "confidence badge",
+    "badge source",
+    "source check",
+    "check bypass"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-249"
+}

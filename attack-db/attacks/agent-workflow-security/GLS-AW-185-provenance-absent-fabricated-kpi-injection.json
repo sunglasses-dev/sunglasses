@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-185",
+  "name": "Provenance-Absent Fabricated KPI Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker injects metrics whose provenance chain is blurred or absent so autonomous reporting loops accept fabricated KPIs as ground truth, propagating bad numbers into downstream decisions and dashboards.",
+  "keywords": [
+    "metric lineage forgery",
+    "blurred provenance metric",
+    "orphan metric injection",
+    "untraceable kpi claim",
+    "metric without source attribution",
+    "fabricated metric origin",
+    "lineage gap exploitation",
+    "anonymous metric in report",
+    "source-less kpi inflation",
+    "provenance gap forgery",
+    "ghost metric in dashboard",
+    "metric provenance laundering"
+  ],
+  "regex": [
+    "(?i)(?:(?:metric|kpi|measurement)\\s+(?:lineage|provenance)\\s+(?:gap|forgery|blur|missing)|(?:orphan|anonymous|source[- ]?less|untraceable)\\s+(?:metric|kpi|figure)\\s+(?:in|injected|posing)|(?:fabricated|forged|ghost)\\s+(?:metric|kpi)\\s+(?:origin|source|attribution))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-185"
+}

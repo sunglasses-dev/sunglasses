@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-168",
+  "name": "Session-Resume Stale Approval Inheritance",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker abuses session-resume or restart flows where compact saved state outranks live policy context, so cron retries and handoff recovery silently inherit stale approvals and skip fresh safety checks.",
+  "keywords": [
+    "session resume trusts stale state",
+    "compact state outranks live policy",
+    "handoff recovery authority creep",
+    "cron retry skips policy re-check",
+    "resume artifact authority spoof",
+    "restart bypasses fresh gates",
+    "saved session elevated trust",
+    "stale checkpoint accepted as live",
+    "resumption inherits prior approval",
+    "agent restart skips revalidation",
+    "session blob authority confusion",
+    "handoff state forged"
+  ],
+  "regex": [
+    "(?i)(?:session\\s+resum(?:e|ption)\\s+(?:authority|trust)\\s+(?:confus|spoof|creep|inherit)|(?:cron\\s+retry|agent\\s+restart|handoff\\s+recovery)\\s+(?:skip|bypass|omit)\\s+(?:policy|gate|revalidation))",
+    "(?i)(?:(?:compact|saved|stale)\\s+(?:state|session|checkpoint)\\s+(?:outranks?|overrides?|trusted\\s+over)\\s+(?:live|fresh|current)\\s+(?:policy|context|gate)|resumption\\s+(?:inherits|retains)\\s+(?:prior|stale)\\s+approval)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-168"
+}

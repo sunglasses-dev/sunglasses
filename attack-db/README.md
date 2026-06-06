@@ -1,30 +1,35 @@
-# GLASSES Attack Database
+# Sunglasses Attack Pattern Database
 
-The open, community-built collection of AI agent attack patterns.
+The open collection of AI agent attack patterns that powers
+[Sunglasses](https://sunglasses.dev) — the runtime firewall for AI agents.
+
+**981 detection patterns across 64 attack categories.**
 
 **Nobody owns this data. Everyone contributes. Everyone benefits.**
 
 ## How It Works
 
-Each attack pattern is a JSON file in the `attacks/` directory. GLASSES loads these patterns and uses them to detect threats in real-time.
+The canonical source of every pattern is
+[`sunglasses/patterns.py`](../sunglasses/patterns.py) — that file is what the
+scanner actually loads at runtime. The JSON files in `attacks/` are a
+human-readable **export** of those patterns, generated from `patterns.py` so the
+database is easy to browse, search, and contribute to.
 
-- One file per attack pattern
-- Human-readable JSON format
+- `patterns.py` → the single source of truth (981 patterns / 64 categories)
+- `attacks/*.json` → generated, browsable mirror
+  (regenerate with `scripts/export_patterns_to_attack_db.py`)
 - Community adds new patterns via pull requests
-- The more patterns → the smarter GLASSES gets
+- The more patterns → the more attacks Sunglasses catches
 
-## Structure
+## Categories
 
-```
-attacks/
-  prompt-injection/     # Attempts to override agent instructions
-  data-exfiltration/    # Attempts to steal data through the agent
-  command-injection/    # Attempts to execute system commands
-  hidden-instruction/   # Instructions hidden in files/web content
-  memory-poisoning/     # Persistence attacks through agent memory
-  secret-detection/     # Credentials/keys in places they shouldn't be
-  social-engineering/   # Manipulation through authority/emotion
-```
+Sunglasses organizes its 64 categories across families like prompt injection,
+data exfiltration, command injection, hidden/indirect instructions, memory
+poisoning, secret detection, tool poisoning, MCP threats, discovery-file
+poisoning, and supply-chain / attestation poisoning — among many others.
+
+See [`sunglasses/patterns.py`](../sunglasses/patterns.py) for the full, current
+list of every category and pattern.
 
 ## Pattern Format
 
@@ -51,22 +56,25 @@ attacks/
 
 ## Contributing
 
+New patterns ultimately live in `sunglasses/patterns.py` (the canonical source),
+and the `attacks/` JSON is regenerated from it. To propose a pattern:
+
 1. Fork this repo
-2. Create a JSON file in the right `attacks/` subdirectory
-3. Follow the pattern format above
-4. Include at least 1 malicious AND 1 benign example (helps prevent false positives)
-5. Submit a pull request
+2. Add your pattern (id, category, severity, description, keywords/regex)
+3. Include at least 1 malicious AND 1 benign example (helps prevent false positives)
+4. Submit a pull request
 
 **Rules for contributions:**
-- One pattern per file
-- Must include `examples.benign` — we catch attacks but we DON'T block legit content
-- Must include `description` explaining what this catches and why it matters
+- Must include a benign example — we catch attacks but we DON'T block legit content
+- Must include a `description` explaining what this catches and why it matters
 - Severity must be justified (don't mark everything as critical)
 
 ## Privacy
 
-This database contains PATTERNS, not data. No user data, no secrets, no personal information. Just descriptions of what attacks look like so GLASSES can recognize them.
+This database contains PATTERNS, not data. No user data, no secrets, no personal
+information. Just descriptions of what attacks look like so Sunglasses can
+recognize them.
 
 ## License
 
-Apache 2.0 — free to use, modify, and distribute.
+MIT — free to use, modify, and distribute.

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-CAI-707",
+  "name": "Other-agent authorization injection (no human review)",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Other-agent authorization injection \u2014 attacker claims a named peer agent has already authorized an action AND explicitly waives human review, attempting to short-circuit human-in-the-loop guardrails.",
+  "keywords": [
+    "no human review needed",
+    "no human review required",
+    "skip human review",
+    "bypass human review",
+    "no human approval needed",
+    "no human approval required",
+    "other-agent confirmation injection",
+    "agent has authorized the merge",
+    "agent has authorized \u2014 no human",
+    "has authorized the merge \u2014 no human review",
+    "has authorized \u2014 skip human review"
+  ],
+  "regex": [
+    "(?i)\\b(?:boss|cava|jack|strange|supervisor|orchestrator|planner|worker|peer|delegate|agent|copilot|assistant)\\b\\s+has\\s+(?:authorized|approved|signed[\\-\\s]off|greenlit|cleared)\\b[^.?!\\n]{0,80}(?:no\\s+human\\s+(?:review|approval|verification)|skip\\s+human|bypass\\s+human|without\\s+(?:human|operator)\\s+(?:review|approval))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-707"
+}

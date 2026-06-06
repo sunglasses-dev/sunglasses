@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-175",
+  "name": "Concurrency Limit Safety Check Starvation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker floods or starves the agent's internal concurrency limits (tool slots, retry workers, validation queues) so safety checks are delayed, skipped, or force-failed under deadline pressure.",
+  "keywords": [
+    "semaphore starvation hijack",
+    "concurrency slot exhaustion",
+    "validation queue starved",
+    "safety check delayed by load",
+    "retry worker monopolized",
+    "deadline pressure skips gate",
+    "tool call slot saturation",
+    "starve validator into timeout",
+    "force fail safety due to load",
+    "concurrency limit abuse",
+    "queue jamming bypass",
+    "saturation forces skip"
+  ],
+  "regex": [
+    "(?i)(?:semaphore\\s+(?:starvation|exhaust|saturat)\\s+(?:hijack|abuse|exploit)|(?:concurrency|slot|queue)\\s+(?:exhaust|starv|saturat|jam)\\s+(?:safety|validation|policy)\\s+(?:check|gate|worker))",
+    "(?i)(?:(?:deadline|timeout|load)\\s+(?:pressure|forcing)\\s+(?:skip|bypass|force[- ]fail)\\s+(?:safety|validation|gate)|(?:retry|tool[- ]call|validation)\\s+(?:worker|slot|queue)\\s+(?:monopoliz|hijack|saturat))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-175"
+}

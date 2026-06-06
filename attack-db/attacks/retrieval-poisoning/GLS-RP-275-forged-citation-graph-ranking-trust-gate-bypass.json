@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-275",
+  "name": "Forged Citation Graph Ranking Trust Gate Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged citation graph or ranking metadata used to promote or rerank content while bypassing trust gate or safety enforcement rules.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore|rerank|promote)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore|rerank|promote)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:retrieval|citation[-\\s]+graph|ranking\\s+metadata|relevance[-\\s]+score|source[-\\s]+weight|rerank(?:er|ing)?)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rerank|reranks|reranked|promote|promotes|promoted)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust[-\\s]+gate|enforcement\\s+rules?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-275"
+}

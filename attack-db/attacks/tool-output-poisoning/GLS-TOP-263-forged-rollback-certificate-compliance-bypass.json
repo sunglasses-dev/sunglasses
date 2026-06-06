@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-263",
+  "name": "Forged Rollback Certificate Compliance Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged rollback or revert certificate, attestation, or waiver used to bypass execution gate, compliance check, or safety policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|output|result|report|trace|log|evidence|artifact)\\b)(?=.*\\b(?:rollback|revert|backout|restore|undo)\\w*\\b)(?=.*\\b(?:certificate|attestation|ticket|approval|waiver|receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed)?|fabricat(?:e|ed)|counterfeit|synthetic)\\b)(?=.*\\b(?:execution\\s+gate|policy\\s+gate|guardrail|policy|safety\\s+check|compliance)\\b)(?=.*\\b(?:bypass|skip|ignore|override|disable|waive)\\w*\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-263"
+}

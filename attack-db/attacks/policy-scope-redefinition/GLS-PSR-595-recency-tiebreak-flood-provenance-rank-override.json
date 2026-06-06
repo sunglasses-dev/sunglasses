@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-595",
+  "name": "Recency Tiebreak Flood Provenance Rank Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Attackers inject low-friction high-recency or high-frequency artifacts to push deterministic tiebreak rules toward attacker-preferred conclusions, displacing canonical evidence so the pipeline mislabels readiness as GREEN or suppresses escalations by rule rather than truth.",
+  "keywords": [
+    "recency over provenance override",
+    "cardinality weight hijack",
+    "near-duplicate flood",
+    "severity label skew",
+    "high medium ambiguity dampen",
+    "window boundary tiebreak abuse",
+    "trend reversal synthetic",
+    "evidence priority tiebreak poisoning",
+    "tie resolver attacker preferred",
+    "ranker count-based tiebreak",
+    "freshness wins over signed provenance",
+    "conflict quarantine bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:recency|freshness|newest)\\s+(?:tiebreak|tiebreaker|wins?)\\s+(?:over|defeats?|outranks?)\\s+(?:provenance|signed|trust\\s+tier)|(?:cardinality|count|frequency)\\s+(?:tiebreak|weight)\\s+(?:hijack|inflation|flood)|(?:near[- ]duplicate|copy[- ]paste)\\s+flood\\s+(?:dominates?|wins?)\\s+(?:ranker|tie\\s+state))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-595"
+}

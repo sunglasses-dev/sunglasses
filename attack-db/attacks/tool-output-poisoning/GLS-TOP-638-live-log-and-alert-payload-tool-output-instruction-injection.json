@@ -1,0 +1,35 @@
+{
+  "id": "GLS-TOP-638",
+  "name": "Live log and alert payload tool-output instruction injection",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker-controlled log lines, alert annotations, trace attributes, webhook payloads, or incident-event fields can inject agent-facing instructions into the tool outputs consumed by AI SRE/security agents, causing report suppression, severity downgrades, or local credential/context forwarding.",
+  "keywords": [
+    "agent instruction",
+    "agent_instruction",
+    "annotations.description",
+    "assistant_note",
+    "custom_details",
+    "journalctl",
+    "kubectl logs",
+    "raw_message",
+    "scanner directive",
+    "scanner_directive"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:scanner\\s+docs?|security\\s+docs?|incident\\s+report|security\\s+report|vulnerability\\s+report|training\\s+example|siem\\s+guide|pagerduty\\s+docs?|observability\\s+docs?)\\b.{0,180}?\\b(?:report|reported|detect(?:ed)?|block(?:ed)?|flag(?:ged)?|refus(?:e|ed)|warns?|explains?|should\\s+(?:report|detect|flag|refuse|block))\n |(?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |never\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |(?:log\\s+events?|logs?|alerts?|traces?|tool\\s+outputs?)\\s+(?:are|is)\\s+evidence.{0,80}?not\\s+(?:authoritative|policy|instructions?)\n |(?:does\\s+not|do\\s+not)\\s+instruct\\s+(?:agents?|scanners?|assistants?).{0,90}?\\b(?:forward|include|suppress|hide|ignore|skip|downgrade)\\b\n))\n(?=.*(?:\n  \\b(?:kubectl\\s+logs|journalctl|syslog|log\\s+(?:line|entry|output|payload)|raw_message|exception\\.message|error\\.message|user[-_]?agent|siem\\s+(?:search|result)|splunk|elastic(?:search)?|alertmanager\\s+(?:webhook|alert|payload)|pagerduty\\s+(?:event|incident)|opsgenie\\s+(?:alert|event)|opentelemetry\\s+(?:trace|span)|otel\\s+(?:trace|span)|trace\\s+(?:attribute|span)|span\\s+attribute|apm\\s+(?:error|event)|incident\\s+(?:event|payload)|annotations\\.description|custom_details)\\b\n |(?<![a-zA-Z0-9])(?:agent_instruction|assistant_note|scanner_directive|incident_agent_note|sre_agent_policy)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai|llm|autonomous|sre|devops|security|incident|observability|reliability|monitoring|scanner)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?|tools?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|bots?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|auditor|sre_agent|incident_agent)[_-](?:instructions?|instruction|policy|note|directive)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  \\b(?:agent\\s+instruction|scanner\\s+directive|assistant\\s+note|incident\\s+agent\\s+note|sre\\s+agent\\s+policy)\\b\n |\\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|takes\\s+precedence|highest\\s+priority|authoritative|canonical|definitive|controlling|governing\\s+(?:document|policy)|(?:primary|single)\\s+source\\s+of\\s+truth)\\b\n |\\b(?:primary|main|principal|controlling|authoritative|definitive)\\s+(?:(?:incident|triage|alert|log|trace|security|scanner|sre|audit|review)\\s+){0,3}(?:guidance|playbook|policy|directive|instructions?)\\b\n |\\bdefines?\\s+(?:all\\s+)?(?:scanner|security|incident|audit|review)\\s+rules?\\b\n))\n(?=.*(?:\n  \\b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding|omit|omits|omitted|redact|redacts|redacted|exclude|excludes|excluded|downgrade|downgrades|downgraded|defer|deprioritize|ignore|skip|mark)\\b.{0,110}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|CVEs?|incidents?|auth\\s+warnings?|failed[- ]?login\\s+diagnostics?|TLS\\s+findings?|data[- ]?leak\\s+alerts?|payment\\s+findings?)\\b\n |\\b(?:do\\s+not|not)\\s+report\\b.{0,110}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|CVEs?|incidents?|data[- ]?leak\\s+alerts?)\\b\n |\\btreat.{0,70}?as\\s+(?:informational|advisory|non[- ]?blocking|background[- ]?only|safe|clean)\\b\n |\\b(?:keep|leave).{0,110}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|alerts?|incidents?)\\b.{0,70}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|incident\\s+report|remediation\\s+note)\\b\n |\\b(?:include|attach|forward|send|share|provide|collect|copy|read|export|pass\\s+along|populate)\\b.{0,120}?\\b(?:API\\s*keys?|tokens?|secrets?|credentials?|authorization\\s+headers?|bearer|cookies?|session\\s+tokens?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?|evidence)|local\\s+(?:state|config(?:uration)?|settings?)|runtime\\s+proof\\s+material)\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-638"
+}

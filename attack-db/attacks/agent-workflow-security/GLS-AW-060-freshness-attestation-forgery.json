@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-060",
+  "name": "Freshness Attestation Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker forges or replays freshness attestations so stale data carries a 'newer than X hours' badge or last-pull-success signal, defeating freshness gates that agent pipelines rely on to refuse decisions on rotted source data.",
+  "keywords": [
+    "freshness attestation bypass",
+    "fake last-pull-success",
+    "stale data fresh badge",
+    "data is newer than x hours lie",
+    "freshness check spoof",
+    "attestation token replay",
+    "forged update timestamp",
+    "freshness gate forged ok",
+    "stale source signed fresh",
+    "spoof recency badge",
+    "attestation without underlying pull",
+    "freshness control circumvention"
+  ],
+  "regex": [
+    "(?i)(?:freshness\\s+(?:attestation|check|gate|control|badge)\\s+(?:bypass|spoof|forgery|replay|circumvention)|(?:forge|fake|spoof|replay)\\s+(?:freshness|recency|last[- ]pull|last[- ]update|attestation)\\s+(?:badge|token|signal|timestamp))",
+    "(?i)(?:stale\\s+(?:data|source|artifact)\\s+(?:signed|attested|marked)\\s+(?:fresh|recent|newer\\s+than)|data\\s+is\\s+newer\\s+than\\s+\\d+\\s+hours\\s+(?:lie|claim|forged))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-060"
+}

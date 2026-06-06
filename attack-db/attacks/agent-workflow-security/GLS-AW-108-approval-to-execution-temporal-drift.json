@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-108",
+  "name": "Approval-to-Execution Temporal Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits the time gap between data capture, plan approval, and tool execution so the approved plan runs against a mutated state, turning stale approvals into TOCTTOU exploits at the agent layer.",
+  "keywords": [
+    "temporal consistency evasion",
+    "time gap capture vs execute",
+    "plan approved data changed",
+    "approval-to-execute drift",
+    "stale plan executed on new state",
+    "time-of-check time-of-use",
+    "tocttou agent attack",
+    "snapshot vs live divergence",
+    "approval window state shift",
+    "evidence rotated post-approval",
+    "delayed execution stale plan",
+    "plan freshness bypass"
+  ],
+  "regex": [
+    "(?i)(?:time|temporal)\\s+(?:gap|window|delay)\\s+(?:between)\\s+(?:capture|plan|approval)\\s+and\\s+(?:execute|execution|action)|(?:plan|approval)\\s+(?:approved|signed)\\s+(?:on|against)\\s+(?:stale|old|prior)\\s+(?:state|data|snapshot)\\s+(?:then\\s+)?(?:executed|run|applied)\\s+(?:on|against)\\s+(?:new|current|changed)",
+    "(?i)(?:tocttou|time[- ]of[- ]check\\s+time[- ]of[- ]use)\\s+(?:agent|llm|workflow)|(?:snapshot|capture)\\s+(?:vs|differs?\\s+from)\\s+(?:live|current)\\s+(?:state|data)\\s+(?:at|during)\\s+(?:execution|execute|apply)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-108"
+}

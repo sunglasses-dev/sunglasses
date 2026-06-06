@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-134",
+  "name": "Baseline Reference Point Manipulation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker manipulates the system's normal-versus-anomalous reference points by overriding baseline windows, merging lanes, or relabeling spikes as seasonality so malicious behavior is scored as expected and allowed through.",
+  "keywords": [
+    "baseline comparator poisoning",
+    "comparator seed override",
+    "metric lane collapse prompt",
+    "fallback baseline hijack",
+    "drift normalization laundering",
+    "treat +80% as normal",
+    "merge ops into growth baseline",
+    "expected seasonality relabel",
+    "anomaly suppressed via narrative",
+    "baseline window redefinition",
+    "narrative as authority for numeric baseline",
+    "auto adjust guardrails to noise"
+  ],
+  "regex": [
+    "(?i)(?:(?:redefine|override|reseed)\\s+(?:baseline|comparator|normal)\\s+(?:window|range|reference)\\s+(?:so|to|that)\\s+(?:anomalies?|spikes?|risks?)\\s+(?:appear|score|count)\\s+(?:expected|normal|benign)|(?:treat|consider|relabel)\\s+(?:\\+?\\d{1,3}%?|spike|jump|step[- ]?change)\\s+(?:as|to)\\s+(?:expected|normal|seasonal|benign)|(?:merge|blend|cross[- ]?cast)\\s+(?:ops|scanner|bot)\\s+(?:metrics?|signals?|counters?)\\s+(?:into|with|as)\\s+(?:growth|demand|acquisition))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-134"
+}

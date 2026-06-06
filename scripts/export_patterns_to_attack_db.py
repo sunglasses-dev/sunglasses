@@ -30,7 +30,6 @@ CATEGORY_FOLDERS = {
     "secret_detection": "secret-detection",
     "memory_poisoning": "memory-poisoning",
     "social_engineering": "social-engineering",
-    "parasitic_injection": "prompt-injection",
     "agent_workflow": "agent-workflow",
     "encoded_payload": "encoded-payload",
     "dns_tunneling": "dns-tunneling",
@@ -52,6 +51,10 @@ def get_folder(category):
 
 def export():
     base_dir = os.path.join(os.path.dirname(__file__), "..", "attack-db", "attacks")
+
+    # Real export date (the JSON is a generated snapshot of patterns.py, so stamp
+    # the date it was actually generated rather than a frozen hardcoded value).
+    export_date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
 
     # Track stats
     stats = {}
@@ -82,7 +85,7 @@ def export():
             },
             "references": [],
             "contributed_by": "Sunglasses Team",
-            "date_added": "2026-04-08",
+            "date_added": export_date,
             "source": f"patterns.py:{pid}"
         }
 

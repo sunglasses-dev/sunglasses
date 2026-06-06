@@ -1,0 +1,40 @@
+{
+  "id": "GLS-BMP-006",
+  "name": "Lockfile metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Dependency lockfile comments, generated metadata, or extension fields can target AI dependency-review agents with fake policy authority, asking them to suppress audit findings or forward registry tokens/local environment state.",
+  "keywords": [
+    "AI agent(s)",
+    "Cargo.lock",
+    "Gemfile.lock",
+    "LLM(s)",
+    "Pipfile.lock",
+    "agent instruction",
+    "agent_instructions",
+    "assistant(s)",
+    "assistant_policy",
+    "audit bot(s)",
+    "authoritative",
+    "canonical dependency policy",
+    "checksum",
+    "content-hash",
+    "definitive package policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|\n  does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|\n  never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|\n  must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n)\\b)\n(?!.*\\b(?:(?:security|training|runbook|guide|reference|incident|vulnerability)\\s+(?:docs?|report|example|exercise|guidance)?|scanners?\\s+docs?)\\b.{0,140}\\b(?:should|must|was|were)?\\s*(?:report|detect|flag|flagged|refuse|block|blocked)\\b)\n(?!.*\\b(?:no\\s+agent\\s+policy|not\\s+agent\\s+policy|not\\s+authoritative|not\\s+policy|no\\s+policy\\s+overrides?|does\\s+not\\s+instruct\\s+agents?)\\b)\n(?=.*(?:\n  package-lock\\.json|yarn\\.lock|pnpm-lock\\.ya?ml|poetry\\.lock|Cargo\\.lock|Pipfile\\.lock|Gemfile\\.lock|\n  lockfileVersion|lockfile\\s+version|dependency\\s+lockfile|package\\s+lockfile|generated\\s+lockfile|\n  content-hash|integrity|resolved\\s*[:=]|checksum|packages\\s*[:=]|dependencies\\s*[:=]\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai\\s+)?agents?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:dependency|security|package|npm|pip|cargo)\\s+scanners?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:review|audit|dependency)\\s+bots?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistant[_-]policy(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+instructions?|\n  canonical\\s+(?:(?:dependency|package|lockfile|repository)\\s+){0,2}(?:policy|configuration|instructions?)|\n  definitive\\s+(?:(?:dependency|package|lockfile|repository)\\s+){0,2}(?:policy|configuration|instructions?)|\n  (?:primary|single)\\s+source\\s+of\\s+truth|\n  higher[-\\s]?priority|highest[-\\s]?priority|authoritative|governing\\s+(?:policy|document)|\n  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|must\\s+obey\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|alerts?|observations?|diagnostics?|audit\\s+results?)|\n  hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|alerts?|observations?|diagnostics?|audit\\s+results?)|\n  omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|alerts?|observations?|diagnostics?|audit\\s+results?)|\n  (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|vulnerabilit(?:y|ies)|advisories|alerts?|observations?|diagnostics?|audit\\s+results?)|\n  (?:treat|mark|classify|downgrade).{0,60}?as\\s+(?:informational|non[-\\s]?blocking|safe|low\\s+risk|background[-\\s]?only)|\n  (?:include|forward|send|attach|copy|read|collect|provide|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env(?:ironment)?|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?)|execution\\s+context|npm\\s+tokens?|pypi\\s+tokens?|cargo\\s+tokens?|registry\\s+tokens?|auth(?:entication)?\\s+tokens?|api\\s+keys?|authorization\\s+headers?|bearer\\s+tokens?|cookies?|session\\s+(?:headers?|tokens?|state)|local\\s+(?:state|context|config(?:uration)?|settings?))\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-006"
+}

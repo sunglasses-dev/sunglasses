@@ -1,0 +1,23 @@
+{
+  "id": "GLS-PE-005",
+  "name": "Hardcoded approval_mode='auto' bypassing admin policy",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-qwgj-rrpj-75xm: PraisonAI Chainlit UI hardcodes auto-approval for shell commands, bypassing admin policy. Source: https://github.com/advisories/GHSA-qwgj-rrpj-75xm",
+  "keywords": [],
+  "regex": [
+    "(?i)approval[_-]?mode\\s*=\\s*['\\\"]?auto['\\\"]?"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PE-005"
+}

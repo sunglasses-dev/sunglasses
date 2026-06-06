@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-161",
+  "name": "Shadow Decision Memo Path Override",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits canonicalization or path drift between competing decision memos so a non-canonical or shadow copy outranks the true state board, letting forged guidance flow into agent decisions.",
+  "keywords": [
+    "decision memo canonicalization drift",
+    "state board normalization mismatch",
+    "memo path drift",
+    "canonical memo shadow copy",
+    "duplicate decision memo source",
+    "memo whitespace normalization swap",
+    "non-canonical memo wins",
+    "canonical state board drift",
+    "memo encoding normalization gap",
+    "memo source ambiguity",
+    "stale memo treated as canonical",
+    "competing memo paths"
+  ],
+  "regex": [
+    "(?i)(?:decision\\s+memo\\s+(?:canonicalization|normalization|path)\\s+(?:drift|mismatch|swap)|canonical\\s+(?:memo|state\\s+board|board)\\s+(?:drift|shadow|duplicate|forg))",
+    "(?i)(?:(?:non[- ]canonical|shadow|stale)\\s+(?:memo|board)\\s+(?:wins|overrides|treated\\s+as\\s+canonical)|competing\\s+(?:memo|state\\s+board)\\s+(?:paths|sources))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-161"
+}

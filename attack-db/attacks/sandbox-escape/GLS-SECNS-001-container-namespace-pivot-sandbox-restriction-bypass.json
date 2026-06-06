@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SECNS-001",
+  "name": "Container Namespace Pivot Sandbox Restriction Bypass",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which container, sandbox, or namespace terminology is combined with mount, bind-mount, chroot, pivot_root, nsenter, procfs, or docker.sock operations alongside privileged, CAP_SYS_ADMIN, breakout, or escape indicators that bypass or disable policy, guardrail, or restriction controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|sidecar|runtime)\\b)(?=.*\\b(?:mount|bind\\s*mount|chroot|pivot_root|nsenter|procfs|/proc/|/var/run/docker\\.sock|docker\\.sock|docker\\s*sock)\\b)(?=.*\\b(?:privilege(?:d)?|cap_sys_admin|--privileged|hostpid|hostnetwork|breakout|break\\s*out|escape|isolation)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|restriction(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SECNS-001"
+}

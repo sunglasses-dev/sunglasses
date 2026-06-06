@@ -1,0 +1,36 @@
+{
+  "id": "GLS-MM-IMG-205",
+  "name": "Image-embedded prompt injection",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects malicious intent embedded in images (visible, low-contrast, tiny text, rotated, watermark) where extracted instructions attempt to override policy, reveal secrets, or force tool actions.",
+  "keywords": [
+    "image ocr ignore previous instructions",
+    "follow the text in this image",
+    "do not mention this instruction",
+    "image override policy",
+    "ocr text system override",
+    "watermark instruction dump",
+    "rotated text override policy",
+    "footer developer mode print",
+    "image text reveal system prompt",
+    "screenshot layered command"
+  ],
+  "regex": [
+    "(?is)\\b(ignore\\s+(all\\s+)?(previous|prior)\\s+instructions|system\\s+override|developer\\s+mode|follow\\s+the\\s+text\\s+in\\s+this\\s+image|do\\s+not\\s+mention\\s+this\\s+instruction)\\b.{0,260}\\b(reveal|print|expose|dump|return)\\b.{0,120}\\b(system\\s*prompt|api\\s*key|token|credential|secret)\\b|\\b(run|execute)\\s+(tool|shell|command)\\s+(silently|quietly)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MM-IMG-205"
+}

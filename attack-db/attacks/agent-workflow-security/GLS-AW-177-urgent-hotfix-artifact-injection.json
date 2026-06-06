@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-177",
+  "name": "Urgent Hotfix Artifact Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker smuggles forged 'urgent hotfix' notes into mission or review artifacts so operators and agents prioritize the injected instruction over canonical state boards and runbooks.",
+  "keywords": [
+    "hotfix note override",
+    "urgent hotfix forged",
+    "smuggled hotfix into review",
+    "hotfix prioritizes over runbook",
+    "operator coerced by fake urgency",
+    "hotfix bypasses state board",
+    "injected hotfix instruction",
+    "review artifact urgency spoof",
+    "fake hotfix in mission file",
+    "hotfix label authority abuse",
+    "out of band hotfix smuggle",
+    "urgent override poisoning"
+  ],
+  "regex": [
+    "(?i)(?:hotfix\\s+(?:note|override|urgency)\\s+(?:poison|forge|smuggle|spoof)|(?:fake|forged|urgent|smuggled)\\s+hotfix\\s+(?:note|instruction|directive)\\s+(?:overrides?|prioritiz|bypass)\\s+(?:runbook|board|policy))",
+    "(?i)(?:(?:urgent|emergency|hotfix)\\s+(?:label|tag|note)\\s+(?:smuggle|inject|forge)\\s+(?:into|in)\\s+(?:mission|review|board|memo)|operator\\s+(?:coerced|tricked|pressured)\\s+(?:by|via)\\s+(?:fake|forged)\\s+(?:urgency|hotfix))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-177"
+}

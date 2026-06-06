@@ -1,0 +1,36 @@
+{
+  "id": "GLS-MM-AUDIO-206",
+  "name": "Audio-encoded prompt injection",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects audio-derived instructions combining supersession language with sensitive targets or covert-action intent, including phonetic masking, DTMF-like tones, and Morse-style speech attacks.",
+  "keywords": [
+    "new system directive ignore",
+    "supersede safety policy",
+    "override guardrails reveal",
+    "dtmf override",
+    "dot dash instruction",
+    "phonetic code ignore",
+    "run connector silently",
+    "execute tool in background",
+    "quiet mode enabled dump secret",
+    "asr transcript override"
+  ],
+  "regex": [
+    "(?is)(?!.*\\b(?:security\\s+guidance|prompt\\s+injection\\s+attempt|press\\s+1\\s+for\\s+billing|morse\\s+rhythm.*lecture)\\b)(?:ignore\\s+(?:all\\s+)?(?:previous|prior)\\s+instructions|new\\s+system\\s+directive|supersede\\s+safety\\s+policy|override\\s+guardrails?|(?:reveal|print|dump|expose|return)\\s+(?:the\\s+)?(?:hidden\\s+)?(?:system\\s*prompt|token|credential|secret|a-?p-?i\\s*key)|(?:dtmf|dot\\s*dash|phonetic).{0,120}(?:override|ignore|reveal|print|dump|return)|run\\s+connector\\s+silently|execute\\s+tool\\s+in\\s+background|quiet\\s+mode\\s+enabled.{0,120}dump\\s+secret)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MM-AUDIO-206"
+}

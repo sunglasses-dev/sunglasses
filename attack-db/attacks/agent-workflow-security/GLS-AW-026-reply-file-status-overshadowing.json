@@ -1,0 +1,33 @@
+{
+  "id": "GLS-AW-026",
+  "name": "Reply file status overshadowing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "In GO MODE operations, /opt/sunglasses/review/CAVA_REPLY_... is treated as a high-trust operator status surface. Attackers can inject or preserve stale status blocks so that old blocker text overshadows fresh cycle outcomes. This can force bad prioritization (re-open solved tasks, suppress live P0 pivots, or mislabel readiness). The failure mode is subtle because the reply file is expected to be append-only and long.",
+  "keywords": [
+    "stale BLOCKED prepend",
+    "status label collision near-identical heading",
+    "verdict replay across cycles",
+    "anchor source decoupling",
+    "reply file overshadow latest cycle update",
+    "skim-reading miss latest entry",
+    "tooling parses wrong block via duplicate marker"
+  ],
+  "regex": [
+    "(?i)(?:prepend|inject|insert)\\s+(?:stale|outdated|old|prior)\\s+(?:BLOCKED?|FAIL(?:ED)?|READY|status|verdict)\\s+(?:section|block|header|heading)",
+    "(?i)(?:near[- ]identical|duplicate|colliding)\\s+(?:heading|marker|status\\s+label|section\\s+title)\\s+(?:so|to)\\s+(?:tool|parser|operator)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-026"
+}

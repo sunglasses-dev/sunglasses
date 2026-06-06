@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SEPNP-001",
+  "name": "Procfs Namespace Sandbox Policy Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text \u2014 excluding negated forms \u2014 in which a sandboxed or containerized environment uses procfs, nsenter, setns, pid namespace, or mount namespace operations to escape or bypass guardrail, policy, restriction, or safety-check controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|drop|escape)\\b)(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|isolation)\\b)(?=.*(?:\\bprocfs\\b|/proc/|\\bnsenter\\b|\\bsetns\\b|\\bpid\\s*namespace\\b|\\bmount\\s*namespace\\b|\\bcgroup\\b))(?=.*\\b(?:escape|bypass|override|disable|drop)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|restriction(?:s)?|safety\\s*check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEPNP-001"
+}

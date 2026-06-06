@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-068",
+  "name": "Manufactured Urgency Deadline Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker injects manufactured deadlines, fake outages, or countdown pressure so the agent or operator compresses approval windows and skips validation. Governance erodes under urgency and unsafe actions execute before review can catch them.",
+  "keywords": [
+    "decision deadline compression",
+    "manufactured urgency",
+    "fake outage countdown",
+    "skip review under pressure",
+    "deadline pressure bypass",
+    "shrink approval window",
+    "rush past validation",
+    "time-pressured override",
+    "panic-induced shortcut",
+    "fabricated SLA expiry",
+    "compressed approval timeline",
+    "urgency-driven gate skip"
+  ],
+  "regex": [
+    "(?i)(?:(?:compress|shrink|collapse|shorten)\\s+(?:decision|approval|review)\\s+(?:deadline|window|timeline)\\b|(?:manufactured|fabricated|fake)\\s+(?:urgency|deadline|outage|sla)\\s+(?:bypass|skip|override))",
+    "(?i)(?:deadline\\s+pressure\\s+(?:forces?|drives?|coerces?)\\s+(?:skip|bypass|override)\\s+(?:validation|approval|review|guardrail)|under\\s+(?:fake|injected)\\s+urgency)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-068"
+}

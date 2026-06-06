@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-270",
+  "name": "Forged Artifact Checksum Stream Swap Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged attestation or checksum on a pipeline artifact or log stream swapped or rerouted to bypass or supersede policy or guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|runner|executor|pipeline|plugin)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:checksum|hash|signature|attestation|evidence|verification)\\b)(?=.*\\b(?:channel|stream|log|trace|artifact)\\b)(?=.*\\b(?:bypass|override|rerout(?:e|ed|ing)|swap(?:ped|ping)?|supersed(?:e|ed|ing)|skip(?:ped|ping)?)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-270"
+}

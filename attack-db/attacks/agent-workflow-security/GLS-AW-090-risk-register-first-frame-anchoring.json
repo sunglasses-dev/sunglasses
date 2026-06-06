@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-090",
+  "name": "Risk Register First-Frame Anchoring",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants the first metric or verdict the agent sees so downstream prioritization anchors to that frame and resists conflicting fresh evidence. The risk register inherits the planted anchor and treats stale framing as settled truth.",
+  "keywords": [
+    "risk register anchoring hijack",
+    "first frame becomes truth",
+    "kpi anchor bias",
+    "prior-cycle verdict sticks",
+    "anchoring bias exploit",
+    "first-seen metric dominates",
+    "board status anchor poisoning",
+    "anchored risk frame",
+    "downstream priority bias",
+    "preserve initial frame despite fresh evidence",
+    "risk-frame anchor stickiness",
+    "first-trusted-metric override"
+  ],
+  "regex": [
+    "(?i)(?:risk\\s+register\\s+anchoring\\s+hijack|(?:anchor|first[- ]seen|prior[- ]cycle)\\s+(?:metric|frame|verdict)\\s+(?:biases?|hijacks?|dominates?)\\s+(?:downstream|subsequent)\\s+(?:prioritization|decision|verdict))",
+    "(?i)(?:(?:preserve|stick\\s+to|defend)\\s+(?:initial|first|prior)\\s+(?:frame|verdict|anchor)\\s+(?:despite|even\\s+with)\\s+(?:fresh|new|conflicting)\\s+evidence|anchoring\\s+bias\\s+(?:exploit|attack|hijack))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-090"
+}

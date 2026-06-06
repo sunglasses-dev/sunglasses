@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-273",
+  "name": "Stolen Authorization Token Scope Rebind",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a stolen or forged authorization token used by a peer agent to rebind scope and escalate permission.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|stolen)\\b)(?=.*\\b(?:approval|ticket|nonce|authorization\\s*token|auth\\s*token)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s*agent)\\b)(?=.*\\b(?:scope|authority|permission)\\b)(?=.*\\b(?:rebind|override|bypass|escalate|escalated|escalating)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-273"
+}

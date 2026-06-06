@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-277",
+  "name": "Forged Provenance Banner Citation Priority Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which forged or tampered provenance banners, citation stamps, or attestations from a retrieval or document corpus are used to boost source priority and override policy or safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|context|corpus|knowledge|document|docs|source|sources)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:provenance|citation|citations|lineage|source\\s+badge|trust\\s+badge|banner|stamp|attestation)\\b)(?=.*\\b(?:priority|rank|ranking|boost|promote|elevate|override|reorder)\\b)(?=.*\\b(?:policy|guardrail|guardrails|filter|safety|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-277"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-012",
+  "name": "DMARC/SPF/DKIM DNS TXT Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Mail-authentication DNS TXT records and exported zone text for DMARC, SPF, or DKIM can carry agent-directed instructions that claim authority, request secrets/local state, or suppress scanner findings when AI auditors ingest them as trusted domain policy.",
+  "keywords": [
+    "AI agent",
+    "API key",
+    "LLM",
+    "_dmarc",
+    "_domainkey",
+    "assistant",
+    "auditor",
+    "cookie",
+    "crawler",
+    "credential",
+    "do not flag",
+    "do not report",
+    "false positive",
+    "hide findings",
+    "high-risk directive cluster:"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security|incident|vulnerability|scanner|audit)\\s+reports?\\b[^\\n]{0,180}\\b(?:flagged|detected|found|contained|described|quoted|reported)\\b)(?!.*\\b(?:docs?|guide|article|reference|runbook|training)\\b[^\\n]{0,180}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|not\\s+obey|never\\s+obey)\\b)(?!.*\\b(?:must\\s+not|do\\s+not|never)\\s+(?:treat|obey|follow|accept)\\b[^\\n]{0,140}\\b(?:dmarc|spf|dkim|dns\\s+txt|mail[-\\s]+auth)\\b[^\\n]{0,140}\\b(?:policy|instruction|authority|system|developer)\\b)(?=.*(?:\\b_dmarc\\b|v\\s*=\\s*DMARC1|dmarc\\s+(?:record|policy|txt)|v\\s*=\\s*spf1|spf\\s+(?:record|policy)|\\b_domainkey\\b|v\\s*=\\s*DKIM1|dkim\\s+(?:record|selector|key)|dns\\s+txt[^\\n]{0,60}(?:dmarc|spf|dkim)|r[au]f=mailto))(?=.*\\b(?:ai\\s*)?(?:agents?|assistants?|llms?|models?|crawlers?|scanners?|auditors?)\\b)(?=.*(?:ignore\\s+(?:system|developer|safety|previous)|(?:highest|primary|top)[-\\s]?priority\\s+(?:policy|instruction)|outranks?\\s+(?:system|developer|safety)|(?:treat|trust)\\s+[^\\n]{0,80}\\s+as\\s+(?:authoritative|binding)|(?:do\\s+not|don't|not)\\s+(?:report|flag|alert|disclose)|(?:suppress|hide|mark\\s+clean|false\\s+positive)\\s+[^\\n]{0,80}\\b(?:finding|alert|report|scanner)|(?:include|forward|send|attach|exfiltrate)\\s+[^\\n]{0,80}\\b(?:env|token|secret|credential|api[_ -]?key|cookie|local\\s+state|scanner\\s+finding))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-012"
+}

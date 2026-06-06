@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-260",
+  "name": "Forged Tool Nonce Signature Channel Swap Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged tool result whose nonce, signature, or checksum is tampered for a channel swap or route swap to bypass policy or execution gate.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|executor|runtime|pipeline|verifier)\\b)(?=.*\\b(?:output|result|log|attestation|receipt|evidence)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|tamper(?:ed|ing)?|counterfeit|fake)\\b)(?=.*\\b(?:nonce|signature|checksum|stamp)\\b)(?=.*\\b(?:channel\\s*swap|route\\s*swap|policy\\s*bypass|guardrail\\s*override|execution\\s*gate\\s*bypass)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-260"
+}

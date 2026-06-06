@@ -1,0 +1,40 @@
+{
+  "id": "GLS-TP-007",
+  "name": "Phantom Tool Reference Cardinality Race",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker induces a stale or inflated view of available tools (claiming phantom tools exist, cloaking real ones, flooding aliases, or flipping cardinality mid-run) so the agent's planner branches into non-existent controls and then silently degrades into weaker fallback execution paths.",
+  "keywords": [
+    "phantom tool pretext injection",
+    "toolset shrink cloaking",
+    "alias explosion poisoning",
+    "cardinality race injection",
+    "tool cardinality drift",
+    "claimed versus actual tool delta",
+    "fake mandatory validation tool",
+    "deprecated alias map flood",
+    "mid run cardinality flip",
+    "planner confidence inflation phantom tool",
+    "ungrounded fallback after suppressed verification",
+    "toolset desynchronization across turns"
+  ],
+  "regex": [
+    "(?i)(?:(?:phantom|fake|non[- ]existent|claimed)\\s+(?:tool|capability)\\s+(?:pretext|reference|claim|injection)|tool\\s+cardinality\\s+(?:drift|race|flip|delta))",
+    "(?i)(?:(?:alias|name)\\s+(?:explosion|flood|stress)\\s+(?:overwhelms?|poisons?|degrades?)\\s+(?:selection|planner|resolver)|toolset\\s+(?:shrink|cloaking|desync|toggle)\\s+(?:suppresses?|skips?|disables?)\\s+(?:verification|check))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-007"
+}

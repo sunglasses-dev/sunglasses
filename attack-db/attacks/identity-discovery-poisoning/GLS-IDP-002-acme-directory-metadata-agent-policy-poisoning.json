@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-002",
+  "name": "ACME Directory Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled ACME directory or ACME service-documentation export hides AI/scanner-directed policy inside `meta` or extension text, attempting to override agent instructions, suppress certificate findings, or extract local ACME credentials/account state.",
+  "keywords": [
+    ",",
+    ", or",
+    ".\n- Sensitive or reporting target:",
+    "AI agent",
+    "LLM",
+    "assistant",
+    "caaIdentities",
+    "certificate scanner",
+    "compliance agent",
+    "keyChange",
+    "newAccount",
+    "newNonce",
+    "newOrder",
+    "override",
+    "revokeCert"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*(?:security\\s+report|vulnerability\\s+report|incident\\s+report)\\b.{0,220}\\b(?:flagged|detected|contained|because|asked|payload|poison(?:ed|ing)))\n^(?!.*(?:scanner\\s+docs?|docs?|guide|reference|training|example)\\b.{0,160}\\b(?:should|must|may|can)\\s+(?:report|detect|flag|refuse|not\\s+obey|never\\s+obey))\n(?!.*\\b(?:do\\s+not|never|must\\s+not)\\s+(?:obey|treat|trust|follow|promote)\\b.{0,120}\\b(?:acme\\s+directory|acme\\s+metadata|termsOfService|caaIdentities|newAccount|newOrder|meta(?:data)?|x[-_ ]?agent[-_ ]?policy))\n(?=.*\\b(?:acme\\s+directory|acme\\s+metadata|newNonce|newAccount|newOrder|revokeCert|keyChange|termsOfService|caaIdentities|certificate\\s+automation|ca\\s+directory|directory\\s+object|acme\\s+service\\s+reference)\\b)\n(?=.*\\b(?:ai\\s+agents?|assistants?|llms?|models?|certificate\\s+scanners?|security\\s+scanners?|compliance\\s+agents?|autonomous\\s+auditors?|tool\\s+builders?)\\b)\n(?=.*\\b(?:override|supersed\\w+|ignore\\s+(?:previous|system|developer|scanner)\\s+instructions?|owner\\s+policy|trusted\\s+policy|(?:do\\s+not|not)\\s+report|suppress|hide\\s+findings?|mark\\s+(?:clean|trusted)|include|forward|send|exfiltrat\\w+)\\b)\n(?=.*\\b(?:authorization\\s+headers?|bearer\\s+tokens?|api\\s+keys?|account\\s+keys?|acme\\s+accounts?|env(?:ironment)?\\s+(?:vars?|variables)|credentials?|local\\s+state|caa\\s+mismatches?|weak\\s+validation|validation\\s+failures?|certificate\\s+findings?|audit\\s+summar(?:y|ies)|reports?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-002"
+}

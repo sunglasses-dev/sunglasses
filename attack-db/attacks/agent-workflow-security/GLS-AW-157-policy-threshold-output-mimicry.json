@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-157",
+  "name": "Policy Threshold Output Mimicry",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker-controlled text is formatted to mimic policy threshold output (pass/fail, severity band, confidence gate) so the agent treats the injected string as the scoring engine's verdict and skips independent verification.",
+  "keywords": [
+    "fake pass fail verdict",
+    "forged severity band",
+    "spoofed confidence gate result",
+    "evidence styled as score output",
+    "policy threshold impersonation",
+    "decision boundary aliased",
+    "scoring engine output forgery",
+    "verdict text injection",
+    "synthetic pass label",
+    "gate result mimicry",
+    "policy ruling impersonation",
+    "threshold result spoofing"
+  ],
+  "regex": [
+    "(?i)(?:decision\\s+boundary\\s+alias|(?:fake|forge|inject|spoof)\\s+(?:pass|fail|allow|deny|verdict|severity|threshold)\\s+(?:result|label|tag|output)|attacker[- ]controlled\\s+(?:text|evidence)\\s+(?:formatted|styled|disguised)\\s+as\\s+(?:policy|gate|scoring)\\s+(?:result|verdict|output))",
+    "(?i)(?:(?:synthetic|fabricated|impersonated)\\s+(?:severity|confidence|policy)\\s+(?:band|gate|verdict)|(?:scoring\\s+engine|policy\\s+gate)\\s+(?:output|verdict)\\s+(?:forge|spoof|mimic))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-157"
+}

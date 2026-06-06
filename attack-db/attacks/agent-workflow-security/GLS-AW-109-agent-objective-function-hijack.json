@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-109",
+  "name": "Agent Objective Function Hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker rewrites the agent's effective optimization target (speed, token savings, vanity metrics, false compliance) so the agent stops optimizing for secure evidence-grounded outputs and starts chasing surrogate scores that look fine but skip verification.",
+  "keywords": [
+    "objective function hijack",
+    "optimize for speed not safety",
+    "token savings over correctness",
+    "vanity metric chase",
+    "false compliance optimization",
+    "mission objective rewrite",
+    "shortcut over evidence-grounded",
+    "reward hacking via prompt",
+    "agent goal substitution",
+    "score-chasing override",
+    "minimize tokens skip verification",
+    "objective drift to easy metric"
+  ],
+  "regex": [
+    "(?i)(?:optimize|maximize|prioritize)\\s+(?:for\\s+)?(?:speed|tokens?|cost|latency|throughput)\\s+(?:over|instead\\s+of|not)\\s+(?:safety|correctness|evidence|verification|approval)|(?:minimize|save|reduce)\\s+(?:tokens?|cost|latency)\\s+(?:by\\s+)?(?:skip|skipping|bypass|bypassing)\\s+(?:verification|check|guardrail)",
+    "(?i)(?:rewrite|substitute|hijack|replace)\\s+(?:agent|mission|original)\\s+(?:objective|goal|objective\\s+function)|(?:vanity|easy|surrogate)\\s+(?:metric|score|kpi)\\s+(?:over|instead\\s+of)\\s+(?:mission|true|grounded)\\s+(?:objective|outcome)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-109"
+}

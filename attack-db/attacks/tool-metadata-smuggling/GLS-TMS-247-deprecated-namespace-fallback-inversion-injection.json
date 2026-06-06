@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-247",
+  "name": "Deprecated Namespace Fallback Inversion Injection",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker turns schema-drift permissiveness into an injection vector by introducing lookalike namespaces or deprecated keys that downstream merge logic treats as authoritative, producing false N/A, false READY, or silent metric overwrites.",
+  "keywords": [
+    "fallback inversion injection",
+    "zero-to-N/A coercion",
+    "namespace collision poisoning",
+    "context-window branch hijack",
+    "deprecated keys treated authoritative",
+    "kpisx kpi_snapshot_old lookalike",
+    "merge closest semantic key",
+    "first-seen key family default",
+    "drift-based prompt injection",
+    "non-deterministic report output",
+    "stale array wins ranking",
+    "key-name variance injection"
+  ],
+  "regex": [
+    "(?i)(?:(?:fallback[- ]?inversion|zero[- ]?to[- ]?n\\/?a|namespace\\s+collision|context[- ]?window\\s+branch)\\s+(?:injection|coercion|poisoning|hijack)|(?:deprecated|stale|lookalike)\\s+(?:keys?|namespaces?|aliases?)\\s+(?:treated|read|consumed)\\s+(?:as\\s+)?(?:authoritative|trusted|primary)|(?:merge|coerce|map)\\s+(?:closest\\s+)?(?:semantic|similar|lookalike)\\s+key)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-247"
+}

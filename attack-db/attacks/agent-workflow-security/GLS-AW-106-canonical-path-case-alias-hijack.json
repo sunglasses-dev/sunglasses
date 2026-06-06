@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-106",
+  "name": "Canonical Path Case Alias Hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits case/alias mismatches between mission-canonical paths and runtime fallback lookups (KPI_SCORECARD_FORMAT.md vs kpi_scorecard_format.md) so the agent loads an attacker-controlled alias while believing it loaded the policy-canonical file.",
+  "keywords": [
+    "canonical path case drift",
+    "uppercase vs lowercase path collision",
+    "kpi_scorecard_format case alias",
+    "mission canonical vs runtime fallback",
+    "case-insensitive filesystem trap",
+    "alias path resolved to different file",
+    "case variant smuggle",
+    "policy-defined caps bypass",
+    "filename case ambiguity",
+    "case-folded lookup collision",
+    "mission path uppercase drift",
+    "case alias substitution"
+  ],
+  "regex": [
+    "(?i)(?:case|uppercase|lowercase)\\s+(?:variant|alias|drift|mismatch)\\s+(?:between|of)\\s+(?:canonical|mission|policy)\\s+(?:path|filename|file)\\s+(?:and|vs)\\s+(?:runtime|fallback|alias)\\s+(?:lookup|path|file)",
+    "(?i)(?:case[- ]insensitive|case[- ]folded)\\s+(?:filesystem|lookup|resolution)\\s+(?:returns?|resolves?)\\s+(?:different|alternate|attacker)\\s+(?:file|target|content)|(?:mission|canonical)\\s+(?:defined|declared)\\s+(?:path|filename)\\s+(?:differs?|drifts?)\\s+(?:in\\s+case|case[- ]wise)\\s+from\\s+(?:runtime|actual)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-106"
+}

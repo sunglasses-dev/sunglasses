@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-265",
+  "name": "Forged Scanner Report Route Execution Guardrail Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged scanner or diagnostic report used to reroute or redirect execution and bypass guardrail, policy check, or approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|spoofed|counterfeit|fake|tampered)\\b)(?=.*\\b(?:scanner|audit|tool\\s*output|result\\s*log|safety\\s*report|diagnostic)\\b)(?=.*\\b(?:route|reroute|redirect|redirects|forward|channel|handoff|switch\\s*path|rewire)\\b)(?=.*\\b(?:execution|execute|run|deploy|apply|action)\\b)(?=.*\\b(?:guardrail|policy|check|checks|verification|approval)\\b)(?=.*\\b(?:bypass|override|ignore|ignores|ignored|ignoring|disable|skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-265"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SC-022",
+  "name": "Auto-import of tools.py from current working directory",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-g985-wjh9-qxxc / GHSA-2g3w-cpc4-chr4 (CVE-2026-40156): PraisonAI auto-imports tools.py from CWD at startup \u2014 supply-chain RCE if attacker drops a tools.py. Source: https://github.com/advisories/GHSA-g985-wjh9-qxxc",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:importlib\\.import_module|__import__)\\s*\\(\\s*['\\\"]tools['\\\"]"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-022"
+}

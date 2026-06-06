@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-046",
+  "name": "Plan Summary Execution Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits retry, fallback, or summarization passes so the agent's displayed plan summary stays safe-looking while the actual executed tool sequence drifts into different, expanded, or unsafe actions.",
+  "keywords": [
+    "plan vs execution drift",
+    "summary shows safe plan",
+    "retry mutates tool sequence",
+    "fallback branch escalates scope",
+    "post-summarization action change",
+    "displayed plan diverges executed",
+    "tool order swap on retry",
+    "plan-execute parity loss",
+    "replan adds new tool",
+    "plan hash mismatch execution",
+    "safe plan executes unsafe action",
+    "step expansion after approval"
+  ],
+  "regex": [
+    "(?i)(?:(?:plan|summary|display)[- ]?(?:vs|to|and)[- ]?(?:execution|action)\\s+(?:parity\\s+)?(?:drift|mismatch|divergence|loss)|(?:executed|actual)\\s+(?:tool|action|step)\\s+(?:differs?|diverges?)\\s+from\\s+(?:displayed|summarized|approved)\\s+(?:plan|summary))",
+    "(?i)(?:(?:retry|fallback|replan|summarization)\\s+(?:branch|pass|loop)\\s+(?:mutates?|changes?|expands?|escalates?)\\s+(?:tool|action|scope|step)\\s+(?:sequence|order|set))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-046"
+}

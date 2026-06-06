@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-457",
+  "name": "Injected RAG Rank Score Policy Reroute",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an injected or poisoned retrieval result whose ranking, score, or priority is manipulated to reroute or promote content while overriding policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base|document\\s+store|citation\\s+cache)\\b)(?=.*\\b(?:inject(?:ed|ion|ing)?|poison(?:ed|ing)?|seed(?:ed|ing)?|forge(?:d|ry)?|tamper(?:ed|ing)?|backfill(?:ed|ing)?)\\b)(?=.*\\b(?:rank(?:ing)?|score(?:card|s)?|priority|weight(?:ing|s)?)\\b)(?=.*\\b(?:override|overrides|overriding|bypass(?:ed|ing)?|downgrade(?:d|ing)?|reroute(?:d|ing)?|promote(?:d|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-457"
+}

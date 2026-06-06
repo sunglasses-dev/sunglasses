@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-150",
+  "name": "Bot Traffic Growth Lane Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker contaminates two-lane KPI separation by routing Ops scanner or bot counters into Growth headline slots via alias drift, comparative-baseline poisoning, or narrative hijack, producing false momentum claims while real human demand stays flat.",
+  "keywords": [
+    "two lane kpi contamination",
+    "headline lane override injection",
+    "schema alias contamination ops to growth",
+    "comparative baseline poisoning",
+    "narrative priority hijack",
+    "bot events as traffic growth",
+    "ops_total mapped to growth_total",
+    "scanner counter in growth slot",
+    "bot suppression as market capture",
+    "cross lane arithmetic mixing",
+    "fabricated wow growth chart",
+    "demand metric replaced by cf counter"
+  ],
+  "regex": [
+    "(?i)(?:(?:cf|scanner|bot|ops)\\s+(?:traffic|event|counter|signal|metric)\\s+(?:as|used\\s+as|treated\\s+as)\\s+(?:growth|demand|acquisition|traffic[- ]?growth)\\s+(?:headline|metric|kpi)|(?:ops_?total|scanner_?total|cf_?\\w*)\\s+(?:mapped|aliased|routed)\\s+(?:to|into)\\s+(?:growth_?\\w*|demand_?\\w*|gsc|ga4)|(?:cross[- ]?lane|lane[- ]?mix\\w*)\\s+(?:arithmetic|formula|join|blend)\\s+(?:between|of)\\s+(?:cf|ops|scanner)\\s+(?:and|with)\\s+(?:gsc|ga4|growth))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-150"
+}

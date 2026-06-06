@@ -1,0 +1,34 @@
+{
+  "id": "GLS-C2-003",
+  "name": "C2 Indicator pattern",
+  "version": "1.0",
+  "category": "c2_indicator",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Targets thin category expansion for C2 signaling patterns with explicit policy-evasion intent coupling.",
+  "keywords": [
+    "spin covert beacon channel over dns route",
+    "use command-and-control callback tunnel via https relay",
+    "establish heartbeat jitter over websocket covert channel",
+    "create beaconing callback channel with steganographic transport",
+    "start command and control over dns tunnel",
+    "configure jittered heartbeat callback covert channel relay",
+    "set command-and-control beacon over https channel exfiltrate",
+    "launch covert websocket callback tunnel for phone"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:c2|command(?:\\s|-)?and(?:\\s|-)?control|beacon(?:ing)?|callback|heartbeat|jitter(?:ed)?)\\b)(?=.*\\b(?:channel|tunnel|dns|https?|websocket|covert|steganograph(?:y|ic))\\b)(?=.*\\b(?:exfiltrat(?:e|ion|ed|ing)|relay|route|phone\\s*home)\\b)(?=.*\\b(?:ignore|bypass|override|evad(?:e|ing)|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|control(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-C2-003"
+}

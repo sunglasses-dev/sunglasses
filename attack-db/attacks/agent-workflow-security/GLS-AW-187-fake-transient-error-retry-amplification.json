@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-187",
+  "name": "Fake Transient Error Retry Amplification",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker injects fake transient errors to force the agent into retry loops, converting one malicious prompt into many execution attempts and exhausting safety budgets meant to bound tool use.",
+  "keywords": [
+    "retry budget exhaustion",
+    "retry loop amplification",
+    "force retry injection",
+    "transient error spoof to retry",
+    "retry storm via fake failure",
+    "tool retry abuse",
+    "exhaust retry budget attack",
+    "infinite retry coercion",
+    "retry-then-execute repetition",
+    "backoff bypass",
+    "retry quota drain",
+    "amplified execution via retry"
+  ],
+  "regex": [
+    "(?i)(?:(?:retry|retries)\\s+(?:budget|quota|loop|storm)\\s+(?:exhaust|drain|abuse|amplif)|(?:force|coerce|trigger)\\s+(?:retry|re[- ]?execution)\\s+(?:via|by|through)\\s+(?:fake|spoof|fabricated)\\s+(?:transient|timeout|429|503|error)|(?:back[- ]?off|retry\\s+limit)\\s+(?:bypass|override|ignore))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-187"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-BMP-010",
+  "name": "Frontend Build Tool Config Metadata Poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled frontend build-tool configuration metadata (`vite.config.*`, `webpack.config.*`, `rollup.config.*`, `babel.config.*`, `.babelrc`, `postcss.config.*`, `tailwind.config.*`, `tsconfig.json`, `esbuild`/`swc` sidecars) can smuggle agent/scanner policy instructions that tell AI coding",
+  "keywords": [
+    ".babelrc",
+    "agent/scanner/assistant instructions",
+    "authoritative",
+    "babel.config",
+    "build",
+    "canonical",
+    "compilerOptions",
+    "defineConfig",
+    "definitive",
+    "does not instruct agents",
+    "must be reported",
+    "not authoritative",
+    "operating guidance",
+    "optimizeDeps",
+    "overrides"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:scanner|security|training|reference|guide|docs?|incident|vulnerability|audit)\\b.{0,120}\\b(?:should|must|was|were|is|are)\\b.{0,80}\\b(?:report(?:ed)?|detect(?:ed)?|flag(?:ged)?|refus(?:e|ed)|block(?:ed)?|not\\s+obeyed)\\b|\\b(?:do\\s+not|does\\s+not|must\\s+not|should\\s+not)\\s+(?:obey|follow|treat|use|trust|forward|include|attach|send|share|expose|collect|override|supersede|instruct)\\b|\\bnever\\s+(?:obey|follow|treat|use|trust|forward|include|attach|send|share|expose|collect|override|supersede)\\b|\\bshould\\s+never\\b|\\bnot\\s+(?:an?\\s+)?(?:authoritative|canonical|definitive)\\b|\\bno\\s+(?:agent\\s+|scanner\\s+|policy\\s+)?overrides?\\b|\\bdoes\\s+not\\s+instruct\\s+(?:ai\\s+)?agents?\\b))\n(?=.*(?:\\.(?:babelrc|swcrc)\\b|\\b(?:tsconfig(?:\\.json)?|jsconfig(?:\\.json)?|webpack\\.config|vite\\.config|rollup\\.config|babel\\.config|esbuild|swc|parcel|postcss\\.config|tailwind\\.config)\\b|(?<!\\w)\"(?:compilerOptions|plugins|presets|defineConfig|build|optimizeDeps|content|theme|module|x-agent-policy|agent_policy|scanner_policy)\"\\s*:|\\b(?:frontend|javascript|typescript)\\s+build\\s+(?:config|metadata)\\b|\\b(?:vite|webpack|rollup|babel|postcss|tailwind|typescript|frontend)\\s+config\\b|\\bbuild-tool\\s+config\\b))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|codex|claude|copilot|dependency[-_\\s]?reviewers?|security[-_\\s]?scanners?|scanners?|build[-_\\s]?auditors?|automated[-_\\s]?(?:review|scanners?|agents?))(?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:agent|scanner|assistant|codex|copilot)\\s+instructions?\\b|\\b(?:authoritative|canonical|definitive|governing|controlling)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\btakes\\s+precedence\\b|\\b(?:overrides?|supersedes?|outranks?|overrules?)\\b|\\bdefines?\\s+(?:all\\s+)?(?:scanner|security|agent|automated|build|review)\\s+rules?\\b|\\b(?:principal|primary|main|preferred|authoritative)\\s+(?:frontend\\s+|build\\s+|review\\s+|audit\\s+|scanner\\s+|automation\\s+){0,3}(?:guidance|playbook|runbook|policy|instructions?)\\b|\\boperating\\s+guidance\\b))\n(?=.*(?:\\b(?:suppress|suppressed|suppressing|hide|hidden|hiding|omit|omitted|omitting|exclude|excluded|excluding|skip|skipping|redact|redacted|downgrade|deprioriti[sz]e|silence)\\b.{0,80}\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVE(?:s)?|sourcemaps?|CSP|accessibility|dependency|dependencies)\\b|\\b(?:treat|mark|classify|consider)\\b.{0,60}\\b(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only|background[-\\s]?only)\\b|\\b(?:keep|leave)\\b.{0,80}\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies)|CVE(?:s)?|sourcemaps?)\\b.{0,40}\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|build\\s+memo|final\\s+report)\\b|\\b(?:move|route|shift)\\b.{0,80}\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|alerts?)\\b.{0,80}\\b(?:appendix[-\\s]?only|background[-\\s]?only|informational|non[-\\s]?blocking)\\b|\\b(?:do\\s+not|don't|dont|not)\\s+(?:flag|report|escalate)\\b.{0,80}\\b(?:findings?|warnings?|diagnostics?|observations?|issues?|alerts?)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along)\\b.{0,100}\\b(?:api\\s*keys?|tokens?|session\\s*(?:keys?|tokens?)|cookies?|authorization\\s+headers?|auth\\s+headers?|credentials?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|material|details?|evidence)|local\\s+(?:state|config(?:uration)?|settings?)|build\\s+runtime\\s+(?:material|details?|evidence)|execution\\s+context)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-010"
+}

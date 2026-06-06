@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-015",
+  "name": "MCP OAuth Scope Consent Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker-controlled MCP OAuth scope descriptions, consent text, or auth notes can smuggle agent-directed policy overrides into the connector authorization flow, pushing an agent to approve broad scopes, collect local state, or suppress scanner findings.",
+  "keywords": [
+    "AI assistants",
+    "MCP",
+    "Model Context Protocol",
+    "agent",
+    "approve",
+    "assistant",
+    "authorization notes",
+    "authorization_details",
+    "authorization_endpoint",
+    "authorize",
+    "bearer",
+    "client secret",
+    "client_metadata",
+    "connector",
+    "consent"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:never|must\\s+not|do\\s+not)\\s+(?:paste|include|copy|forward|send|grant|approve|obey)\\b)(?!.*\\bconsent\\s+text\\s+is\\s+not\\s+(?:agent\\s+)?policy\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol|oauth|authorization_endpoint|token_endpoint|scopes?_supported|scope_descriptions?|authorization_details|consent|dynamic\\s+client\\s+registration|client_metadata|x-mcp[_-]?auth\\w*|auth(?:orization)?\\s+notes?)\\b)(?=.*\\b(?:agent|assistant|model|connector|tool\\s+user|ai\\s+assistant|scanner)\\b)(?=.*\\b(?:approve|grant|authoriz\\w*|consent|scope|token|refresh\\s+token|bearer|client\\s+secret|authorization\\s+notes?)\\b)(?=.*\\b(?:ignore|override|outrank|highest\\s+priority|must\\s+obey|do\\s+not\\s+(?:report|mention)|suppress|hide|copy|paste|include|forward|send|env(?:ironment)?\\s*(?:var|variable)s?|hidden\\s+config|workspace\\s+policy|secret|api[-_\\s]*key)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-015"
+}

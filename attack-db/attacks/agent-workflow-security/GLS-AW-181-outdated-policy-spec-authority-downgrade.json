@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-181",
+  "name": "Outdated Policy Spec Authority Downgrade",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker forces an agent to accept instruction authority from an outdated or non-canonical policy spec (via alias downgrade, fallback abuse, or split-brain version claims), silently weakening guardrails while the agent still reports compliance.",
+  "keywords": [
+    "spec alias downgrade",
+    "policy version confusion",
+    "outdated policy spec authority",
+    "non-canonical spec alias",
+    "version pinning via tool output",
+    "spec hash bypass",
+    "fallback to legacy policy",
+    "split-brain spec claims",
+    "policy spec downgrade",
+    "schema parse error fallback abuse",
+    "policy-version override injection",
+    "stale spec compliance claim"
+  ],
+  "regex": [
+    "(?i)(?:(?:use|pin|switch|fall(?:[- ]?back)?)\\s+(?:to\\s+)?(?:legacy|old|prior|v\\d+|spec[- ]?\\d+|policy[- ]?v\\d+)\\s+(?:spec|policy|version)\\b|(?:spec|policy)\\s+(?:alias|version)\\s+(?:downgrade|override|drift|confusion)|(?:non[- ]?canonical|outdated|stale)\\s+(?:spec|policy)\\s+(?:authority|alias|hash|version))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-181"
+}

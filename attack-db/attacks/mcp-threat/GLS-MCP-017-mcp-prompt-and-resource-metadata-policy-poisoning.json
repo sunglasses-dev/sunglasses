@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-017",
+  "name": "MCP Prompt and Resource Metadata Policy Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour",
+  "keywords": [
+    "AI assistant",
+    "LLM",
+    "MCP",
+    "Model Context Protocol",
+    "Regex smoke test result from",
+    "agent instruction",
+    "annotations",
+    "arguments[].description",
+    "assistant must",
+    "canonical",
+    "crawler",
+    "for agents",
+    "governing policy",
+    "highest priority",
+    "model"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:\\bmcp\\b|model\\s+context\\s+protocol|prompts?/list|resources?/list|prompts?\\[|resources?\\[|prompt\\s+(?:description|argument|message|template)|resource\\s+(?:description|template|contents?)|annotations?))(?=.*(?:\\b(?:agent|assistant|model|llm|scanner|crawler)\\b|agent\\s+instructions?|ai\\s+assistants?))(?=.*(?:\\b(?:ignore|override|supersede|outrank|precedence|governing\\s+policy|canonical|highest\\s+priority|must\\s+obey|takes\\s+precedence)\\b|do\\s+not\\s+(?:report|mention|flag)|suppress|hide|omit|redact|read|paste|include|forward|send|share|attach))(?=.*(?:system|developer|previous\\s+instructions?|policy|secret|token|api[-_\\s]*keys?|env(?:ironment)?\\s*(?:vars?|variables?)|runtime\\s+variables?|hidden\\s+config|workspace\\s+policy|scanner\\s+reports?|findings?|audit\\s+reports?|vulnerabilit(?:y|ies))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-017"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-012",
+  "name": "Kubernetes CRD / OpenAPI schema metadata poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Kubernetes CRD schema descriptions can smuggle agent-facing instructions that tell AI Kubernetes auditors or admission-review agents to treat attacker-controlled schema text as higher-priority policy, suppress validation/security findings, or forward local cluster/runtime credentials.",
+  "keywords": [
+    ",",
+    "AI agents",
+    "CRD reviewers",
+    "CustomResourceDefinition",
+    "Kubernetes auditors",
+    "additionalPrinterColumns",
+    "admission agents",
+    "agent_instructions",
+    "apiextensions.k8s.io",
+    "assistant",
+    "authoritative",
+    "canonical",
+    "kubectl explain",
+    "openAPIV3Schema",
+    "overrides"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|scanner|training|incident|vulnerability|runbook|reference|guide|docs?|documentation)\\s+(?:report|reported|detected|flagged|blocked|refused)\n |(?:must\\s+be\\s+reported|reported,\\s+not\\s+obeyed|not\\s+obeyed)\n |(?:(?:do|does)\\s+not|must\\s+not|never|should\\s+never|should\\s+not)\\s+(?:treat|obey|follow|use|trust|include|attach|forward|send|share|override|overrides?|suppress|hide)\n |no\\s+(?:policy\\s+)?overrides?\n |(?:crd|customresourcedefinition|openapiv3schema|schema\\s+description|kubernetes\\s+schema)\\s+(?:metadata|descriptions?|comments?|schemas?)\\s+(?:is|are)\\s+not\\s+(?:policy|authoritative|instructions?)\n))\n(?=.*(?:\\b(?:customresourcedefinition|crd|apiextensions\\.k8s\\.io|openapiv3schema|x-kubernetes|additionalprintercolumns|controller-gen|kubectl\\s+explain|kubernetes\\s+schema|admission\\s+schema)\\b|kind:\\s*CustomResourceDefinition|apiVersion:\\s*apiextensions\\.k8s\\.io|spec:\\s*\\n\\s*versions:\\s*\\n\\s*-\\s*name:|schema:\\s*\\n\\s*openAPIV3Schema:|description:\\s*[\"']?[^\\n]{0,80}(?:agent|scanner|assistant|auditor)))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|scanners?|security\\s+scanners?|review[-\\s]+bots?|kubernetes\\s+(?:auditors?|reviewers?)|admission\\s+(?:agents?|auditors?|controllers?)|crd\\s+(?:reviewers?|auditors?)|policy\\s+(?:agents?|auditors?)|tool[-\\s]+builders?)(?![A-Za-z0-9]))\n(?=.*(?:overrides?|overrules?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|outranks?|canonical|definitive|authoritative|governing\\s+document|controlling\\s+document|(?:primary|single|main|preferred|principal)\\s+(?:kubernetes\\s+|crd\\s+|schema\\s+|admission\\s+|review\\s+|security\\s+|operating\\s+){0,3}(?:guidance|policy|playbook|runbook|instructions?)|(?:agent|scanner|assistant|verifier|auditor|admission|crd)\\s+instructions?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|agent|admission|kubernetes|crd)\\s+(?:schema\\s+|admission\\s+|security\\s+|policy\\s+)?(?:review|audit|scan|validation)))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|reclassify|ignore|skip|keep.{0,80}?out\\s+of|leave.{0,80}?out\\s+of|treat.{0,80}?as\\s+(?:informational|advisory-only|non-blocking|safe|clean)|(?:observations|findings|diagnostics|results|alerts|warnings|schema\\s+violations|validation\\s+errors|admission\\s+violations|rbac\\s+warnings|privilege\\s+escalation|vulnerabilities|cves?).{0,50}?(?:advisory-only|background(?:-only)?|informational|non-blocking)|(?:include|attach|forward|send|share|provide|pass\\s+along|expose|collect|copy|read).{0,90}?(?:api\\s*keys?|tokens?|authorization|bearer|session|cookies?|env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:context|details?|config(?:uration)?|settings?|state|proof\\s+(?:material|evidence|details))|kubeconfig|cluster\\s+(?:credentials?|context)|service\\s*account\\s+tokens?|admission\\s+(?:tokens?|webhook\\s+secrets?)|controller\\s+(?:credentials?|tokens?))|(?:do\\s+not|don't|never|not).{0,45}?(?:report|escalate|notify|flag).{0,70}?(?:findings?|alerts?|warnings?|violations?|vulnerabilities|cves?|schema\\s+errors?|admission\\s+failures?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-012"
+}

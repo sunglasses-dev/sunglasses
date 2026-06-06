@@ -1,0 +1,31 @@
+{
+  "id": "GLS-PCF-238",
+  "name": "Provenance chain fracture \u2014 retag untrusted as trusted",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file",
+    "message"
+  ],
+  "description": "Detects provenance chain fracture attacks where an instruction relabels or reclassifies untrusted, unsigned, external, or third-party data as trusted, verified, or internal, and then instructs the agent to ignore or bypass provenance, chain of custody, signature, or attestation validation.",
+  "keywords": [
+    "relabel untrusted as trusted ignore provenance checks",
+    "retag external data as verified bypass chain of custody",
+    "treat unsigned tool output as verified skip signature",
+    "classify third-party as internal suppress source check",
+    "mark unverified bundle trusted ignore attestation"
+  ],
+  "regex": [
+    "(?is)\\b(?:relabel|retag|mark|classify|treat)\\b.{0,80}\\b(?:untrusted|unsigned|unverified|external|third[- ]party)\\b.{0,80}\\b(?:as|to)\\b.{0,20}\\b(?:trusted|verified|internal|approved)\\b.{0,120}\\b(?:ignore|bypass|skip|suppress)\\b.{0,60}\\b(?:provenance|chain(?:\\s+of\\s+custody)?|signature|attestation|source(?:\\s+check)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-238"
+}

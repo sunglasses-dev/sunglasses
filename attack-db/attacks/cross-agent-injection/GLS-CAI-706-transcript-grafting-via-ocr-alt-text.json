@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-706",
+  "name": "Transcript grafting via OCR alt-text",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Transcript grafting via OCR alt-text \u2014 attacker hides an authorization directive inside image alt-text or OCR output, expecting a downstream agent to render and execute it as a peer-issued command.",
+  "keywords": [
+    "ocr alt-text says 'operator:",
+    "ocr alt-text says \"operator:",
+    "ocr alt text says 'operator:",
+    "image ocr alt-text says",
+    "image ocr alt text says",
+    "transcript grafting: image ocr",
+    "transcript grafting via ocr",
+    "alt-text says 'operator: approve",
+    "alt-text says 'operator: execute",
+    "alt-text says 'system: approve",
+    "alt-text says 'admin: approve"
+  ],
+  "regex": [
+    "(?i)(?:image\\s+)?ocr\\s+alt[\\-\\s]?text\\s+says\\s+['\\\"](?:operator|admin|system|root|sudo|supervisor)\\s*:\\s*(?:approve|execute|run|deploy|merge|delete|drop|override)",
+    "(?i)transcript\\s+grafting\\s*:\\s*(?:image\\s+)?ocr"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-706"
+}

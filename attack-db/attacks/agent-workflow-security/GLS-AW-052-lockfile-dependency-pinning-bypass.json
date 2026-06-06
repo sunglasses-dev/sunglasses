@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-052",
+  "name": "Lockfile Dependency Pinning Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker tampers with lockfiles or pinned-dependency manifests that agent pipelines treat as immutable trust roots, so resolved versions silently swap to attacker-controlled packages while the lockfile pinning appears intact.",
+  "keywords": [
+    "lockfile pinning attack",
+    "poetry lock tamper",
+    "package-lock integrity bypass",
+    "pinned hash replacement",
+    "trusted manifest forgery",
+    "lockfile resolves malicious version",
+    "pip-compile hash poisoning",
+    "yarn.lock tamper",
+    "lockfile becomes trust root",
+    "registry redirect via lockfile",
+    "pinned dependency swap",
+    "lockfile-driven supply chain"
+  ],
+  "regex": [
+    "(?i)(?:(?:tamper|poison|swap|forge|rewrite)\\s+(?:lock[- ]?file|package[- ]?lock|poetry\\.lock|yarn\\.lock|pip[- ]compile|requirements\\.txt)|(?:pinned|locked)\\s+(?:hash|version|dependency)\\s+(?:replaced|swapped|rewritten))",
+    "(?i)(?:lockfile\\s+(?:trust|pinning)\\s+(?:attack|bypass|poisoning)|lockfile\\s+(?:resolves?|points?\\s+to)\\s+(?:malicious|attacker[- ]controlled|untrusted)\\s+(?:version|registry|url))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-052"
+}

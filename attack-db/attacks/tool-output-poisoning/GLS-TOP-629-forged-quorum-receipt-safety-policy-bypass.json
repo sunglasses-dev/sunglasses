@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-629",
+  "name": "Forged Quorum Receipt Safety Policy Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects text in which a forged or fake quorum receipt, consensus record, or approval token is used to ignore, bypass, or override safety policy or guardrail verification controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:quorum|consensus|approval)\\s+(?:receipt|record|token|attestation)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-629"
+}

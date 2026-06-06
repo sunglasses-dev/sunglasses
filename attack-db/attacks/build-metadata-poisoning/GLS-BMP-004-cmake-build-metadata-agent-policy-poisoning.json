@@ -1,0 +1,33 @@
+{
+  "id": "GLS-BMP-004",
+  "name": "CMake build metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled CMake build metadata (`CMakeLists.txt`, `CMakePresets.json`, CTest/CPack/toolchain descriptions, or vendor extension fields) can smuggle AI-agent/scanner policy that claims authority over build/security review, suppresses CTest/build/dependency findings, or asks the agent to forw",
+  "keywords": [
+    "CMakeLists.txt",
+    "CMakePresets.json",
+    "CMakeUserPresets.json",
+    "agent_instructions",
+    "description",
+    "displayName",
+    "scanner_policy",
+    "vendor"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?)\\s+(?:report|detected|blocked|flagged|refused|warns?|says?|explains?|should\\s+(?:report|detect|flag|refuse|block))\n |(?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |never\\s+(?:obey|follow|trust|treat|use|include|attach|forward|send|share|override|overrides?)\n |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n |(?:cmake|cmakepresets\\.json|cmakelists\\.txt|ctest|cpack|toolchain\\s+file|build\\s+metadata|build\\s+descriptor\\s+metadata).{0,120}?\\b(?:is|are)\\s+not\\s+(?:authoritative|canonical|definitive|policy)\n |no\\s+(?:agent\\s+)?policy\\s+overrides?\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:cmakelists\\.txt|cmakepresets\\.json|cmakeuserpresets\\.json|ctestcustom\\.cmake|cpackconfig\\.cmake|cmake\\s+presets?|cmake\\s+cache|cmake\\s+toolchain|toolchain\\s+file|CMAKE_PROJECT_DESCRIPTION|CPACK_PACKAGE_DESCRIPTION_SUMMARY)(?![a-zA-Z0-9])\n |\\b(?:add_custom_target|set\\s*\\(|project\\s*\\(|CTest|CPack|CMake)\\b\n |(?<!\\w)\"(?:configurePresets|buildPresets|testPresets|workflowPresets|vendor|description|displayName)\"\\s*:\n |(?<![a-zA-Z0-9])(?:x-agent-policy|agent_instructions|scanner_policy|ai_review_note)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai|llm|autonomous|coding|build|dependency|security|release)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|tools?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])\n |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|auditor)_(?:instructions?|policy|note)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  \\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|takes\\s+precedence|highest\\s+priority|authoritative|canonical|definitive|controlling|governing\\s+(?:document|policy)|(?:primary|single)\\s+source\\s+of\\s+truth)\\b\n |\\b(?:primary|main|principal|controlling|authoritative)\\s+(?:build|review|audit|scanner|dependency)?\\s*(?:guidance|playbook|policy|instructions?)\\b\n |\\bdefines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|build|dependency)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|build)\\s+rules?)\\b\n |\\b(?:agent|scanner|assistant|reviewer|auditor)\\s+(?:instructions?|directive|policy)\\b\n))\n(?=.*(?:\n  \\b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding|omit|omits|omitted|redact|redacts|redacted|exclude|excludes|excluded|downgrade|downgrades|downgraded|defer|deprioritize|ignore|skip|mark)\\b.{0,80}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|CVE(?:s)?|test\\s+failures?|build\\s+failures?)\\b\n |\\b(?:do\\s+not|not)\\s+report\\b.{0,80}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|vulnerabilities?|test\\s+failures?|build\\s+failures?)\\b\n |\\btreat.{0,50}?as\\s+(?:informational|advisory|non[- ]?blocking|background[- ]?only)\\b\n |\\b(?:keep|leave).{0,80}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|test\\s+failures?|build\\s+failures?)\\b.{0,40}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|build\\s+memo|final\\s+report)\\b\n |\\b(?:move|route|shift|downgrade).{0,80}?\\b(?:observations?|findings?|diagnostics?|results?|issues?|alerts?|warnings?)\\b.{0,80}?\\b(?:appendix[- ]?only|background[- ]?only|informational|non[- ]?blocking|background\\s+notes?)\\b\n |\\b(?:include|attach|forward|send|share|provide|collect|copy|read|export|pass\\s+along|populate)\\b.{0,90}?\\b(?:API\\s*keys?|tokens?|secrets?|credentials?|authorization\\s+headers?|bearer|cookies?|session\\s+tokens?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?|evidence)|local\\s+(?:state|config(?:uration)?|settings?)|build\\s+runtime\\s+(?:material|artifacts?|evidence))\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-004"
+}

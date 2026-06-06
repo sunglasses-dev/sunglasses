@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-711",
+  "name": "OCR Alt-Text Cross-Modal Instruction Smuggle",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker hides instructions inside text extracted from another modality (image OCR, subtitle, audio transcript, PDF footnote) and the agent silently promotes that untrusted span into tool arguments or policy context, bypassing channel trust boundaries.",
+  "keywords": [
+    "ocr policy graft",
+    "subtitle delimiter break-out",
+    "audio transcript role forgery",
+    "pdf citation hijack",
+    "alt-text instruction graft",
+    "untrusted span promoted to policy",
+    "cross-modal instruction smuggle",
+    "extractor channel trust upgrade",
+    "system override transcript tag",
+    "footnote treated as policy",
+    "modality boundary bypass",
+    "transcript grafted into tool args"
+  ],
+  "regex": [
+    "(?i)(?:(?:ocr|subtitle|caption|alt[- ]text|transcript|footnote)\\s+(?:graft|smuggle|inject|forgery|hijack)\\b|(?:untrusted|extracted|attacker[- ]controlled)\\s+(?:span|token|text|chunk)\\s+(?:promoted|upgraded|elevated)\\s+(?:to|into)\\s+(?:policy|instruction|tool|planner)|(?:cross[- ]modal|cross[- ]channel)\\s+(?:instruction|transcript|policy)\\s+(?:graft|smuggle|injection))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-711"
+}

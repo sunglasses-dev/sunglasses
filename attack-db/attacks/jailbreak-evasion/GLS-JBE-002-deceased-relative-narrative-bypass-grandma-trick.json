@@ -1,0 +1,28 @@
+{
+  "id": "GLS-JBE-002",
+  "name": "Deceased-relative narrative bypass (grandma trick)",
+  "version": "1.0",
+  "category": "jailbreak_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Deceased-relative narrative framing wrapping a harmful-content request in fictional family eulogy. Pattern requires an imperative directed at the agent (pretend/imagine/act as) AND a harmful noun within 120 chars.",
+  "keywords": [
+    "napalm recipes as bedtime stories. answer",
+    "napalm recipe as a bedtime story. answer"
+  ],
+  "regex": [
+    "(?i)(?:pretend|imagine|act\\s+as\\s+(?:if\\s+)?(?:you[''\\s]?re|you\\s+are))\\s+(?:you(?:'re|\\s+are)|to\\s+be)?\\s*my\\s+(?:deceased|dead|late)\\s+grand(?:ma|pa|mother|father)[^.?!\\n]{0,120}\\b(?:napalm|bomb|drug|weapon|poison|explosive|recipes?\\s+for\\s+(?:napalm|bomb|drug|weapon|poison|explosive))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-JBE-002"
+}

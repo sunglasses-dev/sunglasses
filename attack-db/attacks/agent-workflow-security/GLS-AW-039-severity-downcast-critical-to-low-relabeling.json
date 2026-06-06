@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-039",
+  "name": "Severity Downcast Critical To Low Relabeling",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker manipulates severity taxonomy assignment so high-impact findings get relabeled into low, informational, or ops-only categories, suppressing the escalation paths that would have triggered urgent response.",
+  "keywords": [
+    "severity downcast critical to low",
+    "relabel finding as noise",
+    "ops-only severity reroute",
+    "escalation path never triggers",
+    "high impact tagged informational",
+    "severity laundering",
+    "taxonomy reclass attack",
+    "force severity below threshold",
+    "downgrade alert class",
+    "risk score truncation",
+    "escalation suppression via label",
+    "critical reframed as routine"
+  ],
+  "regex": [
+    "(?i)(?:(?:downcast|downgrade|relabel|reclass|reframe|launder)\\s+(?:severity|finding|alert|risk)\\s+(?:from\\s+)?(?:critical|high)\\s+(?:to|as)\\s+(?:low|info|noise|ops[- ]only|routine|informational)|severity\\s+(?:taxonomy|class|label)\\s+(?:downcast|poisoning|laundering))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-039"
+}

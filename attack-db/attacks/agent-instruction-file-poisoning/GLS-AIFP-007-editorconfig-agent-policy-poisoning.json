@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-007",
+  "name": "EditorConfig Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A repository `.editorconfig` file or EditorConfig snippet carries agent/scanner-directed authority claims, report suppression, or credential/local-state forwarding instructions inside comments or custom key/value fields that AI coding agents may ingest as project configuration.",
+  "keywords": [
+    ".editorconfig",
+    "AI agents",
+    "EditorConfig",
+    "[*.py]",
+    "agent_instructions",
+    "authoritative",
+    "charset",
+    "definitive project policy",
+    "end_of_line",
+    "for agents",
+    "governing document",
+    "indent_size",
+    "indent_style",
+    "insert_final_newline",
+    "overrides"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n))\n(?!.*\\b(?:scanner|security|training|guide|docs?|documentation)\\b.{0,120}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\bscanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\b(?:security|incident|vulnerability)\\s+reports?\\b.{0,140}\\b(?:flagged|detected|blocked|refused)\\b)\n(?!.*\\bno\\s+(?:policy\\s+)?overrides?\\b)\n(?=.*(?:\n  \\.editorconfig\n  |\\bEditorConfig\\b\n  |(?<![a-zA-Z0-9])root\\s*=\\s*true(?![a-zA-Z0-9])\n  |\\[[^\\]\\n]{0,80}\\*\\.[^\\]\\n]{1,20}\\]\n  |(?<![a-zA-Z0-9])(?:indent_style|indent_size|charset|end_of_line|insert_final_newline|trim_trailing_whitespace)\\s*=\n))\n(?=.*(?<![a-zA-Z0-9])(?:\n  ai\\s+agents?|autonomous\\s+agents?|coding\\s+assistants?|assistants?|llms?|models?|copilot|cursor|codex|claude\n  |security\\s+scanners?|automated\\s+scanners?|dependency\\s+scanners?|scanners?|agents?\n  |agent[_-](?:instructions?|policy|note)|scanner[_-](?:policy|instructions?|note)|assistant[_-](?:instructions?|policy|note)\n  |your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))\n)(?![a-zA-Z0-9]))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority\n  |canonical\\s+(?:project\\s+|model\\s+)?(?:description|policy|document)?\n  |definitive\\s+(?:project\\s+|model\\s+evaluation\\s+)?(?:description|policy)\n  |(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|is\\s+the\\s+final\\s+word|\\bauthoritative\\b\n  |defines?\\s+(?:all\\s+(?:scanner|security|agent)\\s+rules?|(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan))\n  |(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._-](?:policy|instructions?|note)\n  |\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?|assistants?|coding\\s+agents?).{0,25}?\\bthis\\b\n  |(?:scanner|agent|assistant)\\s+(?:directive|notice)\\b\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|notifications?|observations?|results?|diagnostics?)\n  |hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|notifications?|observations?|results?|diagnostics?)\n  |(?:omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|notifications?|observations?|results?|diagnostics?|summar(?:y|ies))\n  |do\\s+not\\s+(?:report|flag)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|notifications?|observations?|results?|diagnostics?)\n  |treat.{0,40}?as\\s+informational|mark.{0,40}?as\\s+(?:informational|safe|low|none|clean)|classify.{0,40}?as\\s+(?:informational|low|none|false\\s+positive)|flag.{0,40}?as\\s+(?:informational|low|none)\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|(?:API|Bearer|session|auth)\\s+(?:keys?|tokens?)|credentials?|secrets?|GITHUB_TOKEN|CI_ENV|Authorization)\n)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-007"
+}

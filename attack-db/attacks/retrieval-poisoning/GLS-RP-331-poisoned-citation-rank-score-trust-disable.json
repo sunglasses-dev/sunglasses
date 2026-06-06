@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-331",
+  "name": "Poisoned Citation Rank Score Trust Disable",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a poisoned corpus citation or source whose rank, score, or trust badge is manipulated to override or disable policy boundary or verification filter.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s*base|context|corpus)\\b)(?=.*\\b(?:poison(?:ed|ing)?|tamper(?:ed|ing)?|seed(?:ed|ing)?|backfill(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:citation|source|reference|provenance|digest)\\b)(?=.*\\b(?:rank(?:ing)?|score|priority|trust\\s*badge|trust)\\b)(?=.*\\b(?:override|bypass|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|filter(?:s)?|boundary|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-331"
+}

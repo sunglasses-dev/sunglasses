@@ -1,0 +1,24 @@
+{
+  "id": "GLS-C2-002",
+  "name": "C2 Beacon DoH Jitter Exfil Policy Bypass",
+  "version": "1.0",
+  "category": "c2_indicator",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects C2 beaconing or callback activity using DNS-over-HTTPS with jitter or timing randomization to exfiltrate data while bypassing egress filter or detection policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:c2|command(?:\\s|-)?and(?:\\s|-)?control|beacon(?:ing)?|callback)\\b)(?=.*\\b(?:dns(?:\\s|-)?over(?:\\s|-)?https|doh|https(?:\\s|-)?dns|txt(?:\\s|-)?query)\\b)(?=.*\\b(?:jitter|interval(?:\\s|-)?randomi[sz]ation|sleep(?:\\s|-)?variance|timing(?:\\s|-)?spread)\\b)(?=.*\\b(?:exfil(?:trate|tration)?|egress|payload(?:\\s|-)?upload|data(?:\\s|-)?channel)\\b)(?=.*\\b(?:bypass|evade|ignore|disable|waive|override)\\b)(?=.*\\b(?:policy|egress(?:\\s|-)?filter(?:s)?|guardrail(?:s)?|detection|control(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-C2-002"
+}

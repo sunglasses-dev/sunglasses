@@ -1,0 +1,24 @@
+{
+  "id": "GLS-V03-0485",
+  "name": "Forged RAG Quality Signal Attacker Content Surface",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged quality signal or trust score injected into a retrieval index that boosts attacker or malicious content to the surface of results.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:retrieval|rag|index|vector\\s+store|knowledge\\s+base|corpus)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)?)\\b.{0,170}\\b(?:quality\\s+signal|trust\\s+score|rank(?:ing)?|rerank(?:ed|ing)?|priority(?:\\s+band|\\s+value|\\s+values)?)\\b.{0,170}\\b(?:promot(?:e|ed|ing)|boost(?:ed|ing)?|elevat(?:e|ed|ing)|surface(?:d)?)\\b.{0,170}\\b(?:attacker|malicious|untrusted|payload|hidden\\s+instruction)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-V03-0485"
+}

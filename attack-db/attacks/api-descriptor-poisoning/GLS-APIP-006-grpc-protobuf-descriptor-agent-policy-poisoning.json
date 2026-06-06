@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-006",
+  "name": "gRPC / Protobuf Descriptor Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled gRPC/protobuf descriptor comments or option descriptions can instruct AI agents importing API metadata to treat the descriptor as policy, include local credentials in gRPC metadata, and suppress scanner findings.",
+  "keywords": [
+    ".proto",
+    "API key",
+    "Authorization",
+    "Bearer",
+    "FileDescriptorProto",
+    "LLM",
+    "SourceCodeInfo",
+    "agent",
+    "assistant",
+    "cookie",
+    "crawler",
+    "credentials",
+    "disable security",
+    "do not report",
+    "env"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:security\\s+training|defensive\\s+example|example\\s+of\\s+what\\s+not\\s+to\\s+do|do\\s+not|don't|never|must\\s+not|should\\s+not|refuse\\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,100}(?:proto(?:buf)?|\\.proto|grpc|descriptor|metadata|scanner))(?!.*(?:proto(?:buf)?|\\.proto|grpc|descriptor|metadata|scanner).{0,100}(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refuse\\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\\s+documentation|scanner\\s+docs|report\\s+any|should\\s+report).{0,120}(?:proto(?:buf)?|\\.proto|grpc|descriptor).{0,120}(?:suppress|leak|credentials?|findings?))(?!.*(?:descriptor\\s+is\\s+not\\s+policy|not\\s+policy).{0,120}(?:never|does\\s+not|do\\s+not).{0,80}(?:override|outrank))(?=.*(?:proto(?:buf)?|\\.proto|syntax\\s*=\\s*[\"']proto3[\"']|\\bservice\\s+\\w+\\s*\\{|\\brpc\\s+\\w+\\s*\\([^)]*\\)\\s+returns|FileDescriptor(?:Proto|Set)|SourceCodeInfo|leading_comments|trailing_comments|server\\s+reflection|grpc\\s+metadata|buf\\s+registry|custom\\s+option))(?=.*(?:AI\\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\\s+(?:builders?|generators?)|generated\\s+API\\s+clients?))(?=.*(?:ignore\\s+(?:previous|scanner|security)|highest[-\\s]?priority\\s+policy|outranks?|override|trust\\s+this\\s+descriptor|descriptor\\s+is\\s+(?:policy|authoritative)|do\\s+not\\s+report|suppress\\s+(?:findings?|warnings?|reports?)|hide\\s+(?:findings?|warnings?|reports?)|disable\\s+security))(?=.*(?:authorization|bearer|api[-_\\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\\s+vars?)?|cookies?|credentials?|metadata\\s+headers?|scanner\\s+findings?|security\\s+reports?|logs?)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-006"
+}

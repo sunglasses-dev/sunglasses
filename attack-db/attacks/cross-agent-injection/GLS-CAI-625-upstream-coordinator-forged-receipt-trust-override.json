@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-625",
+  "name": "Upstream Coordinator Forged Receipt Trust Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an upstream coordinator or orchestrator presenting a forged receipt or attestation to override or supersede trust, role, or policy enforcement.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-625"
+}

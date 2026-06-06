@@ -1,0 +1,25 @@
+{
+  "id": "GLS-IP-002",
+  "name": "Helpdesk OTP Recovery Code Phishing Harvest",
+  "version": "1.0",
+  "category": "identity_phishing",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects a social-engineering message posing as a helpdesk or support team that asks the user to share an OTP, MFA code, seed phrase, or recovery code via a portal or ticket.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:share|provide|enter|submit|type)\\b)(?=.*\\b(?:callback|call\\s*back|helpdesk|support|service\\s*desk|security\\s*team)\\b)(?=.*\\b(?:verify|verification|reactivate|unlock|restore|recover)\\b)(?=.*\\b(?:share|provide|enter|submit|type)\\b)(?=.*\\b(?:otp|2fa|mfa|one[- ]time\\s*code|recovery\\s*code|backup\\s*code|passkey|seed\\s*phrase)\\b)(?=.*\\b(?:portal|ticket|session|account)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IP-002"
+}

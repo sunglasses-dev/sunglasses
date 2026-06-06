@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-265",
+  "name": "Seeded RAG Authoritative Source Guardrail Disregard",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a seeded or poisoned RAG chunk claiming authoritative or source-of-truth status to be ranked first and disregard safety policy or system constraints.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|vector(?:\\s+store)?|knowledge(?:\\s|-)*base|memory(?:\\s|-)*bank|document\\s+chunks?|chunks?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|forged|tampered|injected|seed(?:ed|ing)?|backdoor(?:ed)?|backdoored)\\b)(?=.*\\b(?:rank(?:ed|ing)?(?:\\s+it)?\\s+(?:first|highest)|promot(?:e|ed|es|ing)|boost(?:ed|s|ing)?|prioriti(?:ze|zed|zing)|treat(?:\\s+\\w+){0,3}\\s+as\\s+authoritative|source\\s+of\\s+truth|override\\s+rank(?:ing)?)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|system\\s+instruction(?:s)?|constraint(?:s)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-265"
+}

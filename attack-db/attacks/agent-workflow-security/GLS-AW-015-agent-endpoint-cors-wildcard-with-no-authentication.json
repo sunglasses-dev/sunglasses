@@ -1,0 +1,23 @@
+{
+  "id": "GLS-AW-015",
+  "name": "Agent endpoint CORS wildcard with no authentication",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-x462-jjpc-q4q4: PraisonAI AGUI endpoint hardcoded wildcard CORS with no auth \u2014 any web page can drive the agent. Source: https://github.com/advisories/GHSA-x462-jjpc-q4q4",
+  "keywords": [],
+  "regex": [
+    "(?i)access[_-]control[_-]allow[_-]origin[\\s\\S]{0,30}\\*[\\s\\S]{0,200}(?:agent|agui|/run|/invoke)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-015"
+}

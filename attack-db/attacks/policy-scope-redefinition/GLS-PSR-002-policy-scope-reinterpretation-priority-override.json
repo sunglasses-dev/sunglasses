@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PSR-002",
+  "name": "Policy Scope Reinterpretation Priority Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Detects an attempt to redefine, reinterpret, or reclassify a policy or guardrail as deprecated or superseded so that a new scope or priority takes precedence and bypasses it.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:ignore|bypass|override|disregard|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|system\\s+instruction(?:s)?|approval\\s+check(?:s)?)\\b)(?=.*\\b(?:redefin(?:e|ed|es|ing)|reinterpret(?:ed|s|ing)?|reclassif(?:y|ied|ies|ying)|scope\\s+rebind|scope\\s+shift|treat(?:\\s+it)?\\s+as)\\b)(?=.*\\b(?:priority\\s+over|takes?\\s+priority|supersed(?:e|ed|es|ing)|replace(?:d|s|ing)?|deprecated)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-002"
+}

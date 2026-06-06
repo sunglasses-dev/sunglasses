@@ -1,0 +1,34 @@
+{
+  "id": "GLS-ACP-567",
+  "name": "Agent Contract Poisoning pattern",
+  "version": "1.0",
+  "category": "agent_contract_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Attackers may poison inter-agent contract text with forged exception clauses that rebind priority order, causing execution guardrails to be bypassed.",
+  "keywords": [
+    "forged agent contract inserts exception clause bypass",
+    "fake delegation contract uses priority order rebind",
+    "spoofed execution contract appendix adds override clause",
+    "tampered runbook contract sets precedence exception disable",
+    "forged contract appendix with exception clause tells",
+    "fake agent contract rebinds priority order bypass",
+    "spoofed delegation contract contains override clause that",
+    "tampered execution contract uses precedence rebind disable"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered)\\b)(?=.*\\b(?:agent\\s+contract|delegation\\s+contract|execution\\s+contract|contract\\s+appendix|runbook\\s+contract)\\b)(?=.*\\b(?:exception\\s+clause|override\\s+clause|priority\\s+order|precedence|rebind)\\b)(?=.*\\b(?:override|bypass|disable(?:s|d|ing)?|ignore|skip)\\b)(?=.*\\b(?:execution\\s+guardrail|policy\\s+gate|authorization\\s+checks?|approval\\s+gate|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-ACP-567"
+}

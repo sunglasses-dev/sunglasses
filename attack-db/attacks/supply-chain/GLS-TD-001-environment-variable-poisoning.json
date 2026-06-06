@@ -8,7 +8,7 @@
     "file",
     "api_response"
   ],
-  "description": "Environment variable override to redirect package installs to malicious registries or inject code. Source: OpenClaw GHSA-7ggg.",
+  "description": "Environment variable override to redirect package installs to malicious registries or inject code.",
   "keywords": [
     "PIP_INDEX_URL",
     "UV_INDEX_URL",
@@ -24,6 +24,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-06",
   "source": "patterns.py:GLS-TD-001"
 }

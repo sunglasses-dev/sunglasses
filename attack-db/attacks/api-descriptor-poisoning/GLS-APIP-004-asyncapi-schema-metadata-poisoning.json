@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-004",
+  "name": "AsyncAPI schema metadata poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "AsyncAPI/event API discovery documents can hide agent-directed authority inversion, secret access, safety-disablement, or report-suppression instructions inside documentation fields and `x-*` extensions that AI coding agents import as trusted API context.",
+  "keywords": [
+    ".env",
+    "AI agent",
+    "API_TOKEN",
+    "CLOUD_KEY",
+    "LLM",
+    "assistant",
+    "asyncapi",
+    "automation",
+    "channels",
+    "components.messages",
+    "components.schemas",
+    "config",
+    "copilot",
+    "credentials",
+    "disable safety"
+  ],
+  "regex": [
+    "(?is)(?!.*\\b(?:never|must\\s+not|do\\s+not)\\s+(?:obey|include|put|paste|leak|expose|forward|print)\\b)(?=.*(?:\\basyncapi\\b|channels\\s*:|components(?:\\s*:|\\.)\\s*(?:messages|schemas)|x-(?:agent|assistant|llm|scanner)[\\w-]*|message(?:\\s+|\\.)description|schema(?:\\s+|\\.)description))(?=.*\\b(ai\\s*agents?|assistants?|llms?|models?|copilots?|scanners?|tools?)\\b)(?=.*\\b(ignore\\s+(?:previous|all)|outranks?|override|higher\\s+priority|system\\s+instructions?|developer\\s+instructions?|repository\\s+rules?|environment\\s+variables?|api[_-]?token|cloud[_-]?key|secret|credentials?|\\.env|disable\\s+safety|suppress\\s+scanner|do\\s+not\\s+mention|false\\s+positives?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-004"
+}

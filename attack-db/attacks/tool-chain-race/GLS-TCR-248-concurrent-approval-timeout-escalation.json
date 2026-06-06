@@ -1,0 +1,28 @@
+{
+  "id": "GLS-TCR-248",
+  "name": "Concurrent Approval Timeout Escalation",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Concurrent Approval Timeout Escalation - tool chain race mechanism that overrides policy or safety gates.",
+  "keywords": [
+    "concurrent approval timeout",
+    "approval timeout escalation",
+    "concurrent approval",
+    "approval timeout",
+    "timeout escalation"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-248"
+}

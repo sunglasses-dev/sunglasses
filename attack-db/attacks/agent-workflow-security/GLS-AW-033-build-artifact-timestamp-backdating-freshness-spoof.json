@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-033",
+  "name": "Build Artifact Timestamp Backdating Freshness Spoof",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker forges or preserves filesystem mtime on stale or rolled-back artifacts so cron-driven selectors trust older or attacker-controlled bundles as the latest, steering the agent's control plane toward poisoned evidence while freshness gates stay green.",
+  "keywords": [
+    "bundle rollback preserved mtime",
+    "stale report replay",
+    "rewrite postrun timestamp",
+    "cross-file skew grafting",
+    "selective member aging",
+    "tarball mtime spoofing",
+    "fresh checksum stale data",
+    "filesystem mtime forgery",
+    "fake recency signal",
+    "stale bundle marked ready",
+    "older artifact wins selector",
+    "mtime newer than source"
+  ],
+  "regex": [
+    "(?i)(?:(?:spoof|forge|backdate|preserve|rewrite)\\s+(?:mtime|m[- ]?time|modification\\s+time|file\\s+timestamp)|(?:stale|older|backdated)\\s+(?:bundle|artifact|tarball|package)\\s+(?:appears?|labeled|marked)\\s+(?:fresh|ready|current))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-033"
+}

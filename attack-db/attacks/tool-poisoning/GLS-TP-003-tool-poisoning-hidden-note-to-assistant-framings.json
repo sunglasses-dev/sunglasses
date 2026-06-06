@@ -1,0 +1,41 @@
+{
+  "id": "GLS-TP-003",
+  "name": "Tool poisoning \u2014 hidden note-to-assistant framings",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "Tool poisoning patterns \u2014 hidden instructions embedded in tool descriptions, READMEs, or MCP manifests that try to trigger unauthorized actions.",
+  "keywords": [
+    "note to assistant",
+    "note to the assistant",
+    "note to ai",
+    "note to the ai",
+    "hidden instruction",
+    "hidden instructions",
+    "hidden prompt",
+    "secret instruction",
+    "secret note",
+    "do not tell the user",
+    "do not inform the user",
+    "silently execute",
+    "quietly execute",
+    "also transfer funds",
+    "also send",
+    "also leak",
+    "also exfiltrate",
+    "also reveal"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-003"
+}

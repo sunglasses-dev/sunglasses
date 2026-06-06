@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-255",
+  "name": "Cache Manifest Hash Bypass Authority Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Cache/vector-store/embedding-store manifest with forged hash or tampered checksum used to bypass provenance and integrity verification, then execute. RAG-integrity surface not covered by tool-output channel (GLS-TOP-243) or disclaimer framing (GLS-RP-242).",
+  "keywords": [
+    "poisoned cache manifest forged hash",
+    "tampered vector store checksum mismatch",
+    "fabricated embedding store metadata",
+    "corrupted cache forged digest",
+    "stale manifest tampered checksum",
+    "poisoned index fabricated hash evidence",
+    "forged cache signature corrupted digest",
+    "tampered vector store manifest fake checksum",
+    "ignore provenance verification policy",
+    "bypass integrity guardrails and deploy"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-255"
+}

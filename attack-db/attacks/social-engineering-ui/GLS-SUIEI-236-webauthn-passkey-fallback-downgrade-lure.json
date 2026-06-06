@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SUIEI-236",
+  "name": "WebAuthn Passkey Fallback Downgrade Lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Injected UI text that frames strong authentication factors (passkey, security key, WebAuthn) as unavailable/failed and instructs the agent to downgrade to weaker factors (SMS, email code) while explicitly bypassing hardware factor requirements.",
+  "keywords": [
+    "passkey unavailable switch to sms",
+    "security key failed use email code",
+    "webauthn unsupported fallback backup code",
+    "passkey failed bypass hardware factor",
+    "security key unavailable skip passkey",
+    "webauthn failed use sms instead",
+    "passkey unsupported bypass hardware key",
+    "security key failed switch to email code"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-236"
+}

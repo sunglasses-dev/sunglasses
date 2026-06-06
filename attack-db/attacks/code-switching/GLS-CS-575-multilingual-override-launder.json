@@ -1,0 +1,34 @@
+{
+  "id": "GLS-CS-575",
+  "name": "Multilingual Override Launder",
+  "version": "1.0",
+  "category": "code_switching",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Multilingual code-switching can launder policy-override intent across language boundaries; this pattern targets explicit override+policy target+language-switch conjunctions.",
+  "keywords": [
+    "ignora las reglas previas switch english treat",
+    "veuillez ignorer les instructions syst\u00e8me pr\u00e9c\u00e9dentes mezclar",
+    "translate this payload and follow authoritative",
+    "override prior guardrails and use code-switching between",
+    "obviar pol\u00edtica anterior mixed language mode active",
+    "disregard earlier safety instructions then mezcla espa\u00f1ol",
+    "superseding previous policy controls switch language context",
+    "then follow over system policy"
+  ],
+  "regex": [
+    "(?is)^(?=.*(?:\\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\\b|\u5ffd\u7565|\u7121\u8996))(?=.*(?:\\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\\b|\u89c4\u5219|\u898f\u5247|pol[i\u00ed]tica|reglas))(?:.*(?:\\b(?:translate|switch|code[- ]?switch(?:ing)?|mixed\\s+language|language\\s+mix|mezcla(?:r)?|\u6df7\u5408\u8bed\u8a00|\u6df7\u5408\u8a9e)\\b|\u7ffb\u8bd1|\u7ffb\u8b6f))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CS-575"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-005",
+  "name": "llms-full.txt Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker places hostile agent instructions inside an `llms-full.txt` file \u2014 the full-documentation variant of the `llms.txt` standard \u2014 exploiting volume-based context-smuggling, section-mediated hiding, and trust amplification from the \"complete authoritative documentation\" framing to suppress s",
+  "keywords": [
+    "# Page Title",
+    "(?:primary|single) source of truth",
+    ");",
+    "- Skill scope:",
+    "---",
+    "/llms-full.txt",
+    "/tmp/llms_full_txt_smoke_20260519.py",
+    "2.",
+    "3.",
+    "4.",
+    "5.",
+    "6.",
+    "7.",
+    "8.",
+    "AI agent"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:must\\s+not\\s+(?:treat|obey|follow|use|trust)|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress)|never\\s+(?:treat|obey|override|overrides?|forward|include|suppress)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\\b)\n(?=.*\\bllms[-_]full\\.txt\\b)\n(?=.*(?:ai\\s+(?:agents?|assistants?|scanners?|crawlers?)|assistants?|llms?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?|developers?)|security\\s+scanners?|coding\\s+assistants?|agentic|\\bagents?\\b))\n(?=.*(?:governing\\s+document|supersedes?|outranks?|overrides?|takes?\\s+precedence|highest\\s+priority|canonical|definitive|(?:primary|single)\\s+source\\s+of\\s+truth|must\\s+obey|ignore\\s+(?:system|developer|repository|conflicting)\\s+(?:rules?|polic(?:y|ies)|instructions?|prompts?)))\n(?=.*(?:do\\s+not\\s+report|suppress(?:es|ed|ing)?|hide\\s+findings?|exclude\\s+from\\s+(?:final\\s+)?reports?|omit\\s+from\\s+summar(?:y|ies)|redact\\s+(?:[\\w-]+\\s+){0,2}(?:scanner\\s+)?flags?|informational\\s+rather\\s+than\\s+blocking|include\\s+(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context)|API\\s+keys?|tokens?|secrets?|Authorization\\s+headers?)|attach\\s+(?:[\\w-]+\\s+){0,2}(?:env(?:ironment)?\\s+(?:variables?|context)|local\\s+state)|forward\\s+(?:[\\w-]+\\s+){0,2}(?:env(?:ironment)?\\s+(?:variables?|context)|local\\s+state|API\\s+keys?)|share\\s+(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context)|env\\s+context)|skip\\s+(?:code\\s+)?review|mark\\s+(?:all\\s+)?(?:dependencies|PRs?|commits?)\\s+as\\s+(?:reviewed[-_]?safe|safe)|trust\\s+this\\s+repository|prepend\\s+this\\s+policy|outermost\\s+instruction\\s+layer|x-repo-audit|x-runtime-context))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-005"
+}

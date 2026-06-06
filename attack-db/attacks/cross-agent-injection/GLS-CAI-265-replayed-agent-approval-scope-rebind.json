@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-265",
+  "name": "Replayed Agent Approval Scope Rebind",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or replayed approval, nonce, or attestation used by a remote agent to rebind scope or escalate authority while bypassing guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|replay(?:ed)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:approval|ticket|nonce|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|authority|policy|guardrail|permission)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|supersed(?:e|ed|ing)|skip)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-265"
+}

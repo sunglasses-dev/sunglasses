@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-124",
+  "name": "Runbook Escalation Path Spoofing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker rewrites escalation paths (approver, severity threshold, branch order) inside a runbook so critical incidents are routed to low-priority queues or remediation order is inverted while telemetry appears normal.",
+  "keywords": [
+    "runbook escalation path spoofing",
+    "escalation contact swap",
+    "severity threshold rewrite",
+    "role authority aliasing",
+    "runbook branch precedence inversion",
+    "p0 notify rewritten to p2 retry",
+    "stabilize before contain inversion",
+    "lookalike role label binding",
+    "policy invariant violation",
+    "approval chain spoof",
+    "escalation manifest hash mismatch",
+    "containment before cosmetic violation"
+  ],
+  "regex": [
+    "(?i)(?:(?:rewrite|swap|override|spoof)\\s+(?:escalation|runbook|severity)\\s+(?:path|contact|threshold|target|recipient)|(?:P0|critical|high)\\s+(?:notify|escalation)\\s+(?:rerouted?|swapped?|downgrad\\w+)\\s+(?:to|into|as)\\s+(?:P[123]|low|retry|local)|(?:role|authority)\\s+(?:alias|lookalike)\\s+(?:binds?|maps?|routes?)\\s+(?:approval|escalation)\\s+(?:to|into)\\s+(?:weaker|unauthorized))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-124"
+}

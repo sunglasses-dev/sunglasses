@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-154",
+  "name": "Forged Reply File Board Override",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker forges or smuggles content into trusted reply or review files so the agent treats injected text as an authoritative operator status update, overshadowing the canonical board and steering downstream actions.",
+  "keywords": [
+    "reply file forged status",
+    "cava reply overshadow operator",
+    "review file fake operator update",
+    "status surface spoofed",
+    "high trust reply file injection",
+    "reply artifact overrides board",
+    "operator surface impersonation",
+    "review reply outranks canonical",
+    "fabricated reply status",
+    "reply file authority spoof",
+    "stale reply treated as live",
+    "reply file timestamp forgery"
+  ],
+  "regex": [
+    "(?i)(?:(?:cava[_-]?reply|reply\\s+file|review\\s+reply)\\s+(?:status|authority)?\\s*(?:overshadow|spoof|forge|fake|impersonat)|reply\\s+(?:file|artifact)\\s+(?:overrides?|outranks?|replaces?)\\s+(?:board|canonical|operator))",
+    "(?i)(?:(?:fabricated|forged|injected)\\s+(?:reply|review)\\s+(?:status|update|note)|operator\\s+(?:status\\s+)?surface\\s+(?:impersonat|spoof|hijack))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-154"
+}

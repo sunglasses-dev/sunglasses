@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-587",
+  "name": "Pre-Verification Execution Dependency Edge Removal",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker text manipulates the planner's goal-tree ordering so safety and verification nodes are demoted or aliased to a completed state, allowing high-risk execution nodes to run before approval checks pass.",
+  "keywords": [
+    "pretext urgency re-ranking",
+    "verify equals already verified",
+    "goal alias collision",
+    "dependency edge deletion",
+    "guardrail goals as optional",
+    "metric chasing coercion",
+    "execute before verify",
+    "plan dag tamper",
+    "safety node demoted",
+    "synonym auto-merge safety",
+    "goal tree priority poisoning",
+    "planner ordering compromise"
+  ],
+  "regex": [
+    "(?i)(?:(?:execute|run|ship)\\s+(?:before|prior\\s+to|ahead\\s+of)\\s+(?:verify|verification|safety[- ]check|evidence\\s+check)|(?:goal|task)\\s+(?:alias|synonym)\\s+(?:redefines?|maps?|collapses?)\\s+(?:verify|approved|safe)\\s+to\\s+(?:already|completed|done)|(?:dependency|prerequisite)\\s+edge\\s+(?:deleted|removed|treated\\s+as\\s+optional))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-587"
+}

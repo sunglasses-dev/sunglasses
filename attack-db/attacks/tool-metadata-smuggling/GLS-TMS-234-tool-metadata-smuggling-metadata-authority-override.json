@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TMS-234",
+  "name": "Tool metadata smuggling \u2014 metadata authority override",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects metadata, front matter, or annotations claiming system/root/authoritative status and instructing the agent to ignore, bypass, or override safety instructions or guardrails.",
+  "keywords": [
+    "metadata role system override",
+    "front matter root authority bypass",
+    "yaml header trusted ignore safety",
+    "annotations system authority replace instructions",
+    "properties trusted discard rules",
+    "trusted metadata override instructions",
+    "developer tag bypass guardrails"
+  ],
+  "regex": [
+    "(?is)(?=.{0,500}\\b(?:meta(?:data)?|front\\s*matter|yaml\\s*header|attributes?|properties?|tags?|annotations?)\\b)(?=.{0,500}\\b(?:system|developer|root|highest|authoritative|trusted)\\b)(?=.{0,500}\\b(?:ignore|bypass|override|replace|discard|forget|waive)\\b)(?=.{0,500}\\b(?:instructions?|guardrails?|policy|safety|rules?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-234"
+}

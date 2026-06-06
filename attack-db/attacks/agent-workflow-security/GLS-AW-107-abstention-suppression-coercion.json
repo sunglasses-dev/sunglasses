@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-107",
+  "name": "Abstention Suppression Coercion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects directives that suppress the agent's refuse/defer/N-A fallback, coercing confident answers when the correct response is abstention, which converts uncertainty into hallucinated commitments downstream systems then trust.",
+  "keywords": [
+    "abstention suppression coercion",
+    "force answer when n/a",
+    "refusal pressure rewrite",
+    "must answer override",
+    "no-such-thing-as-i-dont-know",
+    "deferral path blocked",
+    "agent compelled to guess",
+    "uncertainty masked as confident",
+    "abstain disabled by injection",
+    "must respond directive injection",
+    "force completion when uncertain",
+    "suppress n/a fallback"
+  ],
+  "regex": [
+    "(?i)(?:suppress|disable|block|override)\\s+(?:abstention|refusal|n\\/a|deferral|i\\s+don'?t\\s+know)\\s+(?:path|response|fallback|option)|(?:must|always|never\\s+refuse|don'?t\\s+abstain)\\s+(?:answer|respond|provide|return)\\s+(?:even\\s+when|despite|regardless\\s+of)\\s+(?:uncertain|insufficient|missing)",
+    "(?i)(?:force|compel|coerce)\\s+(?:agent|model|llm)\\s+(?:to\\s+)?(?:answer|respond|complete)\\s+(?:when|despite)\\s+(?:should\\s+)?(?:refuse|defer|abstain)|(?:no\\s+such\\s+thing\\s+as|never\\s+say)\\s+(?:i\\s+don'?t\\s+know|n\\/a|unknown)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-107"
+}

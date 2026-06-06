@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-016",
+  "name": "Emergency Urgency Approval Gate Skip Deploy",
+  "version": "1.0",
+  "category": "agent_workflow",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an emergency or critical urgency claim used to skip or bypass approval, review, or change-control gates for a deployment or production release.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:skip|bypass|waive|ignore|override)\\b)(?=.*\\b(?:emergency|urgent|critical|sev-?1|hotfix)\\b)(?=.*(?:\\b(?:skip|bypass|waive|ignore|override)\\b.{0,80}\\b(?:approval|review|change(?:[- ]?control)?|sign[- ]?off|gate)\\b|\\b(?:approval|review|change(?:[- ]?control)?|sign[- ]?off|gate)\\b.{0,80}\\b(?:skip|bypass|waive|ignore|override)\\b))(?=.*\\b(?:deploy(?:ment)?|merge|release|production|prod)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-016"
+}

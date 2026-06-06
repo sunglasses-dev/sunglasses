@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-015",
+  "name": "DNT / Tracking-Policy Metadata Agent Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "DNT or tracking-status/privacy-policy discovery metadata can embed agent-directed instructions that claim authority over scanners, suppress tracking findings, or request local cookies/tokens/environment variables.",
+  "keywords": [
+    "AI",
+    "API key",
+    "Authorization",
+    "Do Not Track",
+    "LLM",
+    "Tk:",
+    "agent",
+    "assistant",
+    "bearer",
+    "cookies",
+    "crawler",
+    "dnt-policy",
+    "do not report",
+    "environment variables",
+    "findings"
+  ],
+  "regex": [
+    "(?isx)\n\\A\n(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not)\\s+(?:obey|treat|trust|follow|accept|interpret|use)\\b.{0,120}\\b(?:dnt|do[-_\\s]?not[-_\\s]?track|tracking[-_\\s]?status|tracking[-_\\s]?policy|privacy[-_\\s]?metadata)\\b.{0,120}\\b(?:override|supersede|outrank|replace|policy|instruction))\n(?!.*\\b(?:docs?|guide|article|training|reference)\\b.{0,120}\\b(?:scanners?|agents?|assistants?|crawlers?|auditors?)\\s+should\\s+(?:report|detect|flag|refuse)\\b.{0,160}\\b(?:dnt|do[-_\\s]?not[-_\\s]?track|tracking[-_\\s]?status|tracking[-_\\s]?policy))\n(?=.*\\b(?:dnt[-_\\s]?policy|do[-_\\s]?not[-_\\s]?track|tracking[-_\\s]?status|tracking[-_\\s]?policy|privacy[-_\\s]?policy[-_\\s]?metadata|Tk:|site[-_\\s]?wide\\s+tracking)\\b)\n(?=.*\\b(?:ai|llms?|agents?|assistants?|crawlers?|scanners?|auditors?|privacy[-_\\s]?auditors?)\\b)\n(?=.*(?:\\b(?:ignore|override|supersede|supersedes|outrank|replace|highest[-_\\s]?priority|must\\s+obey|authoritative|policy\\s+for\\s+(?:agents?|assistants?|crawlers?|scanners?|auditors?))\\b|\\b(?:do\\s+not|don't|never|suppress|hide|omit)\\s+(?:report|log|flag|disclose|include)\\b))\n(?=.*\\b(?:cookies?|sessions?|authorization|bearer|api[-_\\s]?keys?|tokens?|env(?:ironment)?(?:\\s+variables?)?|secrets?|findings?|violations?|reports?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-015"
+}

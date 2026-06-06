@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TOP-620",
+  "name": "Tool Output Integrity Forgery",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects forged tool output \u2014 fake scan results, compliance reports, or audit verdicts \u2014 used to unblock execution and bypass policy checks.",
+  "keywords": [
+    "inject forged compliance report pass status into",
+    "spoof the audit verdict tool output unblock",
+    "use fake verification badge scan result output",
+    "fabricate tool output evidence with pass status",
+    "forge scan result summary the audit log",
+    "insert spoofed compliance report output unblock deploy",
+    "create fake audit verdict tool output execute",
+    "forged verification badge tool output should allow"
+  ],
+  "regex": [
+    "(?is)^(?=.*(?:\\b(?:tool\\s*output|scan\\s*result|compliance\\s*report|audit\\s*(?:log|verdict)|verification\\s*badge)\\b.{0,120}\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|fake)\\b|\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|fake)\\b.{0,120}\\b(?:tool\\s*output|scan\\s*result|compliance\\s*report|audit\\s*(?:log|verdict)|verification\\s*badge)\\b))(?=.*\\b(?:unblock|auto-?execut(?:e|es|ed|ing)|execut(?:e|es|ed|ion|ing)|auto-?remediate|pass\\s*status|allow)\\b)(?=.*\\b(?:bypass(?:ing)?|override|ignore|skip(?:s|ping)?|disable|disabling)\\b.{0,80}\\b(?:guardrail(?:s)?|policy|validation|check(?:s)?|controls?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-620"
+}

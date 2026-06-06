@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-118",
+  "name": "Fresh Artifact Freshness-Bias Override",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker injects new but weakly trusted artifacts at the merge boundary where pipelines combine recent inputs with older policy-authoritative artifacts, so freshness bias lets attacker content override stable canonical policy.",
+  "keywords": [
+    "source freshness conflict",
+    "new untrusted vs old authoritative",
+    "freshness beats trust attack",
+    "policy artifact overridden by fresh",
+    "newer-but-weaker source wins",
+    "recency bias exploit",
+    "fresh injected vs stable canonical",
+    "merge boundary poisoning",
+    "newer source supersedes policy",
+    "freshness over provenance",
+    "weak fresh override authoritative",
+    "decision boundary fresh-trust gap"
+  ],
+  "regex": [
+    "(?i)(?:new|fresh|recent)\\s+(?:but\\s+)?(?:weak|untrusted|low[- ]trust|attacker)\\s+(?:source|input|artifact)\\s+(?:override|supersedes?|beats?|wins\\s+over)\\s+(?:old|stable|authoritative|canonical|policy)",
+    "(?i)(?:freshness|recency)\\s+(?:beats?|trumps?|over)\\s+(?:trust|provenance|authority|policy)|(?:merge|decision)\\s+(?:boundary|gate)\\s+(?:prefers?|prioritizes?)\\s+(?:freshness|recency)\\s+(?:over|instead\\s+of)\\s+(?:provenance|trust|authority)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-118"
+}

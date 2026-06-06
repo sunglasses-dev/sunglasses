@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-022",
+  "name": "Matrix .well-known Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Matrix discovery documents (`/.well-known/matrix/client` or `/.well-known/matrix/server`) can carry target-controlled extension fields that tell AI agents or scanners to treat the document as operator policy, disclose local auth context, or suppress reports.",
+  "keywords": [
+    "/.well-known/matrix/client",
+    "/.well-known/matrix/server",
+    "AI agent",
+    "Authorization",
+    "Bearer",
+    "LLM",
+    "Matrix client discovery",
+    "Matrix homeserver",
+    "Semantic rule: In Matrix",
+    "admin_contact",
+    "agent_policy",
+    "assistant",
+    "autonomous scanner",
+    "bot",
+    "canonical operator policy"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:must\\s+not|never|cannot|refus(?:e|ed)|blocked).{0,80}(?:treat|obey|include|forward|send|attach|expose|leak|use)\\b)(?=.*(?:/\\.well-known/matrix/(?:client|server)|well-known\\s+matrix|m\\.homeserver|m\\.identity_server|matrix\\s+homeserver|matrix\\s+client\\s+discovery))(?=.*(?:agent|assistant|autonomous|crawler|scanner|llm|bot|verifier))(?=.*(?:x-agent[-_a-z]*|agent[_-]?policy|crawler[_-]?notice|verifier[_-]?policy|owner[_-]?verification|admin[_-]?contact|policy[_-]?uri))(?=.*(?:canonical\\s+(?:server[-\\s]*)?(?:operator|owner|site)?\\s*policy|supersede|override|outrank|higher[-\\s]*priority|treat\\s+(?:this|the)\\s+(?:matrix\\s+)?(?:well-known|metadata|document)\\s+as\\s+(?:operator|owner|server)\\s+authority|include|send|forward|attach|expose|do\\s+not\\s+(?:report|notify|mention)|suppress|hide))(?=.*(?:authorization|bearer|access\\s*token|matrix_access_token|token|cookie|session|environment|api\\s*key|secret|local\\s+auth|do\\s+not\\s+(?:report|notify|mention)|suppress|hide|supersede|override|outrank)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-022"
+}

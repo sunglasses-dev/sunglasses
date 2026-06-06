@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-023",
+  "name": "oEmbed endpoint agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detect oEmbed discovery responses or provider metadata that target AI agents/scanners with authority-inversion, report-suppression, or credential-forwarding instructions.",
+  "keywords": [
+    "AI agent",
+    "LLM",
+    "application/json+oembed",
+    "assistant",
+    "crawler",
+    "html",
+    "model",
+    "oembed",
+    "provider_name",
+    "provider_url",
+    "scanner",
+    "thumbnail_url"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:do\\s+not|must\\s+not|never)\\s+(?:treat|obey|follow|execute|use|honou?r)\\b.{0,140}\\b(?:oembed|embed\\s+metadata|provider\\s+metadata)\\b)\n^(?!.*\\b(?:docs?|documentation|training|scanner\\s+docs?)\\b.{0,100}\\b(?:should|must)\\s+report\\b.{0,120}\\b(?:oembed|embed\\s+provider|provider\\s+metadata)\\b)\n(?=.*\\b(?:oembed|application/json\\+oembed|provider_name|provider_url|thumbnail_url|embed\\s+provider|discoverable\\s+embed|\"html\"\\s*:|\"type\"\\s*:\\s*\"(?:photo|video|rich|link)\")\\b)\n(?=.*\\b(?:ai\\s*(?:agent|assistant|crawler|scanner)|llm|model|autonomous\\s+agent|seo\\s+agent|security\\s+scanner)\\b)\n(?=.*\\b(?:ignore|override|supersedes?|outrank|replace|bypass|suppress|hide|do\\s+not\\s+report|forward|include|exfiltrate|send)\\b.{0,180}\\b(?:system|developer|scanner|policy|findings?|report|credential|secret|tokens?|cookies?|env(?:ironment)?|local\\s+state|authorization|api\\s*key)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-023"
+}

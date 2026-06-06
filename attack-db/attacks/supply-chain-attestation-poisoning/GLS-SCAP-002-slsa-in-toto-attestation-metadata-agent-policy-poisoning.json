@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SCAP-002",
+  "name": "SLSA / in-toto attestation metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Machine-readable build provenance and in-toto/SLSA attestation metadata can carry agent-directed policy claims that tell AI dependency reviewers or supply-chain scanners to trust a build, suppress provenance failures, or forward local CI/runtime secrets.",
+  "keywords": [
+    "agent/scanner/verifier instructions",
+    "agent_instructions",
+    "buildDefinition",
+    "materials",
+    "predicateType: slsa.dev/provenance",
+    "runDetails",
+    "scanner_policy",
+    "x-agent-policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|incident|vulnerability|training|guide|docs?|documentation|reference)\\b.{0,100}\\b(?:flagged|detected|blocked|refused|should\\s+(?:report|detect|flag|refuse|block)))\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|does\\s+not\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|never\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|must\\s+not\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)|should\\s+(?:not\\s+\\w+|never\\b))\\b)\n(?!.*\\b(?:no\\s+(?:policy\\s+)?overrides?|not\\s+(?:authoritative|canonical|definitive)|does\\s+not\\s+instruct\\s+(?:agents?|scanners?|verifiers?).{0,80}\\b(?:include|forward|suppress|hide|trust|ignore|report)))\n(?=.*(?:\\b(?:slsa|in[-\\s]?toto|intoto|dsse|provenance|provenance_note|attestation|attestations|buildDefinition|runDetails|materials|subject\\s+digest|predicateType|slsa\\.dev/provenance|in-toto\\.io/Statement|sigstore\\s+bundle|rekor\\s+entry)\\b|(?<!\\w)\"(?:_type|predicateType|buildDefinition|runDetails|materials|subject|predicate|attestation_note|provenance_note|x-agent-policy|agent_instructions|scanner_policy)\"\\s*:))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|dependency\\s+(?:reviewers?|auditors?|agents?)|supply[-\\s]?chain\\s+(?:scanners?|auditors?|agents?)|build\\s+(?:auditors?|verifiers?)|provenance\\s+verifiers?|security\\s+scanners?|automated\\s+(?:review|audit)|scanner_policy|agent_instructions|x-agent-policy)(?![a-zA-Z0-9]))\n(?=.*\\b(?:agent|scanner|verifier|auditor|assistant|reviewer)\\s+instructions?\\b|.*\\b(?:authoritative|canonical|definitive|governing\\s+document|controlling\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|takes\\s+precedence|overrides?|supersedes?|overrules?|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|agent|dependency|build)\\s+(?:review|audit|scan|verification)|all\\s+(?:scanner|security|audit|verification)\\s+rules?))\\b)\n(?=.*\\b(?:do\\s+not\\s+report|not\\s+report|suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|background)|mark.{0,50}?as\\s+(?:trusted|clean|safe|verified)|ignore.{0,50}?(?:mismatches?|failures?|findings?|warnings?|alerts?|observations?|diagnostics?)|trust.{0,50}?(?:build|artifact|package|image|release)|include|forward|send|share|attach|provide|expose|copy|collect|pass\\s+along)\\b.{0,90}\\b(?:findings?|reports?|warnings?|alerts?|observations?|diagnostics?|results?|mismatches?|failures?|subject\\s+digest|builder\\s+identity|materials?|provenance\\s+failure|attestation\\s+failure|build|artifact|package|image|release|ci\\s+tokens?|oidc\\s+tokens?|authorization\\s+headers?|api\\s+keys?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCAP-002"
+}

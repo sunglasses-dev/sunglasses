@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-179",
+  "name": "Stale Artifact Current Permission Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker replays or retains syntactically valid but stale artifacts (approvals, summaries, safety checks) so the agent treats them as current authority, upgrading old gate results into present-day permissions.",
+  "keywords": [
+    "temporal staleness exploitation",
+    "old approval still valid",
+    "stale summary authority",
+    "outdated safety check reused",
+    "expired artifact accepted",
+    "time-validity window stretched",
+    "stale signed envelope replayed",
+    "old verdict applied to new action",
+    "freshness check missing",
+    "valid but stale artifact",
+    "approval replay across time",
+    "stale gate result authority"
+  ],
+  "regex": [
+    "(?i)(?:temporal\\s+staleness\\s+(?:exploit|abuse)|(?:stale|old|expired|outdated)\\s+(?:approval|summary|safety\\s+check|gate\\s+result|verdict|envelope)\\s+(?:still\\s+)?(?:valid|trusted|accepted|reused|replayed))",
+    "(?i)(?:(?:freshness|ttl|expiry)\\s+(?:check|gate)\\s+(?:missing|skipped|ignored|stretched)|old[- ]but[- ]valid\\s+(?:artifact|signature|approval)\\s+(?:upgrade|elevat|grants?\\s+authority))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-179"
+}

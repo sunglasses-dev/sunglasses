@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-011",
+  "name": "RDFa / Microdata agent-policy poisoning in HTML structured data",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Hostile instructions are embedded in RDFa or HTML microdata attributes that AI crawlers, SEO agents, security scanners, or tool builders may ingest as trusted page metadata, causing authority inversion, report suppression, or local-secret forwarding.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-011"
+}

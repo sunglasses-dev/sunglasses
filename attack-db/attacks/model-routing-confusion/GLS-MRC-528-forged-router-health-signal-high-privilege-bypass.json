@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-528",
+  "name": "Forged Router Health Signal High-Privilege Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or spoofed router health or telemetry signal used to promote or fail-open routing to a high-privilege or unrestricted model tier while disabling policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|routing|dispatcher|gateway|tier)\\b)(?=.*\\b(?:health|telemetry|latency|risk|score|classifier)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|tamper|tampered|replay|replayed|fabricated)\\b)(?=.*\\b(?:reroute|rerouted|promote|promoted|upgrade|upgraded|switch|switched|fail[-\\s]*open)\\b)(?=.*\\b(?:high[-\\s]*privilege|admin|unrestricted|raw\\s+model|unsafe\\s+tier)\\b)(?=.*\\b(?:bypass|bypassed|override|overrode|disable|disabled)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+gate|approval)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-528"
+}

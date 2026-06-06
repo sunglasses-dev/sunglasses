@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-261",
+  "name": "Forged Telemetry Risk Flag Redirect Execution",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged telemetry risk flag, confidence score, or tool result from an agent or executor is used to redirect or reroute execution in order to bypass policy guardrails or approval checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|router|coordinator|executor)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:telemetry|risk\\s+flag|confidence\\s+score|execution\\s+trace|tool\\s+result)\\b)(?=.*\\b(?:redirect|redirected|redirecting|redirects|reroute|rerouted|rerouting|reroutes|switch(?:ed|ing|es)?\\s+path|override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|execution\\s+gate|execution\\s+gates|approval\\s+check|approval\\s+checks|scope\\s+control)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-261"
+}

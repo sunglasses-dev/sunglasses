@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IF-658",
+  "name": "Forged Device Assertion Step-Up Auth Bypass",
+  "version": "1.0",
+  "category": "identity_federation",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged device or session trust assertion used to bypass step-up MFA or challenge verification and escalate account or session access.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|override|ignore|disable|skip)\\b)(?=.*\\b(?:forged?|fake|spoof(?:ed|ing)?|tampered?)\\b.{0,90}\\b(?:device|session|trust|attestation)\\b.{0,40}\\b(?:assertion|token|proof|claim)\\b)(?=.*\\b(?:step-?up|mfa|otp|challenge|re-?auth(?:entication)?)\\b)(?=.*\\b(?:bypass|override|skip|disable|ignore)\\b.{0,80}\\b(?:verification|validator|check|policy|guardrail)\\b)(?=.*\\b(?:elevat(?:e|ed|ion)|escalat(?:e|ed|ion)|grant|unlock|reactivat(?:e|ed|ion))\\b.{0,80}\\b(?:account|session|access|scope|privilege)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IF-658"
+}

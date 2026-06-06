@@ -1,0 +1,24 @@
+{
+  "id": "GLS-EML-251",
+  "name": "Forced Error Dump Redaction Filter Bypass",
+  "version": "1.0",
+  "category": "error_message_leakage",
+  "severity": "medium",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an instruction to print or expose a full, unredacted error or stack trace containing secrets by bypassing or disabling redaction or masking filters.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:error|exception|stack(?:\\s|-)?trace|debug(?:ging)?|traceback|crash(?:\\s+log)?|diagnostic)\\b)(?=.*\\b(?:dump|print|expose|reveal|show|output)\\b)(?=.*\\b(?:full|raw|unredacted|complete)\\b)(?=.*(?:\\b(?:ignore|bypass|disable|skip|override)\\b.{0,40}\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b|\\b(?:redaction|masking|saniti[sz]ation|filters?)\\b.{0,40}\\b(?:ignore|bypass|disable|skip|override)\\b))(?=.*\\b(?:secret|token|api[_ -]?key|credential|password|env(?:ironment)?\\s+var(?:iable)?s?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-EML-251"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SECSM-001",
+  "name": "Docker Socket Mount Host Namespace Escalation",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which docker.sock or container socket paths are mounted or attached into a host namespace, PID namespace, or privileged context alongside escalation, breakout, or escape language that bypasses sandbox isolation or guardrail restrictions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:mount|bind|attach|expose|map|publish)\\b)(?=.*\\b(?:docker\\s*sock(?:et)?|docker\\.sock|/var/run/docker\\.sock|container\\s*socket|host\\s*socket)\\b)(?=.*\\b(?:host\\s*namespace|pid\\s*namespace|mount\\s*namespace|nsenter|--privileged|privileged|cap_sys_admin)\\b)(?=.*\\b(?:escape|break\\s*out|bypass|override|disable|ignore|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:sandbox|isolation|boundar(?:y|ies)|guardrail|policy|restriction(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SECSM-001"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-580",
+  "name": "Post-Approval Tool Hint Policy Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Lower-trust content (tool output, retrieval, retry wrappers) is merged after policy text and silently overrides protected fields so executed tool arguments drift outside approved scope while summaries still appear compliant.",
+  "keywords": [
+    "policy-last merge bug",
+    "retry wrapper override",
+    "post-approval mutation",
+    "tool hint overrides policy",
+    "cross-tool precedence bleed",
+    "summarize-then-execute inversion",
+    "low-trust channel overrides guardrail",
+    "scope silently widened",
+    "allowlist widened after approval",
+    "approved hash mismatch executed hash",
+    "pseudo-policy metadata trusted",
+    "guardrail priority inversion"
+  ],
+  "regex": [
+    "(?i)(?:(?:tool[- ]?(?:hint|output)|retrieval|retry[- ]?wrapper)\\s+(?:overrides?|wins?\\s+over|supersedes?|outranks?)\\s+(?:policy|guardrail|allowlist|scope)|(?:post[- ]approval|after[- ]approval)\\s+(?:mutation|change|widening|override)|(?:approved|approval)\\s+hash\\s+(?:!=|mismatch|differs?\\s+from)\\s+executed)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-580"
+}

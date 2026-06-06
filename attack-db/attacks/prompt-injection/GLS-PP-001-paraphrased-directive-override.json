@@ -1,0 +1,47 @@
+{
+  "id": "GLS-PP-001",
+  "name": "Paraphrased directive override",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Paraphrased forms of 'ignore previous instructions' that avoid the canonical keyword set.",
+  "keywords": [
+    "set aside what",
+    "set aside the",
+    "set aside your",
+    "earlier directives",
+    "prior directives",
+    "no longer apply",
+    "no longer in effect",
+    "no longer valid",
+    "scrap what came before",
+    "scrap the previous",
+    "discard the earlier",
+    "discard your earlier",
+    "what was told to you earlier",
+    "what you were told earlier",
+    "rules you were given",
+    "new rules:",
+    "new directives:",
+    "new priorities",
+    "never mind the previous",
+    "forget about that",
+    "changed my mind about the rules",
+    "the guidelines from before",
+    "directives no longer"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PP-001"
+}

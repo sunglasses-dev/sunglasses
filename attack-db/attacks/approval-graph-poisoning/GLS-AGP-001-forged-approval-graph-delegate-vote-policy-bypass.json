@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AGP-001",
+  "name": "Forged Approval Graph Delegate Vote Policy Bypass",
+  "version": "1.0",
+  "category": "approval_graph_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged approval graph, quorum snapshot, or delegate ballot used to auto-approve or skip guardrail trust-gate policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|tampered|spoofed|counterfeit)\\b)(?=.*\\b(?:approval\\s+graph|quorum\\s+snapshot|delegate\\s+vote|signed\\s+ballot|attestation\\s+bundle)\\b)(?=.*\\b(?:override|overrides|overridden|overriding|bypass|bypasses|bypassed|bypassing|auto\\s*-?approve|auto\\s*-?approved|skip|skips|skipped|skipping|ignore|ignores|ignored|ignoring)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|trust\\s+gate(?:s)?|approval\\s+gate(?:s)?|verification\\s+check(?:s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AGP-001"
+}

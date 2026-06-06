@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-086",
+  "name": "Fake Executive Approval Pretext",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects social-engineering text impersonating urgent human approvals so the agent treats untrusted content as control-plane authorization. Tool approval gates collapse on pretext and high-impact actions execute under fake consent.",
+  "keywords": [
+    "human override pretext loop",
+    "AZ approved this already",
+    "boss said skip safety",
+    "fake executive approval",
+    "deadline panic override",
+    "channel confusion replay approval",
+    "apology and comply loop",
+    "name-drop authority spoof",
+    "social-engineered approval claim",
+    "fake prior consent",
+    "retry with softened pretext",
+    "impersonated human authority"
+  ],
+  "regex": [
+    "(?i)(?:human\\s+override\\s+pretext|(?:AZ|boss|leader|exec|ceo|admin)\\s+(?:already\\s+)?approved\\s+(?:this|that|it|skip)|(?:skip|bypass)\\s+(?:checks?|approval|safety)\\s+(?:now|immediately))",
+    "(?i)(?:(?:fake|fabricated|claimed)\\s+(?:prior\\s+consent|human\\s+approval|executive\\s+approval)|(?:name[- ]drop|impersonated)\\s+(?:authority|approver)|apology[- ]and[- ]comply\\s+loop)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-086"
+}

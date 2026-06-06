@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-102",
+  "name": "Coldstart Anomaly Baseline Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker primes anomaly-detection baselines during short or coldstart rebuild windows so adversarial behavior is averaged into 'normal,' raising thresholds until malicious traffic falls below the detection floor.",
+  "keywords": [
+    "anomaly baseline poisoning",
+    "coldstart threshold prime",
+    "baseline window attacker-influenced",
+    "malicious traffic primes normal",
+    "short window baseline abuse",
+    "baseline rebuild during attack",
+    "threshold drift via priming",
+    "warm-up baseline poisoning",
+    "anomaly detector blind spot",
+    "baseline reset attack",
+    "adversary in baseline window",
+    "low-and-slow baseline prime"
+  ],
+  "regex": [
+    "(?i)(?:poison|prime|seed|influence)\\s+(?:anomaly\\s+)?(?:baseline|threshold|window)\\s+(?:so|to\\s+make)\\s+(?:malicious|attack|adversarial)\\s+(?:behavior|traffic|signal)\\s+(?:look|appear|seem)\\s+(?:normal|baseline|benign)",
+    "(?i)(?:short|rolling|coldstart|warm[- ]up)\\s+(?:baseline|window)\\s+(?:rebuilt|recomputed|reset)\\s+(?:from|using|with)\\s+(?:attacker|adversarial|tainted)\\s+(?:traffic|data|sample)|(?:baseline|threshold)\\s+(?:drift|shift)\\s+(?:via|through)\\s+(?:slow|gradual|low[- ]and[- ]slow)\\s+(?:priming|injection)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-102"
+}

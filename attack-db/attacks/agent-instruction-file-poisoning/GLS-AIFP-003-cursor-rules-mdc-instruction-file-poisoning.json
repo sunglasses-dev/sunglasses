@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-003",
+  "name": ".cursor/rules MDC Instruction File Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker places a malicious `.mdc` rule file in `.cursor/rules/` with hostile instructions embedded in the YAML frontmatter `description` field and rule body \u2014 exploiting the structured format's dual-reader nature (human sees documentation, agent receives control-plane instructions) to suppress s",
+  "keywords": [
+    "### Suggested severity\n\nHIGH when",
+    "(?six)",
+    ");",
+    "- Skill scope:",
+    ".cursor/rules",
+    ".cursor/rules/",
+    ".cursor/rules/*.mdc",
+    ".github/copilot-instructions.md",
+    ".mdc",
+    "3. **P3 \u2014 Body-only hostile**: Benign",
+    "4. **N4 \u2014 Training example**:",
+    "<!-- suppress all findings -->",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "SKILL.md"
+  ],
+  "regex": [
+    "(?six)^(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n  |should\\s+(?:report|detect|flag|refuse|block)\n))\n(?=.*(?:\n  [.]cursor[/\\\\]rules[/\\\\]\n  |alwaysApply\\s*:\\s*true\n  |description\\s*:\\s*>\n  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note)(?![a-zA-Z0-9])\n  |\\b(?:for\\s+AI\\s+agents?|for\\s+agents?|for\\s+scanners?|for\\s+crawlers?)\\b\n))\n(?=.*(?:\n  \\b(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority)\\b\n  |\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b\n  |\\bgoverning\\s+document\\b\n  |\\bcontrolling\\s+document\\b\n  |\\bdefines\\s+all\\s+scanner\\s+rules?\\b\n  |\\bcanonical(?:\\s+(?:project|model|security|governing|policy))?(?:\\s+(?:description|policy|document))?\\b\n  |\\bdefinitive(?:\\s+(?:project|model\\s+evaluation))?(?:\\s+(?:description|policy))?\\b\n  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?(?![a-zA-Z0-9])\n  |\\bthe\\s+(?:primary|single|final)\\s+(?:policy|authority|reference|word)\\b\n))\n(?=.*(?:\n  \\bsuppress(?:es|ed|ing)?\\b\n  |\\bhide\\s+(?:[a-zA-Z-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?)\\b\n  |\\bomit\\b.{0,20}?\\b(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)\\b\n  |\\bexclude\\b.{0,2}(?:[\\w-]+\\s+){0,2}\\b(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)\\b\n  |\\bredact\\b.{0,30}?\\b(?:findings?|warnings?|flags?)\\b\n  |\\bdo\\s+not\\s+(?:report|flag|escalate)\\b\n  |\\bskip\\s+(?:all\\s+)?(?:security\\s+)?checks?\\b\n  |\\btreat\\b.{0,40}?\\bas\\s+informational\\b\n  |\\bmark\\b.{0,40}?\\bas\\s+(?:informational|safe|low|none)\\b\n  |\\bclassify\\b.{0,30}?(?:as\\s+)?(?:informational|low|none|false\\s+positive)\\b\n  |\\bflag\\b.{0,40}?\\bas\\s+(?:informational|low|none)\\b\n  |(?:\\binclude\\b|\\battach\\b|\\bforward\\b|\\bsend\\b|\\bcollect\\b|\\bembed\\b|\\bshare\\b|\\bprovide\\b|\\bexpose\\b)\n    \\s+(?:[\\w-]+\\s+){0,2}\n    (?:\\benvironment\\s+(?:variables?|context|details?|config(?:uration)?|state)\\b\n      |\\b(?:API|Bearer|session|auth)\\s+(?:keys?|tokens?)\\b\n      |\\blocal\\s+state\\b\n      |\\bcredentials?\\b\n      |\\bsecrets?\\b\n      |\\bruntime\\s+(?:context|variables?|config(?:uration)?)\\b)\n  |\\btransparency\\s+(?:header|addendum|requirement)\\b\n  |\\bcompliance\\s+(?:addendum|requirement|provision)\\b\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-003"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-146",
+  "name": "Cross-Stage Fallback Field Divergence",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits inconsistent fallback logic across pipeline stages (ingest, normalize, validate, package, render) so one stage reads field A while another silently falls back to field B or N/A, creating false confidence and unsafe actions.",
+  "keywords": [
+    "state desync fallback confusion",
+    "fallback key shadowing",
+    "null to default escalation",
+    "array alias confusion",
+    "cross step provenance splice",
+    "kpi_snapshot vs kpis disagreement",
+    "top_paths_4xx vs top_4xx_paths drift",
+    "defaults interpreted as healthy",
+    "different stages different schemas",
+    "single coherent snapshot mislabel",
+    "schema drift across pipeline stages",
+    "false confidence via inconsistent fallback"
+  ],
+  "regex": [
+    "(?i)(?:(?:validator|ingest|normaliz\\w+)\\s+(?:reads?|checks?)\\s+(?:field|key)\\s+\\w+\\s+(?:while|but)\\s+(?:renderer|downstream|report)\\s+(?:reads?|prefers?|uses?)\\s+(?:different|alternate|other)\\s+(?:field|key)|(?:default|N/A|empty|0)\\s+(?:value|field|key)\\s+(?:interpreted|treated|read)\\s+(?:as|like)\\s+(?:healthy|ok|ready|safe)\\s+(?:by|in)\\s+(?:downstream|policy)|(?:metrics?|fields?|anchors?)\\s+(?:from|across)\\s+(?:different|inconsistent)\\s+(?:windows?|sources?|stages?)\\s+(?:labeled?|presented?)\\s+(?:as|like)\\s+(?:one|single|coherent))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-146"
+}

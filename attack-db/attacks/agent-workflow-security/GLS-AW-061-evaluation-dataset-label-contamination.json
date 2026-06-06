@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-061",
+  "name": "Evaluation Dataset Label Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker contaminates evaluation fixtures, manifests, or label files so scoring rewards unsafe behavior and benchmark theater hides real regressions. Results in false confidence, missed vulnerabilities, and bad roadmap priorities.",
+  "keywords": [
+    "eval dataset contamination",
+    "fixture label flip",
+    "benchmark theater",
+    "canary dilution oversampling",
+    "split-version corpus desync",
+    "policy-target mismatch poisoning",
+    "manifest hash mismatch tolerated",
+    "label swap safe unsafe",
+    "fake hardened benchmark",
+    "duplicate benign prompt flooding",
+    "eval scoring poisoning",
+    "fixture metadata override"
+  ],
+  "regex": [
+    "(?i)(?:(?:flip|swap|override|tamper)\\s+(?:eval|fixture|benchmark|dataset)\\s+(?:label|manifest|metadata|outcome)\\b|(?:contaminate|poison|dilute)\\s+(?:eval|benchmark|fixture)\\s+(?:corpus|dataset|prompts?)|(?:canary|injection)\\s+(?:fixture|prompt)s?\\s+(?:diluted|drowned|over[- ]sampled))",
+    "(?i)(?:split[- ]version\\s+(?:corpus|dataset)\\s+desync|policy[- ]target\\s+mismatch\\s+poisoning|fake\\s+(?:hardened|benchmark)\\s+(?:result|score|verdict))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-061"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "GLS-CAI-621",
+  "name": "Cross Agent Injection pattern",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects forged or spoofed directives attributed to a peer, upstream, or remote agent, tagged with false precedence to bypass guardrails and validation.",
+  "keywords": [
+    "inject forged peer agent ticket with higher",
+    "spoof another agent directive authoritative precedence bypass",
+    "fabricate upstream agent instruction order mark priority",
+    "use fake remote agent request ticket claiming",
+    "forge peer agent order with precedence flag",
+    "create spoofed another agent directive with priority",
+    "insert fabricated upstream agent ticket authoritative override",
+    "fake remote agent instruction with precedence metadata"
+  ],
+  "regex": [
+    "(?is)^(?=.*(?:\\b(?:peer|upstream|remote|another)\\s+agent\\b.{0,120}\\b(?:directive|instruction|ticket|request|order)\\b|\\b(?:directive|instruction|ticket|request|order)\\b.{0,120}\\b(?:peer|upstream|remote|another)\\s+agent\\b))(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:precedence|priority|authorit(?:y|ative)|higher\\s+trust|override)\\b)(?=.*\\b(?:bypass|override|ignore|skip|disable)\\w*\\b.{0,80}\\b(?:guardrail(?:s)?|policy|validation|check(?:s)?|control(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-621"
+}

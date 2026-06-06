@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-174",
+  "name": "Prose Success Machine Failure Mismatch",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker (or sloppy tool) emits natural-language success in stdout while the machine verdict (exit code, JSON success, validator status) reports failure, and policy trusts the prose over the machine signal.",
+  "keywords": [
+    "exit code laundering",
+    "stdout ok masks failure",
+    "completed message with nonzero exit",
+    "natural language success spoof",
+    "machine verdict ignored",
+    "tool stdout overrides exit code",
+    "json success false ignored",
+    "validator status overridden by text",
+    "ok printed exit code 1",
+    "false success in tool output",
+    "language masks failure verdict",
+    "policy trusts text over machine"
+  ],
+  "regex": [
+    "(?i)(?:exit\\s+code\\s+(?:laundering|spoof|override|mask)|(?:stdout|natural[- ]language|free[- ]text)\\s+(?:says?|reports?|claims?)\\s+(?:ok|success|completed|done)\\s+(?:while|but|despite)\\s+(?:exit[_\\s-]?code|json\\s+success|validator)\\s+(?:fail|nonzero|false|error))",
+    "(?i)(?:(?:tool|llm|natural[- ]language)\\s+(?:output|message)\\s+(?:overrides?|outranks?|trusted\\s+over)\\s+(?:exit[_\\s-]?code|machine\\s+verdict|validator|json\\s+success))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-174"
+}

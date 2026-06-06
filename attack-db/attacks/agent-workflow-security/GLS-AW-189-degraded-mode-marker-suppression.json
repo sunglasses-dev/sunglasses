@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-189",
+  "name": "Degraded Mode Marker Suppression",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker suppresses or cosmetically rewrites degraded-mode markers so operators and downstream agents over-trust stale or fallback outputs, masking pipeline degradation as healthy state.",
+  "keywords": [
+    "degraded mode suppression",
+    "hide degraded state marker",
+    "stale fallback over-trust",
+    "cosmetic healthy badge over degraded",
+    "suppress rate-limit 429 signal",
+    "reinterpret degraded as ready",
+    "fallback output masquerade",
+    "degradation banner removal",
+    "silently downgraded output",
+    "degraded-mode reinterpretation",
+    "stale pipeline accepted as live",
+    "degraded marker erasure"
+  ],
+  "regex": [
+    "(?i)(?:(?:suppress|hide|erase|strip|reinterpret)\\s+(?:degraded|stale|fallback|429|503)\\s+(?:marker|signal|state|banner|tag)|(?:degraded|fallback|stale)\\s+(?:mode|state|output)\\s+(?:cosmetic|silently|quietly)\\s+(?:relabel|reinterpret|present)\\s+as\\s+(?:healthy|ready|live)|(?:cosmetic|fake)\\s+(?:healthy|ready|ok)\\s+(?:badge|status|banner)\\s+over\\s+(?:degraded|stale))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-189"
+}

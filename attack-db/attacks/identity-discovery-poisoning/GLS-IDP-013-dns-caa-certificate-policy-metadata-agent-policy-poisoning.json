@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-013",
+  "name": "DNS CAA Certificate-Policy Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker embeds hostile agent/scanner policy instructions inside DNS CAA (Certification Authority Authorization) records \u2014 `iodef`, `issuewild`, `accounturi`, `validationmethods` fields, zone-file comments, or DNS-provider JSON wrappers \u2014 causing AI certificate auditors, TLS scanners, and compliance",
+  "keywords": [
+    ") |\n| N6 |",
+    "+ trailing",
+    "AI agent",
+    "AI crawler",
+    "CAA",
+    "Certification Authority Authorization",
+    "DNS CAA",
+    "DNS TYPE257",
+    "Expect-CT",
+    "LLM auditor",
+    "NEG_GUARD branch and",
+    "accounturi",
+    "agent",
+    "agent instruction:",
+    "attach session tokens"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |should\\s+(?:report|detect|flag|refuse|block)\n  |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n))\n(?=.*(?:\\b(?:CAA|Certification\\s+Authority\\s+Authorization|DNS\\s+CAA\n  |iodef|issuewild|accounturi|validationmethods\n  |cert(?:ificate)?[._-]?(?:issuance|policy)\n  |DNS\\s+TYPE257|cert(?:ificate)?\\s+issuance\\s+policy\n  |zone\\s+file)\\b\n  |\\bcert(?:ificate)?[._-]?authorization\\b\n  |(?<!\\w)\"(?:iodef|issuewild|accounturi|validationmethods|scanner_policy|agent_policy)\"))\n(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|autonomous\\s+(?:agents?|scanners?|crawlers?|verifiers?|auditors?)\n  |security\\s+(?:scanners?|auditors?)|compliance\\s+(?:scanners?|auditors?|bots?)\n  |cert(?:ificate)?[._-]?(?:scanners?|auditors?|verifiers?)\n  |agents?|assistants?|crawlers?|scanners?|models?|LLMs?|bots?|verifiers?|auditors?)\n  (?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?\n  |takes?\\s+precedence|higher\\s+priority\n  |(?:primary|single)\\s+source\\s+of\\s+truth\n  |governing\\s+document|controlling\\s+document\n  |is\\s+the\\s+final\\s+word|defines\\s+all\\s+scanner\\s+rules?\n  |is\\s+the\\s+reference\\s+implementation\n  |canonical(?:\\s+(?:project|model|security|governing|policy))?(?:\\s+(?:description|policy|document))?\n  |definitive(?:\\s+(?:project|model\\s+evaluation))?(?:\\s+(?:description|policy))?\n  |must\\s+obey|before\\s+(?:system|developer|user)\\s+rules?\n  |ignore\\s+(?:previous|system|developer|user)\\s+(?:system\\s+)?instructions?\n  |highest\\s+priority\\s+policy\n  )\\b\n  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?\n  (?![a-zA-Z0-9])))\n(?=.*(?:\\b(?:\n  (?:(?:do\\s+not\\s+|never\\s+)(?:report|flag|escalate|notify|mention)\n    |suppress(?:es|ed|ing)?\n    |hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?)\n    |skip\\s+(?:all\\s+)?(?:security\\s+)?checks?\n    |omit.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)\n    |exclude.{0,2}(?:[\\w-]+\\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)\n    |redact.{0,30}?(?:findings?|warnings?|flags?)\n    |treat.{0,40}?as\\s+informational\n    |mark.{0,40}?as\\s+(?:informational|safe|low|none)\n    |classify.{0,30}?(?:as\\s+)?(?:informational|low|none|false\\s+positive)\n    |flag.{0,40}?as\\s+(?:informational|low|none)\n  )\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate)\n    \\s+(?:[\\w-]+\\s+){0,4}\n    (?:environment\\s+(?:variables?|context)|runtime\\s+(?:variables?|context)\n      |API\\s+(?:keys?|tokens?)|Bearer\\s+tokens?|session\\s+(?:tokens?|headers?)\n      |auth\\s+(?:tokens?|headers?|context)|local\\s+state|credentials?|secrets?\n      |Authorization|GITHUB_TOKEN|CI_ENV)\n  )\\b))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-013"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TMS-240",
+  "name": "Metadata System Authority Instruction Bypass",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects tool metadata, front matter, or headers claiming system-root or highest-priority authority used to replace or bypass safety instructions or previous policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.{0,500}$)(?!.*\\b(?:do\\s+not|never|without)\\s+(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:metadata|tool(?:_|\\s)?metadata|front[- ]?matter|header|annotation|properties)\\b)(?=.*\\b(?:system(?:\\s+message)?|root(?:\\s+authority)?|highest\\s+priority|authoritative)\\b)(?=.*\\b(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-240"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-199",
+  "name": "Cross-Lane Telemetry Label Strip Merge",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker triggers merging of telemetry from different lanes or provenance scopes without preserving source labels, so the agent operates on a single blurred truth that masks which lane is malicious.",
+  "keywords": [
+    "source context collapse",
+    "lane provenance merge",
+    "lost source label",
+    "preflight vs postrun blur",
+    "telemetry lane confusion",
+    "scope tag stripping",
+    "merged truth without provenance",
+    "cross-lane telemetry conflation",
+    "inbox vs report mix",
+    "provenance scope loss",
+    "lane attribution erasure",
+    "context tag drop"
+  ],
+  "regex": [
+    "(?i)(?:(?:source|lane|scope|provenance)\\s+(?:context|label|tag|attribution)\\s+(?:collapse|merge|loss|strip|drop)|(?:telemetry|evidence|truth)\\s+(?:from|across)\\s+(?:different|multiple)\\s+(?:lanes?|scopes?|sources?)\\s+(?:merged|conflated|combined)\\s+(?:into|as)\\s+(?:single|one)|(?:preflight|postrun|inbox|report)\\s+(?:scope|lane)\\s+(?:blur|mix|conflate))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-199"
+}

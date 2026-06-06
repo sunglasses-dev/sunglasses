@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-272",
+  "name": "RAG Dataset Provenance Boost Top Rank Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged provenance checksum or confidence injected into a RAG dataset that prioritizes content at the top rank and overrides guardrail verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|corpus|document(?:ation)?|knowledge\\s+base|source\\s+map|dataset|chunk(?:s)?)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|fabricat(?:e|ed|ing)|tamper(?:ed|ing)?|poison(?:ed|ing)?)\\b)(?=.*\\b(?:digest|checksum|hash|lineage|provenance|trust\\s+score|confidence)\\b)(?=.*\\b(?:priorit(?:ize|ized|izing|izes)|boost(?:ed|ing|s)?|elevat(?:e|ed|ing)|rank(?:ed|ing|s)?(?:\\s+\\w+){0,3}\\s+first|top\\s+rank)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety(?:\\s+rule(?:s)?)?|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-272"
+}

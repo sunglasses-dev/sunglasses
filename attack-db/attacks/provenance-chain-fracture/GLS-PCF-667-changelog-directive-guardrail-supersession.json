@@ -1,0 +1,40 @@
+{
+  "id": "GLS-PCF-667",
+  "name": "Changelog Directive Guardrail Supersession",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Attacker injects instructions into release notes, changelogs, or migration documents so an autonomous agent reinterprets them as trusted operator intent and silently bypasses existing guardrails. Result: policy supersession, command smuggling, or rollback to unsafe defaults during cron-driven update cycles.",
+  "keywords": [
+    "changelog policy supersession",
+    "migration step command smuggling",
+    "version banner authority pivot",
+    "rollback note confusion",
+    "release note instruction injection",
+    "legacy safety checks removed",
+    "critical hotfix banner override",
+    "forged migration bullet",
+    "changelog trust spoof",
+    "deprecated unsafe defaults restore",
+    "update doc policy mutation",
+    "trusted operator intent forgery"
+  ],
+  "regex": [
+    "(?i)(?:(?:fake|forged|injected|malicious)\\s+(?:changelog|release\\s+note|migration\\s+(?:doc|step|note|summary)|rollback\\s+note|version\\s+banner)\\b|(?:legacy|prior|existing)\\s+(?:safety|policy|guardrail)\\s+(?:checks?|gates?)\\s+(?:removed|disabled|skipped)\\s+(?:in\\s+)?(?:vnext|new\\s+version|latest\\s+release)|(?:critical\\s+hotfix|emergency\\s+patch|urgent\\s+update)\\s+(?:banner|note)\\s+(?:overrides?|bypasses?|forces?)\\s+(?:policy|behavior|approval))",
+    "(?i)(?:changelog|release\\s+note|migration\\s+doc)\\s+(?:supersedes?|overrides?|mutates?)\\s+(?:runtime\\s+)?(?:tool\\s+)?(?:permissions?|policy|guardrails?|approvals?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-667"
+}

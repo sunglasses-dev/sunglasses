@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SEHNM-001",
+  "name": "Sandbox Break Host Namespace Restriction Bypass",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an escape, breakout, or pivot from a sandbox, container, or runtime environment leverages host namespace, mount namespace, nsenter, /proc/, or docker.sock and is described as disabling, bypassing, ignoring, or overriding policy, guardrail, or restriction checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:escape|break(?:\\s+out)?|pivot)\\b)(?=.*\\b(?:sandbox(?:ed)?|container|runtime|isolation)\\b)(?=.*\\b(?:host\\s+namespace|mount\\s+namespace|setns|nsenter|/proc/|/var/run/docker\\.sock|docker\\.sock)\\b)(?=.*\\b(?:disable|bypass|ignore|override|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|restriction(?:s)?|check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEHNM-001"
+}

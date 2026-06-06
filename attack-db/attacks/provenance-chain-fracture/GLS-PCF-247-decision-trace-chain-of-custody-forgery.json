@@ -1,0 +1,41 @@
+{
+  "id": "GLS-PCF-247",
+  "name": "Decision Trace Chain-of-Custody Forgery",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker forges or mutates decision traces, approval summaries, and post-action logs so malicious tool invocations look policy-compliant while hidden arguments execute privileged variants. Result: chain-of-custody breaks, retries escalate capability under stable request IDs, and forensic rollback paths target the wrong component.",
+  "keywords": [
+    "approval summary substitution",
+    "post exec narrative laundering",
+    "cross tool provenance splice",
+    "retry trace mutation",
+    "summary args hash mismatch",
+    "trace forgery",
+    "chain of custody break",
+    "hidden privileged arguments",
+    "request id reuse on retry",
+    "capability scope mutation",
+    "approval bound to id not hash",
+    "forensic attribution misdirection"
+  ],
+  "regex": [
+    "(?i)(?:(?:forged?|tampered?|mutated?|laundered?)\\s+(?:decision\\s+)?(?:trace|approval\\s+summary|reasoning\\s+excerpt|post[- ]action\\s+log)|(?:summary|narrative)\\s+says?\\s+(?:read[- ]only|safe|benign)\\s+(?:but|while)\\s+(?:args?|arguments?|payload)\\s+(?:include|contain|carry)\\s+(?:write|delete|exec|privileged))",
+    "(?i)(?:(?:reuse|preserve|keep)\\s+(?:request|approval)\\s+id\\s+(?:while|but)\\s+(?:mutating|modifying|escalating)\\s+(?:capability|scope|payload|args?)|(?:cross[- ]tool|inter[- ]tool)\\s+provenance\\s+(?:splice|swap)\\s+(?:attribut(?:es?|ing))\\s+(?:risky|malicious)\\s+action\\s+to\\s+(?:trusted|different)\\s+(?:source|tool))",
+    "(?i)(?:approval|policy)\\s+(?:bound|tied)\\s+to\\s+(?:request\\s+)?id\\s+(?:alone|only)\\s+(?:miss(?:es)?|skips?)\\s+(?:payload\\s+)?(?:hash|capability)\\s+(?:drift|mutation|escalation)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-247"
+}

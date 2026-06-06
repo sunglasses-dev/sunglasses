@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PX-568",
+  "name": "System Prompt Recovery Override",
+  "version": "1.0",
+  "category": "prompt_extraction",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text requesting that an agent reveal, dump, print, or recite its system prompt, hidden instructions, developer message, or internal policy rules.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\b(?:reveal|show|print|dump|expose|leak|output|return|display)\\b.{0,90}\\b(?:system\\s*prompt|hidden\\s*(?:prompt|instructions?)|developer\\s*(?:message|instructions?)|internal\\s*(?:policy|rules?))\\b|\\b(?:tell\\s+me|what\\s+is|recite|quote)\\b.{0,90}\\b(?:your|the)\\b.{0,40}\\b(?:system\\s*prompt|hidden\\s*instructions?|developer\\s*instructions?|internal\\s*policy)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PX-568"
+}

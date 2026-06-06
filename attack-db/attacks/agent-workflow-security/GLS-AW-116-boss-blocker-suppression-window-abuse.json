@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-116",
+  "name": "Boss-Blocker Suppression Window Abuse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker abuses the boss-blocker loop-suppression rule by forcing premature suppression-window resets so the agent regenerates identical proof on a Boss-side blocker, burning cycles instead of pivoting to other P0 work.",
+  "keywords": [
+    "suppression window reset",
+    "boss-blocker loop reset abuse",
+    "regenerate identical proof attack",
+    "pivot rule bypass",
+    "suppression cooldown shortcut",
+    "loop suppression coerced reset",
+    "force regeneration of same proof",
+    "go mode suppression broken",
+    "boss-side fix loop forced",
+    "verdict cooldown reset",
+    "suppression timer shortcut",
+    "suppression rule evasion"
+  ],
+  "regex": [
+    "(?i)(?:reset|shorten|bypass)\\s+(?:suppression|cooldown|loop[- ]suppression)\\s+(?:window|timer|rule)|(?:force|coerce)\\s+(?:regenerat|reproduce|reissue)\\s+(?:identical|same)\\s+(?:proof|verdict|output)\\s+(?:despite|against)\\s+(?:suppression|pivot)\\s+(?:rule|policy)",
+    "(?i)(?:go\\s+mode|boss[- ]blocker)\\s+(?:loop\\s+)?(?:suppression|pivot)\\s+(?:rule|policy)\\s+(?:bypass|evade|reset|abuse)|(?:suppression|cooldown)\\s+(?:window|timer)\\s+(?:abuse|reset|shortcut)\\s+(?:to\\s+)?(?:force|trigger)\\s+(?:rework|regeneration)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-116"
+}

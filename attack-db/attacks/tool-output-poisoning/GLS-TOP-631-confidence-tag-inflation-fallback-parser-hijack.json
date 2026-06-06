@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TOP-631",
+  "name": "Confidence Tag Inflation Fallback Parser Hijack",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker poisons high-priority tool channels with inflated confidence tags, hijacked fallback order, or duplicated origins so rankers and aggregators promote untrusted artifacts above real telemetry and suppress contradictory evidence. Distorts risk scoring and mitigation decisions while passing schema checks.",
+  "keywords": [
+    "priority-tag spoofing in tool output",
+    "inflated confidence tag override",
+    "fallback-order hijack parser",
+    "consensus bootstrap poisoning",
+    "contradiction suppression via confidence laundering",
+    "self-declared confidence rank boost",
+    "stale legacy field wins parser",
+    "duplicate origin counted as agreement",
+    "high-priority channel poison",
+    "ranker weight inflation injection",
+    "untrusted source down-rank bypass",
+    "verified high-priority artifact spoof"
+  ],
+  "regex": [
+    "(?i)(?:(?:spoof|inflate|inject|forge|fake)\\s+(?:priority|confidence|trust|rank)\\s+(?:tag|score|metadata|field)|(?:fallback|parser)\\s+(?:order|path)\\s+(?:hijack|nudg(?:e|ed)|forc(?:e|ed))|(?:consensus|aggregator)\\s+(?:bootstrap|repetition)\\s+(?:poison|spoof)|(?:contradiction|conflict)\\s+(?:suppress|skip)\\s+(?:via\\s+)?confidence\\s+launder)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-631"
+}

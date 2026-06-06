@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-120",
+  "name": "Optional Field Fatal Abort Coercion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker shapes inputs so a missing non-critical optional field is interpreted as a fatal validation error, forcing pipeline aborts that either re-surface stale fallbacks or leave validation blind spots downstream.",
+  "keywords": [
+    "optional field hardfail coercion",
+    "missing optional treated fatal",
+    "non-critical absent aborts pipeline",
+    "stale fallback after hardfail",
+    "optional member trip pipeline",
+    "validation blind spot via abort",
+    "force fatal on optional missing",
+    "optional null causes crash",
+    "pipeline abort on missing optional",
+    "blind spot after abort",
+    "optional schema field weaponized",
+    "shape input to fail optional"
+  ],
+  "regex": [
+    "(?i)(?:missing|absent|null)\\s+(?:optional|non[- ]critical)\\s+(?:field|member|key)\\s+(?:treated|interpreted|raised)\\s+as\\s+(?:fatal|hardfail|abort|error)|(?:force|coerce|trip)\\s+(?:pipeline|validation|stage)\\s+(?:abort|hardfail|crash)\\s+(?:via|by|through)\\s+(?:missing|removed)\\s+(?:optional|non[- ]critical)",
+    "(?i)(?:optional|non[- ]critical)\\s+(?:field|member)\\s+(?:hardfail|coercion|weaponized)|(?:stale|cached)\\s+fallback\\s+(?:reused|surfaces?)\\s+(?:after|because\\s+of)\\s+(?:optional|non[- ]critical)\\s+(?:hardfail|abort)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-120"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "GLS-MEM-PERSIST-214",
+  "name": "Cross-turn memory persistence poisoning",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects attempts to write, preserve, or reactivate malicious payloads in persistent memory so they supersede policy in future turns or sessions.",
+  "keywords": [
+    "remember permanently override policy",
+    "store long-term memory highest priority",
+    "save profile memory reveal system prompt",
+    "persist memory always on operational",
+    "session memory supersede instructions",
+    "workspace memory note supersede",
+    "on keyword bypass guardrails",
+    "next session reveal hidden prompts",
+    "future task export secrets",
+    "long-term memory ignore prior"
+  ],
+  "regex": [
+    "(?is)\\b(remember|store|save|persist|long[-\\s]*term\\s*memory|profile\\s*memory|session\\s*memory)\\b.{0,220}\\b(always|highest\\s*priority|override|supersede|ignore\\s*(prior|previous)\\s*instructions?)\\b.{0,260}\\b(next\\s*(time|session|run)|future\\s*(task|session)|when\\s+.*\\b(ask|query|trigger)\\b|on\\s+keyword)\\b.{0,240}\\b(reveal|dump|export|send|disable|bypass)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MEM-PERSIST-214"
+}

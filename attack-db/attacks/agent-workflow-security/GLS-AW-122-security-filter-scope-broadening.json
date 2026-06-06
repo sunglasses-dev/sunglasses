@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-122",
+  "name": "Security Filter Scope Broadening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects instructions that broaden a narrow security filter (LIKE, prefix, glob, regex) into a permissive one, causing inflated counts, false confidence, or control drift in dashboards and mitigation decisions.",
+  "keywords": [
+    "query filter scope broadening",
+    "wildcard expansion coercion",
+    "boolean broadening or true",
+    "alias field broadening drift",
+    "fallback chain abuse missing members",
+    "permissive filter mutation",
+    "schema key ambiguity",
+    "greenwashed health state",
+    "broad like glob regex injection",
+    "narrow to broad filter swap",
+    "or true clause injection",
+    "least specific key drift"
+  ],
+  "regex": [
+    "(?i)(?:(?:broaden|widen|expand|relax)\\s+(?:query|filter|scope|pattern)\\s+(?:to|into|via)\\s+(?:wildcard|glob|regex|or\\s+true|permissive)|(?:OR\\s+true|%\\w*%|\\.\\*)\\s+(?:clause|pattern|filter)\\s+(?:injection|mutation|expansion)|(?:alias|key|schema)\\s+(?:drift|broadening|ambiguity)\\s+(?:aggregates?|merges?|conflates?)\\s+(?:unrelated|distinct)\\s+(?:records?|fields?|metrics?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-122"
+}

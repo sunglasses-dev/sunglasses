@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-091",
+  "name": "Canary Checksum Semantic Mutation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker preserves the visible canary/checksum sentinel while mutating its semantics through homoglyphs, prepended precedence-inversion, stale checksum replay, or split-channel approval-vs-execution drift, causing tamper-detection to pass while policy intent is silently inverted.",
+  "keywords": [
+    "homoglyph canary shadowing",
+    "semantic-preserving prefix poisoning",
+    "canary checksum replay",
+    "stale policy body replay",
+    "split-channel canary desync",
+    "canary presence preserved",
+    "canary semantics mutated",
+    "canary advisory only",
+    "approval summary payload mismatch",
+    "policy version skew",
+    "canonical hash bypass",
+    "canary precedence inversion"
+  ],
+  "regex": [
+    "(?i)(?:(?:preserve|maintain|keep)\\s+(?:canary|sentinel|checksum)\\s+(?:presence|line|tag)\\s+(?:while|but)\\s+(?:mutat|alter|chang|rewrit)|(?:canary|sentinel)\\s+(?:is\\s+)?(?:advisory|optional|informational)\\s+only|(?:replay|reuse)\\s+(?:stale|old|outdated)\\s+(?:checksum|canary|policy)\\s+(?:pair|hash|body))",
+    "(?i)(?:homoglyph|unicode|nfkc|nfc)\\s+(?:canary|sentinel)\\s+(?:shadow|evasion|bypass|drift)|(?:approval\\s+summary|execution\\s+payload)\\s+(?:hash\\s+)?(?:mismatch|diverge|differ|drift)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-091"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-266",
+  "name": "Forged Tool Log Integrity Stamp Passed Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged tool log or trace whose integrity stamp or audit hash is set to passed or verified to override or waive policy guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool\\s+(?:output|result|log|trace)|plugin\\s+response|execution\\s+log)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered)\\b)(?=.*\\b(?:checksum|hash|signature|integrity\\s+(?:stamp|token)|audit\\s+stamp)\\b)(?=.*\\b(?:passed|verified|approved|clean)\\b)(?=.*\\b(?:policy|guardrail|validation|verification|gate)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|skip|skip(?:ped|s|ping)?|ignore(?:d|s)?|overrid(?:e|es|ed|ing)|overrode|waive(?:d|s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-266"
+}

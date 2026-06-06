@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-095",
+  "name": "Stale Freshness Badge Spoofing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker poisons or stalls the simple FRESH/STALE badge that dashboards and briefing pipelines expose, so consumers see stale evidence labeled current and skip the deeper TTL/age verification they would otherwise run.",
+  "keywords": [
+    "fresh stale badge spoof",
+    "freshness ttl mismatch",
+    "badge cached past ttl",
+    "stale data labeled fresh",
+    "freshness semantic drift",
+    "badge color override",
+    "dashboard freshness lie",
+    "ttl evaluation bypass",
+    "fresh badge stuck on stale",
+    "freshness check skipped",
+    "fake fresh indicator",
+    "briefing pipeline stale fresh"
+  ],
+  "regex": [
+    "(?i)(?:fresh|stale)\\s+badge\\s+(?:spoof|drift|stuck|cached|override)|(?:freshness|ttl)\\s+(?:badge|indicator|flag)\\s+(?:reports?|shows?|labels?)\\s+(?:stale|expired|old)\\s+(?:data|artifact|payload)\\s+as\\s+(?:fresh|valid|current)",
+    "(?i)(?:label|tag|mark)\\s+(?:stale|expired|outdated)\\s+(?:evidence|data|artifact)\\s+(?:as\\s+)?(?:fresh|current|valid)|(?:dashboard|briefing)\\s+(?:freshness|fresh\\s+badge)\\s+(?:lies?|misleads?|misrepresents?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-095"
+}

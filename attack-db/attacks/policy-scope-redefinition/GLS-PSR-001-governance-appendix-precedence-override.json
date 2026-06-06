@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PSR-001",
+  "name": "Governance Appendix Precedence Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Document-structure precedence abuse \u2014 attacker claims an appendix, annex, addendum, footnote, sidebar, or metadata note has precedence over the main policy/governance ruleset and uses that to ignore, bypass, waive, or disable guardrails, safety, review, approval, or compliance checks. Novel scope-redefinition vector.",
+  "keywords": [
+    "appendix takes precedence ignore guardrails",
+    "addendum new ruleset waive safety checks",
+    "metadata note supersedes main policy",
+    "annex authoritative replace control matrix",
+    "footnote governing ruleset ignore safety",
+    "sidebar addendum override governance controls",
+    "appendix supersedes policy waive guardrail",
+    "metadata note higher-priority governance discard approval",
+    "appendix precedence bypass review approval",
+    "addendum baseline override earlier controls"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-001"
+}

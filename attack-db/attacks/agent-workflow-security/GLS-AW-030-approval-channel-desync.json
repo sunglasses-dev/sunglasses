@@ -1,0 +1,35 @@
+{
+  "id": "GLS-AW-030",
+  "name": "Approval channel desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "tool_output",
+    "message",
+    "api_response"
+  ],
+  "description": "Agent stacks increasingly rely on approval UX (summaries, previews, confirmation prompts). If summaries are lossy or attacker-steerable, the approval layer becomes a false control.",
+  "keywords": [
+    "summary execution mismatch",
+    "approval card lies about scope",
+    "approve safe execute risky",
+    "preview diverges from runtime",
+    "lossy approval summary",
+    "hidden args broader actions",
+    "operator approves summary not exact payload",
+    "argument level attestation missing"
+  ],
+  "regex": [
+    "(?i)(?:approval\\s+(?:card|summary|preview|prompt|dialog))\\s+(?:says?|shows?|lists?|claims?)\\s+(?:read[- ]only|safe|benign|no[- ]op).{0,240}?(?:execut(?:e|es|ed|ion)|invoke|call|run|trigger)\\s+(?:write|delete|network|destructive|dangerous|broader)",
+    "(?i)(?:approve(?:d)?|consent(?:ed)?|previewed)\\s+(?:summary|preview|intent)\\b.{0,100}?(?:diverges?|mismatch(?:ed|es)?|differs?|inconsistent)\\s+(?:from|with|against)\\s+(?:execut(?:ed|ion)|runtime|actual\\s+payload)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-030"
+}

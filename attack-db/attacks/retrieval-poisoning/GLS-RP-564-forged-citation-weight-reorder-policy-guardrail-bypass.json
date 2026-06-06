@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-564",
+  "name": "Forged Citation Weight Reorder Policy Guardrail Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects a poisoned search index or reranker fed forged, spoofed evidence that reorders result scores to override retrieval guardrails and verification.",
+  "keywords": [
+    "search retrieval accepted forged citation bundle inflated",
+    "the corpus index used spoofed document metadata",
+    "poisoned retrieval chunk manipulated reranker priority ignored",
+    "retrieval pipeline consumed tampered citation records boosted",
+    "search results carried malicious embedding notes that",
+    "the document retriever processed forged evidence reordered",
+    "reranking logic trusted spoofed corpus annotations changed",
+    "poisoned search index injected tampered citations altered"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|search|index|corpus|document|citation|chunk|rerank(?:er|ing)?|embedding)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|malicious)\\b)(?=.*\\b(?:score|rank|weight|priority|confidence)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|disregard|disregards|disregarded|disregarding|replace|replaces|replaced|replacing|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|approval|verification)\\b).{0,1000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-564"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-CICD-002",
+  "name": "Dependabot Config Metadata Poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Dependabot configuration metadata can be abused to smuggle agent-facing policy that tells AI dependency reviewers or scanners to treat attacker-controlled update config as higher priority than system policy, suppress dependency findings, or forward local registry/runtime credentials.",
+  "keywords": [
+    ".github/dependabot.yml",
+    "commit-message",
+    "dependabot.yml",
+    "groups",
+    "ignore",
+    "open-pull-requests-limit",
+    "package-ecosystem",
+    "registries",
+    "updates"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\\b.{0,180}\\b(?:detected|blocked|flagged|refused|reported|must\\s+be\\s+reported|not\\s+obeyed|should\\s+(?:report|detect|flag|refuse|block))|(?:dependabot(?:\\.ya?ml)?|dependency\\s+update\\s+metadata|update\\s+config(?:uration)?).{0,140}\\b(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)|(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede)))\n(?=.*(?:(?:\\.github/)?dependabot\\.ya?ml|dependabot\\s+config(?:uration)?|dependency\\s+update\\s+metadata|package-ecosystem|open-pull-requests-limit|allow:|ignore:|registries:|commit-message:|groups:))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai|agent|assistant|scanner|dependency|security|review|update|automation|auditor)[._-]?(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)?(?![a-zA-Z0-9])|\\bagents?\\b|\\bassistants?\\b|\\bscanners?\\b|automated\\s+(?:dependency|security|update)\\s+review|dependency\\s+(?:reviewers?|scanners?|agents?)|for\\s+(?:ai\\s+)?agents?))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|(?:canonical|definitive|authoritative|controlling)\\s+(?:dependency\\s+|update\\s+|review\\s+|scanner\\s+)?(?:policy|guidance|instructions?|playbook|document)|(?:main|primary|principal|preferred)\\s+(?:dependency\\s+|update\\s+|review\\s+|security\\s+|operating\\s+)?(?:guidance|playbook)|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|dependency|security|update)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|dependency)\\s+rules?)|(?:agent|scanner|assistant|dependency\\s+reviewer|update\\s+bot)\\s+(?:instructions?|directive|policy)))\n(?=.*(?:(?:suppress|hide|redact|omit|exclude|skip|silence)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVE\\s+findings?|dependency\\s+alerts?)|do\\s+not\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|dependency\\s+alerts?)|(?:treat|mark|classify|consider)\\s+.{0,60}?\\s+as\\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:downgrade|move|route|shift)\\s+.{0,80}?(?:findings?|observations?|diagnostics?|results?|dependency\\s+alerts?|vulnerabilities).{0,80}?(?:background|appendix-only|informational|non-blocking|notes?)|(?:keep|leave)\\s+.{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilities|CVE\\s+findings?)\\s+out\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|upgrade\\s+memo|audit\\s+memo|final\\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|populate|copy|read)\\s+(?:[\\w-]+\\s+){0,5}(?:API\\s+keys?|tokens?|secrets?|credentials?|auth(?:orization)?\\s+headers?|session\\s+(?:keys?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|artifacts?)|local\\s+(?:state|config(?:uration)?|settings?)|npm\\s+tokens?|registry\\s+tokens?|GitHub\\s+tokens?|dependabot\\s+secrets?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-002"
+}

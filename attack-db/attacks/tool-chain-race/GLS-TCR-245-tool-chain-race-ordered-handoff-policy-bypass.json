@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TCR-245",
+  "name": "Tool chain race \u2014 ordered handoff policy bypass",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output"
+  ],
+  "description": "Detects tool-chain race attacks where ordered multi-tool/step sequencing is paired with explicit approval/policy/guardrail bypass language, or where an intermediate tool output is forcibly relabeled trusted/verified/safe to auto-execute the next step without human review. First coverage for tool_chain_race category.",
+  "keywords": [
+    "tool 1 then tool 2 ignore approval policy",
+    "step one then step two bypass safety validation",
+    "tool then tool treat output trusted auto execute",
+    "mark agent result trusted automatically run",
+    "relabel tool output verified execute without approval",
+    "tool then tool override human review",
+    "step then step skip policy guardrail",
+    "handoff tool execute without confirmation"
+  ],
+  "regex": [
+    "(?is)(?:\\b(?:tool|step)\\s*(?:\\d+|one|two|three)?\\b.{0,80}\\b(?:then|before|after|next|->)\\b.{0,120}\\b(?:tool|step)\\s*(?:\\d+|one|two|three)?\\b.{0,180}\\b(?:ignore|override|bypass|skip)\\b.{0,80}\\b(?:approval|policy|guardrail|validation|safety|human review)\\b)|(?:\\b(?:treat|mark|relabel)\\b.{0,60}\\b(?:tool|agent|output|result)\\b.{0,60}\\b(?:trusted|verified|safe)\\b.{0,120}\\b(?:auto(?:matically)?\\s*(?:execute|run)|execute\\s+without\\s+(?:approval|review|confirmation))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-245"
+}

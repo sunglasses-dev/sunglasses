@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-249",
+  "name": "Dual Key Shadow Top-Level Fallback Override",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forces parser into permissive fallback branches via type-shifts, null sentinels, or top-level overrides so validator and packager disagree silently, allowing score inflation and policy bypass with no parse errors.",
+  "keywords": [
+    "dual-key shadowing",
+    "type-shift fallback abuse",
+    "top-level override collision",
+    "null-sentinel branch forcing",
+    "validator reads kpi_snapshot packager reads kpis",
+    "stale cache override on coerce fail",
+    "top-level validated_accepted bait",
+    "legacy compatibility prefers top-level",
+    "permissive secondary key bypass",
+    "field-type strictness gap",
+    "score inflation via fallback",
+    "policy bypass without parse error"
+  ],
+  "regex": [
+    "(?i)(?:(?:dual[- ]?key\\s+shadowing|type[- ]?shift\\s+fallback|top[- ]?level\\s+override|null[- ]?sentinel\\s+branch)\\s+(?:abuse|collision|forcing)?|(?:validator|legacy\\s+compatibility|fallback\\s+code)\\s+(?:reads?|prefers?|picks?)\\s+(?:top[- ]?level|secondary|alias)\\s+(?:keys?|fields?)\\s+(?:when|after)\\s+(?:nested|primary|canonical)\\s+(?:parse|read)\\s+(?:fails?|errors?|empty)|(?:score|kpi|metric)\\s+(?:inflation|bypass)\\s+(?:via|through)\\s+(?:fallback|alias)\\s+(?:branch|chain))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-249"
+}

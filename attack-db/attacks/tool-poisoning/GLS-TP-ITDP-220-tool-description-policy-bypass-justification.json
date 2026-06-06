@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-220",
+  "name": "Tool description policy-bypass justification",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects implicit tool-description poisoning that reframes guardrail bypass as a policy or compliance requirement, steering the agent to suppress verification steps.",
+  "keywords": [
+    "for compliance skip verification",
+    "policy requires skipping checks",
+    "for safety omit validation",
+    "security policy requires disabling confirmation",
+    "policy requires avoiding verification",
+    "compliance skip secondary checks",
+    "for safety disable checks",
+    "policy requires skip confirmation"
+  ],
+  "regex": [
+    "(?i)\\b(?:for\\s+safety|for\\s+compliance|policy\\s+requires|security\\s+policy\\s+requires)\\b.{0,120}\\b(?:skip(?:ping)?|omit(?:ting)?|disable(?:d|ing)?|avoid(?:ing)?)\\b.{0,80}\\b(?:verification|validation|confirmation|checks?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-220"
+}

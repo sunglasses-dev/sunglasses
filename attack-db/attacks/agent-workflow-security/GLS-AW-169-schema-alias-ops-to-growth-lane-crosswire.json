@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-169",
+  "name": "Schema Alias Ops-to-Growth Lane Crosswire",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits schema aliases and fallback precedence to crosswire ops telemetry (Cloudflare, scanner activity) into growth KPI lanes (GA4, GSC), inflating organic narratives with bot or ops traffic without raw-data alarm.",
+  "keywords": [
+    "kpi lane alias crosswire",
+    "ops telemetry blended into growth",
+    "ga4 gsc crosswire with cloudflare",
+    "schema alias drift across lanes",
+    "fallback precedence cross lane",
+    "scanner activity counted as visits",
+    "growth narrative poisoned by ops",
+    "lane separator dropped",
+    "kpi alias collision",
+    "scanner traffic inflates organic",
+    "metric lane confusion",
+    "ops vs growth blend"
+  ],
+  "regex": [
+    "(?i)(?:kpi\\s+lane\\s+(?:alias\\s+)?crosswire|(?:ops|cloudflare|scanner)\\s+(?:telemetry|activity|traffic)\\s+(?:blend|merg|crosswire|crossed)\\s+(?:into|with)\\s+(?:growth|ga4|gsc|organic))",
+    "(?i)(?:(?:schema|kpi)\\s+alias\\s+(?:drift|collision|crosswire)\\s+(?:across|between)\\s+(?:lanes|sources)|growth\\s+(?:metric|narrative)\\s+(?:poison|inflat)\\s+(?:by|with)\\s+(?:ops|scanner|bot))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-169"
+}

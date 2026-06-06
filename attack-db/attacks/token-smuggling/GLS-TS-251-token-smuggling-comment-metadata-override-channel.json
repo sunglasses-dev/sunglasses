@@ -1,0 +1,35 @@
+{
+  "id": "GLS-TS-251",
+  "name": "Token smuggling \u2014 comment/metadata override channel",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects injection via HTML, code, YAML comments, or metadata annotation channels \u2014 attacker smuggles instructions through comment syntax or metadata fields that most agents/pipelines treat as non-instructional text. Zero prior coverage of this channel.",
+  "keywords": [
+    "html comment ignore previous instructions",
+    "code comment bypass system policy",
+    "yaml comment override safety guardrails",
+    "x-instruction metadata override",
+    "annotation bypass guardrails",
+    "comment block disregard instructions",
+    "metadata ignore system prompt",
+    "comment supersede policy"
+  ],
+  "regex": [
+    "(?is)(?:<!--|/\\*|//|#\\s*metadata:|metadata\\s*:|x-instruction\\s*:|annotation\\s*:|comment[_ -]?block\\s*[:=]).{0,140}\\b(?:ignore|bypass|override|disregard|supersede|forget)\\b.{0,140}\\b(?:previous|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-251"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "GLS-AW-099",
+  "name": "Stale Pass Marker Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker coerces pipelines to reuse old PASS/ACK/healthcheck markers without freshness binding, so current failures stay hidden behind historic green state and downstream gates trust a verdict that no longer reflects live system health.",
+  "keywords": [
+    "stale pass marker replay",
+    "old healthcheck json reuse",
+    "previous ack block replay",
+    "historic green state mask",
+    "success marker without freshness",
+    "cached pass signal abuse",
+    "verdict reuse across run",
+    "stale ok hides current failure",
+    "ack block trust shortcut",
+    "old healthy reused as fresh",
+    "success indicator without timestamp",
+    "pass marker replay attack"
+  ],
+  "regex": [
+    "(?i)(?:reuse|replay|cache)\\s+(?:stale|old|previous)\\s+(?:pass|ok|success|ack|healthcheck|green)\\s+(?:marker|signal|json|block|verdict)|(?:historic|past|previous)\\s+(?:green|pass|ok)\\s+(?:state|verdict|marker)\\s+(?:hides?|masks?|covers?)\\s+(?:current|new)\\s+(?:failure|error|red)",
+    "(?i)(?:success|pass|ack)\\s+(?:marker|indicator|signal)\\s+(?:without|missing|lacks?)\\s+(?:freshness|timestamp|ttl|nonce)|(?:stale|old)\\s+(?:healthcheck|ack|status)\\s+(?:replay|reuse)\\s+(?:accepted|trusted)\\s+(?:as\\s+)?(?:current|fresh|valid)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-099"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-008",
+  "name": "OAuth Protected Resource Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned `/.well-known/oauth-protected-resource` metadata document embeds agent-facing policy text in documentation or extension fields to override scanner rules, request bearer tokens or environment secrets, or suppress findings.",
+  "keywords": [
+    "/.well-known/oauth-protected-resource",
+    "AI assistant",
+    "API key",
+    "Authorization bearer",
+    "MCP",
+    "agent",
+    "assistant",
+    "authoritative policy",
+    "authorization_servers",
+    "description",
+    "documentation_uri",
+    "env",
+    "ignore previous",
+    "mark as false positive",
+    "never report"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:do\\s+not|never|must\\s+not)\\s+(?:include|send|forward|expose|paste|print|return).{0,80}(?:bearer\\s+token|authorization\\s+bearer|api[_-]?key|secret|env(?:ironment)?))(?!.*(?:do\\s+not|never|must\\s+not)\\s+(?:suppress|hide|ignore).{0,50}(?:scanner|finding|warning|report))(?=.*(?:oauth-protected-resource|authorization_servers|scopes_supported|resource_documentation|protected[-\\s]?resource))(?=.*(?:ai\\s*assistant|assistant|agent|mcp|scanner|tool))(?=.*(?:ignore\\s+(?:previous|all|scanner)|overrid\\w+|outrank|authoritative.{0,60}(?:policy|instruction|metadata)|(?:send|forward|include|attach|paste|return|print).{0,100}(?:bearer\\s+token|authorization\\s+bearer|api[_-]?key|secret|env(?:ironment)?|local[_-]?api[_-]?key)|mark.{0,80}false\\s+positive|never\\s+report|suppress.{0,60}(?:finding|warning|report))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-008"
+}

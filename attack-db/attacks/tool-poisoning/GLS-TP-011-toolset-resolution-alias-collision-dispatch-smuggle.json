@@ -1,0 +1,41 @@
+{
+  "id": "GLS-TP-011",
+  "name": "Toolset Resolution Alias Collision Dispatch Smuggle",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits divergence between the planner's assumed toolset and the executor's resolved toolset (phantom tools, alias collisions, downgrade pressure, error-loop probing) to force unsafe fallbacks across trust boundaries or to enumerate enabled capabilities for follow-on exploitation.",
+  "keywords": [
+    "toolset resolution confusion",
+    "phantom tool coercion",
+    "alias collision smuggle",
+    "capability downgrade bait",
+    "error loop capability probing",
+    "planned versus resolved tool mismatch",
+    "unsafe fallback to terminal",
+    "platform gated tool ambiguity",
+    "capability oracle enumeration",
+    "structured tool dispatched to broader shell",
+    "if blocked use terminal directly",
+    "fallback crosses trust boundary"
+  ],
+  "regex": [
+    "(?i)(?:toolset\\s+resolution\\s+(?:confusion|mismatch|drift)|(?:planned|claimed)\\s+(?:tool|capability)\\s+(?:differs?|mismatches?|diverges?)\\s+(?:from|with)\\s+(?:resolved|executed|dispatched)\\s+(?:tool|capability))",
+    "(?i)(?:alias\\s+collision\\s+(?:smuggle|dispatch)|capability\\s+(?:downgrade|oracle)\\s+(?:bait|probing|enumeration)|if\\s+(?:blocked|unavailable)[, ]\\s*(?:use|run|fall\\s+back\\s+to)\\s+(?:terminal|shell|curl))",
+    "(?i)(?:fallback\\s+(?:crosses?|breaches?)\\s+trust\\s+boundary|error[- ]oracle\\s+(?:enumerates?|infers?|reveals?)\\s+(?:enabled\\s+)?(?:toolset|capabilities))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-011"
+}

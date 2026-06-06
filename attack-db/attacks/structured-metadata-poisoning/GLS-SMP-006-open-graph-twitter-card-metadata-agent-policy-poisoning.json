@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-006",
+  "name": "Open Graph / Twitter Card Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled HTML social-preview metadata (`og:*`, `twitter:*`, generic description/meta fields) can embed instructions telling AI agents, scanners, crawlers, or summarizers to override policy, suppress findings, or include local secrets.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-006"
+}

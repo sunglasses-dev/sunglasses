@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-250",
+  "name": "Manifest Instruction Metadata Directive Smuggle",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker promotes untrusted content from tool manifests, argument docs, retrieval snippets, or error strings into the instruction channel so the planner executes attacker-defined directives, bypassing prompt-only filters via trusted tool metadata channels.",
+  "keywords": [
+    "manifest instruction override",
+    "argument-description hijack",
+    "retrieval-to-tool escalation",
+    "error-loop prompt pivot",
+    "mcp manifest imperative",
+    "tool description ignore prior constraints",
+    "argument doc file:// url smuggle",
+    "retrieved page calls tool x with y",
+    "stderr instructions replayed in plan",
+    "reasoning helper note stored as policy",
+    "metadata promoted to instruction context",
+    "untrusted metadata authority graft"
+  ],
+  "regex": [
+    "(?i)(?:(?:manifest\\s+instruction\\s+override|argument[- ]?description\\s+hijack|retrieval[- ]?to[- ]?tool\\s+escalation|error[- ]?loop\\s+prompt\\s+pivot)|(?:tool|mcp|manifest|metadata|retrieved)\\s+(?:description|doc|docs|chunk|snippet|manifest)\\s+(?:contains?|carries?|injects?)\\s+(?:imperatives?|directives?|instructions?|you\\s+must|ignore\\s+(?:prior|policy))|(?:untrusted|attacker[- ]controlled)\\s+(?:metadata|content|chunk|fields?)\\s+(?:promoted|elevated|reinterpreted)\\s+(?:to|as)\\s+(?:instruction|authority|trusted|policy)\\s+(?:context|channel|source))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-250"
+}

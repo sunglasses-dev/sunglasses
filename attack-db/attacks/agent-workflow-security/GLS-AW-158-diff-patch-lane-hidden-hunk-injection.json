@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-158",
+  "name": "Diff Patch Lane Hidden Hunk Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits the high-trust diff/patch lane by grafting malicious context lines, hidden hunks, or forged headers into a patch so the agent applies an unintended wider change while reviewing only the visible diff.",
+  "keywords": [
+    "diff context graft",
+    "patch hunk smuggle",
+    "malicious context line",
+    "patch trust lane abuse",
+    "diff header forgery",
+    "unrelated change in trusted hunk",
+    "patch applied wider scope",
+    "context line carries payload",
+    "diff metadata spoofing",
+    "patch file path swap",
+    "extra hunk hidden in patch",
+    "high trust diff lane exploit"
+  ],
+  "regex": [
+    "(?i)(?:diff\\s+(?:context|hunk|patch)\\s+(?:graft|smuggle|inject)|patch\\s+(?:hunk|context|header)\\s+(?:forge|smuggle|hide)|(?:malicious|hidden|extra)\\s+(?:hunk|context\\s+line)\\s+(?:in|inside)\\s+(?:patch|diff))",
+    "(?i)(?:(?:diff|patch)\\s+(?:trust\\s+lane|high[- ]trust\\s+lane)\\s+(?:abuse|exploit)|patch\\s+(?:applied|expands)\\s+(?:wider|broader|unintended)\\s+scope|context\\s+lines?\\s+(?:carry|embed)\\s+(?:payload|instruction))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-158"
+}

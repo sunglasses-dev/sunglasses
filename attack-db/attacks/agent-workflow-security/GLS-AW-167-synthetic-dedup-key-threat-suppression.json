@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-167",
+  "name": "Synthetic Dedup Key Threat Suppression",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects synthetic twin candidates that collide on dedup keys so real high-signal threats are dropped or absorbed before validation, hiding genuine attacks behind harmless-looking duplicates.",
+  "keywords": [
+    "dedup key collision",
+    "candidate threat dropped via collision",
+    "synthetic dedup twin",
+    "high signal collapsed into low",
+    "dedup hash poisoning",
+    "collision forces real drop",
+    "twin candidate suppresses real",
+    "dedup key forgery",
+    "near identical key dedup abuse",
+    "dedup precedence wrong winner",
+    "first seen wins poisoning",
+    "dedup absorbs real signal"
+  ],
+  "regex": [
+    "(?i)(?:dedup(?:e|lication)?\\s+(?:key\\s+)?(?:collision|poison|forge|hijack)|(?:colliding|twin|synthetic)\\s+(?:candidate|entry|key)\\s+(?:suppress|drop|absorb|hide)\\s+(?:real|true|high[- ]signal))",
+    "(?i)(?:(?:first[- ]seen|last[- ]seen)\\s+wins\\s+(?:dedup|policy)\\s+(?:abuse|poison)|dedup\\s+(?:precedence|winner)\\s+(?:wrong|forged|attacker))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-167"
+}

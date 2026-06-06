@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SEDSP-001",
+  "name": "Docker Privileged Container Sandbox Restriction Bypass",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which docker.sock, --privileged containers, nsenter, chroot, or sandbox-escape language is combined with mount, bind, or connect operations that are explicitly described as ignoring, bypassing, or disabling policy, guardrail, or sandbox restrictions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:mount|bind|expose|connect|map|attach|use|run|launch)\\b)(?=.*\\b(?:docker(?:\\.sock|\\s*sock)|/var/run/docker\\.sock|--privileged|privileged\\s+container|host\\s+pid|nsenter|chroot|escape\\s+the\\s+sandbox|break\\s+out\\s+of\\s+sandbox)\\b)(?=.*\\b(?:ignore|ignor(?:e|ed|es|ing)|bypass|bypass(?:ed|es|ing)?|override|overrid(?:e|es|ing|en|ed)|disable|disabled|disabling|skip|skip(?:ped|ping|s)?|disregard|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|sandbox\\s+restriction(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEDSP-001"
+}

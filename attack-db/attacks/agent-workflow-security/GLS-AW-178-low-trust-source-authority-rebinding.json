@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-178",
+  "name": "Low-Trust Source Authority Rebinding",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker lets low-trust sources rebind authority weights at decision or fusion time (via synthetic confidence fields, forged role labels, or stale summaries) so canonical measured anchors are outranked by attacker-controlled evidence.",
+  "keywords": [
+    "authority weight rebinding",
+    "low trust source rebinds weight",
+    "synthetic confidence outranks anchor",
+    "role label spoof at decision time",
+    "stale summary outweighs measured",
+    "rebinding at fusion stage",
+    "authority weight injection",
+    "fake role label elevates trust",
+    "evidence reweighted by attacker",
+    "decision time authority swap",
+    "measured anchor demoted",
+    "weight rebinding poisoning"
+  ],
+  "regex": [
+    "(?i)(?:authority\\s+weight\\s+(?:rebind|reweight|swap|inject)|(?:low[- ]trust|malicious|attacker)\\s+(?:source|evidence)\\s+(?:rebinds?|reweights?|swaps?)\\s+(?:authority|trust|weight)\\s+(?:at|during)\\s+(?:decision|fusion|ranking))",
+    "(?i)(?:(?:stale|synthetic|forged)\\s+(?:summary|confidence|role[- ]label)\\s+(?:outranks?|outweighs?|overrides?)\\s+(?:canonical|measured)\\s+(?:anchor|evidence|metric)|(?:fake|forged|spoofed)\\s+role\\s+label\\s+(?:elevates?|upgrades?|grants?)\\s+(?:trust|authority))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-178"
+}

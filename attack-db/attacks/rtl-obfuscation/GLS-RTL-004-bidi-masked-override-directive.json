@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RTL-004",
+  "name": "Bidi Masked Override Directive",
+  "version": "1.0",
+  "category": "rtl_obfuscation",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text containing Unicode bidirectional control characters (RLO, LRO, RLM, PDF, isolates) used to visually mask or reorder content so that an 'ignore', 'bypass', or 'override' directive targeting policy or guardrails is hidden from human review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:\\u202E|\\u202D|\\u202A|\\u2066|\\u2067|\\u2068|\\u2069|U\\+[0-9A-Fa-f]{4}|right-to-left\\s+override|bidi|\\brtl\\b|rtl\\s*mark))(?=.*\\b(?:hidden|mask(?:ed|ing)?|obfuscat(?:e|ed|ing|ion)|reorder(?:ed|ing)?|visual(?:ly)?)\\b)(?=.*\\b(?:ignor(?:e|es|ing)|bypass|override|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RTL-004"
+}

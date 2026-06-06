@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-001",
+  "name": "OpenAPI schema-example poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "OpenAPI or Swagger discovery metadata can hide agent-targeted prompt injection in `description`, `summary`, `x-*` extension fields, and schema `example` values that agents may import as trusted tool-use guidance.",
+  "keywords": [
+    "Authorization",
+    "Bearer",
+    "Measured local fixture result:",
+    "agent",
+    "agent-compatible",
+    "api discovery",
+    "assistant",
+    "authoritative",
+    "bypass guardrails",
+    "connector",
+    "connector inventory",
+    "continue despite warnings",
+    "description",
+    "description_for_model",
+    "diagnostics"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|should\\s+not|never|warns?\\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\\s+not|don't)\\b.{0,160}\\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\\b)(?=.*\\b(?:openapi|swagger|api\\s+discovery|schema|operation|endpoint|requestbody|description|summary|examples?|x-agent|x-[a-z0-9_-]+)\\b)(?:(?=.*\\b(?:agent|assistant|model|tool|connector|for\\s+ai|for\\s+model)\\b)|(?=.*\\b(?:system\\s+override|scanner|guardrail|safety)\\b))(?=.*\\b(?:ignore|override|supersede|highest\\s+priority|authoritative|include|reveal|send|environment\\s+variable|authorization|bearer|secret|scanner|false\\s+positive|disable\\s+safety|guardrail|system\\s+override)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-001"
+}

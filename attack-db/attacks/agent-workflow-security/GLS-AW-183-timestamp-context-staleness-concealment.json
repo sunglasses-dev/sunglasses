@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-183",
+  "name": "Timestamp Context Staleness Concealment",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates timestamp context (timezones, freshness windows, 'just generated' claims) to make stale evidence appear current, so the agent trusts expired snapshots and acts on out-of-date state.",
+  "keywords": [
+    "clock skew spoofing",
+    "stale evidence trust",
+    "freshness window manipulation",
+    "timezone label swap",
+    "just generated claim spoof",
+    "timestamp context forgery",
+    "fake freshness tag",
+    "evidence age laundering",
+    "stale snapshot posing as live",
+    "rebased timestamp injection",
+    "ttl bypass via clock skew",
+    "out-of-window evidence acceptance"
+  ],
+  "regex": [
+    "(?i)(?:(?:clock|timestamp|time[- ]?zone)\\s+(?:skew|drift|spoof|forgery|manipulation)|(?:just\\s+generated|freshly\\s+pulled|live\\s+now)\\s+(?:claim|tag|marker)\\s+(?:spoof|forg(?:e|ed)|fak(?:e|ed))|(?:stale|expired|outdated)\\s+(?:evidence|snapshot|record)\\s+(?:treated|accepted|trusted)\\s+as\\s+(?:fresh|live|current))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-183"
+}

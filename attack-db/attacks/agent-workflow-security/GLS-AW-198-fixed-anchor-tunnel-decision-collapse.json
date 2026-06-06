@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-198",
+  "name": "Fixed Anchor Tunnel Decision Collapse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker optimizes payloads against the small fixed set of anchors an agent reuses across cycles, inducing decision collapse where outputs look grounded but no longer detect drift outside the tunnel of measured signals.",
+  "keywords": [
+    "anchor entropy collapse",
+    "fixed-anchor overfit attack",
+    "single-kpi tunnel vision",
+    "narrow anchor exploit",
+    "decision collapse via repeated anchors",
+    "low-entropy grounding abuse",
+    "anchor reuse drift blindness",
+    "kpi tunnel hijack",
+    "anchor monoculture exploit",
+    "grounded-but-blind output",
+    "evidence diversity collapse",
+    "tunnel anchor poisoning"
+  ],
+  "regex": [
+    "(?i)(?:(?:anchor|grounding|evidence)\\s+(?:entropy|diversity)\\s+(?:collapse|reduction|loss)|(?:fixed|single|narrow|repeated)\\s+(?:anchor|kpi|metric)\\s+(?:overfit|tunnel|blind|exploit)|(?:decision|reasoning)\\s+(?:collapse|tunnel)\\s+(?:via|through)\\s+(?:reused|monoculture|same)\\s+(?:anchors?|metrics?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-198"
+}

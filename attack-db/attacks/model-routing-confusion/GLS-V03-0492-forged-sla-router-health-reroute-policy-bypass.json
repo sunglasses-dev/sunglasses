@@ -1,0 +1,24 @@
+{
+  "id": "GLS-V03-0492",
+  "name": "Forged SLA Router Health Reroute Policy Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged SLA, health telemetry, or throughput signal submitted to a routing layer to promote or reroute model tier in violation of safety or risk-gate policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-V03-0492"
+}

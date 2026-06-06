@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-171",
+  "name": "Working Directory Path Resolution Hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits ambiguity between declared working directory and tool-level workdir overrides so relative paths resolve into unintended scopes, steering reads or writes outside the agent's expected sandbox.",
+  "keywords": [
+    "working directory ambiguity",
+    "tool level workdir override",
+    "declared cwd vs resolved cwd",
+    "relative path scoped wrong",
+    "cwd shift mid task",
+    "implicit workdir change",
+    "workdir override slipped in",
+    "path resolved in wrong scope",
+    "cwd drift between tools",
+    "agent reads from unintended dir",
+    "write scoped to wrong workdir",
+    "workdir confusion attack"
+  ],
+  "regex": [
+    "(?i)(?:working\\s+directory\\s+(?:context\\s+)?(?:confus|drift|override|shift)|(?:declared|stated)\\s+(?:working\\s+directory|cwd|workdir)\\s+(?:differs|diverges|conflicts)\\s+(?:from|with)\\s+(?:resolved|actual|tool))",
+    "(?i)(?:(?:tool[- ]level|implicit|hidden)\\s+(?:workdir|cwd|working\\s+directory)\\s+(?:override|shift|change)|(?:relative\\s+path|file)\\s+(?:resolved|scoped)\\s+(?:in|to)\\s+(?:wrong|unintended)\\s+(?:directory|scope))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-171"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SBX-887",
+  "name": "Container Namespace Jump Docker Socket Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a container, sandbox, or jail escape or breakout via namespace switching, nsenter, docker.sock, or setns is described as ignoring, bypassing, overriding, or disabling policy, guardrail, isolation boundary, or approval-check controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SBX-887"
+}

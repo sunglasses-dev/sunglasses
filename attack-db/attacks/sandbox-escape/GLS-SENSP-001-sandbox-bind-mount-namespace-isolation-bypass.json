@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SENSP-001",
+  "name": "Sandbox Bind Mount Namespace Isolation Bypass",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a container, sandbox, namespace, cgroup, or chroot environment uses mount, bind-mount, nsenter, setns, pivot_root, or breakout techniques to escape isolation boundaries and bypass, override, or disable policy, guardrail, or restriction controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|namespace|cgroup|chroot)\\b)(?=.*\\b(?:mount|bind\\s*mount|nsenter|setns|pivot_root|pivot|rebind|escape|breakout|host\\s+namespace|host\\s+path(?:s)?)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundary|restriction(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SENSP-001"
+}

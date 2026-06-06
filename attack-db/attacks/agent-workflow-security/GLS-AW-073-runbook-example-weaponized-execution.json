@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-073",
+  "name": "Runbook Example Weaponized Execution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker poisons or pivots runbook examples and emergency snippets so the agent treats illustrative code as live commands. Documentation context laundering turns demo payloads into production actions without approval.",
+  "keywords": [
+    "runbook example trust pivot",
+    "safe example as live command",
+    "emergency snippet executed verbatim",
+    "documentation example weaponized",
+    "runbook code block trusted",
+    "tutorial snippet pivot",
+    "copy-paste runbook attack",
+    "example block run as policy",
+    "snippet trust elevation",
+    "runbook hijack via example",
+    "demo command becomes prod",
+    "illustrative payload executed"
+  ],
+  "regex": [
+    "(?i)(?:runbook\\s+example\\s+(?:trust|pivot|hijack)|(?:safe|illustrative|example)\\s+(?:snippet|command|code\\s+block)\\s+(?:executed|run|pivoted)\\s+(?:as|into)\\s+(?:live|real|production)\\s+(?:action|command|policy))",
+    "(?i)(?:(?:emergency|tutorial|demo)\\s+snippet\\s+(?:trusted|elevated|weaponized)|copy[- ]paste\\s+(?:runbook|doc)\\s+(?:example|payload)\\s+(?:bypasses?|skips?)\\s+(?:approval|gate|review))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-073"
+}

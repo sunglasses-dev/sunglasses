@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-319",
+  "name": "Poisoned Citation Source Tag Rank Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a poisoned or forged citation source tag or reference badge whose rank or priority is overridden to suppress policy guardrail or validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge[-\\s]*base|context|document|corpus|source)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ion)?|tamper(?:ed|ing)?|forg(?:ed|ery)|malicious)\\b)(?=.*\\b(?:citation|provenance|source[-\\s]*tag|reference|badge|checksum)\\b)(?=.*\\b(?:rank(?:ing)?|priority|trust|score|selection)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-319"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-TS-256",
+  "name": "Structured Header Metadata Policy Override",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Structured HTTP/header-style smuggling fields (role:system, x-system-prompt, policy_override:true, priority:critical, <meta name=\"system\">) paired with ignore/override/bypass of system or developer instructions. Channel distinct from comment/annotation regex (GLS-TS-251).",
+  "keywords": [
+    "role system ignore developer instruction",
+    "x-system-prompt override system policy",
+    "policy_override true replace guardrail",
+    "priority critical supersede developer policy",
+    "meta name system disregard system instruction",
+    "role system bypass policy guardrail",
+    "x-system-prompt replace developer guardrail",
+    "policy_override true ignore system policy",
+    "priority critical follow attacker instruction",
+    "meta name system ignore system boundaries"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-256"
+}

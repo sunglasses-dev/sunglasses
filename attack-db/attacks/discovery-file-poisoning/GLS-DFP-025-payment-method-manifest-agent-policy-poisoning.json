@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-025",
+  "name": "Payment Method Manifest Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled Web Payments payment method manifest can embed agent-directed policy text that misuses payment/merchant discovery metadata to make an AI scanner trust checkout origins, forward session/payment context, or suppress PCI/phishing findings.",
+  "keywords": [
+    ",",
+    ", or",
+    ".\n- Sensitive/suppressive action:",
+    "/.well-known/payment-method-manifest",
+    "AI agent",
+    "LLM",
+    "Web Payments",
+    "agentic",
+    "assistant",
+    "autonomous scanner",
+    "autonomous verifier",
+    "canonical checkout policy",
+    "canonical merchant policy",
+    "checkout auditor",
+    "checkout bot"
+  ],
+  "regex": [
+    "(?is)^(?!(?=.*\\b(?:must\\s+not|should\\s+not|never|cannot|can't|do\\s+not)\\b.{0,120}\\b(?:forward|send|share|attach|include|suppress|hide|treat|reuse|skip)\\b))(?=.*\\b(?:payment[-_\\s]*method[-_\\s]*manifest|payment\\s+method\\s+manifest|\\.well-known/payment-method-manifest|default_applications|supported_origins|web\\s+payments?|payment\\s+handler|secure\\s+payment\\s+confirmation)\\b)(?=.*\\b(?:ai\\s+agent|assistant|autonomous\\s+(?:scanner|crawler|agent|verifier)|llm|agentic|security\\s+scanner|checkout\\s+(?:bot|auditor)|compliance\\s+bot)\\b)(?=.*\\b(?:verified\\s+(?:merchant|payment|checkout)\\s+authority|canonical\\s+(?:merchant|payment|checkout)\\s+policy|owner\\s+authority|outrank|supersede|override|higher[-\\s]*priority|treat\\s+[^.]{0,100}\\s+as\\s+(?:trusted|verified|authoritative))\\b)(?=.*\\b(?:authorization|bearer\\s+token|cookie|session\\s+(?:header|context|token)|payment\\s+token|card\\s+number|test\\s+card|checkout\\s+session|merchant\\s+secret|api\\s*key|suppress|do\\s+not\\s+report|hide\\s+(?:finding|issue)|skip\\s+(?:fraud|pci|phishing|checkout)\\s+checks?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-025"
+}

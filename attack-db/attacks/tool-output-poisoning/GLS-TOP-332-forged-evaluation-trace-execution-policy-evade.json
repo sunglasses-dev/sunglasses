@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-332",
+  "name": "Forged Evaluation Trace Execution Policy Evade",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged evaluation trace, confidence stamp, or audit stamp used to evade or bypass an execution gate or approval policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|synthetic)\\b)(?=.*\\b(?:eval(?:uation)?\\s+(?:trace|log)|audit\\s+(?:trail|log|stamp)|confidence\\s+(?:stamp|score|badge)|verification\\s+(?:receipt|stamp))\\b)(?=.*\\b(?:bypass|override|skip|evad(?:e|ed|ing)|disable|ignore|circumvent)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|execution\\s+(?:gate|policy)|approval\\s+(?:gate|policy)|safety\\s+(?:check|policy))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-332"
+}

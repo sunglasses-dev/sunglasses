@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-260",
+  "name": "Poisoned Vector Store Chunk Reranking Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a backdoor-seeded or poisoned vector-store chunk that is boosted or reranked to override safety filters and guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|vector\\s*store|knowledge\\s*base|embedding(?:s)?)\\b)(?=.*\\b(?:poison(?:ed|ing)?|taint(?:ed|ing)?|seed(?:ed|ing)?|inject(?:ed|ing)?|backdoor(?:ed|ing)?)\\b)(?=.*\\b(?:cache|chunk(?:s)?|document(?:s)?|snippet(?:s)?|digest|summary)\\b)(?=.*\\b(?:rerank(?:s|ed|ing)?|reprioriti[sz](?:e|es|ed|ing)?|boost(?:s|ed|ing)?|promot(?:e|es|ed|ing)|elevat(?:e|es|ed|ing))\\b)(?=.*\\b(?:guardrail|policy|filter|safety\\s*checks?)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:n|d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|ping|s)?)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-260"
+}

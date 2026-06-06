@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-266",
+  "name": "Agent Badge Forgery Boundary Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged badge, nonce, or attestation submitted by a peer agent to escalate scope or override policy boundaries.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|peer\\s+agent|reviewer|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|counterfeit)\\b)(?=.*\\b(?:badge|ticket|nonce|attestation|receipt)\\b)(?=.*\\b(?:scope|policy|guardrail|boundary)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-266"
+}

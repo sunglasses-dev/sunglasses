@@ -1,0 +1,41 @@
+{
+  "id": "GLS-PI-024",
+  "name": "Long-Lived Cache Directive Replay",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output",
+    "log_memory",
+    "api_response"
+  ],
+  "description": "Attacker plants a directive in a long-lived prompt or tool-output cache so subsequent runs replay the injection without re-validation. Cross-tenant key collisions, weak cache scoping, and TTL lag let one poisoned write silently influence many downstream tasks and survive policy patches.",
+  "keywords": [
+    "prompt cache poisoning",
+    "summary cache authority pivot",
+    "tool result memo poisoning",
+    "cross tenant key collision",
+    "ttl lag exploitation",
+    "cached summary imported as trusted context",
+    "memoized tool output replays directive",
+    "cache key without policy scope",
+    "stale cache survives policy patch",
+    "session summary contains injected instruction",
+    "long lived cache propagates injection",
+    "cache hit bypasses sanitization"
+  ],
+  "regex": [
+    "(?i)(?:(?:prompt|summary|tool[- ]result|memo)\\s+cache\\s+(?:poison|poisoning|pivot|replay|injection)|cached\\s+(?:summary|memo|tool\\s+output)\\s+(?:imported|loaded|promoted)\\s+(?:as|into)\\s+(?:trusted|planning|reasoning)\\s+(?:context|input))",
+    "(?i)(?:cross[- ]tenant|cross[- ]scope|weak)\\s+cache\\s+(?:key|keying|collision)\\s+(?:leaks?|reuses?|bleeds?)\\s+(?:poisoned|injected|malicious)\\s+(?:entry|line|value)",
+    "(?i)(?:ttl|expiry|stale)\\s+(?:lag|cache|entry)\\s+(?:exploitation|survives?|keeps?\\s+alive)\\s+(?:old|patched|deprecated)\\s+(?:policy|instruction|directive)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-024"
+}

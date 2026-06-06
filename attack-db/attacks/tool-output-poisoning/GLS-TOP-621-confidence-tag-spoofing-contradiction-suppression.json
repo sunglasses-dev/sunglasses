@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-621",
+  "name": "Confidence Tag Spoofing Contradiction Suppression",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker poisons high-priority evidence channels (system docs, dashboards, status channels) with inflated confidence or priority metadata so downstream reasoning inherits bad priors and suppresses contradictory evidence.",
+  "keywords": [
+    "priority tag spoofing",
+    "inflate confidence score",
+    "verified high-priority injection",
+    "consensus bootstrap poisoning",
+    "contradiction suppression",
+    "confidence laundering",
+    "fallback order hijack",
+    "self-declared confidence boost",
+    "ranker weight poisoning",
+    "stale artifact elevated rank",
+    "poisoned high-priority channel",
+    "repetition-as-agreement spoof"
+  ],
+  "regex": [
+    "(?i)(?:(?:spoof|inject|forge|inflate|fake)\\s+(?:priority|confidence|trust|rank|weight)\\s+(?:tag|score|signal|metadata|field)\\b|(?:self[- ]declared|unverified|attacker[- ]controlled)\\s+(?:confidence|priority|trust)\\s+(?:field|tag|score|metadata)\\s+(?:elevates?|overrides?|wins?|ranks?\\s+above)|(?:confidence|priority|trust)\\s+(?:laundering|inflation|spoofing)\\s+(?:suppresses?|bypasses?|overrides?)\\s+(?:contradiction|conflict|verification))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-621"
+}

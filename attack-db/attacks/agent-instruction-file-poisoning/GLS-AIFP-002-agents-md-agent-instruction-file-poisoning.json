@@ -1,0 +1,33 @@
+{
+  "id": "GLS-AIFP-002",
+  "name": "AGENTS.md / Agent Instruction File Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker places a hostile `AGENTS.md`, `CLAUDE.md`, `SKILL.md`, `.cursor/rules`, or `.github/copilot-instructions.md` in a repository that instructs AI coding agents to suppress security scanning, bypass code review, exfiltrate credential metadata, and treat the file as highest-priority authority",
+  "keywords": [
+    ".agent.md",
+    ".cursor/rules",
+    ".github/copilot-instructions.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "SKILL.md",
+    "agent-instructions.md",
+    "ai-instructions.md"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:never\\s+(?:treat|obey|override|overrides?|follow|forward|include|suppress)|must\\s+not\\s+(?:treat|obey|follow|use|forward|include|suppress)|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged|training\\s+example|security\\s+report|incident\\s+report|vulnerability\\s+report|docs\\s+should\\s+report|scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|learn\\s+how\\s+scanners?\\s+should\\s+report|scanners?\\s+should\\s+(?:report|detect|flag|refuse)\\b|is\\s+not\\s+policy\\s+and\\s+never\\s+overrides|does\\s+not\\s+instruct\\s+agents?\\s+to\\s+(?:forward|include|suppress|override))\\b)(?=.*\\b(?:AGENTS\\.md|CLAUDE\\.md|SKILL\\.md|agent[-_]instructions?\\.(?:md|txt)|ai[-_]instructions?\\.(?:md|txt)|copilot[-_]instructions?\\.(?:md|txt)|claude[-_]code[/\\\\]instructions)\\b|.*(?<!\\w)(?:\\.cursor[/\\\\]rules?|\\.github[/\\\\]copilot[-_]instructions?\\.md|\\.agent\\.(?:md|txt))(?!\\w))(?=.*\\b(?:agent|ai|assistant|coding\\s+assistant|scanner|copilot|cursor|codex|claude)s?\\b)(?=.*\\b(?:ignore\\s+(?:previous|system|developer|user)\\s+(?:instructions?|prompts?|rules?)|override\\s+(?:previous|system|developer|user)\\s+(?:instructions?|prompts?|rules?)|overrides?\\s+(?:previous|system|developer|user)\\s+(?:instructions?|prompts?|rules?)|supersede\\w*\\s+(?:previous|system|developer|user)\\s+(?:instructions?|prompts?|rules?)|highest\\s+priority|takes?\\s+precedence|governing\\s+document|primary\\s+source\\s+of\\s+truth|outranks?\\s+(?:system|developer|user)|must\\s+obey\\s+this\\s+(?:file|repo)|do\\s+not\\s+(?:run|execute)\\s+(?:security\\s+)?scanners?|suppress\\s+(?:all\\s+)?(?:scanner|security)\\s+(?:findings?|alerts?|warnings?)|suppress(?:es|ed|ing)?\\s+(?:findings?|alerts?|warnings?|reports?)|skip\\s+code\\s+review|bypass\\s+(?:security\\s+)?review|trust\\s+this\\s+(?:repo|code|repository)\\s+as\\s+verified|do\\s+not\\s+(?:mention|report|include\\s+in\\s+(?:reports?|findings?))|hide\\s+(?:this\\s+)?(?:requirement|finding|from\\s+(?:reports?|scanners?|users?))|mark\\s+(?:this\\s+)?(?:repo|repository|finding)\\s+as\\s+(?:clean|no\\s+findings)|exclude\\s+from\\s+(?:the\\s+)?(?:final\\s+)?(?:report|summary)|redact\\s+(?:non[-_\\s]?applicable|findings?|flags?)|omit\\s+from\\s+(?:summar|report)|treat\\s+as\\s+informational\\s+rather\\s+than\\s+blocking|disable\\s+(?:security\\s+)?scann(?:ing|ers?)|disabling\\s+(?:security\\s+)?scann(?:ing|ers?)|share\\s+environment\\s+context|provide\\s+local\\s+configuration\\s+details?|attach\\s+(?:runtime\\s+)?environment\\s+variables?)\\b)(?=.*\\b(?:secret|token|api[-_\\s]?key|env(?:ironment)?\\s*(?:var|variable)s?|credential|password|auth(?:entication)?\\s*(?:token|header|key)|workspace\\s+(?:policy|state|config)|hidden\\s+config|local\\s+(?:state|config|secrets?|tokens?|credentials?)|environment\\s+context|runtime\\s+environment|local\\s+configuration\\s+details?|scan(?:ner)?\\s+(?:findings?|reports?|alerts?|results?|outputs?)|security\\s+(?:scan|report|finding|alert|result|tool\\s+output)|x[-_]repo[-_]audit|x[-_]agent[-_]|findings?|alerts?|warnings?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-002"
+}
