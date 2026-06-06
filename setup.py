@@ -2,11 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="sunglasses",
-    version="0.2.60",
+    version="0.2.61",
     description="Sunglasses for AI agents. Protection layer + neighborhood watch.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://sunglasses.dev",
+    author="AZ",
+    author_email="contact@sunglasses.dev",
     project_urls={
         "Source": "https://github.com/sunglasses-dev/sunglasses",
         "Threat Database": "https://github.com/sunglasses-dev/sunglasses/tree/main/attack-db",

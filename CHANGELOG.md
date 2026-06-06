@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.61] — 2026-06-06
+
+### Added (V2 SHIP #7 — discovery_file_poisoning)
+
+- **25 new patterns** — `GLS-DFP-001` through `GLS-DFP-025` (new `discovery_file_poisoning` category). The `discovery_file_poisoning` category covers agent-policy poisoning hidden in the well-known discovery and convention files that AI agents and crawlers read to learn a site's "rules" — `robots.txt`, `llms.txt`/`llms-full.txt`, `sitemap.xml`, `ads.txt`/`app-ads.txt`/`sellers.json`, `security.txt`, `humans.txt`, `.well-known/` manifests, and feed/manifest carriers — where a hostile file tries to redefine what an agent is allowed to do. Pattern count: 956 → **981**. Category count: 63 → **64**. Keywords: 6,612 → **6,946**.
+- **New blog:** [Discovery File Poisoning: When robots.txt, llms.txt, and sitemaps Become Agent Policy](https://sunglasses.dev/blog/discovery-file-poisoning-llms-robots) — why discovery files are context, not authority, and how runtime trust stops poisoned robots.txt/llms.txt/sitemap files before agents act. Written by JACK, research by Cava.
+
+
 ## [0.2.60] — 2026-06-04
 
 ### Added (V2 SHIP #6 — cicd_metadata_poisoning + supply_chain_attestation_poisoning)

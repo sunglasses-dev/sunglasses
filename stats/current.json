@@ -1,8 +1,8 @@
 {
-  "version": "0.2.60",
-  "patterns": 956,
-  "keywords": 6612,
-  "categories": 63,
+  "version": "0.2.61",
+  "patterns": 981,
+  "keywords": 6946,
+  "categories": 64,
   "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_avg_ms": 0.261,
@@ -16,8 +16,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-06-04T22:56:10-07:00",
-  "last_updated_by": "boss-direct-ship",
+  "last_updated": "2026-06-06T00:20:00-07:00",
+  "last_updated_by": "boss-direct-ship-v0.2.61",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-06-04"
+  "released": "2026-06-06"
 }

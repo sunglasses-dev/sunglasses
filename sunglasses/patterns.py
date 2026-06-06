@@ -19171,4 +19171,714 @@ PATTERNS = [
         ],
         "description": "Build provenance attestations such as SLSA, in-toto Statement, DSSE envelopes, and Sigstore/Rekor metadata can carry agent-directed policy text that tells AI dependency auditors to treat the attestation as scanner authority, suppress findings, or forward runtime credentials/local state."
     },
+    # === v0.0.0 batch (25 patterns) ===
+    {
+        "id": "GLS-DFP-001",
+        "name": "ads.txt Agent Compliance Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "Authorized Digital Sellers",
+            "DIRECT",
+            "RESELLER",
+            "ads.txt",
+            "app-ads.txt",
+            "seller_id",
+            "sellers.json",
+        ],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:ads\.txt|app-ads\.txt|sellers\.json|authorized\s+digital\s+sellers|seller[_\s-]?id|\bDIRECT\b|\bRESELLER\b)\b)(?=.*\b(?:ai[-\s]*agents?|automated\s+assistants?|assistants?|ad[-\s]*verification\s+agents?|crawlers?|bots?|agents?)\b)(?=.*\b(?:treat\s+this\s+[^\n]{0,100}\s+as\s+(?:the\s+)?authoritative\s+policy|system\s*,?\s*developer|repository\s+instructions?\s+conflict|stale\s+for\s+this\s+(?:domain|seller\s+policy)|include\s+[^\n]{0,100}\b(?:tool\s+configuration|environment\s+variables?|env\s+vars?|local\s+state|api\s*keys?|secrets?)|(?:do|must)\s+not\s+flag\s+[^\n]{0,100}(?:prompt\s+injection|scanner|security)|suppress\s+[^\n]{0,100}(?:finding|report|warning))\b).*""",
+        ],
+        "description": "A hostile `/ads.txt`, `/app-ads.txt`, or `sellers.json` file can blend normal authorized-seller metadata with instructions telling AI agents or ad-verification assistants to treat the compliance file as scan authority, disclose local tool/env context, or suppress prompt-injection findings."
+    },
+    {
+        "id": "GLS-DFP-002",
+        "name": "Apple app-site-association agent policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known",
+            "Authorization",
+            "Bearer",
+            "LLM",
+            "agent",
+            "agent_policy",
+            "ai_agent",
+            "app-site-association",
+            "appclips",
+            "apple-app-site-association",
+            "applinks",
+            "assistant",
+            "assistant_policy",
+            "automated auditor",
+            "cookie",
+        ],
+        "regex": [
+            r"""(?is)(?=.*(?:apple[-\s]*app[-\s]*site[-\s]*association|app[-\s]*site[-\s]*association|applinks|webcredentials|appclips|\.well-known))(?=.*(?:agent|assistant|crawler|scanner|llm|automated\s+auditor|verifier))(?=.*(?:x-agent|agent_policy|verification_policy|owner_verification|precheck|ai_agent|llm_policy|assistant_policy))(?=.*(?:override|supersede|outrank|owner\s+authority|trusted\s+owner|read|include|forward|send|attach|expose|token|secret|cookie|authorization|bearer|environment\s+variables|do\s+not\s+report|delay\s+reporting|suppress)).*""",
+        ],
+        "description": "A target-controlled Apple app-site-association (AASA) file can hide non-standard `x-agent` / `agent_policy` fields that tell AI agents, scanners, or automated verifiers to treat the file as owner authority, suppress findings, or forward local auth context even though native Apple clients ignore thos"
+    },
+    {
+        "id": "GLS-DFP-003",
+        "name": "browserconfig.xml agent policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "Authorization headers",
+            "Bearer token",
+            "LLM",
+            "TileColor",
+            "agent_policy",
+            "agentic verifier",
+            "assistant",
+            "autonomous scanner",
+            "bot",
+            "browserconfig.xml",
+            "canonical owner policy",
+            "cookies",
+            "crawler_notice",
+            "do not report",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:must\s+not|should\s+ignore|not\s+treat).{0,180}(?:browserconfig\.xml|msapplication|x-agent-policy|authorization\s+headers?|cookies?|environment\s+variables?))(?!.*\bno\s+(?:browserconfig|msapplication)\b)(?=.*(?:browserconfig\.xml|msapplication-config|msapplication|tile(?:color|image)|pinned[-\s]*site|site\s+tile|xml\s+browser\s+config))(?=.*(?:ai\s*agent|assistant|autonomous\s*(?:scanner|crawler|verifier)|llm|agentic|security\s*scanner|bot))(?=.*(?:x-agent-policy|agent[_-]?policy|crawler[_-]?notice|verifier[_-]?policy|owner[_-]?verification|canonical\s+(?:site|owner|operator)\s+policy|outrank|supersede|override|higher[-\s]*priority|must\s+obey|treat\s+this\s+as\s+(?:owner|operator)\s+authority|authorization\s+headers?|bearer\s+token|cookies?|session\s+headers?|environment\s+variables?|api\s*keys?|secrets?|do\s+not\s+(?:report|notify|mention)|suppress|hide\s+this|silently))""",
+        ],
+        "description": "A hostile site can hide AI-agent instructions inside `browserconfig.xml` / `msapplication-config` pinned-site metadata, causing an agent that summarizes all discovery files to treat tile configuration XML as owner policy, override higher-priority instructions, suppress reports, or request local auth"
+    },
+    {
+        "id": "GLS-DFP-004",
+        "name": "Cross-file discovery pointer poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".well-known",
+            "<loc>",
+            "AI agent",
+            "Measured local fixture result:",
+            "Sitemap:",
+            "Validation script:",
+            "agent",
+            "agent-discovery",
+            "assistant",
+            "authoritative",
+            "bot",
+            "crawler",
+            "delegated",
+            "delegated trust",
+            "disable security",
+        ],
+        "regex": [
+            r"""(?is)(?=.*\b(?:robots\.txt|sitemap(?:\.xml)?|\.well-known|llms\.txt|site\s*manifest|agent[-\s]*discovery)\b)(?=.*\b(?:sitemap\s*:|loc>|href\s*=|load|include|see|referenc(?:e|ed)|delegat(?:e|ed)|points?\s+to|sidecar)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot)\b)(?=.*\b(?:authoritative|supersede|override|higher[-\s]*priority|ignore\s+(?:system|developer|repository|previous)|scanner|false\s+positive|runtime\s+configuration|token\s+names?|local\s+state|environment\s*variables?)\b)""",
+        ],
+        "description": "A benign-looking discovery file can delegate an AI agent to a second metadata sidecar that carries the hostile payload, making the attack visible only when the `robots.txt`/`sitemap.xml`/`.well-known` bundle is analyzed as a chain."
+    },
+    {
+        "id": "GLS-DFP-005",
+        "name": "Encoded/comment-hidden discovery metadata payload",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".well-known",
+            "AI agent",
+            "Authorization",
+            "Bearer",
+            "CDATA",
+            "JSON-LD",
+            "Measured local fixture result:",
+            "OpenGraph",
+            "URL-encoded",
+            "agent",
+            "agent-discovery",
+            "agent.json",
+            "ai-plugin",
+            "assistant",
+            "authoritative",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|manifest|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery|metadata)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
+        ],
+        "description": "Agent-facing discovery metadata can hide prompt-injection payloads in comments, CDATA, JSON-LD/OpenGraph fields, frontmatter, base64, URL encoding, or zero-width text so a scanner that only inspects visible plain text misses the malicious instruction."
+    },
+    {
+        "id": "GLS-DFP-006",
+        "name": "Host-meta XRD/JRD Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ".\n- Safety/report suppression:",
+            ".\n- Secret/local-state access:",
+            "/.well-known/host-meta",
+            "AI agent",
+            "AI assistant",
+            "LLM",
+            "Link title",
+            "Property",
+            "XRD",
+            "aliases",
+            "coding agent",
+            "crawler agent",
+            "description",
+            "host-meta.json",
+        ],
+        "regex": [
+            r"""(?is)(?=.*(?:host-meta|xrd|jrd|webfinger|\.well-known))(?=.*(?:ai\s*(?:assistant|agent)|coding\s*agent|model|llm))(?=.*(?:ignore\s+(?:all\s+)?(?:previous|system|developer|repository)\s+instructions|highest[-\s]?priority|outranks?|env(?:ironment)?\s+variables?|api\s*keys?|secrets?|disable\s+(?:security|scanner)|do\s+not\s+report)).*""",
+        ],
+        "description": "`/.well-known/host-meta` or `/.well-known/host-meta.json` can hide agent-facing authority inversion and secret-access instructions inside standards-shaped XRD/JRD discovery metadata."
+    },
+    {
+        "id": "GLS-DFP-007",
+        "name": "humans.txt Agent Contact Authority Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/* TEAM */",
+            "/humans.txt",
+            "contact policy",
+            "credits",
+            "humans.txt",
+            "security contact",
+            "site owner",
+        ],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:humans\.txt|/humans\.txt|team\s*/|security\s+contact|site\s+owner|credits|contact\s+policy)\b)(?=.*\b(?:ai[-\s]*agents?|automated\s+assistants?|assistants?|crawlers?|bots?|agents?)\b)(?=.*\b(?:treat\s+this\s+[^\n]{0,80}\s+as\s+(?:the\s+)?(?:current\s+)?(?:site\s+)?authority|system\s*,?\s*developer|repository\s+instructions?\s+conflict|stale\s+for\s+this\s+domain|include\s+[^\n]{0,80}\b(?:tool\s+configuration|environment\s+variables?|env\s+vars?|local\s+state|api\s*keys?|secrets?)|(?:do|must)\s+not\s+flag\s+[^\n]{0,80}(?:prompt\s+injection|scanner|security)|suppress\s+[^\n]{0,80}(?:finding|report|warning))\b).*""",
+        ],
+        "description": "A hostile `/humans.txt` or site credits/contact file can blend normal team/contact metadata with instructions telling AI agents to treat the file as site authority, demote higher-priority instructions, disclose local scan context, or suppress prompt-injection reports."
+    },
+    {
+        "id": "GLS-DFP-008",
+        "name": "robots.txt tool-action poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "Allow",
+            "Disallow",
+            "Measured local fixture result:",
+            "URL",
+            "User-Agent: ai-agent",
+            "admin",
+            "agent",
+            "assistant",
+            "bot",
+            "browser",
+            "bypass policy",
+            "call",
+            "callback",
+            "crawl",
+            "crawl-policy",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:no|without)\b.{0,60}\b(?:robots\.txt|crawl[-\s]*policy)\b.{0,60}\b(?:context|file|metadata)\b)(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any\s+robots\.txt\s+instruction)\b.{0,160}\b(?:execute|run|invoke|call|use|disable|bypass|crawl|fetch|open|submit|post)\b)(?=.*\b(?:robots\.txt|User-Agent\s*:\s*(?:ai-agent|assistant|bot|crawler)|sitemap(?:\.xml)?|crawl[-\s]*policy|disallow|allow)\b)(?=.*\b(?:agent|ai[-\s]*agent|assistant|crawler|bot|tool|browser|fetcher|summarizer)\b)(?=.*\b(?:execute|run|invoke|call|use|disable|bypass|turn\s+off|ignore\s+(?:safety|guardrails?|scanner|policy)|crawl|fetch|open|submit|post)\b)(?=.*\b(?:tool|browser|summarizer|scanner|guardrails?|safety|private|admin|internal|forbidden|disallow(?:ed)?|callback|webhook|endpoint|url)\b).*$""",
+        ],
+        "description": "A `robots.txt` or sitemap-adjacent crawl policy can smuggle action instructions for AI agents, telling them to run browser/fetch/summarizer tools, crawl disallowed private paths, or disable safety checks while pretending to be ordinary crawler metadata."
+    },
+    {
+        "id": "GLS-DFP-009",
+        "name": "Well-known manifest credential forwarding",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".well-known",
+            "API key",
+            "Authorization",
+            "Bearer",
+            "Measured local fixture result:",
+            "Validation script:",
+            "X-API-Key",
+            "agent",
+            "agent-manifest",
+            "agent.json",
+            "ai-plugin.json",
+            "assistant",
+            "attach",
+            "connector",
+            "copy",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse|blocked|redacted|does\s+not\s+ask)\b.{0,120}\b(?:include|attach|send|forward|copy|echo|exfiltrat(?:e|ion)|provide|read|load)\b.{0,120}\b(?:authorization|bearer|x-api-key|api[-_\s]*keys?|tokens?|secrets?|env(?:ironment|runtime)?\s*(?:vars?|variables?)?|headers?)\b)(?=.*(?:(?:^|[\s/])\.well-known|ai-plugin\.json|assetlinks\.json|web-app-manifest|manifest\.json|agent[-_\s]*manifest|agent(?:s)?\.json|mcp\.json|openapi\.json))(?=.*\b(?:agent|assistant|plugin|tool|connector|crawler)\b)(?=.*\b(?:authorization|bearer|x-api-key|api[-_\s]*keys?|tokens?|secrets?|env(?:ironment|runtime)?\s*(?:vars?|variables?)?|headers?)\b)(?=.*\b(?:include|attach|send|forward|copy|echo|exfiltrat(?:e|ion)|provide|read|load)\b).*$""",
+        ],
+        "description": "A `.well-known` or site manifest file can hide credential-forwarding instructions in agent/plugin metadata fields, causing a vulnerable AI agent to read local environment secrets and attach them to tool or connector requests."
+    },
+    {
+        "id": "GLS-DFP-010",
+        "name": "ads.cert / signed ad-verification metadata agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "ads.cert",
+            "ads_cert",
+            "do not report",
+            "hide",
+            "ignore scanner/system/developer rules",
+            "include/attach/forward local state",
+            "mark clean",
+            "outrank",
+            "override",
+            "skip fraud review",
+            "supersedes scanner rules",
+            "suppress",
+            "treat as policy",
+            "verification verdict is final",
+            "x-ads-cert",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never)\s+(?:obey|treat|trust|follow|accept)\b.{0,120}\b(?:ads[._-]?cert|signed\s+ad|ad\s+verification|signed\s+bid|supply\s+path)\b)(?!.*\b(?:docs?|guide|reference|training|learn\s+how|article)\b.{0,120}\bscanners?\s+should\s+(?:report|detect|flag|refuse)\b)(?!.*\bscanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)\b)(?=.*\b(?:ads[._-]?cert|x-ads-cert|signed\s+ad\s+(?:certificate|verification)|ad\s+verification\s+signature|cryptographic\s+ad\s+verification|OpenRTB\s+signed\s+bid|signed\s+bid|certified\s+supply\s+path|ad\s+certificate)\b)(?=.*\b(?:AI\s+agents?|assistants?|LLM\s+(?:agents?|auditors?)|autonomous\s+scanners?|security\s+scanners?|ad[-\s]?fraud\s+scanners?|ad[-\s]?quality\s+bots?|fraud\s+auditors?|compliance\s+auditors?|scanners?)\b)(?=.*\b(?:override|supersed\w+|outrank\w*|ignore\s+(?:scanner|system|developer)\s+rules|treat\s+as\s+(?:policy|authority)|do\s+not\s+report|suppress\w*|hide\s+(?:findings|alerts|reports)|mark\s+(?:the\s+)?(?:supply\s+path|seller\s+chain)?\s*clean|verified\s+clean|skip\s+fraud\s+review|verdict\s+is\s+final|include|attach|forward|reuse)\b)(?=.*\b(?:fraud\s+findings?|findings?|reports?|seller\s+chains?|supply\s+paths?|scanner\s+rules|Authorization\s+headers?|API\s+keys?|tokens?|cookies?|env(?:ironment)?\s+vars?|local\s+state|sessions?)\b).*""",
+        ],
+        "description": "Advertising signed-verification metadata such as ads.cert sidecars or signed ad-verification exports can carry AI-agent/scanner-directed instructions to override audit policy, mark seller paths clean, suppress fraud findings, or forward local credentials/session state."
+    },
+    {
+        "id": "GLS-DFP-011",
+        "name": "ads.txt / app-ads.txt Seller Metadata Agent-Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "DIRECT",
+            "RESELLER",
+            "ads.txt",
+            "app-ads.txt",
+            "attach",
+            "do not report",
+            "forward",
+            "hide",
+            "include",
+            "mark as clean",
+            "override",
+            "supersede",
+            "suppress",
+            "treat as policy",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:scanner\s+docs?|training|guide|reference|article|learn\s+how)\b.{0,140}\b(?:report|detect|flag|refuse|block)\b.{0,140}\b(?:ads\.txt|app-ads\.txt|authorized\s+digital\s+sellers?)\b)
+(?!.*\b(?:do\s+not|never|must\s+not|should\s+not)\s+(?:obey|treat|follow|execute|honou?r|trust|use)\b.{0,140}\b(?:ads\.txt|app-ads\.txt|authorized\s+digital\s+sellers?|seller\s+metadata)\b)
+(?=.*\b(?:ads\.txt|app-ads\.txt|authorized\s+digital\s+sellers?|authorized\s+seller|seller\s+account|DIRECT|RESELLER|adsystem\.com|app-ads)\b)
+(?=.*\b(?:ai\s*(?:agent|assistant|crawler|scanner|auditor)|llm\s*(?:agent|crawler|scanner)?|autonomous\s*(?:agent|scanner)|sunglasses|security\s*scanner|seo\s*agent)\b)
+(?=.*\b(?:ignore|override|supersede|outrank|treat\s+as\s+policy|do\s+not\s+report|suppress|hide|mark\s+as\s+clean|forward|include|attach|reuse)\b)
+(?=.*\b(?:system\s+instructions?|developer\s+rules?|findings?|reports?|cookies?|tokens?|api\s*keys?|env(?:ironment)?\s*vars?|local\s+state|seller\s+verification|fraud\s+signals?)\b)
+.*""",
+        ],
+        "description": "Detects `ads.txt` or `app-ads.txt` seller metadata that tries to convert an advertising-authorization file into policy for AI agents, crawlers, scanners, or auditors, especially to suppress fraud findings or forward local secrets."
+    },
+    {
+        "id": "GLS-DFP-012",
+        "name": "App Links / Universal Links Association Metadata Agent-Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            "Digital Asset Links",
+            "apple-app-site-association",
+            "assetlinks.json",
+            "must obey",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|does\s+not|don't|must\s+not|never|refus(?:e|ed|es)|cannot|should\s+not)\b.{0,120}\b(?:obey|treat|trust|execute|follow|override|suppress|forward|send|reuse|instruct)\b.{0,120}\b(?:apple-app-site-association|assetlinks\.json|digital\s+asset\s+links|app\s+site\s+association|deep\s*link|universal\s+links?|metadata|policy|agents?|assistants?|scanners?)\b)(?=.*\b(?:apple-app-site-association|assetlinks\.json|digital\s+asset\s+links|asset_statements|delegate_permission/common\.handle_all_urls|webcredentials|applinks|universal\s+links?|app\s+links?|deep\s*link(?:ing)?|sha256_cert_fingerprints?)\b)(?=.*\b(?:ai\s+agents?|llms?|assistants?|autonomous\s+(?:scanner|crawler|verifier)s?|agentic\s+(?:scanner|browser|crawler)s?)\b)(?=.*\b(?:ignore|override|supersede|outrank|treat\s+as\s+(?:system|developer)\s+policy|must\s+obey|do\s+not\s+report|suppress|hide|forward|send|exfiltrat(?:e|ion)|reuse\s+(?:cookies?|tokens?|credentials?)|share\s+(?:session|cookie|token))\b)(?=.*\b(?:system\s+rules?|developer\s+instructions?|secrets?|tokens?|cookies?|credentials?|findings?|reports?|local\s+(?:storage|state)|session)\b).*$""",
+        ],
+        "description": "Mobile deep-link association metadata such as `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` can carry agent-targeted instructions that attempt to convert domain/app trust declarations into higher-priority policy, suppress scanner findings, or request cookies/tokens/ses"
+    },
+    {
+        "id": "GLS-DFP-013",
+        "name": "BIMI SVG metadata agent policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "<desc>",
+            "<metadata>",
+            "<svg>",
+            "<title>",
+            "AI-agent",
+            "API key",
+            "BIMI SVG",
+            "Brand Indicators",
+            "agent",
+            "assistant",
+            "auditor",
+            "bot",
+            "crawler",
+            "default._bimi",
+            "developer instructions",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|follow|treat|override|supersede|exfiltrate|forward|send|suppress|hide)\b)(?=.*\b(?:bimi|default\._bimi|brand\s+indicators|v=BIMI1|svg\s+(?:logo|metadata)|<svg|<metadata|<desc|<title)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|scanner|auditor|model|tool)\b)(?=.*\b(?:ignore|override|supersede|highest\s+priority|system\s+policy|developer\s+instructions?|send|forward|include|reveal|exfiltrate|secret|token|env(?:ironment)?\s*(?:var|variable)s?|suppress|hide|do\s+not\s+report|mark\s+(?:safe|compliant|verified))\b).*$""",
+        ],
+        "description": "A domain-controlled BIMI discovery chain can hide prompt-injection text inside linked SVG logo metadata that tells AI mail-security auditors to suppress findings, mark the domain verified, or reveal scanner-local secrets."
+    },
+    {
+        "id": "GLS-DFP-014",
+        "name": "Cross-domain policy metadata agent-instruction poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "<access-policy>",
+            "<cross-domain-policy>",
+            "api key",
+            "auth header",
+            "clientaccesspolicy.xml",
+            "cookie",
+            "credential",
+            "crossdomain.xml",
+            "do not report",
+            "mark safe",
+            "outranks scanner defaults",
+            "suppress",
+            "token",
+        ],
+        "regex": [
+            r"""(?is)(?=.*(?:crossdomain\.xml|clientaccesspolicy\.xml|<\s*cross-domain-policy\b|<\s*access-policy\b))(?=.*\b(?:agent|assistant|scanner|auditor|crawler|llm)\b)(?=.*\b(?:ignore|override|outrank|suppress|do\s+not\s+report|mark\s+(?:as\s+)?(?:safe|trusted)|treat\s+as\s+approved)\b)(?=.*\b(?:finding|report|policy|credential|secret|token|cookie|api[-_\s]?key|auth(?:orization)?\s+header)\b).*""",
+        ],
+        "description": "Legacy site policy files such as `crossdomain.xml` or `clientaccesspolicy.xml` can carry XML comments or extension nodes that tell agents/scanners to suppress findings, override higher-priority policy, or forward credentials while appearing to be ordinary site-discovery metadata."
+    },
+    {
+        "id": "GLS-DFP-015",
+        "name": "DNT / Tracking-Policy Metadata Agent Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI",
+            "API key",
+            "Authorization",
+            "Do Not Track",
+            "LLM",
+            "Tk:",
+            "agent",
+            "assistant",
+            "bearer",
+            "cookies",
+            "crawler",
+            "dnt-policy",
+            "do not report",
+            "environment variables",
+            "findings",
+        ],
+        "regex": [
+            r"""(?isx)
+\A
+(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not)\s+(?:obey|treat|trust|follow|accept|interpret|use)\b.{0,120}\b(?:dnt|do[-_\s]?not[-_\s]?track|tracking[-_\s]?status|tracking[-_\s]?policy|privacy[-_\s]?metadata)\b.{0,120}\b(?:override|supersede|outrank|replace|policy|instruction))
+(?!.*\b(?:docs?|guide|article|training|reference)\b.{0,120}\b(?:scanners?|agents?|assistants?|crawlers?|auditors?)\s+should\s+(?:report|detect|flag|refuse)\b.{0,160}\b(?:dnt|do[-_\s]?not[-_\s]?track|tracking[-_\s]?status|tracking[-_\s]?policy))
+(?=.*\b(?:dnt[-_\s]?policy|do[-_\s]?not[-_\s]?track|tracking[-_\s]?status|tracking[-_\s]?policy|privacy[-_\s]?policy[-_\s]?metadata|Tk:|site[-_\s]?wide\s+tracking)\b)
+(?=.*\b(?:ai|llms?|agents?|assistants?|crawlers?|scanners?|auditors?|privacy[-_\s]?auditors?)\b)
+(?=.*(?:\b(?:ignore|override|supersede|supersedes|outrank|replace|highest[-_\s]?priority|must\s+obey|authoritative|policy\s+for\s+(?:agents?|assistants?|crawlers?|scanners?|auditors?))\b|\b(?:do\s+not|don't|never|suppress|hide|omit)\s+(?:report|log|flag|disclose|include)\b))
+(?=.*\b(?:cookies?|sessions?|authorization|bearer|api[-_\s]?keys?|tokens?|env(?:ironment)?(?:\s+variables?)?|secrets?|findings?|violations?|reports?)\b)
+.*""",
+        ],
+        "description": "DNT or tracking-status/privacy-policy discovery metadata can embed agent-directed instructions that claim authority over scanners, suppress tracking findings, or request local cookies/tokens/environment variables."
+    },
+    {
+        "id": "GLS-DFP-016",
+        "name": "FedCM web-identity metadata agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/web-identity",
+            "AI agent",
+            "LLM",
+            "accounts_endpoint",
+            "assistant",
+            "client_metadata_endpoint",
+            "crawler",
+            "fedcm",
+            "id_assertion_endpoint",
+            "identity auditor",
+            "identity provider config",
+            "model",
+            "provider_urls",
+            "security scanner",
+            "web-identity",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:do\s+not|must\s+not|never)\s+(?:treat|obey|follow|execute|use|honou?r)\b.{0,160}\b(?:fedcm|web[-\s]?identity|identity[-\s]?provider\s+(?:config|metadata)|provider_urls|accounts_endpoint|client_metadata_endpoint)\b)
+^(?!.*\b(?:docs?|documentation|training|guide|reference|article)\b.{0,120}\b(?:should|must)\s+(?:report|detect|flag|refuse)\b.{0,160}\b(?:fedcm|web[-\s]?identity|identity[-\s]?provider\s+(?:config|metadata))\b)
+(?=.*\b(?:fedcm|web[-\s]?identity|\.well-known/web-identity|provider_urls|accounts_endpoint|client_metadata_endpoint|id_assertion_endpoint|identity[-\s]?provider\s+(?:config|metadata)|federated\s+credential\s+management)\b)
+^(?!.*\b(?:does\s+not|doesn't)\s+instruct\b.{0,80}\b(?:agents?|assistants?|models?|scanners?|auditors?)\b.{0,120}\b(?:forward|include|send|exfiltrate|suppress|hide|override|ignore)\b)
+(?=.*\b(?:ai\s*(?:agent|assistant|crawler|scanner|auditor)|assistants?|identity\s+auditors?|security\s+scanners?|llm|models?|autonomous\s+agents?|integration\s+agents?)\b)
+(?=.*\b(?:ignore|override|supersedes?|outrank|replace|bypass|suppress|hide|do\s+not\s+report|forward|include|exfiltrate|send)\b.{0,200}\b(?:system|developer|scanner|policy|rules?|findings?|reports?|credentials?|secrets?|bearer\s+tokens?|tokens?|cookies?|sessions?|env(?:ironment)?|local\s+state|authorization\s+headers?|api\s*keys?)\b)
+.*""",
+        ],
+        "description": "Detect FedCM / `/.well-known/web-identity` discovery metadata that targets AI identity auditors or scanners with authority-inversion, report-suppression, or credential/local-state disclosure instructions."
+    },
+    {
+        "id": "GLS-DFP-017",
+        "name": "HTTP domain-verification file agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/acme-challenge/",
+            "/.well-known/pki-validation/",
+            "AI agent",
+            "BingSiteAuth.xml",
+            "LLM",
+            "acme-challenge",
+            "assistant",
+            "auditor",
+            "bot",
+            "certificate validation",
+            "crawler",
+            "do not report",
+            "domain-verification",
+            "fileauth.txt",
+            "forward tokens",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,180}\b(?:obey|follow|trust|treat|override|supersede|outrank|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*\b(?:\.well-known/acme-challenge|\.well-known/pki-validation|fileauth\.txt|acme[-_\s]*challenge|google[-_\s]*site[-_\s]*verification|google[a-z0-9_-]{4,}\.html|bingsiteauth\.xml|msvalidate\.01|yandex[_-][a-z0-9_-]+\.html|p:domain_verify|domain[-_\s]*(?:verification|verify|ownership)|ownership\s+proof|site[-_\s]*verification|certificate\s+(?:validation|verification)|http[-_\s]*proof[-_\s]*file)\b)(?=.*\b(?:ai\s*)?(?:agents?|assistants?|llms?|models?|crawlers?|scanners?|verifiers?|auditors?|bots?|site[-_\s]*verification\s+agents?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-_\s]*priority|treat\s+this\s+as\s+(?:policy|authority|instruction)|must\s+(?:treat|obey|follow)|mark\s+(?:verification\s+)?pass|do\s+not\s+report|don't\s+report|suppress\s+(?:findings|warnings|reports)|hide\s+(?:findings|warnings|reports)|bypass\s+(?:policy|scanner|validation)|forward|send|include|exfiltrate|leak)\b)(?=.*\b(?:system|developer|repository|policy|instructions?|scanner\s+result|verification\s+status|warnings?|findings?|reports?|secrets?|tokens?|api[-_\s]*keys?|cookies?|authorization|env(?:ironment)?\s*(?:vars?|variables?)|local\s+(?:state|config))\b).*""",
+        ],
+        "description": "HTTP domain-verification proof files such as `/.well-known/pki-validation/fileauth.txt`, `/.well-known/acme-challenge/<token>`, `/google*.html`, and `/BingSiteAuth.xml` can carry agent-directed policy or report-suppression instructions next to legitimate ownership evidence."
+    },
+    {
+        "id": "GLS-DFP-018",
+        "name": "HTTP security header agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "API key",
+            "Authorization",
+            "Bearer",
+            "Content-Security-Policy",
+            "HTTP/1.1",
+            "LLM",
+            "Link:",
+            "Permissions-Policy",
+            "Report-To",
+            "Reporting-Endpoints",
+            "X-Agent-Policy",
+            "X-Robots-Tag",
+            "agent_note",
+            "agentic verifier",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:must\s+not|do\s+not|never|refuse\s+to|should\s+not)\b.{0,160}\b(?:treat|obey|override|supersede)\b)
+(?=.*\b(?:HTTP/\d(?:\.\d)?|Content-Security-Policy|Report-To|Reporting-Endpoints|Permissions-Policy|X-Robots-Tag|Link\s*:|X-Agent-Policy|agent[_-]?note|scanner[_-]?policy|crawler[_-]?notice)\b)
+(?=.*\b(?:AI\s+agents?|assistants?|LLMs?|autonomous\s+(?:scanner|crawler|verifier)s?|security\s+scanners?|agentic\s+verifiers?|bots?)\b)
+(?=.*\b(?:supersed(?:e|es)|outrank(?:s)?|overrid(?:e|es)|higher[-\s]*priority|canonical\s+(?:site[-\s]*owner|operator)\s+policy|must\s+obey|before\s+(?:system|developer)\s+rules)\b)
+(?=.*\b(?:Authorization|Bearer|cookies?|session\s+(?:headers?|tokens?)|environment\s+variables?|API\s+keys?|secrets?|do\s+not\s+report|suppress|hide\s+findings?|silently|private\s+validation\s+note)\b)
+.*""",
+        ],
+        "description": "Detect target-controlled HTTP response-header metadata that addresses AI agents or scanners and tries to convert security headers, report endpoints, or custom policy headers into authority to override instructions, suppress findings, or forward local credentials."
+    },
+    {
+        "id": "GLS-DFP-019",
+        "name": "IndexNow Key-Location Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI crawler",
+            "API key",
+            "LLM",
+            "SEO agent",
+            "agentic bot",
+            "cookie",
+            "credential",
+            "do not report",
+            "environment variable",
+            "exfiltrate",
+            "finding",
+            "forward",
+            "hide",
+            "ignore",
+            "include",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do not|don't|never|must not|should not|refuse(?:s|d)? to|blocked?|training example|defensive example)\b.{0,120}\b(?:ignore|override|suppress|include|forward|leak|exfiltrat|obey)\b)(?=.*\b(?:indexnow|keylocation|key[-_\s]*location|indexnow[-_\s]*key|submiturl|urlsubmitted)\b)(?=.*\b(?:ai\s*(?:crawler|agent|assistant|scanner)|llm|agentic|bot|seo\s*(?:agent|crawler|assistant))\b)(?=.*\b(?:ignore|override|supersede|outrank|obey|treat\s+as\s+(?:system|developer|owner)\s+(?:policy|instruction)|suppress|hide|do\s+not\s+report|forward|include|exfiltrat|leak)\b)(?=.*\b(?:secret|token|api[-_\s]*key|credential|cookie|finding|report|scanner|system\s+prompt|environment|env(?:ironment)?\s*var)\b).*""",
+        ],
+        "description": "IndexNow key files, keyLocation metadata, or submit-status text can carry agent-directed policy claims that tell AI crawlers or SEO/security agents to treat site-verification metadata as higher-priority instructions, suppress findings, or forward secrets."
+    },
+    {
+        "id": "GLS-DFP-020",
+        "name": "Linkset Metadata Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/linkset",
+            "AI agent",
+            "API key",
+            "Authorization",
+            "Bearer",
+            "LLM",
+            "Link",
+            "agentic",
+            "application/linkset+json",
+            "assistant",
+            "autonomous scanner",
+            "bot",
+            "canonical policy",
+            "cookie",
+            "crawler",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|never|should\s+not|cannot|refuse[sd]?)\b.{0,140}\b(?:treat|obey|forward|include|send|suppress|hide|override))(?=.*(?:\.well-known/linkset|linkset\.json|application/linkset\+json|rel=["']?linkset|Link:\s*<[^>]+>;[^\n]*rel=["']?linkset|linkset\s+metadata))(?=.*\b(?:ai\s+agents?|assistants?|assistant[_-]?notes?|autonomous\s+(?:scanner|crawler|verifier)s?|scanners?|crawlers?|verifiers?|llms?|models?|bots?|agentic)\b)(?=.*\b(?:canonical|owner|operator|site[-\s]*owner|authority|policy|supersede|outrank|override|higher[-\s]*priority|must\s+obey|trusted)\b)(?=.*\b(?:authorization|bearer|cookies?|session\s+headers?|environment\s+variables?|api\s*keys?|secrets?|do\s+not\s+(?:report|notify|mention)|suppress(?:es|ed|ion)?|hid(?:e|es|den)|hide\s+(?:this|findings)|silently|delay\s+(?:report|notification))\b).*""",
+        ],
+        "description": "A target-controlled `/.well-known/linkset` or `Link: rel=\"linkset\"` relationship document embeds agent-facing policy text that claims relationship metadata is owner authority, then asks autonomous agents or scanners to forward local auth context or suppress findings."
+    },
+    {
+        "id": "GLS-DFP-021",
+        "name": "Mail Autodiscover/Autoconfig Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "Authorization",
+            "Bearer",
+            "IMAP",
+            "LLM",
+            "SMTP",
+            "assistant",
+            "autoconfig",
+            "autodiscover.xml",
+            "autonomous scanner",
+            "canonical policy",
+            "clientConfig",
+            "config-v1.1.xml",
+            "include/forward/send/expose",
+            "incomingServer",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:do\s+not|must\s+not|never|should\s+not)\b.{0,180}\b(?:treat|obey|follow|accept)\b.{0,180}\b(?:autodiscover|autoconfig|mail\s+config|email\s+client\s+config)\b)
+(?!.*\b(?:scanner\s+docs?|security\s+training|defensive\s+guide)\b.{0,220}\b(?:report|detect|flag|refuse|must\s+not|do\s+not)\b)
+(?!.*\b(?:incident\s+report|security\s+report)\b.{0,220}\b(?:flagged|contained\s+a\s+payload|payload\s+asking|attempted)\b)
+(?!.*\b(?:not\s+policy|not\s+agent\s+policy)\b.{0,140}\b(?:does\s+not|cannot|never)\b.{0,140}\b(?:override|supersede|outrank)\b)
+(?=.*\b(?:autodiscover(?:\.xml)?|autoconfig(?:\s+mail)?|autoconfiguration|config-v1\.1\.xml|mailclientconfig|clientConfig|email\s+client\s+(?:auto)?config|mail\s+(?:auto)?configuration|incomingServer|outgoingServer|imap|smtp)\b)
+(?=.*\b(?:ai\s+agents?|assistants?|llms?|auditors?|autonomous\s+(?:scanners?|auditors?|agents?)|security\s+scanners?|mail\s+setup\s+bots?|support\s+agents?)\b)
+(?=.*\b(?:supersed(?:e|es)|override|outrank|higher-priority|must\s+obey|canonical\s+(?:mail|domain|operator)\s+policy|include|attach|forward|send|echo|expose|suppress|hide|do\s+not\s+(?:report|notify|mention)|skip\s+(?:smtp|imap|tls|spf|dmarc|credential)\s+checks?)\b)
+(?=.*\b(?:authorization|bearer|oauth|passwords?|cookies?|session\s+headers?|environment\s+variables?|api\s+keys?|secrets?|mailbox\s+tokens?|findings?|vulnerabilities|tls|dmarc|spf)\b)
+.*""",
+        ],
+        "description": "Email Autodiscover/Autoconfig metadata (`autodiscover.xml`, `config-v1.1.xml`, `mailclientconfig`, IMAP/SMTP setup docs) can carry target-controlled instructions that ask AI support agents or scanners to treat mail setup metadata as higher-priority policy, forward credentials/local state, or suppres"
+    },
+    {
+        "id": "GLS-DFP-022",
+        "name": "Matrix .well-known Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/.well-known/matrix/client",
+            "/.well-known/matrix/server",
+            "AI agent",
+            "Authorization",
+            "Bearer",
+            "LLM",
+            "Matrix client discovery",
+            "Matrix homeserver",
+            "Semantic rule: In Matrix",
+            "admin_contact",
+            "agent_policy",
+            "assistant",
+            "autonomous scanner",
+            "bot",
+            "canonical operator policy",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*(?:must\s+not|never|cannot|refus(?:e|ed)|blocked).{0,80}(?:treat|obey|include|forward|send|attach|expose|leak|use)\b)(?=.*(?:/\.well-known/matrix/(?:client|server)|well-known\s+matrix|m\.homeserver|m\.identity_server|matrix\s+homeserver|matrix\s+client\s+discovery))(?=.*(?:agent|assistant|autonomous|crawler|scanner|llm|bot|verifier))(?=.*(?:x-agent[-_a-z]*|agent[_-]?policy|crawler[_-]?notice|verifier[_-]?policy|owner[_-]?verification|admin[_-]?contact|policy[_-]?uri))(?=.*(?:canonical\s+(?:server[-\s]*)?(?:operator|owner|site)?\s*policy|supersede|override|outrank|higher[-\s]*priority|treat\s+(?:this|the)\s+(?:matrix\s+)?(?:well-known|metadata|document)\s+as\s+(?:operator|owner|server)\s+authority|include|send|forward|attach|expose|do\s+not\s+(?:report|notify|mention)|suppress|hide))(?=.*(?:authorization|bearer|access\s*token|matrix_access_token|token|cookie|session|environment|api\s*key|secret|local\s+auth|do\s+not\s+(?:report|notify|mention)|suppress|hide|supersede|override|outrank)).*""",
+        ],
+        "description": "Matrix discovery documents (`/.well-known/matrix/client` or `/.well-known/matrix/server`) can carry target-controlled extension fields that tell AI agents or scanners to treat the document as operator policy, disclose local auth context, or suppress reports."
+    },
+    {
+        "id": "GLS-DFP-023",
+        "name": "oEmbed endpoint agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "LLM",
+            "application/json+oembed",
+            "assistant",
+            "crawler",
+            "html",
+            "model",
+            "oembed",
+            "provider_name",
+            "provider_url",
+            "scanner",
+            "thumbnail_url",
+        ],
+        "regex": [
+            r"""(?isx)
+^(?!.*\b(?:do\s+not|must\s+not|never)\s+(?:treat|obey|follow|execute|use|honou?r)\b.{0,140}\b(?:oembed|embed\s+metadata|provider\s+metadata)\b)
+^(?!.*\b(?:docs?|documentation|training|scanner\s+docs?)\b.{0,100}\b(?:should|must)\s+report\b.{0,120}\b(?:oembed|embed\s+provider|provider\s+metadata)\b)
+(?=.*\b(?:oembed|application/json\+oembed|provider_name|provider_url|thumbnail_url|embed\s+provider|discoverable\s+embed|"html"\s*:|"type"\s*:\s*"(?:photo|video|rich|link)")\b)
+(?=.*\b(?:ai\s*(?:agent|assistant|crawler|scanner)|llm|model|autonomous\s+agent|seo\s+agent|security\s+scanner)\b)
+(?=.*\b(?:ignore|override|supersedes?|outrank|replace|bypass|suppress|hide|do\s+not\s+report|forward|include|exfiltrate|send)\b.{0,180}\b(?:system|developer|scanner|policy|findings?|report|credential|secret|tokens?|cookies?|env(?:ironment)?|local\s+state|authorization|api\s*key)\b)
+.*""",
+        ],
+        "description": "Detect oEmbed discovery responses or provider metadata that target AI agents/scanners with authority-inversion, report-suppression, or credential-forwarding instructions."
+    },
+    {
+        "id": "GLS-DFP-024",
+        "name": "P3P Privacy Policy Metadata Agent Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "medium",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "/w3c/p3p.xml",
+            "CP=",
+            "P3P",
+            "POLICY-REF",
+            "p3p.xml",
+            "policyref",
+        ],
+        "regex": [
+            r"""(?isx)^
+(?!.*\b(?:scanner\s+docs?|training|guide|reference|article|learn\s+how)\b.{0,160}\b(?:report|detect|flag|refuse|block)\b.{0,160}\b(?:P3P|p3p\.xml|policyref|compact\s+privacy\s+policy|privacy\s+policy\s+reference)\b)
+(?!.*\b(?:do\s+not|never|must\s+not|should\s+not|does\s+not)\b.{0,100}\b(?:obey|treat|follow|execute|honou?r|trust|override|supersede)\b.{0,160}\b(?:P3P|p3p\.xml|policyref|compact\s+privacy\s+policy|privacy\s+metadata)\b)
+(?=.*\b(?:P3P|p3p\.xml|policyref|compact\s+privacy\s+policy|CP\s*=|policy\s*ref|/w3c/p3p\.xml|privacy\s+policy\s+reference)\b)
+(?=.*\b(?:AI\s*agents?|assistants?|autonomous\s+agents?|privacy\s+auditors?|security\s+scanners?|crawlers?|models?|LLMs?)\b)
+(?=.*\b(?:ignore|override|supersede|outranks?|treat\s+this\s+as|authoritative\s+policy|must\s+follow|do\s+not\s+report|suppress|hide|omit|forward|include|send|append)\b)
+(?=.*\b(?:system|developer|user|policy|rules?|findings?|reports?|tokens?|cookies?|sessions?|authorization|api[-_\s]?keys?|env(?:ironment)?\s*(?:vars?|variables)|local\s+state)\b)
+.*""",
+        ],
+        "description": "Legacy P3P privacy policy references, compact policy headers, or `/w3c/p3p.xml` comments can smuggle instructions telling AI privacy auditors or scanners to treat site privacy metadata as authoritative agent policy, suppress findings, or include local auth/env state."
+    },
+    {
+        "id": "GLS-DFP-025",
+        "name": "Payment Method Manifest Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ",",
+            ", or",
+            ".\n- Sensitive/suppressive action:",
+            "/.well-known/payment-method-manifest",
+            "AI agent",
+            "LLM",
+            "Web Payments",
+            "agentic",
+            "assistant",
+            "autonomous scanner",
+            "autonomous verifier",
+            "canonical checkout policy",
+            "canonical merchant policy",
+            "checkout auditor",
+            "checkout bot",
+        ],
+        "regex": [
+            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|cannot|can't|do\s+not)\b.{0,120}\b(?:forward|send|share|attach|include|suppress|hide|treat|reuse|skip)\b))(?=.*\b(?:payment[-_\s]*method[-_\s]*manifest|payment\s+method\s+manifest|\.well-known/payment-method-manifest|default_applications|supported_origins|web\s+payments?|payment\s+handler|secure\s+payment\s+confirmation)\b)(?=.*\b(?:ai\s+agent|assistant|autonomous\s+(?:scanner|crawler|agent|verifier)|llm|agentic|security\s+scanner|checkout\s+(?:bot|auditor)|compliance\s+bot)\b)(?=.*\b(?:verified\s+(?:merchant|payment|checkout)\s+authority|canonical\s+(?:merchant|payment|checkout)\s+policy|owner\s+authority|outrank|supersede|override|higher[-\s]*priority|treat\s+[^.]{0,100}\s+as\s+(?:trusted|verified|authoritative))\b)(?=.*\b(?:authorization|bearer\s+token|cookie|session\s+(?:header|context|token)|payment\s+token|card\s+number|test\s+card|checkout\s+session|merchant\s+secret|api\s*key|suppress|do\s+not\s+report|hide\s+(?:finding|issue)|skip\s+(?:fraud|pci|phishing|checkout)\s+checks?)\b).*""",
+        ],
+        "description": "A target-controlled Web Payments payment method manifest can embed agent-directed policy text that misuses payment/merchant discovery metadata to make an AI scanner trust checkout origins, forward session/payment context, or suppress PCI/phishing findings."
+    },
 ]
