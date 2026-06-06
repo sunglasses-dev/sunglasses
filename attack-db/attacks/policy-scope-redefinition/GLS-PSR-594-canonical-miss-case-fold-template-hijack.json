@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-594",
+  "name": "Canonical Miss Case Fold Template Hijack",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message",
+    "log_memory"
+  ],
+  "description": "Attackers exploit non-deterministic template/path resolution (case-folding, near-name shadowing, first-match glob) so the system binds to attacker-controlled or looser fallback templates that strip lane separation, freshness, or KPI guards from rendered outputs.",
+  "keywords": [
+    "canonical-miss fallback hijack",
+    "first existing template wins",
+    "template shadowing near-name",
+    "case-sensitivity environment pivot",
+    "precedence override claimed in decisions",
+    "implicit glob template selection",
+    "kpi scorecard template drift",
+    "path resolver non-deterministic",
+    "template path precedence confusion",
+    "lower-priority template binds",
+    "looser fields fallback template",
+    "search-order shadow file"
+  ],
+  "regex": [
+    "(?i)(?:(?:canonical[- ]?(?:miss|missing)|case[- ]?(?:sensitivity|fold))\\s+(?:fallback|pivot|resolution)\\s+(?:hijack|binds?|loads?)\\s+(?:lower|attacker|shadow)|(?:first[- ]existing|first[- ]match)\\s+(?:template|path|config)\\s+(?:resolution|selection)\\s+(?:accepts?|binds?)\\s+(?:unintended|attacker|lower)|(?:near[- ]?name|lookalike)\\s+(?:template|config)\\s+(?:earlier|first)\\s+in\\s+search\\s+order)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-594"
+}

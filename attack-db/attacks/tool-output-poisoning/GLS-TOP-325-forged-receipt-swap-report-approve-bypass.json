@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-325",
+  "name": "Forged Receipt Swap Report Approve Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or injected audit stamp or signed footer on a tool report that is swapped or altered to authorize execution while bypassing policy gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|command\\s+output|agent\\s+output)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:receipt|audit\\s+stamp|signature|signed\\s+footer|verification\\s+token)\\b)(?=.*\\b(?:channel|summary|footer|handoff|report)\\b)(?=.*\\b(?:swap|swap(?:ped|ping)?|replace(?:d|ment)?|inject(?:ed|ion)|rewrite|alter|alter(?:ed|ation))\\b)(?=.*\\b(?:execut(?:e|ion)|run|approve|authorize)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ing|en|ed)?|ignore|skip|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|gate(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-325"
+}

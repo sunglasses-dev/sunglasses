@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CF-251",
+  "name": "Pseudo-Policy Governance Tag Flooding",
+  "version": "1.0",
+  "category": "context_flooding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker floods the context window with high-priority-looking pseudo-policy text and forged governance tags, tricking the planner into treating untrusted content as board-level decisions and silently inverting mission priorities.",
+  "keywords": [
+    "shadow policy override",
+    "forged governance tag",
+    "compliance update supersede mission",
+    "authority tag forgery",
+    "decision must_run_this_first",
+    "context budget watchdog bypass",
+    "cross-file policy shadowing",
+    "operator inversion must to must not",
+    "priority inversion via policy-tone mimicry",
+    "untrusted policy preamble",
+    "pseudo-standards doc flood",
+    "board-level decision spoof"
+  ],
+  "regex": [
+    "(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\\s+(?:policy|governance|compliance|authority|board[- ]level)\\s+(?:tag|preamble|directive|decision|override)|(?:compliance\\s+update|policy\\s+(?:update|supersede)|decision\\s*:?\\s*must[_ ]run)\\s+.{0,80}?(?:supersede|override|outrank|inverts?)\\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\\s+(?:content|chunk|payload|context)\\s+(?:outranks?|overrides?|beats?|exceeds?)\\s+(?:canonical|board|system|mission)\\s+(?:policy|priority|directive))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CF-251"
+}

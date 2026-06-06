@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-262",
+  "name": "Agent Identity Snapshot Forgery Priority Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent presenting a forged identity, profile, or session snapshot to elevate priority or override scope and guardrail enforcement.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|assistant|copilot|peer)\\b)(?=.*\\b(?:identity|profile|memory|session|handoff|ticket|token|snapshot)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|impersonat(?:e|ed|ing)|counterfeit|fake|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:priority|policy|guardrail|approval|scope|trust)\\b)(?=.*\\b(?:override|bypass|skip|ignore|elevat(?:e|ed|ing)|escalat(?:e|ed|ing))\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-262"
+}

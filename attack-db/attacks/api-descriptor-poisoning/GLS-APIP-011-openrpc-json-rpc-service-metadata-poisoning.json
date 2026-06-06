@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-011",
+  "name": "OpenRPC / JSON-RPC Service Metadata Poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "OpenRPC / JSON-RPC service descriptions can smuggle agent-directed policy text inside method, parameter, result, example, and extension metadata that AI tool builders may import as trusted API guidance.",
+  "keywords": [
+    "AI agent",
+    "API keys",
+    "Authorization",
+    "Bearer",
+    "JSON-RPC",
+    "JSON-RPC auth state",
+    "LLM agent",
+    "MCP bridge",
+    "OpenRPC",
+    "agent instruction",
+    "agent_instructions",
+    "assistant",
+    "attach",
+    "authoritative",
+    "autonomous auditor"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|incident|vulnerability)\\s+report\\b.{0,140}\\b(?:flagged|detected|blocked|refused)\\b)\n(?!.*\\b(?:training|guide|docs?|reference|article)\\b.{0,180}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|not\\s+obey)\\b)\n(?!.*\\bno\\s+(?:policy\\s+)?overrides?\\s+(?:are\\s+)?present\\b)\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n  |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n)\\b)\n(?=.*(?:\n  \\bOpenRPC\\b|\\bopenrpc\\s*[:=]|(?<!\\w)\"openrpc\"\\s*:|\\bJSON[-\\s]?RPC\\b|\\bjsonrpc\\b|\n  (?<!\\w)\"methods\"\\s*:|\\bmethods?\\s*[:=]|\\bparams?\\s*[:=]|\\bresults?\\s*[:=]|\n  \\bcontentDescriptors?\\b|\\bexternalDocs\\b|\\bexamples?\\s*[:=]|\n  x[-_](?:agent|scanner|assistant)[-_](?:policy|note|instructions?)|JSON[-\\s]?RPC\\s+service\\s+reference\n))\n(?=.*(?<![a-zA-Z0-9])(?:\n  ai\\s+agents?|llm\\s+agents?|agents?|assistants?|scanners?|crawlers?|models?|\n  tool[-\\s]?builders?|mcp\\s+bridges?|api\\s+agents?|autonomous\\s+(?:auditors?|scanners?)|\n  your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))|\n  (?:agent|scanner|assistant|verifier)[._-](?:policy|instructions?|note)\n)(?![a-zA-Z0-9]))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|\n  canonical(?:\\s+(?:service|method|security|governing|policy))?(?:\\s+(?:description|policy|document))?|\n  definitive(?:\\s+(?:service|method|security))?(?:\\s+(?:description|policy))?|\n  (?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|\\bauthoritative\\b|\n  defines?\\s+(?:all\\s+)?(?:scanner|security|agent|method)\\s+rules?|\n  (?:agent|scanner|assistant|verifier)\\s+(?:instructions?|directives?|notice)|\n  suppress(?:es|ed|ing)?|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?)|\n  do\\s+not\\s+(?:report|flag)|skip\\b.{0,35}?\\b(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\\b|\n  omit.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?)|\n  exclude.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?)|\n  redact.{0,35}?(?:findings?|warnings?|flags?|reports?)|do\\s+not\\s+escalate|\n  treat.{0,50}?as\\s+(?:informational|safe|clean|non[-\\s]?blocking)|\n  mark.{0,50}?as\\s+(?:informational|safe|clean|low|false\\s+positive)|\n  classify.{0,40}?(?:as\\s+)?(?:informational|low|clean|false\\s+positive)|\n  (?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|API\\s+keys?|Bearer\\s+tokens?|session\\s+(?:keys?|tokens?|cookies?)|credentials?|secrets?|Authorization|configured\\s+headers?|JSON[-\\s]?RPC\\s+auth\\s+state)\n))\n(?=.*(?:\n  system|developer|scanner\\s+(?:rules?|polic(?:y|ies))|security\\s+rules?|polic(?:y|ies)|instructions?|\n  findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|results?|summar(?:y|ies)|discrepanc(?:y|ies)|\n  Authorization|Bearer|API[-_\\s]?keys?|tokens?|cookies?|credentials?|secrets?|environment\\s+(?:variables?|context|details?|settings?)|runtime\\s+(?:context|settings?)|local\\s+state|configured\\s+headers?|JSON[-\\s]?RPC\\s+auth\\s+state\n)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-011"
+}

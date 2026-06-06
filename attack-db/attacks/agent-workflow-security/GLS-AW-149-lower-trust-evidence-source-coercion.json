@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-149",
+  "name": "Lower-Trust Evidence Source Coercion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker coerces the agent to accept lower-trust evidence (summaries, stale caches, unverified mirrors, cross-lane proxies) over canonical measured sources while keeping a superficially complete and green-labeled report.",
+  "keywords": [
+    "evidence lineage downgrade",
+    "canonical to derivative precedence flip",
+    "freshness label laundering",
+    "cross lane anchor substitution",
+    "fallback abuse null alias coercion",
+    "summary outranks raw json",
+    "ready label kept references swapped",
+    "cf bot traffic as growth proxy",
+    "two lane isolation violated",
+    "derivative markdown cited over canonical",
+    "low trust evidence accepted",
+    "evidence chain integrity hidden failure"
+  ],
+  "regex": [
+    "(?i)(?:(?:summary|derivative|markdown|narrative)\\s+(?:cited|treated|used)\\s+(?:as|like)\\s+(?:source[- ]?of[- ]?truth|canonical|primary)\\s+(?:over|instead\\s+of|despite)\\s+(?:raw|json|tar|measured)|(?:freshness|ready|fresh)\\s+(?:label|badge|tag)\\s+(?:kept|preserved)\\s+(?:while|but)\\s+(?:underlying|referenced)\\s+(?:artifact|source|content)\\s+(?:swapped|older|stale)|(?:ops|cf|scanner)\\s+(?:signal|metric|anchor)\\s+(?:substituted?|used)\\s+(?:as|for)\\s+(?:growth|gsc|ga4|acquisition)\\s+(?:proxy|outcome|headline))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-149"
+}

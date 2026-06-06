@@ -1,0 +1,39 @@
+{
+  "id": "GLS-MCP-013",
+  "name": "Tool Manifest Capability Claim Injection",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "file"
+  ],
+  "description": "Attacker injects false capability or safety claims into tool manifests, handoff packets, or status payloads so the orchestrator trusts unsigned narrative as control-plane truth and routes to weaker models, skips validators, or relaxes guardrails.",
+  "keywords": [
+    "safety-grade spoof in tool metadata",
+    "frontier-safe capability claim forgery",
+    "schema strict mode guarantee forgery",
+    "capability retirement lie",
+    "cross-agent handoff inflation",
+    "declared capabilities mismatch",
+    "unsigned capability attestation",
+    "forged safety tier upgrade",
+    "tool manifest capability spoof",
+    "policy engine guardrail relaxation",
+    "fake sandbox boundary claim",
+    "model capability claim forgery"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|spoof|fake|inject|fabricate)\\s+(?:capability|safety[- ]tier|safety[- ]grade|schema[- ]guarantee|sandbox)\\s+(?:claim|attestation|metadata|manifest|tag)\\b|(?:declared|claimed|asserted)\\s+(?:capability|safety|sandbox|schema)\\s+(?:disagrees?|mismatches?|conflicts?)\\s+(?:with|against)\\s+(?:observed|runtime|signed)|(?:unsigned|untrusted|attacker[- ]controlled)\\s+(?:capability|safety|policy)\\s+(?:claim|attestation|narrative)\\s+(?:elevates?|relaxes?|bypasses?|overrides?)\\s+(?:guardrail|policy|routing))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-013"
+}

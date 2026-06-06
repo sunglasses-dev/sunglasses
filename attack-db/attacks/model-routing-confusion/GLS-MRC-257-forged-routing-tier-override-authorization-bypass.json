@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-257",
+  "name": "Forged Routing Tier Override Authorization Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged routing tier override or priority escalation combined with an explicit policy or authorization bypass injected into a router or dispatch layer.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:route|routing|router|dispatch|model\\s*selection|fallback\\s*path)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:tier\\s*override|tier\\s*escalation|priority\\s*escalation|capability\\s*tier)\\b)(?=.*\\b(?:policy\\s*bypass|guardrail\\s*override|verification\\s*bypass|authorization\\s*bypass)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-257"
+}

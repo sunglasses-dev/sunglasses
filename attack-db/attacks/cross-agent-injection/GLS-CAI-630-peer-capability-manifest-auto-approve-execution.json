@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-630",
+  "name": "Peer Capability Manifest Auto-Approve Execution",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged peer-agent capability manifest or identity card that instructs the receiver to whitelist or elevate the sender and auto-approve execution of privileged actions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:trust|whitelist|allowlist|execute|dispatch|bypass)\\b)(?=.*\\b(?:forged|fake|spoofed|counterfeit|fabricated)\\b.{0,50}\\b(?:peer\\s*agent|delegate|worker|remote\\s*agent)\\b.{0,50}\\b(?:capability\\s*manifest|capability\\s*token|attestation|identity\\s*card)\\b)(?=.*\\b(?:trust|whitelist|allowlist|elevate)\\b.{0,60}\\b(?:without\\s+verification|skip(?:ping)?\\s+verification|ignore\\s+verification|auto-approve)\\b)(?=.*\\b(?:execute|run|dispatch|trigger)\\b.{0,60}\\b(?:privileged\\s*action|tool\\s*call|write\\s*operation|network\\s*action)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-630"
+}

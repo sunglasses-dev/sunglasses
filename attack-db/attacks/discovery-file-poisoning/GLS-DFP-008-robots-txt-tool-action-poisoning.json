@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-008",
+  "name": "robots.txt tool-action poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A `robots.txt` or sitemap-adjacent crawl policy can smuggle action instructions for AI agents, telling them to run browser/fetch/summarizer tools, crawl disallowed private paths, or disable safety checks while pretending to be ordinary crawler metadata.",
+  "keywords": [
+    "Allow",
+    "Disallow",
+    "Measured local fixture result:",
+    "URL",
+    "User-Agent: ai-agent",
+    "admin",
+    "agent",
+    "assistant",
+    "bot",
+    "browser",
+    "bypass policy",
+    "call",
+    "callback",
+    "crawl",
+    "crawl-policy"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:no|without)\\b.{0,60}\\b(?:robots\\.txt|crawl[-\\s]*policy)\\b.{0,60}\\b(?:context|file|metadata)\\b)(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refus(?:e|ed)|block(?:ed)?|ignore\\s+any\\s+robots\\.txt\\s+instruction)\\b.{0,160}\\b(?:execute|run|invoke|call|use|disable|bypass|crawl|fetch|open|submit|post)\\b)(?=.*\\b(?:robots\\.txt|User-Agent\\s*:\\s*(?:ai-agent|assistant|bot|crawler)|sitemap(?:\\.xml)?|crawl[-\\s]*policy|disallow|allow)\\b)(?=.*\\b(?:agent|ai[-\\s]*agent|assistant|crawler|bot|tool|browser|fetcher|summarizer)\\b)(?=.*\\b(?:execute|run|invoke|call|use|disable|bypass|turn\\s+off|ignore\\s+(?:safety|guardrails?|scanner|policy)|crawl|fetch|open|submit|post)\\b)(?=.*\\b(?:tool|browser|summarizer|scanner|guardrails?|safety|private|admin|internal|forbidden|disallow(?:ed)?|callback|webhook|endpoint|url)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-008"
+}

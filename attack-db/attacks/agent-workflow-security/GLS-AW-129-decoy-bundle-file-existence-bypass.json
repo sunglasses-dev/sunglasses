@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-129",
+  "name": "Decoy Bundle File Existence Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker plants decoy files or expected filenames with poisoned payloads inside automation bundles so preflight existence checks pass while downstream metrics, risk scoring, and daily planning quietly read corrupted or stale data.",
+  "keywords": [
+    "bundle member presence spoofing",
+    "presence pass payload fail",
+    "shadow member collision",
+    "partial member truncation",
+    "timestamp skew laundering",
+    "decoy file with poisoned payload",
+    "lookalike filename resolver picks stale",
+    "syntactically valid semantically incomplete",
+    "filename mtime divergence",
+    "freshness badge false confidence",
+    "bundle preflight greenwash",
+    "presence over semantics trust"
+  ],
+  "regex": [
+    "(?i)(?:(?:bundle|archive|package)\\s+(?:member|file|entry)\\s+(?:exists?|present)\\s+(?:but|with)\\s+(?:payload|content|fields?)\\s+(?:poison\\w+|truncat\\w+|empty|N/A)|(?:lookalike|shadow|decoy)\\s+(?:filename|member|file)\\s+(?:collides?|outranks?|wins?)\\s+(?:canonical|primary|trusted)|(?:trust|verify|accept)\\s+(?:file\\s+)?(?:existence|presence)\\s+(?:more\\s+than|over|without)\\s+(?:semantic|content|integrity))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-129"
+}

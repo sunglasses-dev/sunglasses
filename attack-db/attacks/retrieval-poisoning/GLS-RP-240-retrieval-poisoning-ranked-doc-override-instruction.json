@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-240",
+  "name": "Retrieval poisoning \u2014 ranked doc override instruction",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects retrieval (RAG) poisoning where a retrieved document, knowledge-base chunk, or top-ranked search result is claimed to be authoritative, trusted, priority context, or ground truth \u2014 and on that basis instructs the agent to ignore, bypass, override, supersede, replace, or disregard system instructions, policy, guardrails, or safety rules. Covers retrieval-time injection in RAG pipelines.",
+  "keywords": [
+    "top-ranked retrieved document authoritative ignore system instructions",
+    "knowledge base chunk trusted bypass guardrails",
+    "highest ranked retrieval ground truth override policy",
+    "retrieved document priority context supersede safety rules",
+    "retrieval result authoritative replace system instructions",
+    "top-ranked chunk trusted disregard guardrails",
+    "RAG context ground truth bypass policy checks",
+    "retrieved knowledge base override safety"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:retrieved|retrieval|top-?ranked|highest\\s+ranked|knowledge\\s+base|document|chunk)\\b)(?=.*\\b(?:authoritative|trusted|priority\\s+context|ground\\s+truth)\\b)(?=.*\\b(?:ignore|bypass|override|supersede|replace|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|system\\s+instruction(?:s)?|safety\\s+rule(?:s)?)\\b).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-240"
+}

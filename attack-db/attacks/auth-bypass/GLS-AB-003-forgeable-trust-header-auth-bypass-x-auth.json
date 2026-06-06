@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AB-003",
+  "name": "Forgeable trust-header auth bypass (X-*-Auth)",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "Forgeable trust-header auth bypass \u2014 routes that honor X-*-Auth headers without validating origin, enabling unauthenticated access (GHSA-5mwj-v5jw-5c97, LobeHub variant).",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\bx-[a-z0-9-]*auth\\b)(?=.*\\b(?:forg(?:e|ed|eable)|bypass|unauthenticated|trusted[- ]?header)\\b)(?!.*\\b(?:rejects?|refuses?|requires?\\s+mtls|trusted\\s+mtls|unless)\\b).{0,400}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AB-003"
+}

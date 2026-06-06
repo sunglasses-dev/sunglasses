@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-115",
+  "name": "Gating Verdict Stagnation Loop",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker (or noisy input) makes a gating cron return the same verdict for many consecutive cycles, burning the agent's budget on repeated expensive rechecks and starving real mission progress with a denial-of-progress feedback loop.",
+  "keywords": [
+    "gating verdict stagnation",
+    "same verdict repeated cycles",
+    "expensive recheck starvation",
+    "cron loop verdict spam",
+    "readiness gate stuck",
+    "stagnation forces rerun",
+    "verdict loop denial of progress",
+    "low-quality signal recheck spam",
+    "gate output identical no progress",
+    "mission progress starved",
+    "stagnant verdict trap",
+    "repeated gate failure mining"
+  ],
+  "regex": [
+    "(?i)(?:same|identical|repeated)\\s+(?:verdict|gate\\s+result|readiness\\s+output)\\s+(?:across|for|over)\\s+(?:many|repeated|consecutive)\\s+(?:cycles?|runs?|crons?)|(?:gate|readiness)\\s+(?:stuck|stagnant|frozen)\\s+(?:on|at)\\s+(?:same|identical)\\s+(?:verdict|result|output)",
+    "(?i)(?:starve|block|deny)\\s+(?:mission|new|p0)\\s+(?:progress|work|task)\\s+(?:via|by|through)\\s+(?:repeated|expensive|forced)\\s+(?:recheck|rerun|regenerat)|(?:low[- ]quality|adversarial)\\s+(?:signal|input)\\s+(?:forces?|triggers?)\\s+(?:expensive|repeated)\\s+(?:recheck|regeneration)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-115"
+}

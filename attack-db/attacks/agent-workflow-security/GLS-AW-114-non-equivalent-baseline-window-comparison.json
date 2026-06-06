@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-114",
+  "name": "Non-Equivalent Baseline Window Comparison",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker (or careless gating) forces evaluators to compare non-equivalent time windows (24h incident rates vs 7d smoothed baselines), producing false confidence in trend direction so real spikes get averaged out beneath an aggregated horizon.",
+  "keywords": [
+    "baseline window desync",
+    "24h vs 7d comparison mismatch",
+    "non-equivalent baseline ranges",
+    "smoothed baseline vs spike",
+    "window length mismatch",
+    "incident rate against long baseline",
+    "trend direction false confidence",
+    "rolling window swap",
+    "baseline period mismatch",
+    "compare apples-to-7day-oranges",
+    "window aliasing in trend",
+    "baseline horizon drift"
+  ],
+  "regex": [
+    "(?i)(?:compare|evaluate)\\s+(?:24h|hourly|short)\\s+(?:rate|count|metric)\\s+(?:against|vs)\\s+(?:7d|weekly|smoothed|long)\\s+(?:baseline|average|window)|(?:non[- ]equivalent|mismatched|different)\\s+(?:time\\s+)?(?:window|range|horizon)\\s+(?:comparison|baseline|trend)",
+    "(?i)(?:baseline|window)\\s+(?:length|range|horizon)\\s+(?:mismatch|desync|drift|skew)|(?:smoothed|rolling)\\s+(?:baseline|average)\\s+(?:hides?|masks?|suppresses?)\\s+(?:spike|burst|incident)\\s+(?:in\\s+)?(?:short|recent)\\s+window"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-114"
+}

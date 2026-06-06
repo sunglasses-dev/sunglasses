@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-009",
+  "name": "WSDL / SOAP Service Description Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled WSDL or SOAP service-description documentation can smuggle agent-directed policy instructions that tell tool-building agents to override scanner rules, forward local credentials into SOAP headers, or suppress security findings.",
+  "keywords": [
+    ".wsdl",
+    "AI agent",
+    "API key",
+    "Authorization",
+    "Bearer",
+    "LLM",
+    "SOAP Header",
+    "UDDI",
+    "WS-Security",
+    "assistant",
+    "binding",
+    "cookie",
+    "crawler",
+    "credentials",
+    "disable security"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:security\\s+training|defensive\\s+example|example\\s+of\\s+what\\s+not\\s+to\\s+do|do\\s+not|don't|never|must\\s+not|should\\s+not|refuse\\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\\s+description|scanner))(?!.*(?:wsdl|soap|service\\s+description|scanner).{0,120}(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refuse\\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\\s+documentation|scanner\\s+docs|report\\s+any|should\\s+report).{0,140}(?:wsdl|soap|service\\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\\s+description|soap\\s+documentation).{0,100}(?:is\\s+not|never|does\\s+not|do\\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|\\bbinding\\b|\\bservice\\b|\\boperation\\b|xsd:documentation|ws[-\\s]?policy|ws[-\\s]?security|SOAP\\s+Header|UDDI|\\.wsdl|generated\\s+SOAP\\s+clients?))(?=.*(?:AI\\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\\s+(?:builders?|generators?)|generated\\s+SOAP\\s+clients?|integration\\s+agents?))(?=.*(?:ignore\\s+(?:previous|scanner|security|developer)|highest[-\\s]?priority\\s+policy|outranks?|override|trust\\s+this\\s+WSDL|WSDL\\s+is\\s+(?:policy|authoritative)|do\\s+not\\s+report|suppress\\s+(?:findings?|warnings?|reports?)|hide\\s+(?:findings?|warnings?|reports?)|disable\\s+security))(?=.*(?:authorization|bearer|api[-_\\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\\s+vars?)?|cookies?|credentials?|SOAP\\s+Headers?|WS[-\\s]?Security|scanner\\s+findings?|security\\s+reports?|logs?)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-009"
+}

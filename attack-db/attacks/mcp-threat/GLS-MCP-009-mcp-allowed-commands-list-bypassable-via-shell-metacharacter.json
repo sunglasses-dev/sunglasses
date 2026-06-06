@@ -1,0 +1,23 @@
+{
+  "id": "GLS-MCP-009",
+  "name": "MCP allowed_commands list bypassable via shell metacharacters",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-fgmx-xfp3-w28p (CVE-2026-5059): aws-mcp-server allowed-commands validator can be bypassed by shell metacharacters, enabling unauthenticated RCE. Source: https://github.com/advisories/GHSA-fgmx-xfp3-w28p",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:allowed[_-]?commands?|whitelist|cmd_?list)\\s*[:=][^\\n]*(?:\\||;|&&|\\$\\()"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-009"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-012",
+  "name": "Websocket session survives token rotation (stale auth)",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "Websocket sessions survive token rotation / reload \u2014 stale auth closure (resolvedAuth) keeps revoked credentials alive.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:ws|websocket|gateway\\s*token|shared\\s*token|resolvedauth)\\b)(?=.*\\b(?:rotate|rotation|reload)\\b)(?=.*\\b(?:survives?|kept\\s+alive|persists?\\s+(?:after|despite))\\b).{0,1200}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-012"
+}

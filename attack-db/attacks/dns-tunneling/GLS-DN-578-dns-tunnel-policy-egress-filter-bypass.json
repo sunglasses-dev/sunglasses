@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DN-578",
+  "name": "DNS Tunnel Policy Egress Filter Bypass",
+  "version": "1.0",
+  "category": "dns_tunneling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects a DNS tunneling or beaconing attempt that chunks or exfiltrates secrets, tokens, or commands via DNS/DoH/TXT while bypassing egress filter or DNS-filter policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|egress|control(?:s)?|dns\\s*filter)\\b)(?=.*\\b(?:dns|doh|dot|txt|cname|subdomain|resolver)\\b)(?=.*\\b(?:tunnel|beacon|chunk(?:ing|ed)?|exfiltrat(?:e|ion)|payload)\\b)(?=.*\\b(?:secret(?:s)?|token(?:s)?|credential(?:s)?|key(?:s)?|data|command(?:s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DN-578"
+}

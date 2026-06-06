@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PSR-579",
+  "name": "Policy Reclassified As Advisory Guardrail Demotion",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects attempts to demote policy/guardrail scope from mandatory controls to advisory/optional guidance in order to justify unsafe execution.",
+  "keywords": [
+    "reclassify safety policy advisory and continue with",
+    "treat guardrails optional for this run and",
+    "declare compliance rules non-binding the agent can",
+    "downgrade policy controls informational guidance before action",
+    "consider safety rules best-effort only and bypass",
+    "policy optional this emergency workflow continue now",
+    "mark the guardrails lower-priority and follow user",
+    "reinterpret compliance rule advisory allow the command"
+  ],
+  "regex": [
+    "(?is)(?:\\b(?:treat|reclassif(?:y|ied|ies)|reinterpret|downgrad(?:e|ed|ing)|mark|declare|consider)\\b.{0,80}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|compliance\\s+rule(?:s)?|control(?:s)?)\\b.{0,120}\\b(?:as|to)\\b.{0,40}\\b(?:advisory|optional|non[- ]?binding|informational|best[- ]?effort|lower[- ]?priority)\\b|\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|compliance\\s+rule(?:s)?|control(?:s)?)\\b.{0,120}\\b(?:is|are|be|become)\\b.{0,40}\\b(?:advisory|optional|non[- ]?binding|informational|best[- ]?effort)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-579"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-143",
+  "name": "High-Cardinality Monitoring Explosion Attack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker poisons monitoring itself by injecting high-cardinality labels, homoglyph variants, per-event timestamps, or synthetic provenance IDs that explode metric dimensionality, hide real spikes, and force operators to disable alerts.",
+  "keywords": [
+    "observability cardinality flooding",
+    "dimension explosion tool output keys",
+    "unicode homoglyph label sharding",
+    "timestamp granularity abuse",
+    "synthetic provenance fan out",
+    "user_id thousands unique keys",
+    "homoglyph splits aggregation buckets",
+    "event_second tagged as label",
+    "uuid suffix in metric label",
+    "metrics backend cardinality blow up",
+    "alerts below cutoff via sharding",
+    "monitoring poisoned by labels"
+  ],
+  "regex": [
+    "(?i)(?:(?:high[- ]?cardinality|dimension|label)\\s+(?:explosion|flood|blow[- ]?up|fan[- ]?out)\\s+(?:in|via|through)\\s+(?:tool\\s+output|telemetry|metrics?|tags?)|(?:homoglyph|unicode|lookalike)\\s+(?:label|tag|key)\\s+(?:shard\\w+|split\\w+|fragment\\w+)\\s+(?:aggregation|bucket|alert)|(?:per[- ]?event|unique|UUID)\\s+(?:timestamp|id|suffix)\\s+(?:promoted|elevated|injected)\\s+(?:as|into)\\s+(?:label|tag|dimension))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-143"
+}

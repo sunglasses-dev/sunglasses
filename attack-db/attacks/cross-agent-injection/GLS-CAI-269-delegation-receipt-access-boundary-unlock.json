@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-269",
+  "name": "Delegation Receipt Access Boundary Unlock",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged delegation receipt or capability pass used by a subagent to escalate scope, unlock access boundaries, or bypass controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|delegated\\s+agent|peer\\s+agent|worker|subagent)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|counterfeit)\\b)(?=.*\\b(?:ticket|handoff\\s+token|delegation\\s+receipt|approval\\s+token|capability\\s+pass)\\b)(?=.*\\b(?:scope|privilege|role\\s+boundary|access\\s+boundary)\\b)(?=.*\\b(?:override|bypass|bypassed|bypassing|escalate|escalated|escalation|rebind|rebound|unlock)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-269"
+}

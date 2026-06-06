@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-270",
+  "name": "Poisoned Retrieval Bundle Rank Trust Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a poisoned retrieval bundle or digest whose rank or score is manipulated to override safety, trust, or guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|context|citation|source|provenance)\\b)(?=.*\\b(?:forged|poisoned|seeded|tampered|fabricated)\\b)(?=.*\\b(?:bundle|digest|index|rank|ranking|score)\\b)(?=.*\\b(?:policy|guardrail|safety|trust)\\b)(?=.*\\b(?:bypass|override|prioritiz(?:e|ed|ing)|escalat(?:e|ed|es|ing))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-270"
+}

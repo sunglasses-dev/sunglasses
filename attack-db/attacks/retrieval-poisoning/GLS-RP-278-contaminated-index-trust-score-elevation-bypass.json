@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-278",
+  "name": "Contaminated Index Trust Score Elevation Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a contaminated or poisoned retrieval index whose trust score or ranking signal is elevated to override policy or guardrail approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:retrieval|rag|vector\\s+index|index|knowledge\\s+base|memory\\s+store)\\b)(?=.*\\b(?:poison|inject|seed|tamper|contaminate|backfill)\\w*\\b)(?=.*\\b(?:trust\\s+score|ranking\\s+signal|priority\\s+band|score|rank)\\b)(?=.*\\b(?:override|bypass|ignore|skip|elevate|boost)\\w*\\b)(?=.*\\b(?:policy|guardrail|filter|approval|verification|safety)\\b).{0,700}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-278"
+}

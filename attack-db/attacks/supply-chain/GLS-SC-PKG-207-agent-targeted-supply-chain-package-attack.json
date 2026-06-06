@@ -1,0 +1,38 @@
+{
+  "id": "GLS-SC-PKG-207",
+  "name": "Agent-targeted supply chain package attack",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects malicious package install/update vectors targeting AI agents via setup hooks, postinstall scripts, dependency confusion, typosquats, and poisoned transitive deps.",
+  "keywords": [
+    "pip install extra-index-url http",
+    "npm install trusted-host",
+    "disable hash verification",
+    "skip signature check",
+    "postinstall read token",
+    "preinstall collect credentials",
+    "setup.py collect api key",
+    "typosquat install",
+    "dependency confusion install",
+    "postinstall upload env",
+    "prepare script silently patches"
+  ],
+  "regex": [
+    "(?is)\\b(pip\\s+install|npm\\s+(i|install)|poetry\\s+add|uv\\s+pip\\s+install)\\b.{0,220}\\b(--extra-index-url|--index-url\\s+http|--trusted-host|--no-verify|disable\\s+hash|skip\\s+signature|latest\\s+from\\s+fork)\\b|\\b(postinstall|preinstall|setup\\.py|prepare\\s+script|install\\s+hook)\\b.{0,180}\\b(read|collect|upload|exfil|send)\\b.{0,120}\\b(token|credential|api[_\\s-]?key|\\.npmrc|\\.pypirc|env)\\b|\\b(typosquat|dependency\\s+confusion|internal\\s+package\\s+name)\\b.{0,180}\\b(install|publish|override)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-PKG-207"
+}

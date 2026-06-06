@@ -1,0 +1,34 @@
+{
+  "id": "GLS-APD-251",
+  "name": "Agent Persona Drift pattern",
+  "version": "1.0",
+  "category": "agent_persona_drift",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects a multi-turn persona drift where an agent is gradually pushed to adopt an admin, root, or security-lead identity and then override safety policy.",
+  "keywords": [
+    "across multiple turns gradually shift your role",
+    "step-by-step persona transition act admin identity and",
+    "over the next messages reframe yourself root",
+    "incrementally become maintainer role then disregard approval",
+    "gradually switch policy owner persona and supersede",
+    "across several turns adopt superuser character and",
+    "over the next turns transition admin role",
+    "step step become security lead identity and"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:persona|role|identity|character|mode)\\b)(?=.*\\b(?:gradual(?:ly)?|step(?:-|\\s*)by(?:-|\\s*)step|over\\s+(?:the\\s+)?next\\s+(?:turns?|messages?)|across\\s+(?:multiple|several)\\s+turns?|incremental(?:ly)?)\\b)(?=.*\\b(?:become|act\\s+as|adopt|switch\\s+to|transition\\s+to|reframe\\s+yourself\\s+as)\\b)(?=.*\\b(?:admin|root|maintainer|superuser|policy\\s+owner|security\\s+lead)\\b)(?=.*\\b(?:ignore|override|bypass|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|instruction(?:s)?)|approval\\s+check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APD-251"
+}

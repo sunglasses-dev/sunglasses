@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-259",
+  "name": "Forged Latency Budget Router Tier Downgrade Override",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged latency, cost, or SLA value used to downgrade or reroute a router tier in violation of guardrail or policy controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|routing|model\\s+router|tier\\s+selector|inference\\s+gateway)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:latency|cost|budget|sla|throughput|quota)\\b)(?=.*\\b(?:tier|profile|route|routing|model\\s+tier)\\b)(?=.*\\b(?:downgrad(?:e|ed|es|ing)|rerout(?:e|ed|es|ing)|overrid(?:e|ed|es|ing|en)|overrode|bypass(?:ed|es|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|verification|approval)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-259"
+}

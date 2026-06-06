@@ -1,0 +1,38 @@
+{
+  "id": "GLS-IDP-003",
+  "name": "ATProto DID Discovery Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned `/.well-known/atproto-did` handle-verification file adds nonstandard agent-facing comments that tell AI verifiers to treat the DID proof as higher-priority policy, ignore system/developer/repository rules, or suppress identity-audit findings.",
+  "keywords": [
+    ") or report suppression (",
+    ",",
+    "/.well-known/atproto-did",
+    "AI verifier",
+    "LLM",
+    "agent",
+    "assistant",
+    "atproto-did",
+    "did:plc:",
+    "did:web:",
+    "highest priority",
+    "outranks",
+    "scanner"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:\\.well-known/atproto-did|atproto-did|did:plc:|did:web:))(?=.*(?:ai\\s*(?:agent|assistant|verifier)|assistant|agent|scanner|verifier|llm))(?=.*(?:highest[-\\s]?priority|outranks?|ignore\\s+(?:system|developer|repository|previous)\\s+(?:rules|instructions)|override\\s+(?:system|developer|repository|policy)|do\\s+not\\s+report|suppress\\s+(?:warnings|findings|scanner)|mark\\s+(?:identity\\s+)?checks?\\s+pass|disable\\s+(?:scanner|security)))(?!.*(?:never|do\\s+not|must\\s+not|should\\s+not)\\s+(?:obey|follow|trust|treat).{0,80}(?:atproto-did|\\.well-known|discovery\\s+metadata).{0,80}(?:override|outrank|highest[-\\s]?priority)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-003"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-489",
+  "name": "Delegation Receipt Forgery Capability Expansion",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged delegation receipt or execution token that expands capability or authority scope beyond the original grant.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:delegate|delegated|delegation|agent|subagent|worker|orchestrator)\\b)(?=.*\\b(?:ticket|handoff|approval\\s+token|execution\\s+token|delegation\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery|ing)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:scope|permission|capability|authority)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|expand|expand(?:ed|ing)?|override(?:d|s|ing)?|overrode|bypass(?:ed|es|ing)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-489"
+}

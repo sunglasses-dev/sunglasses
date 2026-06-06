@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-261",
+  "name": "Forged Rate-Limit Budget Model Tier Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged rate limit, quota, or cost budget used to reroute or fall back to an unconstrained model tier while bypassing safety or compliance gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:route|reroute|switch|fallback|downgrade|dispatch|send)\\w*\\b)(?=.*\\b(?:model|llm|tier|router|planner|inference|engine)\\b)(?=.*\\b(?:latency|budget|quota|cost|throughput|token\\s+budget|rate\\s+limit)\\b)(?=.*\\b(?:fake|forged|spoof(?:ed)?|fabricat(?:e|ed)|synthetic|invented)\\b)(?=.*\\b(?:policy|guardrail|approval|safety\\s+check|compliance|risk\\s+gate)\\b)(?=.*\\b(?:bypass|skip|ignore|override|waive|disable)\\w*\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-261"
+}

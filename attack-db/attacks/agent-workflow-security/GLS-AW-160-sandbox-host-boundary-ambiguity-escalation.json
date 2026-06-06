@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-160",
+  "name": "Sandbox-Host Boundary Ambiguity Escalation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker blurs the line between sandbox-permitted and host-requiring actions through ambiguous language or capability claims, coercing the agent into implicit privilege escalation without an explicit policy gate.",
+  "keywords": [
+    "sandbox boundary blur",
+    "implicit escalation claim",
+    "allowed in sandbox so allowed outside",
+    "constrained runtime scope creep",
+    "sandbox capability spillover",
+    "no escalation needed coercion",
+    "sandbox to host confusion",
+    "policy boundary blur",
+    "in-sandbox actions outside scope",
+    "implicit privilege upgrade",
+    "sandbox escape via ambiguity",
+    "runtime boundary deception"
+  ],
+  "regex": [
+    "(?i)(?:sandbox\\s+(?:boundary|scope|capability)\\s+(?:confus|blur|spillover|creep)|(?:constrained|sandboxed)\\s+runtime\\s+(?:scope|boundary)\\s+(?:blur|extend|leak))",
+    "(?i)(?:(?:no|skip|without)\\s+(?:explicit\\s+)?escalation\\s+(?:needed|required)|implicit\\s+(?:privilege|capability)\\s+(?:upgrade|escalation)|allowed\\s+in\\s+sandbox\\s+(?:so|therefore|implies)\\s+allowed\\s+(?:outside|on\\s+host))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-160"
+}

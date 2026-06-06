@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-058",
+  "name": "Fast-Path Async Verification Race",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker exploits the gap between fast-path decisions and slow-path async verification in autonomous pipelines, racing the agent to act on a snap decision before the background verifier can return and block the action.",
+  "keywords": [
+    "fast-path slow-path gap",
+    "decision before verification",
+    "act before async check returns",
+    "latency blindspot poison",
+    "race fast decision",
+    "commit before deep scan",
+    "async verifier too late",
+    "snap decision skips deep check",
+    "preempt slow-path verifier",
+    "fast lane bypass verification",
+    "ship before background check",
+    "verifier-lag exploitation"
+  ],
+  "regex": [
+    "(?i)(?:(?:fast[- ]path|fast[- ]lane|snap|preempt)\\s+(?:decision|action|commit)\\s+(?:before|skipping|bypassing)\\s+(?:slow[- ]path|async|deep|background)\\s+(?:verifier|check|scan)|decision\\s+latency\\s+(?:blindspot|gap)\\s+(?:poison|exploit))",
+    "(?i)(?:(?:async|background)\\s+(?:verifier|check|scan)\\s+(?:returns?|arrives?)\\s+(?:too\\s+late|after|post)[- ]?(?:commit|action|execution)|exploit\\s+(?:lag|latency)\\s+between\\s+(?:decide|act)\\s+and\\s+(?:verify|check))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-058"
+}

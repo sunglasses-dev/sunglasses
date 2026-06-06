@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-098",
+  "name": "Urgency Pretext Approval Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker engineers content that makes risky actions appear urgent, previously approved, or audit-mandatory so the human-in-the-loop rubber-stamps a mutated payload, silently converting read-only requests into write/delete/credential actions past the final safety barrier.",
+  "keywords": [
+    "urgency pretext override",
+    "prior-approval impersonation",
+    "split-intent approval laundering",
+    "compliance theater framing",
+    "fake emergency approval",
+    "rubber-stamp mutated payload",
+    "approved summary executed payload drift",
+    "hitl approval bypass",
+    "outage pretext credential action",
+    "az already approved this",
+    "audit-mandatory fake citation",
+    "operator pretext escalation"
+  ],
+  "regex": [
+    "(?i)(?:urgency|outage|emergency|incident)\\s+(?:pretext|framing|claim)\\s+(?:overrides?|bypasses?|skips?)\\s+(?:policy|approval|safety)\\s+(?:check|gate|review)|(?:fabricat|claim|assert)\\w*\\s+(?:prior\\s+approval|already\\s+approved)\\s+(?:by\\s+)?(?:az|claude|admin|operator)",
+    "(?i)(?:approved|summary)\\s+(?:summary|intent|scope)\\s+(?:differs?|diverges?|drifts?)\\s+(?:from|vs)\\s+(?:executed|actual)\\s+(?:payload|tool\\s+call|action)|(?:compliance|audit)\\s+(?:theater|framing|pretext)\\s+(?:embed|cite)s?\\s+(?:fake|fabricated)\\s+(?:runbook|policy|reference)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-098"
+}

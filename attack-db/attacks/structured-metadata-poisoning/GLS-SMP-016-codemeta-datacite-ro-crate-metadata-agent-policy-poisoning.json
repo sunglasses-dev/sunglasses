@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-016",
+  "name": "CodeMeta / DataCite / RO-Crate Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Machine-readable scholarly/software dataset metadata (`codemeta.json`, DataCite exports, and RO-Crate JSON-LD) can carry agent-facing instructions that falsely claim authority over AI research, provenance, or dependency scanners and direct them to suppress findings or forward local/runtime secrets.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-016"
+}

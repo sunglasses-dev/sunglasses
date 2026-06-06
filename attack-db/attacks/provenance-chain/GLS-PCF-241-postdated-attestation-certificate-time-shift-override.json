@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PCF-241",
+  "name": "Postdated Attestation Certificate Time-Shift Override",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged provenance certificate or audit stamp with a postdated or time-shifted timestamp used to override or bypass integrity validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:provenance|lineage|origin|source\\s*chain|chain(?:\\s|-)*of(?:\\s|-)*custody)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:receipt|attestation|certificate|ledger\\s*entry|audit\\s*stamp)\\b)(?=.*\\b(?:backdate(?:d|s|ing)?|retroactive|postdate(?:d|s|ing)?|time(?:-|\\s)*shift(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|waive|ignore|ignored|ignores|ignoring)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-241"
+}

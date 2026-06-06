@@ -1,0 +1,41 @@
+{
+  "id": "GLS-APD-252",
+  "name": "High-Trust Identity Tag Authority Lift",
+  "version": "1.0",
+  "category": "agent_persona_drift",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker labels untrusted retrieved content or delegate output with high-trust identity tags ('Role: system', 'approved by lead agent', 'Priority: P0') so the planner upgrades it during context assembly. Soft identity boundaries let attacker text inherit privileged authority and steer tool execution without explicit jailbreak.",
+  "keywords": [
+    "agent identity scope confusion",
+    "role label smuggling in retrieved docs",
+    "delegation return path impersonation",
+    "cross channel authority bleed",
+    "session memory rebind operator identity",
+    "fake operator directive tag",
+    "forged approved by lead agent marker",
+    "low trust source ingested as control channel",
+    "untrusted text labeled role system",
+    "priority p0 tag smuggled in retrieval",
+    "child agent forged provenance",
+    "authority field forged in delegate output"
+  ],
+  "regex": [
+    "(?i)(?:(?:role|priority|authority|approval)\\s*[:=]\\s*(?:system|operator|p0|admin|lead\\s+agent)\\b.{0,80}?(?:retrieved|untrusted|ingested|comment|webpage|ticket)|(?:role[- ]label|authority|provenance)\\s+(?:smuggling|forgery|spoof|impersonation))",
+    "(?i)(?:child|delegate|subagent)\\s+(?:output|response|return)\\s+(?:includes?|carries?|forges?)\\s+(?:fake|forged|spoofed)\\s+(?:provenance|approval|authority)\\s+(?:markers?|tokens?|fields?)",
+    "(?i)(?:low[- ]trust|untrusted)\\s+(?:source|channel|input)\\s+(?:ingested|merged|promoted)\\s+(?:into|as)\\s+(?:high[- ]trust|privileged|control)\\s+(?:channel|instructions?|policy)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APD-252"
+}

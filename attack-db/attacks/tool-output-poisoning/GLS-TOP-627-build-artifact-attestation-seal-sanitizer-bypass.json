@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-627",
+  "name": "Build Artifact Attestation Seal Sanitizer Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects text in which stdout logs, build output, or CI/CD artifacts are described as forged or tampered with a fake signature, attestation, or checksum that bypasses, overrides, or disables guardrail, policy, sanitizer, or validation-gate controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-627"
+}

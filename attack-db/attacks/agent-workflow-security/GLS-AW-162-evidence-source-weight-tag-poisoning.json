@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-162",
+  "name": "Evidence Source Weight Tag Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker poisons how the agent weights evidence sources (forged weight tags, ranking priors, source authority labels) so low-trust input outranks canonical anchors during fusion, biasing decisions without altering raw metrics.",
+  "keywords": [
+    "evidence weighting bias",
+    "prior poisoning ranking",
+    "source rank manipulation",
+    "low trust source upranked",
+    "evidence weight rebinding",
+    "ranking prior flipped",
+    "source authority drift",
+    "weight injection in evidence pool",
+    "evidence prior swap",
+    "synthetic source weight",
+    "high weight tag spoofed",
+    "evidence ordering hijack"
+  ],
+  "regex": [
+    "(?i)(?:evidence\\s+(?:weighting|ranking|prior)\\s+(?:poison|bias|skew|flip)|(?:bias|skew|flip|poison)\\s+(?:how|the\\s+way)\\s+(?:the\\s+)?agent\\s+ranks?\\s+(?:evidence|sources))",
+    "(?i)(?:(?:low[- ]trust|untrusted)\\s+source\\s+(?:upranked|elevated|outranks)|(?:fake|spoofed|synthetic)\\s+(?:weight|priority|authority)\\s+(?:tag|field|score)\\s+(?:on|for)\\s+(?:source|evidence))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-162"
+}

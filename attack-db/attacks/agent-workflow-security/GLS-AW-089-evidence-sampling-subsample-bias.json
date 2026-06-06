@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-089",
+  "name": "Evidence Sampling Subsample Bias",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker biases how the agent's pipeline selects a representative slice from larger telemetry so the chosen subsample under-represents the attack and over-represents clean state. Verdicts trust the skewed slice and miss the active threat.",
+  "keywords": [
+    "evidence sampling bias poisoning",
+    "representative slice skewed",
+    "biased subsample chosen",
+    "cherry-pick sampling window",
+    "skewed evidence sampler",
+    "sampler bias toward safe slice",
+    "evidence sampling injection",
+    "subsample skew attack",
+    "skewed slice as representative",
+    "sampling weight poisoning",
+    "biased eval slice",
+    "selection bias in evidence"
+  ],
+  "regex": [
+    "(?i)(?:evidence\\s+sampling\\s+bias\\s+poisoning|(?:poison|bias|skew|cherry[- ]pick)\\s+(?:sampling|sampler|slice|subsample)\\s+(?:so|to)\\s+(?:safe|clean|benign)\\s+(?:slice|subset|window)\\s+(?:wins|chosen|elevated))",
+    "(?i)(?:(?:representative|sampled|chosen)\\s+slice\\s+(?:skewed|biased|poisoned)\\s+(?:by|via)\\s+(?:attacker|injection)|sampler\\s+(?:bias|weight)\\s+(?:poisoning|injection))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-089"
+}

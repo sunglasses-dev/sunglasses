@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TOP-247",
+  "name": "Forged Checksum Log Integrity Gate Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker uses forged checksum log integrity gate bypass to bypass policy/approval: e.g., \"1. The plugin response carried a forged checksum and audit stamp marked verified, then instructed the agent to bypass the policy gate before\".",
+  "keywords": [
+    "plugin response carried",
+    "response carried forged",
+    "carried forged checksum",
+    "forged checksum audit",
+    "checksum audit stamp",
+    "audit stamp marked",
+    "stamp marked verified",
+    "plugin response",
+    "response carried",
+    "carried forged"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-247"
+}

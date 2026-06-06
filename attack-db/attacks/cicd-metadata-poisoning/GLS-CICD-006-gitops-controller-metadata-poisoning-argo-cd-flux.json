@@ -1,0 +1,40 @@
+{
+  "id": "GLS-CICD-006",
+  "name": "GitOps controller metadata poisoning (Argo CD / Flux)",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "GitOps resource metadata can smuggle agent-facing instructions that tell AI deployment or security reviewers to treat attacker-controlled Argo CD / Flux descriptions, annotations, or generated status notes as higher-priority policy, suppress sync/security findings, or forward local cluster/runtime c",
+  "keywords": [
+    ",",
+    "AI agents",
+    "Application",
+    "ApplicationSet",
+    "GitOps auditors",
+    "GitRepository",
+    "HelmRelease",
+    "Kustomization",
+    "OCIRepository",
+    "agent_instructions",
+    "argoproj.io",
+    "assistant",
+    "authoritative",
+    "canonical",
+    "deployment agents"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|scanner|training|incident|vulnerability|runbook|reference|guide|docs?)\\s+(?:report|reported|detected|flagged|blocked|refused)\n |(?:must\\s+be\\s+reported|reported,\\s+not\\s+obeyed|not\\s+obeyed)\n |(?:(?:do|does)\\s+not|must\\s+not|never|should\\s+never|should\\s+not)\\s+(?:treat|obey|follow|use|trust|include|attach|forward|send|share|override|overrides?|suppress|hide)\n |no\\s+(?:policy\\s+)?overrides?\n |(?:gitops|argocd|flux|kustomization|application(?:set)?)\\s+(?:metadata|annotations?|descriptions?)\\s+(?:is|are)\\s+not\\s+(?:policy|authoritative|instructions?)\n))\n(?=.*(?:\\b(?:argocd|argo\\s*cd|fluxcd|flux|gitops|kustomization|helmrelease|gitrepository|helmrepository|ocirepository|applicationset|application)\\b|apiVersion:\\s*(?:argoproj\\.io|source\\.toolkit\\.fluxcd\\.io|kustomize\\.toolkit\\.fluxcd\\.io|helm\\.toolkit\\.fluxcd\\.io)|kind:\\s*(?:Application|ApplicationSet|Kustomization|HelmRelease|GitRepository|OCIRepository)|(?:argocd|fluxcd)\\.(?:argoproj|toolkit)\\.io|metadata:\\s*\\n\\s*(?:annotations|labels):))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|scanners?|security\\s+scanners?|review[-\\s]+bots?|gitops\\s+(?:auditors?|reviewers?)|deployment\\s+(?:agents?|auditors?))(?![A-Za-z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|canonical|definitive|authoritative|governing\\s+document|(?:primary|single|main|preferred|principal)\\s+(?:gitops\\s+|deployment\\s+|sync\\s+|review\\s+|security\\s+|operating\\s+){0,3}(?:guidance|policy|playbook|runbook|instructions?)|(?:agent|scanner|assistant|deployment|gitops)\\s+instructions?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|agent|gitops|deployment)\\s+(?:gitops\\s+|deployment\\s+|security\\s+|sync\\s+)?(?:review|audit|scan|sync)))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|reclassify|keep.{0,80}?out\\s+of|leave.{0,80}?out\\s+of|treat.{0,80}?as\\s+(?:informational|advisory-only|non-blocking)|(?:observations|findings|diagnostics|results|alerts|sync\\s+drift|drift|policy\\s+violations|vulnerabilities).{0,40}?(?:advisory-only|background(?:-only)?|informational)|(?:include|attach|forward|send|share|provide|pass\\s+along|expose|collect).{0,80}?(?:api\\s*keys?|tokens?|authorization|bearer|session|cookies?|env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:context|details?|config(?:uration)?|settings?|state|proof\\s+(?:material|evidence|details))|kubeconfig|cluster\\s+(?:credentials?|context)|argocd\\s+(?:token|auth)|flux\\s+(?:token|auth))|(?:do\\s+not|don't|never).{0,40}?(?:report|escalate|notify).{0,60}?(?:findings?|alerts?|warnings?|drift|violations?|vulnerabilities)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-006"
+}

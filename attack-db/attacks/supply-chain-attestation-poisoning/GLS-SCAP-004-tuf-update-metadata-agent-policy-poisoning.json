@@ -1,0 +1,40 @@
+{
+  "id": "GLS-SCAP-004",
+  "name": "TUF update metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "TUF signed update metadata or adjacent repository metadata can smuggle agent/scanner-facing policy instructions that tell AI update auditors to treat the metadata as higher authority, suppress verification findings, or forward local credentials/state.",
+  "keywords": [
+    "AI agent(s)",
+    "LLM assistant(s)",
+    "TUF",
+    "The Update Framework",
+    "agent instruction",
+    "agent_instructions",
+    "assistant_policy",
+    "authoritative TUF repository policy",
+    "canonical update policy",
+    "consistent snapshots",
+    "definitive package-update policy",
+    "delegated targets",
+    "dependency scanner(s)",
+    "expires",
+    "governing document"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|\n  does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|\n  never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|\n  must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n)\\b)\n(?!.*\\b(?:(?:security|training|runbook|guide|reference|incident|vulnerability)\\s+(?:docs?|report|example|exercise|guidance)?|scanners?\\s+docs?)\\b.{0,160}\\b(?:should|must|was|were)?\\s*(?:report|detect|flag|flagged|refuse|block|blocked)\\b)\n(?!.*\\b(?:no\\s+agent\\s+policy|not\\s+agent\\s+policy|not\\s+authoritative|not\\s+policy|no\\s+policy\\s+overrides?|does\\s+not\\s+instruct\\s+agents?)\\b)\n(?=.*(?:\n  The\\s+Update\\s+Framework|\\bTUF\\b|root\\.json|targets\\.json|snapshot\\.json|timestamp\\.json|\n  delegated\\s+targets?|signed\\s*[:.]?\\s*_type|spec_version|consistent\\s+snapshots?|\n  TUF\\s+repository|update\\s+repository|repository\\s+metadata|repository\\s+report|\n  signatures?|keyid|threshold|expires|hashes\\s*[:=]|sha256|rollback|freeze\\s+attack\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai\\s+)?agents?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:dependency|security|supply-chain|update)\\s+scanners?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:update|security|release)\\s+auditors?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:release|audit|dependency)\\s+bots?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])verifier[_-]policy(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistant[_-]policy(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+instructions?|verifier\\s+instructions?|assistant\\s+instructions?|\n  canonical\\s+(?:(?:TUF|update|repository|verifier|package-update)\\s+){0,2}(?:policy|metadata|configuration|instructions?)|\n  definitive\\s+(?:(?:TUF|update|repository|verifier|package-update)\\s+){0,2}(?:policy|metadata|configuration|instructions?)|\n  (?:primary|single)\\s+source\\s+of\\s+truth|\n  higher[-\\s]?priority|highest[-\\s]?priority|authoritative|governing\\s+(?:policy|document)|\n  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|must\\s+obey\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\\s+results?|verifier\\s+results?)|\n  hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\\s+results?|verifier\\s+results?)|\n  omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|reports?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\\s+results?|verifier\\s+results?)|\n  (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|failures?|errors?|mismatches?|alerts?|observations?|diagnostics?|audit\\s+results?|verifier\\s+results?)|\n  (?:treat|mark|classify|downgrade).{0,80}?as\\s+(?:informational|non[-\\s]?blocking|safe|low\\s+risk|background[-\\s]?only)|\n  (?:include|forward|send|attach|copy|read|collect|provide|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env(?:ironment)?|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?)|execution\\s+context|ci\\s+secrets?|registry\\s+(?:auth\\s+)?tokens?|auth(?:entication)?\\s+tokens?|api\\s+keys?|authorization\\s+headers?|bearer\\s+tokens?|cookies?|session\\s+(?:headers?|tokens?|state)|local\\s+(?:state|context|config(?:uration)?|settings?))\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCAP-004"
+}

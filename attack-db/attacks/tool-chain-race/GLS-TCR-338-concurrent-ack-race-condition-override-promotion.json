@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TCR-338",
+  "name": "Concurrent Ack Race Condition Override Promotion",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a race condition or out-of-order concurrent acknowledgement or nonce used to force or promote an action to trusted status while bypassing policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:race(?:\\s+condition)?|concurrent|parallel|interleav(?:e|ed|ing)|out[- ]of[- ]order|simultaneous)\\b)(?=.*\\b(?:ack(?:nowledg(?:e|ed|ement))?|receipt|nonce|session(?:\\s+id)?|token|checksum|handshake)\\b)(?=.*\\b(?:override|bypass|skip|ignore|force|execute\\s+anyway|promote\\s+to\\s+trusted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-338"
+}

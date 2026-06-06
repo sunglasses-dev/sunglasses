@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-079",
+  "name": "Multi-Agent Role Tag Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forges or desyncs the role tag (planner, reviewer, executor) in a multi-agent handoff so a low-trust agent inherits the authority of a higher-trust role. Reviewers get bypassed and executor privileges flow to the wrong link in the chain.",
+  "keywords": [
+    "multi-agent role binding desync",
+    "planner label spoofed as reviewer",
+    "executor masquerading as planner",
+    "role tag forged in handoff",
+    "trust by role label",
+    "implicit role authority",
+    "role swap between agents",
+    "reviewer bypass via role spoof",
+    "executor privilege from forged role",
+    "multi-agent role desync",
+    "role binding drift",
+    "agent role tag injection"
+  ],
+  "regex": [
+    "(?i)(?:(?:role|agent[- ]role)\\s+(?:binding|tag|label)\\s+(?:desync|drift|forgery|spoofing|injection)|(?:planner|reviewer|executor|orchestrator)\\s+(?:label|role)\\s+(?:spoofed|forged|swapped))",
+    "(?i)(?:agent\\s+(?:masquerading|posing|presenting)\\s+as\\s+(?:planner|reviewer|executor|orchestrator)|multi[- ]agent\\s+role\\s+(?:binding|trust)\\s+(?:desync|gap))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-079"
+}

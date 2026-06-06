@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SESNP-001",
+  "name": "Docker Socket Host Namespace Privileged Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which the Docker socket or container socket, host namespace paths such as /proc/ or nsenter, and privileged container flags such as --privileged or CAP_SYS_ADMIN are all combined with explicit bypass or override language targeting policy or guardrail controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:docker\\.sock|/var/run/docker\\.sock|container\\s+socket|daemon\\s+socket))(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|host\\s+path(?:s)?|mount\\s+host\\s+path))(?=.*(?:--privileged|privileged|cap_sys_admin))(?=.*(?:bypass|bypass(?:ed|es|ing)?|ignor(?:e|ed|es|ing)|override|overrid(?:es|ing|en|ed)|disable|disable(?:d|s|ing)?|skip|skip(?:ped|s|ping)?))(?=.*(?:policy|guardrail(?:s)?|approval\\s*gate(?:s)?|safety\\s*check(?:s)?)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SESNP-001"
+}

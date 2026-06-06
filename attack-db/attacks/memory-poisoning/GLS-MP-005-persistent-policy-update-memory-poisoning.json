@@ -1,0 +1,41 @@
+{
+  "id": "GLS-MP-005",
+  "name": "Persistent Policy Update Memory Poisoning",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "critical",
+  "channels": [
+    "log_memory",
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker frames untrusted tool or retrieval output as a durable policy update ('remember this forever', 'replace safety rule') so the agent persists the exception across sessions and treats it as higher authority than original guardrails. Repetition or fake canonical-config language graft attacker rules into the policy substrate.",
+  "keywords": [
+    "memory policy grafting",
+    "policy as memory overwrite",
+    "scoped rule broadening via memory merge",
+    "authority spoof memory replacement",
+    "feedback loop reinforcement",
+    "remember this forever directive",
+    "replace safety rule with new convention",
+    "narrow scope becomes durable default",
+    "untrusted memory write without provenance",
+    "memory replace overwrites canonical config",
+    "repetition poisoning until auto saved",
+    "policy adjacent memory key mutation"
+  ],
+  "regex": [
+    "(?i)(?:(?:remember\\s+(?:this\\s+)?forever|store\\s+(?:this\\s+)?as\\s+permanent|replace\\s+(?:safety|policy|safety[- ]rule)|new\\s+team\\s+convention)\\s*[.,]?\\s+(?:instruction|exception|rule|directive))",
+    "(?i)(?:scoped|temporary|narrow|one[- ]task)\\s+(?:rule|exception|allowlist)\\s+(?:merged|broadened|promoted)\\s+(?:into|as)\\s+(?:global|durable|permanent|default)\\s+(?:memory|policy|behavior)",
+    "(?i)(?:memory\\s+(?:write|replace|grafting|overwrite)|policy[- ]as[- ]memory)\\s+(?:from|by)\\s+(?:untrusted|retrieval|tool[- ]output|attacker[- ]controlled)\\s+(?:content|chunk|source)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MP-005"
+}

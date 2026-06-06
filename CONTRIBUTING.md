@@ -21,7 +21,7 @@ pytest
 5. Submit a PR
 
 ### Add Language Support
-We detect prompt injection in 13 languages. If you speak a language natively, you can add patterns that catch real-world injection attempts in that language.
+We detect prompt injection in 23 languages. If you speak a language natively, you can add patterns that catch real-world injection attempts in that language.
 
 ### Report False Positives
 If Sunglasses flags something that isn't an attack, open an issue with the text that triggered it. False positives hurt trust — we fix them fast.

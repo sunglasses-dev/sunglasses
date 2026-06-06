@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-071",
+  "name": "Redaction Placeholder Literal Confusion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits pipelines that treat redaction markers like [REDACTED], ellipses, or asterisk masks as literal config or operator intent. The placeholder leaks into tool arguments or decisions, producing wrong paths, broken auth, or unintended actions.",
+  "keywords": [
+    "redaction placeholder confusion",
+    "ellipsis treated as path",
+    "[redacted] parsed as config",
+    "truncated preview as value",
+    "mask string becomes real input",
+    "placeholder as ground truth",
+    "redaction marker mistaken value",
+    "asterisk mask trusted",
+    "preview substring as operator intent",
+    "redacted blob fed to tool",
+    "placeholder injection",
+    "mask leakage into action path"
+  ],
+  "regex": [
+    "(?i)(?:redaction\\s+placeholder\\s+(?:confusion|mistaken|leak)|(?:\\[redacted\\]|\\*+|\\.\\.\\.|<mask>)\\s+(?:parsed|treated|interpreted)\\s+as\\s+(?:real|valid|literal)\\s+(?:path|config|value|secret|input))",
+    "(?i)(?:(?:truncated|masked|redacted)\\s+(?:preview|string|blob)\\s+(?:fed|passed|piped)\\s+(?:into|to)\\s+(?:tool|action|argument)|placeholder\\s+(?:becomes|treated\\s+as)\\s+ground\\s+truth)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-071"
+}

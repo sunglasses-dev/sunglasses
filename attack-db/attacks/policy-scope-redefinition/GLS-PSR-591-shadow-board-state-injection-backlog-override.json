@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-591",
+  "name": "Shadow Board State Injection Backlog Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message",
+    "log_memory"
+  ],
+  "description": "Attackers inject lookalike state-board files, flip section precedence so backlog rows override DECISIONS, or replay stale READY snippets so cron-driven agents pick up wrong owners and produce overstated readiness reports.",
+  "keywords": [
+    "shadow board injection",
+    "lookalike timeline file",
+    "stale inbox mirror as canonical",
+    "section precedence flip",
+    "queued overrides decisions",
+    "open_questions overrides decisions",
+    "temporal replay of ready state",
+    "cross-file canonicality drift",
+    "symlink path alias attack",
+    "owner collision via fake in_progress",
+    "timeline board precedence subversion",
+    "non-canonical board wins task choice"
+  ],
+  "regex": [
+    "(?i)(?:(?:shadow|lookalike|mirror|alternate)\\s+(?:board|timeline|state\\s+file)\\s+(?:injection|spoof|replaces?|overrides?)|(?:queued|open[_ ]questions|backlog)\\s+(?:overrides?|supersedes?|outranks?)\\s+(?:decisions|in[_ ]progress|done)|(?:stale|old|replayed)\\s+(?:ready|in[_ ]progress)\\s+(?:state|snippet)\\s+(?:replayed|reused)\\s+in\\s+(?:fresh|new)\\s+cycle)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-591"
+}

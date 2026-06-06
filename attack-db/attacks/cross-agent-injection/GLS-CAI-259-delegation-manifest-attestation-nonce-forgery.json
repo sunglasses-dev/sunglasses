@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-259",
+  "name": "Delegation Manifest Attestation Nonce Forgery",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged delegation manifest or attestation-nonce submitted by an agent to override trust checks, policy, or safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|subagent)\\b)(?=.*\\b(?:forged|forge|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:delegation\\s+manifest|handoff\\s+manifest|execution(?:\\s|-)+ticket|nonce\\s+attestation|attestation\\s+nonce|attestation)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable|suppress|waive)\\w*\\b)(?=.*\\b(?:policy|guardrail|approval|verification|trust\\s+check(?:s)?|auth\\s+check(?:s)?|safety)\\b).{0,800}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-259"
+}

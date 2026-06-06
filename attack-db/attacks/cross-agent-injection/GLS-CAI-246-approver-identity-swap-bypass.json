@@ -1,0 +1,28 @@
+{
+  "id": "GLS-CAI-246",
+  "name": "Approver Identity Swap Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Approver Identity Swap Bypass - cross agent injection mechanism that overrides policy or safety gates.",
+  "keywords": [
+    "approver identity swap",
+    "identity swap bypass",
+    "approver identity",
+    "identity swap",
+    "swap bypass"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-246"
+}

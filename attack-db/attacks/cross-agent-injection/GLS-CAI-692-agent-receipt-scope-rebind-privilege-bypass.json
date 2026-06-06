@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-692",
+  "name": "Agent Receipt Scope Rebind Privilege Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or delegate forges, fabricates, or asserts a receipt, ticket, attestation, or capability to rebind scope or privilege and then escalate, override, or bypass policy and guardrail controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-692"
+}

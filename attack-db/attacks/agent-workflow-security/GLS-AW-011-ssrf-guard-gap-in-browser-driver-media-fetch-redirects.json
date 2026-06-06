@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-011",
+  "name": "SSRF guard gap in browser-driver/media-fetch redirects",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "SSRF guard coverage gap in browser-driver / media-fetch code paths where redirects bypass private-target blocklists.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:openclaw|playwright|qq\\s*bot|media\\s*fetch)\\b)(?=.*\\bssrf\\b)(?=.*\\b(?:redirect|navigation|fetch\\s*paths?|guard)\\b).{0,1200}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-011"
+}

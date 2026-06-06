@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-010",
+  "name": "Microformats / standalone RDF metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Hostile instructions can be embedded in Microformats fields or standalone RDF/Turtle metadata that AI agents, crawlers, SEO agents, or security scanners import as structured site context.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-010"
+}

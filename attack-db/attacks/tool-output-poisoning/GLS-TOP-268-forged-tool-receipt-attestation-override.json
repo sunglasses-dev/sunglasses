@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-268",
+  "name": "Forged Tool Receipt Attestation Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or fabricated tool output, receipt, or attestation used to override, bypass, or disable policy and safety guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated|counterfeit)\\b)(?=.*\\b(?:tool\\s*output|tool\\s*result|log|trace|checksum|receipt|attestation|verification)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|skip|skipped|waive|waived|disable|disabled)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-268"
+}

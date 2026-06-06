@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-153",
+  "name": "Pre-Policy Summarization Authority Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits pre-policy summarization so untrusted transcript content is converted into a high-authority summary object, laundering injected instructions or policy claims past downstream trust checks.",
+  "keywords": [
+    "summary inherits high authority",
+    "untrusted transcript becomes policy",
+    "summarizer authority flip",
+    "chat history elevated to system",
+    "summary object outranks source",
+    "low trust chat to high trust summary",
+    "transcript instruction smuggling",
+    "summary used as policy input",
+    "policy check after summarization",
+    "summary role label forged",
+    "summarizer strips provenance",
+    "transcript laundering via summary"
+  ],
+  "regex": [
+    "(?i)(?:(?:transcript|chat|conversation)\\s+summar(?:y|izer|ization)\\s+(?:authority|trust|role)\\s+(?:flip|elevat|upgrade|launder)|summar(?:y|ized)\\s+(?:object|output)\\s+(?:treated\\s+as|becomes|outranks)\\s+(?:high[- ]trust|policy|system))",
+    "(?i)(?:(?:untrusted|low[- ]trust)\\s+(?:transcript|chat|content)\\s+(?:converted|laundered|promoted)\\s+(?:into|to)\\s+(?:high[- ]authority|policy|trusted)|policy\\s+check\\s+(?:after|post)\\s+summariz)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-153"
+}

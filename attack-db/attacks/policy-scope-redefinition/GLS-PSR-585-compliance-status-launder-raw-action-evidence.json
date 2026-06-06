@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-585",
+  "name": "Compliance Status Launder Raw Action Evidence",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message",
+    "log_memory"
+  ],
+  "description": "Adversarial content persuades the pipeline to report controls as active while the enforcement path is bypassed, using laundered healthchecks, rewritten compliance summaries, or spoofed freshness metadata so operators trust green dashboards during live attacks.",
+  "keywords": [
+    "healthcheck pass laundering",
+    "guardrail shadow branch",
+    "policy applied but unsafe fallback",
+    "compliance summary overwrite",
+    "post-processor rewrites summary",
+    "staleness badge suppression",
+    "freshness metadata mutated",
+    "green dashboard while bypass",
+    "controls reported active not enforced",
+    "compensating control theater",
+    "summary disconnected from raw actions",
+    "evidence tuple missing"
+  ],
+  "regex": [
+    "(?i)(?:(?:control|guardrail|policy)\\s+(?:reported|claimed|logged)\\s+(?:active|applied|enforced)\\s+(?:while|but)\\s+(?:bypassed?|skipped|not\\s+enforced)|(?:compliance|safety|status)\\s+summary\\s+(?:overwrites?|rewrites?|launders?)\\s+(?:raw|actual)\\s+(?:action|log|evidence)|(?:freshness|staleness)\\s+(?:badge|metadata|timestamp)\\s+(?:suppressed|mutated|spoofed))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-585"
+}

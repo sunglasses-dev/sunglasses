@@ -1,0 +1,24 @@
+{
+  "id": "GLS-V03-0483",
+  "name": "Agent Approval Forgery Execution Gate Skip",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged approval ticket or capability grant used by an agent in a handoff to bypass execution gates and run privileged actions.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:agent|delegate|handoff|worker)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|impersonat(?:e|ed|ing)|counterfeit)\\b.{0,160}\\b(?:approval(?:\\s+ticket)?|permit|capability(?:\\s+token)?|execution(?:\\s+token|\\s+grant)?)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|ping)?|ignore(?:d|s|ing)?)\\b.{0,120}\\b(?:execute|executed|run|deploy|activate)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-V03-0483"
+}

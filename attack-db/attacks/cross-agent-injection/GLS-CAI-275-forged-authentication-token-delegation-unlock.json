@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-275",
+  "name": "Forged Authentication Token Delegation Unlock",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged authentication token or attestation used within a delegation to unlock or escalate privilege and bypass policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|fabricated|counterfeit|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:approval|signoff|authorization|auth(?:entication)?\\s+token|attestation)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|subagent|handoff)\\b)(?=.*\\b(?:scope|permission|privilege|role)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|unlock|bypass|override)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-275"
+}

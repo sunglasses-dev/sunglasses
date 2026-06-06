@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-227",
+  "name": "Semantic UI fake token entry banner",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects UI-overlay instructions that impersonate security or session banners to coerce operators or agents into inputting sensitive short-lived codes such as OTPs or admin tokens directly in-page.",
+  "keywords": [
+    "security banner paste token",
+    "session notice enter otp",
+    "compliance alert type recovery code",
+    "security notice paste admin code",
+    "session banner enter one-time code",
+    "compliance notice type token",
+    "security alert paste recovery code",
+    "session notice enter admin code"
+  ],
+  "regex": [
+    "(?i)\\b(?:security|session|compliance)\\s+(?:banner|notice|alert)\\b.{0,140}\\b(?:paste|enter|type)\\b.{0,60}\\b(?:token|one-time\\s+code|otp|recovery\\s+code|admin\\s+code)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-227"
+}

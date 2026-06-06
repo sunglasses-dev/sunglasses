@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-057",
+  "name": "OCR Image Directive Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "image_alt_text",
+    "file",
+    "tool_output",
+    "message"
+  ],
+  "description": "Attacker embeds imperative text inside images, screenshots, or scanned documents so multimodal OCR/transcription stages surface the directive into the agent's instruction context as if it were first-party operator input, bypassing input-channel policy.",
+  "keywords": [
+    "ocr text as instruction",
+    "image transcript trusted as prompt",
+    "screenshot directive injection",
+    "alt-text imperative",
+    "transcribed pdf becomes tool call",
+    "multimodal trust collapse",
+    "captioned image carries payload",
+    "ocr output bypasses input policy",
+    "scanned document prompt injection",
+    "vision-to-text instruction smuggling",
+    "screen capture poisons agent",
+    "image-borne directive"
+  ],
+  "regex": [
+    "(?i)(?:ocr|transcrib(?:e|ed|ption)|caption|alt[- ]?text|screenshot|scanned\\s+(?:document|pdf|image))\\s+(?:text|output|content)\\s+(?:treated|trusted|parsed)\\s+as\\s+(?:instruction|prompt|tool[- ]call|first[- ]party)",
+    "(?i)(?:(?:image|screenshot|pdf|scanned)\\s+(?:borne|carried|embedded)\\s+(?:directive|imperative|prompt|payload)|multimodal\\s+(?:transclusion|trust[- ]collapse|ocr[- ]injection))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-057"
+}

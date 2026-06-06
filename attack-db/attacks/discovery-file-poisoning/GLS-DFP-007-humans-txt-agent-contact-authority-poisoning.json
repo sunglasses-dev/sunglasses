@@ -1,0 +1,32 @@
+{
+  "id": "GLS-DFP-007",
+  "name": "humans.txt Agent Contact Authority Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile `/humans.txt` or site credits/contact file can blend normal team/contact metadata with instructions telling AI agents to treat the file as site authority, demote higher-priority instructions, disclose local scan context, or suppress prompt-injection reports.",
+  "keywords": [
+    "/* TEAM */",
+    "/humans.txt",
+    "contact policy",
+    "credits",
+    "humans.txt",
+    "security contact",
+    "site owner"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:humans\\.txt|/humans\\.txt|team\\s*/|security\\s+contact|site\\s+owner|credits|contact\\s+policy)\\b)(?=.*\\b(?:ai[-\\s]*agents?|automated\\s+assistants?|assistants?|crawlers?|bots?|agents?)\\b)(?=.*\\b(?:treat\\s+this\\s+[^\\n]{0,80}\\s+as\\s+(?:the\\s+)?(?:current\\s+)?(?:site\\s+)?authority|system\\s*,?\\s*developer|repository\\s+instructions?\\s+conflict|stale\\s+for\\s+this\\s+domain|include\\s+[^\\n]{0,80}\\b(?:tool\\s+configuration|environment\\s+variables?|env\\s+vars?|local\\s+state|api\\s*keys?|secrets?)|(?:do|must)\\s+not\\s+flag\\s+[^\\n]{0,80}(?:prompt\\s+injection|scanner|security)|suppress\\s+[^\\n]{0,80}(?:finding|report|warning))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-007"
+}

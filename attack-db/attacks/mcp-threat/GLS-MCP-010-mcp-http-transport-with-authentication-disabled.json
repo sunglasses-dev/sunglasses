@@ -1,0 +1,23 @@
+{
+  "id": "GLS-MCP-010",
+  "name": "MCP HTTP transport with authentication disabled",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-75hx-xj24-mqrw: n8n-mcp HTTP transport lets unauthenticated clients kill sessions and read session metadata. Source: https://github.com/advisories/GHSA-75hx-xj24-mqrw",
+  "keywords": [],
+  "regex": [
+    "(?i)mcp[^=]{0,40}transport[^=]{0,40}auth(?:entication)?\\s*=\\s*(?:False|None|['\\\"]none['\\\"])"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-010"
+}

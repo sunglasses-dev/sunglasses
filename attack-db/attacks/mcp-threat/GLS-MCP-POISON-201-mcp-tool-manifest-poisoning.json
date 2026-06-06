@@ -1,0 +1,37 @@
+{
+  "id": "GLS-MCP-POISON-201",
+  "name": "MCP tool manifest poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects malicious instructions embedded in MCP tool manifests/descriptions that attempt to override policy, coerce secret disclosure, or trigger unauthorized tool chains.",
+  "keywords": [
+    "tool manifest poisoning",
+    "manifest override instructions",
+    "tool description ignore previous",
+    "manifest exfiltrate credentials",
+    "call tool then call tool",
+    "silently forward results",
+    "tool description developer mode",
+    "manifest system override",
+    "function description reveal api key",
+    "tool description send credentials"
+  ],
+  "regex": [
+    "(?is)(?:\"?(?:tool|function|manifest|description|instructions?)\"?\\s*[:=]\\s*.+?){0,3}(?:ignore\\s+(?:all\\s+)?(?:previous|prior)\\s+instructions|system\\s+override|developer\\s+mode|reveal\\s+(?:api[_ -]?key|token|secret)|send\\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\\s+tool\\s+[a-z0-9_.-]+\\s+then\\s+call\\s+tool\\s+[a-z0-9_.-]+|silent(?:ly)?\\s+forward\\s+results?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-POISON-201"
+}

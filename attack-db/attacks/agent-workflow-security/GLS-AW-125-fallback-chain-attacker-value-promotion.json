@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-125",
+  "name": "Fallback Chain Attacker Value Promotion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker intentionally breaks primary fields so systems accept lower-trust fallback data, silently promoting attacker-controlled text into execution-critical values such as policy mode, metric anchors, or destination paths.",
+  "keywords": [
+    "fallback chain poisoning",
+    "schema drop coercion",
+    "type confusion fallback trigger",
+    "zero value erasure attack",
+    "path priority downgrade",
+    "primary key omission fallback",
+    "kpi snapshot fallback to kpis",
+    "alias collision parser fallback",
+    "fallback as instruction channel",
+    "silent fallback degraded mode",
+    "fallback branch attacker controlled",
+    "type mismatch skip primary"
+  ],
+  "regex": [
+    "(?i)(?:(?:omit|drop|poison|malform)\\s+(?:primary|canonical)\\s+(?:key|field|schema)\\s+(?:so|to|forces?)\\s+(?:fallback|alternate|secondary)|(?:fallback|alternate)\\s+(?:branch|key|map)\\s+(?:contains?|supplies?|injects?)\\s+(?:attacker|adversary|crafted)\\s+(?:values?|payload|data)|(?:type|schema)\\s+(?:confusion|mismatch)\\s+(?:skips?|bypasses?)\\s+(?:primary|validator)\\s+(?:without|and\\s+trusts?)\\s+(?:provenance|secondary))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-125"
+}

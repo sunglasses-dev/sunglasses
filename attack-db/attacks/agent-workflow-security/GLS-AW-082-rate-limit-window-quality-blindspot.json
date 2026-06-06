@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-082",
+  "name": "Rate-Limit Window Quality Blindspot",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits the ambiguity of rate-limit windows (especially 429-throttled APIs) where output shape stays valid but source quality silently drops. Agents treat shape-healthy responses as trustworthy and inherit degraded data into decisions.",
+  "keywords": [
+    "rate limit telemetry ambiguity",
+    "429 window degraded quality",
+    "pytrends rate limit blind spot",
+    "structurally healthy but stale",
+    "rate-limit-shaped success",
+    "telemetry ambiguity under throttle",
+    "429 looks like normal output",
+    "rate-limited stale data",
+    "throttle window false healthy",
+    "rate limit masquerade as success",
+    "429 ambiguity exploit",
+    "rate-throttle quality drop hidden"
+  ],
+  "regex": [
+    "(?i)(?:rate[- ]limit\\s+telemetry\\s+ambiguity|(?:429|rate[- ]limit|throttle)\\s+(?:window|response)\\s+(?:looks|appears|presents)\\s+(?:healthy|normal|successful))",
+    "(?i)(?:(?:structurally\\s+healthy|shape[- ]valid)\\s+(?:output|response)\\s+(?:hides|masks)\\s+(?:rate[- ]limit|throttle|429|degraded)\\s+(?:state|quality)|pytrends\\s+(?:429|rate)\\s+(?:window|blind))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-082"
+}

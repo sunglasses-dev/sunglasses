@@ -1,0 +1,40 @@
+{
+  "id": "GLS-CICD-005",
+  "name": "GitLab CI Pipeline Metadata Poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious `.gitlab-ci.yml` file can hide agent-directed instructions in pipeline metadata, variables, job descriptions, comments, or rules text, telling AI CI/security reviewers to treat the pipeline file as authoritative, suppress findings, or forward GitLab CI tokens and runtime context.",
+  "keywords": [
+    ",",
+    ".\n- **Report suppression:**",
+    ".gitlab-ci.yaml",
+    ".gitlab-ci.yml",
+    "AI agents",
+    "CI auditor",
+    "CI/CD config",
+    "CI_JOB_TOKEN",
+    "CI_PIPELINE_SOURCE",
+    "CI_REGISTRY_PASSWORD",
+    "GITLAB_TOKEN",
+    "GitLab CI",
+    "assistant",
+    "authoritative",
+    "automated security agents"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+reference|defensive\\s+training|incident\\s+report|scanner\\s+docs?|CI\\s+security\\s+guide)\\b.{0,220}\\b(?:must\\s+report|should\\s+report|must\\s+be\\s+reported|not\\s+obeyed|never\\s+obey|not\\s+authoritative|should\\s+never|detected\\s+and\\s+blocked|refused)\\b)\n(?!.*\\b(?:\\.gitlab-ci\\.ya?ml|GitLab\\s+CI|CI/CD\\s+config|pipeline\\s+metadata)\\b.{0,180}\\b(?:is\\s+not\\s+authoritative|not\\s+agent\\s+policy|does\\s+not\\s+(?:override|instruct)|must\\s+not\\s+(?:obey|treat|use)|should\\s+never\\s+be\\s+used)\\b)\n(?=.*(?:\\.gitlab-ci\\.ya?ml|GitLab\\s+CI|CI/CD\\s+config|pipeline\\s+metadata|stages\\s*:|workflow\\s*:|rules\\s*:|variables\\s*:|CI_JOB_TOKEN|CI_REGISTRY_PASSWORD|GITLAB_TOKEN|CI_PIPELINE_SOURCE|job\\s+description))\n(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|automated\\s+(?:security\\s+)?agents?|assistants?|scanners?|CI\\s+auditors?|pipeline\\s+reviewers?|dependency\\s+review\\s+agents?|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies)))(?![a-zA-Z0-9]))\n(?=.*(?:\\bauthoritative\\b|\\bcanonical\\b|\\b(?:primary|main|principal|preferred)\\s+(?:pipeline\\s+|CI\\s+|review\\s+|security\\s+|operating\\s+)*(?:guidance|playbook|policy|instructions?)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\bgoverning\\s+(?:pipeline\\s+)?document\\b|\\bcontrolling\\s+(?:pipeline\\s+)?document\\b|\\bsupersedes?\\s+(?:scanner|security|review)\\s+guidance\\b|\\boverrides?\\s+(?:system|scanner|security|repository|developer)\\s+(?:rules?|polic(?:y|ies)|instructions?)\\b|\\bdefines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|pipeline)\\s+(?:review|audit|scan)\\b|\\b(?:agent|scanner|assistant|pipeline\\s+reviewer)\\s+(?:instructions?|directive|notice)\\b))\n(?=.*(?:\\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip)\\b.{0,60}\\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\\b|\\bdo\\s+not\\s+(?:report|flag|escalate)\\b.{0,60}\\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|vulnerabilit(?:y|ies))\\b|\\bdowngrade\\b.{0,80}\\b(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?)\\b.{0,80}\\b(?:background\\s+notes?|background-only|informational|non-blocking)\\b|\\b(?:keep|leave)\\b.{0,80}\\b(?:findings?|warnings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies))\\b.{0,30}\\bout\\s+of\\s+(?:the\\s+)?(?:memo|report|summary|audit\\s+memo|pipeline\\s+report|final\\s+report)\\b|\\b(?:treat|mark|classify|flag)\\b.{0,50}\\bas\\s+(?:informational|safe|clean|low|none|non-blocking)\\b|\\b(?:include|attach|forward|send|collect|embed|share|provide|expose|pass\\s+along)\\b.{0,90}\\b(?:CI_JOB_TOKEN|CI_REGISTRY_PASSWORD|GITLAB_TOKEN|CI_JOB_JWT|CI_JOB_JWT_V2|job\\s+token|registry\\s+password|pipeline\\s+variables?|protected\\s+variables?|masked\\s+variables?|environment\\s+(?:variables?|context|details?|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|proof|material|details?)|execution\\s+context|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?|Authorization)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-005"
+}

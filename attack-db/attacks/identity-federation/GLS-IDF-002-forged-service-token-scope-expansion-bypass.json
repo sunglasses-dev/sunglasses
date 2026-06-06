@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IDF-002",
+  "name": "Forged Service Token Scope Expansion Bypass",
+  "version": "1.0",
+  "category": "identity_federation",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or minted service token, JWT, or bearer token submitted by an agent or delegate to expand scope or privilege and bypass authentication checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:service(?:\\s|-)?token|oauth(?:\\s|-)?token|jwt|session(?:\\s|-)?token|bearer(?:\\s|-)?token|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|mint(?:ed|ing)?|fake)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|copilot|orchestrator)\\b)(?=.*\\b(?:scope|permission(?:s)?|role|privilege(?:s)?|tenant|admin)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|expand(?:ed|s|ing)?|widen(?:ed|ing)?|admin)\\b)(?=.*\\b(?:ignore|ignored|ignoring|ignores|override|overrode|overriding|bypass|bypassed|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDF-002"
+}

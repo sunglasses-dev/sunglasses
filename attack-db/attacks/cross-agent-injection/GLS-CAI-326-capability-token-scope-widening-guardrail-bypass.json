@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-326",
+  "name": "Capability Token Scope Widening Guardrail Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged capability token or delegation ticket used by a peer agent to widen or elevate scope beyond approved boundaries and bypass verification gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:delegation\\s+ticket|capability\\s+token|authorization\\s+token|session\\s+tag|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|boundary|access\\s+scope)\\b)(?=.*\\b(?:expand|elevat(?:e|ed|ion)|widen|rewrite|override|bypass)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|approval\\s+gate(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-326"
+}

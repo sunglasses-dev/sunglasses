@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-135",
+  "name": "Digest Prefix Trust Shortcut Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker crafts payloads that share a digest, prefix, or canonical form with previously approved evidence so a trust shortcut elevates new malicious content via hash reuse, weak binding, or replay against stale policy context.",
+  "keywords": [
+    "evidence hash collision",
+    "canonicalization collision swap",
+    "digest prefix trust downgrade",
+    "cross source hash key aliasing",
+    "replay by hash stale policy",
+    "short digest prefix collision",
+    "unicode folding hash bypass",
+    "whitespace collapse hash match",
+    "hash without source binding",
+    "post approval payload swap",
+    "policy epoch not bound to digest",
+    "trusted artifact handle reuse"
+  ],
+  "regex": [
+    "(?i)(?:(?:hash|digest|checksum|fingerprint)\\s+(?:collision|prefix|alias)\\s+(?:reuse|inherit|swap)\\s+(?:approval|trust|allowlist)|(?:canonicaliz\\w+|normaliz\\w+)\\s+(?:collision|folding|collapse)\\s+(?:lets?|allows?|enables?)\\s+(?:payload|content|directive)\\s+(?:swap|substitution)|(?:replay|reuse)\\s+(?:approved|prior|stale)\\s+(?:hash|digest)\\s+(?:after|despite|without)\\s+(?:policy|version|epoch)\\s+(?:change|bump|update))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-135"
+}

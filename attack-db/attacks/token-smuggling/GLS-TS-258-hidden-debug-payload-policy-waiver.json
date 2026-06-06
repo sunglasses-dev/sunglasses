@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TS-258",
+  "name": "Hidden Debug Payload Policy Waiver",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a hidden, invisible, base64-encoded, or frontmatter-embedded debug payload or backdoor instruction is paired with an explicit policy waiver, guardrail bypass, or safety override phrase.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:hidden|invisible|base64|frontmatter|metadata|comment)\\b)(?=.*\\b(?:debug payload|diagnostic payload|maintenance command|backdoor instruction|secret directive)\\b)(?=.*\\b(?:policy waiver|bypass policy|ignore guardrail|override safety|skip approval)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-258"
+}

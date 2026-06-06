@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-225",
+  "name": "Semantic UI reauth external link redirect",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-overlay injections that use security or session-expiry messaging to redirect agents or users to attacker-controlled external reauthentication URLs.",
+  "keywords": [
+    "session expired open external link",
+    "security verification navigate to url",
+    "reauthenticate visit https",
+    "session expired go to www",
+    "security verification open bit.ly",
+    "reauth navigate external url",
+    "session expired visit tinyurl",
+    "security verification go to https"
+  ],
+  "regex": [
+    "(?i)\\b(?:session\\s+expired|reauth(?:enticate)?|security\\s+verification)\\b.{0,120}\\b(?:open|visit|navigate|go\\s+to)\\b.{0,80}\\b(?:https?://|www\\.|bit\\.ly/|tinyurl\\.com/|t\\.co/)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-225"
+}

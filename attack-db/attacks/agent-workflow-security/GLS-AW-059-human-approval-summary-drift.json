@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-059",
+  "name": "Human Approval Summary Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker exploits HITL gaps so the human sees an approval summary that says one thing (e.g., read-only stats pull) while the agent's execution channel dispatches mutated arguments, expanded scope, or extra tool calls beyond the operator's actual intent.",
+  "keywords": [
+    "approval summary drift",
+    "human approves read-only execution writes",
+    "intent-splitting multi-tool bundle",
+    "post-approval argument mutation",
+    "ui trust-marker spoof",
+    "safe badge from attacker metadata",
+    "approval hash skipped on retry",
+    "operator confidence false",
+    "approval prose hides write flag",
+    "hitl theater attack",
+    "approved one action many executed",
+    "machine action exceeds approved scope"
+  ],
+  "regex": [
+    "(?i)(?:hitl|human[- ]in[- ]the[- ]loop)\\s+(?:decision\\s+)?(?:theater|drift|mismatch|bypass)",
+    "(?i)(?:(?:approval|approved)\\s+(?:summary|card|prose|hash)\\s+(?:differs?|drifts?|hides?|does\\s+not\\s+match)\\s+(?:executed|actual|dispatched)\\s+(?:payload|action|tool)|(?:argument|scope|recipient)\\s+(?:mutated|changed)\\s+after\\s+approval\\s+(?:without|skipping)\\s+re[- ]approval)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-059"
+}

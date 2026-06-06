@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-280",
+  "name": "Forged Citation Verified Banner Rank Promote",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or fabricated citation or source carrying a fake verified or trust banner used to boost rank and override or skip policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|fake|poisoned)\\b)(?=.*\\b(?:citation|source|reference|snippet|document)\\b)(?=.*\\b(?:verified|signed|attested|trust\\s+banner)\\b)(?=.*\\b(?:promote|boost|rank|priority|top\\s+result)\\b)(?=.*\\b(?:override|bypass|ignore|skip)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-280"
+}

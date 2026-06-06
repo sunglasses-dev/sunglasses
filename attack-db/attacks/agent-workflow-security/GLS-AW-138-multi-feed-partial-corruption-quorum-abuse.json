@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-138",
+  "name": "Multi-Feed Partial Corruption Quorum Abuse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker coordinates partial corruption across multiple feeds so the agent mistakes consensus for truth, abusing role-weighted quorum, temporal skew, or schema-alias false-agreement to bypass single-source guardrails.",
+  "keywords": [
+    "epistemic quorum poisoning",
+    "cross source weak signal collusion",
+    "temporal quorum skew",
+    "role weighted quorum hijack",
+    "schema alias quorum forgery",
+    "two of three sources poisoned",
+    "fresh source vs stale cached majority",
+    "trusted role over weighted vote",
+    "alias drift fake agreement on defaults",
+    "consensus mistaken for truth",
+    "majority vote shaped by attacker",
+    "quorum without provenance diversity"
+  ],
+  "regex": [
+    "(?i)(?:(?:two|majority|coordinated)\\s+(?:of\\s+three\\s+)?(?:sources?|feeds?|signals?)\\s+(?:poison\\w+|tainted|corrupt\\w+)\\s+(?:so|to|that)\\s+(?:quorum|consensus|majority|vote)\\s+(?:passes?|wins?|agrees?)|(?:role|reviewer|trusted)\\s+(?:metadata|weight|tag)\\s+(?:over[- ]?weight\\w*|inflate\\w+|spoof\\w+)\\s+(?:vote|quorum|consensus)|(?:stale|cached|prior)\\s+(?:sources?|copies?)\\s+(?:appear\\s+to\\s+)?(?:agree|consent|concur)\\s+(?:on|with)\\s+(?:default|N/A|0))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-138"
+}

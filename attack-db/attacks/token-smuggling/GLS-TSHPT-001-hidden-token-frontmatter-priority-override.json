@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TSHPT-001",
+  "name": "Hidden Token Frontmatter Priority Override",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a hidden or smuggled token or annotation in frontmatter or metadata that claims authority precedence to override or bypass policy and execution gate guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:token|frontmatter|metadata|annotation|comment\\s+block|hidden\\s+tag)\\b)(?=.*\\b(?:hidden|smuggled|injected|embedded|covert)\\b)(?=.*\\b(?:policy|guardrail|execution\\s+gate|verification)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|ignore(?:d|s)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:priority|precedence|authority|instruction\\s+order)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TSHPT-001"
+}

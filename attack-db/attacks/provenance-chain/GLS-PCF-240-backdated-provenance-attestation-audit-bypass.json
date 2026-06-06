@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PCF-240",
+  "name": "Backdated Provenance Attestation Audit Bypass",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged attestation or receipt with a retroactively backdated or reconstructed lineage used to bypass audit, integrity, or validation checkpoints.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:provenance|lineage|chain(?:\\s|-)*of(?:\\s|-)*custody|attestation|receipt)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:backfill|retro(?:active|actively)?|rewrite|reconstruct|postdate|antedate)\\b)(?=.*\\b(?:verification|verifier|audit|integrity|validation|checkpoint)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|s|ping)?|ignore(?:d|s|ing)?|waiv(?:e|ed|es|ing))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-240"
+}

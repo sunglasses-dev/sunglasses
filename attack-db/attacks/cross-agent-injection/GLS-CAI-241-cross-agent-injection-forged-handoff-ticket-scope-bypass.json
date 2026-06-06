@@ -1,0 +1,33 @@
+{
+  "id": "GLS-CAI-241",
+  "name": "Cross-agent injection \u2014 forged handoff ticket scope bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects cross-agent injection variant where a forged, spoofed, replayed, fabricated, or stolen approval ticket, signoff receipt, or delegation token from an upstream, downstream, peer, or delegate agent is used to justify bypassing scope, boundary, permission, policy, guardrail, or verification controls. Covers ticket-forgery attacks on A2A trust handoffs.",
+  "keywords": [
+    "forged approval ticket bypass scope guardrails",
+    "fabricated signoff receipt ignore permission scope",
+    "spoofed delegation approval token skip policy",
+    "replayed delegated token override boundary verification",
+    "stolen handoff ticket override scope policy",
+    "cross-agent receipt replayed bypass verification boundary",
+    "agent-to-agent fabricated signoff circumvent permission",
+    "delegate receipt forgery disable boundary verification"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:cross[- ]agent|delegat(?:e|ed|ion)|handoff|upstream\\s+agent|downstream\\s+agent|agent-to-agent|another\\s+agent|peer\\s+agent)\\b)(?=.*\\b(?:ticket|receipt|approval|signoff|token)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed)?|replay(?:ed)?|fabricat(?:e|ed|ion)|stolen)\\b)(?=.*\\b(?:scope|boundary|permission|policy|guardrails?|verification)\\b)(?=.*\\b(?:bypass|override|ignore|skip|disable|circumvent)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-241"
+}

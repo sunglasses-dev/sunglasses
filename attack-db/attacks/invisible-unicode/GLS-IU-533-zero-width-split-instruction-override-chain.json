@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IU-533",
+  "name": "Zero-Width Split Instruction Override Chain",
+  "version": "1.0",
+  "category": "invisible_unicode",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text containing zero-width Unicode characters (U+200B, U+200C, U+200D, U+FEFF) used to split override or bypass directive keywords such as 'ignore', 'override', or 'bypass' targeting previous system or safety instructions.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*(?:\\u200b|\\u200c|\\u200d|\\ufeff|&#8203;|&#8204;|&#8205;|&#xfeff;|\\\\u200[bcd]|\\\\ufeff))(?=.*(?:\\bi[\\u200b\\u200c\\u200d\\ufeff]*gnore(?:d|ing)?\\b|\\boverri[\\u200b\\u200c\\u200d\\ufeff]*de(?:s|d|ing)?\\b|\\boverrid(?:e|es|ing|den)\\b|\\bbypass(?:ed|ing)?\\b|\\bdisregard(?:ed|ing|s)?\\b))(?=.*\\b(?:previous|prior|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\\b).{0,600}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IU-533"
+}

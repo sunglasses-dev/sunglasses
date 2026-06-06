@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-163",
+  "name": "Primary Anchor Omission Fallback Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker omits or corrupts primary anchor fields so a fallback chain (kpi_snapshot to kpis to top-level) resolves to attacker-controlled values, laundering forged metrics into pipelines that require measured anchors.",
+  "keywords": [
+    "fallback chain laundering",
+    "kpi_snapshot fallback abuse",
+    "top level kpi spoof",
+    "measured anchor downgrade",
+    "fallback precedence hijack",
+    "secondary kpi source poisoning",
+    "anchor field omission forces fallback",
+    "spoofed fallback object",
+    "fallback path returns attacker value",
+    "anchor precedence inversion",
+    "laundered anchor via fallback",
+    "fallback chain attacker controlled"
+  ],
+  "regex": [
+    "(?i)(?:measured\\s+anchor\\s+(?:fallback|chain)\\s+(?:launder|abuse|hijack)|(?:fallback|kpi)\\s+(?:chain|precedence)\\s+(?:launder|hijack|invert|abuse))",
+    "(?i)(?:(?:kpi_snapshot|kpis)\\s+(?:fallback|to\\s+top[- ]level)\\s+(?:abuse|spoof|poison)|(?:primary|canonical)\\s+(?:anchor|kpi)\\s+(?:omitted|missing)\\s+(?:forces|triggers)\\s+fallback)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-163"
+}

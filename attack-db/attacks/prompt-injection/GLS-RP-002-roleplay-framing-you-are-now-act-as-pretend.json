@@ -1,0 +1,45 @@
+{
+  "id": "GLS-RP-002",
+  "name": "Roleplay framing \u2014 you are now / act as / pretend",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Persona-override attack framing. Forces the agent to adopt an alternate identity that bypasses its guidelines.",
+  "keywords": [
+    "you are now",
+    "from now on you are",
+    "from now on, you are",
+    "act as a",
+    "act as an",
+    "pretend you are",
+    "pretend to be",
+    "play the role of",
+    "you will now",
+    "you must now",
+    "let's play a game where",
+    "let us play a game where",
+    "imagine you are",
+    "assume you are",
+    "assume the role of",
+    "take on the role of",
+    "roleplay as",
+    "role-play as",
+    "pretend you have no",
+    "imagine you had no",
+    "suppose you had no"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-002"
+}

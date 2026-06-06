@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-259",
+  "name": "Forged Trust Cache TTL Override Rerank Guardrail Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects forged retrieval or citation entries that tamper with a trust cache TTL/expiry so poisoned evidence stays live and reranks results past guardrails.",
+  "keywords": [
+    "forge retrieval trust cache entries extend ttl",
+    "tamper the citation cache entry with poisoned",
+    "poison knowledge base retrieval records set expiration",
+    "forged retrieval packet tamper trust cache ttl",
+    "rewrite citation retrieval cache with forged source",
+    "tampering runbook poison trust cache entry alter",
+    "inject forged retrieval evidence into cache extend",
+    "forged citation-layer operation poisons trust cache rewrites"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without|did\\s+not|does\\s+not)\\s+(?:forge|tamper|override|bypass|rerank|poison)\\b)(?=.*\\b(?:retrieval|citation|knowledge\\s+base|trust\\s+cache|cache\\s+entry)\\b)(?=.*\\b(?:forge|forged|tamper(?:ed|ing)?|poison(?:ed|ing|s)?|rewrite|rewrites)\\b)(?=.*\\b(?:ttl|time[-\\s]+to[-\\s]+live|expiry|expiration)\\b)(?=.*\\b(?:rerank|re-rank|priority|weight(?:ing)?)\\b)(?=.*\\b(?:override|bypass(?:es)?|disable|skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-259"
+}

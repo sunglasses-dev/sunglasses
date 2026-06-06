@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-005",
+  "name": "DNS TXT Ownership Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A DNS TXT ownership or verification record mixes a legitimate domain-proof token with AI-agent-facing instructions that claim policy authority, suppress audit findings, or request local secrets.",
+  "keywords": [
+    ",",
+    "AI auditor",
+    "DNS TXT",
+    "LLM",
+    "TXT record",
+    "_acme-challenge",
+    "agent",
+    "apple-domain-verification",
+    "assistant",
+    "atlassian-domain-verification",
+    "compliance bot",
+    "crawler",
+    "domain ownership",
+    "domain verification",
+    "facebook-domain-verification"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:dns\\s*txt|txt\\s+record|_acme-challenge|google-site-verification|facebook-domain-verification|apple-domain-verification|atlassian-domain-verification|\\bms=|domain[-\\s]*(?:ownership|verification)|ownership\\s+proof))(?=.*(?:ai\\s*(?:agent|assistant|auditor|crawler)|assistant|agent|llm|scanner|verifier|crawler|compliance\\s+bot))(?=.*(?:highest[-\\s]?priority|outranks?|ignore\\s+(?:system|developer|repository|previous)\\s+(?:rules|instructions)|override\\s+(?:system|developer|repository|policy)|do\\s+not\\s+report|suppress\\s+(?:warnings|findings|scanner)|mark\\s+(?:domain|ownership|verification|checks?)\\s+pass|disable\\s+(?:scanner|security)|(?:send|forward|include)\\s+.{0,60}\\b(?:env|token|secret|credential|api[_-]?key)s?\\b))(?!.*(?:never|do\\s+not|must\\s+not|should\\s+not)\\s+(?:obey|follow|trust|treat).{0,80}(?:dns\\s*txt|txt\\s+record|domain\\s+verification|ownership\\s+proof).{0,80}(?:override|outrank|highest[-\\s]?priority)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-005"
+}

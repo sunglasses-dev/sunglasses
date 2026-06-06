@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-333",
+  "name": "Agent-to-Agent Delegation Privilege Circumvention",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged agent-to-agent handoff token or delegation receipt used to escalate privilege and circumvent approval guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:handoff|delegate|delegation|agent-to-agent|a2a|receipt|token|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|capability)\\b)(?=.*\\b(?:bypass|override|skip|ignore|evad(?:e|ed|ing)|disable|circumvent)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval\\s+gate|safety\\s+check|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-333"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-008",
+  "name": "Event stream delimiter injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message",
+    "api_response",
+    "file"
+  ],
+  "description": "Event-stream and chunked-output toolchains often parse separators (---, JSONL newlines, SSE data: frames, markdown fences) as control boundaries. Attackers can inject delimiter-shaped payloads into low-trust content so the orchestrator mis-frames data as new instructions, bypassing normal prompt/tool priority rules.",
+  "keywords": [
+    "inject sse delimiter",
+    "fake event frame",
+    "splice sse data",
+    "jsonl record breakout",
+    "markdown fence pivot",
+    "csv injection shift columns",
+    "frame splicing attack",
+    "control boundary injection",
+    "delimiter-shaped payload",
+    "data: prefix injection",
+    "triple-backtick close pivot",
+    "newline plus brace breakout"
+  ],
+  "regex": [
+    "(?i)(?:inject|splice|forge|fabricate)\\s+(?:fake|forged|spoofed|extra|hostile)\\s+(?:sse|event|jsonl|csv|markdown)\\s+(?:frame|record|delimiter|fence)",
+    "(?i)(?:sse|jsonl|markdown|csv)\\s+(?:delimiter|fence|frame|record)\\s+(?:injection|breakout|pivot|poison|splice)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-008"
+}

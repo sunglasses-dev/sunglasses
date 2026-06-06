@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-034",
+  "name": "Append-Only Status Log Entry Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "message"
+  ],
+  "description": "Attacker injects or forges append-only operational status artifacts (CAVA_REPLY, wins-log, cron acknowledgements) so the agent's GO MODE reads fabricated success signals as ground truth, advancing pipelines on work that never ran or hiding failures behind ghost log lines.",
+  "keywords": [
+    "cava reply log forgery",
+    "append-only status drift",
+    "cron reply timestamp spoof",
+    "wins log fabricated entry",
+    "operational truth source poisoning",
+    "go mode status injection",
+    "fake completion log line",
+    "ghost reply append",
+    "status artifact rewrite",
+    "log gap silent skip",
+    "spoofed cron acknowledgement",
+    "out-of-band log entry"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|fabricate|inject|append)\\s+(?:cava[- ]reply|wins[- ]log|status[- ]log|reply[- ]log)\\s+(?:entry|line|artifact)|(?:append[- ]only|status)\\s+(?:log|artifact|channel)\\s+(?:drift|forgery|poisoning))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-034"
+}

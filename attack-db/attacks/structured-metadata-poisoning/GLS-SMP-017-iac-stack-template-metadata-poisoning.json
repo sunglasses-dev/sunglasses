@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-017",
+  "name": "IaC stack template metadata poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "IaC stack/template metadata fields can smuggle agent-facing policy instructions that tell AI DevOps, cloud-security, or deployment-review agents to treat attacker-controlled descriptions as authoritative, suppress drift/security findings, or forward cloud credentials and local runtime context.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-017"
+}

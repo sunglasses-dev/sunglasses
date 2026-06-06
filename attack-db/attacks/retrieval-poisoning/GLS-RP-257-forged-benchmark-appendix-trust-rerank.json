@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-257",
+  "name": "Forged Benchmark Appendix Trust Rerank",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged benchmark scorecard or appendix used to claim trusted-source authority and rerank or promote results while overriding policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|fabricated|counterfeit|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:benchmark|eval(?:uation)?|scorecard|leaderboard)\\b)(?=.*\\b(?:appendix|footnote|supplement|annex|addendum)\\b)(?=.*\\b(?:rerank(?:ed|s|ing)?|reroute(?:d|s|ing)?|reprioritiz(?:e|ed|es|ing)|promot(?:e|ed|es|ing))\\b)(?=.*\\b(?:trust|authority|credibility|verified\\s+source|trusted[-\\s]+source|provenance)\\b)(?=.*\\b(?:override(?:d|s|ing)?|bypass(?:ed|es|ing)?|waiv(?:e|ed|es|ing)|ignore(?:d|s|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-257"
+}

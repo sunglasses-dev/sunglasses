@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIPH-001",
+  "name": "Revoked Agent Token Handoff Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or delegate presents a revoked, expired, stale, or forged token, ticket, or capability during a handoff or approval step in order to override, bypass, or escalate past policy and guardrail controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:revoked|expired|stale|invalid|forged|spoofed|fabricated)\\b)(?=.*\\b(?:token|ticket|capability|credential|attestation)\\b)(?=.*\\b(?:handoff|delegate|approval|authorization|policy|guardrail)\\b)(?=.*\\b(?:override|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|escalat(?:e|ed|ion)|rebind)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIPH-001"
+}

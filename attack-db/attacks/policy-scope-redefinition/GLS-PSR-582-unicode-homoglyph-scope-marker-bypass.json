@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-582",
+  "name": "Unicode Homoglyph Scope Marker Bypass",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attackers hide control directives in Unicode confusables, zero-width marks, or emoji bullets so the rendered text looks benign to operators while normalization or tokenization expands the payload into policy-changing instructions at execution time.",
+  "keywords": [
+    "homoglyph verb swap",
+    "cyrillic confusable allow deny",
+    "emoji scope marker",
+    "hidden precedence emoji",
+    "zero-width control directive",
+    "bidi mark policy bypass",
+    "nfc nfkc normalization split",
+    "rendered plaintext mismatch",
+    "unicode confusable policy evasion",
+    "tokenization-time policy flip",
+    "script-mixing policy term",
+    "human-review pass machine-execute fail"
+  ],
+  "regex": [
+    "(?i)(?:(?:homoglyph|confusable|unicode|cyrillic|zero[- ]?width|bidi|directional\\s+mark)\\s+(?:swap|bypass|evasion|injection|smuggle)|(?:emoji|emoji[- ]bullet)\\s+(?:scope\\s+marker|hidden\\s+precedence|override\\s+(?:guardrail|policy))|(?:nfc|nfkc|normalization)\\s+(?:split|drift|mismatch)\\s+(?:flips?|mutates?|changes?)\\s+(?:policy|token|directive))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-582"
+}

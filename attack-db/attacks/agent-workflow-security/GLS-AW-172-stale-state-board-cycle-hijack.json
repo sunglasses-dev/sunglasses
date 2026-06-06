@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-172",
+  "name": "Stale State Board Cycle Hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker keeps or reintroduces stale canonical state board content so outdated DONE, BLOCKED, or DECISIONS entries authoritatively drive the agent's current cycle, hijacking GO MODE with old context.",
+  "keywords": [
+    "canonical state board staleness",
+    "company_timeline outdated trusted",
+    "stale board overrides live",
+    "old done entry reused",
+    "stale blocked list authority",
+    "frozen state board hijack",
+    "agent trusts old board snapshot",
+    "board freshness gate missing",
+    "stale open_questions coerce action",
+    "outdated decisions authority",
+    "company timeline drift",
+    "board mtime ignored"
+  ],
+  "regex": [
+    "(?i)(?:canonical\\s+(?:state\\s+)?board\\s+(?:staleness|stale|drift)\\s+(?:hijack|exploit|abuse)|(?:stale|outdated|frozen)\\s+(?:company[_\\s-]?timeline|state\\s+board|board)\\s+(?:treated\\s+as|trusted\\s+as|outranks)\\s+(?:live|current|fresh))",
+    "(?i)(?:(?:old|stale)\\s+(?:DONE|IN_PROGRESS|BLOCKED|DECISIONS|OPEN_QUESTIONS)\\s+(?:entry|line|block)\\s+(?:reused|trusted|authoritative)|board\\s+(?:freshness|mtime)\\s+(?:gate\\s+)?(?:missing|skipped|ignored))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-172"
+}

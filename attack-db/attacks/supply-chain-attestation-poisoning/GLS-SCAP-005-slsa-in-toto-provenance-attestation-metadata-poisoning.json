@@ -1,0 +1,40 @@
+{
+  "id": "GLS-SCAP-005",
+  "name": "SLSA / in-toto provenance attestation metadata poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Build provenance attestations such as SLSA, in-toto Statement, DSSE envelopes, and Sigstore/Rekor metadata can carry agent-directed policy text that tells AI dependency auditors to treat the attestation as scanner authority, suppress findings, or forward runtime credentials/local state.",
+  "keywords": [
+    "DSSE",
+    "Rekor",
+    "SLSA",
+    "Sigstore",
+    "Statement",
+    "agent_note",
+    "assistant_instructions",
+    "attestation",
+    "buildDefinition",
+    "builder.id",
+    "in-toto",
+    "materials",
+    "payloadType",
+    "predicate",
+    "predicateType"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|vulnerability|training|reference|guide|documentation|docs?|blog|report).{0,120}?\\b(?:detected|blocked|flagged|refused|reported|must\\s+report|should\\s+(?:report|detect|flag|refuse|block)|must\\s+not\\s+(?:obey|treat|follow|include|attach|forward|send|share|overrides?|trust)|do\\s+not\\s+(?:obey|treat|follow|include|attach|forward|send|share|overrides?|trust)|never\\s+(?:obey|treat|include|attach|forward|send|share|overrides?|trust))\n  |\\b(?:do\\s+not\\s+(?:obey|treat|follow)|does\\s+not\\s+(?:obey|follow|override|overrides?|supersede|supersedes|instruct)|never\\s+(?:obey|treat|override|overrides?|supersede|supersedes)|must\\s+not\\s+(?:obey|treat|follow))\\b.{0,120}?\\b(?:SLSA|in[-\\s]?toto|attestations?|provenance|DSSE|Sigstore|Rekor)\\b\n  |\\b(?:no\\s+(?:policy\\s+)?overrides?|not\\s+(?:authoritative|canonical|policy)|does\\s+not\\s+instruct\\s+agents?)\\b\n))\n(?=.*(?:\\bSLSA\\b|slsa\\.dev/provenance|in[-\\s]?toto|https://in-toto\\.io/Statement|predicateType|payloadType|DSSE|dsseEnvelope|Sigstore|Rekor|slsa-verifier|attestations?|provenance|buildDefinition|runDetails|materials?|builder\\.id|\"builder\"\\s*:|\"subject\"\\s*:|\"predicate\"\\s*:))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|agents?|assistants?|LLMs?|models?|autonomous\\s+(?:auditors?|scanners?|agents?)|dependency\\s+(?:scanners?|auditors?|reviewers?)|supply[-\\s]?chain\\s+(?:agents?|auditors?|scanners?)|security\\s+scanners?|provenance\\s+(?:auditors?|reviewers?)|scanner|auditor|reviewer|verifier|agent_note|agent_policy|scanner_policy|assistant_instructions|x[-_]?agent[-_]?policy)(?![A-Za-z0-9]))\n(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|canonical(?:\\s+(?:release|build|provenance|vendor|security|policy))?(?:\\s+(?:description|policy|document))?|definitive(?:\\s+(?:release|build|provenance|security))?(?:\\s+(?:description|policy))?|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|\\bauthoritative\\b|defines?\\s+(?:all\\s+)?(?:scanner|security|agent|automated|build|provenance)?\\s*rules?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency|supply[-\\s]?chain|provenance)\\s+(?:review|audit|scan)|(?:agent|scanner|assistant|auditor|verifier)\\s+(?:instructions?|directive|policy|notice)|(?:main|primary|principal|preferred)\\s+(?:operating\\s+)?(?:review|audit|scanner|dependency|provenance|supply[-\\s]?chain|release|build)?\\s*(?:guidance|playbook|policy|instructions?)))\n(?=.*(?:suppress(?:es|ed|ing)?.{0,50}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?|license|malware)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|do\\s+not\\s+(?:report|flag).{0,40}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|omit.{0,50}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?|CVEs?)|exclude.{0,50}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|redact.{0,50}?(?:findings?|warnings?|flags?|observations?|diagnostics?|results?)|skip\\b.{0,50}?\\b(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|observations?|diagnostics?|results?)|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign)|mark.{0,50}?as\\s+(?:informational|safe|clean|low|none)|classify.{0,50}?(?:as\\s+)?(?:informational|low|none|false\\s+positive|non[-\\s]?blocking)|downgrade.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|CVEs?|license|malware).{0,80}?(?:background\\s+notes?|background-only|informational|non[-\\s]?blocking)|(?:keep|leave).{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|CVEs?|license|malware).{0,30}?out\\s+of\\s+(?:the\\s+)?(?:audit\\s+memo|release\\s+memo|build\\s+memo|summary|report|final\\s+report|memo)|(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:Authorization|Bearer|cookies?|session\\s+(?:headers?|tokens?|keys?)|API\\s+(?:keys?|tokens?)|auth\\s+(?:headers?|tokens?|keys?)|credentials?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?|material|proof)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|build\\s+credentials?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCAP-005"
+}

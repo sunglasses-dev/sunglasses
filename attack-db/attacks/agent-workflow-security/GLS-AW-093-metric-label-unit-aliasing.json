@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-093",
+  "name": "Metric Label Unit Aliasing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates how numeric metrics are labeled or scaled (swapping ms/s, bytes/MB, percent/bps, count/rate) so the same underlying values fall under or over thresholds, silently degrading alerting, KPI gates, and capacity decisions.",
+  "keywords": [
+    "metric unit aliasing",
+    "ms vs seconds confusion",
+    "bytes vs megabytes swap",
+    "rate per second vs per minute",
+    "percent vs basis points",
+    "unit label spoof",
+    "absolute count framed as rate",
+    "unit suffix omission",
+    "mixed unit reporting",
+    "scale exponent drift",
+    "implicit unit assumption",
+    "kpi unit relabeling"
+  ],
+  "regex": [
+    "(?i)(?:swap|alias|relabel|drop)\\s+(?:metric\\s+)?(?:unit|label|suffix)\\s+(?:so|to\\s+make)\\s+(?:value|number|metric)\\s+(?:look|appear|seem)\\s+(?:smaller|larger|safer|better)|(?:ms|seconds|bytes|mb|gb|bps|qps)\\s+(?:vs|swapped\\s+with|aliased\\s+to)\\s+(?:ms|seconds|bytes|mb|gb|bps|qps)",
+    "(?i)(?:absolute|raw)\\s+(?:count|number)\\s+(?:reported|framed|presented)\\s+as\\s+(?:rate|percentage|ratio)|(?:percent|basis\\s+points|bps)\\s+(?:confusion|aliasing|drift)\\s+(?:hides?|masks?|suppresses?)\\s+(?:threshold|breach|alert)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-093"
+}

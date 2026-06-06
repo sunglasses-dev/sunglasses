@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-262",
+  "name": "RAG Attestation Provenance Escalation Boost",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged provenance attestation or signature injected into a RAG corpus used to boost rank or escalate trust and override guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|index|corpus|source|document|citation|knowledge\\s*base|kb)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|tamper(?:ed|ing)|inject(?:ed|ing)|seed(?:ed|ing)|backdat(?:e|ed|ing))\\b)(?=.*\\b(?:provenance|lineage|attestation|signature|digest|checksum|badge|stamp)\\b)(?=.*\\b(?:overrid(?:e|es|ing|en|ed)|overrode|bypass|escalat(?:e|ed|ing)|boost(?:ed|ing)?|promot(?:e|ed|ing)|rank\\s*(?:override|boost)|trust\\s*(?:override|boost)|policy\\s*(?:override|bypass))\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-262"
+}

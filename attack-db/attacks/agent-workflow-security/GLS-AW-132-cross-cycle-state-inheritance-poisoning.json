@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-132",
+  "name": "Cross-Cycle State Inheritance Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker seeds one cron cycle with manipulative state so future cycles inherit it as trusted already-verified context, propagating false READY posture, stale anchors, or sticky guardrail bypasses without an obvious single-event compromise.",
+  "keywords": [
+    "cron state carryover poisoning",
+    "last good replay poisoning",
+    "cross cycle target date confusion",
+    "guardrail downgrade carried exception",
+    "state board precedence hijack",
+    "stale ready marker inheritance",
+    "temporary bypass becomes sticky",
+    "prior verdict text overrides current",
+    "cycle to cycle status propagation",
+    "synthetic stale ready injection",
+    "non canonical state outranks board",
+    "carryover trust shortcut"
+  ],
+  "regex": [
+    "(?i)(?:(?:stale|prior|previous)\\s+(?:cycle|run|verdict)\\s+(?:READY|status|state)\\s+(?:inherit\\w*|carried?|propagat\\w*)\\s+(?:into|to|across)\\s+(?:next|future|new)\\s+(?:cycle|run)|(?:temporary|one[- ]?cycle|bypass)\\s+(?:exception|note|skip)\\s+(?:becomes?|persists?|sticks?)\\s+(?:permanent|sticky|policy)|(?:prior|historical|carried)\\s+(?:state|verdict|status)\\s+(?:overrides?|outranks?|displaces?)\\s+(?:current|measured|fresh)\\s+(?:anchor|input|evidence))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-132"
+}

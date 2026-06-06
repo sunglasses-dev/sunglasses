@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-005",
+  "name": "JSON Feed extension agent policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "JSON Feed documents can hide agent-directed authority inversion, secret disclosure, or report-suppression instructions in `_extensions` or feed/item text fields that AI feed readers and scanners may ingest as discovery metadata.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-005"
+}

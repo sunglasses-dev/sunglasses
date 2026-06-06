@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-151",
+  "name": "Cron Date Freshness Verdict Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker manipulates date or freshness signals in cron-driven agent pipelines (filename date laundering, postrun proof reuse, timezone ambiguity) so the system emits a READY verdict despite stale or wrong-cycle bundles, silently degrading downstream decisions.",
+  "keywords": [
+    "fresh but wrong day override",
+    "filename date laundering",
+    "target date gate bypass",
+    "timezone ambiguity coercion",
+    "postrun proof misdirection",
+    "stale bundle accepted as ready",
+    "date match field omitted",
+    "cycle date mismatch ignored",
+    "ambiguous latest bundle good",
+    "freshness gate without date gate",
+    "utc pt boundary shift",
+    "bundle date drift ready flag"
+  ],
+  "regex": [
+    "(?i)(?:(?:fresh|latest)\\s+(?:bundle|input|artifact)\\s+(?:but\\s+)?(?:wrong|stale|mismatched)\\s+(?:day|date|cycle)|(?:bundle|cycle|target)\\s+date\\s+(?:mismatch|drift|skew)\\s+(?:ignored|suppressed|accepted)|(?:postrun|prior)\\s+(?:pass|verify)\\s+(?:as|treated\\s+as)\\s+(?:readiness|ready)\\s+(?:proof|evidence))",
+    "(?i)(?:(?:timezone|utc|pt)\\s+(?:ambiguity|boundary|shift)\\s+(?:coerc|fool|trick)|filename\\s+date\\s+laundering|freshness\\s+gate\\s+without\\s+(?:target[- ]date|date[- ]match)\\s+gate)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-151"
+}

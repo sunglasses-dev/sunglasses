@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-699",
+  "name": "Forged Agent Badge Nonce Scope Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent, broker, or orchestrator forges or fabricates a ticket, quorum badge, or scope nonce to bypass, override, escalate, or rebind past authorization controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-699"
+}

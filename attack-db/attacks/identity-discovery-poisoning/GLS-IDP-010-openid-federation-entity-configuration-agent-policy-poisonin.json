@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-010",
+  "name": "OpenID Federation Entity Configuration Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled OpenID Federation entity configuration embeds non-standard `agent_policy` / `metadata_policy` text that tells AI agents to treat federation metadata as higher-priority operator authority, disclose local auth context, or suppress reports.",
+  "keywords": [
+    "), or report suppression (",
+    "), sensitive auth/local-state requests (",
+    ",",
+    ", cookies, env vars,",
+    "/.well-known/openid-federation",
+    "AI agent",
+    "LLM",
+    "agent_policy",
+    "agentic",
+    "assistant",
+    "authority_hints",
+    "autonomous scanner",
+    "autonomous verifier",
+    "crawler_notice",
+    "entity configuration"
+  ],
+  "regex": [
+    "(?is)^(?!(?=.*\\b(?:must\\s+not|should\\s+not|never|cannot|can't|do\\s+not)\\b.{0,80}\\b(?:treat|obey|send|include|forward|attach|expose)\\b))(?=.*(?:openid[-_\\s]*federation|openid-federation|entity\\s+configuration|\\.well-known/openid-federation|federation[_\\s-]*entity|trust[_\\s-]*anchor|authority[_\\s-]*hints))(?=.*(?:ai\\s+agent|assistant|autonomous\\s+(?:scanner|verifier|crawler)|llm|agentic|security\\s+scanner))(?=.*(?:metadata[_\\s-]*policy|x[-_]?agent[-_]?policy|agent[_\\s-]*policy|trust\\s+chain|authority[_\\s-]*hint|federation\\s+operator|trust\\s+anchor))(?=.*(?:supersede|outrank|override|higher[-\\s]*priority|treat\\s+(?:this|the)\\s+(?:entity\\s+configuration|federation\\s+statement|trust\\s+chain)\\s+as\\s+(?:operator|owner|policy)\\s+authority|canonical\\s+(?:operator|issuer|federation)\\s+policy|send|include|forward|attach|expose|Authorization|Bearer|cookie|environment\\s+variables?|client_secret|suppress|do\\s+not\\s+(?:report|notify|mention))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-010"
+}

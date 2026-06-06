@@ -1,0 +1,36 @@
+{
+  "id": "GLS-AW-022",
+  "name": "Control plane status forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "log",
+    "tool_output",
+    "file"
+  ],
+  "description": "Control-plane status messages (\"healthy\", \"verified\", \"ready\", \"green\") are often trusted as gate signals by agent workflows. If an attacker can inject forged status artifacts into tool outputs, logs, or bridge files, the agent can skip validation gates and execute high-impact actions under false confidence. This creates a silent escalation path: no explicit jailbreak phrase is needed, just counterfeit health/approval state.",
+  "keywords": [
+    "healthcheck verdict forgery",
+    "cross-file status shadowing",
+    "reason-code laundering",
+    "approval-state replay",
+    "fake STATUS PASS line",
+    "counterfeit health state",
+    "rate_limit aliased as normal",
+    "stale approved hash new payload",
+    "second latest status file forged"
+  ],
+  "regex": [
+    "(?i)(?:forge|inject|fabricate|emit)\\s+(?:STATUS|HEALTH(?:CHECK)?|VERDICT)\\s*[:=]\\s*(?:PASS|OK|HEALTHY|GREEN|READY|VERIFIED)",
+    "(?i)(?:reason[- ]code|failure[- ]reason|error[- ]class)\\s+(?:launder|alias|rewrite|swap|rename)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-022"
+}

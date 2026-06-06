@@ -1,0 +1,34 @@
+{
+  "id": "GLS-BMP-005",
+  "name": "Gradle / Maven Build Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Gradle and Maven build metadata can smuggle agent-facing authority, report-suppression, or credential-forwarding instructions into files that AI dependency reviewers and security scanners often ingest as project context.",
+  "keywords": [
+    "agent_instructions",
+    "assistant_note",
+    "build.gradle(.kts)",
+    "ext",
+    "extra",
+    "gradle.properties",
+    "pom.xml",
+    "scanner_policy",
+    "settings.gradle(.kts)"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?|documentation).{0,140}?(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:report|detect|flag|refuse|block))|(?:build\\s+metadata|package\\s+metadata|Gradle|Maven|pom\\.xml|build\\.gradle|settings\\.gradle).{0,140}?(?:is\\s+not|does\\s+not|do\\s+not|never|must\\s+not|should\\s+never).{0,100}?(?:authoritative|policy|override|overrides?|supersede|obey|trusted)|(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat)))\n(?=.*(?:pom\\.xml|build\\.gradle(?:\\.kts)?|settings\\.gradle(?:\\.kts)?|gradle\\.properties|Maven\\s+POM|Gradle\\s+build|Maven\\s+project|<project\\b|<description>|<properties>|<plugin>|<profiles?>|groupId|artifactId|dependencyManagement|extra\\s*\\[|ext\\s*\\{|(?<!\\w)\"(?:description|name|group|version|ext|extraProperties)\"\\s*:|(?<![a-zA-Z0-9])(?:x-agent-policy|scanner_policy|agent_instructions|assistant_note)(?![a-zA-Z0-9])))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|copilot|codex|claude|llms?|dependency[-_\\s]?scanners?|security[-_\\s]?scanners?|build[-_\\s]?auditors?|scanners?|scanner\\s+directives?|automated[-_\\s]?(?:review|dependency\\s+review)|scanner_policy|agent_instructions|assistant_note)(?![a-zA-Z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|overrules?|governing\\s+document|controlling\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|authoritative|canonical\\s+(?:project\\s+|build\\s+|dependency\\s+)?(?:description|policy|guidance)|definitive\\s+(?:project\\s+|build\\s+|dependency\\s+)?(?:description|policy|guidance)|(?:main|primary|principal)\\s+(?:operating\\s+)?(?:(?:review|audit|dependency|scanner|build)\\s+)?(?:guidance|playbook|policy)|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency|build)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|dependency|build)\\s+rules?)|(?:agent|scanner|assistant|dependency\\s+scanner|build\\s+auditor)\\s+(?:instructions?|directives?|policy)))\n(?=.*(?:(?:suppress|hide|redact|exclude|omit|skip|downgrade|reclassify)(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVEs?|licenses?|dependencies?|builds?|tests?)\\b|(?:treat|mark|classify|flag).{0,60}?\\b(?:informational|non-blocking|safe|clean|benign|advisory-only|background(?:-only)?|low\\s+priority)\\b|(?:keep|leave).{0,80}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|CVEs?|dependency\\s+alerts?).{0,40}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|build\\s+memo|final\\s+report|release\\s+summary)\\b|(?:move|route|shift).{0,80}?\\b(?:observations?|findings?|diagnostics?|results?|issues?|alerts?|dependency\\s+alerts?).{0,80}?\\b(?:appendix-only|background-only|informational|non-blocking)\\b|(?:do\\s+not|don't|not)\\s+(?:flag|report|escalate).{0,60}?(?:findings?|warnings?|issues?|observations?|diagnostics?|results?)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,5}(?:API\\s+tokens?|session\\s+(?:keys?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material)|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|auth(?:orization)?\\s+headers?|secrets?|execution\\s+context|build\\s+runtime\\s+material)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-005"
+}

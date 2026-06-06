@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-043",
+  "name": "Gap-Fill Fabrication Pressure",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects instructions that pressure the agent to fill missing evidence with plausible defaults or fabricated values instead of emitting N/A or deferring, so downstream pipelines treat invented data as verified facts.",
+  "keywords": [
+    "fill missing evidence with default",
+    "ship even if data missing",
+    "never emit n/a directive",
+    "plausible default coercion",
+    "skip defer instruction",
+    "fabricate to avoid blank",
+    "must produce output pressure",
+    "hallucinate to satisfy template",
+    "no nulls allowed pressure",
+    "complete every field even guessing",
+    "coerce model to invent value",
+    "gap-fill instead of abstain"
+  ],
+  "regex": [
+    "(?i)(?:(?:fill|complete|invent|fabricate|guess|hallucinate)\\s+(?:missing|absent|gap|empty)\\s+(?:evidence|field|value|data)\\s+(?:with|using)\\s+(?:plausible|reasonable|default)|(?:never|do\\s+not|don't)\\s+(?:emit|return|output)\\s+(?:n\\/?a|null|blank|empty|tbd|defer))",
+    "(?i)(?:(?:must|always|just)\\s+(?:produce|ship|complete|return)\\s+(?:output|result|answer)\\s+(?:even|regardless)\\s+(?:of|if)\\s+(?:missing|unknown|incomplete)|gap[- ]fill\\s+coercion)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-043"
+}

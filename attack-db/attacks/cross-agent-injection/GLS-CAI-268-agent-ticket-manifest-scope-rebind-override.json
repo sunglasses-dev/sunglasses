@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-268",
+  "name": "Agent Ticket Manifest Scope Rebind Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged ticket, nonce, or manifest used in an agent handoff to rebind scope or privilege and override guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|delegation|handoff|coordinator|worker|planner|peer)\\b)(?=.*\\b(?:forged|spoofed|fabricated|counterfeit|fake)\\b)(?=.*\\b(?:ticket|nonce|token|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail|authorization|boundary)\\b)(?=.*\\b(?:override|overrides|overrode|bypass|bypasses|bypassed|rebind|rebinds|rebound|escalate|escalates|escalated)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-268"
+}

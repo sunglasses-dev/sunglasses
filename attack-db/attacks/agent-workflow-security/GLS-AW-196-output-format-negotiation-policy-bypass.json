@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-196",
+  "name": "Output Format Negotiation Policy Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates output format negotiation to steer the agent into a response shape whose parser or downstream policy is weaker, using format choice as a control-boundary exploit rather than presentation.",
+  "keywords": [
+    "output format negotiation hijack",
+    "format-as-control-boundary abuse",
+    "force unsafe response shape",
+    "json mode coercion",
+    "markdown to executable shape pivot",
+    "format flag injection",
+    "schema negotiation manipulation",
+    "downgrade structured output",
+    "force free-text to evade parser",
+    "content-type spoofing",
+    "format steering for escape",
+    "negotiated shape policy gap"
+  ],
+  "regex": [
+    "(?i)(?:(?:output|response)\\s+(?:format|shape|schema)\\s+(?:negotiation|hijack|steer|coerce)|(?:force|coerce|switch)\\s+(?:to|into)\\s+(?:json|markdown|table|free[- ]?text)\\s+(?:to\\s+)?(?:bypass|evade|escape)\\s+(?:parser|policy|filter)|(?:content[- ]?type|format[- ]?flag)\\s+(?:spoof|injection|abuse))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-196"
+}

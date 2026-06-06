@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-010",
+  "name": "IIIF manifest agent-policy poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detect IIIF Presentation API manifests or adjacent IIIF metadata that embed AI-agent/scanner-directed instructions to override higher-priority rules, suppress findings, or forward local secrets.",
+  "keywords": [
+    "@context",
+    "AI",
+    "API keys",
+    "LLM",
+    "Presentation API",
+    "agent",
+    "annotation",
+    "assistant",
+    "canvas",
+    "cookies",
+    "crawler",
+    "credentials",
+    "do not report",
+    "findings",
+    "hide"
+  ],
+  "regex": [
+    "(?isx)\n\\A\n(?!.*\\b(?:security|vulnerability|incident)\\s+report\\b.{0,140}\\b(?:payload|asked|asking|contained|contains)\\b)\n(?!.*\\b(?:security|scanner|training|developer|defensive)\\s+(?:guide|docs?|report|training|reference|note)\\b.{0,180}\\b(?:should|must|will)\\s+(?:detect|report|flag|refuse|reject)\\b)\n(?!.*\\b(?:do\\s+not|don't|must\\s+not|never)\\s+(?:obey|treat|follow|execute|trust)\\b.{0,100}\\b(?:IIIF|manifest|metadata|annotation|summary)\\b)\n(?=.*\\b(?:IIIF|Presentation\\s+API|@context[\"']?\\s*:\\s*[\"'][^\"']*iiif|type[\"']?\\s*:\\s*[\"']Manifest|canvases?|annotations?|requiredStatement|summary[\"']?\\s*:|metadata[\"']?\\s*:|items[\"']?\\s*:\\s*\\[)\\b)\n(?=.*\\b(?:AI|LLM|agentic|autonomous|assistants?|agents?|crawlers?|scanners?|models?|tool\\s*builders?|research\\s*bots?)\\b)\n(?=.*\\b(?:ignore|override|supersed(?:e|es)|outranks?|treat\\s+as\\s+(?:system|developer)\\s+policy|do\\s+not\\s+report|not\\s+report|hide|suppress(?:es|ed|ing)?|mark\\s+(?:clean|safe)|include|forward|send|exfiltrat\\w*)\\b)\n(?=.*\\b(?:system|developer|instructions?|policy|rules?|API\\s*keys?|tokens?|cookies?|credentials?|local\\s+state|findings?|reports?|warnings?|audit)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-010"
+}

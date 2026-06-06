@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-703",
+  "name": "Peer Agent Scope Tag Replay Policy Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a peer, upstream, or delegated agent forges, tampers with, or replays a handoff ticket, transfer scope tag, or authorization tag to override, bypass, or disable policy, guardrail, or approval verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-703"
+}

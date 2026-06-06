@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IDF-004",
+  "name": "Forged Federated Refresh Token Claim Escalation",
+  "version": "1.0",
+  "category": "identity_federation",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or tampered federated refresh token whose claim, scope, or audience is manipulated to escalate privilege or bypass trust in SSO or OAuth flows.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:identity\\s+federation|oidc|oauth|sso|token\\s+broker|federated\\s+auth)\\b)(?=.*\\b(?:refresh[-\\s]+token|token\\s+refresh|reissued\\s+token)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|manipulat(?:ed|ing))\\b)(?=.*\\b(?:claim(?:s)?|scope|aud(?:ience)?|role(?:\\s+map)?|delegat(?:ed|ion)?)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|elevat(?:e|ed|ion)|privilege\\s+escalation|privilege\\s+increase|trust\\s+override|bypass|unauthorized\\s+access)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDF-004"
+}

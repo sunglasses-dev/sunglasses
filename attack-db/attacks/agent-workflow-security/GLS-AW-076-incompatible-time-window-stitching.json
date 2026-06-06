@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-076",
+  "name": "Incompatible Time Window Stitching",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker stitches metrics from incompatible time windows into one decision narrative so trends and confidence intervals are fabricated. The blended summary tells a story the underlying data does not support and biases approvals toward unsafe actions.",
+  "keywords": [
+    "measurement window stitching",
+    "different time windows merged",
+    "stitch metrics across windows",
+    "false confidence via window blend",
+    "cross-window metric splice",
+    "incompatible window aggregation",
+    "decision narrative window mix",
+    "time-window stitching poisoning",
+    "splice 1h with 24h metric",
+    "aggregate divergent intervals",
+    "metric stitching artifact",
+    "stitched window false trend"
+  ],
+  "regex": [
+    "(?i)(?:measurement\\s+window\\s+stitching\\s+poisoning|(?:stitch|splice|merge|aggregate)\\s+(?:metrics?|signals?|telemetry)\\s+(?:from|across)\\s+(?:different|divergent|incompatible)\\s+(?:time\\s+)?(?:windows?|intervals?))",
+    "(?i)(?:(?:cross|inter)[- ]window\\s+(?:metric|signal)\\s+(?:splice|stitch|merge)|(?:1h|24h|7d)\\s+(?:metric|window)\\s+(?:stitched|blended)\\s+with\\s+(?:1h|24h|7d|different))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-076"
+}

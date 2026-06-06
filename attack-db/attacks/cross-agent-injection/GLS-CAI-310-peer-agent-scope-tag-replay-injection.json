@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-310",
+  "name": "Peer Agent Scope Tag Replay Injection",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a peer agent using a forged, tampered, or replayed scope tag or transfer token to ignore policy or bypass authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-310"
+}

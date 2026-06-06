@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-037",
+  "name": "Validator Consensus Herding Lockstep Coercion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker crafts inputs that herd every validator and planning stage onto the same poisoned interpretation, collapsing ensemble diversity so disagreement-based safeguards never fire and the bad verdict ships with apparent unanimous consensus.",
+  "keywords": [
+    "consensus lockstep poisoning",
+    "force validators agree",
+    "coerce planning stages converge",
+    "disagreement safeguard bypass",
+    "synchronized validator hallucination",
+    "multi-agent same poisoned interpretation",
+    "quorum collapse via shared prior",
+    "shared prompt poisons all stages",
+    "no contradiction fires",
+    "lockstep verdict on adversarial input",
+    "ensemble bypass via shared seed",
+    "stage diversity loss"
+  ],
+  "regex": [
+    "(?i)(?:(?:coerce|force|herd|nudge)\\s+(?:all\\s+)?(?:validators?|planners?|stages?|reviewers?)\\s+(?:to\\s+)?(?:agree|converge|lockstep|same\\s+(?:verdict|interpretation))|consensus\\s+(?:lockstep|collapse|herding|poisoning))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-037"
+}

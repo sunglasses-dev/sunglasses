@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-049",
+  "name": "Stream Chunk Parser Boundary Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker splits hostile payloads across stream chunks so the policy evaluator scans pre-reassembly fragments while the downstream consumer sees the reassembled whole, creating a parser-vs-policy boundary gap that smuggles directives past the filter.",
+  "keywords": [
+    "chunk parser vs policy desync",
+    "reassembly boundary mismatch",
+    "policy sees fragment not whole",
+    "split payload bypass scanner",
+    "mcp chunk reorder injection",
+    "stream segment boundary shift",
+    "scanner reads pre-reassembly",
+    "policy evaluates per-chunk",
+    "post-reassembly payload changes",
+    "fragmented attack across chunks",
+    "reassembly normalization gap",
+    "chunk split smuggles directive"
+  ],
+  "regex": [
+    "(?i)(?:(?:chunk|stream|fragment|segment)\\s+(?:parser|reassembly|boundary)\\s+(?:desync|mismatch|drift|gap)|policy\\s+(?:evaluates?|sees?|reads?)\\s+(?:per[- ]chunk|fragment|pre[- ]reassembly)\\s+(?:not|instead\\s+of)\\s+(?:whole|reassembled))",
+    "(?i)(?:(?:split|fragment|chunk)\\s+(?:payload|attack|directive)\\s+(?:across|over)\\s+(?:chunks?|segments?|frames?)\\s+(?:to\\s+)?(?:bypass|evade)\\s+(?:scanner|policy|filter))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-049"
+}

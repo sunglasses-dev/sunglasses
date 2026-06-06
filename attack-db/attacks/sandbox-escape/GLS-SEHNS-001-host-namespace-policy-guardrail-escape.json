@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SEHNS-001",
+  "name": "Host Namespace Policy Guardrail Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text \u2014 excluding negated forms \u2014 in which host namespace, /proc/, nsenter, setns, privileged flags, docker.sock, or host path escape indicators appear alongside ignore, bypass, override, or skip language targeting policy, guardrail, or safety approval checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\b.{0,24}\\b(?:ignore|bypass|override|skip)\\b)(?=.*(?:host\\s+namespace|/proc/|nsenter|setns|escape|break\\s*out|privileged|cap_sys_admin|mount\\s+host\\s+path|docker\\.sock|/var/run/docker\\.sock|socket\\b))(?=.*(?:ignore|bypass|override|skip))(?=.*(?:policy|guardrail(?:s)?|safety|approval\\s*check(?:s)?)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEHNS-001"
+}

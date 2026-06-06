@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-625",
+  "name": "Redacted Placeholder Treated As Canonical Value",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker steers agents or operators to treat redacted placeholders (masked secrets, truncation markers) as canonical on-disk values, causing broken automation, false verification, and latent runtime failures when placeholder garbage is written into executable configs.",
+  "keywords": [
+    "placeholder as truth coercion",
+    "masked string canonical value",
+    "redaction replay poisoning",
+    "placeholder written to executable config",
+    "semantic mismatch laundering",
+    "masked secret path swap",
+    "truncation marker accepted as value",
+    "ellipsis as on-disk value",
+    "redacted snippet patch injection",
+    "display excerpt vs byte verified",
+    "UI renderer mask treated as canonical",
+    "stale fallback masked as healthy"
+  ],
+  "regex": [
+    "(?i)(?:(?:treat|accept|use|trust)\\s+(?:masked|redacted|truncated|elided|placeholder)\\s+(?:string|value|path|token|secret)\\s+(?:as|for)\\s+(?:canonical|exact|on[- ]disk|literal|verified|authoritative)\\b|(?:write|patch|inject|copy)\\s+(?:redacted|masked|placeholder|truncated)\\s+(?:snippet|value|string|content)\\s+(?:into|to)\\s+(?:config|script|executable|file|deploy)|(?:masked|redacted|placeholder|truncated).{0,20}?(?:string|value|marker|snippet|token|secret|path)\\s+(?:accepted|used|treated)\\s+as\\s+(?:real|exact|canonical|on[- ]disk|literal))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-625"
+}

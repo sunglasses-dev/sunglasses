@@ -1,0 +1,42 @@
+{
+  "id": "GLS-PCF-248",
+  "name": "Forged Trust Signal Authority Spoofing",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker packages payloads with forged trust signals (verified badges, fake [SYSTEM] preambles, signature-theater checksums, smuggled safe=true flags) so the planner inherits trust from content text instead of cryptographic envelopes. Result: state-changing tool calls execute under spoofed authority while normal skepticism and verifier gates are bypassed.",
+  "keywords": [
+    "provenance badge forgery",
+    "role tag impersonation",
+    "signature theater injection",
+    "safety flag parameter smuggle",
+    "internal verified label forgery",
+    "fake system preamble",
+    "forged checksum field",
+    "verified true without verifier",
+    "safe true injected in args",
+    "risk low label smuggle",
+    "trust upgrade from content text",
+    "wrapper metadata trust inheritance"
+  ],
+  "regex": [
+    "(?i)(?:(?:forged?|fake|spoofed?|fabricated?)\\s+(?:trust|provenance|verification)\\s+(?:badge|label|tag|marker|signal)|(?:source\\s*=\\s*internal[_ ]verified|verified\\s*=\\s*true|checksum[_ ]ok\\s*=\\s*true|sig\\s*=)\\s*(?:without|with\\s+no)\\s+(?:verifier|verification|validator))",
+    "(?i)(?:(?:\\[system\\]|\\[security[_ ]policy\\]|system:|developer:)\\s+(?:preamble|header|tag)\\s+(?:in|inside|injected\\s+into)\\s+(?:retrieved|untrusted|tool[_ ]output)\\s+(?:snippet|content|text)|role[- ]tag\\s+impersonation|fake\\s+role\\s+preamble)",
+    "(?i)(?:safe\\s*=\\s*true|risk\\s*=\\s*low|safe[_ ]mode\\s*=\\s*true)\\s+(?:injected|smuggled|supplied)\\s+(?:in|into)\\s+(?:tool\\s+)?(?:args?|arguments?|memory\\s+summar(?:y|ies))|(?:trust|risk)\\s+(?:flag|score)\\s+(?:inherited|derived)\\s+from\\s+(?:content\\s+)?(?:body|text|payload)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-248"
+}

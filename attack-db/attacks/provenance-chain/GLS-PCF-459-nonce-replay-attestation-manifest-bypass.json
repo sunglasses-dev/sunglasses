@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PCF-459",
+  "name": "Nonce Replay Attestation Manifest Bypass",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or replayed attestation, provenance manifest, or nonce used to backfill or bypass integrity checks and override policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:forge|forged|forging|fabricate|fabricated|fabricating|counterfeit|spoof|spoofed|spoofing)\\b)(?=.*\\b(?:attestation|provenance|lineage|receipt|manifest)\\b)(?=.*\\b(?:nonce|checksum|signature|hash)\\b)(?=.*\\b(?:replay|rollback|backfill|bypass|override)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-459"
+}

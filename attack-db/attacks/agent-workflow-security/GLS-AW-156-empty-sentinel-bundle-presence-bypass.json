@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-156",
+  "name": "Empty Sentinel Bundle Presence Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects empty or near-empty sentinel files into trusted bundles so pipelines that check for member presence (but not usability) treat the bundle as complete, masking missing or sabotaged content.",
+  "keywords": [
+    "empty file sentinel injection",
+    "presence check without usability",
+    "zero byte member passes bundle",
+    "stub file fakes completeness",
+    "sentinel file injection",
+    "manifest count satisfied empty body",
+    "near empty placeholder accepted",
+    "bundle member shape only",
+    "empty member trust spoof",
+    "minimal sentinel content evasion",
+    "file existence elevates trust",
+    "empty member completes bundle"
+  ],
+  "regex": [
+    "(?i)(?:empty\\s+(?:member|file|sentinel)\\s+(?:confus|inject|spoof|accept)|(?:zero[- ]byte|near[- ]empty|stub)\\s+(?:file|member|artifact)\\s+(?:passes?|satisfies?|completes?)\\s+(?:bundle|manifest|check))",
+    "(?i)(?:(?:presence|existence)\\s+(?:check|gate)\\s+(?:without|missing)\\s+(?:usability|content|validity)|sentinel\\s+(?:file|member)\\s+(?:injection|smuggle|spoof))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-156"
+}

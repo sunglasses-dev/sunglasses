@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-253",
+  "name": "Forged Signoff Scope Policy Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or counterfeit approval, signoff, or attestation submitted to a delegate or worker to bypass policy or scope guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:approval|attestation|signoff|ticket)\\b)(?=.*\\b(?:delegate|agent|worker|reviewer)\\b)(?=.*\\b(?:bypass|override|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|scope)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-253"
+}

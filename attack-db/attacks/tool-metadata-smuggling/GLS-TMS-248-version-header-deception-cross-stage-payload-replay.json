@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-248",
+  "name": "Version Header Deception Cross-Stage Payload Replay",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits silent schema-version drift between adjacent pipeline stages (collector, normalizer, renderer) by mismatching header and body versions or flooding compatibility aliases so policy checks and reporting operate on different interpretations.",
+  "keywords": [
+    "version-header deception",
+    "cross-stage precedence split",
+    "compatibility alias flooding",
+    "silent downgrade replay",
+    "schema_version header body mismatch",
+    "v1 fields under v2 declaration",
+    "normalizer kpi_snapshot first renderer kpis first",
+    "deprecated synonym best-effort merge",
+    "stale payload fresh timestamp wrapper",
+    "legacy branch selection replay",
+    "implementation-dependent merge order",
+    "freshness alarm suppression"
+  ],
+  "regex": [
+    "(?i)(?:(?:version[- ]?header\\s+deception|cross[- ]?stage\\s+precedence\\s+split|compatibility\\s+alias\\s+flooding|silent\\s+downgrade\\s+replay)|(?:schema[_\\s]?version)\\s+(?:declares?|header)\\s+(?:v\\d|one\\s+branch)\\s+(?:but|while|with)\\s+(?:body|payload|fields?)\\s+(?:conform|match|use)\\s+(?:another|different|v\\d)|(?:stale|old|replayed?)\\s+(?:payload|schema|branch)\\s+(?:accepted|passes?|reaches?)\\s+(?:as\\s+)?(?:fresh|current|valid))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-248"
+}

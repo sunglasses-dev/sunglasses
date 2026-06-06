@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-584",
+  "name": "Upstream-Agent Policy Override Directive",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a message attributed to an upstream or supervisor agent that instructs the recipient to ignore or bypass policy, guardrails, or system instructions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-584"
+}

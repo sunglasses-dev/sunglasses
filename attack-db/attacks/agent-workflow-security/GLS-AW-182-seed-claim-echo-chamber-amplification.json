@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-182",
+  "name": "Seed Claim Echo Chamber Amplification",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker plants a weak seed claim, then floods derived artifacts (summaries, dashboards, logs) with echoes so the planner mistakes repetition for independent confirmation and escalates confidence without any new ground truth.",
+  "keywords": [
+    "seed and echo consensus",
+    "confirmation bias loop",
+    "confidence amplification loop",
+    "already verified marker injection",
+    "comparator poisoning",
+    "selective recall manipulation",
+    "review log anchoring",
+    "echo chain consensus spoof",
+    "derived artifact confidence laundering",
+    "contradiction suppression by ordering",
+    "fake independent confirmation",
+    "claim lineage collapse"
+  ],
+  "regex": [
+    "(?i)(?:(?:seed[- ]and[- ]?echo|echo[- ]?chain|repeated\\s+claim)\\s+(?:consensus|confirmation|amplification)|(?:already\\s+verified|previously\\s+confirmed|consensus\\s+reached)\\s+(?:marker|tag|claim)\\s+(?:injection|spoof|inherits?)|(?:derived|echoed|repeated)\\s+(?:artifacts?|sources?)\\s+(?:masquerade|posing|treated)\\s+as\\s+(?:independent|raw|new)\\s+evidence)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-182"
+}

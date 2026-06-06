@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-045",
+  "name": "Template Placeholder Imperative Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker plants imperative payloads inside template placeholders or unfilled variables (scorecards, briefs, widget snippets) so when the render stage fills the slot, the resulting text is parsed as a fresh instruction rather than inert data.",
+  "keywords": [
+    "template placeholder smuggling",
+    "unfilled variable becomes instruction",
+    "scorecard placeholder injection",
+    "brief slot hijack",
+    "widget snippet placeholder pivot",
+    "jinja-style token abuse",
+    "double curly brace smuggling",
+    "placeholder text imperative",
+    "template fill becomes payload",
+    "render-time variable poisoning",
+    "slot value runs as prompt",
+    "mustache placeholder hijack"
+  ],
+  "regex": [
+    "(?i)(?:(?:template|placeholder|slot|variable|token)\\s+(?:smuggling|hijack|injection|pivot)|\\{\\{[^}]{1,80}?\\}\\}\\s+(?:becomes?|executes?|runs?)\\s+(?:as\\s+)?(?:instruction|prompt|tool))",
+    "(?i)(?:(?:unfilled|empty|default)\\s+(?:placeholder|slot|variable)\\s+(?:treated|interpreted)\\s+as\\s+(?:instruction|imperative|command)|(?:scorecard|brief|widget)\\s+(?:template|slot)\\s+(?:contains?|carries?)\\s+(?:imperative|payload))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-045"
+}

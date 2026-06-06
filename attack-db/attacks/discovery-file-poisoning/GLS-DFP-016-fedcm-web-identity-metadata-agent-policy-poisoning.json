@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-016",
+  "name": "FedCM web-identity metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detect FedCM / `/.well-known/web-identity` discovery metadata that targets AI identity auditors or scanners with authority-inversion, report-suppression, or credential/local-state disclosure instructions.",
+  "keywords": [
+    "/.well-known/web-identity",
+    "AI agent",
+    "LLM",
+    "accounts_endpoint",
+    "assistant",
+    "client_metadata_endpoint",
+    "crawler",
+    "fedcm",
+    "id_assertion_endpoint",
+    "identity auditor",
+    "identity provider config",
+    "model",
+    "provider_urls",
+    "security scanner",
+    "web-identity"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:do\\s+not|must\\s+not|never)\\s+(?:treat|obey|follow|execute|use|honou?r)\\b.{0,160}\\b(?:fedcm|web[-\\s]?identity|identity[-\\s]?provider\\s+(?:config|metadata)|provider_urls|accounts_endpoint|client_metadata_endpoint)\\b)\n^(?!.*\\b(?:docs?|documentation|training|guide|reference|article)\\b.{0,120}\\b(?:should|must)\\s+(?:report|detect|flag|refuse)\\b.{0,160}\\b(?:fedcm|web[-\\s]?identity|identity[-\\s]?provider\\s+(?:config|metadata))\\b)\n(?=.*\\b(?:fedcm|web[-\\s]?identity|\\.well-known/web-identity|provider_urls|accounts_endpoint|client_metadata_endpoint|id_assertion_endpoint|identity[-\\s]?provider\\s+(?:config|metadata)|federated\\s+credential\\s+management)\\b)\n^(?!.*\\b(?:does\\s+not|doesn't)\\s+instruct\\b.{0,80}\\b(?:agents?|assistants?|models?|scanners?|auditors?)\\b.{0,120}\\b(?:forward|include|send|exfiltrate|suppress|hide|override|ignore)\\b)\n(?=.*\\b(?:ai\\s*(?:agent|assistant|crawler|scanner|auditor)|assistants?|identity\\s+auditors?|security\\s+scanners?|llm|models?|autonomous\\s+agents?|integration\\s+agents?)\\b)\n(?=.*\\b(?:ignore|override|supersedes?|outrank|replace|bypass|suppress|hide|do\\s+not\\s+report|forward|include|exfiltrate|send)\\b.{0,200}\\b(?:system|developer|scanner|policy|rules?|findings?|reports?|credentials?|secrets?|bearer\\s+tokens?|tokens?|cookies?|sessions?|env(?:ironment)?|local\\s+state|authorization\\s+headers?|api\\s*keys?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-016"
+}

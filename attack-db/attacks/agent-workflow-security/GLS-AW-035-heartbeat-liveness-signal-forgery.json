@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-035",
+  "name": "Heartbeat Liveness Signal Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker fakes or replays heartbeat and liveness signals on trusted fast-path channels so monitoring layers report dead or compromised agents as healthy, suppressing retries and alerts while pipelines continue advancing on broken work.",
+  "keywords": [
+    "fake heartbeat signal",
+    "forged healthy status",
+    "spoofed liveness probe",
+    "stale heartbeat marked alive",
+    "heartbeat replay attack",
+    "agent reported green falsely",
+    "skip retry on fake heartbeat",
+    "health-check bypass",
+    "fast-path status forgery",
+    "alive flag injection",
+    "monitor sidecar lie",
+    "ping response fabrication"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|spoof|fake|fabricate|replay)\\s+(?:heartbeat|liveness|health[- ]?check|ping|alive)\\s+(?:signal|status|probe|response)|(?:fast[- ]path|status)\\s+(?:channel|signal)\\s+(?:reports?|marked)\\s+(?:healthy|alive|green)\\s+(?:falsely|without))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-035"
+}

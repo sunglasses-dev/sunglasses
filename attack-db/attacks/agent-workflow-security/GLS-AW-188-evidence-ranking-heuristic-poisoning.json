@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-188",
+  "name": "Evidence Ranking Heuristic Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker poisons the ranking heuristic that decides which evidence or tool result wins priority, causing the agent to choose attacker-controlled inputs as its next action over legitimate ones.",
+  "keywords": [
+    "scoring heuristic poisoning",
+    "ranking logic manipulation",
+    "priority weight tampering",
+    "evidence ranker hijack",
+    "tool result priority forge",
+    "heuristic weight injection",
+    "rank-jump payload",
+    "scorer feature poisoning",
+    "rank inversion attack",
+    "priority feature spoof",
+    "next-action ranker poison",
+    "weighted heuristic skew"
+  ],
+  "regex": [
+    "(?i)(?:(?:scoring|ranking|priority)\\s+(?:heuristic|logic|weight|feature)\\s+(?:poison|tamper|skew|hijack)|(?:rank|priority)\\s+(?:jump|inversion|skew)\\s+(?:payload|attack|injection)|(?:manipulate|tamper|forge)\\s+(?:ranker|scorer|priority)\\s+(?:weight|feature|signal))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-188"
+}

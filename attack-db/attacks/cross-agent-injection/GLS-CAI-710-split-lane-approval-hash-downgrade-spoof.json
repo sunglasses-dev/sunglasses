@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-710",
+  "name": "Split-Lane Approval Hash Downgrade Spoof",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker forges or replays an acknowledgment in one channel (planner summary, audit log, approval text) while the executor lane commits a different, higher-impact action, breaking the binding between what the user approved and what the agent runs.",
+  "keywords": [
+    "approval receipt substitution",
+    "split-lane ack downgrade",
+    "cross-turn ack replay",
+    "telemetry ack laundering",
+    "forged approval receipt",
+    "ack hash mismatch",
+    "stale ack envelope replay",
+    "executor lane write capability",
+    "planner channel read-only spoof",
+    "sidecar execution unsanitized",
+    "ack-to-exec hash divergence",
+    "approval summary hash forgery"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|spoof|substitute|replay)\\s+(?:approval|ack|acknowledgment|receipt)\\s+(?:hash|nonce|token|envelope)\\b|(?:split[- ]lane|cross[- ]channel|cross[- ]turn)\\s+(?:ack|acknowledgment)\\s+(?:downgrade|spoof|replay|laundering)|(?:planner|approval|user[- ]visible)\\s+(?:hash|ack|summary)\\s+(?:differs?|diverges?|mismatch(?:es)?)\\s+(?:from\\s+)?(?:executor|sidecar|execution))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-710"
+}

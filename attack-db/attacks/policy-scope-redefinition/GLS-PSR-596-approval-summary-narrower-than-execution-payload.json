@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-596",
+  "name": "Approval Summary Narrower Than Execution Payload",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attackers introduce a second policy layer (glossary rewrite, compressed approval summary, forged role inheritance, or retry constraint mutation) that redefines safety terms so downstream tool calls execute riskier actions while still appearing policy-compliant.",
+  "keywords": [
+    "glossary rewrite shadowing",
+    "redefine read-only includes metadata",
+    "safe command includes install",
+    "security glossary inject",
+    "approval summary compression drift",
+    "tool args broader than summary",
+    "hidden force or wildcard in args",
+    "role inheritance shadowing",
+    "maintainer override claim",
+    "retry path constraint mutation",
+    "rephrase to satisfy policy",
+    "policy constraint shadowing"
+  ],
+  "regex": [
+    "(?i)(?:(?:redefine|treat\\s+as|policy\\s+note|safety\\s+glossary)\\s+(?:read[- ]only|safe|approved|trusted)\\s+(?:to\\s+)?(?:includes?|covers?|means?)\\s+(?:write|install|exec|metadata\\s+update|elevated)|(?:approval|approved)\\s+summary\\s+(?:differs?|narrower|hides?)\\s+(?:from|than)\\s+(?:tool\\s+args?|actual\\s+args?|execution\\s+payload)|(?:retry|retry[- ]?handler)\\s+(?:rephrases?|mutates?|expands?)\\s+(?:constraint|envelope|scope)\\s+(?:to\\s+satisfy|past)\\s+(?:policy|safety))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-596"
+}

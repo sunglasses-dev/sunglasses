@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-224",
+  "name": "Tool description trusted route review bypass",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects implicit tool-description poisoning that frames a trusted execution route as justification to suppress human or manual review, enabling unsafe autonomous execution.",
+  "keywords": [
+    "connector note trusted path without human approval",
+    "integration guidance approved route skip review",
+    "tool description recommended flow bypass",
+    "connector note trusted path bypass manual review",
+    "integration approved route without secondary review",
+    "tool description trusted path no human approval",
+    "connector note recommended flow skip review",
+    "integration guidance trusted path bypass"
+  ],
+  "regex": [
+    "(?i)\\b(?:tool\\s+description|connector\\s+note|integration\\s+guidance)\\b.{0,140}\\b(?:trusted\\s+path|approved\\s+route|recommended\\s+flow)\\b.{0,120}\\b(?:bypass|skip|without)\\b.{0,60}\\b(?:human\\s+approval|manual\\s+review|secondary\\s+review)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-224"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-078",
+  "name": "Numeric Unit Scale Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker (or sloppy interop) drifts numeric units across retrieval, tool, and report layers so thresholds, rates, or sizes are interpreted in the wrong scale. Guardrails fire on the wrong magnitude and unsafe values pass as compliant.",
+  "keywords": [
+    "numeric unit drift",
+    "ms vs s unit mismatch",
+    "MB vs GB confusion",
+    "percent vs ratio swap",
+    "unit drift across pipeline",
+    "rate-per-second vs minute",
+    "threshold unit silently changed",
+    "currency unit drift",
+    "byte unit confusion",
+    "kilo mega giga swap",
+    "duration unit mismatch",
+    "count vs percentage drift"
+  ],
+  "regex": [
+    "(?i)(?:numeric\\s+unit\\s+drift|(?:unit|scale)\\s+(?:mismatch|drift|swap)\\s+(?:across|between)\\s+(?:retrieval|tool|report|layer)s?\\b)",
+    "(?i)(?:(?:ms|s|min|hr|MB|GB|KB|TB|percent|ratio|count)\\s+(?:vs|misread\\s+as|coerced\\s+to)\\s+(?:ms|s|min|hr|MB|GB|KB|TB|percent|ratio|count)|threshold\\s+unit\\s+(?:silently|implicitly)\\s+(?:changed|drifted))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-078"
+}

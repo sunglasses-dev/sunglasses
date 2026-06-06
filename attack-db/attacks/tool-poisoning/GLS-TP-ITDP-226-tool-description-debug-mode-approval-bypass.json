@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-226",
+  "name": "Tool description debug mode approval bypass",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects tool-description poisoning that frames weakened controls as a temporary debug or maintenance mode, persuading agents to skip approval and review checks.",
+  "keywords": [
+    "developer mode auto-approve",
+    "debug mode skip confirmation",
+    "maintenance mode bypass approval",
+    "test mode disable authentication",
+    "developer mode always approve",
+    "debug mode skip review",
+    "maintenance mode disable confirmation",
+    "test mode bypass permission"
+  ],
+  "regex": [
+    "(?i)\\b(?:developer|debug|maintenance|test)\\s+mode\\b.{0,140}\\b(?:auto-approve|always\\s+approve|skip|disable|bypass)\\b.{0,80}\\b(?:confirmation|approval|permission|auth(?:entication)?|review)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-226"
+}

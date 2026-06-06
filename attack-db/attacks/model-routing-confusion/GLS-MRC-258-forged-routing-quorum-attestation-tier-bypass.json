@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-258",
+  "name": "Forged Routing Quorum Attestation Tier Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged quorum or approval token injected into a router or dispatcher to reroute to a higher trust tier while bypassing policy escalation controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|dispatcher|orchestrator|gateway|route\\s+planner)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:manifest|quorum|approval\\s+token|attestation|routing\\s+ticket)\\b)(?=.*\\b(?:tier|trust\\s+tier|risk\\s+tier|priority\\s+lane)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rerout(?:e|ed|ing))\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-258"
+}

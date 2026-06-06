@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-254",
+  "name": "Forged Model Score Capability Escalation Gate Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged model capability score, budget, or confidence value used to escalate or reroute to a higher tier while bypassing approval or safety gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:model|router|routing|tier|profile|engine|planner)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:capability|score|latency|budget|priority|quota|confidence)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|rerout(?:e|ed|es|ing)|upgrad(?:e|ed|es|ing)|promot(?:e|ed|es|ing))\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:d|s|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|safety|check(?:s)?|gate(?:s)?)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-254"
+}

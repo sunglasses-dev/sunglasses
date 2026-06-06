@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-315",
+  "name": "RAG Provenance Digest Override Policy",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or poisoned RAG corpus document whose provenance digest, hash, or source tag is overridden to bypass policy or guardrail verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|corpus|document|source|snippet|passage)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion)|fabricat(?:ed|ion))\\b)(?=.*\\b(?:digest|hash|signature|provenance|source\\s*tag|trust\\s*badge)\\b)(?=.*\\b(?:override|overrode|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail|review|verification|safety)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-315"
+}

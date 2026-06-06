@@ -1,0 +1,32 @@
+{
+  "id": "GLS-MSE-236",
+  "name": "Multi-stage encoding \u2014 decoder authority shift",
+  "version": "1.0",
+  "category": "multi_stage_encoding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects multi-stage encoding attacks where instructions are hidden in encoded payloads (base64, hex, gzip, rot13) and the agent is told to decode, then either bypass safety controls or treat the decoded content as authoritative system or developer instructions.",
+  "keywords": [
+    "base64 decode then ignore safety",
+    "double encoded payload bypass guardrails",
+    "decode hex then override policy",
+    "decompress gzip treat as system prompt",
+    "decode then interpret as developer instructions"
+  ],
+  "regex": [
+    "(?is)\\b(?:ignore|bypass|override|replace|discard|skip)\\b.{0,100}\\b(?:safety|policy|guardrails?|restrictions?|filters?)\\b.{0,220}\\b(?:(?:base64|hex|rot13|gzip|zlib|double[-\\s]?encoded|url[-\\s]?encoded|encoded).{0,80}(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?)|(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?).{0,80}(?:base64|hex|rot13|gzip|zlib|double[-\\s]?encoded|url[-\\s]?encoded|encoded))\\b",
+    "(?is)\\b(?:(?:base64|hex|rot13|gzip|zlib|double[-\\s]?encoded|url[-\\s]?encoded|encoded).{0,80}(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?)|(?:decode(?:d|s|ing)?|decrypt(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?|unpack(?:ed|s|ing)?).{0,80}(?:base64|hex|rot13|gzip|zlib|double[-\\s]?encoded|url[-\\s]?encoded|encoded))\\b.{0,180}\\b(?:treat(?:\\s+it)?\\s+as|interpret(?:\\s+it)?\\s+as)\\b.{0,60}\\b(?:system|developer)\\b.{0,40}\\b(?:instructions?|prompt)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MSE-236"
+}

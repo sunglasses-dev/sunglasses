@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-017",
+  "name": "HTTP domain-verification file agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "HTTP domain-verification proof files such as `/.well-known/pki-validation/fileauth.txt`, `/.well-known/acme-challenge/<token>`, `/google*.html`, and `/BingSiteAuth.xml` can carry agent-directed policy or report-suppression instructions next to legitimate ownership evidence.",
+  "keywords": [
+    "/.well-known/acme-challenge/",
+    "/.well-known/pki-validation/",
+    "AI agent",
+    "BingSiteAuth.xml",
+    "LLM",
+    "acme-challenge",
+    "assistant",
+    "auditor",
+    "bot",
+    "certificate validation",
+    "crawler",
+    "do not report",
+    "domain-verification",
+    "fileauth.txt",
+    "forward tokens"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refuse)\\b.{0,180}\\b(?:obey|follow|trust|treat|override|supersede|outrank|include|forward|send|leak|suppress|ignore|bypass)\\b)(?=.*\\b(?:\\.well-known/acme-challenge|\\.well-known/pki-validation|fileauth\\.txt|acme[-_\\s]*challenge|google[-_\\s]*site[-_\\s]*verification|google[a-z0-9_-]{4,}\\.html|bingsiteauth\\.xml|msvalidate\\.01|yandex[_-][a-z0-9_-]+\\.html|p:domain_verify|domain[-_\\s]*(?:verification|verify|ownership)|ownership\\s+proof|site[-_\\s]*verification|certificate\\s+(?:validation|verification)|http[-_\\s]*proof[-_\\s]*file)\\b)(?=.*\\b(?:ai\\s*)?(?:agents?|assistants?|llms?|models?|crawlers?|scanners?|verifiers?|auditors?|bots?|site[-_\\s]*verification\\s+agents?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|highest[-_\\s]*priority|treat\\s+this\\s+as\\s+(?:policy|authority|instruction)|must\\s+(?:treat|obey|follow)|mark\\s+(?:verification\\s+)?pass|do\\s+not\\s+report|don't\\s+report|suppress\\s+(?:findings|warnings|reports)|hide\\s+(?:findings|warnings|reports)|bypass\\s+(?:policy|scanner|validation)|forward|send|include|exfiltrate|leak)\\b)(?=.*\\b(?:system|developer|repository|policy|instructions?|scanner\\s+result|verification\\s+status|warnings?|findings?|reports?|secrets?|tokens?|api[-_\\s]*keys?|cookies?|authorization|env(?:ironment)?\\s*(?:vars?|variables?)|local\\s+(?:state|config))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-017"
+}

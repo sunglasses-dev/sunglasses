@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-552",
+  "name": "Cross-Agent Revoked Attestation Scope Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a cross-agent or peer handoff presenting a revoked, stale, or forged attestation or certificate to override authorization scope and bypass safety validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:override|bypass|ignore|disregard|rebind|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator|controller|handoff|cross-agent|peer)\\b)(?=.*(?:\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b.{0,80}\\b(?:attestation|nonce|token|certificate|capability|signature)\\b|\\b(?:attestation|nonce|token|certificate|capability|signature)\\b.{0,80}\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b))(?=.*\\b(?:override|bypass|ignore|disregard|supersed(?:e|es|ed|ing)|rebind)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|authorization|scope|validation)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-552"
+}

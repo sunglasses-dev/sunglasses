@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-273",
+  "name": "Forged Citation Graph Trust Score Rerank",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged citation graph, trust score, or provenance record within a retrieval or RAG system is manipulated to re-rank or boost sources and override a policy ranking or guardrail bypass.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|index|knowledge\\s+base)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:citation\\s+graph|source\\s+bundle|trust\\s+score|provenance\\s+record)\\b)(?=.*\\b(?:re[-\\s]?rank(?:ed|ing)?|boost(?:ed|ing)?|elevate(?:d|s|ing)?|override)\\b)(?=.*\\b(?:policy\\s+override|policy\\s+exception|guardrail\\s+bypass|ranking\\s+policy)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-273"
+}

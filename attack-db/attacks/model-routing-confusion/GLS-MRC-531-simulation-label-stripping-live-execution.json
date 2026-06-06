@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MRC-531",
+  "name": "Simulation Label Stripping Live Execution",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "prompt"
+  ],
+  "description": "Attacker convinces the agent to treat non-executable planning or 'simulation only' text as a safe sandbox, then sneaks tool-ready payloads into the simulated content. Downstream parsers strip the simulation label or reuse simulated artifacts in live execution, producing real side effects from supposedly dry-run plans.",
+  "keywords": [
+    "simulation mode confusion",
+    "dry run authority laundering",
+    "spec to exec transclusion",
+    "approval pretext collapse",
+    "mode flag downgrade race",
+    "simulate equals true then false",
+    "non executable planning text executed",
+    "example only runbook copied into real call",
+    "hidden steps inside approval summary",
+    "simulated artifact reused in live phase",
+    "simulation label stripped before execution",
+    "dry run command fragment executed"
+  ],
+  "regex": [
+    "(?i)(?:(?:dry[- ]run|simulation|simulate|preview)\\s+(?:authority|label|mode|flag)\\s+(?:laundering|strip|downgrade|bypass)|(?:simulate|sim)\\s*[:=]\\s*(?:true|false)\\s+(?:race|flip|toggle)\\s+(?:on|across)\\s+(?:retry|chain))",
+    "(?i)(?:(?:example|sample|simulated|planning)[- ]?only\\s+(?:runbook|spec|payload|fragment)\\s+(?:copied|transcluded|reused|emitted)\\s+(?:into|as|in)\\s+(?:real|live|production|tool)\\s+(?:call|execution|action))",
+    "(?i)(?:approval\\s+summary\\s+(?:hides?|contains?|includes?)\\s+(?:hidden|unreviewed|high[- ]impact)\\s+(?:steps?|payload|actions?)|simulated\\s+artifact\\s+(?:reused|promoted|loaded)\\s+(?:in|into)\\s+live\\s+(?:phase|mode|run))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-531"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-016",
+  "name": "DNS SVCB / HTTPS Service-Binding Metadata Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled DNS SVCB / HTTPS service-binding records, zone-file comments, or DNS-provider export metadata can smuggle AI-agent/scanner instructions that claim authority over TLS/HTTPS audit behavior, suppress findings, or request local credentials.",
+  "keywords": [
+    "Authorization",
+    "HTTPS RR",
+    "SVCB",
+    "Service Binding",
+    "TYPE64",
+    "TYPE65",
+    "agent instruction",
+    "agent_instructions",
+    "alpn",
+    "attach",
+    "authoritative",
+    "canonical",
+    "collect",
+    "defines scanner rules",
+    "definitive"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat|instruct)\n  |never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)\n  |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n  |no\\s+(?:policy\\s+)?overrides?\n  |not\\s+(?:authoritative|canonical|definitive)\n  |(?:scanner|security|incident|vulnerability|training|runbook|guide|reference)\\s+(?:docs?|report|example|exercise|guidance).{0,140}\\b(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:report|detect|flag|refuse|block))\n  |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n))\n(?=.*(?:\n  \\b(?:SVCB|HTTPS\\s+(?:RR|record)|Service\\s+Binding|DNS\\s+HTTPS|DNS\\s+SVCB|TYPE\\s*64|TYPE\\s*65|RRtype\\s*65|RRtype\\s*64|svcparams?|svcparamkey|echconfig|ipv4hint|ipv6hint|dohpath|alpn|mandatory|zone\\s+file|DNS\\s+provider\\s+export)\\b\n  |(?<!\\w)\"(?:svcparams|echconfig|alpn|ipv4hint|ipv6hint|dohpath|agent_instructions|scanner_policy|agent_policy)\"\n  |_[0-9]+\\._tcp\\b\n))\n(?=.*(?<![a-zA-Z0-9])(?:\n  AI\\s+agents?|autonomous\\s+(?:agents?|scanners?|crawlers?|auditors?|verifiers?)|security\\s+(?:scanners?|auditors?)|TLS\\s+(?:scanners?|auditors?)|HTTPS\\s+(?:scanners?|auditors?)|resolver\\s+(?:scanners?|auditors?)|DNS\\s+(?:scanners?|auditors?)|compliance\\s+(?:bots?|scanners?|auditors?)|agents?|assistants?|crawlers?|scanners?|models?|LLMs?|bots?|auditors?|verifiers?\n)(?![a-zA-Z0-9]))\n(?=.*(?:\n  \\b(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|highest\\s+priority\\s+policy|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|is\\s+the\\s+final\\s+word|authoritative|main\\s+operating\\s+guidance|operating\\s+guidance|defines?\\s+all\\s+(?:scanner|security|agent)\\s+rules?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan)|is\\s+the\\s+reference\\s+implementation|canonical(?:\\s+(?:project|model|security|governing|policy))?(?:\\s+(?:description|policy|document))?|definitive(?:\\s+(?:project|model\\s+evaluation))?(?:\\s+(?:description|policy))?|must\\s+obey|ignore\\s+(?:previous|system|developer|user)\\s+(?:system\\s+)?instructions?)\\b\n  |(?<![a-zA-Z0-9])(?:agent|scanner|assistant|verifier|crawler)\\s+(?:instructions?|directive|notice)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  \\b(?:do\\s+not\\s+(?:report|flag|escalate|notify|mention)|never\\s+(?:report|flag|escalate|notify|mention)|not\\s+report|suppress(?:es|ed|ing)?|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|diagnostics?|observations?|results?)|skip\\b.{0,30}?\\b(?:security\\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|diagnostics?)|omit.{0,30}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?|results?)|exclude.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?)|redact.{0,35}?(?:findings?|warnings?|flags?|diagnostics?|observations?)|treat.{0,45}?as\\s+informational|mark.{0,45}?as\\s+(?:informational|safe|low|none|clean)|classify.{0,35}?(?:as\\s+)?(?:informational|low|none|false\\s+positive|clean)|flag.{0,45}?as\\s+(?:informational|low|none)|(?:keep|leave).{0,45}?(?:findings?|warnings?|alerts?|reports?|flags?|diagnostics?|observations?|results?|issues?).{0,30}?out\\s+of\\s+(?:the\\s+)?(?:memo|summary|report|audit|final\\s+report|audit\\s+memo))\\b\n  |\\b(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\\s+(?:state|context|config(?:uration)?|settings?)|API\\s+(?:keys?|tokens?)|Bearer\\s+tokens?|session\\s+(?:tokens?|headers?)|auth\\s+(?:tokens?|headers?|context)|Authorization\\s+headers?|cookies?|credentials?|secrets?|DNS\\s+provider\\s+tokens?|zone\\s+transfer\\s+credentials?)\\b\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-016"
+}

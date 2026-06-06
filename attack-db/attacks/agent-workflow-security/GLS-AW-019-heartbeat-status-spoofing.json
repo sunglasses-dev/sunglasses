@@ -1,0 +1,37 @@
+{
+  "id": "GLS-AW-019",
+  "name": "Heartbeat status spoofing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message",
+    "api_response"
+  ],
+  "description": "Heartbeat/status channels are trusted fast-path signals in multi-agent pipelines. If an attacker can inject or spoof \"healthy\", \"completed\", or \"ready\" state into these channels, operators and orchestrators can skip deeper validation and execute stale or poisoned artifacts. This is high leverage because status metadata often bypasses the same scrutiny as task content.",
+  "keywords": [
+    "spoof heartbeat",
+    "replay healthy heartbeat",
+    "synthetic heartbeat replay",
+    "status channel role confusion",
+    "completion pretext injection",
+    "stale-state pinning",
+    "fake gateway healthy",
+    "alive event replay",
+    "untrusted output framed as orchestrator status",
+    "task complete marker before verification"
+  ],
+  "regex": [
+    "(?i)(?:spoof|forge|replay|fake|inject)\\s+(?:heartbeat|health(?:check)?|alive|status)\\s+(?:event|signal|message|envelope|marker|frame)?",
+    "(?i)(?:synthetic|stale|forged|spoofed|replayed)\\s+(?:heartbeat|status|alive|healthy|ok)\\s+(?:replay|envelope|marker|signal|object|state)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-019"
+}

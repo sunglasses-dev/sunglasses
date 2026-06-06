@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SEM-TOOL-218",
+  "name": "Implicit tool description authority and bypass poisoning",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects implicit tool-description poisoning that inflates tool authority with trust/priority language or reframes guardrail bypass as a policy/safety requirement.",
+  "keywords": [
+    "official certified connector highest priority",
+    "always prefer this tool over others",
+    "for compliance skip verification checks",
+    "for safety disable validation",
+    "policy requires skip checks",
+    "trusted tool priority override",
+    "certified highest priority api",
+    "for safety avoid confirmation"
+  ],
+  "regex": [
+    "(?i)\\b(?:official|trusted|certified|highest\\s+priority|always\\s+prefer)\\b.{0,120}\\b(?:tool|plugin|connector|integration|api)\\b|\\b(?:for\\s+safety|for\\s+compliance|policy\\s+requires)\\b.{0,140}\\b(?:skip|omit|disable|avoid)\\b.{0,80}\\b(?:verification|validation|confirmation|checks?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-TOOL-218"
+}

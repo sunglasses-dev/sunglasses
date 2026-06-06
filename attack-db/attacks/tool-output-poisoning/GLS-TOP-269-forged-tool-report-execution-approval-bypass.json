@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-269",
+  "name": "Forged Tool Report Execution Approval Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged tool report or compliance log used to execute or deploy actions while bypassing guardrail, policy gate, or approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|tampered|spoofed)\\b)(?=.*\\b(?:tool|report|output|log|trace|telemetry|compliance)\\b)(?=.*\\b(?:execute|run|deploy|apply|approve|action)\\w*\\b)(?=.*\\b(?:bypass|override|skip|ignore|disable)\\w*\\b)(?=.*\\b(?:guardrail|policy|gate|approval|check)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-269"
+}

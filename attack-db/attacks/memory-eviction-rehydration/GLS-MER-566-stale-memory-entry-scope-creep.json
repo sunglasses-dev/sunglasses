@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MER-566",
+  "name": "Stale Memory Entry Scope Creep",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "high",
+  "channels": [
+    "log_memory",
+    "message",
+    "tool_output"
+  ],
+  "description": "Attacker forces the agent to reinterpret old or narrow memory entries as valid for a new mission, identity, or scope, causing silent privilege creep without an explicit jailbreak. Namespace collisions, expired-but-rolling approvals, and unsigned cross-agent imports all rebind authority through the memory substrate.",
+  "keywords": [
+    "agent memory scope rebinding",
+    "role to scope carryover injection",
+    "namespace collision rebinding",
+    "temporal scope override",
+    "cross agent memory inheritance forgery",
+    "one time approval treated as global",
+    "expired memory entry treated as valid",
+    "approval status alias to approval override status",
+    "homoglyph memory key collision",
+    "stale approval bypasses freshness gate",
+    "teammate memory imported without provenance",
+    "scope rebinding privilege creep"
+  ],
+  "regex": [
+    "(?i)(?:(?:role|scope|namespace|temporal)[- ](?:carryover|collision|rebinding|override)\\s+(?:injection|attack|exploit)|memory\\s+(?:entry|key|tuple)\\s+(?:rebinding|aliased|relabeled)\\s+(?:as|to)\\s+(?:globally|broadly|permanently)\\s+valid)",
+    "(?i)(?:(?:expired|stale|one[- ]time|emergency)\\s+(?:memory|approval|exception)\\s+(?:entry|allowlist|override)\\s+(?:treated|reframed|reused)\\s+(?:as|with)\\s+(?:rolling|fresh|valid|persistent)\\s+(?:validity|scope|authority))",
+    "(?i)(?:cross[- ]agent|teammate|foreign)\\s+memory\\s+(?:import|inheritance|merge)\\s+(?:without|missing|lacking)\\s+(?:signed\\s+)?provenance\\s+(?:hash|tuple|signature)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MER-566"
+}

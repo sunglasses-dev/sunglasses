@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-246",
+  "name": "Schema Version Enum Collision Executor Mismatch",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits structured-output validators (JSON schema, regex guards) by using enum collisions, type-coercion gaps, or additionalProperties grafts so payloads pass validation while executors reinterpret semantic intent at runtime.",
+  "keywords": [
+    "enum-collision smuggle",
+    "type-coercion downgrade",
+    "additional-properties authority graft",
+    "schema-version confusion replay",
+    "mode safe overloaded enum",
+    "validator vs runtime coercion split",
+    "unknown field trusted metadata",
+    "approval_context graft",
+    "additionalProperties true exploit",
+    "cached payload schema v1 replay",
+    "structured output safety bypass",
+    "schema pass policy bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:enum[- ]?collision|type[- ]?coercion|additional[- ]?properties|schema[- ]?version\\s+confusion)\\s+(?:smuggle|downgrade|graft|replay)|(?:validator|schema)\\s+(?:passes?|accepts?|allows?)\\s+(?:while|but)\\s+(?:executor|runtime|downstream)\\s+(?:interprets?|reinterprets?|treats?)|(?:unknown|additional|grafted)\\s+(?:keys?|fields?|properties)\\s+(?:treated\\s+as|mistakenly\\s+treated\\s+as|reinterpreted\\s+as)\\s+(?:trusted|authority|approval))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-246"
+}

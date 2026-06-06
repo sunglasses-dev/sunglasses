@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-139",
+  "name": "Blocker Regeneration Budget Burn",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker nudges an agent to keep regenerating equivalent blocker artifacts via wording churn, false cross-owner urgency, or threshold oscillation so execution budget burns on the same gate while real source conditions stay unchanged.",
+  "keywords": [
+    "boss blocker loop suppression evasion",
+    "suppression window reset bait",
+    "owner boundary pretext hijack",
+    "freshness threshold oscillation",
+    "evidence laundering timestamp churn",
+    "wording churn refresh same blocker",
+    "regenerate equivalent gate artifact",
+    "cross owner urgency pretext",
+    "near threshold age oscillate verdict",
+    "timestamped artifacts cite identical anchors",
+    "low signal loop attacker nudge",
+    "wasted execution budget on blocker"
+  ],
+  "regex": [
+    "(?i)(?:(?:reword|rename|churn)\\s+(?:blocker|gate|artifact|verdict)\\s+(?:so|to|making)\\s+(?:it\\s+)?(?:look|appear)\\s+(?:new|fresh|different)\\s+(?:while|but|despite)\\s+(?:source|input|anchor)\\s+(?:unchanged|same)|(?:repeat|regenerate)\\s+(?:same|identical|equivalent)\\s+(?:blocker|gate|verdict)\\s+(?:cycle\\s+after|across)\\s+(?:cycles?|runs?)|(?:cross[- ]?owner|other[- ]?owner)\\s+(?:urgency|pretext|dependency)\\s+(?:forces?|pressures?)\\s+(?:rerun|re[- ]?execute|repeat))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-139"
+}

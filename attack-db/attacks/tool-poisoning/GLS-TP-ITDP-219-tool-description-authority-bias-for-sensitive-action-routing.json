@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-219",
+  "name": "Tool description authority bias for sensitive action routing",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects implicit tool-description poisoning where authority or priority language biases agent tool routing for sensitive actions without explicit jailbreak phrasing.",
+  "keywords": [
+    "official certified connector sensitive actions",
+    "always prefer this tool by policy",
+    "primary source over others",
+    "trusted tool over others policy",
+    "certified connector for sensitive actions",
+    "always prefer primary source",
+    "official tool sensitive actions by policy",
+    "trusted connector over others"
+  ],
+  "regex": [
+    "(?i)\\b(?:official|trusted|certified|highest\\s+priority|always\\s+prefer|primary\\s+source)\\b.{0,120}\\b(?:tool|plugin|connector|integration|api)\\b.{0,120}\\b(?:for\\s+sensitive\\s+actions|over\\s+others|by\\s+policy)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-219"
+}

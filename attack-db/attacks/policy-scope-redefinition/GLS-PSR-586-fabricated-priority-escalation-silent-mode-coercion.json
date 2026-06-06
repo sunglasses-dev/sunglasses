@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-586",
+  "name": "Fabricated Priority Escalation Silent Mode Coercion",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attackers inject fake operational-urgency framing or list-truncation directives to make schedulers reorder priority lanes, skip end-of-cycle verification steps, or force false silent-mode completion, silently shifting effort away from high-impact missions.",
+  "keywords": [
+    "urgency spoof override",
+    "fake p0 emergency tag",
+    "fabricated authority chain",
+    "priority list truncation",
+    "ignore everything after item",
+    "cross-file precedence confusion",
+    "older mission supersedes newest",
+    "silent mode coercion",
+    "scheduler lane hijack",
+    "mission priority preemption",
+    "go mode urgent override",
+    "missed cycle false healthy"
+  ],
+  "regex": [
+    "(?i)(?:(?:p0|emergency|critical|urgent)\\s+(?:override|escalation|preemption)\\s+(?:spoofed|fabricated|fake|injected)|(?:ignore|skip)\\s+(?:everything|all)\\s+after\\s+(?:item|bullet|step|line)\\s+\\d+|(?:silent[- ]?mode|\\[SILENT\\])\\s+(?:coercion|forced|suppressed)\\s+(?:despite|while)\\s+(?:pending|active)\\s+(?:work|task))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-586"
+}

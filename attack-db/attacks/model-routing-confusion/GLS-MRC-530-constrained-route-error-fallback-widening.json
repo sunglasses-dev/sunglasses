@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MRC-530",
+  "name": "Constrained Route Error Fallback Widening",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker induces a recoverable error on a constrained route (strict schema, approved toolset) so orchestration falls back to a looser router or broader toolset that lacks the same denylist and approval gates. The denied action quietly succeeds on the fallback lane while approval state appears unchanged.",
+  "keywords": [
+    "router fallback ambiguity",
+    "policy first to utility first downgrade",
+    "structured output failure pivot",
+    "toolset resolution drift on retry",
+    "cross agent delegation fallback",
+    "constrained to unconstrained route",
+    "schema validation failure forces text route",
+    "tool unavailable hint widens toolset",
+    "fallback policy monotonicity bypass",
+    "approval reused after route class change",
+    "denylist absent on fallback router",
+    "retry expands capability scope"
+  ],
+  "regex": [
+    "(?i)(?:(?:policy|constrained|strict)[- ](?:first|router|path)\\s+(?:timeout|failure|error)\\s+(?:falls?\\s+back|downgrades?|pivots?)\\s+(?:to|into)\\s+(?:utility|unconstrained|loose|broader))",
+    "(?i)(?:retry|fallback|delegate)\\s+(?:expands?|widens?|escalates?)\\s+(?:tool|capability|route)\\s+(?:scope|set|class)\\s+(?:without|skipping|bypassing)\\s+(?:approval|gate|re[- ]approval)",
+    "(?i)(?:tool\\s+unavailable|schema\\s+(?:failure|invalid|error))\\s+(?:hint|pretext|error)\\s+(?:pushes?|forces?|routes?)\\s+(?:retry|fallback)\\s+(?:into|to)\\s+(?:unstructured|broader|unconstrained)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-530"
+}

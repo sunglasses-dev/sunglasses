@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-251",
+  "name": "Delegation Ticket Scope Escalation Execution",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged delegate ticket or authorization token carrying an explicit scope-escalation or privilege-upgrade claim that is then used to execute actions while bypassing controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:delegate\\s+ticket|agent\\s+ticket|handoff\\s+token|delegation\\s+pass|authorization\\s+token)\\b)(?=.*\\b(?:scope\\s+escalation|scope\\s+rebind|privilege\\s+upgrade|permission\\s+escalation|access\\s+elevation)\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-251"
+}

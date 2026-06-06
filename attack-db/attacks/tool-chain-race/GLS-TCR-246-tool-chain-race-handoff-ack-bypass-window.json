@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TCR-246",
+  "name": "Tool chain race \u2014 handoff ack bypass window",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "tool_output"
+  ],
+  "description": "Detects timing-window attacks on agent handoffs \u2014 exploits the acknowledgement/transfer window where guardrails are briefly relaxed during delegate/handoff/transfer/ack phases. Distinct mechanism from GLS-TCR-245 ordered-handoff bypass.",
+  "keywords": [
+    "before handoff skip check",
+    "during delegate bypass guardrail",
+    "after ack ignore verification",
+    "while transfer disable approval",
+    "race handoff inject state",
+    "window delegate override policy",
+    "timing agent replace instruction",
+    "handoff ack bypass window"
+  ],
+  "regex": [
+    "(?is)(?:\\b(?:before|during|after|while)\\b.{0,80}\\b(?:handoff|delegate|transfer|ack(?:nowledg(?:e|ement))?)\\b.{0,80}\\b(?:skip|bypass|ignore|disable)\\b.{0,80}\\b(?:check|checks|guardrail|verification|approval)\\b|\\b(?:race|window|timing)\\b.{0,80}\\b(?:handoff|delegate|agent)\\b.{0,80}\\b(?:inject|override|replace)\\b.{0,80}\\b(?:state|policy|instruction)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-246"
+}

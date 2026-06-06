@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CF-249",
+  "name": "Summarization-Surviving Payload Context Poisoning",
+  "version": "1.0",
+  "category": "context_flooding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker injects payloads that survive summarization or compression while safety context is stripped, so downstream planners treat poisoned summaries as trusted state and inherit malicious directives across turns.",
+  "keywords": [
+    "summary laundering",
+    "compression poisoning",
+    "safety-drop summarizer priming",
+    "role inversion recap",
+    "evidence chain truncation",
+    "remove repetitive citations",
+    "summarize only actionable steps",
+    "latent directive carryover",
+    "policy section stripped from summary",
+    "compressed state forged approval",
+    "recap template canonical truth",
+    "summarizer drops policy boundaries"
+  ],
+  "regex": [
+    "(?i)(?:(?:summariz(?:e|ation)|compress(?:ion|ed)?|recap)\\s+(?:drops?|strips?|omits?|prunes?|removes?)\\s+(?:policy|safety|approval|constraint|citation|guardrail)\\s+(?:boundary|clause|context|section|evidence)|(?:remove|strip|omit)\\s+(?:repetitive|redundant)\\s+(?:citations?|safety|policy)\\s+(?:before|prior\\s+to)\\s+(?:handoff|summary|compression)|(?:poisoned|laundered|forged)\\s+(?:summary|recap|compressed\\s+state)\\s+(?:preserves?|inherits?|carries?)\\s+(?:directive|instruction|approval))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CF-249"
+}

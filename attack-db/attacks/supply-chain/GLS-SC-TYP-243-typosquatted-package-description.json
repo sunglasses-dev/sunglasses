@@ -1,0 +1,37 @@
+{
+  "id": "GLS-SC-TYP-243",
+  "name": "Typosquatted package description",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects natural-language descriptions of typosquatted package attacks (e.g. 'requets' instead of 'requests', installed via autocomplete mistake). Text-level signal \u2014 different attack vector from GLS-SC-PKG-207 (which catches install-flag bypass) and GLS-SC-010/011 (which catch specific known-bad versions). Regex narrow: requires 'typosquat' directly adjacent to package-noun, not just within 80 chars.",
+  "keywords": [
+    "typosquatted package",
+    "typo-squatted package",
+    "typosquat package",
+    "typosquatted module",
+    "typo-squatted module",
+    "typosquatted dependency",
+    "installed by autocomplete fail",
+    "installed via typo",
+    "package name typo"
+  ],
+  "regex": [
+    "(?i)\\btypo[\\s-]?squat(?:ted|ting)?\\b\\s+(?:package|module|library|dep|dependency|crate|gem)\\b",
+    "(?i)\\b(?:installed|pulled|fetched)\\b.{0,40}\\b(?:by|via|through)\\s+(?:autocomplete\\s+(?:fail|mistake)|typo|misspelling|name\\s+confusion)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-TYP-243"
+}

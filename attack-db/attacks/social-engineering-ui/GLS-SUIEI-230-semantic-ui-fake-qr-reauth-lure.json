@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-230",
+  "name": "Semantic UI fake QR reauth lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-injection text that uses fake QR-code verification prompts to push reauthentication or relink actions for privileged targets such as admin accounts or wallets.",
+  "keywords": [
+    "scan qr code reauthenticate admin",
+    "open verification code restore session",
+    "scan qr code relink account",
+    "open qr code unlock workspace",
+    "scan verification code admin account",
+    "scan qr code unlock repository",
+    "open qr code reauthenticate wallet",
+    "scan qr code restore session account"
+  ],
+  "regex": [
+    "(?i)\\b(?:scan|open)\\b.{0,80}\\b(?:qr\\s*code|verification\\s*code)\\b.{0,120}\\b(?:reauth(?:enticate)?|re-?link|restore\\s+session|unlock\\s+workspace)\\b.{0,120}\\b(?:admin|wallet|repository|account)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-230"
+}

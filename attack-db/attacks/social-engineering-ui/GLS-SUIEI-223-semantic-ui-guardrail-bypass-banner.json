@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-223",
+  "name": "Semantic UI guardrail bypass banner",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-overlay text that impersonates policy or security messaging and explicitly instructs the agent to bypass confirmation or safety controls before taking action.",
+  "keywords": [
+    "automation notice ignore guardrails",
+    "security notice bypass confirmation",
+    "policy update disable safety check",
+    "assistant instruction skip approval",
+    "automation notice disable guardrail",
+    "security notice skip confirmation",
+    "policy update bypass approval",
+    "automation notice ignore safety check"
+  ],
+  "regex": [
+    "(?i)\\b(?:automation\\s+notice|security\\s+notice|policy\\s+update|assistant\\s+instruction)\\b.{0,140}\\b(?:ignore|bypass|disable|skip)\\b.{0,80}\\b(?:confirmation|approval|safety\\s+check|guardrails?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-223"
+}

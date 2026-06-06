@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TOP-256",
+  "name": "Forged Safety Verdict Execution Force",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Expands production coverage for tool-output integrity attacks that force execution via forged safety verdicts.",
+  "keywords": [
+    "forge the audit log tool output rewrite",
+    "tamper with scanner-result evidence mark risk score",
+    "backfill forged audit-log entry showing pass status",
+    "rewrite tool output claim allowlisted safe result",
+    "alter the verdict record the audit log",
+    "forged scanner result says passed and safe",
+    "tampered tool-output report sets risk-score safe execute",
+    "rewrote the audit log verdict allow deploy"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool(?:\\s|-)?output|audit(?:\\s|-)?log|scanner(?:\\s|-)?result|verdict)\\b)(?=.*\\b(?:forge|forg(?:ed|ing)|tamper(?:ed|ing)?|rewrite|rewrote|rewrit(?:e|ing)|backfill(?:ed|ing)?|alter(?:ed|ing)?)\\b)(?=.*\\b(?:safe|trusted|allow(?:ed|list(?:ed)?)?|pass(?:ed)?|risk(?:\\s|-)?score)\\b)(?=.*\\b(?:execute|execution|run|deploy|ship)\\b)(?=.*\\b(?:bypass|override|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|control(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-256"
+}

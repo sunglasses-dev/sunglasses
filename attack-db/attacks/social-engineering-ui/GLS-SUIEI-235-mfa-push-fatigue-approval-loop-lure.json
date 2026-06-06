@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SUIEI-235",
+  "name": "MFA Push Fatigue Approval Loop Lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Injected UI text that coerces an agent (or user guided by an agent) to repeatedly approve MFA push notifications until one succeeds \u2014 weaponizes push-fatigue social engineering via GUI text overlay.",
+  "keywords": [
+    "approve push notification repeatedly",
+    "confirm mfa push multiple times",
+    "accept authenticator prompt until succeeds",
+    "approve push notification spam approve",
+    "confirm mfa push repeatedly until",
+    "accept authenticator prompt repeatedly",
+    "approve mfa push until it succeeds",
+    "approve push notification until succeeds"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-235"
+}

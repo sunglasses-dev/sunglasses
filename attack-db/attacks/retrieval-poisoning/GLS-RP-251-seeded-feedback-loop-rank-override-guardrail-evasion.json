@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RP-251",
+  "name": "Seeded Feedback Loop Rank Override Guardrail Evasion",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker uses seeded feedback loop rank override guardrail evasion to bypass policy/approval: e.g., \"A poisoned RAG source document seeded the retrieval feedback loop, inflated trust score ranking, and bypassed safety guardrails through poli\".",
+  "keywords": [
+    "poisoned rag source",
+    "rag source document",
+    "source document seeded",
+    "document seeded retrieval",
+    "seeded retrieval feedback",
+    "retrieval feedback loop",
+    "poisoned rag",
+    "rag source",
+    "source document",
+    "document seeded"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-251"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-RP-565",
+  "name": "Citation Resolution Untrusted Claim Laundering",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker manipulates citation resolution so similarly named files, broad filename references, or stale citation blocks launder untrusted claims as verified evidence. Reports look compliant because they cite real-looking sources, but the cited bytes do not exist or do not match the paraphrased claim.",
+  "keywords": [
+    "path alias citation swap",
+    "line range authority hijack",
+    "stale citation replay",
+    "cross artifact citation grafting",
+    "citation resolution confusion",
+    "cited claim with no byte offset",
+    "filename case collision citation",
+    "untrusted text inheriting trusted citation",
+    "fabricated source path mapping",
+    "citation footer reused from prior cycle",
+    "paraphrased attacker content cited",
+    "broad filename citation without provenance"
+  ],
+  "regex": [
+    "(?i)(?:(?:path|filename|case)[- ](?:alias|collision|swap)\\s+(?:citation|reference|source)\\s+(?:swap|hijack|substitution)|cite[ds]?\\s+(?:without|missing|lacking)\\s+(?:byte\\s+offset|line\\s+range|hash|provenance\\s+tuple))",
+    "(?i)(?:stale|prior[- ]cycle|old)\\s+citation\\s+(?:replay|reuse|backfill|graft)\\s+(?:as|claimed|labeled)\\s+(?:fresh|current|verified)",
+    "(?i)(?:cross[- ]artifact|untrusted)\\s+(?:citation|quote|content)\\s+(?:grafting|inherits?|labeled)\\s+(?:trusted|verified|approved)\\s+(?:citation|footer|provenance)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-565"
+}

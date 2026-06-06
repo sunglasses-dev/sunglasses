@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-148",
+  "name": "Conflict-Resolution Merge Layer Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects into how conflicts are resolved (priority rules, tie-break metadata, alias smuggling, rationale phrasing) so the merge layer elevates untrusted text as policy authority while appearing policy-aligned.",
+  "keywords": [
+    "conflict resolution prompt poisoning",
+    "priority ladder inversion",
+    "tie break key poisoning",
+    "merge policy alias smuggle",
+    "resolver rationale hijack",
+    "latest source always wins override",
+    "confidence=1.0 verified=true forged",
+    "policy_override policyPatch directive alias",
+    "operator intent phrasing trap",
+    "merge layer attack",
+    "untrusted text as tie break authority",
+    "resolver branch from unsigned metadata"
+  ],
+  "regex": [
+    "(?i)(?:(?:latest|newest|attacker[- ]?controlled)\\s+(?:source|artifact|patch)\\s+(?:always|must)\\s+(?:wins?|overrides?|outranks?)\\s+(?:mission|policy|canonical)|(?:fake|forged|fabricated)\\s+(?:confidence|verified|trusted|priority)\\s+(?:=|:)\\s*(?:1\\.0|true|high)\\s+(?:to|so)\\s+(?:win|elevate|tie[- ]?break)|(?:policy_?override|policy_?patch|directive)\\s+(?:alias|key|field)\\s+(?:smuggl\\w+|routes?|carries?)\\s+(?:malicious|attacker|adversarial))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-148"
+}

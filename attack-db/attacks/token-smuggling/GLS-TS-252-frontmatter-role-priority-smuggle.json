@@ -1,0 +1,34 @@
+{
+  "id": "GLS-TS-252",
+  "name": "Frontmatter Role Priority Smuggle",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker uses frontmatter role priority smuggle to bypass policy/approval: e.g., \"- Inject yaml frontmatter with role priority authority to override policy.\".",
+  "keywords": [
+    "inject yaml frontmatter",
+    "yaml frontmatter role",
+    "frontmatter role priority",
+    "role priority authority",
+    "priority authority override",
+    "authority override policy",
+    "inject yaml",
+    "yaml frontmatter",
+    "frontmatter role",
+    "role priority"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-252"
+}

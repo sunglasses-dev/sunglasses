@@ -1,0 +1,37 @@
+{
+  "id": "GLS-AW-018",
+  "name": "Cron reply log drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "message"
+  ],
+  "description": "GO MODE relies on append-only status artifacts (cava_wins_log.md + CAVA_REPLY_*) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims.",
+  "keywords": [
+    "status-first override",
+    "split-append desync",
+    "timestamp laundering",
+    "tail-truncation blindspot",
+    "fake success log entry",
+    "audit trail desync",
+    "write success before verification",
+    "suppress wins log",
+    "contradictory audit trail",
+    "log file early-edit hidden"
+  ],
+  "regex": [
+    "(?i)(?:write|append|log|record)\\s+(?:fake|forged|fabricated|premature)\\s+(?:success|status|completion|done)\\s+(?:before|prior\\s+to|without|skipping)\\s+(?:verification|validation|run|execution)",
+    "(?i)(?:status|reply|append|audit)\\s+(?:log|file|trail)\\s+(?:desync|drift|divergence|laundering|truncation\\s+blindspot)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-018"
+}

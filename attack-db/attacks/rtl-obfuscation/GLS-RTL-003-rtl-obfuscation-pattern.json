@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RTL-003",
+  "name": "Rtl Obfuscation pattern",
+  "version": "1.0",
+  "category": "rtl_obfuscation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects right-to-left and bidirectional Unicode control characters used to obfuscate a prompt and smuggle instructions that bypass safety guardrails.",
+  "keywords": [
+    "insert the marker hide text direction and",
+    "use unicode bidi control with rlo marker",
+    "apply right-to-left override this payload and bypass",
+    "embed and around the command then supersede",
+    "add rtl override metadata and disregard guardrail",
+    "use bidirectional control characters obfuscate this command",
+    "inject unicode bidi formatting the prompt and",
+    "include directional override then bypassing instruction safeguards"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without)\\s+(?:ignore(?:d|s|ing)?|bypass(?:ed|es|ing)?|override(?:d|s|ing)?|supersed(?:e|es|ed|ing)|disregard(?:ed|s|ing)?|drop(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*(?:\\u202e|\\u202d|\\u2066|\\u2067|\\u2068|\\u2069|right-to-left\\s+override|rtl\\s+override|bidi(?:rectional)?\\s+control|unicode\\s+bidi|rlo\\s+marker))(?=.*\\b(?:ignore(?:d|s|ing)?|bypass(?:ed|es|ing)?|override(?:d|s|ing)?|supersed(?:e|es|ed|ing)|disregard(?:ed|s|ing)?|drop(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|control(?:s)?)\\b).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RTL-003"
+}

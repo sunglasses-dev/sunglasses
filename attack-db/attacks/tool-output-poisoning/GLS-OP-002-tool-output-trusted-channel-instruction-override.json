@@ -1,0 +1,25 @@
+{
+  "id": "GLS-OP-002",
+  "name": "Tool Output Trusted Channel Instruction Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Detects text that instructs an agent to treat tool, search, browser, retrieval, or API output as trusted, authoritative, or a higher-priority source of truth and then use that framing to override, bypass, or discard previous instructions, policies, or guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\b(?:because|since)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,60}\\b(?:trusted|authoritative|verified|reliable)\\b|\\b(?:treat|consider|use)\\b.{0,40}\\b(?:tool|search|browser|retrieval|plugin|api)\\s+output\\b.{0,40}\\b(?:as\\s+)?(?:trusted|authoritative|higher\\s+priority|source\\s+of\\s+truth)\\b).{0,160}\\b(?:ignore|override|bypass|replace|discard)\\b.{0,80}\\b(?:previous|prior|earlier)?\\s*(?:instruction(?:s)?|polic(?:y|ies)|guardrail(?:s)?|safety\\s+rule(?:s)?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-OP-002"
+}

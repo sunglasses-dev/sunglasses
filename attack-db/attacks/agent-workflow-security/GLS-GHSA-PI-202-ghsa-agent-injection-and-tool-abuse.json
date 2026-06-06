@@ -1,0 +1,37 @@
+{
+  "id": "GLS-GHSA-PI-202",
+  "name": "GHSA agent injection and tool abuse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems \u2014 grounded in GitHub Security Advisories.",
+  "keywords": [
+    "approved already run shell",
+    "consent cached skip confirmation",
+    "execute this command",
+    "run shell command now",
+    "mcp server subprocess",
+    "printenv for diagnostics",
+    "approval cache bypass",
+    "debug mode reveal api key",
+    "skip confirmation execute",
+    "unverified mcp server"
+  ],
+  "regex": [
+    "(?is)(?:ignore\\s+(?:previous|prior)\\s+instructions|approved\\s+already|consent\\s+cached|run\\s+(?:shell|bash|aws\\s+cli)|subprocess|mcp\\s+server|tool\\s+server|execute\\s+this\\s+command|\\$\\(|`[^`]+`|curl\\s+https?://|export\\s+[A-Z0-9_]+|printenv|env\\s*\\||token|api[_ -]?key|secret)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-GHSA-PI-202"
+}

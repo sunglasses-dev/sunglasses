@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-166",
+  "name": "Encoding Canonicalization Policy Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits canonicalization or encoding mismatches so input passes policy checks in one representation and executes in a different representation, smuggling malicious payloads through filters.",
+  "keywords": [
+    "canonicalization collision",
+    "policy sees different form than executor",
+    "unicode normalization smuggle",
+    "url decode bypass policy",
+    "homoglyph evades check",
+    "policy regex vs runtime parser",
+    "encoded variant survives execution",
+    "canonical form mismatch policy",
+    "double decode bypass",
+    "representation gap exploit",
+    "input form collision",
+    "policy check on different representation"
+  ],
+  "regex": [
+    "(?i)(?:input\\s+canonicalization\\s+(?:collision|mismatch|gap)|(?:canonicalization|normalization)\\s+(?:mismatch|drift|collision)\\s+(?:between|across)\\s+(?:policy|check|gate)\\s+(?:and|vs)\\s+(?:execution|runtime|parser))",
+    "(?i)(?:(?:unicode|url|html|base64|double)\\s+(?:decode|encoding|normalization)\\s+(?:bypass|smuggle|evades?)\\s+(?:policy|check|filter)|(?:homoglyph|encoded\\s+variant)\\s+(?:survives|passes|bypass))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-166"
+}

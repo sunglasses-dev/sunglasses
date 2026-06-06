@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PP-002",
+  "name": "Paraphrased directive override \u2014 'disregard the above' family",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Short-form paraphrased overrides missed by the canonical 'ignore previous instructions' pattern.",
+  "keywords": [
+    "disregard the above",
+    "disregard what",
+    "disregard everything",
+    "please disregard the",
+    "please ignore the above",
+    "please ignore everything",
+    "ignore the above",
+    "ignore everything above",
+    "ignore what i said",
+    "ignore what was said"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PP-002"
+}

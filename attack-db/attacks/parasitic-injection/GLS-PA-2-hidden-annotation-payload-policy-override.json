@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PA-2",
+  "name": "Hidden Annotation Payload Policy Override",
+  "version": "1.0",
+  "category": "parasitic_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker uses hidden annotation payload policy override to bypass policy/approval: e.g., \"1. A hidden annotation payload says to ignore current safety policy and follow the embedded directive.\".",
+  "keywords": [
+    "hidden annotation payload",
+    "annotation payload says",
+    "payload says ignore",
+    "says ignore current",
+    "ignore current safety",
+    "current safety policy",
+    "safety policy follow",
+    "policy follow embedded",
+    "follow embedded directive",
+    "hidden annotation"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PA-2"
+}

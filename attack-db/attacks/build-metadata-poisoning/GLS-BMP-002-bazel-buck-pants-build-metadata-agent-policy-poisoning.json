@@ -1,0 +1,36 @@
+{
+  "id": "GLS-BMP-002",
+  "name": "Bazel / Buck / Pants Build Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Bazel, Buck, and Pants build metadata can smuggle agent-facing authority, report-suppression, or credential-forwarding instructions into monorepo build descriptors that AI coding agents and build-security scanners often ingest as trusted project context.",
+  "keywords": [
+    ".bazelrc",
+    ".bzl",
+    "BUCK",
+    "BUILD.bazel",
+    "MODULE.bazel",
+    "TARGETS",
+    "WORKSPACE",
+    "agent_instructions",
+    "assistant_note",
+    "pants.toml",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?|documentation|Buildifier\\s+guide).{0,160}?(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:report|detect|flag|refuse|block))|(?:build\\s+metadata|build\\s+descriptor\\s+metadata|Bazel|Buck|Pants|BUILD\\.bazel|MODULE\\.bazel|WORKSPACE|\\.bzl|\\.bazelrc|BUCK|TARGETS|pants\\.toml|Starlark).{0,170}?(?:is\\s+not|are\\s+not|does\\s+not|do\\s+not|never|must\\s+not|should\\s+never|should\\s+not).{0,130}?(?:authoritative|policy|override|overrides?|supersede|obey|trusted|used)|no\\s+(?:policy\\s+)?overrides?|(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat)))\n(?=.*(?:BUILD\\.bazel|MODULE\\.bazel|WORKSPACE|\\.bzl\\b|\\.bazelrc\\b|bzlmod|Bazel\\s+build|Bazel\\s+module|Starlark|load\\s*\\(|rule\\s*\\(|py_library\\s*\\(|cc_library\\s*\\(|java_library\\s*\\(|visibility\\s*=|tags\\s*=|generator_name|BUCK\\b|TARGETS\\b|Buck\\s+build|pants\\.toml|Pants\\s+build|\\[GLOBAL\\]|\\[python\\]|(?<!\\w)\"(?:description|name|tags|visibility|generator_name)\"\\s*:|(?<![a-zA-Z0-9])(?:x-agent-policy|scanner_policy|agent_instructions|assistant_note|build_auditor_note)(?![a-zA-Z0-9])))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|copilot|codex|claude|llms?|coding[-_\\s]?agents?|dependency[-_\\s]?scanners?|security[-_\\s]?scanners?|build[-_\\s]?auditors?|monorepo[-_\\s]?scanners?|scanners?|scanner\\s+directives?|automated[-_\\s]?(?:review|build\\s+review|dependency\\s+review)|scanner_policy|agent_instructions|assistant_note|build_auditor_note)(?![a-zA-Z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|overrules?|governing\\s+document|controlling\\s+(?:document|playbook)|(?:primary|single)\\s+source\\s+of\\s+truth|authoritative|canonical\\s+(?:project\\s+|build\\s+|dependency\\s+|monorepo\\s+)?(?:description|policy|guidance)|definitive\\s+(?:project\\s+|build\\s+|dependency\\s+|monorepo\\s+)?(?:description|policy|guidance)|(?:main|primary|principal)\\s+(?:operating\\s+)?(?:(?:review|audit|dependency|scanner|build|monorepo)\\s+)?(?:guidance|playbook|policy)|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency|build|monorepo)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|dependency|build|monorepo)\\s+rules?)|(?:agent|scanner|assistant|dependency\\s+scanner|build\\s+auditor|monorepo\\s+scanner)\\s+(?:instructions?|directives?|policy)))\n(?=.*(?:(?:suppress|hide|redact|exclude|omit|skip|downgrade|reclassify)(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVEs?|licenses?|dependencies?|dependency\\s+graph|visibility|sandbox|generated-code|targets?|builds?|tests?)\\b|(?:treat|mark|classify|flag).{0,60}?\\b(?:informational|non-blocking|safe|clean|benign|advisory-only|background(?:-only)?|low\\s+priority)\\b|(?:keep|leave).{0,90}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|CVEs?|dependency\\s+alerts?|target\\s+visibility\\s+alerts?).{0,45}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|build\\s+memo|final\\s+report|review\\s+summary)\\b|(?:move|route|shift).{0,90}?\\b(?:observations?|findings?|diagnostics?|results?|issues?|alerts?|dependency\\s+graph\\s+observations?).{0,90}?\\b(?:appendix-only|background-only|informational|non-blocking|background\\s+notes?)\\b|(?:do\\s+not|don't|not)\\s+(?:flag|report|escalate).{0,70}?(?:findings?|warnings?|issues?|observations?|diagnostics?|results?|dependencies?|generated-code)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,5}(?:API\\s+tokens?|session\\s+(?:keys?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material)|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|auth(?:orization)?\\s+headers?|secrets?|execution\\s+context|remote-cache\\s+credentials?|cache\\s+credentials?|build\\s+runtime\\s+(?:material|artifacts?|context))))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-002"
+}

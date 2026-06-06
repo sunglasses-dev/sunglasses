@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-019",
+  "name": "IndexNow Key-Location Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "IndexNow key files, keyLocation metadata, or submit-status text can carry agent-directed policy claims that tell AI crawlers or SEO/security agents to treat site-verification metadata as higher-priority instructions, suppress findings, or forward secrets.",
+  "keywords": [
+    "AI crawler",
+    "API key",
+    "LLM",
+    "SEO agent",
+    "agentic bot",
+    "cookie",
+    "credential",
+    "do not report",
+    "environment variable",
+    "exfiltrate",
+    "finding",
+    "forward",
+    "hide",
+    "ignore",
+    "include"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do not|don't|never|must not|should not|refuse(?:s|d)? to|blocked?|training example|defensive example)\\b.{0,120}\\b(?:ignore|override|suppress|include|forward|leak|exfiltrat|obey)\\b)(?=.*\\b(?:indexnow|keylocation|key[-_\\s]*location|indexnow[-_\\s]*key|submiturl|urlsubmitted)\\b)(?=.*\\b(?:ai\\s*(?:crawler|agent|assistant|scanner)|llm|agentic|bot|seo\\s*(?:agent|crawler|assistant))\\b)(?=.*\\b(?:ignore|override|supersede|outrank|obey|treat\\s+as\\s+(?:system|developer|owner)\\s+(?:policy|instruction)|suppress|hide|do\\s+not\\s+report|forward|include|exfiltrat|leak)\\b)(?=.*\\b(?:secret|token|api[-_\\s]*key|credential|cookie|finding|report|scanner|system\\s+prompt|environment|env(?:ironment)?\\s*var)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-019"
+}

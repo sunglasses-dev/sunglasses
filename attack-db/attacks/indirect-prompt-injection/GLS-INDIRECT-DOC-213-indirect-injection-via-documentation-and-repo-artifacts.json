@@ -1,0 +1,36 @@
+{
+  "id": "GLS-INDIRECT-DOC-213",
+  "name": "Indirect injection via documentation and repo artifacts",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects attempts to embed action-taking instructions in external documentation (README, docs, runbooks) that coerce agents to reveal secrets, bypass policy, or execute privileged commands.",
+  "keywords": [
+    "readme ignore previous instructions",
+    "documentation override policy",
+    "runbook bypass restrictions",
+    "setup guide dump system prompt",
+    "wiki supersede instructions",
+    "docs system instruction reveal",
+    "tool docs highest priority export",
+    "readme troubleshooting send secrets",
+    "documentation curl upload env",
+    "setup guide print api key"
+  ],
+  "regex": [
+    "(?is)\\b(readme|documentation|docs|wiki|runbook|setup\\s*guide|tool\\s*docs?)\\b.{0,240}\\b(ignore|override|bypass|supersede|highest\\s*priority|system\\s*instruction)\\b.{0,260}\\b(print|dump|reveal|export|upload|post|curl|send)\\b.{0,240}\\b(api\\s*key|token|secret|\\.env|system\\s*prompt|tool\\s*schema|credentials?)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-INDIRECT-DOC-213"
+}

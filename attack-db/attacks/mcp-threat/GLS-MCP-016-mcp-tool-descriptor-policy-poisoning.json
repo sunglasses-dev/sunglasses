@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-016",
+  "name": "MCP Tool Descriptor Policy Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker-controlled MCP discovery or tool metadata can hide policy-overriding instructions in tool descriptions or schema descriptions, causing an agent to treat untrusted descriptor text as higher-priority control-plane policy.",
+  "keywords": [
+    ".well-known",
+    "Model Context Protocol",
+    "agent policy",
+    "argument schema",
+    "highest priority",
+    "ignore system/developer",
+    "inputSchema",
+    "mcp-server",
+    "mcp.json",
+    "must obey this tool",
+    "override previous instructions",
+    "tool description",
+    "tool description outranks",
+    "tools[].description",
+    "x-mcp-*"
+  ],
+  "regex": [
+    "(?is)(?=.*\\b(?:mcp(?:\\.json|-server|\\s+server)?|model\\s+context\\s+protocol|tools?\\[?\\]?\\.description|tool\\s+description|inputSchema|argument\\s+schema|x-mcp|\\.well-known/[^\\s\"'`]*mcp)\\b)(?=.*\\b(?:agent|assistant|model|tool\\s+user|scanner)\\b)(?=.*\\b(?:ignore|override|outrank|highest\\s+priority|must\\s+obey|do\\s+not\\s+(?:mention|report)|suppress|disable|bypass|read|paste|include|forward|send|exfiltrat(?:e|ion))\\b)(?=.*\\b(?:system|developer|previous\\s+instructions|policy|secret|token|api[-_\\s]*key|env(?:ironment)?\\s*(?:var|variable)s?|hidden\\s+config|workspace\\s+policy|scanner\\s+reports?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-016"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-561",
+  "name": "Peer Agent Instruction Override Execute",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects another or upstream agent instructing the recipient to override policy or guardrails and execute an action in place of the previous instruction set.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:another|other|peer|upstream|planner|worker|delegate|orchestrator)\\s+agent\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|previous\\s+instruction(?:s)?)\\b)(?=.*\\b(?:execute|run|invoke|trigger|call)\\b).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-561"
+}

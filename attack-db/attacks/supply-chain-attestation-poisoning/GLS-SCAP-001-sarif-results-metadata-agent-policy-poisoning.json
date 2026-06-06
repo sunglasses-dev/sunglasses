@@ -1,0 +1,35 @@
+{
+  "id": "GLS-SCAP-001",
+  "name": "SARIF Results Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "SARIF result files and code-scanning exports can carry attacker-authored `message.text`, `properties`, or extension metadata that tells AI code-review/security agents to treat the scan result as policy, suppress findings, or forward local runtime context.",
+  "keywords": [
+    "\"$schema\"",
+    "\"message\"",
+    "\"results\"",
+    "\"ruleId\"",
+    "\"runs\"",
+    "\"version\":\"2.1.0\"",
+    "SARIF",
+    "agent_instructions",
+    "assistant_note",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability|scanner|training|reference|runbook)\\s+(?:report|docs?|guide|example|exercise|reference)?).{0,160}?\\b(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:report|detect|flag|refuse|block))\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?|supersede|supersedes?)\\b)\n(?!.*\\b(?:not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?)\\b)\n(?=.*(?:\\bSARIF\\b|\"\\$schema\"\\s*:\\s*\"[^\"]*sarif|(?<!\\w)\"version\"\\s*:\\s*\"2\\.1\\.0\"|(?<!\\w)\"runs\"\\s*:|(?<!\\w)\"tool\"\\s*:|(?<!\\w)\"results\"\\s*:|(?<!\\w)\"ruleId\"\\s*:|(?<!\\w)\"message\"\\s*:\\s*\\{|\\bcode\\s+scanning\\s+(?:alerts?|results?)\\b|\\bstatic\\s+analysis\\s+results?\\b))\n(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|autonomous\\s+agents?|security\\s+agents?|code\\s+review\\s+agents?|vulnerability\\s+(?:management\\s+)?agents?|dependency\\s+review|automated\\s+(?:review|triage|audit)|assistants?|LLMs?|models?|scanners?|verifiers?|agent_instructions?|scanner_policy|assistant_note|x-agent-policy)(?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:governing|controlling|canonical|definitive|authoritative)\\s+(?:(?:review|audit|scanner|project)\\s+)?(?:document|policy|guidance|playbook|source)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\b(?:main|primary|principal)\\s+(?:operating|review|audit|scanner|triage)\\s+(?:guidance|playbook|policy)\\b|\\btakes\\s+precedence\\b|\\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?)\\b|\\bdefines?\\s+(?:(?:all|the)\\s+)?(?:scanner|security|agent|review|triage|automated)\\s+rules?\\b|\\b(?:agent|scanner|assistant|verifier)\\s+(?:instructions?|directives?|policy)\\b))\n(?=.*(?:\\b(?:suppress|hide|redact|exclude|omit|skip|silence|downgrade|deprioriti[sz]e)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies)|observations?|diagnostics?|results?|rule\\s+hits?|code\\s+scanning\\s+alerts?)\\b|\\b(?:treat|mark|classify|label)\\b.{0,50}?\\b(?:informational|non[- ]blocking|safe|clean|benign|accepted|background[- ]only)\\b|\\b(?:do\\s+not|don't|never)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\\b|\\b(?:keep|leave)\\b.{0,80}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies))\\b.{0,40}?\\bout\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|triage\\s+memo|final\\s+report)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|copy|read|populate)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|session\\s+keys?|credentials?|secrets?|auth(?:orization)?\\s+headers?|cookies?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|material)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SCAP-001"
+}

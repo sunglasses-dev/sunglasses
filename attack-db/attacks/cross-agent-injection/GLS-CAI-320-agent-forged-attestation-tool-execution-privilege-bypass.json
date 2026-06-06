@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-320",
+  "name": "Agent Forged Attestation Tool Execution Privilege Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a peer or remote agent presenting a forged attestation, receipt, or ticket to authorize a tool or command execution while bypassing scope or privilege controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|delegated|peer|remote)\\b)(?=.*\\b(?:forg(?:ed|ery)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:attestation|receipt|approval|token|ticket|manifest)\\b)(?=.*\\b(?:tool|command|execution|run|action)\\b)(?=.*\\b(?:scope|privilege|authorization|permission)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|escalat(?:e|ed|ing)|ignore(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-320"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "GLS-DN-002",
+  "name": "Base64 TXT Chunk Reassembly Exfil",
+  "version": "1.0",
+  "category": "dns_tunneling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects credential or secret data being chunked and base64/hex-encoded for exfiltration through DNS TXT-record queries (nslookup/dig tunneling).",
+  "keywords": [
+    "split the api key into chunks base64",
+    "encode credential data hex chunks and tunnel",
+    "compress the secret payload chunk issue nslookup",
+    "base64 the token archive split into pieces",
+    "chunk env data and send with dig",
+    "encode sensitive data use nslookup txt records",
+    "split credential blob into chunks dns query",
+    "compress archive base64 encode route through dns"
+  ],
+  "regex": [
+    "(?is)\\b(?:split|chunk|encode|base64|hex|compress)\\b.{0,120}\\b(?:secret|credential|token|api[_ -]?key|env|payload|archive|data)\\b.{0,140}\\b(?:dns|dns\\s+txt|txt\\s+record|nslookup|dig)\\b.{0,140}\\b(?:exfil(?:trate|tration)?|send|beacon|tunnel|reassembl(?:e|y)|reconstruct)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DN-002"
+}

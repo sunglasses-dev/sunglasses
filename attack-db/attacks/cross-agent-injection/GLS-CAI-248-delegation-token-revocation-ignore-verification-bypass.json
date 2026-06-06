@@ -1,0 +1,34 @@
+{
+  "id": "GLS-CAI-248",
+  "name": "Delegation Token Revocation Ignore Verification Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker explicitly names a delegation token/receipt as REVOKED/EXPIRED/MISMATCH and instructs agent to ignore revocation and execute anyway. Revocation-ignore channel not covered by forgery/spoof/replay (GLS-CAI-241).",
+  "keywords": [
+    "delegation token marked revoked",
+    "peer agent handoff token expired",
+    "delegated approval receipt mismatch",
+    "delegation token invalid disregard approval",
+    "delegate handoff revocation notice",
+    "expired delegated credential ignore guardrails",
+    "approval receipt revoked bypass verification",
+    "delegation token invalid mismatch metadata",
+    "ignore verification policy execute payout",
+    "override trust boundary checks apply changes"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-248"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "GLS-AW-020",
+  "name": "Justification channel hijack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Agents often separate **decision payloads** from human-readable **justification text** (approval notes, risk summaries, changelog blurbs). Attackers can target the justification channel to make unsafe actions look compliant, reducing reviewer skepticism and increasing approval-throughput for malicious plans.",
+  "keywords": [
+    "risk summary inversion",
+    "approval note laundering",
+    "justification drift on retry",
+    "evidence-selective narration",
+    "make destructive look safe",
+    "soften warning across retries",
+    "claim no side effects while destructive",
+    "downplay risk to reviewer",
+    "approval-throughput laundering",
+    "tool args risky summary benign"
+  ],
+  "regex": [
+    "(?i)(?:make|present|frame|describe)\\s+(?:destructive|risky|dangerous|write|delete|network)\\s+(?:action|tool\\s+call|payload|operation)\\s+(?:as|appear|look)\\s+(?:safe|benign|read[- ]only|no[- ]op)",
+    "(?i)(?:justification|approval\\s+note|risk\\s+summary|reviewer\\s+note)\\s+(?:hijack|inversion|laundering|drift|softening)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-020"
+}

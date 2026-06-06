@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-014",
+  "name": "JWKS metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A JWKS / JSON Web Key Set endpoint can hide agent-facing instructions in key metadata or custom fields that tell AI auditors, token validators, or scanners to override policy, suppress identity findings, or include local bearer/API/session material in reports.",
+  "keywords": [
+    "\"keys\"",
+    "\"kid\"",
+    "\"kty\"",
+    "\"x5u\"",
+    "AI agent",
+    "API key",
+    "Authorization",
+    "JSON Web Key Set",
+    "JWK Set",
+    "LLM",
+    "assistant",
+    "auditor",
+    "bearer",
+    "cookie",
+    "developer"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*(?:do\\s+not|never|must\\s+not)\\s+(?:obey|treat|trust|follow|honou?r|accept).{0,90}(?:jwks|jwk\\s+set|json\\s+web\\s+key|kid|x5u))\n(?!.*(?:security|vulnerability|incident)\\s+report.{0,140}(?:jwks|jwk\\s+set|json\\s+web\\s+key).{0,180}(?:hide\\s+findings|suppress|include\\s+(?:api\\s+)?tokens?))\n(?!.*(?:scanner|validator|auditor)s?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse).{0,180}(?:jwks|jwk\\s+set|json\\s+web\\s+key|kid|x5u))\n(?=.*(?:jwks_uri|jwks\\.json|jwk\\s+set|json\\s+web\\s+key\\s+set|json\\s+web\\s+key|\"keys\"\\s*:|\"kty\"\\s*:|\"kid\"\\s*:|\"x5u\"\\s*:|x-agent-policy|x_scanner_policy))\n(?=.*\\b(?:ai\\s+agents?|assistants?|llms?|models?|scanners?|auditors?|token\\s+validators?|security\\s+tools?|integration\\s+agents?)\\b)\n(?=.*\\b(?:ignore|override|supersede|outrank|highest\\s+priority|do\\s+not\\s+report|not\\s+report|suppress|hide\\s+findings|mark\\s+(?:this\\s+)?(?:jwks|key|issuer)\\s+clean|forward|send|include)\\b)\n(?=.*\\b(?:system|developer|policy|scanner|findings?|reports?|warnings?|bearer|authorization|api\\s*key|tokens?|cookie|session|env|local\\s+state|secret)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-014"
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate attack-db JSON files from glasses/patterns.py"""
+"""Generate attack-db JSON files from sunglasses/patterns.py"""
 import json
 import os
 import sys

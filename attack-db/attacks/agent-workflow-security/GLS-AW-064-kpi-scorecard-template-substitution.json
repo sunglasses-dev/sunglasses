@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-064",
+  "name": "KPI Scorecard Template Substitution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker swaps or injects KPI scorecard templates so metric definitions, lane boundaries, or fallback rules silently change while the executive summary still looks routine. Downstream decisions inherit drifted semantics and approve unsafe states.",
+  "keywords": [
+    "scorecard template substitution",
+    "kpi template swap",
+    "rewrite metric semantics",
+    "ops vs growth lane confusion",
+    "baseline window override",
+    "fallback rule poisoning",
+    "executive summary template hijack",
+    "kpi lane boundary drift",
+    "scorecard semantics rewrite",
+    "template-injected metric definition",
+    "drifted scorecard binding",
+    "metric formula substitution"
+  ],
+  "regex": [
+    "(?i)(?:(?:swap|substitute|inject|rewrite)\\s+(?:scorecard|kpi|metric)\\s+(?:template|formula|definition|semantics)\\b|(?:scorecard|kpi)\\s+template\\s+(?:substitution|hijack|poisoning))",
+    "(?i)(?:(?:ops|growth)\\s+lane\\s+(?:boundary|definition)\\s+(?:drift|swap|override)|baseline\\s+window\\s+(?:override|swap)\\s+in\\s+(?:scorecard|template|summary))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-064"
+}

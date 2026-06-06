@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-041",
+  "name": "Score Normalization Bucket Boundary Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker inflates or seeds outlier values into raw telemetry so the score-normalization stage stretches its range or shifts bucket boundaries, causing critical findings to map below operator-action thresholds while attacker-favored items rank higher.",
+  "keywords": [
+    "score normalization poisoning",
+    "outlier shifts normalized rank",
+    "stretch min-max range",
+    "normalize bias attacker score",
+    "z-score inflation injection",
+    "percentile compression attack",
+    "scale factor manipulation",
+    "denominator poison shifts boundary",
+    "raw telemetry inflate to dominate",
+    "normalization bucket flip",
+    "operator action below threshold",
+    "scaling makes critical look benign"
+  ],
+  "regex": [
+    "(?i)(?:(?:poison|manipulate|game|skew|shift)\\s+(?:score|rank|percentile|z[- ]score|normaliz(?:ation|ed))\\s+(?:bucket|range|denominator|boundary|threshold)|(?:min[- ]max|percentile|z[- ]score)\\s+(?:normalization|scaling)\\s+(?:poisoning|attack|manipulation))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-041"
+}

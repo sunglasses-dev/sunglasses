@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-180",
+  "name": "Hash-Equivalent Behavior-Divergent Approval Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forces hash-equivalent but behavior-divergent payloads through approval (truncation collisions, field-order tricks, encoding smuggles) so approval logs say 'approved A' while execution runs higher-risk B.",
+  "keywords": [
+    "approval hash collision",
+    "hash equivalent behavior divergent",
+    "approved summary differs from executed",
+    "truncated preview collision",
+    "json field order hash collision",
+    "whitespace encoding collision smuggle",
+    "cross tool intent collision",
+    "approval card hash incomplete",
+    "execution payload mutated post approval",
+    "dual hash mismatch",
+    "approve a execute b",
+    "canonicalization drift approval"
+  ],
+  "regex": [
+    "(?i)(?:approval\\s+hash\\s+(?:collision|forge|spoof)|hash[- ]equivalent\\s+(?:but\\s+)?(?:behavior|execution)\\s+(?:divergent|different|mutated)|(?:approve|approved)\\s+(?:summary|preview|envelope)\\s+(?:differs|diverges)\\s+from\\s+(?:executed|runtime|actual)\\s+payload)",
+    "(?i)(?:(?:truncated[- ]preview|whitespace|encoding|field[- ]order|cross[- ]tool)\\s+(?:collision|smuggle)\\s+(?:in|on)\\s+approval|approval\\s+(?:hash|envelope)\\s+(?:bound|tied)\\s+(?:only\\s+)?to\\s+(?:intent|preview|summary)\\s+(?:while|but)\\s+(?:execution|runtime)\\s+(?:mutates|differs|swaps))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-180"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-119",
+  "name": "Dependency Health Spoof Gate Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker spoofs or replays a healthy dependency-health response so the last-mile 'run healthcheck before promote/deploy' gate passes against an unhealthy upstream, letting bad releases or broken dependencies ride into production.",
+  "keywords": [
+    "healthcheck gate bypass",
+    "dependency health spoof",
+    "fake healthy upstream",
+    "promote past failing dep",
+    "healthcheck forged 200",
+    "stale health json reuse",
+    "dep health check skipped",
+    "healthy badge on broken dep",
+    "deploy past unhealthy dependency",
+    "dependency probe poisoning",
+    "health endpoint trust hijack",
+    "gate bypass via health spoof"
+  ],
+  "regex": [
+    "(?i)(?:health(?:check)?|dependency\\s+health)\\s+(?:gate|probe|check)\\s+(?:bypass|spoof|forg|skip|evade)|(?:fake|spoof|forge)\\s+(?:healthy|200|ok|pass)\\s+(?:response|status|signal)\\s+(?:from|for)\\s+(?:dependency|upstream|service)",
+    "(?i)(?:promote|deploy|advance)\\s+(?:past|despite|over)\\s+(?:failing|unhealthy|broken)\\s+(?:dependency|upstream|dep|service)|(?:stale|cached|reused)\\s+(?:health|status)\\s+(?:json|response)\\s+(?:bypass|gate|hide)\\s+(?:current|live)\\s+(?:failure|outage)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-119"
+}

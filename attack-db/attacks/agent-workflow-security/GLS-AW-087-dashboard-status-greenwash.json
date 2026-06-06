@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-087",
+  "name": "Dashboard Status Greenwash",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker forges or holds a green status on operator dashboards during an active incident so responders trust the panel and delay escalation. Operators act on the greenwashed view while the underlying system degrades unmitigated.",
+  "keywords": [
+    "status panel greenwashing",
+    "all green during incident",
+    "dashboard greenwash",
+    "fake healthy status during outage",
+    "status indicator forgery",
+    "incident-time green dot lie",
+    "status panel poisoning",
+    "ops dashboard green spoof",
+    "synthetic all-clear",
+    "status board lie during alert",
+    "green status during failure",
+    "dashboard health forgery"
+  ],
+  "regex": [
+    "(?i)(?:status\\s+panel\\s+greenwash(?:ing)?|(?:dashboard|status\\s+board|status\\s+page)\\s+(?:greenwashed|spoofed|forged|poisoned)\\s+(?:during|while)\\s+(?:incident|outage|failure|alert))",
+    "(?i)(?:(?:all[- ]green|all[- ]clear|healthy)\\s+(?:status|indicator|signal)\\s+(?:during|while|amid)\\s+(?:incident|outage|degradation)|synthetic\\s+all[- ]clear)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-087"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-233",
+  "name": "Semantic UI compliance local upload lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects malicious UI overlays that impersonate compliance or security banners to coerce agents into uploading local session artifacts such as cookies, tokens, or credential exports.",
+  "keywords": [
+    "compliance notice upload local session",
+    "security alert attach browser cookie",
+    "automation check export local credentials",
+    "compliance banner drag browser token",
+    "security notice upload session export",
+    "automation alert attach local cookie",
+    "compliance check export browser session",
+    "security banner upload local credential"
+  ],
+  "regex": [
+    "(?i)\\b(?:security|compliance|automation)\\s+(?:notice|alert|banner|check)\\b.{0,140}\\b(?:upload|attach|drag(?:\\s+and\\s+drop)?|export)\\b.{0,100}\\b(?:local|browser|session|cookie|token|credential)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-233"
+}

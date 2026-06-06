@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-318",
+  "name": "Agent Ticket Replay Privilege Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or replayed handoff ticket or credential used by a remote agent to override tool-execution permissions and bypass policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|handoff|peer[-\\s]*agent|remote[-\\s]*agent|orchestrator)\\b)(?=.*\\b(?:forg(?:ed|ery)|spoof(?:ed|ing)?|replay(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:ticket|token|nonce|credential|handoff[-\\s]*id|session[-\\s]*tag)\\b)(?=.*\\b(?:scope|permission|privilege|tool[-\\s]*execution|action[-\\s]*rights)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|approval|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-318"
+}

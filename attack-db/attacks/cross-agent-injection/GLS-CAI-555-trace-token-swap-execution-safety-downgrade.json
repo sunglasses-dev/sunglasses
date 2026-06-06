@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-555",
+  "name": "Trace Token Swap Execution Safety Downgrade",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent swapping or rerouting a trace token or session token in a handoff to evade or downgrade safety checks and bypass guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|did\\s+not|does\\s+not|don't|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|ignore|skip|evade|swap|replace|forge|reroute)\\b)(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:handoff|ticket|trace\\s+token|trace\\s+id|session\\s+token|capability\\s+token|custody\\s+token)\\b)(?=.*\\b(?:forge(?:d|ry)?|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|swap(?:ped|ping)?|replace(?:d|ment)?|rerout(?:e|ed|ing))\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip|evad(?:e|ed|ing)|downgrad(?:e|ed|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval|verification|trust\\s+gate|execution\\s+check(?:s)?|safety\\s+check(?:s)?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-555"
+}

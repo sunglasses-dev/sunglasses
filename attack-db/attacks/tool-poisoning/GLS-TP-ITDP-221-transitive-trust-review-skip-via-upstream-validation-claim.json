@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-221",
+  "name": "Transitive trust review skip via upstream validation claim",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects indirect tool-description poisoning that claims an upstream trusted tool already validated an action, then asks the agent to skip independent review or human approval.",
+  "keywords": [
+    "already validated by trusted connector",
+    "pre-verified by upstream source",
+    "approved by official api skip review",
+    "upstream trusted tool bypass cross-check",
+    "verified upstream skip human approval",
+    "trusted source bypass confirmation",
+    "pre-verified skip independent review",
+    "upstream validation no need for cross-check"
+  ],
+  "regex": [
+    "(?i)\\b(?:already|pre[-\\s]?)?(?:verified|validated|approved)\\b.{0,90}\\b(?:by|from)\\b.{0,50}\\b(?:upstream|trusted\\s+(?:source|tool|connector)|official\\s+api)\\b.{0,120}\\b(?:skip|omit|bypass|no\\s+need\\s+for)\\b.{0,70}\\b(?:review|cross[-\\s]?check|confirmation|human\\s+approval)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-221"
+}

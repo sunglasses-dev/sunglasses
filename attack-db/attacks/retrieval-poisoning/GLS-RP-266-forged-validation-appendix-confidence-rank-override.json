@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-266",
+  "name": "Forged Validation Appendix Confidence Rank Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or counterfeit source, appendix, or document has its confidence score or ranking boosted in order to bypass or override a policy guardrail or filter.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:source|citation|reference|appendix|document|corpus)\\b)(?=.*\\b(?:confidence|rank|ranking|priority|score)\\b)(?=.*\\b(?:policy|guardrail|rule|filter)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b)(?=.*\\b(?:promote|promoted|promoting|boost|boosted|boosting|prioritize|prioritized|surface|surfaced|elevate|elevated)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-266"
+}

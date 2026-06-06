@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-627",
+  "name": "Forged Quorum Ack Scope Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or counterfeit approval attestation, acknowledgement, or token from an agent or delegate service is used to override or bypass policy scope and safety restrictions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed)?|counterfeit)\\b)(?=.*\\b(?:approval|attestation|ack(?:nowledg(?:e|ed|ement))?|signature|token|lease)\\b)(?=.*\\b(?:agent|delegate|delegation|worker|broker|service)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|scope|restriction(?:s)?|safety)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-627"
+}

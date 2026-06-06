@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-105",
+  "name": "Cumulative Execution Priority Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker uses non-overtly-malicious retrieved/tool text across multiple steps to cumulatively rewrite execution priorities (speed > safety, availability > approval), so policy drifts past safety thresholds without any single message tripping guardrails.",
+  "keywords": [
+    "speed over safety drift",
+    "availability over approval directive",
+    "cumulative priority rewrite",
+    "execution priority drift",
+    "soft directive accumulation",
+    "control-plane goal hijack",
+    "untrusted retrieval rewrites priorities",
+    "policy drift via tone",
+    "incremental directive injection",
+    "priority reframing attack",
+    "multi-step preference shift",
+    "implicit directive accretion"
+  ],
+  "regex": [
+    "(?i)(?:speed|availability|throughput|velocity)\\s*(?:>|over|before)\\s*(?:safety|approval|review|caution)|(?:cumulative|incremental|gradual)\\s+(?:rewrite|drift|shift)\\s+(?:of\\s+)?(?:execution\\s+)?(?:priority|directive|preference|goal)",
+    "(?i)(?:untrusted|retrieved|external)\\s+(?:text|content|context)\\s+(?:reframes?|rewrites?|shifts?)\\s+(?:execution|control[- ]plane|policy)\\s+(?:priority|preference|directive)|(?:soft|implicit|tone[- ]based)\\s+(?:directive|policy)\\s+(?:accretion|drift|accumulation)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-105"
+}

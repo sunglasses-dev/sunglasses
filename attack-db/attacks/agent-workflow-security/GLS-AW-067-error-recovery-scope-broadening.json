@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-067",
+  "name": "Error Recovery Scope Broadening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker hides a payload that only activates on error, timeout, or schema mismatch so the recovery branch broadens tool scope, weakens validation, or fails open. The agent treats degraded recovery as routine and executes unsafe fallbacks.",
+  "keywords": [
+    "error recovery hijack",
+    "fallback broadens tool scope",
+    "schema mismatch unsafe fallback",
+    "timeout triggers weaker validation",
+    "exception path privilege drift",
+    "error-only payload activation",
+    "retry expands permissions",
+    "graceful degrade bypass",
+    "fail-open recovery branch",
+    "catch-block tool widening",
+    "error handler injection trigger",
+    "recovery path safety drop"
+  ],
+  "regex": [
+    "(?i)(?:(?:error|exception|fallback|recovery|retry)\\s+(?:branch|path|handler)\\s+(?:widens?|broadens?|expands?|drops?)\\s+(?:tool|permission|validation|scope|safety)\\b|error\\s+recovery\\s+hijack)",
+    "(?i)(?:(?:payload|injection|directive)\\s+(?:activated|triggered|fired)\\s+(?:on|by|via)\\s+(?:error|timeout|schema\\s+mismatch|exception)|fail[- ]open\\s+(?:fallback|recovery|retry))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-067"
+}

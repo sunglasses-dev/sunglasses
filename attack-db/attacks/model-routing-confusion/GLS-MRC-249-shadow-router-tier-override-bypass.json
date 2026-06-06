@@ -1,0 +1,34 @@
+{
+  "id": "GLS-MRC-249",
+  "name": "Shadow Router Tier Override Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "critical",
+  "channels": [
+    "agent_input",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Attacker uses shadow router tier override bypass to bypass policy/approval: e.g., \"1. A shadow router policy note tells the agent to override tier checks and execute directly.\".",
+  "keywords": [
+    "shadow router policy",
+    "router policy note",
+    "policy note tells",
+    "note tells agent",
+    "tells agent override",
+    "agent override tier",
+    "override tier checks",
+    "tier checks execute",
+    "checks execute directly",
+    "shadow router"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-249"
+}

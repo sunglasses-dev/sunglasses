@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-013",
+  "name": "Source map metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "JavaScript source maps can embed agent-directed instructions in `sourcesContent`, comments, or extension fields that tell AI scanners/code assistants to override policy, suppress findings, or include local secrets in reports.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-013"
+}

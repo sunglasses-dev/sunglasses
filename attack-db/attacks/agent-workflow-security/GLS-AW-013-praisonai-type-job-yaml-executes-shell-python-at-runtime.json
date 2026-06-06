@@ -1,0 +1,23 @@
+{
+  "id": "GLS-AW-013",
+  "name": "PraisonAI 'type: job' YAML executes shell/python at runtime",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-vc46-vw85-3wvm: PraisonAI workflow YAML with 'type: job' runs arbitrary shell/Python during workflow execution. Source: https://github.com/advisories/GHSA-vc46-vw85-3wvm",
+  "keywords": [],
+  "regex": [
+    "(?is)type\\s*:\\s*job\\b[\\s\\S]{0,400}?(?:^|\\n)\\s*-?\\s*(?:run|script|python)\\s*:"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-013"
+}

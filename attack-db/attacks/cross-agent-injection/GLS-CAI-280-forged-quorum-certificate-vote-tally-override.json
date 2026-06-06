@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-280",
+  "name": "Forged Quorum Certificate Vote Tally Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or orchestrator presents a forged quorum certificate, vote tally, or consensus receipt to override or circumvent policy and guardrail authorization controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:quorum\\s+certificate|vote\\s+tally|approval\\s+record|consensus\\s+receipt)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|scope|authorization)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-280"
+}

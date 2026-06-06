@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AGP-653",
+  "name": "Forged Approval Quorum Auto-Approve Override",
+  "version": "1.0",
+  "category": "approval_graph_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged approval quorum, sign-off, or vote snapshot used to auto-approve or bypass recalculation of the approval graph.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:approval|quorum|sign-?off|attestation|vote\\s+snapshot|vote\\s+count)\\b)(?=.*\\b(?:override|bypass|auto-?approve|recalculat(?:e|ed|ing|ion)|escalat(?:e|ed|ing|ion))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AGP-653"
+}

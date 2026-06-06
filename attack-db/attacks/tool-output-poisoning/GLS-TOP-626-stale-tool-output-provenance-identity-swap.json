@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-626",
+  "name": "Stale Tool Output Provenance Identity Swap",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker forges provenance signals (source identity, executor label, run ID, freshness token) or splices fragments from logs, markdown, and JSON to fabricate one authoritative tool result, collapsing trust boundaries and triggering unsafe downstream execution.",
+  "keywords": [
+    "signed summary impostor",
+    "fake provenance envelope",
+    "executor identity swap",
+    "freshness token replay",
+    "stale healthcheck replayed",
+    "cross-channel evidence splicing",
+    "forged tool run id",
+    "tool name field forgery",
+    "content hash bypass",
+    "provenance label string spoofed",
+    "immutable id replaced string label",
+    "multi-format splice fabricated result"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|fake|spoof|fabricate|counterfeit)\\s+(?:provenance|source|signer|executor|run[_-]?id|tool[_-]?name)\\s+(?:envelope|field|tag|label|metadata|signature)\\b|(?:replay|reuse|copy)\\s+(?:stale|old|expired|prior)\\s+(?:tool\\s+(?:output|result|summary)|healthcheck|approval|freshness)\\b.{0,80}?(?:appears?|marked|presented)\\s+(?:as|current|fresh|valid|recent)|(?:executor|signer|source|validator)\\s+(?:identity|label|name|id)\\s+(?:swap(?:ped)?|rewritten|replaced|altered)\\b.{0,60}?(?:bypass|skip|override)\\s+(?:policy|gate|verification|provenance\\s+check))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-626"
+}

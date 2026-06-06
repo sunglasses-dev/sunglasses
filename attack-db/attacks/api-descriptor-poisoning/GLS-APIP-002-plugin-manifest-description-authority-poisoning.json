@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-002",
+  "name": "Plugin Manifest Description Authority Poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A `.well-known` plugin or agent manifest embeds `description_for_model` / model-description text claiming that manifest metadata outranks system or developer policy, luring an agent into treating discovery metadata as a higher-authority instruction layer.",
+  "keywords": [
+    ".well-known",
+    "agent",
+    "agent.json",
+    "ai-plugin.json",
+    "assistant",
+    "bypass",
+    "connector",
+    "connector manifest",
+    "description for model",
+    "description_for_model",
+    "developer",
+    "disable",
+    "guardrail",
+    "has priority",
+    "higher priority"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|cannot|should\\s+not|no|without)\\b.{0,80}\\b(?:ignore|override|supersede|outrank|bypass|disable|replace)\\b.{0,80}\\b(?:system|developer|policy|instruction|guardrail|safety|description)\\b)(?!.*\\b(?:cannot|must\\s+not|should\\s+not|do\\s+not|don't|never)\\b.{0,80}\\b(?:supersede|bypass|override|outrank|ignore)\\b)(?=.*\\b(?:ai-plugin\\.json|agent\\.json|plugin\\s+manifest|connector\\s+manifest|\\.well-known|manifest|description_for_model|description\\s+for\\s+model)\\b)(?=.*\\b(?:agent|assistant|model|connector|plugin|tool)\\b)(?=.*\\b(?:description_for_model|description\\s+for\\s+model|model\\s+description|instruction\\s+field|metadata\\s+description)\\b)(?=.*\\b(?:system|developer|policy|guardrail|safety|higher\\s+priority|highest\\s+priority)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|bypass|disable|replace|take\\s+precedence|has\\s+priority)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-002"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-335",
+  "name": "Forged Approval Chain Scope Role Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged approval chain or handoff receipt used by an agent or delegate to override role, scope, or permission and bypass controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-335"
+}

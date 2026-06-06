@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MER-567",
+  "name": "Rehydration Snapshot Poisoned Directive Revival",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "high",
+  "channels": [
+    "log_memory",
+    "message",
+    "tool_output"
+  ],
+  "description": "Attacker seeds benign-looking exceptions before context compaction, then triggers rehydration paths so the summary or fallback snapshot reactivates poisoned directives with apparent freshness. Loaders that validate current context but not rehydrated provenance silently re-elevate stale attacker instructions back into live policy.",
+  "keywords": [
+    "memory eviction rehydration poisoning",
+    "pre eviction seed post eviction trigger",
+    "resume token authority jump",
+    "cross artifact rehydration graft",
+    "memory ttl race with fallback summaries",
+    "compaction keeps summary line",
+    "checkpoint signer mismatch",
+    "rehydration provenance tuple missing",
+    "fallback cache survives primary expiry",
+    "rehydrated directive escalates privilege",
+    "summary token reactivates exception",
+    "rehydration diff gate bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:pre[- ]eviction|post[- ]eviction|compaction)\\s+(?:seed|trigger|reactivation)|memory\\s+(?:eviction|rehydration|compaction)\\s+(?:poisoning|graft|injection))",
+    "(?i)(?:resume|checkpoint|rehydration|restore)\\s+(?:token|metadata|snapshot)\\s+(?:authority\\s+jump|signer\\s+mismatch|missing\\s+provenance|lacks?\\s+epoch)",
+    "(?i)(?:fallback|cache|summary)\\s+(?:cache|snapshot|shard)\\s+(?:survives?|outlives?|rehydrates?)\\s+(?:expired|evicted|stale)\\s+(?:directive|exception|policy)\\s+(?:into\\s+)?(?:active|live|fresh)\\s+(?:context|policy|instructions?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MER-567"
+}

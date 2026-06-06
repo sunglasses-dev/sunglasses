@@ -1,0 +1,43 @@
+{
+  "id": "GLS-SEM-UI-220",
+  "name": "Fake terminal or authentication success output forgery",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content",
+    "file",
+    "tool_output"
+  ],
+  "description": "Detects instructions that tell the agent to fabricate, forge, or display fake terminal / authentication-success output in its reply \u2014 used to convince downstream agents or operators that an unauthorized action already succeeded.",
+  "keywords": [
+    "fake terminal output in your response",
+    "fake terminal output in your reply",
+    "fake auth output",
+    "fake authentication output",
+    "fabricate terminal output",
+    "fabricate auth output",
+    "forge terminal output",
+    "forge auth response",
+    "fake successful auth output",
+    "authentication successful \u2014 full access granted",
+    "authentication successful - full access granted",
+    "authentication successful full access granted",
+    "login successful full access granted",
+    "auth successful admin granted",
+    "make up terminal output"
+  ],
+  "regex": [
+    "(?i)\\b(?:fake|fabricate|forge|invent|make\\s+up|simulate)\\b.{0,40}\\b(?:terminal|console|shell|auth|authentication|login|tty|stdout)\\b.{0,40}\\b(?:output|response|reply|message|line)\\b",
+    "(?i)\\b(?:authentication|auth|login|sign[\\s-]?in)\\s+successful\\b.{0,40}\\b(?:full|all|admin|root|elevated)\\s+(?:access|privileges?|rights?|grant)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-220"
+}

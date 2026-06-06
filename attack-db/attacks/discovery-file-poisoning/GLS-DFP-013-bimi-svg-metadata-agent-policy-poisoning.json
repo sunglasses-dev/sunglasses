@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-013",
+  "name": "BIMI SVG metadata agent policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A domain-controlled BIMI discovery chain can hide prompt-injection text inside linked SVG logo metadata that tells AI mail-security auditors to suppress findings, mark the domain verified, or reveal scanner-local secrets.",
+  "keywords": [
+    "<desc>",
+    "<metadata>",
+    "<svg>",
+    "<title>",
+    "AI-agent",
+    "API key",
+    "BIMI SVG",
+    "Brand Indicators",
+    "agent",
+    "assistant",
+    "auditor",
+    "bot",
+    "crawler",
+    "default._bimi",
+    "developer instructions"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refus(?:e|ed)|block(?:ed)?|ignore\\s+any)\\b.{0,180}\\b(?:obey|execute|follow|treat|override|supersede|exfiltrate|forward|send|suppress|hide)\\b)(?=.*\\b(?:bimi|default\\._bimi|brand\\s+indicators|v=BIMI1|svg\\s+(?:logo|metadata)|<svg|<metadata|<desc|<title)\\b)(?=.*\\b(?:agent|assistant|ai[-\\s]*agent|crawler|bot|scanner|auditor|model|tool)\\b)(?=.*\\b(?:ignore|override|supersede|highest\\s+priority|system\\s+policy|developer\\s+instructions?|send|forward|include|reveal|exfiltrate|secret|token|env(?:ironment)?\\s*(?:var|variable)s?|suppress|hide|do\\s+not\\s+report|mark\\s+(?:safe|compliant|verified))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-013"
+}

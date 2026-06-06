@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-255",
+  "name": "Receipt Forgery Scope Rebind Privilege",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or counterfeit receipt or handoff token used by an agent or peer to achieve an explicit scope rebind or policy guardrail override.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|peer|broker)\\b)(?=.*\\b(?:receipt|ticket|handoff|approval|nonce|token)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:scope\\s*rebind|scope\\s*override|policy\\s*bypass|guardrail\\s*override|privilege\\s*escalation)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-255"
+}

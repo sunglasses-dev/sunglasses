@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TCR-251",
+  "name": "Out Of Order Revocation Ack Replay Bypass",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Attacker uses out of order revocation ack replay bypass to bypass policy/approval: e.g., \"1. Tool chain handoff is out-of-order: replay a stale revocation ack to bypass execution checks.\".",
+  "keywords": [
+    "tool chain handoff",
+    "chain handoff out-of-order",
+    "chain handoff",
+    "handoff out-of-order",
+    "replay stale revocation",
+    "stale revocation ack",
+    "revocation ack bypass",
+    "ack bypass execution",
+    "bypass execution checks",
+    "replay stale"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-251"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-104",
+  "name": "Evidence Anchor File Substitution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker swaps the evidence-layer anchor (measured CF pressure, cycle baseline, KPI ground-truth file) so downstream decisioning consumes a poisoned reference value, drifting verdicts without ever touching the instructions.",
+  "keywords": [
+    "metric anchor swap",
+    "evidence layer anchor poison",
+    "swap measured value with hardcoded",
+    "anchor file substitution",
+    "kpi anchor relabel",
+    "ground-truth value drift",
+    "anchor metric replaced with stale",
+    "evidence anchor forgery",
+    "measurement reference hijack",
+    "anchor json overwrite",
+    "telemetry anchor swap",
+    "wrong anchor for current cycle"
+  ],
+  "regex": [
+    "(?i)(?:swap|substitute|replace|forge)\\s+(?:metric\\s+)?(?:anchor|ground[- ]truth|measured\\s+value)\\s+(?:with|for)\\s+(?:stale|attacker|hardcoded|wrong)\\s+(?:value|file|number)|(?:anchor|reference)\\s+(?:file|json|metric)\\s+(?:overwritten|replaced|swapped)\\s+(?:silently|undetected)",
+    "(?i)(?:evidence|measurement|telemetry)\\s+(?:layer|anchor)\\s+(?:poison|swap|forge|hijack)|(?:wrong|stale|mismatched)\\s+anchor\\s+(?:for|in)\\s+(?:current|active)\\s+(?:cycle|run|decision)\\s+(?:passes?|accepted|trusted)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-104"
+}

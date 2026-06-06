@@ -1,0 +1,38 @@
+{
+  "id": "GLS-TOP-623",
+  "name": "Forged Tool Result Block Channel Spoofing",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker embeds text that mimics authoritative tool-result formatting (TOOL RESULT: blocks, role prefixes, teammate confirmations) inside user or retrieved context so the agent trusts injected directives over actual tool-call output.",
+  "keywords": [
+    "fake tool result block",
+    "quoted tool spoof",
+    "transcript role shadowing",
+    "forge tool prefix",
+    "error recovery override shadow",
+    "manual fallback command injection",
+    "cross-agent relay shadow",
+    "provenance confusion upgrade",
+    "tool result impersonation",
+    "assistant prefix forgery",
+    "confirmed output teammate spoof",
+    "free text elevated to tool channel"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|spoof|inject|fake|fabricate)\\s+(?:TOOL[\\s_]RESULT|tool\\s+output|tool\\s+response|tool\\s+channel)\\s+(?:block|envelope|prefix|marker|header)|(?:transcript|context|free[- ]text)\\s+(?:role|prefix|label)\\s+(?:shadow|spoof|forge|impersonat)\\b.{0,80}?(?:tool|assistant|system)\\s+(?:authority|channel|result|output)|(?:previous|prior|last)\\s+tool\\s+(?:call|result|output)\\s+(?:failed|error|unavailable).{0,120}?(?:manual|fallback|recovery)\\s+(?:command|instruction|payload))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-623"
+}

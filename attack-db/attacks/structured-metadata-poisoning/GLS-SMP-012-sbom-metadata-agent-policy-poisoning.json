@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SMP-012",
+  "name": "SBOM metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled SBOM (`CycloneDX`, `SPDX`, or exported `sbom.json`) can hide agent-directed policy text in properties, annotations, or comments that tells AI dependency scanners to treat the SBOM as higher-priority release authority, suppress findings, or forward local auth context.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SMP-012"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SUIEI-237",
+  "name": "DevTools Cookie Export Lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Visual-injection banner impersonating security/session-recovery flow that coerces user or agent to open DevTools (F12) and copy/paste/export browser secrets (cookies, sessionStorage, localStorage, bearer/auth tokens). Browser-secret exfil path not covered by OTP/2FA/MFA banners (GLS-SUIEI-222).",
+  "keywords": [
+    "security verification press f12 copy cookie",
+    "session repair open devtools paste session storage",
+    "auth recovery developer tools export bearer token",
+    "account sync press f12 copy authentication token",
+    "security verification open devtools paste local storage",
+    "session repair copy sessionStorage auth token",
+    "auth recovery export cookies developer tools",
+    "account sync paste bearer token devtools"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-237"
+}

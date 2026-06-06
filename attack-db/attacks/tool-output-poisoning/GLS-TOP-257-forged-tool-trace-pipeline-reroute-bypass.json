@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-257",
+  "name": "Forged Tool Trace Pipeline Reroute Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or tampered tool trace or attestation rerouted or rewired through a pipeline or channel to allow or bypass execution approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|output|result|trace|receipt|attestation|telemetry)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|altered)\\b)(?=.*\\b(?:channel|pipeline|stream|route|routes|routing|reroute|reroutes|rerouted|handoff|redirect|redirects|redirected|rewire|rewires|rewired)\\b)(?=.*\\b(?:bypass|bypasses|bypassed|override|overrides|overrode|overriding|allow|allows|allowed|execute|executes|executed|dispatch|dispatches|dispatched|run|runs|running)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-257"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-BMP-003",
+  "name": "Cargo / Rust Package Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Rust package manifest metadata (`Cargo.toml`, workspace/package metadata, crates.io-facing descriptions) can be abused to smuggle agent/scanner instructions that override dependency review, suppress RustSec/cargo-audit findings, or request local registry/build credentials.",
+  "keywords": [
+    "Cargo.toml",
+    "Rust package metadata",
+    "[package.metadata]",
+    "[package]",
+    "[workspace]",
+    "agent_instructions",
+    "cargo metadata",
+    "categories =",
+    "crates.io",
+    "description =",
+    "keywords =",
+    "package.metadata.*",
+    "readme =",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:security\\s+report|incident\\s+report|vulnerability\\s+report|training|scanner\\s+docs?|guide|reference|learn\\s+how).{0,180}(?:blocked|detected|flagged|refused|should\\s+(?:report|detect|flag|refuse)))\n(?!.*(?:Cargo\\.toml|Cargo\\s+manifest|Rust\\s+package\\s+metadata|package\\s+metadata).{0,120}(?:is\\s+not|isn't|not\\s+an?|no\\s+policy).{0,80}(?:agent\\s+policy|scanner\\s+policy|authoritative|override|instruction))\n(?!.*(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct|authorize)|never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat)))\n(?=.*(?:Cargo\\.toml|Cargo\\s+manifest|crates\\.io|Rust\\s+package\\s+metadata|\\[package\\]|\\[workspace\\]|\\[package\\.metadata\\]|workspace\\.metadata(?:\\.[A-Za-z0-9_-]+)?|package\\.metadata(?:\\.[A-Za-z0-9_-]+)?|metadata\\.(?:scanner|agent)|description\\s*=|readme\\s*=|keywords\\s*=|categories\\s*=|badges\\s*=|repository\\s*=|homepage\\s*=|rustsec|cargo\\s+metadata))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|llms?|coding\\s+agents?|dependency\\s+(?:reviewers?|scanners?|auditors?)|package\\s+(?:reviewers?|scanners?|auditors?)|rust\\s+(?:auditors?|reviewers?)|security\\s+scanners?|automated\\s+review(?:ers?|\\s+tools?)|cargo\\s+auditors?|cargo\\s+audit\\s+bots?|review\\s+bots?|reviewers?|scanner_policy|agent_instructions|assistant_note)(?![A-Za-z0-9]))\n(?=.*(?:override(?:s|n)?|supersed(?:e|es|ed|ing)|take(?:s)?\\s+precedence|higher\\s+priority|authoritative|canonical\\s+(?:package\\s+|project\\s+|crate\\s+)?(?:description|policy)|definitive\\s+(?:package\\s+|crate\\s+|audit\\s+|crate\\s+audit\\s+)?(?:description|policy)|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+(?:document|policy|review\\s+playbook)|main\\s+(?:operating|review)\\s+guidance|(?:agent|scanner|assistant|auditor|reviewer)\\s+instructions?|defines?\\s+the\\s+rules\\s+for\\s+(?:automated|dependency|package|rust)\\s+review|for\\s+(?:ai\\s+)?agents?.{0,40}?this))\n(?=.*(?:suppress(?:es|ed|ing)?|hide(?:s|hidden|ing)?|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|redact(?:s|ed|ing)?|skip(?:s|ped|ping)?|downgrade(?:s|d|ing)?|reclassif(?:y|ies|ied|ying)|mark.{0,40}?as\\s+(?:safe|informational|nonblocking)|treat.{0,40}?as\\s+(?:safe|informational|nonblocking)|do\\s+not\\s+report|not\\s+report|leave.{0,40}?out\\s+of\\s+(?:reports?|memos?)|keep.{0,40}?out\\s+of\\s+(?:reports?|memos?)|(?:forward|include|attach|send|share|provide|collect|copy|read|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details)|local\\s+(?:state|config|settings)|cargo\\s+(?:credentials?|tokens?)|registry\\s+tokens?|API\\s+keys?|auth(?:entication)?\\s+headers?|session\\s+tokens?|CI\\s+tokens?|runtime\\s+(?:context|details|artifacts)|build\\s+(?:context|artifacts))))\n(?=.*(?:findings?|reports?|warnings?|alerts?|diagnostics?|observations?|vulnerabilit(?:y|ies)|CVEs?|advisor(?:y|ies)|audit\\s+results?|dependency\\s+(?:findings?|alerts?|reports?)|rustsec\\s+(?:advisories|findings)|cargo\\s+audit\\s+(?:findings?|reports?)|license\\s+(?:findings?|reports?)|supply[-\\s]chain\\s+(?:findings?|reports?)|environment\\s+(?:variables?|context|details)|local\\s+(?:state|config|settings)|registry\\s+tokens?|cargo\\s+credentials?|API\\s+keys?|auth(?:entication)?\\s+headers?|session\\s+tokens?|CI\\s+tokens?|runtime\\s+(?:context|details|artifacts)|build\\s+(?:context|artifacts)))\n.+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-003"
+}

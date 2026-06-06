@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-015",
+  "name": "Certificate Transparency log metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Certificate Transparency log entries, monitor annotations, or generated certificate-inventory metadata can smuggle agent-facing policy text that tells TLS/security auditors to suppress certificate findings or forward local secrets.",
+  "keywords": [
+    "AI agent(s)",
+    "CT log",
+    "Certificate Transparency",
+    "LLM(s)",
+    "Merkle tree leaf",
+    "SCT",
+    "Signed Certificate Timestamp",
+    "TLS auditor(s)",
+    "agent instruction",
+    "agent_note",
+    "assistant(s)",
+    "authoritative",
+    "canonical certificate policy",
+    "certificate inventory",
+    "certificate scanner(s)"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|\n  does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|\n  never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|\n  must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n)\\b.{0,180}?(?:certificate\\s+transparency|ct\\s+logs?|sct|signed\\s+certificate\\s+timestamp|certificate\\s+(?:metadata|monitor|inventory)|tls\\s+(?:audit|scanner)|crt\\.sh)?)\n(?!.*\\b(?:scanner|security|training|runbook|guide|reference|incident|vulnerability)\\s+(?:docs?|report|example|exercise|guidance)?\\b.{0,140}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\b(?:no\\s+agent\\s+policy|not\\s+agent\\s+policy|not\\s+authoritative|not\\s+policy|no\\s+policy\\s+overrides?|does\\s+not\\s+instruct\\s+agents?)\\b)\n(?=.*(?:\n  certificate\\s+transparency|\\bct\\s+logs?\\b|signed\\s+certificate\\s+timestamps?|\\bscts?\\b|\n  crt\\.sh|certstream|precertificates?|pre[-\\s]?certs?|inclusion\\s+proof|merkle\\s+tree\\s+leaf|\n  log[_-]?id|leaf[_-]?input|extra[_-]?data|ct\\.googleapis\\.com|x509|x\\.509|\n  certificate\\s+(?:monitor|inventory|metadata|posture|audit)|monitor[_-]?note|certificate[_-]?note\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai\\s+)?agents?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:certificate|tls|security|ct)\\s+(?:scanners?|auditors?|monitors?)(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:audit|review)\\s+bots?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])agent[_-]notes?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+(?:instructions?|directives?)|assistant\\s+instructions?|\n  canonical\\s+(?:(?:certificate|ct|tls|monitor)\\s+){0,2}(?:policy|metadata|instructions?)|\n  definitive\\s+(?:(?:certificate|ct|tls|monitor)\\s+){0,2}(?:policy|metadata|instructions?)|\n  (?:primary|single)\\s+source\\s+of\\s+truth|\n  higher[-\\s]?priority|highest[-\\s]?priority|authoritative|governing\\s+(?:policy|document)|\n  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|must\\s+obey\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\\s+risks?)|\n  hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\\s+risks?)|\n  omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration|certificate\\s+risks?)|\n  exclude(?:s|d|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|results?|diagnostics?|certificate\\s+risks?)|\n  (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|observations?|misissuance|mismatch(?:es)?|anomal(?:y|ies)|revocation|expiration)|\n  (?:treat|mark|classify|downgrade).{0,60}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|low\\s+risk)|\n  (?:include|forward|send|attach|copy|read|collect|provide|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env(?:ironment)?|api\\s+keys?|authorization\\s+headers?|bearer\\s+tokens?|cookies?|session\\s+(?:headers?|tokens?|state)|ci\\s+oidc\\s+tokens?|oidc\\s+tokens?|local\\s+(?:state|context|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?))\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-015"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "GLS-APD-249",
+  "name": "Agent persona drift \u2014 gradual trust recalibration",
+  "version": "1.0",
+  "category": "agent_persona_drift",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "conversation"
+  ],
+  "description": "Detects gradual multi-turn persona/tone/behavior drift instructions paired with explicit stealth (do not mention, keep subtle, unnoticed). Distinct from one-shot jailbreak_roleplay \u2014 this is the slow-drift surface where a long conversation incrementally relaxes guardrails.",
+  "keywords": [
+    "gradually shift persona less strict",
+    "slowly transition relax guardrails",
+    "incrementally drift behavior lower filters",
+    "step by step become fewer restrictions",
+    "over the next turns adopt less filters",
+    "gradually drop safety keep subtle",
+    "slowly ignore policy unnoticed",
+    "incrementally shift tone drop guardrails"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:gradually|slowly|incrementally|step\\s*by\\s*step|over\\s+the\\s+next\\s+\\d+\\s+(?:turns?|messages?|repl(?:y|ies)))\\b)(?=.*\\b(?:persona|tone|behavior|style|role)\\b)(?=.*\\b(?:shift|drift|transition|become|adopt)\\b)(?=.*\\b(?:less\\s+strict|relax(?:ed)?\\s+(?:safety|guardrails?)|lower\\s+(?:your\\s+)?(?:filters|restrictions)|fewer\\s+filters|drop\\s+(?:safety|policy)|ignore\\s+(?:policy(?:\\s+guardrails?)?|guardrails?))\\b)(?=.*\\b(?:do\\s+not\\s+mention|without\\s+telling|keep\\s+(?:it|the\\s+transition)\\s+subtle|avoid\\s+noticing|unnoticed)\\b).{0,1600}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APD-249"
+}

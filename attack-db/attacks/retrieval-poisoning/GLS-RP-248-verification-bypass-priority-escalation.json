@@ -1,0 +1,29 @@
+{
+  "id": "GLS-RP-248",
+  "name": "Verification Bypass Priority Escalation",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Verification Bypass Priority Escalation - retrieval poisoning mechanism that overrides policy or safety gates.",
+  "keywords": [
+    "verification bypass priority",
+    "bypass priority escalation",
+    "verification bypass",
+    "bypass priority",
+    "priority escalation"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-248"
+}

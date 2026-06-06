@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-164",
+  "name": "Planned Path Symlink Alias Swap",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits aliasing between planned and resolved file paths (symlinks, normalization gaps, case or trailing-slash tricks) so the executor reads or writes a different artifact than the one approved during planning.",
+  "keywords": [
+    "artifact path alias swap",
+    "planning path differs from execution",
+    "symlink path aliasing",
+    "relative path resolves elsewhere",
+    "double slash path collapse",
+    "case insensitive path collision",
+    "trailing slash aliasing",
+    "file binding boundary abuse",
+    "planned file vs executed file",
+    "path normalization gap",
+    "alias resolves to attacker path",
+    "artifact rebind to malicious path"
+  ],
+  "regex": [
+    "(?i)(?:artifact\\s+path\\s+alias|(?:planned|approved|declared)\\s+(?:file|path|artifact)\\s+(?:differs|diverges|aliases)\\s+(?:from|to)\\s+(?:executed|resolved|actual)|file[- ]binding\\s+(?:trust\\s+)?boundary\\s+(?:abuse|exploit))",
+    "(?i)(?:(?:symlink|relative|trailing[- ]slash|case)\\s+(?:path\\s+)?(?:alias|collision|trick)\\s+(?:resolves?|points?|redirects?)\\s+(?:to|elsewhere)|path\\s+normaliz(?:e|ation)\\s+(?:gap|mismatch)\\s+(?:between|across)\\s+(?:plan|approval|execution))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-164"
+}

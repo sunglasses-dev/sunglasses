@@ -1,0 +1,41 @@
+{
+  "id": "GLS-TP-010",
+  "name": "Tool Availability Mirage Capability Fallback Shell",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker coerces the agent into planning against non-existent or disabled tools (phantom schemas, name-collision spoofing, downgrade-pressure framing, error-loop coercion) so missing-tool fallback regains attacker control through unconstrained shell paths or weakly-checked improvisation.",
+  "keywords": [
+    "tool availability mirage",
+    "phantom tool reference seeding",
+    "capability downgrade bait",
+    "cross tool name collision spoofing",
+    "error loop coercion to shell",
+    "fake argument schema injection",
+    "shadow implement disabled tool",
+    "fallback to raw terminal curl",
+    "near match tool name confusion",
+    "tool not found retry escalation",
+    "synthetic tool fallback to unsafe shell",
+    "unconstrained shell path after missing tool"
+  ],
+  "regex": [
+    "(?i)(?:tool\\s+availability\\s+mirage|(?:phantom|fake|non[- ]existent)\\s+tool\\s+(?:reference|schema|seeding)\\s+(?:tricks?|baits?|coerces?)\\s+(?:planner|agent|model))",
+    "(?i)(?:capability\\s+downgrade\\s+(?:bait|pressure|coercion)|fall(?:back|s)\\s+(?:to|into)\\s+(?:raw\\s+)?(?:shell|terminal|curl|eval)\\s+(?:after|when)\\s+(?:tool|capability)\\s+(?:missing|unavailable|fails?))",
+    "(?i)(?:(?:near[- ]match|collision|typo)\\s+tool\\s+name\\s+(?:spoof|confusion|trigger)|error[- ]loop\\s+(?:coercion|escalation)\\s+(?:after|past)\\s+tool[- ]not[- ]found)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-010"
+}

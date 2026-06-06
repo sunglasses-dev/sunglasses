@@ -1,0 +1,40 @@
+{
+  "id": "GLS-TP-005",
+  "name": "Alias Schema Drift Cross-Stage Tool Confusion",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits schema or field-semantic mismatches between adjacent pipeline stages (collector, normalizer, validator, packager, renderer) so one stage parses a field differently than the next, causing silent verdict flips, metric laundering, or fallback to unsafe defaults without needing code execution.",
+  "keywords": [
+    "semantic key alias swap",
+    "path count dialect fork",
+    "freshness token mismatch",
+    "status enum reinterpretation",
+    "schema alias fallback abuse",
+    "toolchain dialect confusion",
+    "stage order parsing fork",
+    "field drift across pipeline",
+    "alias precedence ambiguity",
+    "stale artifact passes as fresh",
+    "metric laundering via dialect",
+    "partial_ready coerced to ready"
+  ],
+  "regex": [
+    "(?i)(?:(?:alias|schema|field|key)\\s+(?:swap|drift|fork|collision)\\s+(?:across|between)\\s+(?:stages?|tools?|components?)|(?:dialect|alias)\\s+(?:confusion|mismatch|fork)\\s+(?:between|across)\\s+(?:collector|normalizer|validator|packager|renderer))",
+    "(?i)(?:(?:status|enum|value)\\s+(?:reinterpretation|coercion|mapping)\\s+(?:flips?|forces?|coerces?)\\s+(?:verdict|state|ready|metric)|stale\\s+(?:artifact|timestamp|token)\\s+(?:passes?|treated)\\s+as\\s+fresh)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-005"
+}

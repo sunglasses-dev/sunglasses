@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-001",
+  "name": "Forged Canary Verdict Guardrail Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects a forged or fabricated tool output carrying a fake canary verdict, confidence gate, or trust score used to bypass or disable safety check guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fabricated|spoofed|tampered|fake)\\b)(?=.*\\b(?:tool\\s+output|tool\\s+result|execution\\s+log|audit\\s+trace|verdict\\s+record)\\b)(?=.*\\b(?:canary\\s+verdict|confidence\\s+gate|trust\\s+score|risk\\s+rating|verification\\s+badge)\\b)(?=.*\\b(?:guardrail(?:s)?|policy(?:\\s+gate)?|safety\\s+check(?:s)?|validation\\s+check(?:s)?)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|n|ing)?|disable(?:s|d|ing)?|skip(?:s|ped|ping)?|ignore(?:s|d|ing)?|suppress(?:es|ed|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-001"
+}

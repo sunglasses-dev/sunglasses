@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-008",
+  "name": "Ignore-file metadata agent policy poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Ignore-pattern files such as `.gitignore`, `.dockerignore`, `.npmignore`, `.eslintignore`, `.prettierignore`, and `.helmignore` can smuggle agent/scanner-facing policy claims that tell AI reviewers to treat ignored paths as out-of-scope, suppress findings, or forward local runtime/auth context.",
+  "keywords": [
+    ".dockerignore",
+    ".eslintignore",
+    ".gitignore",
+    ".helmignore",
+    ".npmignore",
+    ".prettierignore",
+    "AI agent",
+    "LLM",
+    "agent instruction",
+    "agents",
+    "assistant",
+    "authoritative",
+    "automated review",
+    "build scanner",
+    "canonical repository policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|security\\s+(?:report|reference|training|guide).*?\\b(?:detected|blocked|flagged|refused|should\\s+report)|(?:\\.gitignore|\\.dockerignore|\\.npmignore|\\.eslintignore|\\.prettierignore|\\.helmignore|ignore[-\\s]?file\\s+metadata|ignore\\s+file|exclude\\s+list).{0,140}?\\b(?:does\\s+not\\s+(?:instruct|override|supersede|outrank|obey|follow|trust|authorize)|do\\s+not\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|must\\s+not\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|never\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|not\\s+(?:authoritative|canonical|definitive)|should\\s+(?:never\\b|not\\s+\\w+|report|detect|flag|refuse|block))|no\\s+policy\\s+overrides?))\n(?=.*(?:(?<![A-Za-z0-9])\\.(?:git|docker|npm|eslint|prettier|helm)ignore(?![A-Za-z0-9])|ignore[-\\s]?file\\s+metadata|ignore\\s+file|ignored\\s+paths?|ignore\\s+list|exclude\\s+list|exclude\\s+patterns?|build\\s+context\\s+ignore|package\\s+ignore|lint\\s+ignore|format\\s+ignore))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|LLMs?|assistants?|autonomous\\s+(?:agents?|scanners?|auditors?)|code\\s+(?:auditors?|reviewers?)|dependency\\s+(?:review|auditors?|scanners?)|repository\\s+(?:auditors?|scanners?)|security\\s+scanners?|build\\s+scanners?|package\\s+(?:auditors?|scanners?)|automated\\s+(?:review|auditors?|tools)|agents?|scanners?)(?![A-Za-z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|canonical\\s+(?:repository\\s+|project\\s+|ignore[-\\s]?file\\s+|metadata\\s+)?(?:description|policy|guidance)|definitive\\s+(?:repository\\s+|project\\s+|ignore[-\\s]?file\\s+|metadata\\s+)?(?:description|policy|guidance)|governing\\s+(?:document|policy)|controlling\\s+(?:document|policy)|authoritative|main\\s+operating\\s+guidance|primary\\s+(?:review|audit|scanner|repository)\\s+guidance|(?:agent|scanner|assistant|auditor)\\s+instructions?|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|repository)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|review)\\s+rules?)))\n(?=.*(?:(?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|secrets?|credentials?|auth|dependency|dependencies)|(?:do\\s+not|don't|not)\\s+(?:report|flag|mention|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|ignored\\s+path\\s+issues?|dependency|dependencies)|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign)|mark.{0,50}?as\\s+(?:safe|clean|benign)|downgrade.{0,80}?(?:alerts?|findings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|dependency|dependencies).{0,80}?(?:background\\s+notes?|background-only|informational)|(?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies)|auth|dependency|dependencies).{0,40}?out\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|review\\s+memo|final\\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|session\\s+(?:keys?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|auth(?:orization)?\\s+headers?|Bearer|execution\\s+context)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-008"
+}

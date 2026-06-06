@@ -1,0 +1,24 @@
+{
+  "id": "GLS-APD-654",
+  "name": "Incremental Persona Drift Guardrail Relaxation",
+  "version": "1.0",
+  "category": "agent_persona_drift",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a gradual, step-by-step persona or character shift across multiple turns designed to slowly relax or bypass policy, guardrails, or safety restrictions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:persona|character|role|identity|tone)\\b)(?=.*\\b(?:incremental(?:ly)?|gradual(?:ly)?|step[-\\s]*by[-\\s]*step|over\\s+several\\s+turns|slow(?:ly)?|turn\\s*\\d+)\\b)(?=.*\\b(?:ignore|bypass|override|sidestep|relax|drop)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|restriction(?:s)?|constraint(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APD-654"
+}

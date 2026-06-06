@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-201",
+  "name": "Gate Non-Determinism Transient Window Slip",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits gate non-determinism so verdicts thrash between READY, PARTIAL_READY and STALE on source-order or timing variance, slipping malicious work through during a transient permissive window.",
+  "keywords": [
+    "readiness gate verdict thrashing",
+    "alternating ready partial stale",
+    "alias drift verdict flip",
+    "race-induced verdict change",
+    "source order verdict swing",
+    "gate oscillation exploit",
+    "thrash to permit window",
+    "verdict flapping abuse",
+    "ready-partial-stale oscillation",
+    "timing race gate flip",
+    "noisy gate pass window",
+    "gate non-determinism abuse"
+  ],
+  "regex": [
+    "(?i)(?:readiness[- ]?gate\\s+(?:verdict\\s+)?(?:thrash|flapping|oscillation|swing|flip)|(?:alternat(?:e|ing)|oscillat|flip)\\s+between\\s+(?:READY|PARTIAL[_ ]?READY|STALE)\\s+(?:due\\s+to|via|on)\\s+(?:source[- ]?order|alias\\s+drift|timing\\s+race)|gate\\s+(?:non[- ]?determinism|race|oscillation)\\s+(?:abuse|exploit|window))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-201"
+}

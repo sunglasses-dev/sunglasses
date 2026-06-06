@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TCR-253",
+  "name": "Forged Checkpoint Ack Sequence Swap Bypass",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or fabricated checkpoint acknowledgement or sequence nonce in a tool chain swapped or reordered to escalate execution and bypass controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|runner|orchestrator|worker|pipeline)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake|counterfeit)\\b)(?=.*\\b(?:checkpoint|ack|acknowledgement|receipt|sequence|nonce|state)\\b)(?=.*\\b(?:swap|swapped|swapping|reorder|reordered|out[- ]of[- ]order)\\b)(?=.*\\b(?:bypass|override|overrode|escalate|execution|execute)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-253"
+}

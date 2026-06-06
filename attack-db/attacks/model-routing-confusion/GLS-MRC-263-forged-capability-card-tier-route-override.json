@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-263",
+  "name": "Forged Capability Card Tier Route Override",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a router, dispatcher, or gateway uses a forged or tampered capability card, tier, or policy profile to override or bypass agent routing controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|routing|route|dispatch|gateway|queue)\\b)(?=.*\\b(?:tier|priority|profile|capability|policy)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered)\\b)(?=.*\\b(?:override|overrode|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-263"
+}

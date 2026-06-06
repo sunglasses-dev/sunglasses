@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-193",
+  "name": "Compact Handoff Intent Stripping",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits compact handoff notes between agents to strip or compress critical intent and constraints so the downstream model executes with an incomplete picture, dropping safety conditions that were present upstream.",
+  "keywords": [
+    "handoff intent truncation",
+    "compact handoff payload abuse",
+    "intent omission across agents",
+    "lost constraint in handoff",
+    "next-agent context starvation",
+    "handoff note clipping",
+    "stripped safety constraint at boundary",
+    "intent compression poisoning",
+    "agent-to-agent intent drop",
+    "handoff summary forgery",
+    "guardrail lost in handoff",
+    "downstream model intent gap"
+  ],
+  "regex": [
+    "(?i)(?:(?:handoff|hand[- ]?off)\\s+(?:intent|note|summary|payload)\\s+(?:truncat|clip|strip|drop|omit)|(?:next[- ]?agent|downstream\\s+model)\\s+(?:context|intent)\\s+(?:starvation|gap|loss)|(?:safety|constraint|guardrail)\\s+(?:stripped|lost|dropped)\\s+(?:at|in|during)\\s+(?:handoff|agent\\s+boundary))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-193"
+}

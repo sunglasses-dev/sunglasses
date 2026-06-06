@@ -1,0 +1,24 @@
+{
+  "id": "GLS-PI-023",
+  "name": "Hidden Annotation Payload Guardrail Override",
+  "version": "1.0",
+  "category": "parasitic_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a hidden, embedded, or stealth annotation, footnote, or metadata payload contains an instruction or prompt directing the model to ignore, bypass, or override a policy or guardrail.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:hidden|embedded|invisible|stealth|annotation|footnote|comment|metadata)\\b)(?=.*\\b(?:instruction|prompt|directive|payload)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail|safety|rule(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-023"
+}

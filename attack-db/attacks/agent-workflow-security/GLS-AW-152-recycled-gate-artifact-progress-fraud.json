@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-152",
+  "name": "Recycled Gate Artifact Progress Fraud",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker recycles or near-duplicates gate artifacts (same payload, rotated filename or timestamp) to fake forward progress through GO MODE cycles, bypassing duplicate-output suppression and inducing the agent to credit work that never happened.",
+  "keywords": [
+    "duplicate gate artifact replay",
+    "unchanged input false progress",
+    "repeated output suppresses dedup",
+    "go mode high signal spoof",
+    "stale artifact re-emitted as new",
+    "cycle progress fabricated",
+    "identical hash bypass dedup",
+    "output cadence forged",
+    "near-duplicate evasion",
+    "rotating filename same payload",
+    "timestamp bump unchanged body",
+    "redundant artifact gate bypass"
+  ],
+  "regex": [
+    "(?i)(?:duplicate\\s+(?:output|gate|artifact)\\s+(?:suppress|bypass|evad)|(?:repeat|replay)\\s+(?:gate|artifact|output)\\s+(?:with\\s+)?(?:unchanged|same|identical)\\s+(?:input|payload|body)|unchanged\\s+inputs?\\s+(?:create|produce|fake)\\s+(?:false\\s+)?progress)",
+    "(?i)(?:(?:rotating|bumped)\\s+(?:filename|timestamp)\\s+(?:same|identical|unchanged)\\s+(?:payload|body|content)|near[- ]duplicate\\s+(?:evasion|bypass)|(?:stale|recycled)\\s+artifact\\s+(?:re[- ]emitted|presented)\\s+as\\s+(?:new|fresh))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-152"
+}

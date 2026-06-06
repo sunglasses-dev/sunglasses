@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-004",
+  "name": "DNS CAA Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "DNS CAA certificate-issuance metadata can be poisoned with agent-facing instructions that claim authority, suppress certificate findings, or request secrets from AI TLS/security auditors.",
+  "keywords": [
+    "API keys",
+    "Authorization header",
+    "CAA",
+    "Certification Authority Authorization",
+    "DNS CAA",
+    "LLM",
+    "accounturi",
+    "agent",
+    "assistant",
+    "auditor",
+    "bot",
+    "crawler",
+    "disable scanner",
+    "do not report",
+    "env"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refuse)\\b.{0,140}\\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\\b)(?=.*\\b(?:caa|certification\\s+authority\\s+authorization|certificate\\s+authority\\s+authorization|dns\\s+caa|iodef|issuewild|issue|accounturi|validationmethods|acme[-_\\s]*dns|tls\\s+certificate\\s+issuance)\\b)(?=.*\\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|highest[-\\s]*priority|treat\\s+(?:this|record|caa|iodef)[^.\\n]{0,80}\\bas\\s+(?:policy|instructions?|authorization)|must\\s+obey|do\\s+not\\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\\w*)\\b)(?=.*\\b(?:system|developer|previous\\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\\s]*keys?|env(?:ironment)?|authorization\\s+header|session\\s+cookies?|private\\s+keys?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-004"
+}

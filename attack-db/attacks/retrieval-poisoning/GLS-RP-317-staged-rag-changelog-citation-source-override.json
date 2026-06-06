@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-317",
+  "name": "Staged RAG Changelog Citation Source Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a staged or injected changelog or digest in a RAG index used to suppress or override citation validation, policy, or guardrail checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|knowledge[-\\s]*base|index|document|changelog|digest|appendix|source[-\\s]*note|provenance[-\\s]*badge|citation)\\b)(?=.*\\b(?:poison(?:ed|ing)?|seed(?:ed|ing)?|forg(?:ed|ery)|tamper(?:ed|ing)?|inject(?:ed|ion)|stag(?:e|ed|ing))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|citation[-\\s]*check|source[-\\s]*validation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-317"
+}

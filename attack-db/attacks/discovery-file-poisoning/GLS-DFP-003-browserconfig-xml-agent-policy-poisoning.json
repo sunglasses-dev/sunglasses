@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-003",
+  "name": "browserconfig.xml agent policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile site can hide AI-agent instructions inside `browserconfig.xml` / `msapplication-config` pinned-site metadata, causing an agent that summarizes all discovery files to treat tile configuration XML as owner policy, override higher-priority instructions, suppress reports, or request local auth",
+  "keywords": [
+    "AI agent",
+    "Authorization headers",
+    "Bearer token",
+    "LLM",
+    "TileColor",
+    "agent_policy",
+    "agentic verifier",
+    "assistant",
+    "autonomous scanner",
+    "bot",
+    "browserconfig.xml",
+    "canonical owner policy",
+    "cookies",
+    "crawler_notice",
+    "do not report"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:must\\s+not|should\\s+ignore|not\\s+treat).{0,180}(?:browserconfig\\.xml|msapplication|x-agent-policy|authorization\\s+headers?|cookies?|environment\\s+variables?))(?!.*\\bno\\s+(?:browserconfig|msapplication)\\b)(?=.*(?:browserconfig\\.xml|msapplication-config|msapplication|tile(?:color|image)|pinned[-\\s]*site|site\\s+tile|xml\\s+browser\\s+config))(?=.*(?:ai\\s*agent|assistant|autonomous\\s*(?:scanner|crawler|verifier)|llm|agentic|security\\s*scanner|bot))(?=.*(?:x-agent-policy|agent[_-]?policy|crawler[_-]?notice|verifier[_-]?policy|owner[_-]?verification|canonical\\s+(?:site|owner|operator)\\s+policy|outrank|supersede|override|higher[-\\s]*priority|must\\s+obey|treat\\s+this\\s+as\\s+(?:owner|operator)\\s+authority|authorization\\s+headers?|bearer\\s+token|cookies?|session\\s+headers?|environment\\s+variables?|api\\s*keys?|secrets?|do\\s+not\\s+(?:report|notify|mention)|suppress|hide\\s+this|silently))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-003"
+}

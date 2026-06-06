@@ -1,0 +1,40 @@
+{
+  "id": "GLS-TP-008",
+  "name": "Verifier Timeout Stale Cache Evidence Promotion",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits inconsistent timeout behavior across toolchain components by inflating expensive branches so verifier or safety tools time out while executors or caches return quickly, causing silent fallback to stale or attacker-shaped evidence treated as fresh.",
+  "keywords": [
+    "tool timeout asymmetry abuse",
+    "verifier timeout executor success split",
+    "timeout triggered stale fallback",
+    "asymmetric timeout policy between agents",
+    "deadline compression adversarial prioritization",
+    "safety tool timeout under pressure",
+    "stale cached summary promoted after timeout",
+    "verifier deadline gaming",
+    "best effort fallback after verifier timeout",
+    "fail open on verifier timeout",
+    "downstream hard fail accepts partial narrative",
+    "urgency framing skips safety check"
+  ],
+  "regex": [
+    "(?i)(?:(?:verifier|safety|validation)\\s+(?:tool\\s+)?(?:timeout|deadline|times?\\s+out)\\s+(?:while|but|then)\\s+(?:executor|fallback|cache)\\s+(?:succeeds?|returns?|promoted)|timeout[- ]triggered\\s+(?:fallback|promotion)\\s+to\\s+(?:stale|cached|prior)\\s+(?:evidence|summary|state))",
+    "(?i)(?:asymmetric\\s+timeout\\s+(?:policy|behavior)\\s+(?:between|across)\\s+(?:agents?|tools?)|deadline\\s+(?:compression|pressure)\\s+(?:starves?|skips?|drops?)\\s+(?:safety|verifier|validation))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-008"
+}

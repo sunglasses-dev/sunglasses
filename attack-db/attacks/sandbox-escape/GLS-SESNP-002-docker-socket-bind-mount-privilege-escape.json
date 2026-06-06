@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SESNP-002",
+  "name": "Docker Socket Bind Mount Privilege Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which the Docker socket path, host namespace or host path references, and privileged mount or escape operations are all present alongside explicit ignore, bypass, override, or skip language targeting policy or guardrail controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:\\bdocker\\.sock\\b|\\bdocker\\s*sock\\b|/var/run/docker\\.sock|\\bsocket\\b))(?=.*(?:\\bhost\\s+namespace\\b|\\bhost\\s+path(?:s)?\\b|/proc/|\\bnsenter\\b|\\bsetns\\b))(?=.*(?:\\bmount\\b|\\bbind\\s*mount\\b|\\bprivileged\\b|\\bcap_sys_admin\\b|\\bescape\\b|\\bbreak\\s*out\\b|\\bexecute\\b))(?=.*(?:\\bignore\\b|\\bbypass\\b|\\boverride\\b|\\bskip\\b|\\bdisable\\b))(?=.*(?:\\bpolicy\\b|\\bguardrail(?:s)?\\b|\\bsafety\\s+check(?:s)?\\b|\\bapproval\\s+gate(?:s)?\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SESNP-002"
+}

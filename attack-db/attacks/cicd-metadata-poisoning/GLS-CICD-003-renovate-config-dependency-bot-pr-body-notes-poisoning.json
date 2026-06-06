@@ -1,0 +1,37 @@
+{
+  "id": "GLS-CICD-003",
+  "name": "Renovate config / dependency-bot PR body notes poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Dependency automation configuration and generated PR body notes can smuggle agent/scanner-directed instructions that claim authority over dependency review, suppress CVE findings, or request local runtime/auth context from AI coding agents.",
+  "keywords": [
+    ",",
+    ".\n- Agent/review audience:",
+    ".\n- Authority terms:",
+    "commitBody",
+    "dependabot.yml",
+    "dependency-bot",
+    "packageRules[].description",
+    "prBodyNotes",
+    "pull request body notes",
+    "renovate config",
+    "renovate.json",
+    "renovate.json5"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\n  (?:security|incident|vulnerability|scanner|training|guide|docs?|reference|article|runbook|postmortem).{0,140}?(?:blocked|detected|flagged|refused|reported|warns?\\s+about|should\\s+(?:report|detect|flag|refuse|block)|must\\s+not\\s+(?:treat|obey|follow|use)|do\\s+not\\s+(?:treat|obey|follow|use|forward|send|share|attach|include)|does\\s+not\\s+(?:treat|obey|follow|use|override|overrides?|trust)|never\\s+(?:treat|obey|follow|use|override|overrides?|trust))\n  |(?:do\\s+not\\s+(?:obey|follow|treat|use|forward|send|share|attach|include)|does\\s+not\\s+(?:obey|follow|treat|use|override|overrides?|trust)|never\\s+(?:obey|follow|treat|use|override|overrides?|trust)|must\\s+not\\s+(?:obey|follow|treat|use|override|overrides?|trust)|should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block))\\b.{0,140}?(?:renovate(?:\\.json|\\.json5)?|dependabot\\.yml|dependency[-_\\s]?bot|prBodyNotes|pull[-_\\s]?request\\s+body)\n  |(?:renovate|dependabot|dependency[-_\\s]?bot).{0,80}?(?:notes?|config(?:uration)?|metadata).{0,80}?(?:is|are)\\s+not\\s+(?:agent\\s+)?polic(?:y|ies)\n))\n(?=.*(?:renovate(?:\\.json|\\.json5)?|renovate[-_\\s]?config(?:uration)?|dependabot\\.ya?ml|dependency[-_\\s]?bot(?:\\s+config(?:uration)?|\\s+metadata|\\s+PR)?|prBodyNotes|commitBody|packageRules(?:\\[\\])?\\.description|pull[-_\\s]?request\\s+body\\s+notes?|generated\\s+(?:dependency|renovate|dependabot)\\s+PR))\n(?=.*(?:(?:ai|autonomous|dependency|security|upgrade|release|devops|coding)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?)|(?:agents?|assistants?|scanners?|auditors?|reviewers?|models?|llms?)|(?:agent|assistant|scanner|auditor|reviewer)[-_]?(?:instructions?|policy|note|directive)))\n(?=.*(?:overrides?\\s+(?:system|developer|scanner|security|repository|upgrade|dependency|review)\\s+(?:rules?|polic(?:y|ies)|instructions?|defaults?)|supersed(?:e|es|ed|ing)\\s+(?:scanner|security|repository|system|developer|dependency)\\s+(?:rules?|polic(?:y|ies)|instructions?)|takes?\\s+precedence\\s+over\\s+(?:scanner|security|system|developer|repository|dependency|review)|(?:primary|single)\\s+source\\s+of\\s+truth|canonical\\s+(?:upgrade\\s+|dependency\\s+|review\\s+|PR\\s+)?(?:description|policy|instructions?|notes?)|definitive\\s+(?:upgrade\\s+|dependency\\s+|review\\s+|PR\\s+)?(?:description|policy|instructions?|notes?)|governing\\s+(?:document|policy|instructions?|notes?)|controlling\\s+(?:document|policy|instructions?|notes?)|authoritative(?:\\s+(?:source|policy|instructions?|notes?))?|overrules?\\s+(?:scanner|security|system|developer|repository|dependency)|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency|upgrade)\\s+(?:review|audit|scan|upgrade)|all\\s+(?:scanner|security|dependency)\\s+rules?)|(?:agent|scanner|assistant|auditor|reviewer)\\s+(?:instructions?|directive|policy)))\n(?=.*(?:(?:suppress|hide)\\w*\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output|dependency\\s+findings?)|(?:omit|exclude|redact|downgrade|deprioriti[sz]e|reclassify)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output|dependency\\s+findings?)|(?:treat|mark|classify|flag).{0,60}?as\\s+(?:informational|non[-\\s]?blocking|advisory[-\\s]?only|safe|clean|non[-\\s]?actionable)|(?:do\\s+not|not)\\s+(?:report|escalate|flag|include)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output|dependency\\s+findings?)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|embed)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|access\\s+tokens?|GitHub\\s+tokens?|Bearer\\s+tokens?|session\\s+tokens?|secrets?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+(?:variables?|secrets?|context)|auth(?:entication)?\\s+(?:headers?|context))))\n(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output|dependency\\s+findings?|API\\s+keys?|access\\s+tokens?|GitHub\\s+tokens?|Bearer\\s+tokens?|session\\s+tokens?|secrets?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+(?:variables?|secrets?|context)|auth(?:entication)?\\s+(?:headers?|context)))\n.{0,7000}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-003"
+}

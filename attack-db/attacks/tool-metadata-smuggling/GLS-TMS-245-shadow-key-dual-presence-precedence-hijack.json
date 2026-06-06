@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-245",
+  "name": "Shadow Key Dual Presence Precedence Hijack",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker poisons the precedence chain rather than the raw values, using null sentinels or stale shadow keys so weaker branches outrank authoritative fields and silently steer readiness verdicts and triage priorities.",
+  "keywords": [
+    "shadow-key precedence hijack",
+    "dual-presence contradiction graft",
+    "array-key drift bait",
+    "null-sentinel override",
+    "fallback ordering ambiguity",
+    "stale field outranks authoritative",
+    "narrative cherry-picking precedence",
+    "explicit null forces lower priority",
+    "branch precedence poisoning",
+    "kpi_snapshot vs kpis precedence",
+    "selected branch flip attack",
+    "ad-hoc or chain precedence abuse"
+  ],
+  "regex": [
+    "(?i)(?:(?:shadow[- ]?key\\s+precedence|dual[- ]?presence\\s+contradiction|array[- ]?key\\s+drift|null[- ]?sentinel)\\s+(?:hijack|graft|bait|override|poisoning)|(?:precedence|fallback\\s+order(?:ing)?)\\s+(?:poisoning|hijack|ambiguity|abuse)|(?:stale|adversarial|attacker[- ]controlled)\\s+(?:fields?|branch(?:es)?)\\s+(?:outranks?|overrides?|wins?\\s+over)\\s+(?:authoritative|canonical|primary))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-245"
+}

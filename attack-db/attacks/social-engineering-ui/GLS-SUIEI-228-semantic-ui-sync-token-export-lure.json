@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SUIEI-228",
+  "name": "Semantic UI sync token export lure",
+  "version": "1.0",
+  "category": "social_engineering_ui",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-overlay injections that impersonate sync or security notices and push credential or token export actions, consistent with semantic-level UI element injection against GUI agents.",
+  "keywords": [
+    "security sync export access token",
+    "compliance sync paste api key",
+    "status sync enter secret",
+    "security sync export recovery code",
+    "compliance sync paste seed phrase",
+    "status sync enter api key",
+    "security sync export api key",
+    "compliance sync enter access token"
+  ],
+  "regex": [
+    "(?i)\\b(?:status|security|compliance)\\s+sync\\b.{0,120}\\b(?:export|paste|enter)\\b.{0,80}\\b(?:api\\s*key|access\\s*token|secret|seed\\s*phrase|recovery\\s*code)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SUIEI-228"
+}

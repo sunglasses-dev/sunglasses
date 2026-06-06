@@ -1,0 +1,40 @@
+{
+  "id": "GLS-IDP-001",
+  "name": "DID Configuration Agent Authority Poisoning",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled `/.well-known/did-configuration.json` document embeds agent-directed policy text in DID/linked-domain metadata, attempting to make an AI agent treat a verifiable-credential identity proof as higher-priority owner authority and disclose local auth context or suppress reporting.",
+  "keywords": [
+    ",",
+    ", or",
+    ".\n- Control-plane action: request",
+    "/.well-known/did-configuration",
+    "/.well-known/did-configuration.json",
+    "AI agent",
+    "LLM",
+    "agent_policy",
+    "assistant",
+    "autonomous scanner",
+    "autonomous verifier",
+    "bot",
+    "canonical operator/site/owner policy",
+    "crawler",
+    "crawler_notice"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|should\\s+not)\\b.{0,140}\\b(?:treat|obey|include|send|forward|expose|leak)\\b)(?=.*(?:did[-_\\s]*configuration|\\.well-known/did-configuration|linked[_\\s-]*dids?|linked\\s+domain|verifiable\\s+credential|credentialSubject|did:))(?=.*(?:AI\\s+agents?|assistant|autonomous\\s+(?:scanner|verifier|crawler)|LLM|bot|crawler|agentic))(?=.*(?:owner[-\\s]*verified|canonical\\s+(?:operator|owner|site)\\s+policy|treat\\s+(?:this|the)\\s+(?:credential|DID\\s+configuration|DID|configuration)\\s+as\\s+(?:owner|operator|site)\\s+authority|supersede|outrank|override|higher[-\\s]*priority))(?=.*(?:Authorization|Bearer|cookies?|session\\s+headers?|environment\\s+variables?|API\\s*keys?|secrets?|local\\s+auth\\s+state|do\\s+not\\s+(?:report|notify|mention)|suppress|hide\\s+this|silently)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IDP-001"
+}

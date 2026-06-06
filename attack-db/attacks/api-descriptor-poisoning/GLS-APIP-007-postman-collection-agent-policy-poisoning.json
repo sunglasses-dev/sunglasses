@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-007",
+  "name": "Postman Collection Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Postman or Insomnia API collection descriptions can smuggle agent-directed instructions that claim collection metadata outranks developer policy, request local credentials, or suppress scanner findings.",
+  "keywords": [
+    "AI agent",
+    "API key",
+    "Authorization bearer token",
+    "Insomnia",
+    "LLM",
+    "Postman",
+    "_type: export",
+    "agent importer",
+    "assistant",
+    "authoritative owner policy",
+    "autonomous auditor",
+    "collection-level docs",
+    "collection.json",
+    "cookies",
+    "do not report"
+  ],
+  "regex": [
+    "(?is)(?!.*(?:AI\\s+agents?|assistants?|LLMs?|security\\s+scanners?|agent\\s+importers?)\\s+(?:must\\s+not|should\\s+not|never|do\\s+not)\\s+(?:obey|treat|trust|include|forward|suppress|hide|leak))(?=.*(?:Postman\\s+collection|schema\\.getpostman\\.com/json/collection|collection\\.json|info\\.description|item\\[\\]\\.description|request\\.description|Insomnia\\s+(?:export|workspace|collection)|collection-level\\s+docs?))(?=.*(?:AI\\s+agents?|assistants?|LLMs?|agent\\s+importers?|security\\s+scanners?|autonomous\\s+(?:auditors?|testers?)|tool\\s+generators?))(?=.*(?:authoritative\\s+(?:owner\\s+)?policy|supersedes?\\s+(?:developer|system)\\s+instructions?|outranks?\\s+(?:system|developer)\\s+policy|highest[-\\s]?priority|trust\\s+this\\s+collection|ignore\\s+previous\\s+instructions?))(?=.*(?:Authorization\\s+bearer\\s+token|API\\s*keys?|environment\\s+variables?|cookies?|local\\s+config|suppress\\s+(?:the\\s+)?(?:warning|finding|report)|mark\\s+(?:it\\s+)?false\\s+positive|do\\s+not\\s+report)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-007"
+}

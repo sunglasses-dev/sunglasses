@@ -1,0 +1,40 @@
+{
+  "id": "GLS-TP-004",
+  "name": "Speculative Plan Stage Poisoning Pre-Authorization",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker influences the planning stage with untrusted content that pre-authorizes extra tools, inflates fallback branches, or laundering plan summaries so the agent commits to unsafe tool chains before execution-time policy checks ever evaluate the final arguments.",
+  "keywords": [
+    "plan seeding via context preamble",
+    "pre-authorize extra tools in draft plan",
+    "speculative branch inflation",
+    "fake fallback plan pre-approves tool",
+    "dependency ghosting prerequisite injection",
+    "plan summary laundering",
+    "tainted plan node creation",
+    "speculative tool plan poisoning",
+    "best-effort fallback plan injection",
+    "plan execution drift",
+    "unauthorized tool edge in plan",
+    "plan-stage policy bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:seed|inject|inflate|forge)\\s+(?:speculative|draft|fallback)\\s+(?:plan|branch|step)|(?:pre[- ]authorize|pre[- ]approve|smuggle)\\s+(?:tool|capability|edge)\\s+(?:in|into)\\s+(?:plan|planner|draft)|(?:plan|planning)[- ]stage\\s+(?:poisoning|bypass|injection))",
+    "(?i)(?:fake\\s+(?:prerequisite|dependency)\\s+claim|plan[- ]summary\\s+laundering|tainted\\s+span\\s+(?:creates?|introduces?)\\s+tool\\s+(?:node|edge))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-004"
+}

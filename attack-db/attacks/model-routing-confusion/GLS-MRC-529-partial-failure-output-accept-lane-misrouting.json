@@ -1,0 +1,39 @@
+{
+  "id": "GLS-MRC-529",
+  "name": "Partial Failure Output Accept Lane Misrouting",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates verdict routing logic so partial-failure, low-confidence, or fallback-branch outputs get mapped to fully-validated accept/ship lanes. The agent treats parse warnings, N/A values, or stale embedded verdicts as actionable approvals, silently shipping unvalidated decisions.",
+  "keywords": [
+    "pass on parse fail coercion",
+    "confidence band overwrite",
+    "fallback lane privilege escalation",
+    "verdict routing confusion",
+    "stale approved verdict transclusion",
+    "low confidence promoted to accepted",
+    "n/a treated as actionable",
+    "schema alias drift bypass",
+    "fallback output mapped to production verdict",
+    "embedded verdict overrides current evidence",
+    "confidence label rewrite",
+    "unknown enum coerced to accepted"
+  ],
+  "regex": [
+    "(?i)(?:(?:pass|accept|approve)\\s+(?:on|when)\\s+(?:parse|schema|validation)\\s+(?:fail|warning|error)|(?:confidence|verdict)\\s+(?:band|label|tier)\\s+(?:overwrite|rewrite|promotion)|(?:fallback|unknown|n[/\\\\\\-]a)\\s+(?:lane|branch|output)\\s+(?:mapped|coerced|promoted)\\s+(?:to|into)\\s+(?:accepted|production|actionable))",
+    "(?i)(?:stale|embedded|prior[- ]cycle)\\s+(?:approved\\s+)?verdict\\s+(?:block|transclusion|copy)\\s+(?:overrides?|trusted\\s+over)\\s+(?:current|measured)\\s+(?:source|evidence|artifact)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-529"
+}

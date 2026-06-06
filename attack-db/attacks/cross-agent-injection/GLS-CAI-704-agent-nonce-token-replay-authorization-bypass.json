@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-704",
+  "name": "Agent Nonce Token Replay Authorization Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or peer agent forges, replays, or tampers with a nonce, token, ticket, or approval receipt to override, bypass, or escalate past policy, guardrail, authorization, or approval-check controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-704"
+}

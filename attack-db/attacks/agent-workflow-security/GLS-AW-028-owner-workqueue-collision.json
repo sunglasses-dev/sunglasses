@@ -1,0 +1,33 @@
+{
+  "id": "GLS-AW-028",
+  "name": "Owner workqueue collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file"
+  ],
+  "description": "GO MODE execution is explicitly one-task-per-cycle, while the company board enforces owner-aware coordination across DONE / IN_PROGRESS / QUEUED. An attacker who can inject owner or queue-state hints can force duplicate effort, collision with active work, or starvation of higher-value tasks.",
+  "keywords": [
+    "owner reassignment pretext",
+    "queue starvation by urgency laundering",
+    "duplicate effort collision",
+    "forced takeover of in-progress work",
+    "skip P0 checks emergency low-value escalation",
+    "owner stalled fake reassignment",
+    "violate owner board boundary"
+  ],
+  "regex": [
+    "(?i)(?:owner|assignee|sprint\\s+lead|task\\s+owner|primary)\\s+(?:stalled|blocked|frozen|unresponsive|gone)\\b.{0,120}?(?:should|must|now|immediately)\\s+(?:take\\s+over|reassign|claim|own|grab)",
+    "(?i)(?:skip|ignore|bypass|override)\\s+(?:P0|priority|owner|board)\\s+(?:check|coordination|gate|policy).{0,80}?(?:CRITICAL|emergency|urgent|now)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-028"
+}

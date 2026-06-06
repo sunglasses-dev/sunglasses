@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-131",
+  "name": "Fake Budget Pressure Validation Skip",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects fake budget or cost signals that frame validation as wasteful, pushing the agent into cheaper modes, smaller sample sizes, or skip-verification fallbacks while appearing policy-compliant.",
+  "keywords": [
+    "cost model manipulation",
+    "budget exhaustion pretext injection",
+    "cost tier downgrade coercion",
+    "validation sampling collapse",
+    "spend panic escalation loop",
+    "too expensive skip validation",
+    "switch to cheapest mode",
+    "budget exhausted trust cache",
+    "downgrade model now",
+    "cost emergency retry drift",
+    "fabricated budget state",
+    "low cost mode bypass"
+  ],
+  "regex": [
+    "(?i)(?:(?:budget|cost|quota|spend)\\s+(?:exhausted?|depleted?|low|critical)\\s*(?:[,.;:-]|so)?\\s*(?:skip|bypass|disable|reduce)\\s+(?:validation|check|verification|sampling)|(?:switch|downgrade|drop)\\s+(?:to|into)\\s+(?:cheap\\w*|low[- ]?cost|cheapest)\\s+(?:mode|tier|model)\\s+(?:before|skipping|without)\\s+(?:policy|guardrail|check)|(?:cost|spend|budget)\\s+(?:panic|emergency|pressure)\\s+(?:loop|retry|escalation)\\s+(?:alter\\w*|relax\\w*|weakens?)\\s+(?:guardrail|policy|control))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-131"
+}

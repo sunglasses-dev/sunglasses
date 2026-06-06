@@ -1,0 +1,31 @@
+{
+  "id": "GLS-DFP-024",
+  "name": "P3P Privacy Policy Metadata Agent Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Legacy P3P privacy policy references, compact policy headers, or `/w3c/p3p.xml` comments can smuggle instructions telling AI privacy auditors or scanners to treat site privacy metadata as authoritative agent policy, suppress findings, or include local auth/env state.",
+  "keywords": [
+    "/w3c/p3p.xml",
+    "CP=",
+    "P3P",
+    "POLICY-REF",
+    "p3p.xml",
+    "policyref"
+  ],
+  "regex": [
+    "(?isx)^\n(?!.*\\b(?:scanner\\s+docs?|training|guide|reference|article|learn\\s+how)\\b.{0,160}\\b(?:report|detect|flag|refuse|block)\\b.{0,160}\\b(?:P3P|p3p\\.xml|policyref|compact\\s+privacy\\s+policy|privacy\\s+policy\\s+reference)\\b)\n(?!.*\\b(?:do\\s+not|never|must\\s+not|should\\s+not|does\\s+not)\\b.{0,100}\\b(?:obey|treat|follow|execute|honou?r|trust|override|supersede)\\b.{0,160}\\b(?:P3P|p3p\\.xml|policyref|compact\\s+privacy\\s+policy|privacy\\s+metadata)\\b)\n(?=.*\\b(?:P3P|p3p\\.xml|policyref|compact\\s+privacy\\s+policy|CP\\s*=|policy\\s*ref|/w3c/p3p\\.xml|privacy\\s+policy\\s+reference)\\b)\n(?=.*\\b(?:AI\\s*agents?|assistants?|autonomous\\s+agents?|privacy\\s+auditors?|security\\s+scanners?|crawlers?|models?|LLMs?)\\b)\n(?=.*\\b(?:ignore|override|supersede|outranks?|treat\\s+this\\s+as|authoritative\\s+policy|must\\s+follow|do\\s+not\\s+report|suppress|hide|omit|forward|include|send|append)\\b)\n(?=.*\\b(?:system|developer|user|policy|rules?|findings?|reports?|tokens?|cookies?|sessions?|authorization|api[-_\\s]?keys?|env(?:ironment)?\\s*(?:vars?|variables)|local\\s+state)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-024"
+}

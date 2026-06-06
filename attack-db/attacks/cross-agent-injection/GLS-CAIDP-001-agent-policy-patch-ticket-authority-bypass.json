@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIDP-001",
+  "name": "Agent Policy Patch Ticket Authority Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which an agent or planner presents a patch, hotfix, or policy patch claimed to be signed by a delegate, planner, or security lead with an approval ticket and elevated authority to bypass or waive policy and guardrail verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent)\\b)(?=.*\\b(?:patch|hotfix|override\\s+patch|instruction\\s+patch|policy\\s+patch)\\b)(?=.*\\b(?:signed\\s+by|claimed\\s+as|asserted\\s+by|from)\\s+(?:delegate|planner|peer\\s+agent|security\\s+lead)\\b)(?=.*\\b(?:ticket|change\\s+ticket|incident\\s+ticket|approval\\s+token)\\b)(?=.*\\b(?:priority|authority|precedence|admin\\s+scope|elevated\\s+scope)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|skip(?:ped|s|ping)?|waive(?:d|s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIDP-001"
+}

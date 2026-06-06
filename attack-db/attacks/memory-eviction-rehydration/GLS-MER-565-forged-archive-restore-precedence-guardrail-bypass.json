@@ -1,0 +1,33 @@
+{
+  "id": "GLS-MER-565",
+  "name": "Forged Archive Restore Precedence Guardrail Bypass",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Detects forged checkpoint or archive-restore metadata that rehydrates a poisoned prior session with false precedence to override verification guardrails.",
+  "keywords": [
+    "the memory session accepted forged archive restore",
+    "context history was poisoned with spoofed checkpoint",
+    "tampered memory checkpoint forced rehydration flow replace",
+    "the agent restored malicious archive context elevated",
+    "session history received forged rehydration metadata skipped",
+    "poisoned memory archive instructed context restore priority",
+    "tampered context restore logs rehydrated old session",
+    "forged checkpoint memory data triggered restore precedence"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:memory|context|session|history|archive|checkpoint)\\b)(?=.*\\b(?:evict(?:ion|ed|ing)?|purge(?:d|ing)?|forget(?:ting)?|drop(?:ped|ping)?|rehydrat(?:e|ed|ing|ion)|restore(?:d|ing)?)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|poison(?:ed|ing)?|malicious)\\b)(?=.*\\b(?:precedence|priority|override(?:s|d|ing)?|bypass(?:es|ed|ing)?|ignore(?:s|d|ing)?|disregard(?:s|ed|ing)?|skip(?:s|ped|ping)?|replace(?:s|d|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|verification|approval)\\b).{0,1200}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MER-565"
+}

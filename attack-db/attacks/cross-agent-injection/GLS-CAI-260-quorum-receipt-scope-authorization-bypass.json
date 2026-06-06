@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-260",
+  "name": "Quorum Receipt Scope Authorization Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged quorum receipt, approval token, or attestation used by an agent to regrant or unlock scope while bypassing policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|planner|reviewer|peer)\\b)(?=.*\\b(?:forged|fabricated|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:receipt|ticket|token|approval|quorum|attestation)\\b)(?=.*\\b(?:scope|privilege|authorization|policy|guardrail)\\b)(?=.*\\b(?:bypass|override|ignore|skip|disable|regrant|unlock)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-260"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-147",
+  "name": "False Done Sentinel Premature Exit",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker biases termination logic via false done sentinels, no-new-data coercion, retry-budget exhaustion, or reclassified blocking errors so the agent emits premature success claims or silent exits while real risk remains unverified.",
+  "keywords": [
+    "termination condition hijack",
+    "false done sentinel injection",
+    "no new data coercion",
+    "retry ceiling exhaustion forcing",
+    "guardrail inversion blocking errors",
+    "complete silent no findings premature",
+    "treat 5xx as no new threats",
+    "best effort completed despite failure",
+    "validation error reframed as benign",
+    "success artifact without verifier",
+    "exit early before validation",
+    "premature task complete claim"
+  ],
+  "regex": [
+    "(?i)(?:(?:premature|early|forced)\\s+(?:task[- ]?complete|done|success|exit)\\s+(?:before|without|skipping)\\s+(?:validation|verifier|artifact|check)|(?:treat|mark|label)\\s+(?:fetch[- ]?failure|timeout|5xx|429|empty)\\s+(?:as|like)\\s+(?:no\\s+new\\s+data|nothing\\s+new|complete|done|silent)|(?:reframe|reclassif\\w+|relabel)\\s+(?:validation|blocking|policy)\\s+(?:error|failure)\\s+(?:as|to|into)\\s+(?:expected|benign|retryable|transient))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-147"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-CI-007",
+  "name": "GitHub Actions workflow shell-step interpolation",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "medium",
+  "channels": [
+    "file"
+  ],
+  "description": "GitHub Actions / deployment workflow step interpolates user- or package-controlled fields directly into a shell step without quoting \u2014 RCE-via-workflow primitive.",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:run|script|shell)\\s*:\\s*[^\\n]*\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]+\\}\\}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CI-007"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-036",
+  "name": "Justification Channel Hijack Decision Divergence",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker rewrites the human-readable justification text (approval notes, risk summaries, changelog blurbs) so operators see benign-sounding rationale while the machine-executed decision payload performs a materially different action.",
+  "keywords": [
+    "justification text hijack",
+    "approval note rewrite",
+    "risk summary swap",
+    "changelog blurb mismatch",
+    "decision payload vs prose drift",
+    "human-readable justification spoof",
+    "approval rationale forgery",
+    "side-channel rationale injection",
+    "machine action vs prose split",
+    "explanation channel poisoning",
+    "decision-vs-prose desync",
+    "rationale doesn't match action"
+  ],
+  "regex": [
+    "(?i)(?:(?:hijack|forge|rewrite|swap|spoof)\\s+(?:justification|rationale|approval\\s+note|risk\\s+summary|changelog)\\s+(?:text|prose|channel|blurb)|(?:decision\\s+payload|machine\\s+action)\\s+(?:differs?|diverges?|drifts?)\\s+from\\s+(?:prose|justification|rationale))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-036"
+}

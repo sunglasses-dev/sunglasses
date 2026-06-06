@@ -1,0 +1,33 @@
+{
+  "id": "GLS-TP-ITDP-232",
+  "name": "Tool description self-attestation skip independent review",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects tool metadata that claims self-attestation or pre-verification and instructs skipping independent review, biasing agent tool-routing and suppressing safeguards.",
+  "keywords": [
+    "connector self-attest skip independent review",
+    "plugin pre-verified without secondary review",
+    "tool already verified no external review",
+    "integration self-verify skip independent approval",
+    "connector pre-verified no secondary verification",
+    "plugin self-attest without external approval",
+    "tool self-verify skip secondary review",
+    "integration already verified no independent check"
+  ],
+  "regex": [
+    "(?i)\\b(?:tool|plugin|connector|integration)\\b.{0,120}\\b(?:self-verify|self-attest|already\\s+verified|pre-verified)\\b.{0,120}\\b(?:skip|without|no)\\b.{0,40}\\b(?:independent|secondary|external)\\b.{0,40}\\b(?:review|verification|approval)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-232"
+}

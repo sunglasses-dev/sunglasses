@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-111",
+  "name": "Cross-Layer Resource Budget Desync",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits inconsistent resource-budget enforcement across planner, executor, wrapper, and guard layers so the same retry/token/timeout cap is interpreted differently, opening windows where attacker workload runs past any single layer's ceiling.",
+  "keywords": [
+    "token budget aliasing",
+    "retry cap mismatch",
+    "timeout window drift",
+    "tool-call quota divergence",
+    "planner vs executor budget skew",
+    "wrapper budget bypass",
+    "post-process guard skipped budget",
+    "budget reset trick",
+    "multi-layer quota desync",
+    "retry counter laundering",
+    "budget headroom injection",
+    "budget enforcement gap"
+  ],
+  "regex": [
+    "(?i)(?:token|retry|timeout|quota|budget)\\s+(?:limit|cap|window)\\s+(?:enforced|set)\\s+(?:differently|inconsistently|skewed)\\s+(?:across|between)\\s+(?:planner|executor|wrapper|guard|layer)|(?:reset|launder|refresh)\\s+(?:retry|budget|quota)\\s+(?:counter|cap|window)\\s+(?:between|across)\\s+(?:layers?|stages?)",
+    "(?i)(?:planner|executor|wrapper|post[- ]process)\\s+(?:budget|quota|limit)\\s+(?:desync|drift|mismatch|divergence)|(?:bypass|skip|evade)\\s+(?:budget|quota|retry)\\s+(?:enforcement|guard|gate)\\s+(?:via|by|through)\\s+(?:layer|alias|wrapper)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-111"
+}

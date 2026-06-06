@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-584",
+  "name": "Late-Layer Duplicate Key Policy Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Attackers exploit overlay-merge ambiguity in layered policy bundles so a later, weaker stanza silently overrides stronger rules through namespace collisions, forged priority tags, or environment-flag pivots, shifting effective policy without audit trace.",
+  "keywords": [
+    "late-layer exception smuggle",
+    "last-write-wins policy weakened",
+    "namespace collision override",
+    "duplicate key approval required",
+    "priority tag spoofing",
+    "unverified priority elevated",
+    "environment flag flip",
+    "staging debug branch policy off",
+    "overlay order ambiguity",
+    "policy bundle merge attack",
+    "deny rule silently dropped",
+    "effective policy differs after merge"
+  ],
+  "regex": [
+    "(?i)(?:(?:late[- ]?layer|later[- ]?overlay|last[- ]?write[- ]?wins)\\s+(?:exception|allow|stanza|fragment)\\s+(?:smuggles?|weakens?|overrides?|drops?)\\s+(?:deny|policy|guardrail)|(?:duplicate|colliding)\\s+(?:key|namespace)\\s+(?:overrides?|shadows?)\\s+(?:approval|policy)|(?:priority[- ]?tag|priority[- ]?metadata)\\s+(?:spoofed|unverified|forged)\\s+(?:elevates?|outranks?)\\s+(?:baseline|guardrail))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-584"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-322",
+  "name": "Forged Audit Stamp Review Gate Override",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged audit stamp, verification badge, or signed footer attached to a tool result to execute or deploy while overriding review gate policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool\\s+output|execution\\s+result|run\\s+log|agent\\s+response|output\\s+summary)\\b)(?=.*\\b(?:audit\\s+stamp|signed\\s+footer|footer|verification\\s+badge|attestation|checksum)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|tamper(?:ed|ing)?|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|mismatch)\\b)(?=.*\\b(?:execute|run|approve|ship|deploy(?:ment)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore|waive|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|review\\s+gate(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-322"
+}

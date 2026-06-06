@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-264",
+  "name": "Forged Router Profile Tier Priority Override",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or counterfeit router profile, tier, or priority rank is used to escalate or promote routing priority and then bypass or skip a policy gate or guardrail.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:router|routing|route|dispatcher|profile)\\b)(?=.*\\b(?:tier|priority|rank|lane)\\b)(?=.*\\b(?:override|overrode|overriding|escalate|escalated|escalation|promote|promoted|promotion)\\b)(?=.*\\b(?:gate|policy|guardrail|approval|verification)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-264"
+}

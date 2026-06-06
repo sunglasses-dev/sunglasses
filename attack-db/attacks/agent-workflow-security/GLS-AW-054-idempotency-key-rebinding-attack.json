@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-054",
+  "name": "Idempotency Key Rebinding Attack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "tool_output",
+    "file"
+  ],
+  "description": "Attacker reuses or rebinds idempotency keys so the agent's deduplication layer treats a new attacker-crafted payload as already-completed (or replays a prior side effect with mutated arguments), defeating once-only execution guarantees.",
+  "keywords": [
+    "idempotency key rebinding",
+    "reuse key new payload",
+    "side-effect duplicated under same key",
+    "key bound to wrong action",
+    "idempotency cache poisoning",
+    "replay with mutated args same key",
+    "force key collision",
+    "stale key reused",
+    "rebind idempotency to attacker action",
+    "duplicate write disguised idempotent",
+    "key replay attack",
+    "idempotency window abuse"
+  ],
+  "regex": [
+    "(?i)(?:idempotenc(?:y|e)\\s+(?:key|token)\\s+(?:rebinding|collision|reuse|poisoning|replay)|(?:reuse|replay|recycle)\\s+(?:idempotency|request)\\s+(?:key|id|token)\\s+(?:with|for)\\s+(?:new|different|mutated)\\s+(?:payload|args|action))",
+    "(?i)(?:(?:same|stale)\\s+idempotency\\s+(?:key|id)\\s+(?:bound|maps?|points?)\\s+to\\s+(?:different|new|attacker)\\s+(?:action|payload|side[- ]effect))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-054"
+}

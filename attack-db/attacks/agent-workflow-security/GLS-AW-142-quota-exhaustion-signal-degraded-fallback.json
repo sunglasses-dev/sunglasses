@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-142",
+  "name": "Quota Exhaustion Signal Degraded Fallback",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forges quota or budget exhaustion signals (tokens, rate limits, iteration budgets, API quotas) so the agent degrades into permissive fallback paths that skip verification, drop provenance checks, or trust attacker-seeded caches.",
+  "keywords": [
+    "quota exhaustion signal forgery",
+    "rate limit pretext override",
+    "iteration budget panic pivot",
+    "quota header forgery tool output",
+    "cost optimization coercion",
+    "x-ratelimit-remaining zero forged",
+    "skip cross check use cached summary",
+    "synthetic urgency bypass validation",
+    "fake exhausted budget guidance",
+    "permissive fallback handler",
+    "drop provenance under cost spike",
+    "unverified quota signal downgrade"
+  ],
+  "regex": [
+    "(?i)(?:(?:rate[- ]?limit|quota|budget|token)\\s+(?:exhausted?|exceeded?|depleted?|zero)\\s*(?:[,.;:-]|so)?\\s*(?:skip|bypass|disable)\\s+(?:verification|cross[- ]?check|validation|guard)|(?:forge|fabricate|spoof)\\s+(?:x-?rate-?limit|quota|budget)\\s+(?:header|metadata|remaining|counter)\\s+(?:to|so)\\s+(?:route|force|trigger)\\s+(?:fallback|permissive|cheap)|(?:iteration|retry|spend)\\s+(?:budget|panic|emergency)\\s+(?:forces?|requires?|justifies?)\\s+(?:skipping|relaxing|dropping)\\s+(?:check|guardrail|provenance))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-142"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-190",
+  "name": "Health Badge Swap GO Mode Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forges or swaps compact health badges (READY/DEGRADED/STALE) so GO MODE cycles ship work against falsely-green systems, bypassing the readiness gate meant to halt on real degradation.",
+  "keywords": [
+    "signal health badge impersonation",
+    "fake ready badge",
+    "spoof ready status",
+    "forged degraded-to-ready flip",
+    "health status forgery",
+    "badge swap attack",
+    "stale marker hidden",
+    "false green light health",
+    "go mode badge spoof",
+    "health beacon impersonation",
+    "fabricated readiness badge",
+    "status compact lying"
+  ],
+  "regex": [
+    "(?i)(?:(?:READY|DEGRADED|STALE|GREEN|OK)\\s+(?:badge|status|marker|flag)\\s+(?:spoof|forge|impersonat|swap|fake)|(?:fake|forged|fabricated)\\s+(?:health|readiness|status)\\s+(?:badge|signal|beacon)|(?:flip|swap|relabel)\\s+(?:degraded|stale)\\s+(?:to|as)\\s+(?:ready|green|healthy))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-190"
+}

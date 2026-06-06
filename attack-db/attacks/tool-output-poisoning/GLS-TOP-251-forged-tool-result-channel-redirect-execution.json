@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-251",
+  "name": "Forged Tool Result Channel Redirect Execution",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which forged or fabricated tool output, logs, or receipts are redirected through a queue or pipeline channel in order to bypass or suppress execution policy and guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:tool|plugin|connector|scanner|validator|runner)\\b)(?=.*\\b(?:output|outputs|result|results|log|logs|trace|traces|receipt|receipts|report|reports)\\b)(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:queue|channel|route|pipeline|handoff|dispatch|forward|reroute|redirect)\\b)(?=.*\\b(?:execute|execution|run|trigger|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|ignore|ignored|ignoring|skip|skipped|skipping|disable|disabled|suppress|suppressed)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-251"
+}

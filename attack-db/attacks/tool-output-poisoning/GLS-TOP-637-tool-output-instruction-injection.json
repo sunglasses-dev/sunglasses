@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-637",
+  "name": "Tool-Output Instruction Injection",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "An AI agent ingests data through a runtime tool (web_fetch, read_file, API response, terminal output) and the retrieved content contains agent-targeting instructions that manipulate behavior, leak secrets, suppress findings, or edit memory \u2014 exploiting the agent's trust in tool output as ground-trut",
+  "keywords": [],
+  "regex": [
+    "(?six)\n(?!\n    .*\\b(?:\n        do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)\n        |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n        |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n        |should\\s+(?:report|detect|flag|refuse|block)\n        |scanner\\s+docs?(?:\\s+should\\s+(?:report|detect|flag|refuse))\n        |security\\s+researchers?\\s+should\\s+report\n        |training\\s+example\n        |redact\\s+credentials?\\s+before\n        |never\\s+obey\\s+(?:['\"]|`)?ignore\n    )\n)\n(?=.*(?:\n    \\b(?:AI|LLM)?\\s*AGENT\\s+INSTRUCTION\n    |\\bagent\\s+instruction\n    |\\b(?:you\\s+are\\s+now\\s+operating|you\\s+must\\s+(?:now\\s+)?(?:obey|follow|comply))\n    |\\b(?:as\\s+(?:an\\s+)?(?:AI\\s+(?:agent|assistant|coding\\s+agent|model)|language\\s+model|agent|assistant|coding\\s+agent)[,.])\n    |\\b(?:ignore\\s+(?:your\\s+|all\\s+|the\\s+)?(?:previous|prior|above|system)\\s+(?:instructions?|prompts?|rules?|polic(?:y|ies)))\n    |\\b(?:new\\s+(?:system\\s+|override\\s+|priority\\s+)?instructions?\\s+(?:apply|take\\s+effect|are\\s+now|begin))\n    |\\b(?:from\\s+now\\s+on[,;])\n    |\\b(?:this\\s+(?:document(?:ation)?|page|output|file|response|text|content)\\s+(?:takes?\\s+precedence|overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?))\n    |\\b(?:this\\s+(?:document(?:ation)?|page|output|text|content)\\s+is\\s+(?:now\\s+|the\\s+)?(?:authoritative|canonical|governing|controlling|the\\s+final\\s+word))\n    |\\b(?:this\\s+is\\s+(?:now\\s+|the\\s+)?(?:authoritative|canonical|governing|controlling)\\s+(?:document(?:ation)?|page|output|text|content|reference))\n    |\\b(?:takes?\\s+precedence\\s+over\\s+(?:your\\s+|the\\s+|system\\s+|user\\s+)?(?:[\\w-]+\\s+)?(?:instructions?|prompts?|rules?|polic(?:y|ies)))\n    |\\b(?:this\\s+overrides?\\s+(?:your\\s+|the\\s+)?(?:system|user|developer)\\s+(?:instructions?|prompts?|rules?))\n    |\\b(?:your\\s+new\\s+(?:system\\s+)?instructions?\\s+(?:are|begin|start))\n    |\\b(?:new\\s+directive|override\\s+protocol|priority\\s+override)\n))\n(?=.*(?:\n    \\b(?:read|copy|include|attach|forward|send|share|provide|expose|collect|embed)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context|details?|config)|API\\s+keys?|tokens?|secrets?|credentials?|local\\s+state|Authorization|session)\n    |\\b(?:suppress|hide|omit|exclude|redact|skip|ignore)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|scanner|scan|checks?|errors?|issues?)\n    |\\b(?:do\\s+not\\s+(?:report|flag|escalate|mention|show|display))\n    |\\b(?:treat|mark|classify|flag)\\s+.{0,40}?(?:as\\s+)?(?:informational|safe|low|none|false\\s+positive)\n    |\\b(?:edit|modify|update|change|rewrite)\\s+(?:your\\s+)?(?:memory|config|settings?|rules?|polic(?:y|ies)|system\\s+prompt)\n    |\\b(?:remember|store|save|persist)\\s+(?:this|the\\s+following|that|these\\s+instructions?)\n    |\\b(?:do\\s+not\\s+(?:tell|inform|notify|alert|mention|show)\\s+(?:the\\s+)?(?:user|anyone))\n    |\\b(?:keep\\s+this\\s+(?:instruction|secret|hidden|confidential))\n    |\\b(?:this\\s+(?:instruction|message|protocol)\\s+(?:is\\s+)?(?:hidden|secret|confidential|internal))\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-637"
+}

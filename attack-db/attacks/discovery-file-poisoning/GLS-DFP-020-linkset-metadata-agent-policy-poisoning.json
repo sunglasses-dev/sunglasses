@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-020",
+  "name": "Linkset Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled `/.well-known/linkset` or `Link: rel=\"linkset\"` relationship document embeds agent-facing policy text that claims relationship metadata is owner authority, then asks autonomous agents or scanners to forward local auth context or suppress findings.",
+  "keywords": [
+    "/.well-known/linkset",
+    "AI agent",
+    "API key",
+    "Authorization",
+    "Bearer",
+    "LLM",
+    "Link",
+    "agentic",
+    "application/linkset+json",
+    "assistant",
+    "autonomous scanner",
+    "bot",
+    "canonical policy",
+    "cookie",
+    "crawler"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|never|should\\s+not|cannot|refuse[sd]?)\\b.{0,140}\\b(?:treat|obey|forward|include|send|suppress|hide|override))(?=.*(?:\\.well-known/linkset|linkset\\.json|application/linkset\\+json|rel=[\"']?linkset|Link:\\s*<[^>]+>;[^\\n]*rel=[\"']?linkset|linkset\\s+metadata))(?=.*\\b(?:ai\\s+agents?|assistants?|assistant[_-]?notes?|autonomous\\s+(?:scanner|crawler|verifier)s?|scanners?|crawlers?|verifiers?|llms?|models?|bots?|agentic)\\b)(?=.*\\b(?:canonical|owner|operator|site[-\\s]*owner|authority|policy|supersede|outrank|override|higher[-\\s]*priority|must\\s+obey|trusted)\\b)(?=.*\\b(?:authorization|bearer|cookies?|session\\s+headers?|environment\\s+variables?|api\\s*keys?|secrets?|do\\s+not\\s+(?:report|notify|mention)|suppress(?:es|ed|ion)?|hid(?:e|es|den)|hide\\s+(?:this|findings)|silently|delay\\s+(?:report|notification))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-020"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "GLS-PI-019",
+  "name": "Prompt injection \u2014 encoded payload decode-and-execute",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "agent_input",
+    "web_content",
+    "file",
+    "tool_output"
+  ],
+  "description": "Detects encoded-payload decode-and-execute prompt injection: instructs the agent to decode/deobfuscate/decrypt a base64/hex/rot13/unicode-escaped blob and then execute the decoded instructions. Complements GLS-PI-017 typoglycemic redaction.",
+  "keywords": [
+    "ignore base64 decode instructions",
+    "bypass hex-encoded decode payload",
+    "override rot13 deobfuscate instructions",
+    "disregard unicode-escaped decode prompt",
+    "decode base64 ignore previous instructions",
+    "deobfuscate b64 bypass system",
+    "decrypt encoded override policy",
+    "decode payload ignore instructions"
+  ],
+  "regex": [
+    "(?is)\\b(?:ignore|bypass|override|disregard)\\b.{0,140}\\b(?:(?:base64|b64|hex(?:-)?encoded|rot13|unicode(?:-)?escaped).{0,80}(?:decode|deobfuscate|decrypt)|(?:decode|deobfuscate|decrypt).{0,80}(?:base64|b64|hex(?:-)?encoded|rot13|unicode(?:-)?escaped))\\b.{0,140}\\b(?:instructions?|payload|prompt)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-019"
+}

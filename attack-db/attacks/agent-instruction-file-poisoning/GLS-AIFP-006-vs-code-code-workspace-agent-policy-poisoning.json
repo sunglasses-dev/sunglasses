@@ -1,0 +1,30 @@
+{
+  "id": "GLS-AIFP-006",
+  "name": "VS Code `.code-workspace` agent-policy poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A repository can hide agent-directed policy text inside a VS Code `.code-workspace` file or workspace JSON fields, causing AI coding agents that ingest editor/workspace metadata to suppress findings or forward local environment details.",
+  "keywords": [
+    ".code-workspace",
+    "extensions",
+    "folders",
+    "recommendations",
+    "settings"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:training|scanner\\s+docs?|security\\s+guide|incident\\s+report|vulnerability\\s+report|example\\s+of)\\b.{0,140}\\b(?:should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)|must\\s+not\\s+(?:obey|treat|follow|include|attach|forward|send|share|override|trust)|do\\s+not\\s+(?:obey|treat|follow|include|attach|forward|send|share|override|trust)|does\\s+not\\s+(?:obey|treat|follow|include|attach|forward|send|share|override|trust)|never\\s+(?:obey|treat|follow|include|attach|forward|send|share|override|trust)))\n(?!.*\\b(?:no\\s+policy\\s+overrides?|does\\s+not\\s+instruct\\s+agents?\\s+to|does\\s+not\\s+override|not\\s+(?:agent\\s+)?policy)\\b)\n(?=.*(?:\\.code-workspace|code-workspace|workspace\\s+file|workspace\\s+settings|workspace\\s+metadata|(?<!\\w)\"folders\"\\s*:|(?<!\\w)\"settings\"\\s*:|(?<!\\w)\"extensions\"\\s*:|(?<!\\w)\"recommendations\"\\s*:|(?<![A-Za-z0-9])(?:agent|scanner|assistant)[_-](?:instructions?|policy|note)(?![A-Za-z0-9])))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+coding\\s+agents?|coding\\s+agents?|ai\\s+agents?|agents?|assistants?|scanners?|security\\s+scanners?|copilot|cursor|codex|claude|llms?)(?![A-Za-z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|canonical\\s+(?:project\\s+|workspace\\s+)?(?:policy|instructions?|description)|definitive\\s+(?:project\\s+|workspace\\s+)?(?:policy|instructions?|description)|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+(?:document|policy)|authoritative|(?:agent|scanner|assistant)\\s+instructions?))\n(?=.*(?:suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|alerts?|issues?|observations?|results?|diagnostics?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|alerts?|issues?|observations?|results?|diagnostics?)|omit\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|alerts?|issues?|observations?|results?|diagnostics?)|exclude\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|alerts?|issues?|observations?|results?|diagnostics?)|treat.{0,50}?as\\s+informational|mark\\s+(?:[\\w-]+\\s+){0,3}(?:clean|safe|non-actionable)|(?:attach|forward|send|share|include|provide|expose|collect|copy)\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:variables?|context|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|api\\s*keys?|tokens?|secrets?|authorization|bearer)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-006"
+}

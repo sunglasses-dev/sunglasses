@@ -1,0 +1,34 @@
+{
+  "id": "GLS-ACP-566",
+  "name": "Forged SLA Exception Precedence Guardrail Bypass",
+  "version": "1.0",
+  "category": "agent_contract_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects forged SLA or service-level exception text injected into an agent contract or runbook to reorder execution priority and override guardrails or approval checks.",
+  "keywords": [
+    "the agent contract accepted forged sla exception",
+    "spoofed service level runbook clause tampered with",
+    "the playbook was poisoned with fabricated exception",
+    "malicious contract metadata forged sla override path",
+    "tampered runbook exception changed priority handling and",
+    "forged agent contract terms injected precedence override",
+    "spoofed sla exception notes reordered execution priority",
+    "fabricated service level exception text forced precedence"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:contract|agent\\s+contract|sla|service\\s+level|runbook|playbook|exception)\\b)(?=.*\\b(?:forged|spoofed|fabricated|poisoned|tampered|malicious)\\b)(?=.*\\b(?:precedence|priority|override|overrode|overrides|overriding|reorder|reordered|reordering|rebind|rebinds|rebinding|bypass(?:es|ed|ing)?|ignore(?:s|d|ing)?|skip(?:s|ped|ping)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|safety|approval|verification|control(?:s)?)\\b).{0,1200}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-ACP-566"
+}

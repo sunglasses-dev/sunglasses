@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-329",
+  "name": "Backfilled RAG Trust Badge Priority Elevate",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a backfilled or seeded retrieval corpus entry with a fake trust badge or verified-source label used to prioritize or elevate content and bypass guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:seeded|poisoned|backfilled|injected|tampered)\\b)(?=.*\\b(?:retrieval|rag|index|corpus|knowledge\\s+base|document)\\b)(?=.*\\b(?:trust\\s+badge|provenance\\s+tag|citation\\s+badge|verified\\s+source)\\b)(?=.*\\b(?:override|bypass|ignore|prioritiz(?:e|ed|ing)|elevat(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|rank(?:ing)?|verification|filter(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-329"
+}

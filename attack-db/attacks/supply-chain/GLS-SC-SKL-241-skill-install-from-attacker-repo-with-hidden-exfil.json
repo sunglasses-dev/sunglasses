@@ -1,0 +1,37 @@
+{
+  "id": "GLS-SC-SKL-241",
+  "name": "Skill install from attacker repo with hidden exfil",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects natural-language descriptions of malicious skill/plugin installs sourced from attacker-controlled repos that hide exfil logic in standard manifest entry points (setup.py / __init__.py / conftest.py / requirements). Companion text-level signal to code-level GLS-SC-014.",
+  "keywords": [
+    "hidden exfil in setup.py",
+    "hidden exfil in __init__",
+    "hidden exfil in conftest",
+    "hidden exfiltration in setup.py",
+    "skill has hidden exfil",
+    "tool has hidden exfil",
+    "install this skill from github.com/attacker",
+    "install this plugin from github.com/attacker",
+    "install this tool from github.com/attacker"
+  ],
+  "regex": [
+    "(?i)\\binstall\\s+(?:this\\s+)?(?:skill|plugin|tool|package|module|extension)\\s+from\\b.{0,40}\\b(?:github\\.com|gitlab\\.com|gist\\.github|bitbucket\\.org)\\b.{0,80}\\b(?:attacker|malicious|hidden\\s+exfil|exfiltrat|backdoor|trojan|stealer)\\b",
+    "(?i)\\bhidden\\s+exfil(?:tration)?\\b.{0,40}\\bin\\s+(?:setup\\.py|__init__\\.py|conftest\\.py|requirements\\.txt|package\\.json|Cargo\\.toml|pyproject\\.toml)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SC-SKL-241"
+}

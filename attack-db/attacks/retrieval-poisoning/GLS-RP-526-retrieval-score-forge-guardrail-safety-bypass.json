@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-526",
+  "name": "Retrieval Score Forge Guardrail Safety Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "web_content",
+    "file"
+  ],
+  "description": "Detects a poisoned or forged retrieval ranking or relevance score used to elevate a document and bypass safety policy or verification approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:retrieval|rag|index|knowledge\\s+base|search)\\b.{0,140}\\b(?:score|ranking|priority|relevance)\\b.{0,140}\\b(?:forge|forged|forging|manipulate|manipulated|manipulating|poisoned|poisoning|tampered|tampering|spoofed|spoofing)\\b.{0,140}\\b(?:elevate|elevated|elevating|promote|promoted|promoting|rerank|reranked|reranking|prioritize|prioritized|prioritizing|boost|boosted|boosting)\\b.{0,140}\\b(?:ignore|bypass|override|disable|skip)\\b.{0,80}\\b(?:safety|policy|guardrail(?:s)?|verification|approval)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-526"
+}

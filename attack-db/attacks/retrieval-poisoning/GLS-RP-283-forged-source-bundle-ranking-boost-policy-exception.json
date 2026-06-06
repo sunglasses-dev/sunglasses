@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-283",
+  "name": "Forged Source Bundle Ranking Boost Policy Exception",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or fabricated source bundle, citation pack, or provenance record is given a ranking boost in order to trigger a policy exception or guardrail bypass.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:source\\s+bundle|citation\\s+pack|provenance\\s+record|evidence\\s+bundle|reference\\s+manifest)\\b)(?=.*\\b(?:rank(?:ing)?\\s+boost|priority\\s+boost|top[-\\s]?rank|promote(?:d|s|ing)?|elevate(?:d|s|ing)?)\\b)(?=.*\\b(?:policy\\s+exception|policy\\s+override|guardrail\\s+bypass|trust\\s+bypass|compliance\\s+skip)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-283"
+}

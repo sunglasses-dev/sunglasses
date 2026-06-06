@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-251",
+  "name": "Forged Routing Capability Tier Policy Gate Skip",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or tampered routing capability or tier clearance used to skip a policy gate or safety guardrail in the model router.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:route|router|routing\\s+layer|model\\s+router|selector)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:capability|tier|clearance|policy\\s+tier|trust\\s+level)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b)(?=.*\\b(?:policy\\s+gate|safety\\s+gate|execution\\s+gate|guardrail)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-251"
+}

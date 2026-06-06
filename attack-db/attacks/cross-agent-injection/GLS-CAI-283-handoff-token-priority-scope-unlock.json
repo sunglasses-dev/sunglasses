@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-283",
+  "name": "Handoff Token Priority Scope Unlock",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged handoff token or receipt used by an agent or planner to override priority, scope, or role and unlock policy-gated actions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|counterfeit|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:handoff|ticket|receipt|token|session)\\b)(?=.*\\b(?:scope|priority|role|permission)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:n|d|s|ing)?|escalat(?:e|ed|ing|ion)|unlock(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|check(?:s)?|approval)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-283"
+}

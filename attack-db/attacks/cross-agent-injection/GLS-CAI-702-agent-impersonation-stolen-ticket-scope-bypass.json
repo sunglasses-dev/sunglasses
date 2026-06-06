@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-702",
+  "name": "Agent Impersonation Stolen Ticket Scope Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a peer agent, delegate, or handoff participant spoofs, impersonates, or uses a stolen ticket or fake approval to bypass, override, skip, or escalate trust controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-702"
+}

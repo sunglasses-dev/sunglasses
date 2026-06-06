@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AW-010",
+  "name": "Trusted-proxy gateway auth widens operator scope at runtime",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "message"
+  ],
+  "description": "Detection for GHSA-4f8g-77mw-3rxc: trusted-proxy gateway auth where operator.read + operator.write scopes widen at runtime without re-consent.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:auth:\\s*gateway|gateway\\s+auth|trusted-proxy)\\b)(?=.*\\boperator\\.read\\b)(?=.*\\boperator\\.write\\b)(?=.*\\b(?:widen|scope|runtime|produce(?:d)?|yield(?:s|ed)?)\\b).{0,1400}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-010"
+}

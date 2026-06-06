@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-155",
+  "name": "Semantic Diff Negation Swap Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker crafts edits that pass string-level or syntactic diffs while flipping meaning (negation swaps, scope reversals, synonym substitution), bypassing review pipelines that verify form rather than intent.",
+  "keywords": [
+    "string diff misses meaning flip",
+    "semantic diff blindspot",
+    "negation flip same tokens",
+    "meaning level change unverified",
+    "policy verb swap evades diff",
+    "allow to deny same chars",
+    "diff passes meaning changed",
+    "synonym substitution evasion",
+    "scope flip with identical hash",
+    "byte equal semantic divergent",
+    "diff sees no change semantic flip",
+    "verification on string not intent"
+  ],
+  "regex": [
+    "(?i)(?:semantic\\s+diff\\s+(?:blindspot|gap|miss)|string[- ]level\\s+(?:change|diff)\\s+(?:miss|ignore|fail)\\s+(?:meaning|semantic|intent)\\s+(?:flip|change|swap)|(?:negation|verb|scope)\\s+flip\\s+(?:with|under|same)\\s+(?:identical|equal|same)\\s+(?:string|bytes|tokens))",
+    "(?i)(?:(?:allow|deny|permit|block)\\s+(?:swapped|flipped)\\s+(?:without|while)\\s+(?:diff|hash|string)\\s+(?:passes|matches|approves)|meaning[- ]level\\s+(?:flip|change)\\s+(?:unverified|evades|bypass))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-155"
+}

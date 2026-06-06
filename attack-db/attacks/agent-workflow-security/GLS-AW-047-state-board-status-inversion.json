@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-047",
+  "name": "State Board Status Inversion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file",
+    "log_memory",
+    "message"
+  ],
+  "description": "Attacker tampers with the agent's decision/state board (DONE / IN_PROGRESS / QUEUED / BLOCKED / DECISIONS / OPEN_QUESTIONS) to mark unfinished work complete, clear blockers silently, or invert priority, causing duplicate work and unauthorized state advancement.",
+  "keywords": [
+    "decision register drift",
+    "state board rewrite",
+    "mark done without completion",
+    "queued flipped to done",
+    "blocked silently cleared",
+    "open question deleted",
+    "priority inversion via board edit",
+    "duplicate work after register tamper",
+    "decisions log fabricated entry",
+    "in-progress reset to queued",
+    "ghost completion on tracker",
+    "state board injection"
+  ],
+  "regex": [
+    "(?i)(?:(?:rewrite|edit|tamper|flip|forge)\\s+(?:decision[- ]?(?:register|board|log)|state[- ]board|status[- ]board|tracker)|(?:mark|flip|set)\\s+(?:queued|blocked|in[- ]progress|open)\\s+(?:to|as)\\s+(?:done|completed|resolved)\\s+(?:without|silently))",
+    "(?i)(?:(?:open[- ]questions?|decisions?|blocked|in[- ]progress)\\s+(?:silently\\s+)?(?:cleared|deleted|removed)\\s+from\\s+(?:register|board|log)|priority\\s+inversion\\s+via\\s+(?:board|register|state)\\s+(?:edit|tamper))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-047"
+}

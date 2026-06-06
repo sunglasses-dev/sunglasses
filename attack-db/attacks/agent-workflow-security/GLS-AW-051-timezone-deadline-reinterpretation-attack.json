@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-051",
+  "name": "Timezone Deadline Reinterpretation Attack",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects timezone or deadline-reinterpretation directives into untrusted content so the agent's cron-window or 'current day' logic shifts, causing freshness gates to pass on stale data or scheduled actions to fire in the wrong window.",
+  "keywords": [
+    "timezone deadline spoofing",
+    "redefine current day",
+    "force pt to utc reinterpretation",
+    "deadline urgency injection",
+    "cron window misalignment",
+    "fake today date directive",
+    "tz offset injection",
+    "current day reinterpretation",
+    "skip the 05:00 pt deadline",
+    "deadline already passed pretext",
+    "next-day rollover spoofing",
+    "tz shift bypass freshness"
+  ],
+  "regex": [
+    "(?i)(?:(?:spoof|redefine|inject|shift|fake)\\s+(?:timezone|tz|deadline|current\\s+(?:day|date)|today)|(?:tz|timezone)\\s+(?:offset|context)\\s+(?:injection|spoofing|drift))",
+    "(?i)(?:(?:deadline|cron\\s+window)\\s+(?:already\\s+)?(?:passed|missed|expired)\\s+(?:so|thus|therefore)\\s+(?:skip|defer|bypass)|reinterpret\\s+(?:pt|pst|utc|gmt)\\s+as\\s+(?:utc|pt|gmt|local))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-051"
+}

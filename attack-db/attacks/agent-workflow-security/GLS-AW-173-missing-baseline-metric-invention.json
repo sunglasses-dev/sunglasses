@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-173",
+  "name": "Missing Baseline Metric Invention",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker pushes the pipeline to invent or overwrite missing baseline metrics so dashboards stay visually complete, laundering fabricated history into agent decisions that compare against trusted prior periods.",
+  "keywords": [
+    "baseline backfill fabrication",
+    "invent missing baseline metric",
+    "overwrite missing kpi to look complete",
+    "fabricated history fill",
+    "synthetic baseline injection",
+    "dashboard completeness forced",
+    "pipeline invents prior period",
+    "backfill from attacker prompt",
+    "missing baseline auto filled",
+    "fake historical anchor",
+    "baseline gap silently patched",
+    "interpolated baseline trusted"
+  ],
+  "regex": [
+    "(?i)(?:baseline\\s+backfill\\s+(?:fabricat|invent|forge)|(?:invent|fabricate|overwrite|interpolate)\\s+(?:missing\\s+)?(?:baseline|historical|prior[- ]period)\\s+(?:metric|kpi|anchor|value))",
+    "(?i)(?:dashboard\\s+(?:still\\s+)?(?:looks?|appears?)\\s+complete\\s+(?:via|through|by)\\s+(?:fabricat|invent|fill|synthetic)|(?:synthetic|forged|fake)\\s+baseline\\s+(?:injection|fill|insert))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-173"
+}

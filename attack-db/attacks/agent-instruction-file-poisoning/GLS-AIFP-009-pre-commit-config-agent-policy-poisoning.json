@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AIFP-009",
+  "name": "Pre-commit Config Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious `.pre-commit-config.yaml` or hook metadata field can smuggle AI-agent/scanner instructions that claim review authority, suppress hook/security findings, or solicit local CI/environment state.",
+  "keywords": [
+    ".pre-commit-config.yaml",
+    "additional_dependencies:",
+    "agent instruction",
+    "agent_instructions",
+    "agent_note",
+    "authoritative",
+    "canonical/definitive policy",
+    "defines rules",
+    "downgrade ... into background notes",
+    "entry:",
+    "execution context",
+    "governing document",
+    "hooks:",
+    "main operating guidance",
+    "not authoritative"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|scanner|training|documentation|guide|reference|incident|vulnerability)\\b.{0,120}?\\b(?:flagged|detected|blocked|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+not\\s+(?:obey|follow|treat|use|override|trust)|do\\s+not\\s+(?:obey|follow|treat|use|override|trust)|does\\s+not\\s+(?:obey|follow|treat|use|override|overrides?|trust)|never\\s+(?:obey|follow|treat|use|override|overrides?|trust))|\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|treat|use|override|overrides?|trust)\\b.{0,140}?(?:pre[-_ ]?commit|\\.pre-commit-config\\.ya?ml|hook\\s+config|hook\\s+metadata)|\\bpre[-_ ]?commit\\s+(?:configuration|metadata|hooks?)\\s+(?:is|are)\\s+not\\s+(?:agent\\s+)?polic(?:y|ies)|\\bno\\s+(?:agent\\s+)?policy\\s+overrides?\\b))\n(?=.*(?:\\.pre-commit-config\\.ya?ml|pre[-_ ]?commit\\s+(?:config(?:uration)?|hooks?|ci)|repos\\s*:|hooks\\s*:|additional_dependencies\\s*:|default_stages\\s*:|stages\\s*:|entry\\s*:|language_version\\s*:|pre-commit\\.ci|local\\s+hook|hook\\s+metadata|hook\\s+description))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|coding\\s+agents?|review\\s+bots?|security\\s+scanners?|dependency\\s+scanners?|autonomous\\s+scanners?|llms?|models?|copilot|codex|claude|cursor|scanner_policy|agent_note|agent_instructions|x-agent-policy)(?![a-zA-Z0-9]))\n(?=.*(?:overrides?|overrules?|supersed(?:e|es|ed|ing)?|outranks?|takes\\s+precedence|highest\\s+priority|governing\\s+document|controlling\\s+document|canonical\\s+(?:project\\s+|hook\\s+|scanner\\s+)?(?:description|policy|instructions?)|definitive\\s+(?:project\\s+|hook\\s+|scanner\\s+)?(?:description|policy|instructions?)|(?:primary|single)\\s+source\\s+of\\s+truth|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|hook)\\s+(?:review|audit|scan|checks?)|all\\s+(?:scanner|security|agent|hook)\\s+rules?)|authoritative\\b|(?:agent|scanner|assistant|review\\s+bot|hook)\\s+(?:instructions?|directive|policy)))\n(?=.*(?:suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|checks?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|checks?)|(?:omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|checks?|security\\s+checks?)|(?:treat|mark|classify|label).{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only)|(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|vulnerabilit(?:y|ies)|observations?|notifications?|results?|diagnostics?)|(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|observations?|CVE\\s+observations?|security\\s+results?)\\s+out\\s+of\\s+(?:summar(?:y|ies)|reports?|memos?|audit\\s+reports?|final\\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|session\\s+(?:keys?|tokens?)|credentials?|auth(?:orization)?\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+secrets?|GITHUB_TOKEN|PRE_COMMIT_HOME)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AIFP-009"
+}

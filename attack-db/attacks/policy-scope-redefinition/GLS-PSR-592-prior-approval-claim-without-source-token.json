@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-592",
+  "name": "Prior Approval Claim Without Source Token",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attackers inject synthetic compliance language into intermediate briefing layers and handoff notes so downstream steps trust unapproved directives as already-reviewed policy, bypassing evidence checks because the brief is trusted more than raw source artifacts.",
+  "keywords": [
+    "policy voice prepend",
+    "security already approved this",
+    "handoff summary authority swap",
+    "guardrail relaxed in prior cycle",
+    "status panel greenwash",
+    "fake pass healthy language",
+    "compliance citation laundering",
+    "real policy id altered interpretation",
+    "briefing layer compliance spoofing",
+    "approved by boss without token",
+    "downstream trusts brief over source",
+    "source binding missing"
+  ],
+  "regex": [
+    "(?i)(?:(?:security|compliance|policy)\\s+(?:team|review|board)\\s+(?:already\\s+)?approved\\s+this\\s+(?:exception|action|directive)|(?:guardrail|control|constraint)\\s+(?:relaxed|waived|downgraded)\\s+(?:in\\s+)?(?:prior|previous|last)\\s+cycle|(?:briefing|handoff|summary)\\s+(?:claims?|asserts?)\\s+(?:approved|compliant|policy[- ]applied)\\s+without\\s+(?:source|token|signed)\\s+(?:binding|provenance))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-592"
+}

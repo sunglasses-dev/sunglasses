@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-629",
+  "name": "Replayed Forged Nonce Stale Scope Disregard",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged or replayed nonce, token, or attestation that is stale or expired and reused in an agent handoff to disregard policy boundaries and trust gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-629"
+}

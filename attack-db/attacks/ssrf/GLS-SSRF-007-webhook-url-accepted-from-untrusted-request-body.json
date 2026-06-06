@@ -1,0 +1,23 @@
+{
+  "id": "GLS-SSRF-007",
+  "name": "Webhook URL accepted from untrusted request body",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Detection for GHSA-8frj-8q3m-xhgm (CVE-2026-40114): PraisonAI Jobs API accepts arbitrary webhook URLs without allowlist, enabling SSRF. Source: https://github.com/advisories/GHSA-8frj-8q3m-xhgm",
+  "keywords": [],
+  "regex": [
+    "(?i)webhook_url['\\\"\\s]*[:=][^\\n]{0,40}\\b(?:request|input|params|body|payload)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SSRF-007"
+}

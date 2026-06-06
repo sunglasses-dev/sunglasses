@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IU-532",
+  "name": "Zero-Width Split Override Guardrail Bypass",
+  "version": "1.0",
+  "category": "invisible_unicode",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which zero-width Unicode characters (ZWSP, ZWNJ, ZWJ, BOM) are inserted inside words like 'ignore', 'override', or 'bypass' to split the token and evade policy or guardrail detection.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disregard|supersed(?:e|es|ed|ing)))(?=.*(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?|instruction(?:s)?))(?=.*(?:zero[\\s-]*width|zwj|zwnj|invisible\\s+unicode|u\\+200b|u\\+200c|u\\+200d)).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-IU-532"
+}

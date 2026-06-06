@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-186",
+  "name": "Atomic Task Multi-Action Smuggling",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker smuggles multiple actions into what the agent treats as a single atomic task, evading one-task-per-cycle quotas and executing extra unauthorized operations under cover of a legitimate P0 mission.",
+  "keywords": [
+    "one task per cycle bypass",
+    "single task quota evasion",
+    "piggyback subtask injection",
+    "go mode quota escape",
+    "task fan-out smuggling",
+    "compound task disguised as one",
+    "multi-action single-task spoof",
+    "quota guard bypass",
+    "p0 mission piggyback action",
+    "stealth subtask attach",
+    "atomic task envelope smuggling",
+    "cycle quota override"
+  ],
+  "regex": [
+    "(?i)(?:(?:single|one)[- ]?task\\s+(?:quota|limit|cap)\\s+(?:evasion|bypass|escape)|(?:piggyback|smuggle|attach)\\s+(?:subtask|action|step)\\s+(?:into|onto|under)\\s+(?:single|atomic|p0)\\s+(?:task|mission|cycle)|(?:compound|chained|stacked)\\s+(?:actions?|operations?)\\s+(?:disguised|posing|masked)\\s+as\\s+(?:one|single|atomic)\\s+(?:task|step))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-186"
+}

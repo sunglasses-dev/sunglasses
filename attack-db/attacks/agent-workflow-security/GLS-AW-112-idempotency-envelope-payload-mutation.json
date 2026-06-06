@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-112",
+  "name": "Idempotency Envelope Payload Mutation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker preserves an approved idempotency/retry envelope while mutating the underlying payload, so the system treats the new request as a 'safe replay' of a prior approval and skips re-validation, letting attacker parameters ride through on a trusted token.",
+  "keywords": [
+    "idempotency key replay",
+    "retry token trust shortcut",
+    "approved payload mutated",
+    "idempotency envelope abuse",
+    "safe-to-replay parameter swap",
+    "idempotency bypass approval",
+    "key reuse with different body",
+    "envelope identity laundering",
+    "retry token mutation",
+    "already-approved replay",
+    "idempotency cache poisoning",
+    "key-bound payload tampering"
+  ],
+  "regex": [
+    "(?i)(?:idempotency|retry)\\s+(?:key|token|envelope)\\s+(?:reused|replay|preserved)\\s+(?:while|but)\\s+(?:body|payload|parameter|argument)\\s+(?:mutat|chang|alter|differ)|(?:already[- ]approved|safe[- ]to[- ]replay|previously[- ]processed)\\s+(?:claim|tag|marker)\\s+(?:on|with)\\s+(?:mutated|altered|new)\\s+(?:payload|body|args)",
+    "(?i)(?:idempotency|retry[- ]token)\\s+(?:cache|envelope|store)\\s+(?:poison|abuse|bypass|shortcut)|(?:trust|approval)\\s+(?:shortcut|bypass)\\s+(?:via|through)\\s+(?:idempotency|retry)\\s+(?:key|token|marker)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-112"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-PCF-245",
+  "name": "Source-ID Collision Trust Label Remap",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Attacker remaps weak or detached evidence to a trusted source-of-truth label via source-id collision, digest-pointer swaps, or wrapper-level timestamp injection, so the agent accepts spoofed rows as canonical. Result: quiet policy bypass where unsafe actions appear justified by 'verified' evidence that was only alias-mapped.",
+  "keywords": [
+    "source label collision",
+    "digest pointer swap",
+    "cross lane evidence bleed",
+    "staleness as authority replay",
+    "alias map fuzz collision",
+    "trusted source id reuse",
+    "hash target mismatch",
+    "wrapper timestamp injection",
+    "provenance aliasing",
+    "fallback resolver hijack",
+    "ops metric as growth proof",
+    "relabeled evidence as canonical"
+  ],
+  "regex": [
+    "(?i)(?:(?:reuse|collide|alias|relabel)\\s+(?:trusted\\s+)?(?:source\\s+)?(?:id|label|tag)\\s+(?:so|to)\\s+(?:fallback|merge|resolver)\\s+(?:selects?|resolves?|consumes?)|(?:digest|hash)\\s+(?:pointer|target|uri)\\s+(?:swap|mismatch|drift)\\s+(?:verifies?|validates?)\\s+one\\s+(?:object|file|artifact)|(?:cross[- ]lane|inter[- ]lane)\\s+(?:evidence|metric)\\s+(?:bleed|leak|reframe)\\s+(?:overrides?|satisfies?|bypasses?)\\s+(?:decision\\s+)?(?:gate|policy))",
+    "(?i)(?:stale|replayed|expired)\\s+(?:evidence|artifact|block)\\s+(?:with|using)\\s+(?:fresh|injected|wrapper)\\s+(?:timestamps?|freshness)\\s+(?:passes?|bypasses?|defeats?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-245"
+}

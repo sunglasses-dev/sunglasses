@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAIPA-001",
+  "name": "Peer Agent Capability Ticket Scope Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a peer or remote agent uses a forged or counterfeit capability ticket, delegation ticket, or attestation to claim elevated scope or permission and then bypass or override a policy safety gate or execution gate.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:peer\\s+agent|remote\\s+agent|delegate|worker|agent)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability\\s+ticket|delegation\\s+ticket|handoff\\s+token|attestation|authorization\\s+tag)\\b)(?=.*\\b(?:scope|permission|privilege|role|authorization)\\b)(?=.*\\b(?:guardrail|policy|safety\\s+gate|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override|overrides|overriding|overrode|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAIPA-001"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SSP-001",
+  "name": "Forged Replica Convergence Receipt Policy Gate Bypass",
+  "version": "1.0",
+  "category": "state_sync_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Attackers may inject forged replica/state-sync convergence receipts (or checkpoint acknowledgements) to trick an agent into bypassing policy/verification gates during reconciliation or execution handoff.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered)\\b)(?=.*\\b(?:replica|state(?:\\s+sync)?|convergence|checkpoint|reconcile)\\b)(?=.*\\b(?:receipt|snapshot|ack(?:nowledg(?:e|ement|ment))?|ledger)\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|risk\\s+gate|authorization|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SSP-001"
+}

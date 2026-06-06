@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-127",
+  "name": "Tool Call Monitoring Signal Muting",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker targets monitoring and approval metadata around tool calls by muting, delaying, or overwhelming safety signals so operators see a healthy run while high-risk actions still execute and incident triage misroutes.",
+  "keywords": [
+    "control plane signal jamming",
+    "alert channel saturation burst",
+    "approval summary attenuation",
+    "health gate heartbeat spoofing",
+    "reason code obfuscation drift",
+    "high risk alert delay drop",
+    "approval hash mismatch executed payload",
+    "heartbeat ok=true spoof",
+    "retryable transient reclassification",
+    "monitoring metadata mute",
+    "summary execution divergence",
+    "priority lane starvation"
+  ],
+  "regex": [
+    "(?i)(?:(?:flood|saturate|starve)\\s+(?:alert|critical|high[- ]?risk)\\s+(?:channel|queue|lane)\\s+(?:with|via)\\s+(?:noise|low[- ]?severity|junk)|(?:approval|approved)\\s+(?:summary|view)\\s+(?:omits?|sanitiz\\w+|strips?)\\s+(?:scope|path|target|args?)\\s+(?:while|but)\\s+(?:execution|payload)\\s+(?:still|retains?|includes?)|(?:heartbeat|health[- ]?gate|status)\\s+(?:spoof|forg\\w+|fake)\\s+(?:ok|success|healthy)\\s+(?:while|despite|with)\\s+(?:underlying|real)\\s+(?:fail|degrad\\w+|broken))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-127"
+}

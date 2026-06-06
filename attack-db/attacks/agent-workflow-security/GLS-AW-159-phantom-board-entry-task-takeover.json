@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-159",
+  "name": "Phantom Board Entry Task Takeover",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker injects a colliding or phantom in_progress entry on the canonical board so two owners appear to claim the same lane, forcing the agent into placeholder collision logic that can be steered toward malicious task takeover.",
+  "keywords": [
+    "in progress placeholder collision",
+    "duplicate in_progress owner",
+    "fake task ownership claim",
+    "board placeholder squat",
+    "company timeline placeholder spoof",
+    "owner collision induced",
+    "phantom in_progress entry",
+    "stale in_progress reused",
+    "placeholder hijacks board lane",
+    "collision forces dual ownership",
+    "synthetic in_progress block",
+    "go mode owner conflict"
+  ],
+  "regex": [
+    "(?i)(?:in[_\\s-]progress\\s+placeholder\\s+(?:collision|squat|spoof|hijack)|(?:duplicate|colliding|phantom)\\s+in[_\\s-]progress\\s+(?:owner|entry|claim)|(?:fake|forged|synthetic)\\s+(?:task|board|timeline)\\s+(?:ownership|placeholder)\\s+(?:claim|entry))",
+    "(?i)(?:owner\\s+collision\\s+(?:on|in)\\s+(?:board|timeline)|company[_\\s-]?timeline\\s+(?:placeholder|in_progress)\\s+(?:spoof|inject|forge))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-159"
+}

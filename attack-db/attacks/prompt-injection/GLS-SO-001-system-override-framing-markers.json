@@ -1,0 +1,46 @@
+{
+  "id": "GLS-SO-001",
+  "name": "System override framing markers",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "System override framing markers used in prompt injection attacks to impersonate authority.",
+  "keywords": [
+    "system override",
+    "system_override",
+    "admin override",
+    "admin_override",
+    "new directive:",
+    "new_directive:",
+    "[admin]",
+    "[system]",
+    "[root]",
+    "administrator notice",
+    "admin notice",
+    "urgent system",
+    "priority override",
+    "###new_task###",
+    "###system###",
+    "###admin###",
+    "### admin ###",
+    "override previous",
+    "override prior",
+    "override all",
+    "disregard safety checks",
+    "disregard safety protocols"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SO-001"
+}

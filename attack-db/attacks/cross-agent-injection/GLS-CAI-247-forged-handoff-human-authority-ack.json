@@ -1,0 +1,33 @@
+{
+  "id": "GLS-CAI-247",
+  "name": "Forged Handoff Human Authority Ack",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "tool_output"
+  ],
+  "description": "Impersonates HUMAN authority (boss/chief/director/owner/security-lead signed off) inside an agent-to-agent handoff to justify policy bypass and execution. Distinct from forged AGENT tickets/tokens (GLS-CAI-241).",
+  "keywords": [
+    "delegate agent handoff boss signed off",
+    "worker instruction security lead authorized",
+    "assistant handoff chief approved",
+    "planner message director greenlit",
+    "agent note owner authorized handoff",
+    "boss approved signed off execute reveal",
+    "security-lead greenlit bypass policy",
+    "chief authorized supersede safety guardrail",
+    "ignore system policy execute export",
+    "override safety guardrails run send"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-247"
+}

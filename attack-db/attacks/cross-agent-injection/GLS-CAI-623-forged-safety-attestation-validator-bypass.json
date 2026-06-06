@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-623",
+  "name": "Forged Safety Attestation Validator Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent forging a safety attestation, compliance token, or audit token to suppress or disable policy validators and safety checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|handoff|supervisor|peer\\s+agent)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|fabricat(?:e|ed|ing)|fake)\\b)(?=.*\\b(?:safety\\s+attestation|audit\\s+token|approval\\s+token|signature|compliance\\s+token|trust\\s+attestation)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|disable|disabled|disabling|skip|skipped|skipping|ignore|ignored|ignoring|suppress|suppressed|suppressing)\\b)(?=.*\\b(?:policy|guardrail|validator|verification|safety\\s+check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-623"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-084",
+  "name": "Telemetry Window Boundary Flip",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker manipulates which telemetry window counts as 'current truth' across tools, files, and reports so the agent reasons over a different time slice than expected. Decisions reference the wrong window and act on misaligned evidence.",
+  "keywords": [
+    "evidence window boundary flip",
+    "swap current truth window",
+    "window cutoff manipulated",
+    "boundary flip across tools",
+    "current-truth window swap",
+    "telemetry window override",
+    "evidence window cutoff drift",
+    "now-window redefined",
+    "boundary-flip evidence attack",
+    "shift which window is current",
+    "live-window redirection",
+    "current evidence window spoof"
+  ],
+  "regex": [
+    "(?i)(?:evidence\\s+window\\s+boundary\\s+flip|(?:flip|swap|shift|redefine)\\s+(?:which|the)\\s+(?:evidence|telemetry|current[- ]truth)\\s+window\\s+(?:is|counts\\s+as)\\s+(?:current|live|active))",
+    "(?i)(?:(?:current[- ]truth|now|live)\\s+window\\s+(?:manipulated|spoofed|redirected|drifted)|boundary[- ]flip\\s+(?:across|between)\\s+(?:tools?|files?|reports?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-084"
+}

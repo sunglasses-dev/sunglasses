@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-458",
+  "name": "Cheap Model Fallback Admin Policy Gate Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a routing manipulation that downgrades or falls back to a cheap or mini model for admin, production, or credential workloads while ignoring policy gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:model|router|routing|tier|lane|profile)\\b)(?=.*\\b(?:downgrade|downgraded|downgrading|fallback|fallbacks|cheap|lightweight|mini)\\b)(?=.*\\b(?:admin|production|payment|credential|secret|deployment|policy\\s+gate)\\b)(?=.*\\b(?:ignore|bypass|override|overriding|skip|waive)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-458"
+}

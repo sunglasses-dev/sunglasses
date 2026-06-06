@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-097",
+  "name": "Eval Fixture Overfit Benchmark Gaming",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker infers the structure of a security eval harness and crafts payloads that pass the benchmark while leaving the underlying defense objective unchanged, so leaderboard scores improve but real-world attack surface stays open.",
+  "keywords": [
+    "eval fixture overfit",
+    "benchmark gaming attack",
+    "fixture structure leak",
+    "payload tuned to fixture",
+    "harness specific evasion",
+    "test set memorization abuse",
+    "eval-only safe payload",
+    "fixture signature dodge",
+    "metric gaming without defense",
+    "red-team fixture inference",
+    "harness blind spot exploit",
+    "leaderboard score forgery"
+  ],
+  "regex": [
+    "(?i)(?:overfit|tune|optimize|game)\\s+(?:payload|attack|prompt)\\s+(?:to|against|for)\\s+(?:fixture|benchmark|harness|test\\s+set)|(?:eval|benchmark|fixture)\\s+(?:structure|signature|pattern)\\s+(?:leak|inferred|reverse[- ]engineered)\\s+(?:by|to)\\s+(?:attacker|adversary)",
+    "(?i)(?:safe|passes?|defeats?)\\s+(?:eval|benchmark|harness)\\s+(?:but|while)\\s+(?:unsafe|fails?|exploits?)\\s+(?:in\\s+)?(?:production|real|deployed)|(?:leaderboard|score)\\s+(?:gam|forg|hack)\\w*\\s+(?:without|with\\s+no)\\s+(?:real|actual)\\s+(?:defense|hardening)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-097"
+}

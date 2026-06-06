@@ -1,0 +1,35 @@
+{
+  "id": "GLS-AW-017",
+  "name": "Mtime backdating",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "file"
+  ],
+  "description": "Mtime-backdating attacks forge file recency signals so automation trusts stale or attacker-controlled artifacts as \"fresh.\" In Sunglasses-style cron pipelines, mtime is frequently used to pick the latest bundle, cycle package, or dashboard source. If an attacker can preserve or spoof mtime ordering, they can steer the control plane toward older evidence while status checks still appear green.",
+  "keywords": [
+    "backdate file mtime",
+    "spoof modification time",
+    "preserve mtime rollback",
+    "fake recency signal",
+    "stale bundle replay",
+    "rolled-back tarball fresh mtime",
+    "selective member aging",
+    "cross-file skew grafting",
+    "stale report replay timestamp",
+    "fresh archive stale members"
+  ],
+  "regex": [
+    "(?i)(?:backdate|spoof|forge|preserve|fake)\\s+(?:mtime|m-time|modification\\s+time|file\\s+timestamp|fs\\s+timestamp)",
+    "(?i)(?:stale|backdated|rolled[- ]?back|older)\\s+(?:bundle|tarball|artifact|archive|file)\\s+(?:with|via|using|but)\\s+(?:fresh|forged|preserved|newer)\\s+(?:mtime|timestamp|recency)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-017"
+}

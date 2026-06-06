@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-065",
+  "name": "Single Telemetry Anchor Reuse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker (or sloppy pipeline) reuses one real telemetry anchor across unrelated readiness, risk, or mission claims until operators stop checking freshness. The single anchor laundering masks divergence between current state and the evidence on file.",
+  "keywords": [
+    "evidence reuse amplification",
+    "stale telemetry replayed as fresh",
+    "single anchor reused across claims",
+    "context-stripped evidence reuse",
+    "freshness check skipped",
+    "one signal many decisions",
+    "telemetry anchor amplified",
+    "readiness reuse across missions",
+    "risk-claim evidence recycling",
+    "anchor reuse without revalidation",
+    "broad reuse single proof",
+    "evidence laundering across reports"
+  ],
+  "regex": [
+    "(?i)(?:(?:reuse|recycle|replay)\\s+(?:single|same|one)\\s+(?:telemetry|evidence|anchor|signal)\\s+(?:across|for)\\s+(?:multiple|unrelated|many)\\s+(?:claims?|decisions?|missions?|reports?)\\b|evidence\\s+reuse\\s+amplification)",
+    "(?i)(?:stale|cached|anchored)\\s+(?:telemetry|evidence|signal)\\s+(?:presented|replayed|amplified)\\s+as\\s+(?:fresh|current|new)\\s+(?:proof|verification|readiness)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-065"
+}

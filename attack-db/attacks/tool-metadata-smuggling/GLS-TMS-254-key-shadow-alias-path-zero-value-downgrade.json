@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-254",
+  "name": "Key Shadow Alias Path Zero-Value Downgrade",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits parser drift between key aliases and canonical paths (kpi_snapshot vs kpis, path vs uri, canonical vs lowercase) to induce split-brain state, silent metric loss, and zero-value erasure so checks pass while the renderer consumes the poisoned branch.",
+  "keywords": [
+    "key-shadow downgrade",
+    "alias-path poisoning",
+    "array-shape confusion",
+    "zero-value erasure",
+    "split-brain alias state",
+    "canonical vs lowercase path alias",
+    "top_paths uri count drop",
+    "truthy fallback erases zero",
+    "alternate object missing primary key",
+    "path hits vs uri count drift",
+    "rejected count silently N/A",
+    "stale default via alias miss"
+  ],
+  "regex": [
+    "(?i)(?:(?:key[- ]?shadow|alias[- ]?path|array[- ]?shape|zero[- ]?value)\\s+(?:downgrade|poisoning|confusion|erasure)|(?:canonical|primary)\\s+(?:path|key|alias)\\s+(?:vs|differs\\s+from|mismatches?)\\s+(?:lowercase|runtime|fallback)\\s+(?:alias|path|key)|(?:truthy|falsy)\\s+(?:fallback|coercion)\\s+(?:replaces?|coerces?|drops?)\\s+(?:numeric\\s+)?(?:zero|0)\\s+(?:with|to)\\s+(?:N\\/A|missing|null))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-254"
+}

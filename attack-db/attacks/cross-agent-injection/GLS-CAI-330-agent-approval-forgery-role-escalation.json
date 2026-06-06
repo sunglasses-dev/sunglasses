@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-330",
+  "name": "Agent Approval Forgery Role Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent presenting a forged approval or attestation to escalate role or scope and override policy or guardrail boundaries.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake)\\b)(?=.*\\b(?:approval|attestation|handoff|delegation|ticket)\\b)(?=.*\\b(?:role|scope|permission|privilege)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|boundary|limit(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-330"
+}

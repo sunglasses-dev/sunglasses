@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-279",
+  "name": "Agent Ticket Mint Verification Skip",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent minting or forging a ticket or credential to skip verification or guardrail checks and bypass policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-279"
+}

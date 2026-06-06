@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TOP-632",
+  "name": "Rewriter Guardrail Inversion Schema Normalization Drift",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker-controlled text survives into the rewrite stage where summarizers, formatters, or JSON normalizers silently flip deny/allow intent, drop mandatory guardrails, launder forged citations, or swap risk severity fields. Produces policy-equivalent-looking output that has been semantically inverted before tool execution.",
+  "keywords": [
+    "safety-note inversion in final rewrite",
+    "deny flipped to allow postprocessor",
+    "citation laundering by rewriter",
+    "forged provenance canonicalization",
+    "constraint collapse via brevity mode",
+    "summarizer drops mandatory guardrails",
+    "schema-compliant malicious normalization",
+    "rewriter swaps risk severity field",
+    "authority escalation through rewrite chain",
+    "postprocessor upgrades untrusted text",
+    "policy drift in formatter stage",
+    "json normalizer flips deny allow intent"
+  ],
+  "regex": [
+    "(?i)(?:(?:postprocessor|summarizer|rewriter|formatter|normalizer)\\s+(?:flips?|invert(?:s|ed)?|rewrites?|upgrades?|swaps?)\\s+(?:deny|allow|safety|policy|risk|severity|intent|constraint)|(?:safety[- ]note|guardrail|constraint)\\s+(?:inversion|collapse|removed?)\\s+(?:in|via|during)\\s+(?:final\\s+)?rewrite|(?:citation|provenance)\\s+launder|(?:schema[- ]compliant|valid\\s+json)\\s+(?:malicious|semantic)\\s+(?:normalization|drift|swap))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-632"
+}

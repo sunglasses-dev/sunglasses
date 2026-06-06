@@ -1,0 +1,43 @@
+{
+  "id": "GLS-RP-003",
+  "name": "Hypothetical framing \u2014 thought experiment / creative writing dodge",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Hypothetical / fictional framing used to coerce restricted outputs by wrapping the request in 'just pretend' language.",
+  "keywords": [
+    "hypothetical world",
+    "hypothetically speaking",
+    "thought experiment",
+    "creative writing exercise",
+    "fiction writing",
+    "for a story",
+    "for a novel",
+    "in an alternate universe",
+    "parallel universe",
+    "in a world where",
+    "imagine a scenario",
+    "what if you could",
+    "if you were allowed to",
+    "if there were no rules",
+    "if you had no restrictions",
+    "without any rules",
+    "for academic purposes",
+    "for research purposes",
+    "in a safe sandbox"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-003"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-309",
+  "name": "Signed Summary Footer Policy Bypass",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a signed or attested summary footer or result digest used to override or bypass safety, approval, or guardrail policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:signed|signature|verified|attested)\\b)(?=.*\\b(?:summary|footer|report|digest|result)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:d|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disregard(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-309"
+}

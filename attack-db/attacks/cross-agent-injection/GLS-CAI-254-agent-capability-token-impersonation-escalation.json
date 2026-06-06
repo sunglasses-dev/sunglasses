@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-254",
+  "name": "Agent Capability Token Impersonation Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent or coordinator presenting a forged or replayed capability token or handoff credential to gain unauthorized authority and bypass approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|orchestrator|service)\\b)(?=.*\\b(?:handoff|handover|ticket|token|credential|capability|nonce)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|impersonat(?:e|ed|ing)|replay(?:ed|ing))\\b)(?=.*\\b(?:authorit(?:y|ies)|scope|permission|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|escalat(?:e|ed|ing)|rerout(?:e|ed|ing))\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-254"
+}

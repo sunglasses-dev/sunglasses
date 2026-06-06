@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-698",
+  "name": "Delegate Handoff Receipt Scope Role Override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or spoofed delegate, delegation, or agent handoff receipt, ticket, attestation, or approval chain carries elevated scope, role, or privilege claims used to override, bypass, or escalate past guardrail controls.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-698"
+}

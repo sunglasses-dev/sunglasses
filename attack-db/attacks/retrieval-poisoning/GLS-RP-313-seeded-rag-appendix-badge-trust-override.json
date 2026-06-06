@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-313",
+  "name": "Seeded RAG Appendix Badge Trust Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a seeded or poisoned RAG appendix or footnote carrying a fake trust or authority badge used to override policy guardrails and approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:rag|retrieval|index|knowledge\\s?base|document|context|memory)\\b)(?=.*\\b(?:seed(?:ed|ing)?|poison(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:appendix|footnote|citation|source|badge|provenance)\\b)(?=.*\\b(?:trust|verified|authoritative|official)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable)\\b)(?=.*\\b(?:policy|guardrail|review|approval|safety)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-313"
+}

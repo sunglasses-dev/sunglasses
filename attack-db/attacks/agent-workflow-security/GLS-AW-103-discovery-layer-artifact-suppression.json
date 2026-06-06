@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-103",
+  "name": "Discovery Layer Artifact Suppression",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker poisons the discovery layer (file listing, glob, exists-check) so critical artifacts appear missing to the agent, forcing fallback to stale defaults or aborting verification gates that depended on those artifacts.",
+  "keywords": [
+    "file lookup false negative",
+    "discovery layer poison",
+    "path check missing trick",
+    "listing artifact suppression",
+    "exists check fooled",
+    "ls glob blind spot",
+    "critical artifact hidden from agent",
+    "discovery skip causes stale fallback",
+    "fake missing file",
+    "find returns empty falsely",
+    "discovery layer coercion",
+    "artifact existence denied"
+  ],
+  "regex": [
+    "(?i)(?:file|artifact|path)\\s+(?:lookup|listing|discovery|exists?\\s+check)\\s+(?:returns?|reports?|claims?)\\s+(?:missing|empty|not[- ]found|absent)\\s+(?:while|when|but)\\s+(?:file|artifact)\\s+(?:actually|in\\s+fact|truly)\\s+exists?",
+    "(?i)(?:poison|coerce|trick)\\s+(?:discovery|listing|glob|find)\\s+(?:layer|step|stage)\\s+(?:to|into)\\s+(?:hide|skip|suppress)\\s+(?:critical|required|expected)\\s+(?:artifact|file|path)|(?:false[- ]negative|missing)\\s+(?:discovery|lookup)\\s+(?:forces?|triggers?)\\s+(?:stale|fallback|default)\\s+(?:reuse|path|decision)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-103"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-006",
+  "name": "Host-meta XRD/JRD Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "`/.well-known/host-meta` or `/.well-known/host-meta.json` can hide agent-facing authority inversion and secret-access instructions inside standards-shaped XRD/JRD discovery metadata.",
+  "keywords": [
+    ",",
+    ".\n- Safety/report suppression:",
+    ".\n- Secret/local-state access:",
+    "/.well-known/host-meta",
+    "AI agent",
+    "AI assistant",
+    "LLM",
+    "Link title",
+    "Property",
+    "XRD",
+    "aliases",
+    "coding agent",
+    "crawler agent",
+    "description",
+    "host-meta.json"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:host-meta|xrd|jrd|webfinger|\\.well-known))(?=.*(?:ai\\s*(?:assistant|agent)|coding\\s*agent|model|llm))(?=.*(?:ignore\\s+(?:all\\s+)?(?:previous|system|developer|repository)\\s+instructions|highest[-\\s]?priority|outranks?|env(?:ironment)?\\s+variables?|api\\s*keys?|secrets?|disable\\s+(?:security|scanner)|do\\s+not\\s+report)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-006"
+}

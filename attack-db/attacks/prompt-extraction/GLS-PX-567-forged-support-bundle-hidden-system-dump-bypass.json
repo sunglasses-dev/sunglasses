@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PX-567",
+  "name": "Forged Support Bundle Hidden System Dump Bypass",
+  "version": "1.0",
+  "category": "prompt_extraction",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "file"
+  ],
+  "description": "Detects forged support, debug, or diagnostic bundles carrying a hidden system prompt or internal instructions used to dump or override the agent's protected context.",
+  "keywords": [
+    "the support bundle was forged with hidden",
+    "spoofed diagnostic pack embedded internal instructions and",
+    "the ticket attachment was fabricated with disguised",
+    "tampered incident bundle included masked hidden instructions",
+    "malicious support-bundle metadata carried inline system prompt",
+    "fabricated debug bundle used embedded prompt dump",
+    "the diagnostic pack was spoofed with hidden",
+    "forged ticket artifacts inserted disguised system prompt"
+  ],
+  "regex": [
+    "(?is)^(?=.*\\b(?:support[-\\s]*bundle|debug[-\\s]*bundle|diagnostic\\s*pack|ticket\\s*(?:attachment|artifact(?:s)?)|incident[-\\s]*bundle)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|malicious)\\b)(?=.*\\b(?:hidden|embedded|inline|disguised|masked)\\b)(?=.*\\b(?:system\\s*prompt|developer\\s*prompt|internal\\s*instruction(?:s)?|hidden\\s*instruction(?:s)?|prompt\\s*dump)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:s|d|ing)?|overrode|disable(?:s|d|ing)?|ignore(?:s|d|ing)?)\\b).{0,1200}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PX-567"
+}

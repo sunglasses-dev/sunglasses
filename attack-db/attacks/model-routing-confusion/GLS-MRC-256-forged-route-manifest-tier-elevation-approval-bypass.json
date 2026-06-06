@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-256",
+  "name": "Forged Route Manifest Tier Elevation Approval Bypass",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged router profile or dispatch plan whose tier escalation or upgrade claim is used to bypass routing approval gates or guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:router\\s*profile|route\\s*manifest|model\\s*card|routing\\s*policy|dispatch\\s*plan)\\b)(?=.*\\b(?:tier\\s*escalation|tier\\s*override|upgrade\\s*to\\s*premium|route\\s*to\\s*highest\\s*tier|elevate\\s*model\\s*tier)\\b)(?=.*\\b(?:bypass\\s*approval\\s*gate|skip\\s*routing\\s*approval|ignore\\s*routing\\s*policy|override\\s*route\\s*guardrails?|force\\s*unauthorized\\s*routing)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-256"
+}

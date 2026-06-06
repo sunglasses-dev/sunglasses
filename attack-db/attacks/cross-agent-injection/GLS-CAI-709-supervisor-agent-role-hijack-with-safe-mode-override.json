@@ -1,0 +1,39 @@
+{
+  "id": "GLS-CAI-709",
+  "name": "Supervisor-agent role hijack with safe-mode override",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Supervisor-agent role hijack \u2014 attacker claims to BE the supervisor/orchestrator agent and issues a safe-mode override directive for the current thread, attempting to elevate privilege via false role assertion.",
+  "keywords": [
+    "pretending to be the supervisor agent",
+    "pretending to be the supervisor",
+    "pretending to be the orchestrator agent",
+    "pretending to be the orchestrator",
+    "pretending to be the boss agent",
+    "pretending to be the planner agent",
+    "pretending to be the coordinator agent",
+    "override safe-mode for this thread",
+    "override safe mode for this thread",
+    "override safemode for this thread",
+    "disable safe-mode for this thread"
+  ],
+  "regex": [
+    "(?i)pretend(?:ing)?\\s+to\\s+be\\s+(?:the\\s+)?(?:supervisor|orchestrator|boss|planner|coordinator|controller|manager)\\s+agent\\b",
+    "(?i)override\\s+safe[\\-\\s]?mode\\s+(?:for\\s+this\\s+thread|temporarily|only\\s+for|just\\s+for)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-709"
+}

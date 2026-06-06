@@ -1,0 +1,40 @@
+{
+  "id": "GLS-MCP-011",
+  "name": "Negotiation-Text Constraint Downgrade",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "file"
+  ],
+  "description": "Attacker injects negotiation text that downgrades declared constraints, inverts safety flags, or shadows the trusted capability manifest, pushing the agent into weaker execution paths (legacy parsers, fallback handlers, broader scope) that bypass hardening checks.",
+  "keywords": [
+    "version-floor coercion downgrade",
+    "legacy parser fallback coercion",
+    "safety-flag inversion negotiation",
+    "safe_mode false injection",
+    "dry_run disabled coercion",
+    "fallback-handler capture",
+    "induced transient failure fallback",
+    "capability-map shadowing",
+    "shadow capability table injection",
+    "negotiation downgrade coercion",
+    "monotonic security violation",
+    "fake compatibility fallback hint"
+  ],
+  "regex": [
+    "(?i)(?:(?:downgrade|coerce|force|switch)\\s+(?:to\\s+)?(?:legacy|v1|older|weaker)\\s+(?:tool|schema|parser|mode|version)\\b|(?:safe_mode|dry_run|approval_required|strict_mode)\\s*=\\s*(?:false|off|disabled)|(?:shadow|fake|injected)\\s+(?:capability|tool)\\s+(?:map|table|manifest)\\s+(?:overrides?|shadows?|conflicts?\\s+with)\\s+(?:signed|trusted|static)\\s+manifest)",
+    "(?i)(?:fallback)\\s+(?:path|handler|branch)\\s+(?:has|uses|with)\\s+(?:looser|weaker|broader|reduced)\\s+(?:validation|policy|scope|guardrail)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MCP-011"
+}

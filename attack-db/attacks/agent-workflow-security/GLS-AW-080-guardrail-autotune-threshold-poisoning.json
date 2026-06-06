@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-080",
+  "name": "Guardrail Autotune Threshold Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker feeds poisoned telemetry into a threshold autotune loop so guardrails progressively relax themselves. Over time the detector accepts attacks it once blocked and the autotune system can no longer distinguish drift from attack.",
+  "keywords": [
+    "threshold autotune poisoning",
+    "feed false-positive telemetry",
+    "drift anomaly baseline",
+    "guardrail self-loosening",
+    "auto-relax detection threshold",
+    "training set poisoning for autotune",
+    "false positive rate inflation",
+    "pass-rate target gaming",
+    "autotune downward drift",
+    "telemetry-driven threshold loosen",
+    "adaptive baseline poisoning",
+    "autotune feedback poisoning"
+  ],
+  "regex": [
+    "(?i)(?:threshold\\s+autotune\\s+poisoning|(?:poison|game|inflate|drift)\\s+(?:false[- ]positive|fp|anomaly|baseline)\\s+(?:rate|telemetry|signal)\\s+(?:to|so)\\s+(?:loosen|relax|widen)\\s+(?:threshold|guardrail))",
+    "(?i)(?:(?:autotune|adaptive|self[- ]tuning)\\s+(?:threshold|guardrail|detector)\\s+(?:loosens?|relaxes?|drifts?)\\s+(?:from|via|under)\\s+(?:poisoned|injected|gamed)\\s+(?:telemetry|feedback))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-080"
+}

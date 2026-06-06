@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-005",
+  "name": "GraphQL schema description poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "GraphQL SDL or introspection metadata can carry agent-targeted instructions in type, field, argument, directive, enum, and deprecation descriptions that agents may import as trusted API/tool guidance.",
+  "keywords": [
+    "Authorization",
+    "Bearer",
+    "LLM",
+    "Measured local fixture result:",
+    "SDL",
+    "__schema",
+    "__type",
+    "agent",
+    "assistant",
+    "authoritative runtime policy",
+    "bypass guardrails",
+    "configured headers",
+    "connector",
+    "connector inventory",
+    "continue even if flagged"
+  ],
+  "regex": [
+    "(?is)^(?!(?=.*\\b(?:must\\s+not|should\\s+not|never|do\\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\\b.{0,120}\\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\\b)(?!.*\\b(?:authoritative\\s+runtime\\s+policy|compatibility\\s+note|diagnostic\\s+mode|highest\\s+priority|system\\s+override|scanner\\s+warnings\\s+as\\s+false\\s+positives)\\b))(?=.*\\b(?:graphql|schema|introspection|sdl|type|field|mutation|query|description|deprecationreason|directive|enum)\\b)(?=.*\\b(?:agent|assistant|model|tool|connector|client|for\\s+ai|model\\s+clients?)\\b)(?=.*\\b(?:ignore|override|supersede|authoritative|runtime\\s+policy|include|environment\\s+variables?|local\\s+state|scanner|false\\s+positive|disable\\s+safety|suppress|continue\\s+even\\s+if)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-005"
+}

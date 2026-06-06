@@ -1,0 +1,24 @@
+{
+  "id": "GLS-RP-263",
+  "name": "Forged Citation Attestation Execution Gate Override",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a retrieved context or citation with a forged attestation or source digest used to suppress or override execution gate or policy guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieved\\s+context|source|citation|evidence|document)\\b)(?=.*\\b(?:forged|spoofed|tampered|fabricated|seeded)\\b)(?=.*\\b(?:attestation|provenance|trust\\s+badge|source\\s+digest|citation\\s+rank)\\b)(?=.*\\b(?:override|overrides|overriding|overrode|bypass(?:ed|ing)?|ignore(?:d|s)?|suppress(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|execution\\s+gate)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-RP-263"
+}

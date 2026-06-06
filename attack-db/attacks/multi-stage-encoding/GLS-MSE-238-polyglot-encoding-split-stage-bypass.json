@@ -1,0 +1,41 @@
+{
+  "id": "GLS-MSE-238",
+  "name": "Polyglot Encoding Split-Stage Bypass",
+  "version": "1.0",
+  "category": "multi_stage_encoding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker splits an injection across URL-encoding, base64, homoglyphs, or polyglot JSON/markdown envelopes so each transform looks benign to the first policy gate. A late decode step in a helper tool reconstitutes the imperative directive after policy evaluation, executing intent the scanner never saw.",
+  "keywords": [
+    "multi stage encoding camouflage",
+    "layered decode ladder",
+    "polyglot markdown json envelope",
+    "homoglyph percent mix command reconstruction",
+    "archive comment detonation",
+    "url encoded chunks reassembled after normalize",
+    "base64 inside json telemetry field",
+    "unicode confusables plus percent encoding",
+    "decode increases imperative token density",
+    "instruction hash drift after canonicalization",
+    "post decode policy parity bypass",
+    "compressed blob comment injects directive"
+  ],
+  "regex": [
+    "(?i)(?:(?:multi[- ]stage|layered|chained)\\s+(?:encoding|decode|transform)\\s+(?:camouflage|ladder|bypass)|(?:url[- ]encoded|base64|percent[- ]encoded)\\s+(?:chunks?|fragments?)\\s+(?:reassembled|reconstituted|decoded)\\s+(?:after|post)\\s+(?:normalize|canonicalize|policy))",
+    "(?i)(?:homoglyph|unicode\\s+confusable)\\s+(?:swap|mix|substitution).{0,80}?(?:percent|url|hex)[- ]?encod(?:ing|ed)\\s+(?:reconstruct|combine|reassemble)\\s+(?:forbidden|imperative|command)\\s+(?:verb|token|capability)",
+    "(?i)(?:decode|canonicalization|normalization)\\s+(?:increases?|raises?|introduces?)\\s+imperative[- ](?:token\\s+)?density|instruction\\s+hash\\s+drift\\s+(?:post|after)\\s+decode"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MSE-238"
+}

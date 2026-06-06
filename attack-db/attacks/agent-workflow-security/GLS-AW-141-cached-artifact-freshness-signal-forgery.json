@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-141",
+  "name": "Cached Artifact Freshness Signal Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker forges freshness signals on cached artifacts (overprinted timestamps, fake last-pull metadata, suppressed stale badges) so the agent treats stale snapshots as authoritative current state while passing superficial health checks.",
+  "keywords": [
+    "stale cache freshness forgery",
+    "timestamp overprint injection",
+    "fallback branch coercion",
+    "etag version shadow mismatch",
+    "staleness indicator suppression",
+    "generated_at rewritten to current",
+    "api unstable use cached snapshot",
+    "amber stale warning stripped",
+    "user controlled version trusts over hash",
+    "signed manifest absent silent stale",
+    "cache age tamper",
+    "freshness label decoupled from content hash"
+  ],
+  "regex": [
+    "(?i)(?:(?:overprint|rewrite|forge|inject)\\s+(?:generated_at|updated_at|last_pull|timestamp)\\s+(?:in|on)\\s+(?:cache|cached|snapshot|checkpoint)|(?:API|source|upstream)\\s+(?:down|unstable|unreachable)\\s*(?:[,.;:-]|so)?\\s*(?:use|fall\\s*back\\s+to|trust)\\s+(?:cache|snapshot|last[- ]?known)|(?:strip|suppress|remove)\\s+(?:stale|amber|age|freshness)\\s+(?:warning|badge|indicator)\\s+(?:from|in)\\s+(?:report|UI|render))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-141"
+}

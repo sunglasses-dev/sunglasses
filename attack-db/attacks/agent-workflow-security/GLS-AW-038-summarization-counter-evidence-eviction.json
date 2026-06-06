@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-038",
+  "name": "Summarization Counter-Evidence Eviction",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits summarization, truncation, and context-window compaction stages to strip away contradiction-bearing details while preserving benign headline numbers, so downstream reasoning never sees the dissenting evidence that would have blocked the action.",
+  "keywords": [
+    "summarization strips contradiction",
+    "truncation hides counter-evidence",
+    "headline number survives compression",
+    "lossy summary preserves benign",
+    "context compaction attack",
+    "evidence pruned by summarizer",
+    "summarizer drops dissent",
+    "compression bias toward bland",
+    "key detail lost in roll-up",
+    "summary contradicts source",
+    "shrink window evict contradiction",
+    "rolling summary poisoning"
+  ],
+  "regex": [
+    "(?i)(?:(?:summarization|truncation|compression|compaction|roll[- ]up)\\s+(?:strips?|drops?|loses?|prunes?|evicts?|hides?)\\s+(?:contradiction|counter[- ]evidence|dissent|caveat|nuance)|(?:summary|summarizer)\\s+(?:preserves?|keeps?)\\s+(?:benign|headline)\\s+(?:number|signal)\\s+(?:but|while)\\s+(?:drops?|strips?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-038"
+}

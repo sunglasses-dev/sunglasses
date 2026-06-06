@@ -1,0 +1,33 @@
+{
+  "id": "GLS-SEM-UI-217",
+  "name": "Semantic UI urgency-driven action redirection",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content"
+  ],
+  "description": "Detects semantic UI-injection text that combines action verbs (click, install, approve) with urgency/mandatory language to coerce immediate unsafe agent actions.",
+  "keywords": [
+    "click approve immediately",
+    "open install urgent",
+    "download required mandatory",
+    "authorize now mandatory",
+    "install immediately required",
+    "approve urgent security update",
+    "open connector approve mandatory",
+    "authorize immediately required"
+  ],
+  "regex": [
+    "(?i)\\b(?:click|open|download|install|approve|authorize)\\b.{0,80}\\b(?:immediately|now|urgent|required|mandatory)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-217"
+}

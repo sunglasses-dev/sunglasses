@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TOP-633",
+  "name": "Tool Result Role Shadow Error Recovery Injection",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Attacker embeds forged tool-result blocks, role prefixes, recovery fallback commands, or spoofed teammate confirmations in free text so summarizers and downstream agents collapse provenance and treat untrusted prose as authoritative tool output. Inverts trust boundaries and triggers silent policy bypass.",
+  "keywords": [
+    "quoted tool-result spoof block",
+    "fake TOOL RESULT envelope",
+    "transcript role shadowing",
+    "forged assistant tool prefix",
+    "error-recovery override shadow",
+    "manual fallback command injection",
+    "cross-agent relay shadowing",
+    "spoofed teammate confirmation",
+    "free text promoted to tool channel",
+    "provenance drift user to tool",
+    "delegate attestation bypass",
+    "summarizer collapses provenance"
+  ],
+  "regex": [
+    "(?i)(?:(?:fake|forged|spoof(?:ed)?|quoted)\\s+(?:tool\\s+result|tool\\s+output|assistant|tool)\\s+(?:block|envelope|prefix|role)|(?:transcript|role)\\s+shadow(?:ing)?|(?:error[- ]recovery|manual\\s+fallback)\\s+(?:override|command)\\s+(?:shadow|injection)|(?:cross[- ]agent|delegate(?:d)?)\\s+(?:relay|teammate)\\s+(?:shadow|spoof|confirmation)|provenance\\s+(?:drift|collapse)\\s+(?:user|retrieval)\\s*(?:->|to)\\s*tool)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TOP-633"
+}

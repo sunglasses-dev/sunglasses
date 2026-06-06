@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MRC-492",
+  "name": "Forged Latency Health Signal Router Override",
+  "version": "1.0",
+  "category": "model_routing_confusion",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a forged latency or health telemetry signal submitted to a router or traffic manager to override, reroute, or promote model tier beyond policy guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MRC-492"
+}

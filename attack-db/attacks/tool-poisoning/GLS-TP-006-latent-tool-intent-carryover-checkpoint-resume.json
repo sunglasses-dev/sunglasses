@@ -1,0 +1,41 @@
+{
+  "id": "GLS-TP-006",
+  "name": "Latent Tool Intent Carryover Checkpoint Resume",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker plants deferred or pending tool intents in low-trust content, retries, sub-agent handoffs, or session checkpoints so stale plans silently re-execute after the policy, toolset, or trust assumptions have changed, bypassing explicit re-authorization.",
+  "keywords": [
+    "latent tool intent carryover",
+    "deferred execution bait",
+    "retry path inheritance",
+    "task handoff carryover",
+    "checkpoint resurrection",
+    "stale planner memory reuse",
+    "cross step authority drift",
+    "pending action survives policy change",
+    "subagent partial plan smuggling",
+    "old intent under new trust",
+    "session resume pending intent",
+    "policy hash mismatch on execution"
+  ],
+  "regex": [
+    "(?i)(?:(?:latent|deferred|stale|pending)\\s+(?:tool\\s+)?intent\\s+(?:carryover|reuse|survives?|persists?|executes?)|cross[- ]step\\s+(?:authority|trust|policy)\\s+drift)",
+    "(?i)(?:retry\\s+(?:reuses?|inherits?)\\s+(?:cached|stale|prior)\\s+(?:plan|tool|args)|checkpoint\\s+(?:resurrection|resume)\\s+(?:restores?|fires?)\\s+(?:pending|old)\\s+(?:intent|action))",
+    "(?i)(?:subagent\\s+(?:output|report|text)\\s+(?:interpreted|treated)\\s+as\\s+(?:executable|pending)\\s+(?:intent|action|directive))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-006"
+}

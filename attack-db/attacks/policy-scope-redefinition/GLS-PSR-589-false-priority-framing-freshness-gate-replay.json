@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-589",
+  "name": "False Priority Framing Freshness Gate Replay",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attack content coerces a one-task-per-cycle scheduler into priority inversion by framing repeated low-value checks as urgent blockers or by mimicking canonical-board authority, causing the agent to burn cycles re-auditing already-green missions instead of advancing real work.",
+  "keywords": [
+    "false p0 escalation framing",
+    "regenerate freshness gate every cycle",
+    "pseudo-authority board override",
+    "decisions style snippet injection",
+    "one-task rule weaponization",
+    "forced template repetition",
+    "collision laundering reopen done",
+    "priority stack hijack",
+    "audit already-green missions",
+    "burn cycles without new readiness",
+    "no owner collision claim",
+    "in_progress contradicted by inject"
+  ],
+  "regex": [
+    "(?i)(?:(?:false|fake|fabricated)\\s+(?:p0|priority|escalation)\\s+(?:framing|tag|claim)|(?:regenerate|rerun|repeat)\\s+(?:freshness\\s+gate|same\\s+(?:gate|artifact))\\s+(?:every|each)\\s+cycle|(?:pseudo[- ]?authority|spoofed\\s+(?:decisions|board))\\s+(?:override|snippet|tone)\\s+(?:contradicts?|outranks?)\\s+(?:canonical|in_progress))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-589"
+}

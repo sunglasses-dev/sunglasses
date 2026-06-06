@@ -1,0 +1,40 @@
+{
+  "id": "GLS-PCF-246",
+  "name": "Source-Precedence Trust Tier Inversion",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "api_response"
+  ],
+  "description": "Attacker manipulates source-precedence so a lower-trust metric source is treated as canonical while the intended source-of-truth is demoted, via lane inversion, freshness inversion, or fallback-field elevation. Result: strategic decisions silently flip (Ops telemetry justifies Growth claims, stale inputs produce false READY verdicts).",
+  "keywords": [
+    "anchor source inversion",
+    "lane inversion prompt",
+    "freshness inversion",
+    "priority inversion via alias",
+    "fallback inversion attack",
+    "lower trust source as canonical",
+    "ops telemetry as growth proof",
+    "stale postrun overrides input gate",
+    "case alias canonical bypass",
+    "fallback fields elevated over primary",
+    "source of truth downgrade",
+    "weaker evidence laundered as primary"
+  ],
+  "regex": [
+    "(?i)(?:(?:invert|swap|downgrade|demote)\\s+(?:source[- ]of[- ]truth|canonical\\s+source|primary\\s+(?:source|metric))|(?:lower[- ]trust|weaker|secondary|fallback)\\s+(?:metric\\s+)?source\\s+(?:treated\\s+as|presented\\s+as|elevated\\s+to)\\s+(?:canonical|primary|source[- ]of[- ]truth)|(?:fallback|alias|partial)\\s+(?:fields?|keys?|array)\\s+(?:chosen|selected|preferred)\\s+(?:over|before)\\s+(?:primary|canonical|documented)\\s+(?:keys?|fields?))",
+    "(?i)(?:freshness|stale)\\s+inversion\\b|(?:stale|wrong[- ]day)\\s+input\\s+(?:with\\s+)?(?:recent|fresh)[- ]looking\\s+(?:postrun|report|summary)\\s+(?:causes?|yields?|produces?)\\s+(?:false\\s+)?ready"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PCF-246"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "GLS-SEM-UI-238",
+  "name": "Bracketed approval-banner forgery",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "web_content",
+    "file",
+    "tool_output"
+  ],
+  "description": "Detects forged UI approval banners of the form '[\u2713 APPROVED BY USER] proceed ...' \u2014 a fake chip/badge attack used to convince agents that user consent was already given. Requires co-occurrence of bracketed checkmark-approval banner AND a proceed-action imperative; narrow enough to safely carry negation_immune so wrappers like 'Calendar note:' or 'Forwarded mail:' don't downgrade it.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\[\\s*[\u2713\u2714\u2705vV]\\s*approved\\s+by\\s+(?:the\\s+)?user\\s*\\].{0,80}\\b(?:proceed|continue|execute|run|do|action)\\b",
+    "(?i)[\u2713\u2714\u2705]\\s*approved\\s+by\\s+(?:the\\s+)?user\\b.{0,80}\\bproceed\\s+(?:with|without)\\b",
+    "(?i)\\[\\s*approved\\s+by\\s+(?:the\\s+)?user\\s*\\].{0,40}\\bproceed\\s+(?:with|without)\\s+(?:destructive|further|additional|the)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SEM-UI-238"
+}

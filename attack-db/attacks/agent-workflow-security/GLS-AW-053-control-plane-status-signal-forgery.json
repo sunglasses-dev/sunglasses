@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-053",
+  "name": "Control-Plane Status Signal Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "tool_output",
+    "api_response",
+    "log_memory"
+  ],
+  "description": "Attacker forges control-plane status messages ('healthy', 'verified', 'ready', 'green') so agent workflows trust the gate signal and advance into unsafe state without the underlying check ever passing.",
+  "keywords": [
+    "forged healthy status",
+    "fake verified badge",
+    "spoofed ready signal",
+    "green status injection",
+    "control plane health lie",
+    "gate signal forgery",
+    "status channel poisoning",
+    "fabricated ok response",
+    "trust gate auto-green",
+    "monitor returns fake healthy",
+    "ready status without verification",
+    "verified label without check"
+  ],
+  "regex": [
+    "(?i)(?:(?:forge|spoof|fake|fabricate|inject)\\s+(?:control[- ]plane\\s+)?(?:status|health|ready|verified|green|healthy)\\s+(?:message|signal|badge|response|flag)|(?:status|gate|control[- ]plane)\\s+(?:forgery|spoofing|poisoning))",
+    "(?i)(?:(?:healthy|verified|ready|green|ok)\\s+(?:status|badge|label)\\s+(?:without|absent|skipping)\\s+(?:underlying|actual|real)\\s+(?:check|verification|probe))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-053"
+}

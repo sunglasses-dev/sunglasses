@@ -1,0 +1,38 @@
+{
+  "id": "GLS-PSR-588",
+  "name": "Precedence Ladder Inversion Lower Trust Override",
+  "version": "1.0",
+  "category": "policy_scope_redefinition",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "log_memory"
+  ],
+  "description": "Attackers inject conflicting directives at lower-trust layers of the precedence ladder (templates, fallback schemas, runtime notes) so they silently override canonical mission constraints, causing duplicate outputs, metric laundering, or suppressed pivots.",
+  "keywords": [
+    "template over mission inversion",
+    "freshness over authority inversion",
+    "fallback over primary inversion",
+    "status note override loop",
+    "non-canonical layer outranks canonical",
+    "metric laundering via fallback key",
+    "duplicate output suppression bypass",
+    "precedence ladder collision",
+    "schema fallback authoritative",
+    "lower-trust layer wins",
+    "inherited text authority",
+    "kpi snapshot fallback elevated"
+  ],
+  "regex": [
+    "(?i)(?:(?:template|fallback|cached|status|runtime[- ]?note)\\s+(?:outranks?|overrides?|wins?\\s+over|supersedes?)\\s+(?:mission|canonical|primary|policy)|(?:precedence|authority)\\s+ladder\\s+(?:collision|inversion|hijack)|(?:lower[- ]?trust|secondary)\\s+layer\\s+(?:silently\\s+)?(?:overrides?|wins?|supersedes?)\\s+(?:canonical|primary|higher[- ]trust))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PSR-588"
+}

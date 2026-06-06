@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TS-257",
+  "name": "Hidden YAML Policy Profile Override",
+  "version": "1.0",
+  "category": "token_smuggling",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which hidden YAML front matter, metadata, or comment blocks are used to embed a policy, safety profile, or guardrail override or bypass directive.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:hidden|front\\s*matter|frontmatter|yaml|meta(?:data)?|comment(?:\\s*block)?|system\\s*note|annotation)\\b)(?=.*\\b(?:policy|safety|guardrail(?:s)?|profile|rule(?:s)?|instruction(?:s)?)\\b)(?=.*\\b(?:override|overrides|overriding|bypass|bypassed|ignore|ignored|waive|waived|disable|disabled|skip|skipped)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TS-257"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "GLS-AW-130",
+  "name": "Date Boundary READY Label Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits date-boundary logic to force READY labels on the wrong operational window, slipping a previous-day bundle past freshness-only checks via filename-date trust, timezone relabeling, or preflight/postrun verdict collapse.",
+  "keywords": [
+    "target date gate spoofing",
+    "fresh but wrong day substitution",
+    "timezone boundary laundering",
+    "filename date trust override",
+    "dual verdict narrative split",
+    "ready input wrong day",
+    "utc pt boundary flip",
+    "freshness gate without target date gate",
+    "cycle date misalignment",
+    "rename replay under new filename",
+    "preflight postrun divergence collapse",
+    "bundle age alone false ready"
+  ],
+  "regex": [
+    "(?i)(?:(?:fresh|recent|<\\s*24h)\\s+(?:bundle|file|input)\\s+(?:but|with)\\s+(?:wrong|prior|misaligned)\\s+(?:day|date|cycle)|(?:filename|name|label)\\s+(?:date|timestamp)\\s+(?:trust|override|wins?)\\s+(?:over|above|despite)\\s+(?:embedded|internal|content)\\s+(?:timestamp|date|mtime)|(?:UTC|PT|timezone)\\s+(?:boundary|flip|relabel\\w*)\\s+(?:laundering|spoof|trick))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-130"
+}

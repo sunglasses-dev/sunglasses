@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-682",
+  "name": "Support Bundle Swap System Prompt Bypass",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects an agent or copilot receiving a swapped or poisoned support bundle or incident artifact that overwrites system prompts or bypasses policy approval gates.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:support(?:\\s|-)?bundle|ticket(?:\\s|-)?attachment|incident(?:\\s|-)?artifact|retrieval(?:\\s|-)?cache)\\b)(?=.*\\b(?:swap|swapped|replace|replaced|overwrite|overwrote|overrode|inject|injected|poison(?:ed|ing)?)\\b)(?=.*\\b(?:system\\s+prompt|guardrail(?:s)?|policy(?:\\s|-)?check(?:s)?|approval(?:\\s|-)?gate(?:s)?)\\b)(?=.*\\b(?:bypass|bypasses|ignore|ignores|disable|disables|skip|skips)\\b).{0,900}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-682"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "GLS-MER-235",
+  "name": "Memory eviction + rehydration chain",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Detects two-stage memory attacks that first instruct the agent to evict prior context (forget, erase, purge memory or instructions) and then rehydrate or reseed state from attacker-controlled payload, blob, or tool output.",
+  "keywords": [
+    "forget previous instructions then rehydrate from payload",
+    "purge context reload from encoded notes",
+    "erase history restore from tool output",
+    "discard prior reconstruct from blob",
+    "drop memory reseed from metadata"
+  ],
+  "regex": [
+    "(?is)(?=.*\\b(?:forget|erase|drop|purge|clear|discard|wipe)\\b.{0,120}\\b(?:memory|context|history|previous\\s+instructions?|prior\\s+instructions?)\\b)(?=.*\\b(?:reload|rehydrate|restore|reseed|reconstruct)\\b.{0,120}\\b(?:from|using)\\b.{0,120}\\b(?:payload|blob|encoded|notes?|tool\\s+output|metadata)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-MER-235"
+}

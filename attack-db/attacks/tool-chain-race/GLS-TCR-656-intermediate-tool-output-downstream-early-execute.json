@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TCR-656",
+  "name": "Intermediate Tool Output Downstream Early Execute",
+  "version": "1.0",
+  "category": "tool_chain_race",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects a partial or intermediate tool result piped to a downstream executor before full verification is complete, overriding or bypassing policy and guardrails.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:bypass|skip|ignore|override|waive)\\b)(?=.*\\b(?:intermediate|partial|preliminary|incomplete)\\s+(?:tool\\s+)?(?:output|result|response)\\b)(?=.*\\b(?:next|downstream|follow[- ]?up|subsequent)\\s+(?:tool|step|executor)\\b)(?=.*\\b(?:run|call|invoke|execute|trigger|chain|forward|pipe|feed)\\b)(?=.*\\b(?:before|prior\\s+to|without\\s+waiting\\s+for|skip(?:ping)?|bypass(?:ing)?|waive)\\b.{0,80}\\b(?:final|full|complete)\\s+(?:verification|validation|check|review)\\b)(?=.*\\b(?:ignore|overrid(?:e|es|ed|ing)|bypass|waive|relax)\\b.{0,80}\\b(?:policy|guardrail|safety|approval)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TCR-656"
+}

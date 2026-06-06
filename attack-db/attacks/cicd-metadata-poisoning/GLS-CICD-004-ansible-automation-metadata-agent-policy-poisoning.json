@@ -1,0 +1,34 @@
+{
+  "id": "GLS-CICD-004",
+  "name": "Ansible Automation Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker can hide agent-targeting instructions in Ansible automation metadata \u2014 playbook names/descriptions, role metadata, inventory comments, `group_vars`, `ansible.cfg`, or Galaxy collection descriptors \u2014 to convince AI deployment/security agents that the automation file is authoritative polic",
+  "keywords": [
+    "agent instruction",
+    "ansible.cfg",
+    "argument_specs",
+    "group_vars",
+    "host_vars",
+    "main operating guidance",
+    "no policy overrides",
+    "not authoritative",
+    "scanner instructions"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n    (?:security|scanner|training|runbook|guide|reference|incident|vulnerability|postmortem)\\s+(?:docs?|report|example|exercise|guidance|reference)?.{0,180}?(?:should|must|was|were)?\\s*(?:report|detect|flag|refuse|block|blocked|detected|flagged|reported)\n  | scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n  | (?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:treat|obey|follow|include|attach|forward|send|share|override|trust|use)\n  | not\\s+(?:authoritative|canonical|definitive)\n  | no\\s+(?:policy\\s+)?overrides?\n  | (?:playbook|role|inventory|ansible\\s+metadata|ansible\\s+playbooks?)\\s+(?:is|are)\\s+not\\s+(?:agent\\s+)?policy\n)\\b)\n(?=.*(?:\n    \\bansible(?:\\.cfg|[-\\s]+playbooks?|[-\\s]+roles?|[-\\s]+inventory|[-\\s]+galaxy|[-\\s]+collection|[-\\s]+metadata)\\b\n  | (?<![a-zA-Z0-9])(?:galaxy_info|argument_specs?|module_defaults|collections|roles|hosts|tasks|vars|group_vars|host_vars|inventory_hostname|inventory[-_\\s]+host[-_\\s]+vars?|ansible_managed)(?![a-zA-Z0-9])\n  | (?:^|\\n)\\s*(?:-\\s*)?(?:name|description|comment|vars|hosts|tasks|roles|collections|module_defaults)\\s*:\n  | (?:^|\\n)\\s*\\[(?:defaults|inventory|privilege_escalation|ssh_connection)\\]\n))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|scanners?|autonomous[-_\\s]?scanners?|security[-_\\s]?scanners?|dependency[-_\\s]?reviewers?|deployment[-_\\s]?agents?|ansible[-_\\s]?auditors?|automation[-_\\s]?review|automation[-_\\s]?scanners?)(?![a-zA-Z0-9]))\n(?=.*(?:\n    \\b(?:governing|controlling|canonical|definitive|authoritative)\\b.{0,80}?(?:document|policy|playbook|guidance|source|description|metadata|rules?)\n  | (?:primary|single)\\s+source\\s+of\\s+truth\n  | (?:takes\\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?)\n  | defines?\\s+(?:(?:all|the)\\s+)?(?:scanner|security|agent|automation|deployment|review)?\\s*rules?\n  | (?:main|primary|principal|preferred)\\s+(?:(?:operating\\s+)?(?:review|automation|deployment|scanner|audit)\\s+)?(?:operating\\s+)?(?:guidance|playbook|runbook)(?:\\s+for\\s+(?:automation|deployment|scanner|audit|security)\\s+review)?\n  | (?:agent|scanner|assistant|auditor|automation)\\s+(?:instructions?|directive|policy):\n))\n(?=.*(?:\n    (?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|diagnostics?|observations?|results?|vulnerabilities?|failures?)\n  | (?:treat|mark|classify|downgrade|move|route|shift).{0,70}?(?:informational|non[-\\s]?blocking|safe|clean|benign|background(?:[-\\s]?only)?|appendix[-\\s]?only|advisory[-\\s]?only|background\\s+notes?)\n  | (?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|diagnostics?|observations?|results?|vulnerabilities?|failures?)\n  | (?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilities?|failures?).{0,45}?out\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|deployment\\s+memo|final\\s+report)\n  | (?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s*keys?|tokens?|session\\s+keys?|auth(?:orization)?\\s+headers?|credentials?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|material|artifacts?|proof)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CICD-004"
+}

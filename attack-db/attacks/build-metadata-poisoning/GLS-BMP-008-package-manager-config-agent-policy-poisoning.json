@@ -1,0 +1,40 @@
+{
+  "id": "GLS-BMP-008",
+  "name": "Package-manager config agent-policy poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Package-manager configuration comments or extension fields can target dependency-review agents with fake policy authority, asking them to suppress audit findings or forward registry tokens/environment state.",
+  "keywords": [
+    ".cargo/config.toml",
+    ".npmrc",
+    ".pypirc",
+    ".yarnrc",
+    ".yarnrc.yml",
+    "AI agent(s)",
+    "LLM(s)",
+    "_authToken",
+    "agent instruction",
+    "agent_instructions",
+    "always-auth",
+    "assistant(s)",
+    "audit bot(s)",
+    "authoritative",
+    "canonical repository dependency policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat|use)|\n  does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|\n  never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat|use)|\n  must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat|use)\n)\\b)\n(?!.*\\b(?:scanner|security|training|runbook|guide|reference|incident|vulnerability)\\s+(?:docs?|report|example|exercise|guidance)?\\b.{0,120}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\b(?:no\\s+agent\\s+policy|not\\s+agent\\s+policy|not\\s+authoritative|not\\s+policy|no\\s+policy\\s+overrides?)\\b)\n(?=.*(?:\n  (?:^|[\\s/`\"'])\\.(?:npmrc|yarnrc(?:\\.yml)?|pypirc)(?![a-z0-9_-])|\n  (?:^|[\\s/`\"'])pip\\.conf(?![a-z0-9_-])|\n  (?:^|[\\s/`\"'])\\.cargo/config(?:\\.toml)?(?![a-z0-9_-])|\n  cargo\\s+config|\n  npmrc|yarnrc|pypirc|pip\\s+config|\n  _authToken|npmAuthToken|always-auth|index-url|extra-index-url|registries\\.|registry\\s*=|token\\s*=|auth-token\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai\\s+)?agents?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])assistants?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:dependency|security|package|npm|pip|cargo)\\s+scanners?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])(?:review|audit|dependency)\\s+bots?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])llms?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])agent[_-]instructions?(?![a-zA-Z0-9])|\n  (?<![a-zA-Z0-9])scanner[_-]policy(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+instructions?|\n  canonical\\s+(?:(?:repository|dependency|package)\\s+){0,2}(?:policy|configuration|instructions?)|\n  definitive\\s+(?:(?:repository|dependency|package)\\s+){0,2}(?:policy|configuration|instructions?)|\n  (?:primary|single)\\s+source\\s+of\\s+truth|\n  higher[-\\s]?priority|highest[-\\s]?priority|authoritative|governing\\s+(?:policy|document)|\n  overrides?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|must\\s+obey\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|audit\\s+results?)|\n  hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|audit\\s+results?)|\n  omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|advisories|audit\\s+results?)|\n  (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|vulnerabilit(?:y|ies)|advisories|audit\\s+results?)|\n  (?:treat|mark|classify|downgrade).{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|low\\s+risk)|\n  (?:include|forward|send|attach|copy|read|collect|provide|populate)\\s+(?:[\\w-]+\\s+){0,4}(?:environment\\s+(?:variables?|context)|env(?:ironment)?|npm\\s+tokens?|pypi\\s+tokens?|cargo\\s+tokens?|registry\\s+tokens?|auth(?:entication)?\\s+tokens?|api\\s+keys?|authorization\\s+headers?|bearer\\s+tokens?|cookies?|session\\s+(?:headers?|tokens?|state)|local\\s+(?:state|context))\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-008"
+}

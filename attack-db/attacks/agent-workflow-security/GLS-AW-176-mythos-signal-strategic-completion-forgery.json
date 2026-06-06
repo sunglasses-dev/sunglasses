@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-176",
+  "name": "Mythos Signal Strategic Completion Forgery",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker spoofs Mythos-themed signals (companion artifacts, strategic memos, wave capture markers) so the canonical company board appears to credit fake brand or strategic completion events, steering downstream prioritization.",
+  "keywords": [
+    "mythos signal spoof",
+    "fake mythos memo done",
+    "spoofed wave capture artifact",
+    "company timeline mythos forgery",
+    "false companion artifact published",
+    "mythos narrative injection",
+    "strategic memo done spoof",
+    "wave capture forged",
+    "mythos brand signal poison",
+    "fabricated mythos completion",
+    "spoofed companion detection pattern",
+    "mythos strategic claim forged"
+  ],
+  "regex": [
+    "(?i)(?:mythos\\s+(?:signal|memo|narrative|wave)\\s+(?:spoof|forge|inject|fake)|(?:fake|forged|spoof)\\s+(?:mythos|companion|wave[- ]capture)\\s+(?:artifact|memo|signal|status))",
+    "(?i)(?:company[_\\s-]?timeline\\s+(?:mythos|strategic\\s+memo)\\s+(?:done|complete)\\s+(?:spoof|forge|fake)|mythos\\s+(?:strategic|brand)\\s+(?:signal|claim)\\s+(?:poison|forg))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-176"
+}

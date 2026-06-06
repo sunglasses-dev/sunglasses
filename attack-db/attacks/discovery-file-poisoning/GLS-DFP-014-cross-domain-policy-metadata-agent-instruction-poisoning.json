@@ -1,0 +1,38 @@
+{
+  "id": "GLS-DFP-014",
+  "name": "Cross-domain policy metadata agent-instruction poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Legacy site policy files such as `crossdomain.xml` or `clientaccesspolicy.xml` can carry XML comments or extension nodes that tell agents/scanners to suppress findings, override higher-priority policy, or forward credentials while appearing to be ordinary site-discovery metadata.",
+  "keywords": [
+    "<access-policy>",
+    "<cross-domain-policy>",
+    "api key",
+    "auth header",
+    "clientaccesspolicy.xml",
+    "cookie",
+    "credential",
+    "crossdomain.xml",
+    "do not report",
+    "mark safe",
+    "outranks scanner defaults",
+    "suppress",
+    "token"
+  ],
+  "regex": [
+    "(?is)(?=.*(?:crossdomain\\.xml|clientaccesspolicy\\.xml|<\\s*cross-domain-policy\\b|<\\s*access-policy\\b))(?=.*\\b(?:agent|assistant|scanner|auditor|crawler|llm)\\b)(?=.*\\b(?:ignore|override|outrank|suppress|do\\s+not\\s+report|mark\\s+(?:as\\s+)?(?:safe|trusted)|treat\\s+as\\s+approved)\\b)(?=.*\\b(?:finding|report|policy|credential|secret|token|cookie|api[-_\\s]?key|auth(?:orization)?\\s+header)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-DFP-014"
+}

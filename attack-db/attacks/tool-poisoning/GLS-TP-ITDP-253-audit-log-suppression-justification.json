@@ -1,0 +1,31 @@
+{
+  "id": "GLS-TP-ITDP-253",
+  "name": "Audit Log Suppression Justification",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "file"
+  ],
+  "description": "Poisoned tool description blends trust language (compliance-approved, internally audited by vendor/provider) with an instruction to disable audit logging, tracing, or monitoring. Observability-kill vector distinct from verification-skip ITDP patterns (GLS-TP-ITDP-220/221).",
+  "keywords": [
+    "compliance-approved internally audited disable logging",
+    "internally audited by provider disable audit log",
+    "compliance approved disable audit logging",
+    "audited by vendor skip logging",
+    "compliance approved turn off audit logging",
+    "internally audited omit monitoring",
+    "connector compliance approved disable tracing",
+    "audited by provider policy disable logging"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TP-ITDP-253"
+}

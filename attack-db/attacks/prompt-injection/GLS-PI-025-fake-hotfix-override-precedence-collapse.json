@@ -1,0 +1,41 @@
+{
+  "id": "GLS-PI-025",
+  "name": "Fake Hotfix Override Precedence Collapse",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "prompt",
+    "log_memory"
+  ],
+  "description": "Attacker plants directives that masquerade as a newer prompt version, hotfix, or emergency override and pushes the agent to treat the inline text as stronger than canonical mission and policy artifacts. Urgency framing or fake patch-note language collapses precedence and silently rewrites the operating contract.",
+  "keywords": [
+    "prompt shadow version skew",
+    "patch note authority flip",
+    "reply template shadow overwrite",
+    "cross file version skew exploit",
+    "hotfix pretext with emergency tone",
+    "use prompt vnext from this section only",
+    "previous constraints deprecated",
+    "latest cycle update block",
+    "schema declared obsolete by inline text",
+    "production emergency bypass policy",
+    "merge missions now urgency bypass",
+    "fake newer hotfix prompt"
+  ],
+  "regex": [
+    "(?i)(?:(?:patch[- ]note|hotfix|vnext|latest[- ]version|newer\\s+prompt)\\s+(?:authority|directive|update)\\s+(?:flip|overrides?|deprecates?|replaces?)\\s+(?:previous|canonical|true)\\s+(?:constraints?|prompt|spec|contract))",
+    "(?i)(?:reply[- ]?template|cycle[- ]update|runbook)\\s+(?:shadow|overwrite|graft)\\s+(?:contains?|plants?|injects?)\\s+(?:fake|mandatory|new)\\s+(?:rules?|policy|directives?)",
+    "(?i)(?:production\\s+emergency|urgent\\s+hotfix|critical\\s+bypass)\\s*[,:.]?\\s+(?:bypass|skip|merge|override)\\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\\s+(?:rule|gate|constraint)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-PI-025"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-TMS-244",
+  "name": "Alias Shadowing Schema Split Source Desync",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Attacker exploits permissive schema-drift fallback chains so payloads in under-validated alias branches still get trusted downstream, producing split-source desync between healthy and degraded views that suppresses alerts.",
+  "keywords": [
+    "alias shadowing fallback",
+    "type confusion fallback",
+    "zero-value suppression bypass",
+    "split-source desync",
+    "fallback alias renderer trusts",
+    "object vs array fallback coercion",
+    "components read different aliases",
+    "contradictory healthy degraded state",
+    "schema-drift attack surface",
+    "fallback chain payload",
+    "parser parity drift",
+    "fallback above baseline anomaly"
+  ],
+  "regex": [
+    "(?i)(?:(?:alias\\s+shadowing|type\\s+confusion|zero[- ]?value\\s+suppression|split[- ]?source\\s+desync)\\s+(?:fallback|bypass|attack)?|(?:fallback\\s+(?:alias|key|chain))\\s+(?:renderer|consumer|component)\\s+(?:eventually\\s+)?(?:trusts?|consumes?|executes?)|(?:different|adjacent|split)\\s+(?:components?|stages?|readers?)\\s+(?:read|parse|consume)\\s+(?:different|conflicting)\\s+(?:aliases?|keys?|schemas?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-TMS-244"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CAI-694",
+  "name": "Handoff Capability Scope Permission Escalation",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which a forged or counterfeit handoff receipt, capability token, or delegation approval is used to claim elevated scope or permission and then bypass, override, or escalate past guardrails or safety checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-CAI-694"
+}

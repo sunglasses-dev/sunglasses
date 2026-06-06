@@ -1,0 +1,41 @@
+{
+  "id": "GLS-AW-170",
+  "name": "Telemetry Log Signal Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory",
+    "api_response"
+  ],
+  "description": "Attacker poisons logs, counters, or health signals that the agent treats as trusted telemetry, manipulating downstream auto-approval, incident triage, or risk scoring without altering the underlying system state.",
+  "keywords": [
+    "observability telemetry poisoning",
+    "log injection inflates health",
+    "fake counter increment",
+    "synthetic health signal",
+    "auto approval triggered by forged metric",
+    "incident triage misled by logs",
+    "risk score lowered via telemetry",
+    "log tampering for decisions",
+    "telemetry trusted as truth",
+    "metric forgery in agent pipeline",
+    "spoofed observability counters",
+    "log poisoning bypass review"
+  ],
+  "regex": [
+    "(?i)(?:observability\\s+(?:telemetry\\s+)?poison|(?:log|telemetry|counter|health[- ]signal)\\s+(?:poison|inject|forge|spoof|tamper)\\s+(?:to|for|drives?)\\s+(?:auto[- ]approval|decision|triage|risk))",
+    "(?i)(?:(?:fake|synthetic|forged)\\s+(?:counter|metric|health|log)\\s+(?:increment|entry|signal)\\s+(?:trust|treated|accepted)|telemetry\\s+(?:treated\\s+as|trusted\\s+as)\\s+truth)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-170"
+}

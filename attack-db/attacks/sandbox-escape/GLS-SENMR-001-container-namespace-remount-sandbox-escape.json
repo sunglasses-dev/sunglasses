@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SENMR-001",
+  "name": "Container Namespace Remount Sandbox Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "tool_output",
+    "message"
+  ],
+  "description": "Detects text in which sandbox, container, or jailed environment terminology is combined with namespace remounting, bind-mount, chroot, or pivot_root operations described as escaping or breaking out of isolation to bypass or override policy and guardrail restrictions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:sandbox(?:ed)?|container(?:ized)?|jail(?:ed)?)\\b)(?=.*\\b(?:namespace|mount|chroot|procfs|cgroup|pivot_root)\\b)(?=.*\\b(?:remount|bind[- ]?mount|pivot_root|escape|break(?:\\s*out|out)?|host)\\b)(?=.*\\b(?:bypass|override|ignore|disable)\\b)(?=.*\\b(?:policy|guardrail|isolation|restriction|boundary)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-SENMR-001"
+}

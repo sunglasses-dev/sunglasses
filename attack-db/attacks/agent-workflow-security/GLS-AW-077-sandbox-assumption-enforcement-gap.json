@@ -1,0 +1,39 @@
+{
+  "id": "GLS-AW-077",
+  "name": "Sandbox Assumption Enforcement Gap",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output"
+  ],
+  "description": "Attacker exploits the gap between sandbox assumption and enforcement so an agent runs destructive actions in what it believes is a dry-run, read-only, or non-prod environment. Real systems take real damage while the agent's audit trail says it was safe.",
+  "keywords": [
+    "sandbox assumption drift",
+    "dry-run actually wrote",
+    "read-only mount became writable",
+    "non-prod env hit prod",
+    "sandbox flag ignored",
+    "dangerous action under fake sandbox",
+    "sandbox boundary erosion",
+    "presumed safe env spoof",
+    "test mount escapes to prod",
+    "sandbox label without enforcement",
+    "fake dry-run execution",
+    "isolation drift exploit"
+  ],
+  "regex": [
+    "(?i)(?:sandbox\\s+assumption\\s+drift|(?:dry[- ]run|read[- ]only|non[- ]prod|sandbox)\\s+(?:flag|mode|mount|env)\\s+(?:ignored|bypassed|silently\\s+writable|leaked\\s+to\\s+prod))",
+    "(?i)(?:(?:dangerous|destructive|prod)\\s+action\\s+(?:under|in)\\s+(?:fake|spoofed|drifted)\\s+sandbox|sandbox\\s+(?:boundary|isolation)\\s+(?:erosion|drift|escape))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-077"
+}

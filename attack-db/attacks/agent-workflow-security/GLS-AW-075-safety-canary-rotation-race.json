@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-075",
+  "name": "Safety Canary Rotation Race",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker exploits the rotation window of a safety canary so a stale token is still trusted during the seam, or a fresh token bypasses a check expecting the old one. The tripwire fails silently and unsafe tool execution proceeds.",
+  "keywords": [
+    "canary rotation race",
+    "stale canary still trusted",
+    "rotate canary mid-check",
+    "tripwire race condition",
+    "canary swap during validation",
+    "rotation window exploit",
+    "pre-rotation canary replay",
+    "post-rotation gap",
+    "canary token race",
+    "safety tripwire bypass via timing",
+    "rotation seam exploit",
+    "concurrent canary refresh attack"
+  ],
+  "regex": [
+    "(?i)(?:canary\\s+rotation\\s+race|(?:rotate|swap|refresh)\\s+canary\\s+(?:during|mid|while)\\s+(?:check|validation|execution))",
+    "(?i)(?:(?:stale|pre[- ]rotation|expired)\\s+canary\\s+(?:still|incorrectly)\\s+(?:trusted|accepted|valid)|(?:safety\\s+tripwire|canary\\s+token)\\s+(?:bypass|race)\\s+(?:via|through|on)\\s+(?:timing|rotation|seam))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-075"
+}

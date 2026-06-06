@@ -1,0 +1,40 @@
+{
+  "id": "GLS-BMP-009",
+  "name": "pyproject.toml / Python package metadata agent policy poisoning",
+  "version": "1.0",
+  "category": "build_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Python package metadata (`pyproject.toml`, `setup.cfg`, generated `PKG-INFO` / `METADATA`) can carry agent/scanner-directed policy claims that try to override dependency review, suppress vulnerability findings, or solicit local environment and auth material.",
+  "keywords": [
+    "AI agent",
+    "Classifier",
+    "LLM",
+    "METADATA",
+    "PKG-INFO",
+    "Summary",
+    "[project]",
+    "[tool.poetry]",
+    "agent instruction",
+    "agents",
+    "assistant",
+    "authoritative",
+    "automated review",
+    "canonical package policy",
+    "dependency scanner"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|security\\s+(?:report|reference|training|guide).*?\\b(?:detected|blocked|flagged|refused|should\\s+report)|(?:pyproject\\.toml|setup\\.cfg|setup\\.py|PEP\\s*621|tool\\.poetry|package\\s+metadata).{0,120}?\\b(?:does\\s+not\\s+(?:instruct|override|supersede|outrank|obey|follow|trust|authorize)|do\\s+not\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|must\\s+not\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|never\\s+(?:obey|follow|treat|trust|forward|include|send|share|attach|override)|not\\s+(?:authoritative|canonical|definitive)|should\\s+(?:never\\b|not\\s+\\w+|report|detect|flag|refuse|block))|no\\s+policy\\s+overrides?))\n(?=.*(?:(?:pyproject\\.toml|setup\\.cfg|setup\\.py|PEP\\s*621|Python\\s+package\\s+metadata|project\\.description|tool\\.poetry|tool\\.flit|setuptools|PKG-INFO|METADATA|Name:|Summary:|Classifier:)|(?<!\\w)\"(?:description|summary|readme|project|tool|agent_instructions|scanner_policy)\"\\s*:|\\[(?:project|tool\\.poetry|metadata)\\]))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|LLMs?|assistants?|autonomous\\s+(?:agents?|scanners?|auditors?)|dependency\\s+(?:review|auditors?|scanners?)|package\\s+(?:auditors?|scanners?)|security\\s+scanners?|automated\\s+(?:review|auditors?|tools)|agents?|scanners?)(?![A-Za-z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|canonical\\s+(?:project\\s+|package\\s+|metadata\\s+)?(?:description|policy|guidance)|definitive\\s+(?:project\\s+|package\\s+|metadata\\s+)?(?:description|policy|guidance)|governing\\s+(?:document|policy)|controlling\\s+(?:document|policy)|authoritative|main\\s+operating\\s+guidance|primary\\s+(?:review|audit|scanner)\\s+guidance|(?:agent|scanner|assistant|auditor)\\s+instructions?|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security)\\s+rules?)))\n(?=.*(?:(?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVE|CVEs)|(?:do\\s+not|don't|not)\\s+(?:report|flag|mention|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign)|mark.{0,50}?as\\s+(?:safe|clean|benign)|downgrade.{0,80}?(?:alerts?|findings?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)).{0,80}?(?:background\\s+notes?|background-only|informational)|(?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies)|CVEs?).{0,40}?out\\s+of\\s+(?:the\\s+)?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|upgrade\\s+memo|final\\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|session\\s+(?:keys?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|auth(?:orization)?\\s+headers?|Bearer|execution\\s+context)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-BMP-009"
+}

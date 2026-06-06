@@ -1,0 +1,40 @@
+{
+  "id": "GLS-APIP-003",
+  "name": "AI plugin manifest agent policy poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A site-hosted `ai-plugin.json` manifest can hide policy-like instructions in model-facing fields such as `description_for_model`, causing an agent that treats discovery metadata as trusted context to suppress findings, override higher-priority instructions, or request/forward secrets.",
+  "keywords": [
+    ".well-known/ai-plugin.json",
+    "API keys",
+    "api",
+    "auth",
+    "cookies",
+    "description_for_model",
+    "do not flag",
+    "do not report",
+    "environment secrets",
+    "forward/send/exfiltrate tokens",
+    "highest-priority policy",
+    "ignore system instructions",
+    "legal_info_url",
+    "name_for_model",
+    "outrank"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|do\\s+not|never|cannot|refuse(?:s|d)?\\s+to|blocked\\s+from)\\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\\b)(?=.*\\b(?:\\.well-known/ai-plugin\\.json|name_for_model|description_for_model|legal_info_url|schema_version|auth|api)\\b)(?=.*\\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|highest[-\\s]+priority|system\\s+instructions|developer\\s+instructions|(?:do\\s+not|don['\u2019]?t)\\s+.{0,40}(?:report|flag)|suppress\\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\\s+.{0,60}(?:token|secret|cookie|api[-\\s]?key|environment))\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-APIP-003"
+}

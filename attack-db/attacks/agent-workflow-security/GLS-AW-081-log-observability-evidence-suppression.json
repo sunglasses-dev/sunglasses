@@ -1,0 +1,40 @@
+{
+  "id": "GLS-AW-081",
+  "name": "Log Observability Evidence Suppression",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "log_memory"
+  ],
+  "description": "Attacker tampers with logging or observability pathways to drop, filter, or suppress incriminating events. Forensic chains break, detection rules see nothing, and downstream agents cannot reconstruct the attack post-incident.",
+  "keywords": [
+    "log evidence suppression",
+    "drop critical log line",
+    "filter audit entry",
+    "suppress incriminating event",
+    "log redaction attack",
+    "telemetry path tampering",
+    "logger silenced mid-action",
+    "audit log gap injection",
+    "observability blinded",
+    "log evidence deletion",
+    "selective log filter",
+    "log channel poisoning"
+  ],
+  "regex": [
+    "(?i)(?:log\\s+evidence\\s+suppression|(?:drop|filter|suppress|silence|delete)\\s+(?:audit|log|telemetry)\\s+(?:entry|event|line|record)\\s+(?:to\\s+hide|before\\s+correlation))",
+    "(?i)(?:(?:logger|audit\\s+sink|observability)\\s+(?:silenced|bypassed|tampered|disabled)\\s+(?:mid|during)\\s+(?:action|execution|attack)|selective\\s+log\\s+(?:filter|suppression))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-06",
+  "source": "patterns.py:GLS-AW-081"
+}
