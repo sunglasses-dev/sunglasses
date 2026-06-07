@@ -18,7 +18,7 @@
     "paste"
   ],
   "regex": [
-    "(?i)(?:prerequisites?|setup|installation).{0,200}(?:download|curl|wget|terminal|powershell|bash).{0,200}(?:run|execute|paste)"
+    "(?i)(?:curl|wget|iwr|invoke-webrequest)\\s+[^\\n|]{0,200}\\|\\s*(?:sudo\\s+)?(?:bash|sh|zsh|python\\d?)\\b"
   ],
   "examples": {
     "malicious": [],
@@ -26,6 +26,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-SC-014"
 }

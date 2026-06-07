@@ -18,7 +18,7 @@
     "reverse shell"
   ],
   "regex": [
-    "(?i)os\\.system\\(|subprocess\\.(?:Popen|run|call)|bash -i|/dev/tcp/|nc\\s+-e|reverse shell"
+    "(?i)os\\.system\\(|subprocess\\.(?:Popen|run|call)\\([^)]*shell\\s*=\\s*True|bash\\s+-i|/dev/tcp/|nc\\s+-e|reverse shell"
   ],
   "examples": {
     "malicious": [],
@@ -26,6 +26,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-CI-005"
 }

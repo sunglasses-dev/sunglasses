@@ -10,8 +10,6 @@
   ],
   "description": "A target-controlled `/.well-known/did-configuration.json` document embeds agent-directed policy text in DID/linked-domain metadata, attempting to make an AI agent treat a verifiable-credential identity proof as higher-priority owner authority and disclose local auth context or suppress reporting.",
   "keywords": [
-    ",",
-    ", or",
     ".\n- Control-plane action: request",
     "/.well-known/did-configuration",
     "/.well-known/did-configuration.json",
@@ -35,6 +33,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-IDP-001"
 }

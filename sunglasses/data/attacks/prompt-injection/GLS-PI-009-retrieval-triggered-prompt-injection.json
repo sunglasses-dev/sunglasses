@@ -11,12 +11,11 @@
   ],
   "description": "Detects business-content injections phrased as normal human-facing text to evade prompt injection classifiers.",
   "keywords": [
-    "summarize",
-    "draft",
-    "ignore",
-    "secretly",
-    "internal data",
-    "private data"
+    "secretly extract",
+    "without telling the user",
+    "do not mention",
+    "exfiltrate internal data",
+    "exfiltrate private data"
   ],
   "regex": [
     "(?i)(?:summari[sz]e|prepare|draft|review).{0,120}(?:recent|related|project|meeting|email|document).{0,200}(?:ignore|bypass|do not mention|secretly|without telling|internal data|private data)"
@@ -27,6 +26,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-PI-009"
 }

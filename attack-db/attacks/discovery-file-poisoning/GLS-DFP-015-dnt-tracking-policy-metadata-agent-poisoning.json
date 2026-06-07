@@ -10,7 +10,6 @@
   ],
   "description": "DNT or tracking-status/privacy-policy discovery metadata can embed agent-directed instructions that claim authority over scanners, suppress tracking findings, or request local cookies/tokens/environment variables.",
   "keywords": [
-    "AI",
     "API key",
     "Authorization",
     "Do Not Track",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-DFP-015"
 }

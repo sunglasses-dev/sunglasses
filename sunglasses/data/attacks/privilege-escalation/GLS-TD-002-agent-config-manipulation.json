@@ -9,7 +9,7 @@
     "file",
     "api_response"
   ],
-  "description": "LLM agent silently disabling execution approval or safety checks via config modification. Source: OpenClaw GHSA-v3qc.",
+  "description": "LLM agent silently disabling execution approval or safety checks via config modification.",
   "keywords": [
     "config.patch",
     "config.set(",
@@ -24,6 +24,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-TD-002"
 }

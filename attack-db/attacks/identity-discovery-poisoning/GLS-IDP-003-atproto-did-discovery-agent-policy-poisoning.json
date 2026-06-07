@@ -11,7 +11,6 @@
   "description": "A poisoned `/.well-known/atproto-did` handle-verification file adds nonstandard agent-facing comments that tell AI verifiers to treat the DID proof as higher-priority policy, ignore system/developer/repository rules, or suppress identity-audit findings.",
   "keywords": [
     ") or report suppression (",
-    ",",
     "/.well-known/atproto-did",
     "AI verifier",
     "LLM",
@@ -33,6 +32,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-IDP-003"
 }

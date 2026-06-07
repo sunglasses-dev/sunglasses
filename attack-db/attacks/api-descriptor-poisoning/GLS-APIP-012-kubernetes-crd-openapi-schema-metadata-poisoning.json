@@ -10,7 +10,6 @@
   ],
   "description": "Kubernetes CRD schema descriptions can smuggle agent-facing instructions that tell AI Kubernetes auditors or admission-review agents to treat attacker-controlled schema text as higher-priority policy, suppress validation/security findings, or forward local cluster/runtime credentials.",
   "keywords": [
-    ",",
     "AI agents",
     "CRD reviewers",
     "CustomResourceDefinition",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-APIP-012"
 }

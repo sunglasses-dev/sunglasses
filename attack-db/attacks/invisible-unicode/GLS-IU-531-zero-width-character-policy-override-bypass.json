@@ -12,7 +12,7 @@
   "description": "Detects invisible unicode zero-width characters embedded in keywords such as ignore, override, or bypass to conceal a policy or guardrail override directive.",
   "keywords": [],
   "regex": [
-    "(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disre[\\u200b\\u200c\\u200d\\ufeff]*gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"
+    "(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]+gnore|overri[\\u200b\\u200c\\u200d\\ufeff]+de|bypa[\\u200b\\u200c\\u200d\\ufeff]+ss|disre[\\u200b\\u200c\\u200d\\ufeff]+gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"
   ],
   "examples": {
     "malicious": [],
@@ -20,6 +20,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-IU-531"
 }

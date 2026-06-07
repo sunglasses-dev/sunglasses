@@ -8,7 +8,7 @@
     "file",
     "api_response"
   ],
-  "description": "Sandbox escape via symlink pointing to host filesystem for arbitrary file read/write. Source: OpenClaw GHSA-cwf8.",
+  "description": "Sandbox escape via symlink pointing to host filesystem for arbitrary file read/write.",
   "keywords": [
     "ln -s /",
     "os.symlink(",
@@ -21,6 +21,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-TD-003"
 }

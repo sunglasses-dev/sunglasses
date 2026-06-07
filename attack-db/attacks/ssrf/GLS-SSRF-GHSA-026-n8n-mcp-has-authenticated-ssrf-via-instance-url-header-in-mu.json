@@ -11,9 +11,8 @@
   ],
   "description": "Detection for GHSA-4ggg-h7ph-26qr: n8n-mcp has authenticated SSRF via instance-URL header in multi-tenant HTTP mode. Source: https://github.com/advisories/GHSA-4ggg-h7ph-26qr",
   "keywords": [
-    "HTTP",
-    "SSRF",
-    "ssrf"
+    "n8n-mcp",
+    "ghsa-4ggg-h7ph-26qr"
   ],
   "regex": [],
   "examples": {
@@ -22,6 +21,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-SSRF-GHSA-026"
 }

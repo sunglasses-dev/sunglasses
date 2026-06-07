@@ -10,7 +10,6 @@
   ],
   "description": "Mobile deep-link association metadata such as `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` can carry agent-targeted instructions that attempt to convert domain/app trust declarations into higher-priority policy, suppress scanner findings, or request cookies/tokens/ses",
   "keywords": [
-    ",",
     "Digital Asset Links",
     "apple-app-site-association",
     "assetlinks.json",
@@ -25,6 +24,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-DFP-012"
 }
