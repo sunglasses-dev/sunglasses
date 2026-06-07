@@ -3,6 +3,21 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.62] — 2026-06-06
+
+### Added (V2 SHIP #8 — discovery_file_poisoning continued + FP credibility fix)
+
+- **25 new patterns** — `GLS-DFP-026` through `GLS-DFP-050` (continued expansion of the `discovery_file_poisoning` category). These patterns extend coverage of agent-policy poisoning in discovery and convention files (`robots.txt`, `llms.txt`, `sitemap.xml`, `security.txt`, `.well-known/` manifests, and feed carriers) with hardened regexes that require real poison/authority-injection signal — eliminating false positives on legitimate discovery files. Pattern count: 981 → **1,006**. Keywords: 6,946 → **7,171**. Categories: 64 (unchanged).
+- **FP credibility fix:** tightened all `discovery_file_poisoning` patterns to require affirmative injection evidence rather than file-presence alone. Clean `robots.txt`, `llms.txt`, `security.txt`, and `sitemap.xml` now pass cleanly; poisoned variants still block. Clean-corpus gate: 46 → **0** false positives (general clean-text corpus from the prior PR #50 fix).
+- **New blogs:**
+  - [Discovery File Poisoning and Runtime Trust: What robots.txt Can't Actually Do](https://sunglasses.dev/blog/discovery-file-poisoning-runtime-trust)
+  - [Discovery File Poisoning, Security Metadata, and Runtime Trust](https://sunglasses.dev/blog/discovery-file-poisoning-security-metadata-runtime-trust)
+
+### Context
+
+The `discovery_file_poisoning` category ships in two waves: GLS-DFP-001..025 (v0.2.61) established the category; GLS-DFP-026..050 (v0.2.62) harden detection precision and eliminate scanner false positives on normal discovery files — a credibility prerequisite for the category's launch blog.
+
+
 ## [0.2.61] — 2026-06-06
 
 ### Added (V2 SHIP #7 — discovery_file_poisoning)
