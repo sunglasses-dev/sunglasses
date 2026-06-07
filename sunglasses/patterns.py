@@ -16559,8 +16559,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
-            ", or",
             ".\n- Control-plane action: request",
             "/.well-known/did-configuration",
             "/.well-known/did-configuration.json",
@@ -16587,8 +16585,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
-            ", or",
             ".\n- Sensitive or reporting target:",
             "AI agent",
             "LLM",
@@ -16624,7 +16620,6 @@ PATTERNS = [
         "channel": ["file", "web_content"],
         "keywords": [
             ") or report suppression (",
-            ",",
             "/.well-known/atproto-did",
             "AI verifier",
             "LLM",
@@ -16677,7 +16672,6 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             "AI auditor",
             "DNS TXT",
             "LLM",
@@ -16819,7 +16813,6 @@ PATTERNS = [
         "keywords": [
             "), or report suppression (",
             "), sensitive auth/local-state requests (",
-            ",",
             ", cookies, env vars,",
             "/.well-known/openid-federation",
             "AI agent",
@@ -17406,7 +17399,6 @@ PATTERNS = [
         "channel": ["file", "web_content"],
         "keywords": [
             "@context",
-            "AI",
             "API keys",
             "LLM",
             "Presentation API",
@@ -17514,7 +17506,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             "AI agents",
             "CRD reviewers",
             "CustomResourceDefinition",
@@ -17603,7 +17594,6 @@ PATTERNS = [
             "_agent_note",
             "agent",
             "agent_note",
-            "ai",
             "ai-agent audience language",
             "ai.agent_instructions",
             "assistant",
@@ -18188,7 +18178,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             "API keys",
             "User-Agent: ai-agent",
             "Validation script:",
@@ -18337,16 +18326,8 @@ PATTERNS = [
             "(?:primary|single) source of truth",
             ");",
             "- Skill scope:",
-            "---",
             "/llms-full.txt",
             "/tmp/llms_full_txt_smoke_20260519.py",
-            "2.",
-            "3.",
-            "4.",
-            "5.",
-            "6.",
-            "7.",
-            "8.",
             "AI agent",
         ],
         "regex": [
@@ -18671,7 +18652,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             ".\n- Agent/review audience:",
             ".\n- Authority terms:",
             "commitBody",
@@ -18759,7 +18739,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             ".\n- **Report suppression:**",
             ".gitlab-ci.yaml",
             ".gitlab-ci.yml",
@@ -18794,7 +18773,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             "AI agents",
             "Application",
             "ApplicationSet",
@@ -18834,7 +18812,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             ".\n- **Report suppression:**",
             "AI agents",
             "BUILD_TAG",
@@ -19311,7 +19288,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             ".\n- Safety/report suppression:",
             ".\n- Secret/local-state access:",
             "/.well-known/host-meta",
@@ -19477,7 +19453,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
             "Digital Asset Links",
             "apple-app-site-association",
             "assetlinks.json",
@@ -19549,7 +19524,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            "AI",
             "API key",
             "Authorization",
             "Do Not Track",
@@ -19860,9 +19834,6 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "web_content"],
         "keywords": [
-            ",",
-            ", or",
-            ".\n- Sensitive/suppressive action:",
             "/.well-known/payment-method-manifest",
             "AI agent",
             "LLM",
