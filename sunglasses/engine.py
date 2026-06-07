@@ -108,6 +108,18 @@ class SunglassesEngine:
         "build", "settings", "application", "url", "call", "token", "html",
         "oembed", "provider_url", "provider_name", "<title>", "mcp",
         "system prompt", "jailbreak", "bypass", "key", "secret",
+        # ── Discovery-file FP fix (Jun 6 2026, v0.2.62) ──────────────────────
+        # Generic discovery/config/manifest tokens that appear in EVERY normal
+        # robots.txt, llms.txt, security.txt, sitemap.xml and .well-known
+        # manifest. As bare keywords they made the scanner block normal
+        # discovery files — the exact embarrassment the discovery_file_poisoning
+        # category warns against ("don't panic at a normal robots.txt"). Real
+        # poisoning is still caught by each pattern's regex + multi-word
+        # injection keywords. Gate: tests/test_false_positives.py (clean
+        # discovery files must ALLOW; poisoned ones must still BLOCK).
+        "canonical", "description", "expires", "allow", "disallow", "admin",
+        "support", "sitemap:", ".well-known", ".well-known/", "/.well-known",
+        "<loc>", "description_for_model", "name_for_model", "sdl", "/* team */",
     })
 
     # Decision priority: higher severity = stronger action
