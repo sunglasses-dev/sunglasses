@@ -1,7 +1,7 @@
 {
-  "version": "0.2.61",
-  "patterns": 981,
-  "keywords": 6946,
+  "version": "0.2.62",
+  "patterns": 1006,
+  "keywords": 7171,
   "categories": 64,
   "languages": 23,
   "normalization_techniques": 17,
@@ -16,8 +16,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-06-06T00:20:00-07:00",
-  "last_updated_by": "boss-direct-ship-v0.2.61",
+  "last_updated": "2026-06-06T22:59:14-0:700",
+  "last_updated_by": "sunglasses-publish-sh",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
   "released": "2026-06-06"
 }
