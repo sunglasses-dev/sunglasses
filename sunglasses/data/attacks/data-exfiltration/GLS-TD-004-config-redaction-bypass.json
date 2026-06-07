@@ -8,7 +8,7 @@
     "file",
     "log_memory"
   ],
-  "description": "Bypassing config value redaction to leak plaintext credentials. Source: OpenClaw Nostr GHSA.",
+  "description": "Bypassing config value redaction to leak plaintext credentials.",
   "keywords": [
     "privateKey",
     "signingKey"
@@ -22,6 +22,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-TD-004"
 }

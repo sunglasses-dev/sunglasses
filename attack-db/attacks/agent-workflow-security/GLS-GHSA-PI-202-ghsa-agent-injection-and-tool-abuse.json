@@ -24,7 +24,7 @@
     "unverified mcp server"
   ],
   "regex": [
-    "(?is)(?:ignore\\s+(?:previous|prior)\\s+instructions|approved\\s+already|consent\\s+cached|run\\s+(?:shell|bash|aws\\s+cli)|subprocess|mcp\\s+server|tool\\s+server|execute\\s+this\\s+command|\\$\\(|`[^`]+`|curl\\s+https?://|export\\s+[A-Z0-9_]+|printenv|env\\s*\\||token|api[_ -]?key|secret)"
+    "(?is)(ignore\\s+(?:previous|prior)\\s+instructions|approved\\s+already|consent\\s+cached|run\\s+(?:shell|bash|aws\\s+cli)|execute\\s+this\\s+command|printenv\\b|curl\\s+https?://|env\\s*\\|\\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\\b[^.\\n]{0,40}\\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))"
   ],
   "examples": {
     "malicious": [],
@@ -32,6 +32,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-GHSA-PI-202"
 }

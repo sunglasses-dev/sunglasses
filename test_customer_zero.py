@@ -363,7 +363,9 @@ def main():
     else:
         print(f"  {R}{B}FAILURES FOUND — Fix before shipping.{X}")
     print()
+    return all_pass
 
 
 if __name__ == "__main__":
-    main()
+    # Exit non-zero on failure so CI / preflight can gate on it.
+    sys.exit(0 if main() else 1)

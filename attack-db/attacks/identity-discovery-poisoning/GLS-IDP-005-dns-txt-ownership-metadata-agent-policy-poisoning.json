@@ -10,7 +10,6 @@
   ],
   "description": "A DNS TXT ownership or verification record mixes a legitimate domain-proof token with AI-agent-facing instructions that claim policy authority, suppress audit findings, or request local secrets.",
   "keywords": [
-    ",",
     "AI auditor",
     "DNS TXT",
     "LLM",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-IDP-005"
 }

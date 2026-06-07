@@ -10,7 +10,6 @@
   ],
   "description": "Agent-facing discovery files such as `llms.txt`, `robots.txt`, sitemap-adjacent metadata, or site manifests can disguise prompt-injection instructions as crawler policy, causing agents to treat untrusted website text as higher-priority control-plane authority.",
   "keywords": [
-    ",",
     "API keys",
     "User-Agent: ai-agent",
     "Validation script:",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-AIFP-001"
 }

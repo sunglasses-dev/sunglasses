@@ -10,7 +10,6 @@
   ],
   "description": "A malicious `Jenkinsfile` or Jenkins job metadata field can hide agent-directed instructions in comments, descriptions, parameter text, environment labels, or generated job summaries, telling AI CI/security reviewers to treat the pipeline as authoritative, suppress findings, or forward Jenkins crede",
   "keywords": [
-    ",",
     ".\n- **Report suppression:**",
     "AI agents",
     "BUILD_TAG",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-CICD-007"
 }

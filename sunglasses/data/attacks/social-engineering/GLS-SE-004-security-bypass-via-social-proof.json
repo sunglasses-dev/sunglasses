@@ -9,15 +9,19 @@
     "file",
     "web_content"
   ],
-  "description": "Detects social proof language used to convince agents to bypass security checks.",
+  "description": "Detects social proof language used to convince agents to bypass security checks (legacy: owner approved / safe to proceed) and forged-banner proceed-without-confirmation phrasing.",
   "keywords": [
     "owner approved",
     "already approved",
     "safe to proceed",
-    "ignore scanner warning"
+    "ignore scanner warning",
+    "proceed with destructive action",
+    "proceed without further prompt",
+    "no further prompt required"
   ],
   "regex": [
-    "(?i)(?:ignore|dismiss).{0,60}(?:scanner|warning|security warning|policy check|guardrail).{0,120}(?:owner approved|already approved|safe to proceed)"
+    "(?i)(?:ignore|dismiss).{0,60}(?:scanner|warning|security warning|policy check|guardrail).{0,120}(?:owner approved|already approved|safe to proceed)",
+    "(?i)\\bapproved\\s+by\\s+(?:the\\s+)?user\\b.{0,80}\\b(?:proceed|continue|execute|run|do)\\b.{0,80}\\b(?:without|no)\\s+(?:further|additional)\\s+(?:prompt|confirmation|approval|check)"
   ],
   "examples": {
     "malicious": [],
@@ -25,6 +29,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-SE-004"
 }

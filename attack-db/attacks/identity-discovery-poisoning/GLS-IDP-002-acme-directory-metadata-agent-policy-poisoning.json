@@ -10,8 +10,6 @@
   ],
   "description": "A target-controlled ACME directory or ACME service-documentation export hides AI/scanner-directed policy inside `meta` or extension text, attempting to override agent instructions, suppress certificate findings, or extract local ACME credentials/account state.",
   "keywords": [
-    ",",
-    ", or",
     ".\n- Sensitive or reporting target:",
     "AI agent",
     "LLM",
@@ -35,6 +33,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-IDP-002"
 }

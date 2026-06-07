@@ -2250,7 +2250,7 @@ PATTERNS = [
             "paste",
         ],
         "regex": [
-            r"(?i)(?:prerequisites?|setup|installation).{0,200}(?:download|curl|wget|terminal|powershell|bash).{0,200}(?:run|execute|paste)",
+            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
         ],
         "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
     },
@@ -2290,7 +2290,7 @@ PATTERNS = [
             "reverse shell",
         ],
         "regex": [
-            r"(?i)os\.system\(|subprocess\.(?:Popen|run|call)|bash -i|/dev/tcp/|nc\s+-e|reverse shell",
+            r"(?i)os\.system\(|subprocess\.(?:Popen|run|call)\([^)]*shell\s*=\s*True|bash\s+-i|/dev/tcp/|nc\s+-e|reverse shell",
         ],
         "description": "Detects reverse-shell logic embedded in agent skills — a critical code execution threat."
     },
@@ -3041,7 +3041,7 @@ PATTERNS = [
         "category": 'command_injection',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "keywords": ['command injection', 'injection'],
+        "keywords": ['praisonai', 'ghsa-2763-cj5r-c79m'],
         "description": 'Detection for GHSA-2763-cj5r-c79m: PraisonAI Vulnerable to OS Command Injection. Source: https://github.com/advisories/GHSA-2763-cj5r-c79m',
     },
     {
@@ -3059,7 +3059,7 @@ PATTERNS = [
         "category": 'ssrf',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "keywords": ['HTTP', 'SSRF', 'ssrf'],
+        "keywords": ['n8n-mcp', 'ghsa-4ggg-h7ph-26qr'],
         "description": 'Detection for GHSA-4ggg-h7ph-26qr: n8n-mcp has authenticated SSRF via instance-URL header in multi-tenant HTTP mode. Source: https://github.com/advisories/GHSA-4ggg-h7ph-26qr',
     },
     {
@@ -3068,7 +3068,7 @@ PATTERNS = [
         "category": 'ssrf',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "keywords": ['SSRF', 'ssrf'],
+        "keywords": ['mcp-from-openapi', 'ghsa-v6ph-xcq9-qxxj'],
         "description": 'Detection for GHSA-v6ph-xcq9-qxxj: mcp-from-openapi is Vulnerable to SSRF via $ref Dereferencing in Untrusted OpenAPI Specifications. Source: https://github.com/advisories/GHSA-v6ph-xcq9-qxxj',
     },
     {
@@ -3086,7 +3086,7 @@ PATTERNS = [
         "category": 'command_injection',
         "severity": 'medium',
         "channel": ['message', 'file', 'web_content'],
-        "keywords": ['exec'],
+        "keywords": ['stata-mcp', 'ghsa-jpcj-7wfg-mqxv'],
         "description": 'Detection for GHSA-jpcj-7wfg-mqxv: stata-mcp has insufficient validation of user-supplied Stata do-file content that can lead to command execution. Source: https://github.com/advisories/GHSA-jpcj-7wfg-mqxv',
     },
     {
@@ -3684,7 +3684,7 @@ PATTERNS = [
             "tool description send credentials",
         ],
         "regex": [
-            r'(?is)(?:"?(?:tool|function|manifest|description|instructions?)"?\s*[:=]\s*.+?){0,3}(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+override|developer\s+mode|reveal\s+(?:api[_ -]?key|token|secret)|send\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\s+tool\s+[a-z0-9_.-]+\s+then\s+call\s+tool\s+[a-z0-9_.-]+|silent(?:ly)?\s+forward\s+results?)',
+            r'(?is)(?:"?(?:tool|function|manifest|description|instructions?)"?\s*[:=]\s*.+?){1,3}(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+override|developer\s+mode|reveal\s+(?:api[_ -]?key|token|secret)|send\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\s+tool\s+[a-z0-9_.-]+\s+then\s+call\s+tool\s+[a-z0-9_.-]+|silent(?:ly)?\s+forward\s+results?)',
         ],
         "description": "Detects malicious instructions embedded in MCP tool manifests/descriptions that attempt to override policy, coerce secret disclosure, or trigger unauthorized tool chains.",
     },
@@ -3709,7 +3709,7 @@ PATTERNS = [
             "unverified mcp server",
         ],
         "regex": [
-            r'(?is)(?:ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|subprocess|mcp\s+server|tool\s+server|execute\s+this\s+command|\$\(|`[^`]+`|curl\s+https?://|export\s+[A-Z0-9_]+|printenv|env\s*\||token|api[_ -]?key|secret)',
+            r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|execute\s+this\s+command|printenv\b|curl\s+https?://|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
         ],
         "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems — grounded in GitHub Security Advisories.",
     },
@@ -3742,7 +3742,7 @@ PATTERNS = [
             "\u062e\u0641\u06cc\u06c1 \u0679\u0648\u06a9\u0646",
         ],
         "regex": [
-            r'(?is)(ignore\s+(previous|prior)\s+instructions|bypass|jailbreak|system\s*prompt|developer\s*mode|reveal\s+(secret|token|key)|langkau\s+(arahan|peraturan)|onyesha\s+(siri|token)|fichua\s+(maelekezo|prompt)|\u0989\u09aa\u09c7\u0995\u09cd\u09b7\u09be\s+\u0995\u09b0|\u0997\u09cb\u09aa\u09a8\s+(\u0995\u09c0|\u099f\u09cb\u0995\u09c7\u09a8)|balewala\s+ang\s+mga\s+tagubilin|ilantad\s+ang\s+(sekreto|token)|\u0646\u0627\u062f\u06cc\u062f\u0647\s+\u0628\u06af\u06cc\u0631|\u062f\u0633\u062a\u0648\u0631(?:\u0627\u062a)?\s+\u0642\u0628\u0644\u06cc|\u0631\u0627\u0632\s+\u0631\u0627\s+\u0646\u0634\u0627\u0646|\u06c1\u062f\u0627\u06cc\u0627\u062a\s+\u0646\u0638\u0631\u0627\u0646\u062f\u0627\u0632|\u062e\u0641\u06cc\u06c1\s+(\u06a9\u0644\u06cc\u062f|\u0679\u0648\u06a9\u0646))',
+            r'(?is)(ignore\s+(previous|prior)\s+instructions|reveal\s+(secret|token|key)|langkau\s+(arahan|peraturan)|onyesha\s+(siri|token)|fichua\s+(maelekezo|prompt)|\u0989\u09aa\u09c7\u0995\u09cd\u09b7\u09be\s+\u0995\u09b0|\u0997\u09cb\u09aa\u09a8\s+(\u0995\u09c0|\u099f\u09cb\u0995\u09c7\u09a8)|balewala\s+ang\s+mga\s+tagubilin|ilantad\s+ang\s+(sekreto|token)|\u0646\u0627\u062f\u06cc\u062f\u0647\s+\u0628\u06af\u06cc\u0631|\u062f\u0633\u062a\u0648\u0631(?:\u0627\u062a)?\s+\u0642\u0628\u0644\u06cc|\u0631\u0627\u0632\s+\u0631\u0627\s+\u0646\u0634\u0627\u0646|\u06c1\u062f\u0627\u06cc\u0627\u062a\s+\u0646\u0638\u0631\u0627\u0646\u062f\u0627\u0632|\u062e\u0641\u06cc\u06c1\s+(\u06a9\u0644\u06cc\u062f|\u0679\u0648\u06a9\u0646))',
         ],
         "description": "Detects jailbreak intent in low-resource languages (Swahili, Bengali, Tagalog, Persian, Urdu, Malay) including transliteration and code-switching variants.",
     },
@@ -6862,7 +6862,7 @@ PATTERNS = [
         "category": 'invisible_unicode',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "regex": ["(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]*gnore|overri[\\u200b\\u200c\\u200d\\ufeff]*de|bypa[\\u200b\\u200c\\u200d\\ufeff]*ss|disre[\\u200b\\u200c\\u200d\\ufeff]*gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"],
+        "regex": ["(?is)^(?=.*(?:i[\\u200b\\u200c\\u200d\\ufeff]+gnore|overri[\\u200b\\u200c\\u200d\\ufeff]+de|bypa[\\u200b\\u200c\\u200d\\ufeff]+ss|disre[\\u200b\\u200c\\u200d\\ufeff]+gard))(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|instruction(?:s)?|control(?:s)?)\\b)(?!.*\\b(?:do\\s+not|never|cannot|can\\'t|without|no)\\s+(?:\\w+\\s+){0,2}(?:ignore|override|bypass|disregard)\\b).+"],
         "description": 'Detects invisible unicode zero-width characters embedded in keywords such as ignore, override, or bypass to conceal a policy or guardrail override directive.'
     },
     # --- model_routing_confusion ---

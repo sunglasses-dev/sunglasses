@@ -10,7 +10,6 @@
   ],
   "description": "A malicious `.gitlab-ci.yml` file can hide agent-directed instructions in pipeline metadata, variables, job descriptions, comments, or rules text, telling AI CI/security reviewers to treat the pipeline file as authoritative, suppress findings, or forward GitLab CI tokens and runtime context.",
   "keywords": [
-    ",",
     ".\n- **Report suppression:**",
     ".gitlab-ci.yaml",
     ".gitlab-ci.yml",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-CICD-005"
 }

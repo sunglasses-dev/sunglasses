@@ -41,3 +41,9 @@ jobs:
 
       - name: Dogfood regression tests (May 27 incident)
         run: pytest tests/test_dogfood_bugs.py -v
+
+      - name: False-positive regression gate (Jun 6 incident — clean text must not block)
+        run: pytest tests/test_false_positives.py -v
+
+      - name: Customer-zero real-world suite (attacks block, normal usage passes)
+        run: python test_customer_zero.py

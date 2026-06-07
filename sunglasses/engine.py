@@ -83,6 +83,33 @@ class ScanResult:
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
+    # ── KEYWORD DENYLIST (false-positive guard) ──────────────────────────────
+    # Generic, high-frequency words that appear constantly in normal docs, code,
+    # security articles and web pages. On their own they are TOO BROAD to mean
+    # "attack", so they must never trigger a block by themselves. They are
+    # stripped from every pattern's keyword set at index-build time — patterns
+    # keep their SPECIFIC keywords (product names, advisory IDs, multi-word
+    # attack phrases) and their regexes.
+    #
+    # Born Jun 6 2026: a clean-text corpus tripped 46 patterns (READMEs,
+    # security articles, normal HTML all "BLOCKED") — the exact credibility bug
+    # where the scanner blocks the very things it's supposed to discuss. This is
+    # the structural fix so any future auto-generated pattern that reuses a
+    # generic word as a keyword is neutralized automatically.
+    # Paired with tests/test_false_positives.py (the permanent regression gate).
+    KEYWORD_DENYLIST = frozenset({
+        "assistant", "ai assistant", "llm", "ai agent", "agent", "crawler",
+        "crawl", "authorization", "authorization header", "auth", "api key",
+        "api keys", "api", "bearer", "bearer token", "ssrf", "bot", "exec",
+        "rce", "injection", "command injection", "model", "redirect", "http",
+        "https", "developer", "developer mode", "direct", "prerequisites",
+        "prerequisite", "setup", "installation", "install", "download",
+        "terminal", "paste", "subprocess", "eval", "config", "command", "ext",
+        "build", "settings", "application", "url", "call", "token", "html",
+        "oembed", "provider_url", "provider_name", "<title>", "mcp",
+        "system prompt", "jailbreak", "bypass", "key", "secret",
+    })
+
     # Decision priority: higher severity = stronger action
     SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "review": 0}
     SEVERITY_TO_DECISION = {
@@ -119,6 +146,8 @@ class SunglassesEngine:
         for pattern in self._patterns:
             for kw in pattern.get("keywords", []):
                 kw_lower = kw.lower()
+                if kw_lower in self.KEYWORD_DENYLIST:
+                    continue  # generic word — too broad to trigger a block alone
                 if kw_lower not in self._keyword_to_patterns:
                     self._keyword_to_patterns[kw_lower] = []
                 self._keyword_to_patterns[kw_lower].append(pattern)

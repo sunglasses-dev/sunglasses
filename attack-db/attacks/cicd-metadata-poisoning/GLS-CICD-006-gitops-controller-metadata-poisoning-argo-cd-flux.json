@@ -10,7 +10,6 @@
   ],
   "description": "GitOps resource metadata can smuggle agent-facing instructions that tell AI deployment or security reviewers to treat attacker-controlled Argo CD / Flux descriptions, annotations, or generated status notes as higher-priority policy, suppress sync/security findings, or forward local cluster/runtime c",
   "keywords": [
-    ",",
     "AI agents",
     "Application",
     "ApplicationSet",
@@ -35,6 +34,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-CICD-006"
 }

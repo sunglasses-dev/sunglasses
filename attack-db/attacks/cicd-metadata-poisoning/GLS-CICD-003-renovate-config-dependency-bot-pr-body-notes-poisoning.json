@@ -10,7 +10,6 @@
   ],
   "description": "Dependency automation configuration and generated PR body notes can smuggle agent/scanner-directed instructions that claim authority over dependency review, suppress CVE findings, or request local runtime/auth context from AI coding agents.",
   "keywords": [
-    ",",
     ".\n- Agent/review audience:",
     ".\n- Authority terms:",
     "commitBody",
@@ -32,6 +31,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-06-06",
+  "date_added": "2026-06-07",
   "source": "patterns.py:GLS-CICD-003"
 }
