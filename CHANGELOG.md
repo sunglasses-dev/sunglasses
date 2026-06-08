@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.63] — 2026-06-07
+
+### Added (V2 SHIP #9 — discovery_file_poisoning continued + repo_metadata_poisoning new category)
+
+- **13 new patterns** — `GLS-DFP-051` through `GLS-DFP-057` (7 patterns, continued `discovery_file_poisoning` expansion targeting IaC/policy files, admission controllers, and agent instruction carriers) + `GLS-RMP-001` through `GLS-RMP-006` (6 patterns, new `repo_metadata_poisoning` category covering CODEOWNERS files, release notes/changelogs, repository topics/tags, contributor lists, and governance metadata that AI coding agents read as authoritative policy). Pattern count: 1,006 → **1,019**. Keywords: 7,171 → **7,350**. Categories: 64 → **65**.
+- **New blog:** [Repo Metadata Poisoning: When CODEOWNERS, Release Notes, and Topics Become Agent Policy](https://sunglasses.dev/blog/repo-metadata-poisoning) — covers how attackers hide agent instructions in the governance metadata layer of a repository, and how Sunglasses runtime trust catches it before the agent acts. Written by JACK, research by Cava.
+
+### Context
+
+`repo_metadata_poisoning` (GLS-RMP-001..006) is the 65th category in the Sunglasses detection library. It targets the trusted governance metadata that AI coding agents read before acting on a repository — CODEOWNERS, release notes, CHANGELOG files, repository description/topics, contributor lists, and issue/PR templates. This metadata carries strong implied authority: agents treat it as "the rules of this repo." The six patterns detect covert agent directives hidden in each carrier type, including authority-framing phrases, token-injection patterns, and role-redefinition attempts.
+
+
 ## [0.2.62] — 2026-06-06
 
 ### Added (V2 SHIP #8 — discovery_file_poisoning continued + FP credibility fix)
