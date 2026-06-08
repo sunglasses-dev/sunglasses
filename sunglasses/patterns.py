@@ -20748,4 +20748,546 @@ PATTERNS = [
         ],
         "description": "Deployment-platform configuration files such as `netlify.toml`, `vercel.json`, Cloudflare `wrangler.toml`, `_headers`, and `_redirects` can carry agent/scanner-directed metadata that claims deployment config is authoritative policy, suppresses security findings, or asks agents to forward local deplo"
     },
+    # === v0.0.0 batch (13 patterns) ===
+    {
+        "id": "GLS-DFP-051",
+        "name": "Documentation Site Config Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "agent instruction:",
+            "agent_instructions",
+            "assistant_note",
+            "crawler_notice",
+            "mkdocs.yml",
+            "nav:",
+            "scanner instruction:",
+            "scanner_policy",
+            "sidebar:",
+            "sidebars.js",
+            "site_name:",
+            "theme:",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|scanner|training|runbook|guide|reference|incident|vulnerability|documentation)\s+(?:docs?|report|example|exercise|guidance|article|reference)?.{0,160}?\b(?:should\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|refused)\b)
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+(?:not|never))\s+(?:obey|follow|treat|use|include|attach|forward|send|share|override|overrides?|trust|expose)\b)
+(?!.*\b(?:not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?)\b)
+(?=.*(?:\b(?:mkdocs\.ya?ml|mkdocs|docusaurus(?:\.config)?(?:\.(?:js|ts|mjs|cjs))?|vitepress|\.vitepress/config\.(?:js|ts|mjs)|docsify|documentation\s+site\s+config|static\s+site\s+config|site_name\s*:|theme\s*:|nav\s*:|sidebars\.js|sidebar\s*:|config\s*:\s*\{)\b))
+(?=.*(?<![A-Za-z0-9])(?:ai[-_\s]?agents?|assistants?|llms?|crawlers?|scanners?|security[-_\s]?scanners?|docs[-_\s]?agents?|documentation[-_\s]?agents?|agent[_-]instructions?|scanner[_-]policy|assistant[_-]note|crawler[_-]notice)(?![A-Za-z0-9]))
+(?=.*(?:\b(?:governing|controlling|canonical|definitive|authoritative)\s+(?:document|policy|guidance|instructions?|source|description|configuration)\b|(?:primary|single)\s+source\s+of\s+truth|(?:primary|main|operating|review|audit|quality|scanner)\s+guidance|takes?\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|defines?\s+(?:(?:all|the)\s+)?(?:scanner|security|agent|automated|review|audit|docs?)\s+rules?|(?:agent|scanner|assistant|crawler|docs?)\s+(?:instructions?|directive|policy)\s*:))
+(?=.*(?:\b(?:suppress|hide|redact|exclude|omit|skip|downgrade|deprioriti[sz]e)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|vulnerabilities?|CVE(?:s)?|audit\s+memos?|summaries?|notes?)\b|(?:treat|mark|classify|flag).{0,50}?\bas\s+(?:informational|non[-\s]?blocking|safe|clean|benign|background[-\s]?only)\b|(?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|alerts?|issues?|vulnerabilities?).{0,40}?\bout\s+of\s+(?:the\s+)?(?:memo|memos|summary|summaries|report|reports|audit\s+memo|final\s+report|docs\s+audit)\b|do\s+not\s+(?:report|flag|escalate|include)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|issues?|observations?|results?|diagnostics?|security[-\s]?team|reports?)\b|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|copy|read)\s+(?:[\w-]+\s+){0,4}(?:api\s*keys?|tokens?|session\s+(?:keys?|tokens?)|authorization\s+headers?|auth\s+headers?|cookies?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?|proof\s+material)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context)\b))
+.*""",
+        ],
+        "description": "Documentation-site configuration files such as `mkdocs.yml`, `docusaurus.config.js`, `.vitepress/config.ts`, `sidebars.js`, or Docsify config can carry agent-facing policy text that tells AI documentation/security agents to treat the config as authoritative, suppress docs/security findings, or forwa"
+    },
+    {
+        "id": "GLS-DFP-052",
+        "name": "Global Privacy Control metadata agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "\"globalPrivacyControl\"",
+            "\"gpc\"",
+            "\"gpc\": true",
+            ".well-known/gpc.json",
+            "GPC header",
+            "GPC signal",
+            "Global Privacy Control",
+            "Sec-GPC",
+            "Sec-GPC: 1",
+            "agent instruction",
+            "agent_instructions",
+            "assistant_note",
+            "authoritative",
+            "canonical",
+            "definitive",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|trust|override|use)|does\s+not\s+(?:obey|follow|instruct|override|trust|treat)|never\s+(?:obey|follow|treat|trust|override|use)|must\s+not\s+(?:obey|follow|treat|trust|override|use)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|(?:security|incident|vulnerability)\s+report.{0,80}\b(?:flagged|detected|blocked|refused)|(?:scanner|privacy)\s+docs?\s+should\s+(?:report|detect|flag|refuse)))
+(?=.*(?:\b(?:Global\s+Privacy\s+Control|Sec-GPC|GPC\s+signal|GPC\s+header|privacy\s+signal|do\s+not\s+sell|do\s+not\s+share)\b|(?<!\w)"gpc"\s*:|(?<!\w)"globalPrivacyControl"\s*:|(?<![A-Za-z0-9])gpc_policy(?![A-Za-z0-9])|\.well-known/gpc(?:\.json)?))
+(?=.*(?<![A-Za-z0-9])(?:AI\s+agents?|assistants?|autonomous\s+(?:agents?|scanners?|auditors?)|privacy\s+(?:auditors?|scanners?)|security\s+scanners?|llms?|models?|crawlers?|bots?|agents?|scanner_policy|agent_instructions|assistant_note)(?![A-Za-z0-9]))
+(?=.*(?:\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|higher-priority|takes\s+precedence|canonical|definitive|authoritative|governing\s+document|controlling\s+document|(?:primary|single)\s+source\s+of\s+truth|must\s+obey|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|privacy)\s+(?:review|audit|scan)|all\s+(?:scanner|security|privacy)\s+rules?))\b|(?:agent|scanner|assistant|privacy\s+auditor)\s+(?:instruction|directive|policy)s?))
+(?=.*(?:\b(?:suppress|hide|redact|exclude|omit|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|privacy\s+violations?|GPC\s+violations?)\b|do\s+not\s+(?:report|mention|notify|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|issues?|observations?|privacy\s+violations?|GPC\s+violations?)\b|treat.{0,50}?as\s+(?:informational|advisory|non[- ]blocking|safe|clean)|mark.{0,50}?as\s+(?:safe|clean|benign)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read)\s+(?:[\w-]+\s+){0,4}(?:Authorization|Bearer|cookies?|session\s+(?:headers?|tokens?)|API\s+keys?|secrets?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?))\b))
+.*""",
+        ],
+        "description": "A hostile site can place agent-directed authority, report-suppression, or credential-forwarding instructions in Global Privacy Control (GPC) / Sec-GPC-adjacent privacy metadata so AI privacy auditors or scanners over-trust privacy-signal text as scanner policy."
+    },
+    {
+        "id": "GLS-DFP-053",
+        "name": "Linter / formatter config metadata agent-policy poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".eslintrc",
+            ".prettierrc",
+            ".stylelintrc",
+            "agent instruction",
+            "authoritative",
+            "biome.json",
+            "canonical/definitive policy",
+            "eslint.config.*",
+            "eslintConfig",
+            "extends",
+            "formatter config",
+            "governing/controlling document",
+            "lint-staged",
+            "linter config",
+            "overrides",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|incident|vulnerability|training|reference|guide|docs?|article|runbook)\b.{0,160}\b(?:detected|blocked|flagged|refused|should\s+(?:report|detect|flag|refuse|block)|must\s+not\s+(?:obey|treat|follow|use)|do\s+not\s+(?:obey|treat|follow|use)|does\s+not\s+(?:instruct|override|obey|follow)|never\s+(?:obey|treat|override|follow))\b)
+(?!.*\b(?:linter|formatter|eslint|prettier|biome|stylelint)\s+(?:config|metadata|comments?)\s+(?:is|are)\s+not\s+(?:authoritative|policy|instructions?))
+(?!.*\bno\s+(?:agent\s+)?policy\s+overrides?\b)
+(?=.*(?:\.eslintrc|eslint\.config\.(?:js|mjs|cjs|ts)|eslintConfig|\.prettierrc|prettier\.config\.(?:js|cjs|mjs|ts)|biome\.json|stylelint\.config\.(?:js|cjs|mjs|ts)|\.stylelintrc|lint-staged|linter\s+config|formatter\s+config|static\s+analysis\s+config|rule\s+metadata|rules?\s*:\s*\[|overrides\s*:\s*\[|plugins\s*:\s*\[|extends\s*:\s*\[))
+(?=.*(?<![a-zA-Z0-9])(?:ai[-_\s]?agents?|agents?|assistants?|codex|copilot|claude|cursor|scanners?|security[-_\s]?scanners?|dependency[-_\s]?scanners?|repo[-_\s]?auditors?|automated[-_\s]?(?:review|audit)|lint[-_\s]?auditors?)(?![a-zA-Z0-9]))
+(?=.*(?:overrides?\s+(?:system|developer|scanner|security|repository)\s+(?:rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\s+(?:scanner|security|repository|developer)\s+(?:guidance|policy|rules?)|(?:primary|main|principal|authoritative)\s+(?:review|lint|scanner|audit|security)\s+(?:guidance|playbook|policy)|(?:canonical|definitive)\s+(?:project\s+|lint\s+|scanner\s+)?(?:policy|instructions?|description)|(?:agent|scanner|assistant|auditor|linter)\s+(?:instructions?|directive|policy)|takes?\s+precedence|(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|authoritative\b))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|mark.{0,40}?as\s+(?:safe|informational|non-blocking)|treat.{0,50}?as\s+(?:informational|non-blocking|advisory)|(?:keep|leave).{0,80}?\bout\s+of\s+(?:the\s+)?(?:report|summary|memo|audit|final)|(?:move|route|shift).{0,80}?(?:appendix-only|background-only|informational)|do\s+not\s+report|not\s+report|pass\s+along|forward|send|attach|include|copy|collect|provide|share|expose).{0,100}?(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|issues?|vulnerabilit(?:y|ies)|lint\s+errors?|rule\s+violations?|security\s+flags?|dependency\s+alerts?|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:context|material|details?|config(?:uration)?|settings?|state|artifacts?)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context|api\s+keys?|tokens?|authorization|cookies?|session))
+.*""",
+        ],
+        "description": "Attacker-controlled linter or formatter config metadata (`eslint.config.js`, `.eslintrc`, `.prettierrc`, `biome.json`, Stylelint config, or adjacent rule comments/custom fields) tells AI coding/security agents to treat the config as higher-priority policy, suppress findings, or forward local runtime"
+    },
+    {
+        "id": "GLS-DFP-054",
+        "name": "Sonar project properties metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agents",
+            "SonarCloud",
+            "SonarQube",
+            "agent/scanner instruction",
+            "agents",
+            "assistants",
+            "authoritative",
+            "automated review",
+            "canonical scanner policy",
+            "dependency auditors",
+            "do not/must not/never",
+            "main operating guidance",
+            "overrides",
+            "quality gate",
+            "security scanners",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:scanner\s+docs?\s+should|security\s+report:.*(?:detected|blocked|flagged|refused)|incident\s+report:.*(?:detected|blocked|flagged|refused)|training\s+(?:example|guide).*?(?:do\s+not|never|must\s+not)|(?:do|does)\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?))
+(?=.*(?:sonar-project\.properties|sonar\.projectKey|sonar\.sources|sonar\.qualitygate|sonar\.issue\.(?:ignore|enforce)|sonar\.scanner|SonarQube|SonarCloud|quality\s+gate|sonar\s+project\s+config))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|agents?|assistants?|scanners?|code\s+scanners?|security\s+scanners?|automated\s+(?:review|audit|tools)|dependency\s+auditors?|sonar\s+auditors?)(?![a-zA-Z0-9]))
+(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\s+precedence|(?:primary|single)\s+source\s+of\s+truth|canonical\s+(?:project\s+|scanner\s+|sonar\s+)?(?:description|policy|guidance)|definitive\s+(?:project\s+|scanner\s+|sonar\s+)?(?:description|policy|guidance)|governing\s+document|controlling\s+document|authoritative|main\s+operating\s+guidance|agent\s+instructions?|scanner\s+instructions?|defines?\s+(?:all\s+)?(?:scanner|security|sonar|automated\s+review)\s+rules?))
+(?=.*(?:(?:suppress|hide|redact|omit|exclude|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|issues?|warnings?|alerts?|reports?|flags?|failures?|observations?|diagnostics?|results?|quality\s+gate|hotspots?|vulnerabilit(?:y|ies))|(?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|issues?|warnings?|alerts?|reports?|flags?|failures?|observations?|diagnostics?|results?|quality\s+gate|hotspots?|vulnerabilit(?:y|ies))|treat.{0,50}?as\s+(?:informational|non-blocking|safe|clean|benign)|(?:mark|classify).{0,50}?as\s+(?:safe|clean|benign|informational)|(?:keep|leave).{0,60}?out\s+of\s+(?:the\s+)?(?:summary|report|memo|audit|quality\s+gate|audit\s+memo|final\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:api\s+keys?|api\s+tokens?|tokens?|session\s+keys?|credentials?|auth(?:orization)?\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|proof\s+material)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context)))
+.*""",
+        ],
+        "description": "A hostile `sonar-project.properties` or SonarQube/SonarCloud configuration metadata field can target AI code-review/scanner agents with authority-inversion, report-suppression, or credential-forwarding instructions disguised as scanner policy."
+    },
+    {
+        "id": "GLS-DFP-055",
+        "name": "systemd Unit File Agent Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".service",
+            ".socket",
+            ".timer",
+            "Description=",
+            "Documentation=",
+            "Environment=",
+            "ExecStart=",
+            "[Service]",
+            "[Socket]",
+            "[Timer]",
+            "[Unit]",
+            "agent_policy",
+            "do not",
+            "does not",
+            "must not",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|vulnerability|scanner|training|reference|runbook|guide)\s+(?:docs?|report|example|exercise|reference|guidance).{0,140}?\b(?:detected|blocked|flagged|refused|report|detect|flag|refuse|should\s+report|should\s+detect)|
+  scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)|
+  (?:systemd\s+)?(?:unit|service|timer)\s+(?:metadata|comments?|descriptions?)\s+(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|
+  no\s+(?:agent\s+)?policy\s+overrides?|
+  not\s+(?:authoritative|canonical|definitive)|
+  do\s+not\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|use)|
+  does\s+not\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|overrides?|instruct)|
+  never\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|overrides?|use)|
+  must\s+not\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|use)
+)\b)
+(?=.*(?:
+  (?<![A-Za-z0-9])(?:systemd(?:\.service|\.timer|\.socket)?|systemctl|journalctl)(?![A-Za-z0-9])|
+  (?:^|[\n\r])\s*\[(?:Unit|Service|Timer|Socket|Install)\]\s*|
+  (?<![A-Za-z0-9])(?:Description|Documentation|Environment|EnvironmentFile|ExecStart|ExecReload|User|Group)\s*=|
+  \.(?:service|timer|socket)\b|unit\s+file|service\s+unit|timer\s+unit
+))
+(?=.*(?:
+  (?<![A-Za-z0-9])(?:ai|autonomous|coding|security|dependency|ops|devops)?[-_\s]*(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|llms?|models?)(?![A-Za-z0-9])|
+  (?<![A-Za-z0-9])(?:agent|assistant|scanner|auditor|reviewer)[_-](?:policy|instructions?|note|guidance)(?![A-Za-z0-9])
+))
+(?=.*(?:
+  overrides?|supersed(?:e|es|ed|ing)?|outranks?|overrules?|takes\s+precedence|highest\s+priority|(?:primary|single)\s+source\s+of\s+truth|canonical|definitive|authoritative|governing\s+(?:document|policy)|controlling\s+(?:document|policy)|defines?\s+(?:(?:all|the)\s+)?(?:scanner|security|agent|review|audit|systemd|service)?\s*rules?|(?:main|primary|principal)\s+(?:operating|review|audit|scanner)\s+(?:guidance|playbook|policy)|(?:agent|scanner|assistant|auditor|reviewer)\s+(?:instructions?|directive|policy)
+))
+(?=.*(?:
+  (?:suppress|hide|redact|exclude|omit|skip|silence)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|mismatches?|failures?)|
+  (?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|mismatches?|failures?)|
+  (?:treat|mark|classify|rate)\s+.{0,60}?\s+as\s+(?:informational|non[-\s]?blocking|safe|clean|benign|advisory(?:-only)?)|
+  (?:downgrade|move|route|shift)\s+.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)\s+.{0,80}?(?:background|appendix|informational|non[-\s]?blocking|advisory)\s+(?:notes?|section|memo|summary)|
+  (?:keep|leave)\s+.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?|failures?)\s+out\s+of\s+(?:the\s+)?(?:reports?|summaries|memos?|audit\s+memo|final\s+report|review\s+memo|incident\s+report)|
+  (?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\s+along)\s+(?:[\w-]+\s+){0,5}(?:api\s+keys?|tokens?|session\s+(?:keys?|tokens?)|bearer|authorization\s+headers?|credentials?|secrets?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|material|artifacts?|evidence)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context|unit\s+environment)
+))
+.*""",
+        ],
+        "description": "A malicious `systemd` unit file, generated `systemctl show` dump, or service/timer metadata field can target AI agents or security scanners with fake authority, report-suppression, or credential-forwarding instructions embedded in otherwise inert service configuration text."
+    },
+    {
+        "id": "GLS-DFP-056",
+        "name": "Terraform Module/Provider Registry Agent-Policy Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".tfstate",
+            ".tfvars",
+            "AI agents",
+            "DevOps agents",
+            "IaC agents",
+            "LLMs",
+            "OpenTofu",
+            "agent/scanner instructions",
+            "agent_policy",
+            "assistant_note",
+            "auditors",
+            "authoritative",
+            "canonical",
+            "checks",
+            "coding assistants",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)
+ |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)
+ |never\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
+ |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
+ |should\s+(?:report|detect|flag|refuse|block|not\s+\w+|never\b)
+ |(?:scanner|security|incident|vulnerability)\s+reports?.{0,120}\b(?:detected|blocked|flagged|refused)
+ |(?:scanner|security)\s+docs?\s+should\s+(?:report|detect|flag|refuse)
+ |(?:training|guide|article|reference).{0,100}\b(?:do\s+not|never|must\s+not)\s+(?:obey|treat|trust|follow)
+ |no\s+(?:agent|scanner|assistant)\s+instructions?\s+(?:are\s+)?present
+))
+(?=.*(?:\b(?:terraform|opentofu|hcl|registry\.terraform\.io|provider\s+registry|module\s+registry|terraform\s+registry|terraform\s+cloud|variables?\.tf|outputs?\.tf|providers?\.tf|terraform\.tfvars|tfvars|tfstate|\.tfstate|terraform\.lock\.hcl|required_providers|provider\s+schema|resource\s+schema|data\s+source|plan\s+output|drift\s+detection)\b|\b(?:module|provider|resource|data|variable|output)\s+"|\bdescription\s*=|\bsensitive\s*=|\bvalidation\s*\{|\blocals\s*\{|(?<!\w)"(?:description|variables?|outputs?|provider|resources?|data_sources?|required_providers|x[-_]agent[-_]policy|scanner_policy|agent_instructions)"\s*:))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai\s+agents?|agents?|assistants?|coding\s+agents?|devops\s+agents?|iac\s+agents?|terraform\s+agents?|opentofu\s+agents?|security\s+scanners?|dependency\s+scanners?|scanners?|verifiers?|auditors?|llms?|models?)(?![a-zA-Z0-9])|(?:agent|scanner|assistant|verifier|auditor)[_-](?:policy|instructions?|note|directive)|your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies))))
+(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|canonical(?:\s+(?:project|security|governing|policy|registry|module))?(?:\s+(?:description|policy|document))?|definitive(?:\s+(?:project|security|module))?(?:\s+(?:description|policy))?|(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|is\s+the\s+final\s+word|\bauthoritative\b|defines?\s+all\s+(?:scanner|security|agent)\s+rules?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:automated|ai|scanner|security|agent|iac)\s+(?:review|audit|scan)|(?:agent|scanner|assistant|verifier|auditor)\s+instructions?|(?:agent|scanner|assistant|verifier|auditor)[._-](?:policy|instructions?|note)|\bfor\s+(?:ai\s+)?(?:agents?|scanners?|assistants?|coding\s+agents?|iac\s+agents?).{0,25}?\bthis\b|(?:scanner|agent|assistant|auditor)\s+(?:directive|notice)))
+(?=.*(?:
+  suppress(?:es|ed|ing)?.{0,45}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|violations?|drift|plan\s+diffs?|policy\s+failures?)
+ |hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|violations?|drift|plan\s+diffs?)
+ |(?:do\s+not|don't)\s+(?:report|flag|escalate).{0,45}(?:findings?|warnings?|alerts?|reports?|issues?|violations?|drift|plan\s+diffs?|policy)
+ |skip\b.{0,40}?\b(?:security\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|policy\s+checks?)\b
+ |omit.{0,35}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|violations?|drift|plan\s+diffs?)
+ |exclude.{0,2}(?:[\w-]+\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|violations?|drift|plan\s+diffs?)
+ |redact.{0,35}?(?:findings?|warnings?|flags?|violations?|drift)
+ |treat.{0,45}?as\s+(?:informational|safe|low|none|non[-\s]?blocking|benign)
+ |mark.{0,45}?as\s+(?:informational|safe|low|none|clean|benign)
+ |classify.{0,35}?(?:as\s+)?(?:informational|low|none|false\s+positive|benign)
+ |flag.{0,45}?as\s+(?:informational|low|none|false\s+positive)
+ |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate)\s+(?:[\w.-]+\s+){0,4}(?:terraform\.tfvars|tfvars|\.tfstate|tfstate|local\s+state|state\s+file|(?:environment|runtime)\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|local\s+(?:state|config(?:uration)?|settings?)|(?:api|bearer|session|auth|terraform\s+cloud|cloud|aws|gcp|azure)\s+(?:keys?|tokens?|credentials?)|credentials?|secrets?|authorization|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GITHUB_TOKEN|TF_TOKEN[\w-]*)
+))""",
+        ],
+        "description": "Terraform/OpenTofu module and provider metadata can embed agent-targeted policy instructions in `description`, README-derived registry text, variable/output docs, provider schema docs, or `x-agent`-style sidecar fields that tell IaC agents to suppress drift/security findings or forward local Terrafo"
+    },
+    {
+        "id": "GLS-DFP-057",
+        "name": "OPA/Rego policy metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".manifest",
+            ".rego",
+            "AI agents",
+            "ConstraintTemplate",
+            "Gatekeeper",
+            "IaC scanners",
+            "agent instruction",
+            "agent_instructions",
+            "authoritative",
+            "automated admission review",
+            "canonical review playbook",
+            "conftest",
+            "deny[...]",
+            "dependency scanners",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|incident|training|reference|guide|docs?|runbook)\b.{0,140}\b(?:detected|blocked|flagged|refused|must\s+be\s+reported|reported,\s+not\s+obeyed|should\s+report|should\s+detect)\b)
+(?!.*\b(?:OPA|Rego|Gatekeeper|ConstraintTemplate|policy\.rego|conftest|policy-as-code|policy\s+metadata)\b.{0,120}\b(?:is\s+not|are\s+not|not\s+authoritative|should\s+never|must\s+not|do\s+not|does\s+not|never)\b.{0,90}\b(?:authoritative|agent\s+policy|review\s+policy|override|overrides?|obey|treat|trust|forward|include)\b)
+(?=.*(?:\b(?:policy\.rego|\.rego|rego\s+policy|OPA\s+(?:bundle|policy|manifest)|open\s+policy\s+agent|conftest|Gatekeeper|ConstraintTemplate|deny\s*\[|violation\s*\[|package\s+[a-z0-9_.-]+)\b|(?<![A-Za-z0-9])(?:agent_instructions|scanner_policy|policy_metadata)(?![A-Za-z0-9])))
+(?=.*(?<![A-Za-z0-9])(?:AI\s+agents?|security\s+agents?|policy\s+reviewers?|automated\s+(?:admission|policy|security)\s+review|IaC\s+scanners?|dependency\s+scanners?|platform\s+agents?|review\s+bots?|agents?|scanners?|agent_instructions|scanner_policy)(?![A-Za-z0-9]))
+(?=.*\b(?:canonical\s+(?:review\s+)?(?:playbook|policy|guidance)|main\s+operating\s+guidance|primary\s+(?:policy\s+)?source\s+of\s+truth|authoritative\s+(?:policy|guidance|source)|overrides?\s+(?:scanner|security|agent|system|developer)\s+(?:guidance|rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\s+(?:scanner|security|agent|system|developer)\s+(?:guidance|rules?|polic(?:y|ies)|instructions?)|(?:agent|scanner|policy\s+reviewer)\s+(?:instructions?|directives?))\b)
+(?=.*\b(?:(?:suppress|hide|omit|exclude|redact)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|violations?|admission\s+findings?)|(?:downgrade|reclassify|route|move|shift)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|results?|diagnostics?|observations?|violations?)\s+(?:[\w-]+\s+){0,5}(?:background\s+notes?|informational|advisory-only|non-blocking|appendix-only)|(?:keep|leave)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|observations?|violations?|results?)\s+out\s+of\s+(?:the\s+)?(?:reports?|summaries|memos?|audit\s+memo|final\s+report)|(?:pass\s+along|share|forward|send|include|attach|provide|expose)\s+(?:[\w-]+\s+){0,4}(?:execution\s+context|runtime\s+(?:context|details?|settings?|state|proof|material|evidence)|environment\s+(?:variables?|context|details?|settings?|state)|local\s+(?:state|config(?:uration)?|settings?)|API\s+keys?|tokens?|Authorization\s+headers?))\b).*""",
+        ],
+        "description": "OPA/Rego policy files and policy-bundle metadata can carry agent-directed instructions that tell AI security/review agents to treat policy comments, package metadata, ConstraintTemplate descriptions, or Conftest output as higher-priority review policy, suppress findings, or forward runtime/context m"
+    },
+    {
+        "id": "GLS-RMP-001",
+        "name": "GitHub Issue/PR Template Poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "(up to 2 intervening words) instead of",
+            ".github/ISSUE_TEMPLATE/",
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            "ISSUE_TEMPLATE",
+            "Note: This regex uses",
+            "PULL_REQUEST_TEMPLATE",
+            "about:",
+            "assignees:",
+            "config.yml",
+            "do\\s+not",
+            "include",
+            "name: Bug Report",
+            "name: Feature Request",
+            "name: Security Issue",
+            "name: Vulnerability Report",
+        ],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:never\s+(?:treat|obey|override|overrides?|follow|forward|include|suppress)|must\s+not\s+(?:treat|obey|follow|use|forward|include|suppress)|do\s+not\s+(?:treat|obey|follow|forward)|should\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged|training\s+example|security\s+report|incident\s+report|vulnerability\s+report|docs\s+should\s+report|scanner\s+docs?\s+should\s+(?:report|detect|flag|refuse)|learn\s+how\s+scanners?\s+should\s+report|scanners?\s+should\s+(?:report|detect|flag|refuse)\b|is\s+not\s+policy\s+and\s+never\s+overrides|does\s+not\s+instruct\s+agents?\s+to\s+(?:forward|include|suppress|override)|template\s+is\s+not\s+authority|never\s+obey\s+template\s+instructions?)\b)(?=.*\b(?:ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE|issue[_\s]template|pull[_\s]request[_\s]template|\.github[/\\](?:ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE)|config\.yml.*ISSUE_TEMPLATE|name:\s*(?:Bug\s*Report|Feature\s*Request|Vulnerability\s*Report|Security\s*Issue)|about:\s*(?:Report\s+(?:a\s+)?(?:bug|vulnerability|security|issue)|Request\s+a\s+feature)|##\s*Description.*##\s*Checklist|##\s*Type\s+of\s+Change.*##\s*Checklist|assignees:\s+[\w@-]+)\b)(?=.*\b(?:agents?|assistants?|AIs?|coding\s+assistants?|scanners?|copilot|cursor|codex|claude|llms?)\b)(?=.*\b(?:takes?\s+precedence|authoritative|overrides?\s+(?:system|developer|user|security|reporter)|outranks?\s+(?:system|scanner|security)|supersede\w*\s+(?:system|scanner)|highest\s+priority|governing\s+document|primary\s+source\s+of\s+truth|include\s+(?:[-\w]+\s+){0,2}(?:environment\s+variables?|API\s+keys?|tokens?|\.env|session\s+identifiers?)|paste\s+(?:your\s+)?\.env|forward\s+(?:[-\w]+\s+){0,2}(?:environment\s+variables?|tokens?|local\s+state)|attach\s+(?:[-\w]+\s+){0,2}(?:environment\s+variables?|runtime\s+env|API\s+keys?)|provide\s+(?:[-\w]+\s+){0,2}(?:local\s+config(?:uration)?|environment\s+context)|share\s+(?:[-\w]+\s+){0,2}(?:environment\s+context|runtime\s+env)|omit\s+(?:\w+\s+){0,2}(?:security\s+)?(?:findings?|alerts?|warnings?|vulnerabilities?)|exclude\s+(?:from\s+)?(?:the\s+)?(?:final\s+)?(?:report|findings?|summary)|treat\s+as\s+informational|redact\s+(?:[-\w]+\s+){0,2}(?:findings?|alerts?|flags?)|do\s+not\s+(?:run|execute)\s+(?:security\s+)?scanners?|skip\s+code\s+review|bypass\s+(?:security\s+)?review|suppress\s+(?:all\s+)?(?:scanner|security)\s+(?:findings?|alerts?|warnings?)|suppress(?:es|ed|ing)?\s+(?:findings?|alerts?|warnings?|reports?)|hide\s+(?:this\s+)?(?:finding|report|from\s+(?:reports?|scanners?|users?))|(?:add|assign)\s+@[\w-]+\s+as\s+(?:the\s+)?(?:\w+\s+)?reviewer|do\s+not\s+include\s+@\w+|must\s+complete\s+all\s+sections\s+as\s+instructed|do\s+not\s+mention\s+(?:this|in\s+reports?))\b)(?=.*\b(?:secrets?|tokens?|API[_\s]keys?|environment\s+variables?|credentials?|\.env|session\s+identifiers?|local\s+state|findings?|alerts?|reports?|scanners?|code\s+review|reviewers?|security[_\s]team)\b).*""",
+        ],
+        "description": "An attacker embeds hostile instructions in `.github/ISSUE_TEMPLATE/*.md`, `.github/PULL_REQUEST_TEMPLATE.md`, or YAML template config files that AI coding agents fill out when creating GitHub issues and PRs \u2014 causing agent-generated issues to include secrets, suppress security findings, and manipula"
+    },
+    {
+        "id": "GLS-RMP-002",
+        "name": "LICENSE / COPYING File Agent Policy Poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agent",
+            "API_KEY",
+            "Automated System",
+            "GITHUB_TOKEN",
+            "automated analysis",
+            "bearer token",
+            "canonical governing document",
+            "canonical policy",
+            "classify as informational",
+        ],
+        "regex": [
+            r"""(?six)
+(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust)|never\s+(?:obey|include|attach|forward|send|share|report|override|trust)|must\s+not\s+(?:obey|include|attach|forward|send|share|report|override|trust)))
+(?=.*(?:\b(?:LICENSE|COPYING|Permission\s+is\s+hereby\s+granted|MIT\s+License|Apache\s+License|GPL|BSD)\b|\bcopyright\s+\([cC]\)))
+(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|automated\s+(?:analysis|system|tool)s?|coding\s+assistants?|language\s+models?|automated\s+system|LLMs?)(?![a-zA-Z0-9]))
+(?=.*\b(?:governing\s+document|takes?\s+precedence|overrides?|outranks?|supersedes?|canonical|(?:agent|scanner|assistant|verifier|crawler)\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note))\b)
+(?=.*(?:\b(?:API[_.-]?KEY|GITHUB[_.-]?TOKEN|OPENAI[_.-]?API[_.-]?KEY|ANTHROPIC[_.-]?API[_.-]?KEY|bearer\s+token|environment\s+(?:variables?|context)|session\s+(?:tokens?|metadata)|local\s+state)\b|\b(?:include|attach|forward|send|collect|embed|provide|share)\b.{0,40}?\b(?:environment\s+(?:variables?|context)|tokens?|credentials?|API\s+keys?|secrets?|session)\b|\b(?:(?:informational|low|none)\s+only|do\s+not\s+flag|omit\s+from\b.{0,20}?\b(?:reports?|summar(y|ies)|outputs?|findings?)|suppress\b.{0,30}?\b(?:findings?|warnings?|alerts?|reports?|flags?)|classify\b.{0,30}?\b(?:informational|low|none)|hide\b.{0,40}?\b(?:findings?|warnings?|alerts?|reports?)|redact\b.{0,30}?\b(?:findings?|warnings?|flags?))\b|\boverrides?\b.{0,30}?\b(?:system\s+prompt|safety\s+polic|built-in|default|developer|user\s+instruction)\b|\btakes?\s+precedence\s+over\b.{0,20}?\b(?:system|safety|developer|user)\b|\b(?:transparency\s+(?:header|addendum|requirement)|compliance\s+(?:addendum|requirement|provision)|canonical\s+(?:governing|policy|project|model)(?:\s+(?:description|policy|document))?)\b))""",
+        ],
+        "description": "An attacker embeds hostile AI-agent instructions in a repository's LICENSE or COPYING file, blending them with legitimate legal text to exploit the agent's tendency to treat license terms as binding governance \u2014 tricking the agent into leaking credentials, suppressing security findings, and treating"
+    },
+    {
+        "id": "GLS-RMP-003",
+        "name": "CODEOWNERS Reviewer Metadata Poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".github/CODEOWNERS",
+            "CODEOWNERS",
+            "OWNERS",
+            "OWNERS_ALIASES",
+            "agent instruction",
+            "authoritative",
+            "defines review/scanner rules",
+            "governing document",
+            "overrides",
+            "review owners",
+            "scanner directive",
+            "source of truth",
+            "supersedes",
+            "takes precedence",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:(?:security|incident|vulnerability)\s+report.{0,120}\b(?:flagged|detected|blocked|refused)\b|(?:scanner|reviewer|security)\s+docs?\s+should\s+(?:report|detect|flag|refuse)|scanners?\s+should\s+(?:report|detect|flag|refuse)\s+.{0,80}\bCODEOWNERS\b|(?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|treat|trust|override|overrides?)\s+.{0,80}\b(?:CODEOWNERS|OWNERS)\b|never\s+(?:obey|follow|treat|trust|override|overrides?)\s+.{0,80}\b(?:CODEOWNERS|OWNERS)\b|owner\s+metadata\s+is\s+not\s+(?:agent\s+)?policy|CODEOWNERS\s+(?:is|are)\s+not\s+(?:agent\s+)?(?:policy|authority)|no\s+(?:policy\s+)?overrides?\s+are\s+present|training\s+example.{0,120}\b(?:must\s+not|do\s+not)\s+(?:obey|follow|treat|trust)))
+(?=.*(?:\bCODEOWNERS\b|\.github[/\\]CODEOWNERS\b|\bOWNERS(?:_ALIASES)?\b|\breview\s+owners?\b|\bpath\s+owners?\b|@[-\w]+/[-\w]+\s*$|/[\w*./-]+\s+@[-\w/]+))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+)?(?:agents?|assistants?|coding\s+assistants?|security\s+scanners?|scanners?|review\s+bots?|pr\s+bots?|copilot|cursor|codex|claude|llms?)(?![a-zA-Z0-9]))
+(?=.*\b(?:agent\s+instructions?|scanner\s+directives?|review\s+bot\s+instructions?|authoritative|canonical|definitive|governing\s+document|controlling\s+document|(?:primary|single)\s+source\s+of\s+truth|takes?\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|defines?\s+(?:(?:all|the)\s+)?(?:review|scanner|security|routing)\s+rules?)\b)
+(?=.*\b(?:(?:suppress|hide|omit|redact|exclude|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|summaries?|results?|diagnostics?|observations?|checks?)|treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|clean)|(?:do\s+not|don't)\s+(?:report|mention|include|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|security\s+team|security\s+reviewers?|owners?|reports?|observations?)|(?:omit|remove|exclude)\s+(?:[\w-]+\s+){0,3}(?:security\s+)?(?:reviewers?|owners?|teams?)|add\s+(?:only\s+)?@[-\w/]+\s+as\s+(?:the\s+)?(?:only\s+)?reviewer|route\s+(?:only\s+)?to\s+@[-\w/]+|(?:include|attach|forward|send|share|provide|expose)\s+(?:[\w-]+\s+){0,4}(?:API\s+keys?|tokens?|credentials?|secrets?|auth(?:orization)?\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)))\b)
+.*""",
+        ],
+        "description": "A malicious `CODEOWNERS` / `OWNERS` reviewer-routing file can hide agent-directed instructions in comments or owner notes that tell AI coding agents and review bots to suppress findings, omit security reviewers, or attach local secrets when preparing PRs."
+    },
+    {
+        "id": "GLS-RMP-004",
+        "name": "GitHub release notes agent-policy poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "CHANGELOG",
+            "GitHub Release",
+            "agent instruction",
+            "agent_instructions",
+            "canonical upgrade policy",
+            "defines the rules for automated review",
+            "overrides scanner defaults",
+            "primary/single source of truth",
+            "release body",
+            "release notes",
+            "scanner_policy",
+            "tag_name",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:
+  (?:security|incident|vulnerability|scanner|training|guide|docs?|reference|article|runbook|postmortem).{0,120}?(?:blocked|detected|flagged|refused|reported|warns?\s+about|should\s+(?:report|detect|flag|refuse|block)|must\s+not\s+(?:treat|obey|follow|use)|do\s+not\s+(?:treat|obey|follow|use|forward|send|share|attach|include)|does\s+not\s+(?:treat|obey|follow|use|override|overrides?|trust)|never\s+(?:treat|obey|follow|use|override|overrides?|trust))
+  |(?:do\s+not\s+(?:obey|follow|treat|use|forward|send|share|attach|include)|does\s+not\s+(?:obey|follow|treat|use|override|overrides?|trust)|never\s+(?:obey|follow|treat|use|override|overrides?|trust)|must\s+not\s+(?:obey|follow|treat|use|override|overrides?|trust)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block))\b.{0,120}?(?:release\s+notes?|changelog|release\s+body|GitHub\s+Release|GitLab\s+Release)
+  |no\s+(?:agent\s+)?policy\s+overrides?
+  |release\s+notes?\s+(?:are|is)\s+not\s+(?:agent\s+)?policy
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:GitHub|GitLab)\s+Release(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])release[-_\s]notes?(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])release[-_\s]body(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])tag_name(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])CHANGELOG(?:\.md)?(?![a-zA-Z0-9])
+  |generated\s+changelog
+  |release\s+assets?
+  |gh\s+release\s+view
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:ai|autonomous|dependency|security|upgrade|release|devops)\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|models?|llms?)(?![a-zA-Z0-9])
+  |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|auditor|reviewer)[-_]?(?:instructions?|policy|note|directive)(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  overrides?\s+(?:system|developer|scanner|security|repository|upgrade|dependency)\s+(?:rules?|polic(?:y|ies)|instructions?|defaults?)
+  |supersed(?:e|es|ed|ing)\s+(?:scanner|security|repository|system|developer)\s+(?:rules?|polic(?:y|ies)|instructions?)
+  |takes?\s+precedence\s+over\s+(?:scanner|security|system|developer|repository)
+  |(?:primary|single)\s+source\s+of\s+truth
+  |canonical\s+(?:upgrade\s+|project\s+|release\s+|dependency\s+)?(?:description|policy|instructions?)
+  |definitive\s+(?:upgrade\s+|project\s+|release\s+|dependency\s+)?(?:description|policy|instructions?)
+  |governing\s+(?:document|policy|instructions?)
+  |controlling\s+(?:document|policy|instructions?)
+  |authoritative(?:\s+(?:source|policy|instructions?))?
+  |overrules?\s+(?:scanner|security|system|developer|repository)
+  |defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent|dependency)\s+(?:review|audit|scan|upgrade)|all\s+(?:scanner|security|dependency)\s+rules?)
+  |(?:agent|scanner|assistant|auditor|reviewer)\s+(?:instructions?|directive|policy)
+))
+(?=.*(?:
+  (?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output)
+  |(?:omit|exclude|redact|downgrade|deprioriti[sz]e|reclassify)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output)
+  |(?:treat|mark|classify|flag).{0,50}?as\s+(?:informational|non[-\s]?blocking|advisory[-\s]?only|safe|clean|non[-\s]?actionable)
+  |(?:do\s+not|not)\s+(?:report|escalate|flag|include)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output)
+  |(?:include|attach|forward|send|share|provide|expose|collect|copy|read|embed)\s+(?:[\w-]+\s+){0,4}(?:API\s+keys?|access\s+tokens?|GitHub\s+tokens?|Bearer\s+tokens?|session\s+tokens?|secrets?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|CI\s+(?:variables?|secrets?|context)|auth(?:entication)?\s+(?:headers?|context))
+))
+(?=.*(?:
+  findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\s+output
+  |API\s+keys?|access\s+tokens?|GitHub\s+tokens?|Bearer\s+tokens?|session\s+tokens?|secrets?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|CI\s+(?:variables?|secrets?|context)|auth(?:entication)?\s+(?:headers?|context)
+))
+.{0,6000}""",
+        ],
+        "description": "Attacker-controlled release notes, changelog entries, or release API `body` fields can smuggle agent/scanner-directed instructions that claim authority over the review, suppress upgrade findings, or request local environment and token details."
+    },
+    {
+        "id": "GLS-RMP-005",
+        "name": ".gitmodules Submodule Metadata Agent Policy Poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".gitmodules",
+            "[submodule \"...\"]",
+            "assistant_note",
+            "branch",
+            "git config -f .gitmodules",
+            "git submodule",
+            "ignore",
+            "path",
+            "scanner_policy",
+            "shallow",
+            "submodule.<name>",
+            "update",
+            "url",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:scanner|scanners|security|incident|vulnerability|training|documentation|docs?)\s+(?:docs?|report|guide|reference|runbook|corpus|example|exercise).{0,180}\b(?:detected|blocked|flagged|refused|should\s+(?:report|detect|flag|refuse)|must\s+(?:report|detect|flag|refuse)))
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|treat|follow|trust|use|execute).{0,120}\b(?:metadata|git\s+submodules?|submodule|\.gitmodules).{0,120}\b(?:policy|authority|instruction|rules?))
+(?!.*\b(?:not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?))
+(?=.*(?:(?:^|[\s/`"'])\.gitmodules(?![A-Za-z0-9_-])|\[\s*submodule\s+"[^"]+"\s*\]|\bgit\s+submodules?\b|\bgit\s+config\s+-f\s+\.gitmodules\b|\bsubmodule\.[A-Za-z0-9_.-]+\.(?:path|url|branch|update|shallow|ignore)\b|\bsubmodule\.(?:path|url|branch|update|metadata|configuration)\b|\bsubmodule\s*(?:path|url|branch|update|metadata|configuration)\b|\b(?:path|url|branch|update|shallow|ignore)\s*=.{0,120}\bsubmodule\b))
+(?=.*(?:(?<![A-Za-z0-9])(?:ai|autonomous|dependency|security|supply-chain|repository|code|review|audit)\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|models?|llms?)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|models?|llms?)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:agent|assistant|scanner|auditor|crawler)[._-]?(?:policy|instructions?|note)(?![A-Za-z0-9])))
+(?=.*(?:\bauthoritative\b|\bcanonical\b|\bdefinitive\b|\bgoverning\s+document\b|\bcontrolling\s+document\b|\b(?:primary|single)\s+source\s+of\s+truth\b|\btakes?\s+precedence\b|\boverrides?\b|\boverrules?\b|\bsupersed(?:e|es|ed|ing)\b|\boutranks?\b|\bdefines?\s+(?:all\s+)?(?:scanner|security|agent|review|audit)?\s*rules?\b|\b(?:agent|scanner|assistant|auditor|crawler)\s+(?:instructions?|directives?|policy)\b))
+(?=.*(?:\b(?:suppress|hide|redact|exclude|omit|skip|ignore)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|flags?|issues?|observations?|diagnostics?|results?|anomal(?:y|ies)|dependency|submodule|provenance|url\s+mismatch|unsigned\s+commit|detached\s+HEAD|supply-chain\s+warnings?)\b|\b(?:keep|leave)\s+.{0,80}?\bout\s+of\s+(?:the\s+)?(?:memo|summary|report|audit\s+memo|review\s+notes?|final\s+report)\b|\btreat\s+.{0,80}?\bas\s+(?:informational|non[- ]blocking|safe|clean|benign)\b|\bmark\s+.{0,80}?\bas\s+(?:safe|clean|trusted|verified)\b|\b(?:do\s+not|don't|do\s+not\s+ever)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|issues?|observations?|diagnostics?|anomal(?:y|ies)|dependency|submodule|provenance)\b|\b(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|read|copy|populate)\s+(?:[\w-]+\s+){0,5}(?:api\s+keys?|api\s+tokens?|tokens?|session\s+(?:keys?|tokens?)|cookies?|authorization\s+headers?|auth\s+headers?|credentials?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|details?|proof\s+material|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?))\b))""",
+        ],
+        "description": "Repository `.gitmodules` files can carry attacker-controlled comments or extension-like metadata that target AI dependency/security agents, falsely assert scanner authority, and instruct them to suppress submodule findings or forward local credentials/runtime state."
+    },
+    {
+        "id": "GLS-RMP-006",
+        "name": "Pull Request Template Agent Policy Poisoning",
+        "category": "repo_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".github/PULL_REQUEST_TEMPLATE",
+            "@security-team",
+            "AI coding assistant",
+            "Claude",
+            "Codex",
+            "Copilot",
+            "PR template",
+            "PULL_REQUEST_TEMPLATE.md",
+            "agent",
+            "agent instruction",
+            "authoritative",
+            "automated review",
+            "defines rules",
+            "dependency reviewer",
+            "do not include @security-team",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|trust|treat|override|overrides?)\b|
+  does\s+not\s+(?:obey|follow|trust|treat|override|overrides?)\b|
+  never\s+(?:obey|follow|trust|treat|override|overrides?)\b|
+  must\s+not\s+(?:obey|follow|trust|treat|override|overrides?)\b|
+  should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)\b|
+  no\s+(?:agent\s+)?policy\s+overrides?\b|
+  not\s+(?:authoritative|canonical|definitive)\b|
+  (?:security|scanner|training|incident|vulnerability)\s+(?:docs?|guide|report|reference).*\b(?:detected|flagged|blocked|refused)\b|
+  (?:learn\s+how|guide|reference|training).*\bscanners?\s+should\s+(?:report|detect|flag|refuse)\b
+))
+(?=.*(?:
+  PULL_REQUEST_TEMPLATE(?:\.md)?|\.github/PULL_REQUEST_TEMPLATE|pull\s+request\s+template|PR\s+template|pr\s+body|pull\s+request\s+checklist|generated\s+PR\s+(?:body|description)
+))
+(?=.*(?:
+  AI\s+(?:coding\s+)?assistants?|coding\s+agents?|review\s+bots?|dependency\s+review(?:ers?)?|automated\s+review|security\s+scanners?|scanners?|agents?|Copilot|Codex|Claude
+))
+(?=.*(?:
+  (?:agent|scanner|assistant|review\s+bot|dependency\s+review)\s+instructions?|authoritative\b|canonical\b|definitive\b|governing\s+document|(?:primary|single)\s+source\s+of\s+truth|main\s+operating\s+guidance|takes\s+precedence|overrides?\s+(?:scanner|security|system|developer|repository)\s+(?:policy|rules?|instructions?)|supersed(?:e|es|ed|ing)|defines?\s+(?:(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent)\s+(?:review|audit|scan)|all\s+(?:scanner|security|review)\s+rules?)
+))
+(?=.*(?:
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)|
+  hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)|
+  omit\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|security\s+reviewers?|@security-team)|
+  downgrade\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|observations?|diagnostics?|dependency\s+alerts?)\s+(?:into|to|as)\s+(?:background|informational|non[-\s]?blocking)|
+  treat.{0,60}?as\s+(?:informational|non[-\s]?blocking|advisory[-\s]?only)|
+  (?:do\s+not\s+include|skip|exclude|remove|leave\s+out)\s+(?:[\w@/-]+\s+){0,4}(?:@security-team|security\s+reviewers?|required\s+reviewers?|reviewers?|approvers?|maintainers?)|
+  (?:attach|include|forward|send|share|provide|pass\s+along|copy|paste)\s+(?:[\w-]+\s+){0,4}(?:API\s+keys?|tokens?|secrets?|cookies?|authorization\s+headers?|session\s+tokens?|env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?))
+))
+(?=.*(?:
+  findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|reviewers?|approvers?|maintainers?|@security-team|API\s+keys?|tokens?|secrets?|cookies?|authorization\s+headers?|session\s+tokens?|env(?:ironment)?\s+variables?|runtime\s+(?:context|details?|settings?)|local\s+(?:state|config(?:uration)?|settings?)
+))
+.*""",
+        ],
+        "description": "A hostile `PULL_REQUEST_TEMPLATE.md` can smuggle agent-facing instructions into the PR authoring workflow, telling AI coding agents or review bots that the template is authoritative policy and should suppress findings, omit reviewers, or include local secrets in the PR body."
+    },
 ]
