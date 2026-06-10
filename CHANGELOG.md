@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.65] — 2026-06-10
+
+### Added (discovery_file_poisoning expansion)
+
+- **+19 discovery_file_poisoning patterns** (`GLS-DFP-058`..`GLS-DFP-082`, excluding 060/063/066/069/070/076) — new coverage for poisoned discovery surfaces: Allure/test-report metadata, `security.txt`, `.well-known` manifests, syndication feeds, and related agent-policy carriers. **1,019 → 1,038 patterns / 65 categories / 7,548 keywords.**
+- 6 patterns from the same batch were **held back** for false-positive tightening (they fired on clean code/docs) — the FP credibility gate from v0.2.64 caught them before ship. They will return after regex hardening.
+
+### Fixed (credibility)
+
+- Genericized 3 pattern descriptions that referenced internal operator paths/filenames (no detection change) — public surfaces no longer expose internal infrastructure naming.
+
 ## [0.2.64] — 2026-06-09
 
 ### Fixed (engine reliability — false positives + scanner hang)
