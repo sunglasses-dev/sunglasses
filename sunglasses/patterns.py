@@ -9035,7 +9035,7 @@ PATTERNS = [
             r"(?i)(?:write|append|log|record)\s+(?:fake|forged|fabricated|premature)\s+(?:success|status|completion|done)\s+(?:before|prior\s+to|without|skipping)\s+(?:verification|validation|run|execution)",
             r"(?i)(?:status|reply|append|audit)\s+(?:log|file|trail)\s+(?:desync|drift|divergence|laundering|truncation\s+blindspot)"
         ],
-        "description": "GO MODE relies on append-only status artifacts (cava_wins_log.md + CAVA_REPLY_*) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims."
+        "description": "GO MODE relies on append-only status artifacts (wins-log files and status-reply files) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims."
     },
     {
         "id": "GLS-AW-019",
@@ -9246,7 +9246,7 @@ PATTERNS = [
             r"(?i)(?:prepend|inject|insert)\s+(?:stale|outdated|old|prior)\s+(?:BLOCKED?|FAIL(?:ED)?|READY|status|verdict)\s+(?:section|block|header|heading)",
             r"(?i)(?:near[- ]identical|duplicate|colliding)\s+(?:heading|marker|status\s+label|section\s+title)\s+(?:so|to)\s+(?:tool|parser|operator)"
         ],
-        "description": "In GO MODE operations, /opt/sunglasses/review/CAVA_REPLY_... is treated as a high-trust operator status surface. Attackers can inject or preserve stale status blocks so that old blocker text overshadows fresh cycle outcomes. This can force bad prioritization (re-open solved tasks, suppress live P0 pivots, or mislabel readiness). The failure mode is subtle because the reply file is expected to be append-only and long."
+        "description": "In GO MODE operations, an append-only operator status file is treated as a high-trust status surface. Attackers can inject or preserve stale status blocks so that old blocker text overshadows fresh cycle outcomes. This can force bad prioritization (re-open solved tasks, suppress live P0 pivots, or mislabel readiness). The failure mode is subtle because the reply file is expected to be append-only and long."
     },
     {
         "id": "GLS-AW-027",
@@ -9655,7 +9655,7 @@ PATTERNS = [
         "regex": [
             r"""(?i)(?:(?:forge|fabricate|inject|append)\s+(?:cava[- ]reply|wins[- ]log|status[- ]log|reply[- ]log)\s+(?:entry|line|artifact)|(?:append[- ]only|status)\s+(?:log|artifact|channel)\s+(?:drift|forgery|poisoning))""",
         ],
-        "description": "Attacker injects or forges append-only operational status artifacts (CAVA_REPLY, wins-log, cron acknowledgements) so the agent's GO MODE reads fabricated success signals as ground truth, advancing pipelines on work that never ran or hiding failures behind ghost log lines."
+        "description": "Attacker injects or forges append-only operational status artifacts (status-reply files, wins-logs, cron acknowledgements) so the agent's GO MODE reads fabricated success signals as ground truth, advancing pipelines on work that never ran or hiding failures behind ghost log lines."
     },
     {
         "id": "GLS-AW-035",
