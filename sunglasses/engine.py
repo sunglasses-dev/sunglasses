@@ -120,6 +120,26 @@ class SunglassesEngine:
         "canonical", "description", "expires", "allow", "disallow", "admin",
         "support", "sitemap:", ".well-known", ".well-known/", "/.well-known",
         "<loc>", "description_for_model", "name_for_model", "sdl", "/* team */",
+        # ── Real-file FP fix (Jun 9 2026, v0.2.64) ───────────────────────────
+        # tests/test_real_corpus_fp.py scans REAL files (the project's own
+        # README + Python stdlib modules) instead of short snippets, and caught
+        # 86 false-positive blocks on the clean README. Root cause: the denylist
+        # had SINGULAR/base forms ("agent", "ai agent", "credential"→no) but
+        # leaked the PLURALS and common web/security nouns below, which appear
+        # constantly in normal docs and code (e.g. the product's own tagline
+        # "Sunglasses for AI agents. Protection layer" tripped 15 patterns via
+        # bare "ai agents"). These are too generic to mean "attack" alone —
+        # real poisoning is still caught by each pattern's regex + multi-word
+        # injection keywords (verified: full suite + attack canaries stay green).
+        "ai agents", "agents", "cookie", "cookies", "attach", "credential",
+        "credentials", "scanner", "scanners", "metadata", "annotation",
+        "annotations",
+        # Second pass — generic programming tokens that leaked onto clean stdlib
+        # CODE (json/decoder.py, encoder.py, argparse.py): auto-generated patterns
+        # reused these bare words as keywords. They appear in virtually all normal
+        # source; the real attacks keep their multi-word phrases + regexes.
+        "env", "group", "groups", "override", "pat", "property", "path",
+        "limit", "json-rpc", "extra",
     })
 
     # Decision priority: higher severity = stronger action
@@ -168,9 +188,16 @@ class SunglassesEngine:
                 compiled = []
                 for r in pattern["regex"]:
                     try:
-                        compiled.append(re.compile(r, re.IGNORECASE))
+                        rx = re.compile(r, re.IGNORECASE)
                     except re.error:
-                        pass
+                        continue
+                    # Whole-document classifier regexes begin with a lookahead
+                    # ((?=...)/(?!...)) whose .* spans the entire file. Running these
+                    # through .search() re-evaluates the assertion at every offset ->
+                    # O(n^2) catastrophic slowdown (a 12 KB file took 100s+). They are
+                    # document-level predicates, so matching once at position 0 with
+                    # .match() is both correct and O(n). See _is_anchored.
+                    compiled.append((rx, self._is_anchored(r)))
                 if compiled:
                     self._regex_patterns.append((pattern, compiled))
 
@@ -184,6 +211,17 @@ class SunglassesEngine:
 
         self._pattern_count = len(self._patterns)
         self._keyword_count = len(self._keyword_to_patterns)
+
+    @staticmethod
+    def _is_anchored(raw: str) -> bool:
+        """True if a regex begins with a lookahead assertion after any leading
+        inline-flag group. Such patterns are whole-document predicates (their .*
+        lookaheads scan the full text), so they must be evaluated once at position 0
+        via .match() instead of retried at every offset via .search() — the latter is
+        O(n^2) and caused minute-long ReDoS hangs on ordinary files."""
+        m = re.match(r'\(\?[aiLmsux]+\)', raw)
+        rest = (raw[m.end():] if m else raw).lstrip()
+        return rest.startswith('(?=') or rest.startswith('(?!')
 
     def _check_negation(self, text: str, match_start: int) -> bool:
         """
@@ -280,8 +318,11 @@ class SunglassesEngine:
                 continue
             if pattern["id"] in seen_ids:
                 continue
-            for rx in regexes:
-                match = rx.search(text)  # search ORIGINAL text for regex
+            for rx, anchored in regexes:
+                # Anchored = lookahead-led whole-document predicate: evaluate once at
+                # position 0 (.match) instead of retrying every offset (.search) — avoids
+                # catastrophic O(n^2) backtracking on large files (ReDoS).
+                match = rx.match(text) if anchored else rx.search(text)
                 if match:
                     seen_ids.add(pattern["id"])
                     finding = {

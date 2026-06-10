@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.64] — 2026-06-09
+
+### Fixed (engine reliability — false positives + scanner hang)
+
+- **False positives eliminated on clean code (86 → 0)** — pruned generic plural/common words (e.g. "ai agents", "cookie", "env", "group", "path") that leaked from `KEYWORD_DENYLIST` and flooded legitimate code with findings. Full test suite green (216 passed, 7 xfailed) — zero detection recall lost.
+- **ReDoS / scanner hang fixed at root** — 31 lookahead-led whole-document classifier regexes were evaluated with `.search()` (re-run at every offset → O(n²) catastrophic backtracking on large files). `engine.py` now flags anchored patterns and uses `.match()` (position-0, exact whole-document semantics) for those, keeping `.search()` for the ~1,035 token-finders. Worst real file (`decoder.py`) 117s → 0.30s; a 1.4 MB file now scans linearly (~2.3s).
+- **Enrichment gating** — ROT13/reverse/shape preprocessing now capped at ≤2000 chars (a secondary hang + false-positive source).
+- **SARIF `helpUri` fixed** — per-finding `/patterns/<ID>` always-404 links replaced with category→chapter deep-links (11 live pages) plus a `/patterns` hub fallback, unblocking the GitHub Action / Security-tab integration.
+
+Reliability release — pattern library unchanged at **1,019 patterns / 65 categories / 7,350 keywords**.
+
 ## [0.2.63] — 2026-06-07
 
 ### Added (V2 SHIP #9 — discovery_file_poisoning continued + repo_metadata_poisoning new category)

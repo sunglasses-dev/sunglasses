@@ -89,21 +89,36 @@ def normalize(text: str) -> str:
     text = decode_leetspeak(text)
     text = strip_delimiter_padding(text)  # Collapse spaced chars BEFORE whitespace collapse
     text = collapse_whitespace(text)
-    # ROT13 enrichment: append ROT13-decoded view for pattern matching
-    # so "Vtaber cerivbhf vafgehpgvbaf" also sees "ignore previous instructions"
-    rot = decode_rot13(text)
-    if rot != text:
-        text = text + " " + rot
-    # Reverse enrichment: append reversed view for reversed-string attacks
-    text = text + " " + text[::-1]
-    text = text.lower()
-    # Shape-confusion enrichment: lowercase l visually = capital I.
-    # Append a variant where standalone 'l' at word boundary → 'i'. Covers
-    # attacks like "lgnore all prevIous Instructions" where the attacker
-    # used lowercase L to stand in for capital I.
-    shape_variant = re.sub(r'\bl(?=[a-z])', 'i', text)
-    if shape_variant != text:
-        text = text + " " + shape_variant
+    # ── Obfuscation enrichment (ROT13 / reversed / shape-confusion) ──────────
+    # These three views catch payloads that are LITERALLY ROT13-encoded,
+    # reversed, or use lowercase-l-for-capital-I. Those evasions only ever
+    # appear in SHORT crafted injection strings — never in whole documents.
+    # Applying them to large inputs was actively harmful (Jun 9 2026):
+    #   1. it gave almost no real recall (a clean README/source file is not
+    #      ROT13 ciphertext), but
+    #   2. the reversed/scrambled copy of a big document triggered pathological
+    #      regex backtracking that hung a single scan for 70+ seconds on normal
+    #      Python stdlib code — a real performance / denial-of-service bug, and
+    #   3. it added a few extra false positives on the scrambled text.
+    # So enrich ONLY short inputs, where these evasions actually occur; larger
+    # inputs (files, web pages, tool outputs) skip enrichment entirely.
+    ENRICH_MAX_LEN = 2000
+    if len(text) <= ENRICH_MAX_LEN:
+        # ROT13 enrichment so "Vtaber cerivbhf vafgehpgvbaf" also sees
+        # "ignore previous instructions"
+        rot = decode_rot13(text)
+        if rot != text:
+            text = text + " " + rot
+        # Reverse enrichment for reversed-string attacks
+        text = text + " " + text[::-1]
+        text = text.lower()
+        # Shape-confusion: standalone 'l' at word boundary → 'i' (covers
+        # "lgnore all prevIous Instructions" where lowercase L stands in for I)
+        shape_variant = re.sub(r'\bl(?=[a-z])', 'i', text)
+        if shape_variant != text:
+            text = text + " " + shape_variant
+    else:
+        text = text.lower()
     return text
 
 

@@ -26,6 +26,65 @@ _SARIF_VERSION = "2.1.0"
 _TOOL_URI = "https://sunglasses.dev"
 _TOOL_REPO = "https://github.com/sunglasses-dev/sunglasses"
 
+# Map a finding's category -> the live /patterns/<chapter-slug> page that
+# documents it. Mirrors CHAPTER_MAP in build-patterns-page.py (the patterns-page
+# generator). Findings whose category isn't grouped into a chapter page fall back
+# to the /patterns hub. Both targets are guaranteed-live (200) — this replaces the
+# old per-finding-id helpUri that always 404'd (only chapter pages exist, not
+# /patterns/<FINDING_ID>), which was breaking the GitHub code-scanning "Learn more"
+# links. Keep in sync if chapters are added/renamed.
+_CATEGORY_TO_CHAPTER = {
+    "prompt_injection": "prompt-injection",
+    "indirect_prompt_injection": "prompt-injection",
+    "hidden_instruction": "prompt-injection",
+    "jailbreak_evasion": "prompt-injection",
+    "prompt_extraction": "prompt-injection",
+    "prompt_leak": "prompt-injection",
+    "parasitic_injection": "prompt-injection",
+    "context_flooding": "prompt-injection",
+    "retrieval_poisoning": "prompt-injection",
+    "mcp_threat": "mcp-tool-handoff-abuse",
+    "tool_poisoning": "mcp-tool-handoff-abuse",
+    "tool_metadata_smuggling": "mcp-tool-handoff-abuse",
+    "tool_chain_race": "mcp-tool-handoff-abuse",
+    "tool_output_poisoning": "mcp-tool-handoff-abuse",
+    "provenance_chain": "callback-redirect-trust-drift",
+    "provenance_chain_fracture": "callback-redirect-trust-drift",
+    "agent_contract_poisoning": "callback-redirect-trust-drift",
+    "exfiltration": "outbound-endpoint-control-c2-drift",
+    "ssrf": "outbound-endpoint-control-c2-drift",
+    "dns_tunneling": "outbound-endpoint-control-c2-drift",
+    "c2_indicator": "outbound-endpoint-control-c2-drift",
+    "secret_detection": "outbound-endpoint-control-c2-drift",
+    "policy_scope_redefinition": "policy-scope-redefinition",
+    "authorization_bypass": "policy-scope-redefinition",
+    "auth_bypass": "policy-scope-redefinition",
+    "privilege_escalation": "policy-scope-redefinition",
+    "approval_graph_poisoning": "policy-scope-redefinition",
+    "state_sync_poisoning": "state-sync-poisoning",
+    "cross_agent_injection": "state-sync-poisoning",
+    "memory_poisoning": "memory-persistence-poisoning",
+    "memory_eviction_rehydration": "memory-persistence-poisoning",
+    "supply_chain": "package-dependency-registry-trust-abuse",
+    "ui_injection": "browser-agent-navigation-link-safety-abuse",
+    "social_engineering_ui": "browser-agent-navigation-link-safety-abuse",
+    "social_engineering": "browser-agent-navigation-link-safety-abuse",
+    "identity_phishing": "browser-agent-navigation-link-safety-abuse",
+    "agent_workflow_security": "agent-workflow-publish-path-abuse",
+    "agent_workflow": "agent-workflow-publish-path-abuse",
+    "agent_security": "agent-workflow-publish-path-abuse",
+    "discovery_file_poisoning": "discovery-file-poisoning",
+    "agent_instruction_file_poisoning": "discovery-file-poisoning",
+    "identity_discovery_poisoning": "discovery-file-poisoning",
+}
+
+
+def _help_uri(finding: dict) -> str:
+    """Return a guaranteed-live docs URL for a finding: its chapter page if the
+    category maps to one, else the /patterns hub. Never points at a 404."""
+    slug = _CATEGORY_TO_CHAPTER.get(finding.get("category", ""))
+    return f"{_TOOL_URI}/patterns/{slug}" if slug else f"{_TOOL_URI}/patterns"
+
 
 # Severity mapping: SUNGLASSES severities -> SARIF levels.
 # SARIF levels: "none", "note", "warning", "error".
@@ -60,7 +119,7 @@ def _build_rule(finding: dict) -> dict:
         "fullDescription": {
             "text": finding.get("reason") or finding.get("description") or finding.get("name", finding["id"]),
         },
-        "helpUri": f"{_TOOL_URI}/patterns/{finding['id']}",
+        "helpUri": _help_uri(finding),
         "properties": {
             "category": finding.get("category", "unknown"),
             "sunglasses_severity": severity,
