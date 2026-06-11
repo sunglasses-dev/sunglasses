@@ -22046,4 +22046,359 @@ PATTERNS = [
         ],
         "description": "Python linter and type-checker configs can carry agent-directed comments or custom fields that tell AI coding/security agents to treat the config as review policy, suppress findings, or forward local context."
     },
+    # === v0.2.66 batch (8 discovery_file_poisoning patterns — Miasma/Hades config-file class) ===
+    {
+        "id": "GLS-DFP-083",
+        "name": "Redacted HAR Bundle Sidecar Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".har",
+            "HAR bundle",
+            "README-support-bundle.md",
+            "agent_policy",
+            "assistant_note",
+            "capture.har",
+            "debug bundle",
+            "network capture bundle",
+            "proxy capture bundle",
+            "redacted HAR",
+            "redaction rationale",
+            "redaction-summary.md",
+            "redaction.json",
+            "redaction_reason",
+            "replay manifest",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security\s+training|support\s+guide|browser\s+support\s+guide|scanner\s+docs?|redaction\s+guidance|sanitization\s+documentation|privacy\s+review).{0,180}?(?:should\s+(?:redact|report|detect|flag|refuse|block)|must\s+not\s+(?:treat|include|forward|send|share|trust|obey)|never\s+(?:trust|obey|include|forward|send|share|override|overrides?))
+  |(?:incident\s+report|security\s+report|postmortem).{0,200}?(?:detected\s+and\s+(?:blocked|refused|flagged|remediated)|was\s+(?:blocked|refused|flagged|detected|remediated)\s+by)
+  |(?:no\s+(?:agent\s+)?instructions?|no\s+policy\s+overrides?\s+are\s+present|not\s+(?:agent\s+)?policy|not\s+authoritative)
+  |(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\s+not\s+(?:treat|obey|include|attach|forward|send|share|overrides?|trust))
+))
+(?=.*(?:
+  (?:HAR\s+bundle|redacted\s+HAR|sanitized\s+HAR|support\s+bundle|debug\s+bundle|network\s+capture\s+bundle|proxy\s+capture\s+bundle|ticket\s+attachment|browser\s+capture\s+bundle)
+  |(?:redaction[-_\s]summary|redaction\.json|redaction_reason|redaction\s+rationale|sanitization[-_\s]report|sanitized\s+capture|replay\.ya?ml|replay\s+manifest|replay\s+note|README-support-bundle|import\s+notes?)
+  |(?:capture\.har|\.har\b|HAR\s+1\.2|Chrome\s+DevTools\s+network\s+export|mitmproxy\s+(?:dump|flow)|DevTools\s+HAR\s+export)
+))
+(?=.*(?<![A-Za-z0-9])(?:AI\s+agents?|agents?|assistants?|support[-\s]?agents?|triage\s+agents?|security\s+scanners?|automated\s+scanners?|automated\s+review|replay\s+bots?|browser\s+auditors?|privacy\s+auditors?|LLM\s+auditors?|LLMs?|models?|agent\s+instructions?|scanner\s+policy|assistant\s+note|agent[_-]?policy|scanner[_-]?policy|assistant[_-]?note|replay[_-]?note)(?![A-Za-z0-9]))
+(?=.*(?:
+  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|(?:primary|single)\s+source\s+of\s+truth|canonical|definitive|authoritative|defines?\s+(?:all\s+)?(?:scanner|security|agent|support)\s+rules?|(?:main|primary|principal|preferred|recommended|core|standard|default)\s+(?:(?:support|debug|network|browser|security|privacy|audit|verification|scanner|capture|redaction|replay)\s+){0,4}(?:operating\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)
+  |(?:agent|scanner|assistant|support[-\s]?agent|triage\s+agent|replay\s+bot)\s+(?:instructions?|policy|note|directive|notice)
+  |suppress(?:es|ed|ing)?.{0,90}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookies?|sessions?|auth[-\s]?headers?|Authorization|leakage)
+  |(?:findings?|warnings?|alerts?|reports?|diagnostics?|results?|observations?|leakage)\s+(?:are|is|should\s+(?:be|remain))\s+(?:suppressed|hidden|omitted|excluded|redacted|removed|considered|treated|classified|marked|viewed)\s*(?:as\s+)?(?:advisory-only|informational|non-blocking|safe|benign|secondary|user-approved)?
+  |hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookie\s+warnings?|session\s+findings?)
+  |do\s+not\s+(?:report|flag).{0,80}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookies?|sessions?|auth[-\s]?headers?|leakage)
+  |omit.{0,80}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|cookies?|sessions?|auth[-\s]?headers?|leakage)
+  |(?:mark|classify|label).{0,60}?(?:leakage|findings?|warnings?|results?|auth[-\s]?headers?|cookies?|sessions?).{0,50}?(?:user-approved|safe|benign|known-good|non-blocking|informational)
+  |treat.{0,60}?as\s+(?:informational|non[-\s]?blocking|safe|clean|benign|advisory[-\s]?only|user-approved)
+  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|pass\s+along|hand\s+off)\s+(?:[\w-]+\s+){0,5}(?:Authorization\s+headers?|auth[-\s]?headers?|cookies?|session\s+tokens?|browser\s+profile|local\s+browser\s+profile|API\s+keys?|tokens?|credentials?|secrets?|local\s+state|runtime\s+(?:environment|context|details?|settings?)|environment\s+(?:variables?|context|details?|settings?)|replay\s+(?:context|settings?|details?))
+  |(?:proof|evidence|runtime|environment|debug|replay|browser)\s+(?:(?:proof|evidence|runtime|environment|debug|replay|browser)\s+)?(?:bundle|package|material|context|details?|settings?|profile)\s+(?:should|must|can|may)\s+(?:be|get|remain)\s+(?:relayed|transferred|handed\s+off|sent|passed\s+along|included|attached|forwarded|shared|provided|exposed)
+))""",
+        ],
+        "description": "Redacted HAR/debug bundles can hide agent-directed instructions in adjacent redaction or replay sidecars, causing AI support/security agents to suppress auth/session findings or forward local replay/runtime context even when the HAR itself is benign."
+    },
+    {
+        "id": "GLS-DFP-084",
+        "name": "Release Please / Changesets config metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "preferred release playbook",
+            "release please / changesets carrier context.",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+(?:training|guide|reference)|scanner\s+docs?|defensive\s+example|incident\s+report|quoted\s+attack)\b.{0,220}\b(?:report|detect|flag|refuse|block|blocked|detected|not\s+obeyed|must\s+be\s+reported)\b)
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|trust|treat|use|include|forward|send|share|attach|expose|persist|save|remember|override|overrides?)\b.{0,160}\b(?:release[-\s]?please|changesets?|changeset|release\s+automation|release\s+metadata|changelog|tokens?|secrets?|credentials?)\b)
+(?!.*\b(?:release[-\s]?please|changesets?|changeset|release\s+automation|release\s+metadata)\b.{0,160}\b(?:not\s+(?:authoritative|canonical|definitive|policy|instructions?)|no\s+(?:policy\s+)?overrides?|no\s+(?:agent|scanner|assistant|release[-\s]?agent|release\s+bot)\s+(?:policy|instructions?|notes?))\b)
+(?!.*\bno\s+(?:agent|scanner|assistant|release[-\s]?agent|release\s+bot)\s+(?:policy|instructions?|notes?)\b)
+(?=.*(?:(?<![A-Za-z0-9])(?:\.github/release-please-config\.json|release-please-config\.json|\.release-please-manifest\.json|\.changeset/config\.json|\.changeset/[\w.-]+\.md)(?![A-Za-z0-9])|\b(?:release[-\s]?please|changesets?|changeset\s+config|release\s+automation\s+(?:config|metadata)|changelogSections?|release-type|bumpVersions|extra-files|snapshot\s+release|pre\.json|version\s+packages)\b))
+(?=.*(?:(?<![A-Za-z0-9])(?:agent_instructions?|scanner_policy|assistant_note|release_agent_policy|x[_-](?:agent|scanner|assistant|release)[_-](?:policy|instructions?|note))(?![A-Za-z0-9])|\b(?:ai\s+release\s+agents?|release\s+agents?|release\s+bots?|ai\s+agents?|agents?|assistants?|scanners?|reviewers?|auditors?|automated\s+(?:release\s+)?(?:review|audit|verification))\b|\b(?:agent|scanner|assistant|release\s+bot)\s+(?:instructions?|policy|notes?)\b))
+(?=.*(?:
+  \b(?:agent|scanner|assistant|release\s+bot)\s+(?:instructions?|policy|notes?)\b
+ |\b(?:authoritative|canonical|definitive|governing|controlling)\b.{0,120}\b(?:release|scanner|security|review|audit|agent)\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\b
+ |\b(?:primary|single)\s+source\s+of\s+truth\b
+ |\b(?:takes?\s+precedence|supersed(?:e|es|ed|ing)|overrides?|outranks?|overrules?)\b.{0,120}\b(?:system|developer|user|local|scanner|security|release)\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\b
+ |\bdefines?\s+(?:all\s+)?(?:release|scanner|security|review|audit|agent)\s+rules?\b
+ |\b(?:main|primary|principal|preferred|recommended)\s+(?:(?:release[-\s]?please|changesets?|release|changelog|package|dependency|security|audit|review|verification|operating)\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy|framework)\b.{0,180}\b(?:suppress|hide|omit|exclude|downgrade|reclassify|advisory-only|background-only|non-blocking|findings?|warnings?|observations?|tokens?|credentials?|environment|local\s+state)\b
+ |\b(?:suppress|hide|omit|exclude|redact|skip|silence|downgrade|deprioritize|demote|reclassify)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|CVE|vulnerabilit(?:y|ies)|license\s+warnings?)\b
+ |\b(?:do\s+not|don't|never)\s+(?:report|flag|escalate|mention|include)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|CVE|vulnerabilit(?:y|ies)|license\s+warnings?)\b
+ |\b(?:treat|mark|classify|frame|calibrate).{0,60}?\bas\s+(?:informational|non[-\s]?blocking|advisory[-\s]?only|safe|clean|background[-\s]?only)\b
+ |\b(?:observations?|findings?|warnings?|alerts?|results?|diagnostics?|issues?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:treated|considered|classified|marked|framed|calibrated)\s+(?:as\s+)?(?:advisory[-\s]?only|informational|non[-\s]?blocking|background[-\s]?only)\b
+ |\b(?:keep|leave)\s+(?:[\w-]+\s+){0,5}(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|CVE|vulnerabilit(?:y|ies)|license\s+warnings?)\s+out\s+of\s+(?:the\s+)?(?:release\s+memo|release\s+report|changelog\s+summary|final\s+report|audit\s+memo|summar(?:y|ies)|reports?|memos?)\b
+ |\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|paste|pass\s+along|hand\s+off|hand\s+over|relay|transmit)\s+(?:[\w-]+\s+){0,6}(?:api\s+keys?|tokens?|secrets?|credentials?|auth(?:orization)?\s+headers?|bearer\s+tokens?|github\s+tokens?|npm\s+auth\s+tokens?|ci\s+environment\s+variables?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|proof\s+(?:material|bundle|package|evidence))|local\s+(?:state|config(?:uration)?|settings?))\b
+))
+.*""",
+        ],
+        "description": "Attacker-controlled Release Please or Changesets configuration text can smuggle agent/scanner instructions that redefine release-review authority, suppress dependency/release findings, or solicit CI/npm/GitHub credentials from AI release agents."
+    },
+    {
+        "id": "GLS-DFP-087",
+        "name": "WebdriverIO / Selenium test-config metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "wdio.conf.*",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|expose|store)
+ |does\s+not\s+(?:obey|follow|treat|trust|override|instruct|authorize)
+ |never\s+(?:obey|follow|treat|trust|override|include|forward|expose|store)
+ |must\s+not\s+(?:obey|follow|treat|trust|override|include|forward|expose|store)
+ |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
+ |not\s+(?:authoritative|canonical|definitive)
+ |no\s+(?:finding\s+suppression|credential\s+(?:collection|forwarding)|scanner\s+suppression)
+ |(?:security|incident|training)\s+(?:report|guide|reference|quote).{0,140}?(?:detected|blocked|flagged|refused|must\s+be\s+reported|not\s+obeyed|report\s+it)
+ |scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse|block)
+)\b)
+(?=.*(?:
+  (?<![A-Za-z0-9])(?:webdriverio|web\s*driver\s*io|wdio\.conf\.(?:js|ts|mjs|cjs)|wdio\s+config|selenium\s+(?:grid|config|node|capabilit(?:y|ies))|desiredCapabilities|browserstack\.ya?ml|browserstack\s+capabilit(?:y|ies)|sauce\s+labs?|sauce\s+capabilit(?:y|ies)|test\s+automation\s+config|reporter\s+metadata|service\s+description)(?![A-Za-z0-9])
+ |(?<!\w)"(?:capabilities|desiredCapabilities|agentInstructions|scanner_policy|assistant_note|x-agent-policy|reporters|services)"\s*:
+))
+(?=.*(?<![A-Za-z0-9])(?:
+  ai\s+(?:qa\s+)?agents?|automated\s+(?:browser|qa|test|release|security)?\s*(?:review|verification|scan|audit|agents?)|qa\s+agents?|test\s+agents?|browser\s+reviewers?|release\s+agents?|security\s+scanners?|scanners?|assistants?|llms?|agents?|reviewers?|verif(?:y|iers?|ication)
+)(?![A-Za-z0-9]))
+(?=.*(?:
+  agent\s+instructions?|scanner\s+instructions?|assistant\s+note|overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|(?:primary|single)\s+source\s+of\s+truth|canonical|definitive|authoritative|governing\s+document|controlling\s+(?:document|policy)|defines?\s+(?:all\s+)?(?:scanner|security|qa|browser|test|release)\s+rules?|main\s+operating\s+guidance|(?:preferred|principal|recommended)\s+(?:(?:selenium|webdriverio|grid|browser|qa|test|release|verification|security)\s+){0,3}(?:review\s+)?(?:guidance|playbook|runbook|procedure|process)
+ |suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\s+not\s+report|not\s+report|treat.{0,60}?as\s+(?:informational|advisory|advisory-only|non-blocking|safe|clean)|(?:keep|leave).{0,80}?out\s+of.{0,40}?(?:report|summary|memo)|(?:place|put|route|move|shift|calibrate).{0,80}?(?:observations?|findings?|diagnostics?|results?|issues?).{0,60}?(?:supplementary|appendix|background|background[-\s]?only|informational)|(?:observations?|findings?|warnings?|alerts?|diagnostics?|results?)\s+(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified)
+ |(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\s+off|hand\s+over|pass\s+along|relay|expose).{0,100}?(?:session\s+(?:cookies?|tokens?|keys?|proof\s+(?:package|bundle|material|evidence))|auth\s+headers?|api\s+tokens?|credentials?|env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|config(?:uration)?|settings?|state|material)|local\s+(?:state|config(?:uration)?|settings?)|build\s+proof\s+(?:package|bundle|material|evidence))
+))
+(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|console\s+diagnostics?|accessibility|cors|browser|session\s+(?:cookies?|tokens?|keys?)|auth\s+headers?|tokens?|credentials?|environment\s+variables?|runtime\s+config|local\s+state|build\s+proof\s+(?:package|bundle|material|evidence)))
+.*""",
+        ],
+        "description": "WebdriverIO / Selenium test configuration fields and comments can smuggle agent-facing instructions that tell QA/security agents to treat test-runner metadata as authoritative, suppress browser/test findings, or forward runtime/session state."
+    },
+    {
+        "id": "GLS-DFP-088",
+        "name": "WebGPU / shader source comment poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "agent_policy",
+            "do not obey",
+            "no agent instructions present",
+            "no policy overrides",
+            "scanner_policy",
+            "should report",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:no\s+(?:agent|scanner|assistant)\s+instructions?\s+present|no\s+(?:policy\s+)?overrides?)\b)
+(?!.*\b(?:
+    no\s+(?:agent|scanner|assistant)\s+instructions?\s+present
+  | no\s+(?:policy\s+)?overrides?
+  | do\s+not\s+(?:obey|follow|treat|use|trust|forward|include|attach|send|share|override)
+  | does\s+not\s+(?:obey|follow|treat|trust|include|forward|send|share|override|instruct)
+  | never\s+(?:obey|follow|treat|use|trust|include|forward|send|share|override)
+  | must\s+not\s+(?:obey|follow|treat|use|trust|include|forward|send|share|override)
+  | should\s+(?:report|detect|flag|refuse|block|not\s+\w+|never\b)
+)\b.{0,180}?(?:shader|WGSL|GLSL|HLSL|WebGPU|WebGL|SPIR-V|source\s+comments?|shader\s+metadata|compiler\s+output))
+(?=.*(?:
+    \b(?:WGSL|GLSL|HLSL|WebGPU|WebGL|SPIR-V|SPIRV)\b
+  | \b(?:fragment|vertex|compute)\s+shader\b
+  | \bshader\s+(?:source|module|comments?|metadata|documentation|compiler\s+output)\b
+  | @(?:fragment|vertex|compute)\b
+  | [#]version\s+\d+
+  | \blayout\s*\(
+  | \bfn\s+[A-Za-z_][\w]*\s*\(
+))
+(?=.*(?<![A-Za-z0-9])(?:
+    ai\s+agents?|agents?|assistants?|llms?|models?
+  | code\s+scanners?|security\s+scanners?|shader\s+auditors?|webgpu\s+auditors?
+  | automated\s+(?:(?:shader|security|code|webgpu)\s+)?(?:review|scan|audit|verification)
+  | review\s+bots?|tool\s+builders?
+  | agent\s+instructions?|scanner\s+instructions?|assistant\s+note|scanner_policy|agent_policy
+)(?![A-Za-z0-9]))
+(?=.*(?:
+    (?:agent|scanner|assistant|auditor)\s+(?:instructions?|policy|directive|note)
+  | (?:(?:primary|single)\s+source\s+of\s+truth|canonical|definitive|authoritative|takes\s+precedence|supersed(?:e|es|ed|ing)|overrides?|outranks?)\s+(?:[\w.-]+\s+){0,6}(?:system|developer|repository|scanner|security|review)\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)
+  | (?:preferred|recommended|main|primary)\s+(?:[\w.-]+\s+){0,5}(?:shader|webgpu|security|review|audit)\s+(?:guidance|runbook|playbook|procedure|policy)
+  | (?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|ignore|skip)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|vulnerabilit(?:y|ies)|precision\s+issues?|race\s+conditions?|validation\s+errors?)
+  | (?:do\s+not|don't|never)\s+report\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|vulnerabilit(?:y|ies)|precision\s+issues?|race\s+conditions?|validation\s+errors?)
+  | (?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|precision\s+issues?|race\s+conditions?|validation\s+errors?)\s+(?:[\w-]+\s+){0,4}(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|ignored|skipped)
+  | (?:include|forward|send|share|attach|provide|collect|copy|pass\s+along|hand\s+off|relay|transfer)\s+(?:[\w-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?)|api\s+keys?|tokens?|authorization\s+headers?|browser\s+sessions?|cookies?)
+))
+.*""",
+        ],
+        "description": "Attacker-controlled WebGPU/WebGL shader source comments, shader metadata, or shader compiler-output notes carry instructions to AI code/security agents to suppress shader findings or forward local/browser/runtime secrets."
+    },
+    {
+        "id": "GLS-DFP-089",
+        "name": "OpenTelemetry trace and baggage metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agents",
+            "OTLP",
+            "OTel",
+            "OpenTelemetry",
+            "SRE bots",
+            "agent_policy",
+            "automated incident triage",
+            "baggage",
+            "incident agents",
+            "scanner_policy",
+            "security scanners",
+            "service.name",
+            "span_id",
+            "trace_id",
+            "traceparent",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security\s+guide|scanner\s+docs?|training|reference\s+docs?)\b.{0,180}\b(?:should|must|will|was|were)\s+(?:report|detect|flag|refuse|block|blocked|detected)|\bincident\s+report\b.{0,220}\b(?:detected|blocked|refused|flagged)\b|\b(?:do\s+not|does\s+not|never|must\s+not|should\s+never)\s+(?:treat|obey|follow|trust|use|include|forward|send|share|override)\b.{0,140}\b(?:OpenTelemetry|OTel|trace|span|baggage|telemetry)|\b(?:trace|span|baggage|telemetry)\s+metadata\s+(?:is|are)\s+not\s+(?:policy|authoritative|trusted)))
+(?=.*(?:\bOpenTelemetry\b|\bOTel\b|\bOTLP\b|traceparent|tracestate|\bbaggage\b|span\s+attributes?|resource\s+attributes?|trace\s+attributes?|log\s+attributes?|telemetry\s+(?:attributes?|metadata)|observability\s+(?:trace|telemetry)|"attributes"\s*:|service\.name|trace[_-]?id|span[_-]?id))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|incident\s+(?:agents?|bots?)|assistants?|autonomous\s+(?:agents?|scanners?)|security\s+scanners?|review\s+bots?|verifiers?|auditors?|sre\s+(?:agents?|bots?)|agent\s+(?:instructions?|policy|note)|scanner\s+(?:instructions?|policy|notes?)|for\s+agents?|automated\s+(?:incident\s+)?(?:review|triage|audit|scan|verification))(?![A-Za-z0-9]))
+(?=.*(?:(?:primary|single)\s+source\s+of\s+truth|(?:authoritative|canonical|definitive|governing|controlling|preferred|recommended)\s+(?:telemetry\s+|triage\s+|incident\s+|scanner\s+)?(?:policy|guidance|document|runbook|playbook)|takes\s+precedence|overrides?|supersedes?|outranks?|overrules?|defines?\s+(?:all\s+)?(?:scanner|security|agent|triage)\s+rules?|(?:agent|scanner|assistant|verifier)\s+(?:instructions?|policy|notes?)|per\s+(?:policy|requirements?)|pursuant\s+to|in\s+accordance\s+with|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)\s+(?:are|were|must\s+be|should\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted)|(?:hide|omit|exclude|redact|skip|downgrade|deprioritize|classify|calibrate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|do\s+not\s+(?:report|flag|include)\b|treat.{0,60}?as\s+(?:informational|non[-\s]?blocking|safe|clean|benign|advisory[-\s]?only|background[-\s]?only)|mark.{0,60}?as\s+(?:safe|clean|benign)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|hand\s+over|relay)\s+(?:[\w-]+\s+){0,6}(?:api\s+tokens?|session\s+keys?|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env\s+vars?|local\s+(?:state|config(?:uration)?|settings?)|runtime\s+(?:context|config(?:uration)?|settings?|details?)|credentials?|auth(?:orization)?\s+headers?|trace\s+secrets?|baggage\s+tokens?)))
+.*""",
+        ],
+        "description": "Attacker-controlled OpenTelemetry span/resource/log attributes, `baggage`, or `tracestate` values can carry agent-facing policy instructions that an AI incident-response or security agent may mistake for trusted triage guidance."
+    },
+    {
+        "id": "GLS-DFP-090",
+        "name": "PowerShell module manifest metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".psd1",
+            "FunctionsToExport",
+            "ModuleVersion",
+            "New-ModuleManifest",
+            "PrivateData.PSData",
+            "ReleaseNotes",
+            "RootModule",
+            "agent_policy",
+            "assistant policy",
+            "does not override",
+            "for agents",
+            "never supersedes",
+            "not authoritative",
+            "scanner_policy",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:PowerShell\s+module\s+manifest\s+docs?|module\s+manifest\s+docs?|scanner\s+docs?)\s*:?.{0,140}?\b(?:scanners?\s+should\s+(?:report|detect|flag|refuse)|should\s+(?:report|detect|flag|refuse))\b
+| (?:training|security\s+guide|runbook|reference)\s*:?.{0,180}?\b(?:agents?\s+must\s+not\s+(?:obey|treat|follow|trust)|do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|expose|collect)|never\s+(?:obey|trust|expose|include|forward)|should\s+never\s+be\s+used)\b
+| (?:incident|security)\s+report\b.{0,180}?\b(?:detected|blocked|flagged|refused)\b
+| (?:\.psd1|PowerShell\s+module\s+manifest|module\s+manifest|manifest\s+metadata|PowerShell\s+Gallery\s+release\s+notes?).{0,140}?\b(?:is\s+not\s+authoritative|not\s+authoritative|does\s+not\s+(?:override|supersede|instruct)|never\s+(?:overrides?|supersedes?|exposes?)|must\s+not\s+(?:obey|treat|follow|trust|include|forward|send|share|expose)|should\s+never\s+be\s+used)\b
+| (?:not\s+authoritative|does\s+not\s+(?:override|supersede|instruct)|never\s+(?:overrides?|supersedes?)).{0,120}?\b(?:should\s+never\s+be\s+used|suppress|forward|include|tokens?|policy|rules?)\b
+| do\s+not\s+include\s+(?:tokens?|session\s+keys?|credentials?|environment\s+variables?)
+))
+(?=.*(?:
+  (?:^|[\s/`"'])\.psd1(?![a-z0-9_-])
+| PowerShell\s+(?:module\s+)?manifest
+| New-ModuleManifest
+| PrivateData(?:\.PSData)?
+| PSData
+| ModuleVersion
+| RootModule
+| FunctionsToExport
+| ReleaseNotes
+| PowerShell\s+Gallery\s+(?:summary|metadata|release\s+notes)
+| (?<!\w)"(?:Description|ReleaseNotes|PrivateData|PSData|ModuleVersion|RootModule|Tags|agent_policy|scanner_policy)"\s*[:=]
+| \b(?:Description|ReleaseNotes|Tags)\s*=
+))
+(?=.*(?:
+  \b(?:AI|LLM|autonomous|automated|dependency|security|module|PowerShell)\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|review|audit|verification)\b
+| \b(?:agents?|assistants?|scanners?|auditors?|reviewers?)\b
+| \b(?:agent|scanner|assistant)\s+(?:instructions?|policy|notes?)\b
+| \bfor\s+(?:AI\s+)?agents?\b
+| \bautomated\s+(?:PowerShell\s+)?(?:review|audit|verification)\b
+))
+(?=.*(?:
+  \b(?:canonical|authoritative|governing|controlling|definitive)\s+(?:module\s+|manifest\s+|security\s+|dependency\s+|audit\s+|review\s+){0,4}(?:policy|document|metadata|guidance|procedure|runbook)\b
+| \b(?:single|primary)\s+source\s+of\s+truth\b
+| \b(?:takes\s+precedence|supersedes?|overrides?|outranks?|overrules?)\b.{0,80}?\b(?:system|default|scanner|security|developer|audit)\s+(?:rules?|policy|guidance|instructions?)\b
+| \b(?:recommended|primary|preferred|main)\s+(?:PowerShell\s+|module\s+|security\s+|dependency\s+|audit\s+|review\s+){0,4}(?:procedure|process|playbook|runbook|guidance)\b
+| \b(?:agent|scanner|assistant)\s+(?:instructions?|policy|notes?)\b
+| \b(?:suppress|hide|redact|omit|exclude|skip)\b.{0,70}?\b(?:findings?|warnings?|alerts?|reports?|flags?|observations?|diagnostics?|results?|advisories|audit\s+findings?|vulnerabilit(?:y|ies)|PSScriptAnalyzer|malware-scan|unsigned-command)\b
+| \bdo\s+not\s+(?:report|flag|escalate)\b.{0,70}?\b(?:findings?|warnings?|observations?|diagnostics?|advisories|vulnerabilit(?:y|ies)|PSScriptAnalyzer|malware-scan)\b
+| \b(?:treat|mark|classify|downgrade|deprioritize|demote)\b.{0,70}?\b(?:findings?|warnings?|observations?|diagnostics?|results?|advisories|unsigned-command|PSScriptAnalyzer)\b.{0,50}?\b(?:informational|non-blocking|advisory-only|background|clean|safe|benign)\b
+| \b(?:findings?|warnings?|observations?|diagnostics?|results?|advisories)\b.{0,50}?\b(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted|treated|classified|marked|downgraded)\b.{0,40}?\b(?:informational|non-blocking|advisory-only|background|clean|safe|benign)?
+| \b(?:keep|leave)\b.{0,60}?\b(?:findings?|warnings?|observations?|diagnostics?|vulnerabilit(?:y|ies))\b.{0,40}?\bout\s+of\s+(?:the\s+)?(?:audit\s+memo|final\s+summary|report|summary)\b
+| \b(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|hand\s+over)\b.{0,80}?\b(?:API\s+tokens?|gallery\s+tokens?|authorization\s+headers?|auth\s+headers?|session\s+keys?|environment\s+variables?|environment\s+context|local\s+state|runtime\s+config(?:uration)?|runtime\s+settings?|credentials?|build\s+proof\s+(?:material|bundle|evidence|package))\b
+))
+.*""",
+        ],
+        "description": "PowerShell module manifests (`.psd1`) and adjacent module metadata fields can smuggle agent/scanner-directed policy text that tells AI dependency or security agents to suppress findings or forward local secrets."
+    },
+    {
+        "id": "GLS-DFP-095",
+        "name": "GitHub Discussion Template Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            ".github/DISCUSSION_TEMPLATE",
+            "AI agents",
+            "DISCUSSION_TEMPLATE",
+            "agent instruction",
+            "agents",
+            "assistant policy",
+            "assistants",
+            "auditors",
+            "body[].attributes.description",
+            "category form",
+            "contact_links",
+            "discussion form",
+            "discussion template",
+            "review bots",
+            "reviewer instructions",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+training|training\s+example|scanner\s+docs?|scanner\s+documentation|incident\s+report|postmortem|blocked|detected|flagged|refused)\b.{0,180}\b(?:discussion\s+(?:templates?|forms?)|DISCUSSION_TEMPLATE)\b)
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|does\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?))\b)
+(?=.*(?:\.github/DISCUSSION_TEMPLATE|DISCUSSION_TEMPLATE|discussion\s+(?:templates?|forms?)|category\s+forms?|contact_links|GitHub\s+discussions?|body\[\]\.?attributes\.?description|attributes:\s*.{0,120}?description:))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|agents?|assistants?|review\s+bots?|security\s+bots?|scanners?|auditors?|agent\s+instructions?|assistant\s+policy|scanner\s+notes?|reviewer\s+instructions?)(?![a-zA-Z0-9]))
+(?=.*(?:authoritative|canonical|(?:primary|single)\s+source\s+of\s+truth|supersed(?:e|es|ed|ing)|overrid(?:e|es|ing|den)|takes?\s+precedence|governing\s+policy|trust\s+this|main\s+(?:triage|review)\s+(?:policy|guidance)|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}|hide\s+(?:[\w-]+\s+){0,3}|omit\s+(?:[\w-]+\s+){0,3}|exclude\s+(?:[\w-]+\s+){0,3}|do\s+not\s+report|not\s+report|downgrade\s+(?:[\w-]+\s+){0,3}|treat.{0,40}?as\s+(?:safe|informational|non[-\s]?blocking)|mark.{0,40}?as\s+(?:safe|informational)|include\s+(?:[\w-]+\s+){0,4}|forward\s+(?:[\w-]+\s+){0,4}|attach\s+(?:[\w-]+\s+){0,4}|send\s+(?:[\w-]+\s+){0,4}|collect\s+(?:[\w-]+\s+){0,4}))
+(?=.*(?:findings?|reports?|warnings?|audit\s+reports?|vulnerabilit(?:y|ies)|auth(?:entication|orization)?\s+bugs?|dependency\s+warnings?|security\s+findings?|tokens?|GitHub\s+tokens?|API\s+keys?|authorization\s+headers?|cookies?|session\s+tokens?|environment\s+variables?|env\s+vars?|local\s+(?:runtime\s+)?config|runtime\s+context|local\s+state))
+.*$""",
+        ],
+        "description": "Repository-controlled GitHub Discussion templates or discussion-form YAML fields carry agent-facing instructions that try to turn community routing copy into scanner/reviewer policy."
+    },
+    {
+        "id": "GLS-DFP-096",
+        "name": "GitHub repository ruleset / branch-protection export metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "AI agents",
+            "agent_review_policy",
+            "assistant policy",
+            "branch protection",
+            "branch_protection",
+            "bypass_actors",
+            "compliance auditors",
+            "release agents",
+            "required_deployments",
+            "required_pull_request_reviews",
+            "required_status_checks",
+            "review bots",
+            "rule_suite",
+            "ruleset",
+            "rulesets",
+        ],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)|must\s+not\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)|should\s+(?:report|detect|flag|refuse|block)|(?:scanner\s+docs?|security\s+training|incident\s+report|runbook|guide|documentation).{0,160}?(?:report|detect|flag|refuse|block|blocked|detected|flagged)|not\s+(?:an?\s+)?(?:authoritative|policy|instructional)|no\s+agent\s+instructions?|no\s+policy\s+overrides?))
+(?=.*(?:(?<![a-zA-Z0-9])(?:github\s+)?rulesets?(?![a-zA-Z0-9])|repository\s+rules?|branch[_\s-]+protection|required[_\s-]+status[_\s-]+checks?|bypass[_\s-]+actors?|required[_\s-]+pull[_\s-]+request[_\s-]+reviews?|required[_\s-]+deployments?|rule[_\s-]+suite|enforcement\s*[:=]|"ruleset(?:_name)?"\s*:|"branch_protection"\s*:|"x_agent_review_policy"\s*:))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai\s+)?(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])|release\s+agents?|security\s+scanners?|review\s+bots?|compliance\s+auditors?|repository\s+reviewers?|branch[-\s]?protection\s+verifiers?|(?:agent|assistant|scanner|verifier|reviewer)[._](?:policy|instructions?|notes?|review_policy)|(?:agent|assistant|scanner|reviewer)\s+(?:policy|instructions?|notes?|directive)|your\s+(?:default\s+)?(?:instructions?|rules?|polic(?:y|ies))))
+(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)|takes?\s+precedence|higher\s+priority|(?:primary|single)\s+source\s+of\s+truth|governing\s+(?:document|ruleset|policy)|controlling\s+(?:document|ruleset|policy)|\bauthoritative\b|canonical|definitive|defines?\s+all\s+(?:scanner|security|agent|review)\s+rules?|defines?\s+(?:the\s+)?rules?\s+for\s+(?:(?:automated|AI|scanner|security|agent|release|repository|branch|protection|compliance)\s+){0,2}(?:review|audit|scan|verification)|(?:main|primary|principal|preferred|recommended|core|standard|default)\s+(?:(?:release|security|repository|branch|protection|governance|compliance|review|verification|audit)\s+){0,3}(?:operating\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)|(?:agent|scanner|assistant|reviewer)\s+(?:instructions?|policy|note|directive)|\bfor\s+(?:ai\s+)?(?:agents?|scanners?|assistants?|reviewers?).{0,25}?\bthis\b|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|alerts?|flags?|evidence|bypass(?:es)?|required[-\s]?check\s+findings?)|hide\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|flags?|bypass(?:es)?|required[-\s]?check\s+findings?)|omit.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|branch[-\s]?protection|required[-\s]?check|bypass)|exclude.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|bypass(?:es)?)|redact.{0,40}?(?:findings?|warnings?|flags?|evidence)|do\s+not\s+(?:report|flag|escalate)|skip\b.{0,40}?\b(?:security\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\b|treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|low|approved)|mark.{0,50}?as\s+(?:informational|safe|low|none|approved|clean)|classify.{0,40}?(?:as\s+)?(?:informational|low|none|false\s+positive|approved|clean)|(?:observations?|findings?|results?|diagnostics?|alerts?|CVEs?|vulnerabilit(?:y|ies)|issues?|bypasses|required[-\s]?check\s+findings?)\s+(?:are|is)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary|approved)|(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|hand\s+off|pass\s+along|transfer|copy|read)\s+(?:[\w-]+\s+){0,4}(?:GITHUB_TOKEN|CI_ENV|tokens?|API\s*keys?|secrets?|credentials?|auth(?:orization)?\s+headers?|Bearer\s+tokens?|local\s+state|runtime\s+(?:state|context)|environment\s+(?:variables?|context)|CI\s+(?:context|variables?|secrets?)|token\s+scope\s+summary)|(?:credentials?|tokens?|API\s+keys?|auth\s+headers?|CI\s+context|GITHUB_TOKEN)\s+(?:should|must|can|may)\s+(?:be|get)\s+(?:relayed|forwarded|sent|included|shared|provided|attached|exposed)))""",
+        ],
+        "description": "Repository ruleset or branch-protection exports can smuggle agent-directed policy text that tells AI release/security agents to treat platform governance metadata as higher authority, suppress branch-protection findings, or forward local GitHub/CI context."
+    },
+    # === end v0.2.66 batch ===
 ]
