@@ -1,7 +1,7 @@
 {
-  "version": "0.2.65",
-  "patterns": 1038,
-  "keywords": 7548,
+  "version": "0.2.66",
+  "patterns": 1046,
+  "keywords": 7631,
   "categories": 65,
   "languages": 23,
   "normalization_techniques": 17,
@@ -16,8 +16,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-06-10T04:23:21-07:00",
-  "last_updated_by": "sunglasses-publish-sh",
+  "last_updated": "2026-06-11T10:45:00-07:00",
+  "last_updated_by": "daily-push-skill-v0.2.66-statfix",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
   "released": "2026-06-10"
 }
