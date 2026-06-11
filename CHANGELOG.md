@@ -3,6 +3,13 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.66] — 2026-06-11
+
+### Added (discovery_file_poisoning expansion — agent config/discovery-file class)
+
+- **+8 discovery_file_poisoning patterns** (`GLS-DFP-083`, `084`, `087`, `088`, `089`, `090`, `095`, `096`) — coverage for poisoned config/discovery surfaces AI agents read and trust: redacted HAR-bundle sidecars, Release-Please/Changesets configs, WebdriverIO/Selenium test configs, WebGPU/shader source comments, OpenTelemetry trace/baggage metadata, PowerShell module manifests, GitHub Discussion templates, and repository ruleset / branch-protection exports. **1,038 → 1,046 patterns / 65 categories / 7,631 keywords.**
+- All 8 passed the clean-code false-positive gate (`test_false_positives` + `test_real_corpus_fp`) before ship — the same Miasma/Hades agent-config-poisoning class where a trusted repo file becomes agent policy on read.
+
 ## [0.2.65] — 2026-06-10
 
 ### Added (discovery_file_poisoning expansion)
