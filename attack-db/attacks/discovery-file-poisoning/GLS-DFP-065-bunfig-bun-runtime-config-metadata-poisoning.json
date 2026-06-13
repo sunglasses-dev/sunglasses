@@ -1,0 +1,32 @@
+{
+  "id": "GLS-DFP-065",
+  "name": "Bunfig / Bun runtime config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled Bun configuration or lock/runtime metadata (`bunfig.toml`, `bun.lock`, `bun.lockb`, package-manager Bun fields, registry/install notes) can tell AI dependency/security agents to treat the metadata as higher-priority policy, suppress audit findings, or forward local registry/runti",
+  "keywords": [
+    "bun install",
+    "bun.lock",
+    "bun.lockb",
+    "bunfig.toml",
+    "install.scopes",
+    "packageManager: bun",
+    "trustedDependencies"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|treat|follow|use|trust|override|include|forward|send|share)|does\\s+not\\s+(?:obey|treat|follow|use|trust|override|overrides?|include|forward|send|share)|never\\s+(?:obey|treat|follow|use|trust|override|overrides?|include|forward|send|share|expose)|must\\s+not\\s+(?:obey|treat|follow|use|trust|override|overrides?|include|forward|send|share|expose)|should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never)|not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?|scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|security\\s+(?:training|reference|guide).{0,120}?(?:should\\s+report|must\\s+be\\s+reported|not\\s+obeyed|refuse)|incident\\s+report.{0,160}?(?:detected|blocked|flagged|refused)))\n(?=.*(?:bunfig\\.toml|bun\\.lockb?|bun\\s+install|bun\\s+runtime|bun\\s+configuration|Bun\\.env|bunfig|[\"']?packageManager[\"']?\\s*[:=]\\s*[\"']?bun|trustedDependencies|install\\.scopes|jsx\\s*=|telemetry\\s*=|registry\\s*=))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|coding\\s+agents?|dependency\\s+(?:reviewers?|auditors?|scanners?)|security\\s+(?:scanners?|reviewers?|auditors?)|automated\\s+(?:(?:dependency|package|security|bun)\\s+)?(?:review|audit|scan|verification)|scanner\\s+instructions?|scanner\\s+instruction|agent\\s+instructions?|agent\\s+instruction)(?![a-zA-Z0-9]))\n(?=.*(?:authoritative|canonical|definitive|governing\\s+(?:document|policy)|controlling\\s+(?:document|policy)|(?:primary|single)\\s+source\\s+of\\s+truth|takes\\s+precedence|overrides?|supersedes?|outranks?|overrules?|defines?\\s+(?:all\\s+)?(?:scanner|security|dependency|package|bun|review)\\s+rules?|(?:recommended|preferred|primary|main|principal)\\s+(?:(?:bun|dependency|package|security|audit|review|verification|operating)\\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy|reference)|(?:agent|scanner|assistant)\\s+(?:instructions?|notes?)))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:ted|s|ting)?|exclude|redact|skip|downgrade|deprioritize|reclassify|(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)|treat.{0,50}?as\\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|issues?|vulnerabilit(?:y|ies)|advisories|CVEs?)\\s+(?:are|is|should\\s+be|must\\s+be|were|was)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified|marked)|(?:include|attach|forward|send|share|provide|expose|collect|relay|pass\\s+along|hand\\s+off)\\s+(?:[\\w-]+\\s+){0,6}(?:API\\s+tokens?|session\\s+keys?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|runtime\\s+(?:config(?:uration)?|settings?|context|state|details?)|credentials?|auth(?:orization)?\\s+headers?|BUN_AUTH_TOKEN|registry\\s+tokens?|npm\\s+tokens?|bunfig\\s+secrets?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-065"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "GLS-DFP-026",
+  "name": "RAML / API Blueprint Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "RAML, API Blueprint, or generated API-description documentation can embed prompt-injection text that tells AI agents/tool builders to override higher-priority instructions, disclose local credentials, or suppress scanner findings.",
+  "keywords": [
+    "#%RAML",
+    ".raml",
+    "API Blueprint",
+    "Apiary",
+    "FORMAT: 1A",
+    "LLM agent",
+    "annotationTypes",
+    "cookie"
+  ],
+  "regex": [
+    "^(?!\n  (?=.*\\b(?:security\\s+training|scanner\\s+docs?|policy\\s+docs?|defensive\\s+guidance|example\\s+of\\s+prompt\\s+injection)\\b)\n |\n  (?=.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not)\\b.{0,180}\\b(?:obey|follow|trust|treat|honou?r|include|leak|send|suppress|omit|hide)\\b.{0,180}\\b(?:raml|api\\s+blueprint|apiary|api\\s+description|metadata|documentation)\\b)\n |\n  (?=.*\\b(?:raml|api\\s+blueprint|apiary|api\\s+description|metadata|documentation)\\b.{0,180}\\b(?:is\\s+not\\s+policy|never\\s+overrides|does\\s+not\\s+override)\\b)\n)\n(?=.*(?:\\#%RAML|\\bFORMAT:\\s*1A\\b|\\bAPI\\s+Blueprint\\b|\\bApiary\\b|\\.raml\\b|\\braml\\b|\\bresourceTypes\\b|\\btraits\\b|\\bannotationTypes\\b|\\bdocumentation:|\\bdescription:))\n(?=.*\\b(?:AI\\s+agents?|LLM\\s+agents?|assistants?|tool[-\\s]?builders?|scanners?|crawlers?|models?)\\b)\n(?=.*\\b(?:ignore|override|outrank|highest\\s+priority|trust\\s+this|follow\\s+this|disable|bypass|do\\s+not\\s+report|suppress|omit|hide)\\b)\n(?=.*\\b(?:system|developer|scanners?|policy|rules|findings?|reports?|Authorization|Bearer|API[-_\\s]?keys?|tokens?|cookies?|credentials?|env(?:ironment)?\\s+vars?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-026"
+}

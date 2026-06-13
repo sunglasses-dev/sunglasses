@@ -1,0 +1,40 @@
+{
+  "id": "GLS-RMP-001",
+  "name": "GitHub Issue/PR Template Poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker embeds hostile instructions in `.github/ISSUE_TEMPLATE/*.md`, `.github/PULL_REQUEST_TEMPLATE.md`, or YAML template config files that AI coding agents fill out when creating GitHub issues and PRs \u2014 causing agent-generated issues to include secrets, suppress security findings, and manipula",
+  "keywords": [
+    "(up to 2 intervening words) instead of",
+    ".github/ISSUE_TEMPLATE/",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "ISSUE_TEMPLATE",
+    "Note: This regex uses",
+    "PULL_REQUEST_TEMPLATE",
+    "about:",
+    "assignees:",
+    "config.yml",
+    "do\\s+not",
+    "include",
+    "name: Bug Report",
+    "name: Feature Request",
+    "name: Security Issue",
+    "name: Vulnerability Report"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:never\\s+(?:treat|obey|override|overrides?|follow|forward|include|suppress)|must\\s+not\\s+(?:treat|obey|follow|use|forward|include|suppress)|do\\s+not\\s+(?:treat|obey|follow|forward)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged|training\\s+example|security\\s+report|incident\\s+report|vulnerability\\s+report|docs\\s+should\\s+report|scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|learn\\s+how\\s+scanners?\\s+should\\s+report|scanners?\\s+should\\s+(?:report|detect|flag|refuse)\\b|is\\s+not\\s+policy\\s+and\\s+never\\s+overrides|does\\s+not\\s+instruct\\s+agents?\\s+to\\s+(?:forward|include|suppress|override)|template\\s+is\\s+not\\s+authority|never\\s+obey\\s+template\\s+instructions?)\\b)(?=.*\\b(?:ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE|issue[_\\s]template|pull[_\\s]request[_\\s]template|\\.github[/\\\\](?:ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE)|config\\.yml.*ISSUE_TEMPLATE|name:\\s*(?:Bug\\s*Report|Feature\\s*Request|Vulnerability\\s*Report|Security\\s*Issue)|about:\\s*(?:Report\\s+(?:a\\s+)?(?:bug|vulnerability|security|issue)|Request\\s+a\\s+feature)|##\\s*Description.*##\\s*Checklist|##\\s*Type\\s+of\\s+Change.*##\\s*Checklist|assignees:\\s+[\\w@-]+)\\b)(?=.*\\b(?:agents?|assistants?|AIs?|coding\\s+assistants?|scanners?|copilot|cursor|codex|claude|llms?)\\b)(?=.*\\b(?:takes?\\s+precedence|authoritative|overrides?\\s+(?:system|developer|user|security|reporter)|outranks?\\s+(?:system|scanner|security)|supersede\\w*\\s+(?:system|scanner)|highest\\s+priority|governing\\s+document|primary\\s+source\\s+of\\s+truth|include\\s+(?:[-\\w]+\\s+){0,2}(?:environment\\s+variables?|API\\s+keys?|tokens?|\\.env|session\\s+identifiers?)|paste\\s+(?:your\\s+)?\\.env|forward\\s+(?:[-\\w]+\\s+){0,2}(?:environment\\s+variables?|tokens?|local\\s+state)|attach\\s+(?:[-\\w]+\\s+){0,2}(?:environment\\s+variables?|runtime\\s+env|API\\s+keys?)|provide\\s+(?:[-\\w]+\\s+){0,2}(?:local\\s+config(?:uration)?|environment\\s+context)|share\\s+(?:[-\\w]+\\s+){0,2}(?:environment\\s+context|runtime\\s+env)|omit\\s+(?:\\w+\\s+){0,2}(?:security\\s+)?(?:findings?|alerts?|warnings?|vulnerabilities?)|exclude\\s+(?:from\\s+)?(?:the\\s+)?(?:final\\s+)?(?:report|findings?|summary)|treat\\s+as\\s+informational|redact\\s+(?:[-\\w]+\\s+){0,2}(?:findings?|alerts?|flags?)|do\\s+not\\s+(?:run|execute)\\s+(?:security\\s+)?scanners?|skip\\s+code\\s+review|bypass\\s+(?:security\\s+)?review|suppress\\s+(?:all\\s+)?(?:scanner|security)\\s+(?:findings?|alerts?|warnings?)|suppress(?:es|ed|ing)?\\s+(?:findings?|alerts?|warnings?|reports?)|hide\\s+(?:this\\s+)?(?:finding|report|from\\s+(?:reports?|scanners?|users?))|(?:add|assign)\\s+@[\\w-]+\\s+as\\s+(?:the\\s+)?(?:\\w+\\s+)?reviewer|do\\s+not\\s+include\\s+@\\w+|must\\s+complete\\s+all\\s+sections\\s+as\\s+instructed|do\\s+not\\s+mention\\s+(?:this|in\\s+reports?))\\b)(?=.*\\b(?:secrets?|tokens?|API[_\\s]keys?|environment\\s+variables?|credentials?|\\.env|session\\s+identifiers?|local\\s+state|findings?|alerts?|reports?|scanners?|code\\s+review|reviewers?|security[_\\s]team)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-001"
+}

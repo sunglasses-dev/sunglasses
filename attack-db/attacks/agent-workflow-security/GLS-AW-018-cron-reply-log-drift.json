@@ -9,7 +9,7 @@
     "tool_output",
     "message"
   ],
-  "description": "GO MODE relies on append-only status artifacts (cava_wins_log.md + CAVA_REPLY_*) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims.",
+  "description": "GO MODE relies on append-only status artifacts (wins-log files and status-reply files) as the operational source of truth. If an attacker can inject instructions that desynchronize **what got executed** vs **what got logged**, operators lose visibility and may ship unverified claims.",
   "keywords": [
     "status-first override",
     "split-append desync",

@@ -3,7 +3,7 @@
 The open collection of AI agent attack patterns that powers
 [Sunglasses](https://sunglasses.dev) — the runtime firewall for AI agents.
 
-**981 detection patterns across 64 attack categories.**
+**1046 detection patterns across 65 attack categories.**
 
 **Nobody owns this data. Everyone contributes. Everyone benefits.**
 
@@ -15,7 +15,7 @@ scanner actually loads at runtime. The JSON files in `attacks/` are a
 human-readable **export** of those patterns, generated from `patterns.py` so the
 database is easy to browse, search, and contribute to.
 
-- `patterns.py` → the single source of truth (981 patterns / 64 categories)
+- `patterns.py` → the single source of truth (1046 patterns / 65 categories)
 - `attacks/*.json` → generated, browsable mirror
   (regenerate with `scripts/export_patterns_to_attack_db.py`)
 - Community adds new patterns via pull requests
@@ -23,7 +23,7 @@ database is easy to browse, search, and contribute to.
 
 ## Categories
 
-Sunglasses organizes its 64 categories across families like prompt injection,
+Sunglasses organizes its 65 categories across families like prompt injection,
 data exfiltration, command injection, hidden/indirect instructions, memory
 poisoning, secret detection, tool poisoning, MCP threats, discovery-file
 poisoning, and supply-chain / attestation poisoning — among many others.

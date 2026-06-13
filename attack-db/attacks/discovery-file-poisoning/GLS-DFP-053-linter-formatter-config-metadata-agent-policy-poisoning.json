@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-053",
+  "name": "Linter / formatter config metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled linter or formatter config metadata (`eslint.config.js`, `.eslintrc`, `.prettierrc`, `biome.json`, Stylelint config, or adjacent rule comments/custom fields) tells AI coding/security agents to treat the config as higher-priority policy, suppress findings, or forward local runtime",
+  "keywords": [
+    ".eslintrc",
+    ".prettierrc",
+    ".stylelintrc",
+    "agent instruction",
+    "authoritative",
+    "biome.json",
+    "canonical/definitive policy",
+    "eslint.config.*",
+    "eslintConfig",
+    "extends",
+    "formatter config",
+    "governing/controlling document",
+    "lint-staged",
+    "linter config",
+    "overrides"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|incident|vulnerability|training|reference|guide|docs?|article|runbook)\\b.{0,160}\\b(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+not\\s+(?:obey|treat|follow|use)|do\\s+not\\s+(?:obey|treat|follow|use)|does\\s+not\\s+(?:instruct|override|obey|follow)|never\\s+(?:obey|treat|override|follow))\\b)\n(?!.*\\b(?:linter|formatter|eslint|prettier|biome|stylelint)\\s+(?:config|metadata|comments?)\\s+(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?))\n(?!.*\\bno\\s+(?:agent\\s+)?policy\\s+overrides?\\b)\n(?=.*(?:\\.eslintrc|eslint\\.config\\.(?:js|mjs|cjs|ts)|eslintConfig|\\.prettierrc|prettier\\.config\\.(?:js|cjs|mjs|ts)|biome\\.json|stylelint\\.config\\.(?:js|cjs|mjs|ts)|\\.stylelintrc|lint-staged|linter\\s+config|formatter\\s+config|static\\s+analysis\\s+config|rule\\s+metadata|rules?\\s*:\\s*\\[|overrides\\s*:\\s*\\[|plugins\\s*:\\s*\\[|extends\\s*:\\s*\\[))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|codex|copilot|claude|cursor|scanners?|security[-_\\s]?scanners?|dependency[-_\\s]?scanners?|repo[-_\\s]?auditors?|automated[-_\\s]?(?:review|audit)|lint[-_\\s]?auditors?)(?![a-zA-Z0-9]))\n(?=.*(?:overrides?\\s+(?:system|developer|scanner|security|repository)\\s+(?:rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\\s+(?:scanner|security|repository|developer)\\s+(?:guidance|policy|rules?)|(?:primary|main|principal|authoritative)\\s+(?:review|lint|scanner|audit|security)\\s+(?:guidance|playbook|policy)|(?:canonical|definitive)\\s+(?:project\\s+|lint\\s+|scanner\\s+)?(?:policy|instructions?|description)|(?:agent|scanner|assistant|auditor|linter)\\s+(?:instructions?|directive|policy)|takes?\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|authoritative\\b))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|mark.{0,40}?as\\s+(?:safe|informational|non-blocking)|treat.{0,50}?as\\s+(?:informational|non-blocking|advisory)|(?:keep|leave).{0,80}?\\bout\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|audit|final)|(?:move|route|shift).{0,80}?(?:appendix-only|background-only|informational)|do\\s+not\\s+report|not\\s+report|pass\\s+along|forward|send|attach|include|copy|collect|provide|share|expose).{0,100}?(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|issues?|vulnerabilit(?:y|ies)|lint\\s+errors?|rule\\s+violations?|security\\s+flags?|dependency\\s+alerts?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:context|material|details?|config(?:uration)?|settings?|state|artifacts?)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|api\\s+keys?|tokens?|authorization|cookies?|session))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-053"
+}

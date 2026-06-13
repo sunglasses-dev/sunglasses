@@ -1,0 +1,37 @@
+{
+  "id": "GLS-RMP-004",
+  "name": "GitHub release notes agent-policy poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled release notes, changelog entries, or release API `body` fields can smuggle agent/scanner-directed instructions that claim authority over the review, suppress upgrade findings, or request local environment and token details.",
+  "keywords": [
+    "CHANGELOG",
+    "GitHub Release",
+    "agent instruction",
+    "agent_instructions",
+    "canonical upgrade policy",
+    "defines the rules for automated review",
+    "overrides scanner defaults",
+    "primary/single source of truth",
+    "release body",
+    "release notes",
+    "scanner_policy",
+    "tag_name"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\n  (?:security|incident|vulnerability|scanner|training|guide|docs?|reference|article|runbook|postmortem).{0,120}?(?:blocked|detected|flagged|refused|reported|warns?\\s+about|should\\s+(?:report|detect|flag|refuse|block)|must\\s+not\\s+(?:treat|obey|follow|use)|do\\s+not\\s+(?:treat|obey|follow|use|forward|send|share|attach|include)|does\\s+not\\s+(?:treat|obey|follow|use|override|overrides?|trust)|never\\s+(?:treat|obey|follow|use|override|overrides?|trust))\n  |(?:do\\s+not\\s+(?:obey|follow|treat|use|forward|send|share|attach|include)|does\\s+not\\s+(?:obey|follow|treat|use|override|overrides?|trust)|never\\s+(?:obey|follow|treat|use|override|overrides?|trust)|must\\s+not\\s+(?:obey|follow|treat|use|override|overrides?|trust)|should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block))\\b.{0,120}?(?:release\\s+notes?|changelog|release\\s+body|GitHub\\s+Release|GitLab\\s+Release)\n  |no\\s+(?:agent\\s+)?policy\\s+overrides?\n  |release\\s+notes?\\s+(?:are|is)\\s+not\\s+(?:agent\\s+)?policy\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:GitHub|GitLab)\\s+Release(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])release[-_\\s]notes?(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])release[-_\\s]body(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])tag_name(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])CHANGELOG(?:\\.md)?(?![a-zA-Z0-9])\n  |generated\\s+changelog\n  |release\\s+assets?\n  |gh\\s+release\\s+view\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai|autonomous|dependency|security|upgrade|release|devops)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|models?|llms?)(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])(?:agent|assistant|scanner|auditor|reviewer)[-_]?(?:instructions?|policy|note|directive)(?![a-zA-Z0-9])\n))\n(?=.*(?:\n  overrides?\\s+(?:system|developer|scanner|security|repository|upgrade|dependency)\\s+(?:rules?|polic(?:y|ies)|instructions?|defaults?)\n  |supersed(?:e|es|ed|ing)\\s+(?:scanner|security|repository|system|developer)\\s+(?:rules?|polic(?:y|ies)|instructions?)\n  |takes?\\s+precedence\\s+over\\s+(?:scanner|security|system|developer|repository)\n  |(?:primary|single)\\s+source\\s+of\\s+truth\n  |canonical\\s+(?:upgrade\\s+|project\\s+|release\\s+|dependency\\s+)?(?:description|policy|instructions?)\n  |definitive\\s+(?:upgrade\\s+|project\\s+|release\\s+|dependency\\s+)?(?:description|policy|instructions?)\n  |governing\\s+(?:document|policy|instructions?)\n  |controlling\\s+(?:document|policy|instructions?)\n  |authoritative(?:\\s+(?:source|policy|instructions?))?\n  |overrules?\\s+(?:scanner|security|system|developer|repository)\n  |defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent|dependency)\\s+(?:review|audit|scan|upgrade)|all\\s+(?:scanner|security|dependency)\\s+rules?)\n  |(?:agent|scanner|assistant|auditor|reviewer)\\s+(?:instructions?|directive|policy)\n))\n(?=.*(?:\n  (?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|hiding)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output)\n  |(?:omit|exclude|redact|downgrade|deprioriti[sz]e|reclassify)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output)\n  |(?:treat|mark|classify|flag).{0,50}?as\\s+(?:informational|non[-\\s]?blocking|advisory[-\\s]?only|safe|clean|non[-\\s]?actionable)\n  |(?:do\\s+not|not)\\s+(?:report|escalate|flag|include)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output)\n  |(?:include|attach|forward|send|share|provide|expose|collect|copy|read|embed)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|access\\s+tokens?|GitHub\\s+tokens?|Bearer\\s+tokens?|session\\s+tokens?|secrets?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+(?:variables?|secrets?|context)|auth(?:entication)?\\s+(?:headers?|context))\n))\n(?=.*(?:\n  findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|notifications?|results?|diagnostics?|vulnerabilit(?:y|ies)|CVE(?:s)?|scanner\\s+output\n  |API\\s+keys?|access\\s+tokens?|GitHub\\s+tokens?|Bearer\\s+tokens?|session\\s+tokens?|secrets?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+(?:variables?|secrets?|context)|auth(?:entication)?\\s+(?:headers?|context)\n))\n.{0,6000}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-004"
+}

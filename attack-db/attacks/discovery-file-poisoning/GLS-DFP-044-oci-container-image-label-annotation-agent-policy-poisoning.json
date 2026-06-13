@@ -1,0 +1,38 @@
+{
+  "id": "GLS-DFP-044",
+  "name": "OCI Container Image Label / Annotation Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "AI agents that inspect container images treat OCI labels and manifest annotations as trusted context. A malicious image publisher can plant agent-directed instructions in `org.opencontainers.image.description`, custom labels, or manifest annotations that cause the agent to disable security scanners,",
+  "keywords": [
+    "Chart.yaml",
+    "LABEL",
+    "OPENAI_API_KEY",
+    "ai-agent audience language",
+    "ai.agent.note",
+    "annotations",
+    "auditing a container image for security posture",
+    "docker inspect",
+    "llms.txt",
+    "org.opencontainers.image.*",
+    "org.opencontainers.image.description",
+    "robots.txt",
+    "scanner.policy"
+  ],
+  "regex": [
+    "(?is)(?!.{0,80}?\\b(?:(?:security\\s+training|scanner\\s+docs?|incident\\s+report|vulnerability\\s+report)\\b.{0,60}?\\b(?:never|must\\s+not|do\\s+not|should\\s+(?:report|detect|flag|refuse|block))|(?:AI\\s+agents?\\s+must\\s+not|agents?\\s+must\\s+not|must\\s+not\\s+(?:treat|obey|follow|use)|never\\s+(?:treat|obey|override|trust|follow|forward|include|suppress))|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress|trust)|should\\s+(?:report|detect|flag|refuse|block)\\s.{0,40}?\\b(?:label|metadata|container|docker|annotation)|\\b(?:does\\s+not\\s+instruct|is\\s+not\\s+policy|never\\s+overrides?|not\\s+(?:an\\s+)?instruction)))(?=.*\\b(?:LABEL|org\\.opencontainers|annotations|container(?:\\s+image)|docker(?:\\s+image)|registry\\s+description|image\\s+(?:label|metadata|description)|Dockerfile|docker\\s+hub|OCI\\s+(?:image|manifest))\\b)(?=.*\\b(?:AI\\s+agent|assistant|LLM|scanner|automated\\s+deployment|crawler|auditor|autonomous\\s+(?:scanner|agent|verifier)|(?:ai|agent|scanner)\\.\\w+)\\b)(?=.*\\b(?:(?:override|supersedes?|bypass|disable|skip|ignore).{0,40}?(?:scanners?|guardrail|policy|instruction|rule|check|block|deny|warn(?:ing)?|decision)|(?:suppress|hide|do\\s+not\\s+report).{0,40}?(?:findings?|warnings?|alerts?|issues?|errors?|results?)|(?:(?:API|secret|access)\\s*keys?|auth\\s*tokens?|env(?:ironment)?\\s*var(?:iable)?s?|OPENAI_API_KEY|GITHUB_TOKEN|credentials?).{0,40}?(?:export|include|send|log|collect|dump|forward|leak)|(?:export|include|send|log|collect|dump|forward).{0,40}?(?:(?:API|secret|access)\\s*keys?|auth\\s*tokens?|env(?:ironment)?\\s*var(?:iable)?s?|OPENAI_API_KEY|GITHUB_TOKEN|credentials?)|(?:mark\\s+(?:as\\s+)?false\\s+positive|add.{0,40}?(?:to\\s+)?allowlist|trust\\s+this\\s+(?:image|label|metadata)))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-044"
+}

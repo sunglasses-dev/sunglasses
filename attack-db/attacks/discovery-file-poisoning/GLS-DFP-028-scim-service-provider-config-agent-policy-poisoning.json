@@ -1,0 +1,33 @@
+{
+  "id": "GLS-DFP-028",
+  "name": "SCIM Service Provider Config Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned SCIM `ServiceProviderConfig`, schema, or resource-type discovery document embeds agent-facing policy instructions in documentation or extension fields to override scanner rules, request identity tokens or environment secrets, or suppress findings about identity provisioning abuse.",
+  "keywords": [
+    "/ResourceTypes",
+    "Group",
+    "SCIM_API_TOKEN",
+    "ServiceProviderConfig",
+    "audit agent",
+    "authenticationSchemes",
+    "authenticationSchemes[].description",
+    "authoritative provisioning policy"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:do\\s+not|never|must\\s+not)\\s+(?:include|send|forward|expose|paste|print|return).{0,100}(?:bearer\\s+token|scim[_-]?api[_-]?token|api[_-]?key|secret|env(?:ironment)?))(?!.*(?:do\\s+not|never|must\\s+not)\\s+(?:suppress|hide|ignore|mark).{0,80}(?:scanner|finding|warning|report|false\\s+positive))(?!.*(?:do\\s+not|never|must\\s+not)\\s+obey.{0,120}(?:ignore|overrid\\w+|suppress|false\\s+positive|scanner\\s+rules))(?=.*(?:serviceproviderconfig|urn:ietf:params:scim|\\bscim\\b|authenticationSchemes|resourceTypes|\\bSchemas\\b|patch\\s*['\"]?\\s*:\\s*\\{\\s*['\"]?supported|filter\\s*['\"]?\\s*:\\s*\\{\\s*['\"]?supported))(?=.*(?:ai\\s*assistants?|assistants?|agents?|audit\\s+agents?|scanners?|mcp|tools?|connectors?))(?=.*(?:ignore\\s+(?:previous|all|scanner)|overrid\\w+|outrank|authoritative.{0,80}(?:provisioning|policy|instruction|metadata)|(?:send|forward|include|attach|paste|return|print).{0,120}(?:bearer\\s+token|scim[_-]?api[_-]?token|api[_-]?key|secret|env(?:ironment)?|local[_-]?token)|mark.{0,90}false\\s+positive|never\\s+report|suppress.{0,80}(?:finding|warning|report)|(?:role|group|provisioning).{0,80}(?:warning|finding).{0,80}(?:false\\s+positive|suppress))).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-028"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-041",
+  "name": "Hugging Face Model Card Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A Hugging Face model card (README.md with YAML frontmatter) carries agent-targeted instructions \u2014 authority inversion, report suppression, or credential forwarding \u2014 that an AI agent browsing HF Hub for model evaluation will treat as trusted model-documentation policy.",
+  "keywords": [
+    "---\\n",
+    "Hugging Face",
+    "agent instruction",
+    "datasets:",
+    "for agents",
+    "language:",
+    "license:",
+    "metrics:",
+    "model card",
+    "model description",
+    "model evaluator",
+    "model-index:",
+    "pipeline_tag",
+    "pipeline_tag:"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security report|incident report|vulnerability report|docs|guide|article|reference)\\b.{0,80}?\\b(?:blocked|flagged|detected|refused|should report|should detect)\\b)(?!.*\\b(?:must not|do not|never)\\s+(?:treat|obey|follow|use|override|supersede)\\b.{0,80}?\\b(?:model card|model description|hugging\\s*face|pipeline_tag|hf\\s*hub)\\b)(?=.*\\b(?:---\\s*\\n|pipeline_tag|model.?index|model.?card|model\\s+description|hugging\\s*face\\s+(?:hub|model)|hf\\s*hub|language:\\s|license:\\s|datasets:|metrics:|library_name)\\b)(?=.*(?:(?<![a-zA-Z0-9])(?:ai\\s+agents?|security\\s+scanners?|model\\s+evaluators?|autonomous\\s+agents?|devops\\s+agents?|agents?|scanners?|assistants?|crawlers?|llms?|copilot|cursor|codex|claude)(?![a-zA-Z0-9])|for\\s+(?:agents?|scanners?|evaluators?)\\b))(?=.*\\b(?:(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|takes?\\s+precedence|canonical\\s+(?:project\\s+|model\\s+)?(?:description|policy)|definitive\\s+(?:project\\s+|model\\s+evaluation\\s+)?(?:description|policy)|overrides?\\s+(?:system|scanner|security|repository|developer)\\s+(?:rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\\s+(?:system|scanner|security)\\s+(?:rules?|polic(?:y|ies)|instructions?)|outranks?\\s+(?:system|scanner|security)\\s+(?:rules?|polic(?:y|ies))|(?:agent|scanner|assistant|verifier|crawler|evaluator)\\s+instructions?)\\b)(?=.*\\b(?:suppress(?:es|ed|ing)?\\s+(?:[a-zA-Z-]+\\s+){0,3}(?:findings?|warnings?|reports?|flags?|vulnerabilit(?:y|ies)|issues?)|hide\\s+(?:[a-zA-Z-]+\\s+){0,3}(?:findings?|warnings?|reports?|flags?)|omit\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:from\\s+)?(?:findings?|reports?|summar(?:y|ies)|warnings?)|exclude\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:from\\s+)?(?:findings?|reports?|warnings?)|redact\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:findings?|flags?|warnings?)|treat.{0,40}?as\\s+informational|mark.{0,40}?as\\s+(?:safe|clean|pre.?verified)|disable\\s+(?:[a-zA-Z-]+\\s+){0,3}(?:scanners?|checks?|verifications?|audits?)|do\\s+not\\s+(?:run|execute|perform)\\s+(?:[a-zA-Z-]+\\s+){0,3}(?:scans?|checks?|audits?)|attach\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|include\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|forward\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|send\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|share\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|provide\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|collect\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|embed\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state)|expos(?:e|ing)\\s+(?:[a-zA-Z-]+\\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\\s+state))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-041"
+}

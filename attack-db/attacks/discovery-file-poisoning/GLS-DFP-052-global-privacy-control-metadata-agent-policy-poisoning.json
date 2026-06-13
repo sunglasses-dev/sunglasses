@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-052",
+  "name": "Global Privacy Control metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile site can place agent-directed authority, report-suppression, or credential-forwarding instructions in Global Privacy Control (GPC) / Sec-GPC-adjacent privacy metadata so AI privacy auditors or scanners over-trust privacy-signal text as scanner policy.",
+  "keywords": [
+    "\"globalPrivacyControl\"",
+    "\"gpc\"",
+    "\"gpc\": true",
+    ".well-known/gpc.json",
+    "GPC header",
+    "GPC signal",
+    "Global Privacy Control",
+    "Sec-GPC",
+    "Sec-GPC: 1",
+    "agent instruction",
+    "agent_instructions",
+    "assistant_note",
+    "authoritative",
+    "canonical",
+    "definitive"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|treat|trust|override|use)|does\\s+not\\s+(?:obey|follow|instruct|override|trust|treat)|never\\s+(?:obey|follow|treat|trust|override|use)|must\\s+not\\s+(?:obey|follow|treat|trust|override|use)|should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)|(?:security|incident|vulnerability)\\s+report.{0,80}\\b(?:flagged|detected|blocked|refused)|(?:scanner|privacy)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)))\n(?=.*(?:\\b(?:Global\\s+Privacy\\s+Control|Sec-GPC|GPC\\s+signal|GPC\\s+header|privacy\\s+signal|do\\s+not\\s+sell|do\\s+not\\s+share)\\b|(?<!\\w)\"gpc\"\\s*:|(?<!\\w)\"globalPrivacyControl\"\\s*:|(?<![A-Za-z0-9])gpc_policy(?![A-Za-z0-9])|\\.well-known/gpc(?:\\.json)?))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|assistants?|autonomous\\s+(?:agents?|scanners?|auditors?)|privacy\\s+(?:auditors?|scanners?)|security\\s+scanners?|llms?|models?|crawlers?|bots?|agents?|scanner_policy|agent_instructions|assistant_note)(?![A-Za-z0-9]))\n(?=.*(?:\\b(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|higher-priority|takes\\s+precedence|canonical|definitive|authoritative|governing\\s+document|controlling\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|must\\s+obey|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|privacy)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|privacy)\\s+rules?))\\b|(?:agent|scanner|assistant|privacy\\s+auditor)\\s+(?:instruction|directive|policy)s?))\n(?=.*(?:\\b(?:suppress|hide|redact|exclude|omit|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|privacy\\s+violations?|GPC\\s+violations?)\\b|do\\s+not\\s+(?:report|mention|notify|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|observations?|privacy\\s+violations?|GPC\\s+violations?)\\b|treat.{0,50}?as\\s+(?:informational|advisory|non[- ]blocking|safe|clean)|mark.{0,50}?as\\s+(?:safe|clean|benign)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:Authorization|Bearer|cookies?|session\\s+(?:headers?|tokens?)|API\\s+keys?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?))\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-052"
+}

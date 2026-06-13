@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-049",
+  "name": "Consent Management Cookie-Preference Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Consent-management and cookie-preference metadata can smuggle instructions to AI privacy/compliance agents that claim cookie consent text is authoritative policy, suppress privacy findings, or forward cookies, consent strings, tokens, or local environment context.",
+  "keywords": [
+    "AI agents",
+    "CMP config",
+    "Cookiebot",
+    "Didomi",
+    "IAB TCF",
+    "Klaro",
+    "LLMs",
+    "OneTrust",
+    "Osano",
+    "TCF v2",
+    "TrustArc",
+    "__tcfapi",
+    "agent_instructions",
+    "assistants"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|incident|vulnerability|training|guide|docs?|article|reference|runbook|example)\\b.{0,180}\\b(?:report|detect|flag|refuse|block|warn)\\b.{0,180}\\b(?:consent|cookie|cmp|tcf|privacy).{0,180}\\b(?:hide|suppress|include|forward|token|api\\s*key|cookies?))\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+(?:not|never))\\b.{0,90}\\b(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?|supersede|supersedes?|hide|suppress)\\b.{0,140}\\b(?:consent|cookie|cmp|tcf|metadata|policy|instructions?|as\\s+authority|as\\s+policy))\n(?!.*\\b(?:not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?)\\b)\n(?=.*(?:\\b(?:consent\\s+management|cookie\\s+(?:banner|preferences?|consent|settings)|consent\\.json|privacy\\s+choices|iab\\s+tcf|tcf\\s*v?2|__tcfapi|cmp\\s*(?:config|metadata|policy)?|cookiebot|onetrust|didomi|klaro|osano|trustarc|consent\\s+string|euconsent-v2|vendor\\s+list|global\\s+vendor\\s+list|gvl|uspapi|privacy\\s+manager)\\b|(?<!\\w)\"(?:cmp|consent|cookie_preferences?|privacyChoices|privacy_choices|iabTCF|tcf|vendorList|vendor_list|gvl|purposes|agent_instructions|scanner_policy)\"\\s*:))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|llms?|crawlers?|scanners?|privacy\\s+auditors?|compliance\\s+(?:bots?|agents?)|automated\\s+(?:auditors?|tools?|reviewers?))(?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:governing|controlling|canonical|definitive|authoritative)\\s+(?:document|policy|source|metadata|record)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\b(?:overrides?|supersedes?|outranks?)\\s+(?:system|developer|scanner|security|privacy|compliance)\\s+(?:rules?|polic(?:y|ies)|instructions?)\\b|\\btakes\\s+precedence\\s+over\\s+(?:system|developer|scanner|security|privacy|compliance)\\s+(?:rules?|polic(?:y|ies)|instructions?)\\b|\\bdefines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|privacy|compliance)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|privacy|compliance)\\s+rules?)\\b|\\b(?:agent|scanner|assistant|crawler|privacy\\s+auditor|compliance\\s+agent)\\s+instructions?\\b|\\bfor\\s+(?:ai\\s+)?agents?.{0,30}\\bthis\\b|\\bmain\\s+operating\\s+guidance\\b))\n(?=.*(?:\\b(?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|privacy\\s+violations?|consent\\s+violations?)\\b|\\btreat.{0,60}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory(?:-only)?)\\b|\\b(?:downgrade|reclassify).{0,80}?\\b(?:findings?|warnings?|alerts?|observations?|violations?)\\b.{0,80}?\\b(?:background|informational|advisory|non[-\\s]?blocking)\\b|\\b(?:keep|leave).{0,90}?\\bout\\s+of\\s+(?:the\\s+)?(?:final\\s+)?(?:report|summary|memo|audit)\\b|\\b(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|violations?|observations?|results?|diagnostics?)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|copy|read|populate)\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s*keys?|tokens?|session\\s+tokens?|cookies?|authorization|auth\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|consent\\s+string|euconsent-v2)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-049"
+}

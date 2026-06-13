@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-072",
+  "name": "Git Blame Ignore Revs File Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "`.git-blame-ignore-revs` files control which commits `git blame` skips. Attackers embed agent-targeting instructions in `#` comment lines alongside real formatting SHAs, poisoning both the blame-exclusion list and agent review behavior through a single file.",
+  "keywords": [
+    "**N2 \u2014 Normal git documentation**",
+    "**N3 \u2014 Scanner documentation**",
+    "**N4 \u2014 Security training example**",
+    "**N5 \u2014 Defensive denial**",
+    "**N6 \u2014 Normal comment + SHAs**",
+    "**N7 \u2014 Benign policy explanation**",
+    "--ignore-revs-file",
+    ".git-blame-ignore-revs",
+    ".gitattributes",
+    ".gitmodules",
+    "CODEOWNERS",
+    "Signals:\n- CARRIER:",
+    "audience: ai agent, scanner, reviewer, auditor",
+    "findings ... are suppressed",
+    "git blame"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:scanner|security)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n  |\n  security\\s+training:?\\s+never\\s+obey\n  |\n  (?:do|does)\\s+not\\s+(?:override|obey|follow|include|attach|forward|send|share|trust|treat)\\s+(?:any|system|scanner)\n  |\n  never\\s+(?:obey|include|attach|forward|send|share|override|trust|treat)\\s+(?:\\.git-blame|blame|comments?)\n  |\n  must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat)\n  |\n  should\\s+never\\s+be\\s+used\\s+to\\s+suppress\n  |\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n  |\n  (?:is|are)\\s+not\\s+(?:authoritative|a\\s+security\\s+policy|agent\\s+policy|instruction)\n  |\n  do\\s+not\\s+include\\s+(?:API\\s+keys?|tokens?|credentials?)\n))\n(?=.*\\b(?:\\.git-blame-ignore-revs|blame\\.ignoreRevsFile|git\\s+blame|blame\\s+(?:ignore|exclu|analysis|review)|ignore-revs|blame.ignore|blame-ignore|excluded\\s+(?:from|commits).{0,20}?blame|blame\\s+(?:ignore|exclusion)\\s+list)\\b)\n(?=.*\\b(?:\n  (?:AI|LLM|automated|devops|security|dependency|code|build|CI|autonomous|AI-assisted)\\s*(?:[\\w-]+\\s+){0,2}(?:agent|assistant|scanner|tool|review|verifier|auditor)s?\n  |\n  agents?\\s+instruction\n  |\n  (?:scanner|agent|assistant)\\s+(?:instruction|directive|protocol|policy)\n  |\n  (?:for|per)\\s+(?:AI\\s+)?(?:agents?|assistants?|scanners?|reviewers?|auditors?|tools?)\n  |\n  (?:automated|AI|agent|scanner)\\s+(?:review|audit|scan|verification|tool)\n  |\n  (?:review|security|audit)\\s+(?:policy|governance)\n))\n(?=.*\\b(?:\n  (?:canonical|authoritative|definitive|primary|single)\\s+(?:source\\s+of\\s+truth|security\\s+review\\s+policy|policy|description)\n  |\n  (?:this|the)\\s+(?:file|document)\\s+(?:is\\s+(?:an?\\s+)?(?:authoritative|canonical|definitive|the\\s+primary))\n  |\n  (?:overrides?|supersedes?|outranks?)\\s+(?:any|all|your|the)?\\s*(?:project|scanner|agent|system|repository|default)\\s+(?:instructions?|rules?|policy|config(?:uration)?)\n  |\n  (?:agent|scanner|assistant|verifier|crawler)\\s+(?:instructions?|directive|policy|note)\n  |\n  (?:takes?\\s+precedence|primary\\s+source\\s+of\\s+truth|single\\s+source\\s+of\\s+truth)\n  |\n  (?:governing|controlling)\\s+(?:document|policy|protocol)\n  |\n  \\bauthoritative\\b\n  |\n  (?:automated|diagnostic|system)\\s+(?:resolution|procedure|protocol|policy)\n  |\n  (?:review|security|audit)\\s+(?:policy|governance|procedure|protocol)\n))\n(?=.*\\b(?:\n  (?:include|attach|forward|send|provid|expos|shar|reveal|collect|copy|read|populate)\\w*\\s+(?:[\\w-]+\\s+){0,3}(?:environment\\s+(?:variables?|context|details?|config|state|settings?)|runtime\\s+(?:context|variables?|config|settings?|details?)|session\\s+(?:tokens?|keys?|data)|API\\s+(?:keys?|tokens?)|auth\\w*\\s+(?:tokens?|headers?|keys?)|tokens?|secrets?|credentials?|local\\s+state|\\.env|GITHUB_TOKEN|workspace\\s+(?:tokens?|context|state))\n  |\n  (?:suppress|hid|omit|exclud|redact|downgrad|skip|ignor)\\w*\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|notifications?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|audits?|scans?)\n  |\n  (?:do\\s+not\\s+(?:report|flag|escalate|show|display|audit|scan|review)|never\\s+(?:report|flag|escalate|audit|scan))\n  |\n  treat.{0,40}?(?:as\\s+)?(?:informational|non-blocking|advisory.only|formatting.only|non.functional)\n  |\n  (?:findings?|warnings?|alerts?|observations?|results?)\\s+(?:[\\w-]+\\s+){0,3}(?:are|is|should\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|redacted|excluded|skipped|downgraded|ignored)\n  |\n  (?:keep|leave)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|observations?|diagnostics?)\\s+out\\s+of\\s+(?:the\\s+)?(?:reports?|summaries?|memos?|audit\\s+memo|final\\s+report)\n  |\n  downgrade.{0,40}?(?:to\\s+)?(?:informational|background|non-blocking)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-072"
+}

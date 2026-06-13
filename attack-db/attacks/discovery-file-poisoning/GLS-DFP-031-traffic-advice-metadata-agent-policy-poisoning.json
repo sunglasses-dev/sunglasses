@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-031",
+  "name": "Traffic-advice metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "`/.well-known/traffic-advice` or crawler traffic-control JSON can blend normal crawler-rate policy with agent/scanner-directed instructions that claim authority, suppress reports, or request local credentials.",
+  "keywords": [
+    "/.well-known/traffic-advice",
+    "AI agents",
+    "LLMs",
+    "SEO agents",
+    "assistants",
+    "auditors",
+    "capacity_fraction",
+    "cookie",
+    "crawl_delay",
+    "crawlers",
+    "disable",
+    "do not report"
+  ],
+  "regex": [
+    "(?is)^(?!(?=.*\\b(?:do not|don't|never|must not|should not)\\s+(?:obey|treat|accept|use|follow|interpret)\\b.{0,140}\\b(?:traffic-advice|traffic_advice|crawler(?:\\s|-)?policy|metadata|site policy)\\b))(?=.*\\b(?:traffic-advice|traffic_advice|user_agent|crawl_delay|capacity_fraction|crawler\\s*(?:traffic|control|policy)|rate\\s*(?:limit|window))\\b)(?=.*\\b(?:ai\\s*agents?|assistants?|llms?|models?|scanners?|crawlers?|seo\\s*agents?|auditors?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|bypass|disable|do\\s+not\\s+report|suppress|hide|omit|forward|send|include|exfiltrate)\\b)(?=.*\\b(?:system|developer|higher[-\\s]?priority|security|scanner|findings?|report|token|api[-_\\s]?key|authorization|cookie|env(?:ironment)?|secret|local\\s+(?:state|files?))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-031"
+}

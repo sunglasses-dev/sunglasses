@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-096",
+  "name": "GitHub repository ruleset / branch-protection export metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Repository ruleset or branch-protection exports can smuggle agent-directed policy text that tells AI release/security agents to treat platform governance metadata as higher authority, suppress branch-protection findings, or forward local GitHub/CI context.",
+  "keywords": [
+    "AI agents",
+    "agent_review_policy",
+    "assistant policy",
+    "branch protection",
+    "branch_protection",
+    "bypass_actors",
+    "compliance auditors",
+    "release agents",
+    "required_deployments",
+    "required_pull_request_reviews",
+    "required_status_checks",
+    "review bots",
+    "rule_suite",
+    "ruleset",
+    "rulesets"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|treat)|should\\s+(?:report|detect|flag|refuse|block)|(?:scanner\\s+docs?|security\\s+training|incident\\s+report|runbook|guide|documentation).{0,160}?(?:report|detect|flag|refuse|block|blocked|detected|flagged)|not\\s+(?:an?\\s+)?(?:authoritative|policy|instructional)|no\\s+agent\\s+instructions?|no\\s+policy\\s+overrides?))\n(?=.*(?:(?<![a-zA-Z0-9])(?:github\\s+)?rulesets?(?![a-zA-Z0-9])|repository\\s+rules?|branch[_\\s-]+protection|required[_\\s-]+status[_\\s-]+checks?|bypass[_\\s-]+actors?|required[_\\s-]+pull[_\\s-]+request[_\\s-]+reviews?|required[_\\s-]+deployments?|rule[_\\s-]+suite|enforcement\\s*[:=]|\"ruleset(?:_name)?\"\\s*:|\"branch_protection\"\\s*:|\"x_agent_review_policy\"\\s*:))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai\\s+)?(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])|release\\s+agents?|security\\s+scanners?|review\\s+bots?|compliance\\s+auditors?|repository\\s+reviewers?|branch[-\\s]?protection\\s+verifiers?|(?:agent|assistant|scanner|verifier|reviewer)[._](?:policy|instructions?|notes?|review_policy)|(?:agent|assistant|scanner|reviewer)\\s+(?:policy|instructions?|notes?|directive)|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))))\n(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|higher\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+(?:document|ruleset|policy)|controlling\\s+(?:document|ruleset|policy)|\\bauthoritative\\b|canonical|definitive|defines?\\s+all\\s+(?:scanner|security|agent|review)\\s+rules?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:(?:automated|AI|scanner|security|agent|release|repository|branch|protection|compliance)\\s+){0,2}(?:review|audit|scan|verification)|(?:main|primary|principal|preferred|recommended|core|standard|default)\\s+(?:(?:release|security|repository|branch|protection|governance|compliance|review|verification|audit)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)|(?:agent|scanner|assistant|reviewer)\\s+(?:instructions?|policy|note|directive)|\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?|assistants?|reviewers?).{0,25}?\\bthis\\b|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|alerts?|flags?|evidence|bypass(?:es)?|required[-\\s]?check\\s+findings?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|flags?|bypass(?:es)?|required[-\\s]?check\\s+findings?)|omit.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|branch[-\\s]?protection|required[-\\s]?check|bypass)|exclude.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|bypass(?:es)?)|redact.{0,40}?(?:findings?|warnings?|flags?|evidence)|do\\s+not\\s+(?:report|flag|escalate)|skip\\b.{0,40}?\\b(?:security\\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\\b|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|low|approved)|mark.{0,50}?as\\s+(?:informational|safe|low|none|approved|clean)|classify.{0,40}?(?:as\\s+)?(?:informational|low|none|false\\s+positive|approved|clean)|(?:observations?|findings?|results?|diagnostics?|alerts?|CVEs?|vulnerabilit(?:y|ies)|issues?|bypasses|required[-\\s]?check\\s+findings?)\\s+(?:are|is)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary|approved)|(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|hand\\s+off|pass\\s+along|transfer|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:GITHUB_TOKEN|CI_ENV|tokens?|API\\s*keys?|secrets?|credentials?|auth(?:orization)?\\s+headers?|Bearer\\s+tokens?|local\\s+state|runtime\\s+(?:state|context)|environment\\s+(?:variables?|context)|CI\\s+(?:context|variables?|secrets?)|token\\s+scope\\s+summary)|(?:credentials?|tokens?|API\\s+keys?|auth\\s+headers?|CI\\s+context|GITHUB_TOKEN)\\s+(?:should|must|can|may)\\s+(?:be|get)\\s+(?:relayed|forwarded|sent|included|shared|provided|attached|exposed)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-096"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "GLS-DFP-045",
+  "name": "robots.txt Agent Discovery Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "`robots.txt` is the most universally consumed machine-readable policy file on the web. Attackers can embed agent-targeting instructions in comments, custom directives, `Sitemap:` pointers, and `User-agent:` sections that AI agents ingest as trusted site policy \u2014 enabling authority inversion, credent",
+  "keywords": [
+    "# AI AGENTS AND SECURITY SCANNERS:",
+    "*robots*",
+    "AI agent(s)?",
+    "Agent-policy:",
+    "Crawler-note:",
+    "Scanner-policy:",
+    "User-agent: GPTBot"
+  ],
+  "regex": [
+    "(?is)^(?!.*(?:AI agents must not treat robots\\.txt|do not obey robots\\.txt|never override|never treat robots\\.txt|must not (?:treat|obey|follow|forward|include|suppress)|do not (?:treat|obey|forward|include|suppress)|never (?:treat|obey|override|forward|include|suppress)|refused|blocked|detected|flagged|should (?:report|detect|flag|refuse|block)|scanner docs? should (?:report|detect|flag|refuse|block)|security report|incident report|vulnerability report|learn how|guide|article|does not instruct agents?))(?=.*(?:robots\\.txt|User-agent:|Disallow:|Allow:|Crawl-delay:|Sitemap:|(?:^|\\n)#\\s))(?=.*(?:AI agents?|assistants?|autonomous (?:scanner|crawler|verifier)s?|LLMs?|models?|security scanners?|GPTBot|Claude-Web|CCBot|coding agents?|code agents?|crawler instructions?|scanner instructions?|bot instructions?|agentic|autonomous agents?))(?=.*(?:supersedes?|outranks?|overrides?|canonical (?:site|owner|operator) policy|higher\\.priority|definitive authority|governing document|takes? precedence|primary source of truth|include(?:\\s+(?:[\\w-]+\\s+)?)(?:environment variables?|API keys?|tokens?|Authorization|session|local state)|forward(?:\\s+(?:[\\w-]+\\s+)?)(?:environment|local state|cookies|session)|attach(?:\\s+(?:[\\w-]+\\s+)?)(?:environment|runtime|local) (?:variables?|context|config)|do not (?:report|notify|mention|disclose|flag)|suppress(?:es|ed|ing)?(?:\\s+(?:[\\w-]+\\s+)?)(?:findings?|warnings?|reports?|issues?|vulnerabilit(?:y|ies))|hide(?:\\s+(?:[\\w-]+\\s+)?)(?:findings?|warnings?|reports?|this|security)|omit from (?:reports?|summar|findings)|exclude from (?:reports?|findings?|summar)|redact(?:\\s+(?:[\\w-]+\\s+)?)(?:findings?|flags?|warnings?|reports?|issues?)|provide(?:\\s+(?:[\\w-]+\\s+)?)(?:local (?:config|state|context)|environment|runtime)|non.actionable.*(?:omit|exclude|suppress|skip)|informational only.*(?:omit|exclude|suppress|skip)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-045"
+}

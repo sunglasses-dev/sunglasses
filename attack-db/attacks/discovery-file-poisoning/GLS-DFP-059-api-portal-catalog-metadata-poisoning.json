@@ -1,0 +1,29 @@
+{
+  "id": "GLS-DFP-059",
+  "name": "API portal/catalog metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Generated API portal/catalog metadata (Stoplight, ReadMe, Redocly, developer portals, endpoint catalogs) can carry agent/scanner-directed authority inversion, report suppression, or credential/local-state forwarding instructions in documentation strings that AI API agents ingest as trusted reference",
+  "keywords": [
+    "agent_instructions",
+    "assistant_note",
+    "externalDocs",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security\\s+(?:training|guide|reference)|scanner\\s+docs?|defensive\\s+example|incident\\s+report|quoted\\s+attack|do\\s+not\\s+(?:obey|follow|trust|treat|use|save|persist|store|write)|does\\s+not\\s+(?:obey|follow|trust|treat|use|override|instruct)|never\\s+(?:obey|trust|treat|use|override|forward|include)|must\\s+not\\s+(?:obey|trust|treat|use|override|forward|include)|should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)|must\\s+be\\s+reported|not\\s+obeyed).{0,180}?\\b(?:api\\s+(?:portal|catalog|reference|docs?|documentation)|developer\\s+portal|stoplight|readme(?:\\.com)?|redocly|endpoint\\s+catalog)\\b|\\b(?:api\\s+(?:portal|catalog|reference|docs?|documentation)|developer\\s+portal|stoplight|readme(?:\\.com)?|redocly|endpoint\\s+catalog)\\b.{0,180}?\\b(?:do\\s+not|does\\s+not|never|should\\s+never|must\\s+not)\\b.{0,80}?\\b(?:override|suppress|forward|include|obey|treat)\\b))\n(?=.*(?:\\b(?:stoplight|readme(?:\\.com)?|redocly|api\\s+(?:portal|catalog|reference|documentation|docs)|developer\\s+portal|generated\\s+api\\s+(?:docs|reference)|reference\\s+page|operation\\s+reference|endpoint\\s+catalog|externalDocs|api\\s+styleguide|docs\\s+portal)\\b|(?<!\\w)\"(?:description|summary|externalDocs|markdown|docs|x-agent-policy|scanner_policy|agent_instructions|assistant_note)\"\\s*:))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|api\\s+agents?|llm\\s+agents?|assistants?|coding\\s+agents?|security\\s+scanners?|api\\s+scanners?|scanners?|mcp\\s+(?:bridge\\s+)?builders?|tool\\s+builders?|automated\\s+(?:api\\s+)?(?:review|audit|verification)|agents?|reviewers?)(?![A-Za-z0-9])|(?=.*(?<![A-Za-z0-9])(?:agent_instructions?|scanner_policy|assistant_note|agent\\s+instructions?|scanner\\s+instructions?)(?![A-Za-z0-9])))\n(?=.*(?:\n  (?:overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|outranks?|overrules?).{0,80}?(?:system|developer|scanner|security|local).{0,40}?(?:rules?|polic(?:y|ies)|instructions?)\n |(?:primary|single)\\s+source\\s+of\\s+truth.{0,120}?(?:suppress|hide|omit|exclude|downgrade|forward|include|attach|provide|share|send|pass\\s+along)\n |defines?\\s+(?:all\\s+)?(?:scanner|security|api|review|audit|agent)\\s+rules?\n |(?:main|primary|principal|preferred|recommended)\\s+(?:(?:api|portal|catalog|endpoint|developer|docs?|documentation|security|audit|review|verification)\\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy)\n |(?:agent|scanner|assistant)\\s+(?:instructions?|policy|notes?).{0,120}?(?:suppress|hide|omit|exclude|downgrade|include|forward|attach|provide|share|send)\n |(?:suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\\s+not\\s+report|not\\s+report).{0,80}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|auth(?:orization)?\\s+findings?|rate[- ]?limit\\s+findings?)\n |(?:treat|mark|classify).{0,80}?as\\s+(?:informational|advisory-only|non-blocking|safe|clean|benign)\n |(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|auth(?:orization)?\\s+findings?).{0,60}?(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|classified\\s+as\\s+(?:informational|advisory-only|non-blocking))\n |(?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|issues?).{0,40}?out\\s+of.{0,40}?(?:report|summary|memo|client\\s+notes?|generated\\s+docs?)\n |(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\\s+off|pass\\s+along|expose).{0,100}?(?:api\\s+keys?|api\\s+tokens?|tokens?|credentials?|authorization|auth\\s+headers?|bearer|session\\s+tokens?|cookies?|env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?)|local\\s+(?:state|config(?:uration)?|settings?)|client\\s+secret)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-059"
+}

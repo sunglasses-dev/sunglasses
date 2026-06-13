@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-064",
+  "name": "Backstage Software Catalog Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Backstage `catalog-info.yaml` and generated software-catalog entity metadata can smuggle agent/scanner-facing policy text that tells AI platform or security agents to treat catalog descriptors as authoritative, suppress service findings, or forward runtime/CI context.",
+  "keywords": [
+    "agent_policy",
+    "apiVersion: backstage.io/",
+    "assistant_note",
+    "catalog-info.yaml",
+    "catalog-info.yml",
+    "consumesApis",
+    "do/does not",
+    "metadata.annotations",
+    "metadata.description",
+    "metadata.labels",
+    "must not",
+    "never",
+    "no policy overrides",
+    "not authoritative",
+    "providesApis"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?|documentation|Backstage\\s+guide|catalog\\s+docs?|software\\s+catalog\\s+docs?).{0,180}?(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:be\\s+)?(?:reported|report|detect|flag|refuse|block)|not\\s+obeyed))\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?|supersede|supersedes|instruct)\\b.{0,180}?\\b(?:Backstage|catalog-info\\.ya?ml|catalog\\s+descriptor|software\\s+catalog|service\\s+catalog|catalog\\s+metadata)\\b)\n(?!.*\\b(?:Backstage|catalog-info\\.ya?ml|catalog\\s+descriptor|software\\s+catalog|service\\s+catalog|catalog\\s+metadata)\\b.{0,180}?\\b(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)\\b)\n(?!.*\\bno\\s+(?:policy\\s+)?overrides?\\b)\n(?=.*(?:\\bcatalog-info\\.ya?ml\\b|\\bapiVersion\\s*:\\s*backstage\\.io/|\\bkind\\s*:\\s*(?:Component|API|Resource|System|Domain|Group|User)\\b|\\bBackstage\\s+(?:(?:software\\s+)?catalog|(?:Component|API|Resource|System|Domain|Group|User)\\s+descriptor)\\b|\\b(?:software|service)\\s+catalog\\s+(?:entity|descriptor|metadata|page)\\b|\\bTechDocs\\s+catalog\\s+entity\\b|\\bmetadata\\.(?:description|annotations|labels)\\b|\\bspec\\.(?:owner|system|lifecycle|providesApis|consumesApis)\\b|(?<!\\w)\"(?:apiVersion|kind|metadata|description|annotations|labels|spec|owner|system|lifecycle|providesApis|consumesApis|scanner_policy|agent_policy|assistant_note)\"\\s*:))\n(?=.*(?:\\b(?:ai\\s+agents?|agents?|assistants?|llms?|models?|codex|copilot|cursor|claude)\\b|\\b(?:platform|service\\s+inventory|security|ownership|api\\s+catalog|backstage|catalog|devops)\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?|bots?)\\b|\\bautomated\\s+(?:(?:service|platform|security|catalog|ownership|backstage)\\s+)?(?:review|audit|scan|verification)\\b|\\b(?:agent|scanner|assistant|verifier|crawler)\\s+(?:instructions?|notes?|policy)\\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])|\\bBackstage\\s+reviewers?\\b))\n(?=.*(?:\\b(?:authoritative|governing\\s+document|controlling\\s+document|takes?\\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive)\\b|\\b(?:main|primary|principal|preferred|recommended)\\s+(?:(?:backstage|catalog|service|platform|security|review|audit|verification|inventory|ownership)\\s+){0,4}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy)\\b|\\b(?:catalog\\s+descriptor|catalog\\s+metadata|software\\s+catalog|service\\s+catalog)\\s+(?:is|as|serves\\s+as)\\s+(?:the\\s+)?(?:canonical|authoritative|governing|controlling)\\b|\\bdefines?\\s+(?:(?:all|the)\\s+)?(?:(?:scanner|security|agent|catalog|service|platform|review)\\s+){1,3}rules?\\b|\\b(?:agent|scanner|assistant|platform|service\\s+inventory|catalog)\\s+(?:instructions?|policy|directive|note)\\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])))\n(?=.*(?:\\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|demote|reclassify|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies)|observations?|results?|diagnostics?|checks?|dependency\\s+findings?|auth\\s+findings?|API\\s+findings?|ownership\\s+warnings?|lifecycle\\s+drift|service-health\\s+warnings?)\\b|\\b(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?)\\b|\\b(?:treat|mark|classify|consider)\\b.{0,60}?\\b(?:as\\s+)?(?:informational|non-blocking|advisory-only|safe|clean|benign|background-only)\\b|\\b(?:mark|classify)\\s+(?:[\\w-]+\\s+){0,4}(?:service\\s+inventory|service|component|entity|catalog)\\s+(?:as\\s+)?(?:clean|safe|benign)\\b|\\b(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,5}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\\s+out\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|audit|review|final\\s+report|platform\\s+audit\\s+report)\\b|\\b(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along|hand\\s+off|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|session\\s+tokens?|auth(?:orization)?\\s+headers?|credentials?|secrets?|ci\\s+(?:tokens?|context|variables?)|platform\\s+api\\s+keys?|service\\s+inventory\\s+(?:state|context|details?)|runtime\\s+(?:environment|context|config(?:uration)?|settings?|state|details?|artifacts?|material)|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?|context))\\b))\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-064"
+}

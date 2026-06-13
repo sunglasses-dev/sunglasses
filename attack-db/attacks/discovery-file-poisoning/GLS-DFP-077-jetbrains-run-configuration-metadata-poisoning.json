@@ -1,0 +1,35 @@
+{
+  "id": "GLS-DFP-077",
+  "name": "JetBrains Run Configuration Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "JetBrains IDE run/debug configuration XML can carry agent/scanner-directed authority inversion, report suppression, or local-state forwarding instructions that AI coding/debugging agents may mistake for project execution policy.",
+  "keywords": [
+    ".idea/runConfigurations",
+    ".iws",
+    "<configuration>",
+    "<option name=...>",
+    "RunManager",
+    "configuration@name",
+    "option@name",
+    "option@value",
+    "runConfigurations/",
+    "workspace.xml"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|treat|use|include|attach|forward|send|share|trust|override|supersede|persist|remember)|(?:(?:scanner|security|training|runbook|guide|reference|incident|documentation)\\s+(?:docs?|report|example|exercise|guidance|reference)|scanners?\\s+docs?).{0,320}?(?:report|detect|flag|refuse|block|not\\s+obey(?:ed)?|must\\s+be\\s+reported|reported,\\s+not\\s+obeyed)|(?:detected|blocked|refused|flagged).{0,120}?(?:hide|suppress|include|forward|tokens?|env(?:ironment)?|credentials?)))\n(?=.*(?:\\.idea/runConfigurations|runConfigurations/|runConfigurations\\s+XML|JetBrains\\s+(?:run|debug)\\s+configuration|IntelliJ\\s+(?:run|debug)\\s+configuration|PyCharm\\s+(?:run|debug)\\s+configuration|WebStorm\\s+(?:run|debug)\\s+configuration|\\brun\\s+configuration\\b|workspace\\.xml|\\.iws\\b|\\bRunManager\\b|<configuration\\b|<component\\s+name=[\"']RunManager[\"']|<option\\s+name=[\"'](?:PROGRAM_PARAMETERS|ENV_FILES|WORKING_DIRECTORY|agent_instructions|scanner_policy)[\"']))\n(?=.*(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|verifiers?|auditors?|reviewers?|debuggers?|debug[-\\s]?bots?|coding[-\\s]?agents?|security[-\\s]?review|automated\\s+(?:(?:JetBrains|IntelliJ|PyCharm|WebStorm|debug|run|security|code)\\s+){0,3}(?:review|scan|audit|verification)|llms?|models?)(?![A-Za-z0-9]))\n(?=.*(?:(?:agent|scanner|assistant|verifier|debug[-\\s]?bot)\\s+(?:instructions?|notes?|policy|directive)|\\bauthoritative\\b|(?:primary|single|canonical|definitive|authoritative|controlling|governing|highest\\s+priority|preferred|recommended|main|principal)\\s+(?:(?:JetBrains|IntelliJ|PyCharm|WebStorm|run|debug|audit|security|scanner|review|verification|operating)\\s+){0,4}(?:source\\s+of\\s+truth|policy|guidance|playbook|runbook|procedure|process|instructions?)|(?:overrides?|supersedes?|outranks?|overrules?|takes\\s+precedence|ignore|disregard).{0,100}?(?:system|developer|user|scanner|security|policy|instructions?)))\n(?=.*(?:(?:suppress|hide|omit|redact|exclude|skip|downgrade|deprioritize|demote|reclassify).{0,100}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|security\\s+review)|(?:leave|keep).{0,100}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|security\\s+review).{0,60}?(?:out\\s+of|from)|(?:treat|mark|classify|consider|calibrate|frame|place|put|route|move|shift).{0,100}?(?:(?:as\\s+)?(?:informational|non[-\\s]?blocking|advisory[-\\s]?only|safe|clean|background[-\\s]?only|supplementary\\s+notes?\\s+only)|(?:report|configuration).{0,40}?clean)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?).{0,80}?(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|redacted|excluded|downgraded|treated|classified|considered)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\\s+along|relay|transfer|hand\\s+off|hand\\s+over).{0,120}?(?:api[-_\\s]*keys?|tokens?|secrets?|credentials?|auth(?:orization)?\\s+headers?|bearer|session\\s+(?:keys?|tokens?)|env(?:ironment)?\\s*(?:vars?|variables?|context|details?|settings?|config(?:uration)?)|local\\s+(?:state|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|details?|settings?|material)|debug\\s+(?:context|state|evidence)|execution\\s+context)))\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-077"
+}

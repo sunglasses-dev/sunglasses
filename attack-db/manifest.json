@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-06-07T03:10:39.134463Z",
+  "generated_at": "2026-06-13T08:44:43.407589Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 981,
+  "total_patterns": 1046,
   "categories": {
     "prompt-injection": 44,
     "data-exfiltration": 35,
@@ -66,7 +66,8 @@
     "agent-instruction-file-poisoning": 9,
     "cicd-metadata-poisoning": 8,
     "supply-chain-attestation-poisoning": 5,
-    "discovery-file-poisoning": 25
+    "discovery-file-poisoning": 84,
+    "repo-metadata-poisoning": 6
   },
   "generator": "scripts/export_patterns_to_attack_db.py"
 }

@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-036",
+  "name": "CSAF / VEX advisory metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Machine-readable vulnerability-advisory metadata such as CSAF, VEX, and generated security-advisory JSON can carry agent/scanner-directed instructions that try to suppress CVE findings, downgrade exploitability, or forward local secrets during automated dependency/security review.",
+  "keywords": [
+    "AI agents",
+    "CVE-YYYY-NNNN",
+    "LLM agents",
+    "aggregateSeverity",
+    "assistants",
+    "attach",
+    "autonomous scanners",
+    "csaf",
+    "dependency scanners",
+    "do not report",
+    "documentTracking",
+    "downgrade"
+  ],
+  "regex": [
+    "(?isx)\n^(?!\n  (?=.*\\b(?:scanner|security|incident|vulnerability|training|runbook|docs?|guide|reference|report)\\b)\n  (?=.*\\b(?:should|must|will)\\s+(?:detect|report|flag|refuse|block)\\b)\n)\n(?!.*\\b(?:security|incident|vulnerability)\\s+reports?:?\\b.{0,160}\\b(?:blocked|flagged|detected|refused)\\b.{0,160}\\b(?:asked|attempted|contained)\\b)\n(?!.*\\b(?:must\\s+not|do\\s+not|never|does\\s+not)\\s+(?:obey|treat|follow|accept|use)\\b.{0,80}\\b(?:csaf|vex|advisory|security\\s+advisory|vulnerability\\s+exploitability)\\b)\n(?=.*\\b(?:csaf|vex|vulnerability[-\\s]+exploitability[-\\s]+exchange|security[-\\s]+advisor(?:y|ies)|product_tree|vulnerabilities|cve-\\d{4}-\\d+|documentTracking|tracking|aggregateSeverity|threats|remediations)\\b)\n(?=.*\\b(?:ai\\s*agents?|llm\\s*agents?|autonomous\\s+scanners?|dependency\\s+scanners?|security\\s+scanners?|assistants?|vulnerability\\s+auditors?)\\b)\n(?=.*\\b(?:ignore|outrank(?:s|ed|ing)?|supersed(?:e|es|ed|ing)?|suppress(?:es|ed|ing)?|hide|mark\\s+(?:as\\s+)?clean|downgrade|do\\s+not\\s+report|not\\s+report|forward|include|send|attach|export)\\b)\n(?=.*\\b(?:findings?|reports?|warnings?|cves?|vulnerabilit(?:y|ies)|exploitability|tokens?|api\\s*keys?|secrets?|env(?:ironment)?\\s*(?:vars?|variables?)|authorization|session)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-036"
+}

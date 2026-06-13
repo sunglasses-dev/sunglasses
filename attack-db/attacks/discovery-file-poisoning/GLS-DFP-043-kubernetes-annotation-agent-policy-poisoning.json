@@ -1,0 +1,34 @@
+{
+  "id": "GLS-DFP-043",
+  "name": "Kubernetes Annotation Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Kubernetes annotations and labels on Deployments, Pods, Services, ConfigMaps, and CRDs carry arbitrary free-text metadata that AI DevOps agents, security scanners, and cluster-automation assistants ingest during deployment planning, compliance review, and runtime monitoring. An attacker can embed au",
+  "keywords": [
+    "(?:primary|single) source of truth",
+    "-instructions",
+    "ConfigMap",
+    "Deployment",
+    "DevOps agent",
+    "SRE assistant",
+    "Service",
+    "_instructions",
+    "_policy"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:must\\s+not\\s+(?:treat|obey|follow|use)|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress)|never\\s+(?:treat|obey|override|overrides?|forward|include|suppress)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged|do\\s+not\\s+instruct)\\b)\n(?=.*(?:apiVersion|kind\\s*:\\s*(?:Deployment|Pod|Service|ConfigMap|DaemonSet|StatefulSet|Job|CronJob|Ingress|ReplicaSet)|metadata\\s*:|annotations\\s*:|labels\\s*:|data\\s*:|kubectl\\.kubernetes\\.io/|kubernetes\\.io/|k8s\\.io/|scanner\\.kubernetes\\.io/|_policy|-policy|_instructions|-instructions|configmap|kube-system|kubeconfig))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai\\s+(?:agents?|assistants?|scanners?)|assistants?|llms?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?)|security\\s+scanners?|agentic|container\\s+scanners?|devops\\s+agents?|deployment\\s+agents?|cluster\\s+scanners?|k8s\\s+scanners?|compliance\\s+agents?|sre\\s+assistants?|\\bagents?\\b)(?![a-zA-Z0-9])))\n(?=.*(?:authoritative|supersed(?:e|es|ed|ing)?|outranks?|overrides?\\s+all|highest\\s+priority|canonical\\s+policy|must\\s+obey|ignore\\s+(?:system|developer|repository|scanner)\\s+rules?|takes?\\s+precedence|governing\\s+config|(?:primary|single)\\s+source\\s+of\\s+truth|final\\s+word|definitive|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,2}(?:findings?|warnings?|reports?|issues?|alerts?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|CSP|TLS|warnings?|reports?)|mark\\s+.*?\\b(?:clean|safe)\\b|do\\s+not\\s+report|do\\s+not\\s+flag|false\\s+positive|skip\\s+checks?|exclude\\s+from\\s+scan|omit\\s+from\\s+(?:reports?|summaries?|findings?)|redact\\s+(?:[\\w-]+\\s+){0,2}(?:findings?|flags?|warnings?)|treat\\s+as\\s+informational|forward\\s+(?:[\\w-]+\\s+){0,2}(?:ci\\s+environment|environment\\s+(?:variables?|context)|tokens?|secrets?|api\\s+keys?|auth(?:orization)?|local\\s+state)|include\\s+(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context)|tokens?|api\\s+keys?|auth(?:orization)?\\s+headers?|local\\s+state|ci\\s+variables?)|send\\s+(?:[\\w-]+\\s+){0,2}(?:env|tokens?|secrets?|api\\s+keys?|auth(?:orization)?\\s+headers?)|collect\\s+(?:[\\w-]+\\s+){0,2}(?:env(?:ironment)?\\s+(?:variables?|context)|tokens?)|provide\\s+(?:[\\w-]+\\s+){0,2}(?:local\\s+(?:state|config|secrets?)|environment\\s+(?:variables?|context))|share\\s+(?:[\\w-]+\\s+){0,2}(?:environment\\s+(?:variables?|context)|local\\s+(?:state|config))|session\\s+tokens?|Authorization\\s+header|API\\s+keys?|CI\\s+variables?))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-043"
+}

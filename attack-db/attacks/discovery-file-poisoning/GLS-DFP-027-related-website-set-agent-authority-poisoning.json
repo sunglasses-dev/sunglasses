@@ -1,0 +1,35 @@
+{
+  "id": "GLS-DFP-027",
+  "name": "Related Website Set Agent Authority Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A target-controlled Related Website Set discovery file can add agent-directed policy text that misuses legitimate domain-relationship metadata to make an AI agent trust sibling domains, reuse credentials, or suppress cross-domain risk findings.",
+  "keywords": [
+    "agentic",
+    "assistant_instructions",
+    "associated site",
+    "associatedSites",
+    "autonomous scanner",
+    "compliance bot",
+    "credential forwarding",
+    "credentials",
+    "cross-domain allowed",
+    "customer identifiers"
+  ],
+  "regex": [
+    "(?is)^(?!(?=.*\\b(?:must\\s+not|should\\s+not|never|cannot|can't|do\\s+not)\\b.{0,90}\\b(?:reuse|send|forward|share|attach|include|suppress|ignore|treat)\\b))(?=.*\\b(?:related[-_\\s]*website[-_\\s]*set|associatedSites|serviceSites|rationaleBySite|associated\\s+site|site\\s+relationship|same\\s+owner|domain\\s+affiliation)\\b)(?=.*\\b(?:ai\\s+agent|assistant|autonomous\\s+(?:scanner|crawler|agent)|llm|agentic|security\\s+scanner|compliance\\s+bot)\\b)(?=.*\\b(?:same\\s+(?:security|trust)\\s+boundary|same\\s+origin|verified\\s+owner\\s+authority|trusted\\s+associated\\s+site|outrank|override|higher[-\\s]*priority|cross[-\\s]*domain\\s+(?:allowed|trust)|treat\\s+[^.]{0,80}\\s+as\\s+(?:the\\s+)?same)\\b)(?=.*\\b(?:reuse|share|forward|send|attach|include|cookie|bearer\\s+token|session\\s+context|customer\\s+identifiers?|credential|suppress|do\\s+not\\s+report|ignore\\s+(?:phishing|redirect)|credential[-\\s]*forwarding)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-027"
+}

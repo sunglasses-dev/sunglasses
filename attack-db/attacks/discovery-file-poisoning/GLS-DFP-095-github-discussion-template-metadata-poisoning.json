@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-095",
+  "name": "GitHub Discussion Template Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Repository-controlled GitHub Discussion templates or discussion-form YAML fields carry agent-facing instructions that try to turn community routing copy into scanner/reviewer policy.",
+  "keywords": [
+    ".github/DISCUSSION_TEMPLATE",
+    "AI agents",
+    "DISCUSSION_TEMPLATE",
+    "agent instruction",
+    "agents",
+    "assistant policy",
+    "assistants",
+    "auditors",
+    "body[].attributes.description",
+    "category form",
+    "contact_links",
+    "discussion form",
+    "discussion template",
+    "review bots",
+    "reviewer instructions"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+training|training\\s+example|scanner\\s+docs?|scanner\\s+documentation|incident\\s+report|postmortem|blocked|detected|flagged|refused)\\b.{0,180}\\b(?:discussion\\s+(?:templates?|forms?)|DISCUSSION_TEMPLATE)\\b)\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|does\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?))\\b)\n(?=.*(?:\\.github/DISCUSSION_TEMPLATE|DISCUSSION_TEMPLATE|discussion\\s+(?:templates?|forms?)|category\\s+forms?|contact_links|GitHub\\s+discussions?|body\\[\\]\\.?attributes\\.?description|attributes:\\s*.{0,120}?description:))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|review\\s+bots?|security\\s+bots?|scanners?|auditors?|agent\\s+instructions?|assistant\\s+policy|scanner\\s+notes?|reviewer\\s+instructions?)(?![a-zA-Z0-9]))\n(?=.*(?:authoritative|canonical|(?:primary|single)\\s+source\\s+of\\s+truth|supersed(?:e|es|ed|ing)|overrid(?:e|es|ing|den)|takes?\\s+precedence|governing\\s+policy|trust\\s+this|main\\s+(?:triage|review)\\s+(?:policy|guidance)|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}|hide\\s+(?:[\\w-]+\\s+){0,3}|omit\\s+(?:[\\w-]+\\s+){0,3}|exclude\\s+(?:[\\w-]+\\s+){0,3}|do\\s+not\\s+report|not\\s+report|downgrade\\s+(?:[\\w-]+\\s+){0,3}|treat.{0,40}?as\\s+(?:safe|informational|non[-\\s]?blocking)|mark.{0,40}?as\\s+(?:safe|informational)|include\\s+(?:[\\w-]+\\s+){0,4}|forward\\s+(?:[\\w-]+\\s+){0,4}|attach\\s+(?:[\\w-]+\\s+){0,4}|send\\s+(?:[\\w-]+\\s+){0,4}|collect\\s+(?:[\\w-]+\\s+){0,4}))\n(?=.*(?:findings?|reports?|warnings?|audit\\s+reports?|vulnerabilit(?:y|ies)|auth(?:entication|orization)?\\s+bugs?|dependency\\s+warnings?|security\\s+findings?|tokens?|GitHub\\s+tokens?|API\\s+keys?|authorization\\s+headers?|cookies?|session\\s+tokens?|environment\\s+variables?|env\\s+vars?|local\\s+(?:runtime\\s+)?config|runtime\\s+context|local\\s+state))\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-095"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "GLS-DFP-087",
+  "name": "WebdriverIO / Selenium test-config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "WebdriverIO / Selenium test configuration fields and comments can smuggle agent-facing instructions that tell QA/security agents to treat test-runner metadata as authoritative, suppress browser/test findings, or forward runtime/session state.",
+  "keywords": [
+    "wdio.conf.*"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|expose|store)\n |does\\s+not\\s+(?:obey|follow|treat|trust|override|instruct|authorize)\n |never\\s+(?:obey|follow|treat|trust|override|include|forward|expose|store)\n |must\\s+not\\s+(?:obey|follow|treat|trust|override|include|forward|expose|store)\n |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n |not\\s+(?:authoritative|canonical|definitive)\n |no\\s+(?:finding\\s+suppression|credential\\s+(?:collection|forwarding)|scanner\\s+suppression)\n |(?:security|incident|training)\\s+(?:report|guide|reference|quote).{0,140}?(?:detected|blocked|flagged|refused|must\\s+be\\s+reported|not\\s+obeyed|report\\s+it)\n |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n)\\b)\n(?=.*(?:\n  (?<![A-Za-z0-9])(?:webdriverio|web\\s*driver\\s*io|wdio\\.conf\\.(?:js|ts|mjs|cjs)|wdio\\s+config|selenium\\s+(?:grid|config|node|capabilit(?:y|ies))|desiredCapabilities|browserstack\\.ya?ml|browserstack\\s+capabilit(?:y|ies)|sauce\\s+labs?|sauce\\s+capabilit(?:y|ies)|test\\s+automation\\s+config|reporter\\s+metadata|service\\s+description)(?![A-Za-z0-9])\n |(?<!\\w)\"(?:capabilities|desiredCapabilities|agentInstructions|scanner_policy|assistant_note|x-agent-policy|reporters|services)\"\\s*:\n))\n(?=.*(?<![A-Za-z0-9])(?:\n  ai\\s+(?:qa\\s+)?agents?|automated\\s+(?:browser|qa|test|release|security)?\\s*(?:review|verification|scan|audit|agents?)|qa\\s+agents?|test\\s+agents?|browser\\s+reviewers?|release\\s+agents?|security\\s+scanners?|scanners?|assistants?|llms?|agents?|reviewers?|verif(?:y|iers?|ication)\n)(?![A-Za-z0-9]))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+note|overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|outranks?|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|governing\\s+document|controlling\\s+(?:document|policy)|defines?\\s+(?:all\\s+)?(?:scanner|security|qa|browser|test|release)\\s+rules?|main\\s+operating\\s+guidance|(?:preferred|principal|recommended)\\s+(?:(?:selenium|webdriverio|grid|browser|qa|test|release|verification|security)\\s+){0,3}(?:review\\s+)?(?:guidance|playbook|runbook|procedure|process)\n |suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\\s+not\\s+report|not\\s+report|treat.{0,60}?as\\s+(?:informational|advisory|advisory-only|non-blocking|safe|clean)|(?:keep|leave).{0,80}?out\\s+of.{0,40}?(?:report|summary|memo)|(?:place|put|route|move|shift|calibrate).{0,80}?(?:observations?|findings?|diagnostics?|results?|issues?).{0,60}?(?:supplementary|appendix|background|background[-\\s]?only|informational)|(?:observations?|findings?|warnings?|alerts?|diagnostics?|results?)\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified)\n |(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\\s+off|hand\\s+over|pass\\s+along|relay|expose).{0,100}?(?:session\\s+(?:cookies?|tokens?|keys?|proof\\s+(?:package|bundle|material|evidence))|auth\\s+headers?|api\\s+tokens?|credentials?|env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|config(?:uration)?|settings?|state|material)|local\\s+(?:state|config(?:uration)?|settings?)|build\\s+proof\\s+(?:package|bundle|material|evidence))\n))\n(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|console\\s+diagnostics?|accessibility|cors|browser|session\\s+(?:cookies?|tokens?|keys?)|auth\\s+headers?|tokens?|credentials?|environment\\s+variables?|runtime\\s+config|local\\s+state|build\\s+proof\\s+(?:package|bundle|material|evidence)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-087"
+}

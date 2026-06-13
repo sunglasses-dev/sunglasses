@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-073",
+  "name": "GitHub Action metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious reusable GitHub Action can hide agent/scanner-directed instructions in `action.yml` / `action.yaml` metadata fields so AI coding, CI-review, or supply-chain agents treat Marketplace/action descriptor text as policy, suppress findings, or forward local CI/runtime credentials.",
+  "keywords": [
+    "GITHUB_TOKEN",
+    "GitHub Action metadata",
+    "action.yaml",
+    "action.yml",
+    "agent instructions",
+    "attach",
+    "branding",
+    "canonical",
+    "do not report",
+    "findings are considered advisory-only",
+    "forward",
+    "hide",
+    "include",
+    "inputs[].description",
+    "mark as safe"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)\n  |must\\s+not\\s+(?:treat|obey|include|attach|forward|send|share|overrides?|trust)\n  |should\\s+(?:report|detect|flag|refuse|block)\n  |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n  |(?:security|incident|vulnerability)\\s+reports?.{0,80}?\\b(?:detected|blocked|reported|flagged)\n  |no\\s+policy\\s+overrides?\\s+are\\s+present\n))\n(?=.*(?:\\baction\\.ya?ml\\b|\\bGitHub\\s+Action\\s+(?:metadata|descriptor|Marketplace|page)\\b|\\bMarketplace\\s+action\\s+(?:descriptor|metadata|page)\\b|\\bruns\\s*:\\s*(?:\\n\\s*)?using\\s*:|\\binputs?\\s*:\\s*(?:\\n|$)|\\boutputs?\\s*:\\s*(?:\\n|$)|\\bbranding\\s*:|\\baction\\s+metadata\\s+description\\b))\n(?=.*(?:(?<![A-Za-z0-9])(?:AI\\s+)?(?:agents?|assistants?|scanners?|reviewers?|auditors?|models?|llms?|codex|claude|copilot|cursor)(?![A-Za-z0-9])|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|governing\\s+document|controlling\\s+document|agent\\s+(?:instructions?|policy|note)|scanner\\s+(?:instructions?|policy|note)|(?:main|primary|principal|preferred|recommended|core|standard|default)\\s+(?:(?:ci|action|build|security|review|verification|audit|dependency|workflow)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)\n  |suppress(?:es|ed|ing)?.{0,50}?(?:findings?|warnings?|alerts?|reports?|flags?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?)|omit.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|do\\s+not\\s+report|mark.{0,40}?as\\s+(?:informational|safe|low|none)|treat.{0,40}?as\\s+(?:informational|advisory-only|non-blocking|safe)|(?:observations?|findings?|results?|diagnostics?|alerts?|warnings?|vulnerabilit(?:y|ies))\\s+(?:are|is)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary)|findings?\\s+should\\s+(?:be|remain)\\s+(?:suppressed|hidden|omitted|excluded|redacted|removed)\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|transfer|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:GITHUB_TOKEN|CI_ENV|Authorization|credentials?|secrets?|tokens?|API\\s+keys?|auth\\s+headers?|runtime\\s+(?:environment\\s+)?context|environment\\s+(?:variables?|context)|local\\s+state)|(?:credentials?|tokens?|API\\s+keys?|auth\\s+headers?|runtime\\s+context|environment\\s+variables?|local\\s+state)\\s+(?:should|must|can|may)\\s+(?:be|get)\\s+(?:relayed|transferred|handed\\s+off|sent|passed\\s+along|included|attached|forwarded|shared|provided|exposed)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-073"
+}

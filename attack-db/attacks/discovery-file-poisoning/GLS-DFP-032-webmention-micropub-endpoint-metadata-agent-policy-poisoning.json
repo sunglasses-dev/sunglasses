@@ -1,0 +1,35 @@
+{
+  "id": "GLS-DFP-032",
+  "name": "Webmention / Micropub endpoint metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects Webmention, Micropub, WebSub, IndieAuth, or link-relation endpoint discovery metadata that tells AI agents, crawlers, or scanners to treat endpoint text as higher-priority policy, suppress findings, or forward local credentials/session material.",
+  "keywords": [
+    "Link:",
+    "agentic crawler",
+    "attach",
+    "audit report",
+    "authorization_endpoint",
+    "autonomous scanner",
+    "cookies",
+    "do not report",
+    "forward",
+    "hide"
+  ],
+  "regex": [
+    "(?isx)\n^(?!\n  (?=.*\\b(?:docs?|guide|article|training|scanner\\s+docs?|learn\\s+how|reference)\\b)\n  (?=.*\\b(?:should|must|do\\s+not|does\\s+not|never|refuse|report|detect|flag)\\b)\n  (?=.*\\b(?:webmention|micropub|websub|indieauth|rel\\s*=\\s*[\"']?(?:webmention|micropub|hub)|authorization_endpoint|token_endpoint)\\b)\n)\n(?=.*(?:rel\\s*=\\s*[\"']?(?:webmention|micropub|hub|authorization_endpoint|token_endpoint)|webmention[_-]?endpoint|micropub[_-]?endpoint|websub|Link:\\s*<[^>]+>;\\s*rel\\s*=\\s*[\"']?(?:webmention|micropub|hub)|indieauth[-_]?metadata|authorization_endpoint|token_endpoint))\n(?=.*(?:ai[-\\s]?agents?|assistants?|agentic\\s+(?:scanner|crawler|auditor)|autonomous\\s+(?:scanners?|agents?|crawlers?)|llms?|models?|security\\s+scanners?))\n(?=.*(?:ignore|override|supersede|outrank|treat\\s+this\\s+endpoint\\s+as|must\\s+obey|do\\s+not\\s+report|suppress|hide|forward|include|attach|send|read\\s+(?:local|browser)|load\\s+(?:cookies?|tokens?)))\n(?=.*(?:system|developer|user\\s+instructions|security\\s+findings|report|audit|cookies?|tokens?|api[-_\\s]?keys?|authorization|local\\s+(?:storage|state)|session))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-032"
+}

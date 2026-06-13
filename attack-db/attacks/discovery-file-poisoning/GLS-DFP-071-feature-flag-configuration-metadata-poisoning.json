@@ -1,0 +1,32 @@
+{
+  "id": "GLS-DFP-071",
+  "name": "Feature Flag Configuration Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Feature-flag and experimentation metadata can smuggle agent-directed authority, report-suppression, or local-state forwarding instructions into files AI release, QA, and security agents already treat as operational context.",
+  "keywords": [
+    "feature-flags.yml",
+    "flagd",
+    "flags.json",
+    "maintainerNote",
+    "release_agent_instructions",
+    "scanner_policy",
+    "x-agent-policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:scanner|security|training|guide|docs?|documentation|runbook|incident|postmortem|report|article|reference)\\b.{0,140}\\b(?:should|must|always|will)\\s+(?:report|detect|flag|refuse|block|warn)\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|supersede)\\b)\n(?!.*\\bnever\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|supersede|overrides?)\\b)\n(?!.*\\b(?:not\\s+authoritative|not\\s+policy|no\\s+policy\\s+overrides?|does\\s+not\\s+instruct|refused|blocked|detected|flagged)\\b)\n(?=.*(?<![a-zA-Z0-9])(?:feature[-_\\s]?flags?|feature_flags|feature-flags\\.ya?ml|flags?\\.(?:json|ya?ml)|flagd|openfeature|launchdarkly|unleash|flagsmith|growthbook|split(?:\\.io)?|optimizely|rollouts?\\.ya?ml|experiments?\\.json|targeting\\s+rules?|variations?|prerequisites?|maintainer[-_]?notes?|x[-_](?:agent|scanner)[-_]policy|scanner_policy|agent_policy|release_agent_instructions)(?![a-zA-Z0-9]))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|autonomous\\s+agents?|coding\\s+assistants?|release\\s+agents?|qa\\s+agents?|security\\s+scanners?|dependency\\s+reviewers?|automated\\s+reviewers?|rollout\\s+auditors?|compliance\\s+auditors?|agents?|assistants?|scanners?|auditors?|reviewers?|bots?|agent[-_]?(?:policy|instructions?)|scanner[-_]?(?:policy|notes?))(?![a-zA-Z0-9]))\n(?=.*(?:\n    (?:agent|scanner|assistant|reviewer|auditor|release\\s+agent)\\s+(?:instructions?|notes?|policy|guidance)\n  | (?:single|primary)\\s+source\\s+of\\s+truth\n  | (?:authoritative|canonical|governing)\\s+(?:release|rollout|scanner|agent|review|security|audit)?\\s*(?:policy|guidance|instructions?|runbook|procedure)\n  | (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\\s+precedence\\s+over|ignore)\\s+(?:[\\w-]+\\s+){0,3}(?:system|developer|scanner|security|audit|review|ci|policy|rules?|instructions?)\n  | (?:suppress(?:es|ed|ing)?|hide|hides|hid|omit(?:s|ted|ting)?|redact(?:s|ed|ing)?|downgrade(?:s|d|ing)?|deprioriti[sz]e(?:s|d|ing)?|exclude(?:s|d|ing)?|defer(?:s|red|ring)?|waive(?:s|d|ing)?)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|cves?|vulnerabilit(?:y|ies)|regressions?|failures?|scanner\\s+flags?|security\\s+issues?|audit\\s+items?)\n  | (?:mark|treat|classify|flag)\\b.{0,50}?\\b(?:as|non[-\\s]?blocking|informational|advisory|safe|clean|accepted\\s+risk)\n  | (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|failures?|regressions?|vulnerabilit(?:y|ies)|cves?)\n  | (?:include|attach|forward|send|share|collect|copy|read|populate)\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context)|runtime\\s+config|local\\s+state|session\\s+tokens?|api\\s+keys?|auth(?:orization)?\\s+headers?|cookies?|secrets?)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-071"
+}
