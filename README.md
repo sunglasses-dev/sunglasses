@@ -169,7 +169,6 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 - ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental, requires FFmpeg + Whisper)
 - ✅ CLI: `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`, `sunglasses report`
 - ✅ Python API: `SunglassesEngine` for text, `SunglassesScanner` for media
-- ✅ Bridge/quarantine layer for secure file handoff into agent workflows (`sunglasses.bridge`)
 - ✅ LangChain + CrewAI integrations
 - ✅ MCP server for agent frameworks (`sunglasses.mcp`)
 - ✅ SARIF 2.1.0 output for CI integration
@@ -188,6 +187,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 - 🔨 **Easy bug report form** — non-technical users can report issues
 
 ### Later — On the Horizon
+- 🔭 Bridge filter — scan agent-to-agent and file-handoff messages before the receiving agent ingests them
 - 🔭 Output scanning — scan what the agent SAYS back, not just what comes in
 - 🔭 PII detection — auto-detect sensitive data in content
 - 🔭 Public Threat Registry — accountability board for AI agent attacks
