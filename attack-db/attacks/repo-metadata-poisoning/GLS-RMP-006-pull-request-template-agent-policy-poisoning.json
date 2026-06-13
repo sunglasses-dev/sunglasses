@@ -1,0 +1,40 @@
+{
+  "id": "GLS-RMP-006",
+  "name": "Pull Request Template Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile `PULL_REQUEST_TEMPLATE.md` can smuggle agent-facing instructions into the PR authoring workflow, telling AI coding agents or review bots that the template is authoritative policy and should suppress findings, omit reviewers, or include local secrets in the PR body.",
+  "keywords": [
+    ".github/PULL_REQUEST_TEMPLATE",
+    "@security-team",
+    "AI coding assistant",
+    "Claude",
+    "Codex",
+    "Copilot",
+    "PR template",
+    "PULL_REQUEST_TEMPLATE.md",
+    "agent",
+    "agent instruction",
+    "authoritative",
+    "automated review",
+    "defines rules",
+    "dependency reviewer",
+    "do not include @security-team"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|trust|treat|override|overrides?)\\b|\n  does\\s+not\\s+(?:obey|follow|trust|treat|override|overrides?)\\b|\n  never\\s+(?:obey|follow|trust|treat|override|overrides?)\\b|\n  must\\s+not\\s+(?:obey|follow|trust|treat|override|overrides?)\\b|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\\b|\n  no\\s+(?:agent\\s+)?policy\\s+overrides?\\b|\n  not\\s+(?:authoritative|canonical|definitive)\\b|\n  (?:security|scanner|training|incident|vulnerability)\\s+(?:docs?|guide|report|reference).*\\b(?:detected|flagged|blocked|refused)\\b|\n  (?:learn\\s+how|guide|reference|training).*\\bscanners?\\s+should\\s+(?:report|detect|flag|refuse)\\b\n))\n(?=.*(?:\n  PULL_REQUEST_TEMPLATE(?:\\.md)?|\\.github/PULL_REQUEST_TEMPLATE|pull\\s+request\\s+template|PR\\s+template|pr\\s+body|pull\\s+request\\s+checklist|generated\\s+PR\\s+(?:body|description)\n))\n(?=.*(?:\n  AI\\s+(?:coding\\s+)?assistants?|coding\\s+agents?|review\\s+bots?|dependency\\s+review(?:ers?)?|automated\\s+review|security\\s+scanners?|scanners?|agents?|Copilot|Codex|Claude\n))\n(?=.*(?:\n  (?:agent|scanner|assistant|review\\s+bot|dependency\\s+review)\\s+instructions?|authoritative\\b|canonical\\b|definitive\\b|governing\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|main\\s+operating\\s+guidance|takes\\s+precedence|overrides?\\s+(?:scanner|security|system|developer|repository)\\s+(?:policy|rules?|instructions?)|supersed(?:e|es|ed|ing)|defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|review)\\s+rules?)\n))\n(?=.*(?:\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)|\n  hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)|\n  omit\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|security\\s+reviewers?|@security-team)|\n  downgrade\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|observations?|diagnostics?|dependency\\s+alerts?)\\s+(?:into|to|as)\\s+(?:background|informational|non[-\\s]?blocking)|\n  treat.{0,60}?as\\s+(?:informational|non[-\\s]?blocking|advisory[-\\s]?only)|\n  (?:do\\s+not\\s+include|skip|exclude|remove|leave\\s+out)\\s+(?:[\\w@/-]+\\s+){0,4}(?:@security-team|security\\s+reviewers?|required\\s+reviewers?|reviewers?|approvers?|maintainers?)|\n  (?:attach|include|forward|send|share|provide|pass\\s+along|copy|paste)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|secrets?|cookies?|authorization\\s+headers?|session\\s+tokens?|env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?))\n))\n(?=.*(?:\n  findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|reviewers?|approvers?|maintainers?|@security-team|API\\s+keys?|tokens?|secrets?|cookies?|authorization\\s+headers?|session\\s+tokens?|env(?:ironment)?\\s+variables?|runtime\\s+(?:context|details?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-006"
+}

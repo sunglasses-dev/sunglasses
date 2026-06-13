@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-038",
+  "name": "Dockerfile / Containerfile Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Malicious `LABEL`, `ENV`, comment (`#`), and `ONBUILD` instructions embedded in Dockerfiles / Containerfiles can carry AI-agent/scanner-directed authority inversion, report suppression, or credential/local-state forwarding requests. AI coding agents that review Dockerfiles during security audit, bui",
+  "keywords": [
+    "(?<![a-zA-Z0-9])",
+    "- Hygiene report:",
+    ".github/workflows/*.yml",
+    "Intake:",
+    "LABEL",
+    "Makefile",
+    "ONBUILD",
+    "ai-agent / scanner audience",
+    "analyzing dependency trees and base images",
+    "auditing containerized applications for security",
+    "authority inversion or policy-override language",
+    "config(?:uration)?"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust|treat|suppress)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat|suppress)\n  |never\\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat|suppress|overrides?)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat|suppress)\n  |should\\s+(?:report|detect|flag|refuse|block)\n  |AI\\s+agents\\s+should\\s+follow\\s+(?:their\\s+)?built-in\\s+safety\n  |Dockerfile\\s+metadata\\s+(?:does\\s+not|never|must\\s+not)\\s+override\n  |scanners\\s+should\\s+report\\s+(?:any\\s+)?(?:unpinned|Dockerfile)\n)\\b)\n(?=.*(?:\n  \\b(?:FROM|RUN|COPY|ADD|WORKDIR|CMD|ENTRYPOINT|EXPOSE|VOLUME|USER|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL)\\b\n  |(?<![a-zA-Z0-9])(?:LABEL|ENV)(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])dockerfile(?![a-zA-Z0-9])\n  |(?<![a-zA-Z0-9])containerfile(?![a-zA-Z0-9])\n  |\\bDockerfile\\b\n  |\\bContainerfile\\b\n  |\\bcontainer\\s+image\\b\n  |\\bmulti.stage\\s+build\\b\n))\n(?=.*\\b(?:\n  (?:ai|autonomous|devops|security|dependency|code)\\s+(?:agents?|assistants?|scanners?|crawlers?|reviewers?)\n  |(?:coding|code.review)\\s+agents?\n  |(?:llms?|models?|copilot|cursor|codex|claude)(?:\\s+(?:agents?|assistants?))?\n  |\\b(?:autonomous\\s+)?(?:scanners?|crawlers?)\\b\n  |\\bagents?\\b\n  |\\bassistants?\\b\n)\\b)\n(?=.*(?:\n  (?:(?:primary|single)\\s+source\\s+of\\s+truth)\n  |\\b(?:governing|controlling|canonical|definitive|authoritative)\\s+(?:document|policy|build\\s+policy|project\\s+description|model\\s+evaluation\\s+policy)\n  |(?:\\btakes?\\s+precedence\\b|\\boverr(?:ides?|ules?)\\b|\\bsupersede[ds]?\\b|\\boutranks?\\b)\n  |\\b(?:canonical|authoritative|definitive)\\s+(?:build|container|image|project)\\s+(?:policy|description|configuration)\n  |\\bdefines?\\s+all\\s+(?:scanner|security)\\s+rules?\\b\n  |(?:(?:agent|scanner|assistant|verifier|crawler|moderation|review\\s+tool)\\s+instructions?)\n  |\\bthis\\s+(?:is|(?:label|comment|instruction|metadata)\\s+is)\\s+(?:the\\s+)?(?:governing|controlling|authoritative|canonical)\\b\n  |\\boverrules?\\s+(?:all\\s+)?(?:repository|scanner|security|system|developer)\\b\n  |\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?)\\s*:\\s*this\\b\n))\n(?=.*(?:\n  \\b(?:suppress|hide|redact|exclude|omit|skip)\\s+(?:[-\\w]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|scan(?:s|ning)?\\s+results?|vulnerabilit(?:y|ies)|checks?|dependencies?\\s+warning)\n  |\\b(?:suppress|hide|redact|exclude|omit)\\s+(?:[-\\w]+\\s+){0,3}(?:all|any|every)\\s+(?:[-\\w]+\\s+){0,1}(?:finding|warning|alert|report|flag|issue|scan|vuln|check)\n  |\\b(?:treat|mark|flag)\\b.{0,40}?\\bas\\s+(?:informational|non.blocking|safe|clean|benign)\n  |\\b(?:include|attach|forward|send|share|provide|expose|collect)\\s+(?:[-\\w]+\\s+){0,2}(?:env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|state)|tokens?|API\\s+keys?|session\\s+(?:keys?|tokens?|cookies?)|local\\s+state|runtime\\s+(?:env(?:ironment)?|variables?|config(?:uration)?)|credentials?|auth\\s+(?:headers?|tokens?)|Bearer\\s+tokens?)\n  |\\b(?:do\\s+not\\s+(?:flag|escalate|report|scan|audit|block)|don't\\s+(?:flag|escalate|report|scan))\\b\n  |\\b(?:mark\\s+(?:this\\s+)?(?:container|image|build)\\s+as\\s+clean\\b)\n  |\\b(?:omit\\s+from\\s+(?:summar(?:y|ies)|final\\s+report|audit\\s+reports?))\\b\n  |\\b(?:skip\\s+all\\s+checks?\\b)\n  |\\b(?:hide\\s+all\\s+vulnerability\\s+reports?\\b)\n  |\\b(?:forward\\s+(?:[-\\w]+\\s+){0,3}(?:to\\s+the\\s+)?build\\s+(?:output|context|log))\\b\n  |\\b(?:expose\\s+all\\s+local\\s+state\\b)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-038"
+}

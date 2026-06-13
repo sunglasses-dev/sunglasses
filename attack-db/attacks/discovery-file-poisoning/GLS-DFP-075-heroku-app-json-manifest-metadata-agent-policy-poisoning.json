@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-075",
+  "name": "Heroku app.json Manifest Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Heroku/Dokku `app.json` deployment manifests can carry agent/scanner-directed policy text in descriptions, env-var metadata, scripts, or custom fields that tells AI deployment agents to treat the manifest as authoritative, suppress findings, or forward local/platform credentials.",
+  "keywords": [
+    "addons",
+    "agent_policy",
+    "app.json",
+    "assistant_note",
+    "buildpacks",
+    "description",
+    "do/does not",
+    "env",
+    "formation",
+    "must not",
+    "never",
+    "no policy overrides",
+    "not authoritative",
+    "postdeploy",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability|training|runbook|guide|reference|scanner\\s+docs?|documentation|Heroku\\s+guide|Dokku\\s+guide).{0,180}?(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse|block)|must\\s+(?:be\\s+)?(?:reported|report|detect|flag|refuse|block)|not\\s+obeyed))\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?|supersede|supersedes|instruct)\\b.{0,180}?\\b(?:app\\.json|Heroku|Dokku|app\\s+manifest|deployment\\s+manifest)\\b)\n(?!.*\\b(?:app\\.json|Heroku|Dokku|app\\s+manifest|deployment\\s+metadata)\\b.{0,180}?\\b(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)\\b)\n(?!.*\\bno\\s+(?:policy\\s+)?overrides?\\b)\n(?=.*(?:\\bapp\\.json\\b|\\b(?:Heroku|Dokku)\\s+app\\s+manifest\\b|\\bapp\\s+manifest\\b|\\bdeployment\\s+manifest\\b|(?<!\\w)\"(?:name|description|env|addons|scripts|formation|buildpacks|stack|keywords|repository|success_url|postdeploy|agent_policy|scanner_policy|assistant_note)\"\\s*:|\\bReview\\s+Apps?\\b|\\bpostdeploy\\b|\\bbuildpacks\\b))\n(?=.*(?:\\b(?:ai\\s+agents?|agents?|assistants?|llms?|models?|codex|copilot|cursor|claude)\\b|\\b(?:deployment|devops|security|app|release|platform|heroku|dokku)\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?)\\b|\\bautomated\\s+(?:(?:deployment|security|release|app|platform|heroku|dokku)\\s+)?(?:review|audit|scan|verification)\\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])))\n(?=.*(?:\\b(?:authoritative|governing\\s+document|controlling\\s+document|takes?\\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive)\\b|\\b(?:main|primary|principal|preferred|recommended)\\s+(?:(?:heroku|dokku|app|deployment|release|platform|security|review|audit|verification)\\s+){0,4}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy)\\b|\\bdefines?\\s+(?:(?:all|the)\\s+)?(?:(?:scanner|security|agent|deployment|release|review)\\s+){1,3}rules?\\b|\\b(?:agent|scanner|assistant|deployment|release)\\s+(?:instructions?|policy|directive|note)\\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])))\n(?=.*(?:\\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|demote|reclassify|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies)|observations?|results?|diagnostics?|checks?|port\\s+findings?|dyno\\s+findings?|review\\s+apps?\\s+findings?)\\b|\\b(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?)\\b|\\b(?:treat|mark|classify|consider)\\b.{0,60}?\\b(?:as\\s+)?(?:informational|non-blocking|advisory-only|safe|clean|benign|background-only)\\b|\\b(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,5}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\\s+out\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|audit|review|final\\s+report|release\\s+memo)\\b|\\b(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along|hand\\s+off|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|session\\s+tokens?|auth(?:orization)?\\s+headers?|credentials?|secrets?|HEROKU_API_KEY|DOKKU_TOKEN|heroku\\s+tokens?|platform\\s+api\\s+keys?|config\\s+vars?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|config(?:uration)?|settings?|state|details?|artifacts?|material)|local\\s+(?:state|config(?:uration)?|settings?|context)|ci\\s+(?:tokens?|context|variables?))\\b))\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-075"
+}

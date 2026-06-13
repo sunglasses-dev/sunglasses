@@ -1,0 +1,38 @@
+{
+  "id": "GLS-DFP-082",
+  "name": "Python linter/type-checker config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Python linter and type-checker configs can carry agent-directed comments or custom fields that tell AI coding/security agents to treat the config as review policy, suppress findings, or forward local context.",
+  "keywords": [
+    ".flake8",
+    ".pylintrc",
+    "[mypy]",
+    "[pylint]",
+    "agent_instructions",
+    "findings should be suppressed",
+    "mypy.ini",
+    "pyrightconfig.json",
+    "ruff.toml",
+    "scanner instruction",
+    "setup.cfg [flake8]",
+    "tool.mypy",
+    "tool.ruff"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+(?:training|guide|reference)|scanner\\s+docs?|defensive\\s+example|incident\\s+report|quoted\\s+attack|do\\s+not\\s+(?:obey|follow|trust|treat|use|save|persist|store|write)|does\\s+not\\s+(?:obey|follow|trust|treat|use|override|instruct)|never\\s+(?:obey|trust|treat|use|override|suppress|forward)|must\\s+not\\s+(?:obey|trust|treat|use|override|suppress|forward)|should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)).{0,180}?\\b(?:pylintrc|mypy\\.ini|pyrightconfig|ruff\\.toml|flake8|Python\\s+(?:lint|type-check|static-analysis)|linter\\s+config)\\b)\n(?=.*(?:(?<!\\w)(?:\\.pylintrc|\\.mypy\\.ini|\\.ruff\\.toml|\\.flake8)(?!\\w)|\\b(?:pylintrc|mypy\\.ini|pyrightconfig\\.json|ruff\\.toml|setup\\.cfg|\\[mypy\\]|\\[flake8\\]|\\[pylint\\]|tool\\.ruff|tool\\.mypy)\\b|\\bPython\\s+(?:lint|type-check|type\\s+check|static-analysis)\\s+(?:config|configuration|metadata)\\b|\\blinter\\s+config(?:uration)?\\b|\\btype-checker\\s+config(?:uration)?\\b))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|llms?|codex|claude|copilot|cursor|scanners?|reviewers?|auditors?|verifiers?|automated\\s+(?:code\\s+)?(?:review|audit|scan|verification)|dependency\\s+review|security\\s+review|code\\s+review|agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+policy)(?![A-Za-z0-9]))\n(?=.*(?:\\b(?:authoritative|canonical|definitive|governing|controlling)\\b|(?:primary|single)\\s+source\\s+of\\s+truth|takes?\\s+precedence|supersed(?:e|es|ed|ing)|overrides?|outranks?|overrules?|defines?\\s+(?:all\\s+)?(?:scanner|security|review|audit|agent)\\s+rules?|(?:agent|scanner|assistant|reviewer)\\s+(?:instructions?|policy|notes?)|(?:main|primary|principal|preferred|recommended)\\s+(?:(?:python|lint|linter|type-check|type\\s+check|mypy|pylint|ruff|flake8|pyright|security|audit|review|verification)\\s+){0,4}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy)))\n(?=.*(?:\\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|deprioritize|demote|reclassify|skip|ignore)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|issues?|vulnerabilit(?:y|ies)|type\\s+errors?|lint\\s+errors?)\\b|\\b(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|issues?|type\\s+errors?)\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|ignored|classified|treated|considered)\\b|\\b(?:treat|mark|classify).{0,50}?\\bas\\s+(?:informational|advisory-only|non-blocking|background-only)\\b|\\b(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|diagnostics?|observations?|issues?)\\s+out\\s+of\\s+(?:the\\s+)?(?:report|summary|audit\\s+memo|final\\s+report)\\b|\\b(?:include|forward|send|share|attach|provide|expose|collect|pass\\s+along|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+keys?|tokens?|auth(?:entication)?\\s+headers?|authorization|credentials?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?))\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-082"
+}

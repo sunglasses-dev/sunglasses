@@ -1,0 +1,31 @@
+{
+  "id": "GLS-DFP-067",
+  "name": "Codecov/Coveralls coverage-service config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled coverage-service configuration (`codecov.yml`, `.codecov.yml`, `.coveralls.yml`, Coveralls/Codecov YAML comments or custom fields) can smuggle agent-facing policy that tells AI CI/review agents to suppress coverage/security findings or forward CI/runtime context.",
+  "keywords": [
+    ".codecov.yml",
+    ".coveralls.yml",
+    "Codecov",
+    "Coveralls",
+    "agent/scanner instructions",
+    "codecov.yml"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?|documentation)\\b.{0,200}\\b(?:detected|blocked|flagged|refused|reported|must\\s+be\\s+reported|not\\s+obeyed|should\\s+(?:report|detect|flag|refuse|block))|(?:codecov|coveralls|coverage\\s+service|coverage\\s+config(?:uration)?|\\.codecov\\.yml|codecov\\.yml|\\.coveralls\\.yml).{0,160}\\b(?:does\\s+not|do\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\b.{0,80}\\b(?:override|overrides?|supersede|instruct|obey|trust|treat|use)|(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|trust|treat|use|override|overrides?|supersede|include|attach|forward|send|share|expose)))\n(?=.*(?:(?<![A-Za-z0-9])(?:\\.codecov\\.ya?ml|codecov\\.ya?ml|\\.coveralls\\.ya?ml)(?![A-Za-z0-9])|\\b(?:Codecov|Coveralls|coverage\\s+service\\s+(?:config|configuration|metadata)|coverage\\s+status|coverage\\s+policy|patch\\s+coverage|project\\s+coverage|coverage\\s+gate|coverage\\s+threshold|codecov\\s+config|coveralls\\s+config)\\b|(?<!\\w)\"(?:coverage|comment|flags|ignore|status|project|patch|after_n_builds|require_ci_to_pass|agent_policy|scanner_policy|x-agent-policy)\"\\s*:|\\b(?:comment|coverage|status|project|patch|flags|ignore|notifications)\\s*:))\n(?=.*(?:\\b(?:ai|autonomous|automated|ci|code|security|dependency|release|coverage|pull-request|pr)\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|review|audit|scan|verification|tools?)\\b|\\b(?:agents?|assistants?|scanners?|reviewers?|auditors?)\\b|(?:agent|scanner|assistant|reviewer|auditor)(?:[._-]|\\s+)?(?:instructions?|instruction|policy|notes?|note)|\\bfor\\s+(?:ai\\s+)?(?:agents?|assistants?|scanners?|reviewers?|auditors?)\\b))\n(?=.*(?:\\b(?:authoritative|canonical|definitive|governing|controlling)\\b|(?:primary|single)\\s+source\\s+of\\s+truth|takes?\\s+precedence|supersed(?:e|es|ed|ing)|overrides?|outranks?|overrules?|defines?\\s+(?:all\\s+)?(?:scanner|security|coverage|review|audit|agent|ci)\\s+rules?|(?:agent|scanner|assistant|reviewer|auditor)\\s+(?:instructions?|policy|notes?)|(?:main|primary|principal|preferred|recommended)\\s+(?:(?:coverage|codecov|coveralls|ci|pr|pull-request|release|security|audit|review|verification)\\s+){0,4}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|reference)))\n(?=.*(?:\\b(?:do\\s+not\\s+report|don't\\s+report|not\\s+report|suppress(?:es|ed|ing)?|hide|hides|hidden|redact(?:s|ed|ing)?|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|skip(?:s|ped|ping)?|downgrade(?:s|d|ing)?|deprioriti[sz]e(?:s|d|ing)?|demote(?:s|d|ing)?|reclassif(?:y|ies|ied|ying)|keep|leave)\\b.{0,80}\\b(?:findings?|warnings?|alerts?|reports?|summaries|diagnostics?|observations?|results?|regressions?|coverage\\s+(?:drops?|regressions?|warnings?|findings?|diagnostics?)|patch\\s+(?:coverage\\s+)?(?:warnings?|findings?)|dependency\\s+findings?|security\\s+findings?)\\b|\\b(?:findings?|warnings?|alerts?|reports?|summaries|diagnostics?|observations?|results?|regressions?)\\b\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioriti[sz]ed|treated\\s+as\\s+(?:advisory|advisory-only|informational|non-blocking))|treat.{0,80}?as\\s+(?:informational|advisory-only|non-blocking|safe|clean|benign)|(?:keep|leave).{0,80}?\\bout\\s+of\\s+(?:the\\s+)?(?:report|summary|audit\\s+memo|coverage\\s+summary|final\\s+report)|\\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|relay|transfer|hand\\s+off)\\b\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|ci\\s+tokens?|auth(?:entication)?\\s+headers?|session\\s+(?:keys?|cookies?|tokens?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|proof\\s+(?:material|bundle|package|evidence))|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-067"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-055",
+  "name": "systemd Unit File Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious `systemd` unit file, generated `systemctl show` dump, or service/timer metadata field can target AI agents or security scanners with fake authority, report-suppression, or credential-forwarding instructions embedded in otherwise inert service configuration text.",
+  "keywords": [
+    ".service",
+    ".socket",
+    ".timer",
+    "Description=",
+    "Documentation=",
+    "Environment=",
+    "ExecStart=",
+    "[Service]",
+    "[Socket]",
+    "[Timer]",
+    "[Unit]",
+    "agent_policy",
+    "do not",
+    "does not",
+    "must not"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|vulnerability|scanner|training|reference|runbook|guide)\\s+(?:docs?|report|example|exercise|reference|guidance).{0,140}?\\b(?:detected|blocked|flagged|refused|report|detect|flag|refuse|should\\s+report|should\\s+detect)|\n  scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|\n  (?:systemd\\s+)?(?:unit|service|timer)\\s+(?:metadata|comments?|descriptions?)\\s+(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)|\n  no\\s+(?:agent\\s+)?policy\\s+overrides?|\n  not\\s+(?:authoritative|canonical|definitive)|\n  do\\s+not\\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|use)|\n  does\\s+not\\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|overrides?|instruct)|\n  never\\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|overrides?|use)|\n  must\\s+not\\s+(?:obey|follow|treat|attach|forward|send|share|trust|override|use)\n)\\b)\n(?=.*(?:\n  (?<![A-Za-z0-9])(?:systemd(?:\\.service|\\.timer|\\.socket)?|systemctl|journalctl)(?![A-Za-z0-9])|\n  (?:^|[\\n\\r])\\s*\\[(?:Unit|Service|Timer|Socket|Install)\\]\\s*|\n  (?<![A-Za-z0-9])(?:Description|Documentation|Environment|EnvironmentFile|ExecStart|ExecReload|User|Group)\\s*=|\n  \\.(?:service|timer|socket)\\b|unit\\s+file|service\\s+unit|timer\\s+unit\n))\n(?=.*(?:\n  (?<![A-Za-z0-9])(?:ai|autonomous|coding|security|dependency|ops|devops)?[-_\\s]*(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|llms?|models?)(?![A-Za-z0-9])|\n  (?<![A-Za-z0-9])(?:agent|assistant|scanner|auditor|reviewer)[_-](?:policy|instructions?|note|guidance)(?![A-Za-z0-9])\n))\n(?=.*(?:\n  overrides?|supersed(?:e|es|ed|ing)?|outranks?|overrules?|takes\\s+precedence|highest\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|governing\\s+(?:document|policy)|controlling\\s+(?:document|policy)|defines?\\s+(?:(?:all|the)\\s+)?(?:scanner|security|agent|review|audit|systemd|service)?\\s*rules?|(?:main|primary|principal)\\s+(?:operating|review|audit|scanner)\\s+(?:guidance|playbook|policy)|(?:agent|scanner|assistant|auditor|reviewer)\\s+(?:instructions?|directive|policy)\n))\n(?=.*(?:\n  (?:suppress|hide|redact|exclude|omit|skip|silence)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|mismatches?|failures?)|\n  (?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|checks?|mismatches?|failures?)|\n  (?:treat|mark|classify|rate)\\s+.{0,60}?\\s+as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory(?:-only)?)|\n  (?:downgrade|move|route|shift)\\s+.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)\\s+.{0,80}?(?:background|appendix|informational|non[-\\s]?blocking|advisory)\\s+(?:notes?|section|memo|summary)|\n  (?:keep|leave)\\s+.{0,80}?(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?|failures?)\\s+out\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|final\\s+report|review\\s+memo|incident\\s+report)|\n  (?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,5}(?:api\\s+keys?|tokens?|session\\s+(?:keys?|tokens?)|bearer|authorization\\s+headers?|credentials?|secrets?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|material|artifacts?|evidence)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|unit\\s+environment)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-055"
+}

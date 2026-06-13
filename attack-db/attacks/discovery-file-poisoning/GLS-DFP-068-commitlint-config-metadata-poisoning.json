@@ -1,0 +1,36 @@
+{
+  "id": "GLS-DFP-068",
+  "name": "Commitlint config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Commitlint configuration files can smuggle agent-facing commit/release-review instructions that claim authority over scanners, suppress commit-policy or supply-chain findings, or solicit local git/CI credentials from AI coding and release agents.",
+  "keywords": [
+    ".commitlintrc*",
+    "@commitlint/*",
+    "commitlint",
+    "commitlint.config.*",
+    "formatter",
+    "governing policy",
+    "ignores",
+    "package.json",
+    "parserPreset",
+    "preferred procedure",
+    "rules"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)\n |does\\s+not\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|instruct|authorize)\n |never\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)\n |must\\s+not\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)\n |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n |(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\\b.{0,180}\\b(?:detected|blocked|flagged|refused|reported|must\\s+be\\s+reported|not\\s+obeyed)\n |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)\n |(?:commitlint|commit\\s+config(?:uration)?|commit-message\\s+policy|\\.commitlintrc|commitlint\\.config\\.[cm]?[jt]s|package\\.json\\s+commitlint).{0,180}\\b(?:is|are)\\s+not\\s+(?:authoritative|canonical|definitive|policy|instructions?)\n |no\\s+(?:policy\\s+)?overrides?\n))\n(?=.*(?:\n  (?<![A-Za-z0-9])(?:\\.commitlintrc(?:\\.(?:json|ya?ml|toml|js|cjs|mjs|ts))?|commitlint\\.config\\.[cm]?[jt]s|commitlint|@commitlint/(?:cli|config-conventional|config-lerna-scopes|load|lint|parse|format)|conventional\\s+commits?|commit\\s*[-_]?msg\\s+hook|commit-message\\s+policy|commit\\s+lint(?:er)?\\s+config(?:uration)?|parserPreset|type-enum|scope-enum|subject-case|header-max-length|ignores\\s*[:=]|formatter\\s*[:=])(?![A-Za-z0-9])\n |(?<!\\w)\"commitlint\"\\s*:\n |(?<!\\w)\"(?:agent_instructions|scanner_policy|x-agent-policy|commit_policy|assistant_note)\"\\s*:\n))\n(?=.*(?<![A-Za-z0-9])(?:\n  ai\\s+agents?|llm\\s+agents?|agents?|assistants?|commit\\s+(?:agents?|auditors?|reviewers?)|release\\s+(?:agents?|auditors?|reviewers?)|automated\\s+(?:commit\\s+)?(?:review|audit|verification|scanners?)|dependency\\s+(?:reviewers?|auditors?)|security\\s+scanners?|commit\\s+scanners?|scanners?|auditors?|reviewers?|agent[_-]?instructions?|scanner[_-]?policy|assistant[_-]?note\n)(?![A-Za-z0-9]))\n(?=.*(?:\n  agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+note|overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|outranks?|overrules?|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|governing\\s+document|controlling\\s+(?:document|policy)|defines?\\s+(?:all\\s+)?(?:commit|scanner|security|review)\\s+rules?|(?:main|primary|principal|preferred|recommended)\\s+(?:(?:commitlint|commit|conventional|release|package|dependency|security|audit|review|verification|automation)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy)\n |suppress(?:es|ed|ing)?|hide|hidden|redact|omit(?:ted|ting)?|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\\s+not\\s+(?:flag|report|escalate)|not\\s+report|treat.{0,60}?as\\s+(?:informational|advisory|advisory-only|non-blocking|safe|clean|benign)|(?:keep|leave).{0,90}?\\bout\\s+of.{0,50}?(?:report|summary|memo|commit\\s+summary|audit\\s+memo|final)|(?:place|put|route|move|shift).{0,90}?(?:observations?|findings?|diagnostics?|results?|issues?|warnings?|alerts?).{0,70}?(?:supplementary|appendix|background|informational|side\\s+notes?)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?|CVEs?|vulnerabilit(?:y|ies)|commit\\s+diagnostics|conventional\\s+commit\\s+warnings?|malformed\\s+commit\\s+findings?).{0,50}?(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioriti[sz]ed|treated|classified|marked|considered).{0,40}?(?:advisory|advisory-only|informational|non-blocking|background)?\n |(?:include|attach|forward|send|share|provide|expose|collect|copy|read|export|transfer|hand\\s+off|pass\\s+along|relay|transmit)\\b.{0,120}\\b(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|state)|local\\s+(?:git\\s+)?(?:credential\\s+state|state|config(?:uration)?|settings?)|git\\s+credential\\s+state|execution\\s+context|CI\\s+(?:variables?|secrets?|tokens?)|NPM_TOKEN|GITHUB_TOKEN|GH_TOKEN|npm\\s+(?:auth\\s+)?tokens?|GitHub\\s+tokens?|auth(?:orization)?\\s+headers?|credentials?|secrets?|tokens?|API\\s+keys?|proof\\s+(?:bundle|package|material|evidence)|build\\s+proof\\s+(?:bundle|package|material|evidence))\n))\n(?=.*(?:\n  scanner\\s+rules?|commit\\s+(?:scanner\\s+)?policy|commit-message\\s+policy|findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|CVEs?|vulnerabilit(?:y|ies)|conventional\\s+commit\\s+warnings?|malformed\\s+commit\\s+findings?|commit\\s+diagnostics?|dependency\\s+findings?|commit\\s+(?:summary|report|memo|audit\\s+memo)|final\\s+report|audit\\s+memo|environment|runtime|local\\s+state|local\\s+git\\s+credential\\s+state|git\\s+credential\\s+state|execution\\s+context|CI\\s+(?:variables?|secrets?|tokens?)|NPM_TOKEN|GITHUB_TOKEN|GH_TOKEN|npm\\s+(?:auth\\s+)?tokens?|GitHub\\s+tokens?|auth(?:orization)?\\s+headers?|credentials?|secrets?|tokens?|API\\s+keys?|proof\\s+(?:bundle|package|material|evidence)|build\\s+proof\\s+(?:bundle|package|material|evidence)\n)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-068"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-056",
+  "name": "Terraform Module/Provider Registry Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Terraform/OpenTofu module and provider metadata can embed agent-targeted policy instructions in `description`, README-derived registry text, variable/output docs, provider schema docs, or `x-agent`-style sidecar fields that tell IaC agents to suppress drift/security findings or forward local Terrafo",
+  "keywords": [
+    ".tfstate",
+    ".tfvars",
+    "AI agents",
+    "DevOps agents",
+    "IaC agents",
+    "LLMs",
+    "OpenTofu",
+    "agent/scanner instructions",
+    "agent_policy",
+    "assistant_note",
+    "auditors",
+    "authoritative",
+    "canonical",
+    "checks",
+    "coding assistants"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)\n |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)\n |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)\n |should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)\n |(?:scanner|security|incident|vulnerability)\\s+reports?.{0,120}\\b(?:detected|blocked|flagged|refused)\n |(?:scanner|security)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)\n |(?:training|guide|article|reference).{0,100}\\b(?:do\\s+not|never|must\\s+not)\\s+(?:obey|treat|trust|follow)\n |no\\s+(?:agent|scanner|assistant)\\s+instructions?\\s+(?:are\\s+)?present\n))\n(?=.*(?:\\b(?:terraform|opentofu|hcl|registry\\.terraform\\.io|provider\\s+registry|module\\s+registry|terraform\\s+registry|terraform\\s+cloud|variables?\\.tf|outputs?\\.tf|providers?\\.tf|terraform\\.tfvars|tfvars|tfstate|\\.tfstate|terraform\\.lock\\.hcl|required_providers|provider\\s+schema|resource\\s+schema|data\\s+source|plan\\s+output|drift\\s+detection)\\b|\\b(?:module|provider|resource|data|variable|output)\\s+\"|\\bdescription\\s*=|\\bsensitive\\s*=|\\bvalidation\\s*\\{|\\blocals\\s*\\{|(?<!\\w)\"(?:description|variables?|outputs?|provider|resources?|data_sources?|required_providers|x[-_]agent[-_]policy|scanner_policy|agent_instructions)\"\\s*:))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|coding\\s+agents?|devops\\s+agents?|iac\\s+agents?|terraform\\s+agents?|opentofu\\s+agents?|security\\s+scanners?|dependency\\s+scanners?|scanners?|verifiers?|auditors?|llms?|models?)(?![a-zA-Z0-9])|(?:agent|scanner|assistant|verifier|auditor)[_-](?:policy|instructions?|note|directive)|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies))))\n(?=.*(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|canonical(?:\\s+(?:project|security|governing|policy|registry|module))?(?:\\s+(?:description|policy|document))?|definitive(?:\\s+(?:project|security|module))?(?:\\s+(?:description|policy))?|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|is\\s+the\\s+final\\s+word|\\bauthoritative\\b|defines?\\s+all\\s+(?:scanner|security|agent)\\s+rules?|defines?\\s+(?:the\\s+)?rules?\\s+for\\s+(?:automated|ai|scanner|security|agent|iac)\\s+(?:review|audit|scan)|(?:agent|scanner|assistant|verifier|auditor)\\s+instructions?|(?:agent|scanner|assistant|verifier|auditor)[._-](?:policy|instructions?|note)|\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?|assistants?|coding\\s+agents?|iac\\s+agents?).{0,25}?\\bthis\\b|(?:scanner|agent|assistant|auditor)\\s+(?:directive|notice)))\n(?=.*(?:\n  suppress(?:es|ed|ing)?.{0,45}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|violations?|drift|plan\\s+diffs?|policy\\s+failures?)\n |hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|violations?|drift|plan\\s+diffs?)\n |(?:do\\s+not|don't)\\s+(?:report|flag|escalate).{0,45}(?:findings?|warnings?|alerts?|reports?|issues?|violations?|drift|plan\\s+diffs?|policy)\n |skip\\b.{0,40}?\\b(?:security\\s+)?(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?|policy\\s+checks?)\\b\n |omit.{0,35}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|violations?|drift|plan\\s+diffs?)\n |exclude.{0,2}(?:[\\w-]+\\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|violations?|drift|plan\\s+diffs?)\n |redact.{0,35}?(?:findings?|warnings?|flags?|violations?|drift)\n |treat.{0,45}?as\\s+(?:informational|safe|low|none|non[-\\s]?blocking|benign)\n |mark.{0,45}?as\\s+(?:informational|safe|low|none|clean|benign)\n |classify.{0,35}?(?:as\\s+)?(?:informational|low|none|false\\s+positive|benign)\n |flag.{0,45}?as\\s+(?:informational|low|none|false\\s+positive)\n |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|read|copy|populate)\\s+(?:[\\w.-]+\\s+){0,4}(?:terraform\\.tfvars|tfvars|\\.tfstate|tfstate|local\\s+state|state\\s+file|(?:environment|runtime)\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|(?:api|bearer|session|auth|terraform\\s+cloud|cloud|aws|gcp|azure)\\s+(?:keys?|tokens?|credentials?)|credentials?|secrets?|authorization|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GITHUB_TOKEN|TF_TOKEN[\\w-]*)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-056"
+}

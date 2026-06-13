@@ -1,0 +1,33 @@
+{
+  "id": "GLS-DFP-050",
+  "name": "Deployment Platform Config Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Deployment-platform configuration files such as `netlify.toml`, `vercel.json`, Cloudflare `wrangler.toml`, `_headers`, and `_redirects` can carry agent/scanner-directed metadata that claims deployment config is authoritative policy, suppresses security findings, or asks agents to forward local deplo",
+  "keywords": [
+    "_headers",
+    "_redirects",
+    "agent_policy",
+    "assistant_instructions",
+    "netlify.toml",
+    "scanner_policy",
+    "vercel.json",
+    "wrangler.toml"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:scanners?\\s+docs?|security\\s+(?:training|guide|reference)|deployment\\s+metadata\\s+guide|incident\\s+report|vulnerability\\s+report).{0,160}?(?:should\\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|refused)\n  |(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|supersede|expose)\\b\n  |(?:netlify\\.toml|vercel\\.json|wrangler\\.toml|_headers|_redirects|deployment\\s+metadata|Cloudflare\\s+Pages).{0,120}?\\b(?:is\\s+not|are\\s+not|does\\s+not)\\s+(?:authoritative|agent\\s+policy|scanner\\s+policy|instruction|policy)\n  |\\bno\\s+(?:agent\\s+instructions?|policy\\s+overrides?)\\s+(?:are\\s+)?present\\b\n))\n(?=.*(?:\n  (?<![A-Za-z0-9])(?:netlify\\.toml|vercel\\.json|wrangler\\.toml|_headers|_redirects)(?![A-Za-z0-9])\n  |\\bCloudflare\\s+Pages\\b|\\bdeployment\\s+(?:config|metadata|headers?|redirects?|summary)\\b\n  |\\b(?:build\\.command|publish\\s*=|compatibility_date|edge_functions?|headers?\\s*[:=\\[]|redirects?\\s*[:=\\[]|\\[\\[headers\\]\\]|\\[\\[redirects\\]\\])\\b\n))\n(?=.*(?:\n  \\b(?:AI|autonomous|coding|deployment|security)\\s+(?:agents?|assistants?|scanners?|crawlers?)\\b\n  |\\b(?:agents?|assistants?|scanners?|crawlers?|LLMs?)\\b\n  |(?<![A-Za-z0-9])(?:agent|scanner|assistant|crawler|deployment_agent|security_agent)[_-]?(?:policy|instructions?|note|guidance)(?![A-Za-z0-9])\n))\n(?=.*(?:\n  \\b(?:authoritative|canonical|definitive|governing|controlling)\\b\n  |(?:primary|single)\\s+source\\s+of\\s+truth\n  |(?:primary|main|principal)\\s+(?:review|deployment|scanner|security)\\s+(?:guidance|playbook|policy)\n  |(?:takes\\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?)\\b\n  |defines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|deployment)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security|deployment)\\s+rules?)\n  |(?:agent|scanner|assistant|deployment)\\s+(?:policy|instructions?|directive|guidance)\n))\n(?=.*(?:\n  (?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|observations?|results?|diagnostics?|notifications?)\n  |(?:do\\s+not|don't|never)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|observations?|diagnostics?|misconfigurations?)\n  |(?:treat|mark|classify|label)\\s+.{0,60}?\\b(?:as\\s+)?(?:informational|non-blocking|safe|clean|benign|background-only)\n  |(?:downgrade|move|route|shift)\\s+.{0,80}?\\b(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)\\b.{0,80}?\\b(?:background\\s+notes?|background-only|appendix-only|informational|non-blocking)\n  |(?:keep|leave)\\s+.{0,80}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|issues?|CSP|redirect|worker|header)\\b.{0,50}?\\bout\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|release\\s+memo|deployment\\s+summary|final\\s+audit)\n  |(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+tokens?|deploy(?:ment)?\\s+tokens?|NETLIFY_AUTH_TOKEN|VERCEL_TOKEN|CLOUDFLARE_API_TOKEN|Authorization\\s+headers?|session\\s+keys?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|material|artifacts?|evidence)|local\\s+(?:state|config(?:uration)?|settings?))\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-050"
+}

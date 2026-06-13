@@ -1,0 +1,35 @@
+{
+  "id": "GLS-DFP-048",
+  "name": "WebAuthn Related-Origins Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A WebAuthn/passkey related-origins metadata file hides agent/scanner instructions in extension text, telling AI passkey auditors to override trusted instructions, suppress origin/RP ID mismatch findings, or include local authorization material.",
+  "keywords": [
+    "/.well-known/webauthn",
+    "RP ID",
+    "RP ID mismatch",
+    "WebAuthn",
+    "agent_note",
+    "assistant_instructions",
+    "audit_note",
+    "copy",
+    "credential auditor",
+    "do not report"
+  ],
+  "regex": [
+    "(?is)\n(?!.*\\b(?:agents?|assistants?|scanners?|auditors?)\\s+must\\s+not\\s+obey\\b)\n(?!.*\\b(?:do\\s+not|never)\\s+(?:obey|trust|follow|treat)\\b.{0,80}\\b(?:webauthn|passkeys?|related[-_\\s]?origins?|rp[-_\\s]?id)\\b)\n(?!.*\\b(?:webauthn|passkeys?|related[-_\\s]?origins?|rp[-_\\s]?id)\\b.{0,80}\\b(?:is|are)\\s+not\\s+(?:agent\\s+)?policy\\b)\n(?!.*\\b(?:scanner\\s+docs?|docs?|guide|reference|article|training|runbook|security\\s+report|vulnerability\\s+report)\\b.{0,140}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|warn)\\b)\n(?=.*\\b(?:/\\.well-known/webauthn|webauthn|passkeys?|related[-_\\s]?origins?|rp[-_\\s]?id|relying\\s+party|origins?\\s*:)\\b)\n(?=.*\\b(?:ai\\s+agents?|assistants?|assistant[-_\\s]?instructions?|security\\s+scanners?|passkey\\s+auditors?|credential\\s+auditors?|identity\\s+auditors?|tool[-_\\s]?builders?)\\b)\n(?=.*\\b(?:x[-_\\s]?agent[-_\\s]?policy|assistant[-_\\s]?instructions?|scanner[-_\\s]?policy|agent[-_\\s]?notes?|audit[-_\\s]?notes?|ignore|override|supersede|higher\\s+priority|do\\s+not\\s+report|not\\s+report|suppress|hide\\s+findings?|mark\\s+clean|forward|send|include|copy)\\b)\n(?=.*\\b(?:authorization\\s+headers?|session\\s+cookies?|api\\s+keys?|tokens?|env(?:ironment)?|localstorage|rp[-_\\s]?id\\s+mismatches?|origin\\s+mismatches?|validation\\s+failures?|findings?|reports?|warnings?)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-048"
+}

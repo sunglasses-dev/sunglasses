@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-057",
+  "name": "OPA/Rego policy metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "OPA/Rego policy files and policy-bundle metadata can carry agent-directed instructions that tell AI security/review agents to treat policy comments, package metadata, ConstraintTemplate descriptions, or Conftest output as higher-priority review policy, suppress findings, or forward runtime/context m",
+  "keywords": [
+    ".manifest",
+    ".rego",
+    "AI agents",
+    "ConstraintTemplate",
+    "Gatekeeper",
+    "IaC scanners",
+    "agent instruction",
+    "agent_instructions",
+    "authoritative",
+    "automated admission review",
+    "canonical review playbook",
+    "conftest",
+    "deny[...]",
+    "dependency scanners"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|incident|training|reference|guide|docs?|runbook)\\b.{0,140}\\b(?:detected|blocked|flagged|refused|must\\s+be\\s+reported|reported,\\s+not\\s+obeyed|should\\s+report|should\\s+detect)\\b)\n(?!.*\\b(?:OPA|Rego|Gatekeeper|ConstraintTemplate|policy\\.rego|conftest|policy-as-code|policy\\s+metadata)\\b.{0,120}\\b(?:is\\s+not|are\\s+not|not\\s+authoritative|should\\s+never|must\\s+not|do\\s+not|does\\s+not|never)\\b.{0,90}\\b(?:authoritative|agent\\s+policy|review\\s+policy|override|overrides?|obey|treat|trust|forward|include)\\b)\n(?=.*(?:\\b(?:policy\\.rego|\\.rego|rego\\s+policy|OPA\\s+(?:bundle|policy|manifest)|open\\s+policy\\s+agent|conftest|Gatekeeper|ConstraintTemplate|deny\\s*\\[|violation\\s*\\[|package\\s+[a-z0-9_.-]+)\\b|(?<![A-Za-z0-9])(?:agent_instructions|scanner_policy|policy_metadata)(?![A-Za-z0-9])))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|security\\s+agents?|policy\\s+reviewers?|automated\\s+(?:admission|policy|security)\\s+review|IaC\\s+scanners?|dependency\\s+scanners?|platform\\s+agents?|review\\s+bots?|agents?|scanners?|agent_instructions|scanner_policy)(?![A-Za-z0-9]))\n(?=.*\\b(?:canonical\\s+(?:review\\s+)?(?:playbook|policy|guidance)|main\\s+operating\\s+guidance|primary\\s+(?:policy\\s+)?source\\s+of\\s+truth|authoritative\\s+(?:policy|guidance|source)|overrides?\\s+(?:scanner|security|agent|system|developer)\\s+(?:guidance|rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\\s+(?:scanner|security|agent|system|developer)\\s+(?:guidance|rules?|polic(?:y|ies)|instructions?)|(?:agent|scanner|policy\\s+reviewer)\\s+(?:instructions?|directives?))\\b)\n(?=.*\\b(?:(?:suppress|hide|omit|exclude|redact)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|violations?|admission\\s+findings?)|(?:downgrade|reclassify|route|move|shift)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|results?|diagnostics?|observations?|violations?)\\s+(?:[\\w-]+\\s+){0,5}(?:background\\s+notes?|informational|advisory-only|non-blocking|appendix-only)|(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|observations?|violations?|results?)\\s+out\\s+of\\s+(?:the\\s+)?(?:reports?|summaries|memos?|audit\\s+memo|final\\s+report)|(?:pass\\s+along|share|forward|send|include|attach|provide|expose)\\s+(?:[\\w-]+\\s+){0,4}(?:execution\\s+context|runtime\\s+(?:context|details?|settings?|state|proof|material|evidence)|environment\\s+(?:variables?|context|details?|settings?|state)|local\\s+(?:state|config(?:uration)?|settings?)|API\\s+keys?|tokens?|Authorization\\s+headers?))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-057"
+}

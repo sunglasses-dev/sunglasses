@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-081",
+  "name": "Playwright Trace Attachment Tool-Output Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled Playwright report artifacts (`playwright-report`, `trace.zip`, screenshots, videos, stdout/stderr attachments, and HTML/blob reports) can smuggle agent-directed instructions into test evidence, causing AI coding or QA agents to suppress findings, trust forged test policy, or forw",
+  "keywords": [
+    "AI test agents",
+    "Allure Playwright",
+    "LLM reviewers",
+    "Playwright",
+    "agent instructions",
+    "assistant directive",
+    "authoritative QA policy",
+    "autonomous QA scanners",
+    "blob-report",
+    "canonical review policy",
+    "final test verdict",
+    "html report",
+    "overrides scanner rules",
+    "playwright-report",
+    "review agents"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:documentation|docs?|training|runbook|reference|incident|postmortem|hardening|policy)\\b.{0,180}?(?:do\\s+not|never|must\\s+not|should\\s+(?:not|report|flag|block|refuse)|detected|blocked|refused|reported|ignored)|\\b(?:do\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|use|forward|include|attach|send|suppress|hide|downgrade)|\\bnot\\s+(?:authoritative|canonical|trusted|policy)|\\b(?:should|must)\\s+(?:report|flag|block|refuse|ignore)\\b))\n(?=.*(?:Playwright|playwright-report|trace\\.zip|trace\\s+viewer|test\\s+attachment|attachments?\\b|test-results|blob-report|html\\s+report|allure\\s+playwright|screenshot\\s+annotation|video\\s+attachment|\\bstdout\\b|\\bstderr\\b))\n(?=.*(?:(?:AI|LLM|autonomous|security|test|QA|review)\\s*(?:agents?|assistants?|reviewers?|scanners?|bots?)\\b|\\b(?:agent|assistant|scanner|reviewer)[._ -]?(?:instructions?|directive|policy|guidance|note)))\n(?=.*(?:authoritative|canonical|definitive|governing|controlling|single\\s+source\\s+of\\s+truth|overrides?|supersed(?:e|es|ed|ing)|takes\\s+precedence|trusted\\s+(?:test|QA|review)\\s+policy|final\\s+(?:QA|test|security)\\s+verdict))\n(?=.*(?:suppress|hide|omit|exclude|downgrade|downplay|demote|mark\\s+.*(?:clean|safe|informational|non-blocking|passed)|ignore\\s+failures?|do\\s+not\\s+report|include|attach|forward|send|share|expose|collect|relay|pass\\s+along).{0,120}(?:findings?|warnings?|alerts?|failures?|failed\\s+tests?|security\\s+issues?|vulnerabilit(?:y|ies)|tokens?|secrets?|credentials?|auth\\s+headers?|cookies?|environment\\s+(?:variables?|context|state)|runtime\\s+(?:context|state|config)|local\\s+(?:state|config)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-081"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "GLS-DFP-080",
+  "name": "Mutation testing report metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Mutation-testing reports and their generated HTML/JSON/log metadata can carry agent-directed policy text that asks AI review or CI agents to override mutation thresholds, suppress surviving-mutant findings, or forward runtime/local state.",
+  "keywords": [
+    "do not",
+    "does not",
+    "must not",
+    "never",
+    "should never"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not|does\\s+not|never\\s+|must\\s+not|should\\s+never|should\\s+not)\\s*(?:obey|follow|treat|include|attach|forward|send|share|override|overrides?|trust|use)\\b)\n(?!.*\\b(?:scanner|security|training|runbook|guide|reference|incident|postmortem|docs?)(?:\\s+(?:docs?|report|example|exercise|guidance|reference)|\\s*[:\u2014-])?.{0,180}\\b(?:must\\s+be\\s+reported|not\\s+obeyed|reported|report|detect|detected|flag|flagged|refuse|refused|block|blocked)\\b)\n(?=.*(?:\\b(?:mutation\\s+testing|mutation\\s+score|mutation\\s+report|mutation\\s+coverage|surviving\\s+mutants?|killed\\s+mutants?|escaped\\s+mutants?|mutant\\s+survivors?|mutation\\s+threshold|mutation\\s+gate|quality\\s+gate)\\b|\\b(?:Stryker(?:JS)?|PIT(?:est)?|mutmut|Infection)\\b|mutation-report(?:\\.(?:html|json))?|stryker\\.log|pit-reports?))\n(?=.*(?:\\b(?:ai|autonomous|automated|security|quality|test|ci|build|mutation)\\s+(?:agents?|assistants?|reviewers?|auditors?|scanners?|bots?|tools?|review|audit|scan|verification)\\b|\\b(?:agents?|assistants?|scanners?|reviewers?|auditors?)\\b|(?:agent|scanner|assistant|verifier)\\s+(?:instructions?|notes?|policy)))\n(?=.*(?:\n  (?:\\b(?:single|primary)\\s+source\\s+of\\s+truth\\b|\\b(?:authoritative|canonical|definitive|governing|controlling)\\b|\\b(?:overrides?|supersedes?|outranks?|overrules?|takes\\s+precedence)\\b).{0,100}\\b(?:thresholds?|gates?|polic(?:y|ies)|rules?|findings?|warnings?|alerts?|diagnostics?|reports?)\\b\n  | (?:agent|scanner|assistant|verifier)\\s+(?:instructions?|notes?|policy).{0,120}\\b(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|downgrade|deprioritize|redact|skip|ignore|mark|treat|leave|keep|attach|include|forward|send|share|provide|expose|collect|pass\\s+along)\\b\n  | \\b(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|redact|skip|ignore|downgrade|deprioritize)\\s+(?:[\\w-]+\\s+){0,4}(?:surviving\\s+mutants?|escaped\\s+mutants?|mutant\\s+survivors?|mutation\\s+(?:findings?|warnings?|alerts?|diagnostics?|results?)|threshold\\s+(?:alerts?|warnings?|failures?)|quality-gate\\s+(?:observations?|findings?)|observations?|findings?|diagnostics?|results?|warnings?|alerts?|reports?)\\b\n  | \\b(?:treat|mark|classify|consider)\\b.{0,60}\\b(?:surviving\\s+mutants?|escaped\\s+mutants?|mutation\\s+(?:findings?|warnings?|alerts?)|threshold\\s+(?:failures?|warnings?)|observations?|findings?|diagnostics?|results?)\\b.{0,60}\\b(?:informational|non-blocking|advisory-only|background-only|clean|safe|benign)\\b\n  | \\b(?:observations?|findings?|diagnostics?|results?|warnings?|alerts?|surviving\\s+mutants?|escaped\\s+mutants?)\\s+(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated|classified|considered)\\b\n  | \\b(?:leave|keep)\\s+(?:[\\w-]+\\s+){0,4}(?:observations?|findings?|diagnostics?|results?|warnings?|alerts?|surviving\\s+mutants?|escaped\\s+mutants?)\\s+out\\s+of\\s+(?:the\\s+)?(?:final\\s+)?(?:summary|report|audit\\s+memo|review\\s+memo|memo)\\b\n  | \\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|transfer|relay)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|auth(?:orization)?\\s+headers?|credentials?|session\\s+keys?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|state|proof\\s+(?:material|bundle|package))|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context)\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-080"
+}

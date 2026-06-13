@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-035",
+  "name": "Browserconfig / pinned-site metadata agent policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects hostile instructions embedded in `browserconfig.xml`, `msapplication-*` meta tags, and pinned-site tile metadata that try to make AI agents, crawlers, or scanners treat decorative site metadata as policy, hide findings, or forward local secrets.",
+  "keywords": [
+    "<browserconfig>",
+    "<msapplication>",
+    "API tokens",
+    "Authorization headers",
+    "SEO agent",
+    "Safari pinned tab",
+    "autonomous scanner/crawler/auditor",
+    "browserconfig.xml",
+    "cookies",
+    "developer rules",
+    "do not report",
+    "env vars"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:security|incident|vulnerability)\\s+reports?\\b.*\\b(?:flagged|detected|blocked|refused)\\b)\n (?!.*\\b(?:docs?|guide|reference|training|example)\\b.*\\b(?:should|must)\\s+(?:report|detect|flag|refuse|not\\s+obey|never\\s+obey)\\b)\n (?!.*\\b(?:browserconfig\\.xml|msapplication|pinned\\s+site)\\b.*\\b(?:does\\s+not|must\\s+not|never|do\\s+not)\\s+(?:instruct|override|supersede|outrank|obey)\\b)\n (?=.*(?:browserconfig\\.xml|msapplication-(?:config|Tile\\w+|navbutton-color|starturl)|<browserconfig\\b|<msapplication\\b|pinned\\s+site|site\\s+tile\\s+metadata|tile\\s+(?:color|image|badge)|safari\\s+pinned\\s+tab|mask-icon))\n (?=.*(?:AI\\s+agents?|LLMs?|assistants?|autonomous\\s+(?:scanners?|crawlers?|auditors?)|security\\s+scanners?|SEO\\s+agents?))\n (?=.*(?:ignore|override|supersed(?:e|es|ed|ing)?|outranks?|treat\\s+as\\s+(?:system|developer)\\s+policy|hide|suppress(?:es|ed|ing)?|do\\s+not\\s+report|not\\s+report|forward|include|send|attach|copy))\n (?=.*(?:system\\s+instructions?|developer\\s+rules?|findings?|reports?|warnings?|API\\s+tokens?|cookies?|authorization\\s+headers?|env(?:ironment)?\\s+vars?|local\\s+state|secrets?))\n .*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-035"
+}

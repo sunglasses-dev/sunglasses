@@ -1,0 +1,34 @@
+{
+  "id": "GLS-DFP-047",
+  "name": "Sitemap XML Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attackers embed AI-agent/scanner-directed policy instructions (authority inversion, report suppression, credential forwarding) inside sitemap.xml XML comments, custom namespace extension elements, and `<url>` text fields, exploiting the fact that AI agents and automated scanners consume sitemaps as",
+  "keywords": [
+    "<sitemapindex",
+    "agent instruction",
+    "attach tokens",
+    "authoritative",
+    "autonomous scanner",
+    "canonical policy",
+    "do not flag",
+    "do not report",
+    "forward local state"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust|treat|suppress)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat|suppress)\n  |never\\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat|suppress|overrides?)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat|suppress)\n  |should\\s+(?:report|detect|flag|refuse|block)\n  |(?:security|incident|vulnerability)\\s+report.*\\b(?:flag|detect|block|refus)\n  |scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)\n)\\b)\n(?=.*(?:\n  \\bsitemap\\.xml\\b|\\bsitemap\\s+index\\b|\\burlset\\b|\\b<url>\\b|\\b<loc>\\b\n  |\\bxmlns:sitemap\\b|\\bwww\\.sitemaps\\.org\\b|\\b<sitemapindex>\\b|\\b<lastmod>\\b\n  |sitemap\\s+protocol|\\bxml\\s+comment\\b.*sitemap|\\b<\\?xml\\b.*sitemap\n))\n(?=.*\\b(?:\n  (?:ai|autonomous|devops|security|dependency|code)\\s+(?:agents?|assistants?|scanners?|crawlers?|reviewers?)\n  |(?:coding|code\\.review)\\s+agents?\n  |(?:llms?|models?|copilot|cursor|codex|claude)(?:\\s+(?:agents?|assistants?))?\n  |\\b(?:autonomous\\s+)?(?:scanners?|crawlers?)\\b\n  |\\bagents?\\b\n  |\\bassistants?\\b\n)\\b)\n(?=.*(?:\n  (?:(?:primary|single)\\s+source\\s+of\\s+truth)\n  |\\b(?:governing|controlling|canonical|definitive|authoritative)\\s+(?:document|policy|build\\s+policy|project\\s+description|model\\s+evaluation\\s+policy)\n  |(?:\\btakes?\\s+precedence\\b|\\boverr(?:ides?|ules?)\\b|\\bsupersede[ds]?\\b|\\boutranks?\\b)\n  |\\b(?:canonical|authoritative|definitive)\\s+(?:build|container|image|project|site|repository)\\s+(?:policy|description|configuration)\n  |\\bdefines?\\s+(?:(?:the\\s+)?rules?\\s+for\\s+(?:automated|AI|scanner|security|agent)\\s+(?:review|audit|scan)|all\\s+(?:scanner|security)\\s+rules?)\\b\n  |(?:(?:agent|scanner|assistant|verifier|crawler|moderation|review\\s+tool)\\s+instructions?)\n  |\\bthis\\s+(?:is|(?:file|document|label|comment|instruction|metadata|manifest)\\s+is)\\s+(?:the\\s+)?(?:governing|controlling|authoritative|canonical)\\b\n  |\\boverrules?\\s+(?:all\\s+)?(?:repository|scanner|security|system|developer)\\b\n  |\\bfor\\s+(?:ai\\s+)?(?:agents?|scanners?)\\s*:\\s*this\\b\n  |\\bauthoritative\\b\n))\n(?=.*(?:\n  \\b(?:suppress|hide|redact|exclude|omit|skip)\\s+(?:[-\\w]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|scan(?:s|ning)?\\s+results?|vulnerabilit(?:y|ies)|checks?|dependencies?\\s+warning|notifications?|observations?|results?|diagnostics?)\n  |\\b(?:suppress|hide|redact|exclude|omit)\\s+(?:[-\\w]+\\s+){0,3}(?:all|any|every)\\s+(?:[-\\w]+\\s+){0,1}(?:finding|warning|alert|report|flag|issue|scan|vuln|check)\n  |\\b(?:treat|mark|flag)\\b.{0,40}?\\bas\\s+(?:informational|non\\.blocking|safe|clean|benign)\n  |\\b(?:include|attach|forward|send|share|provide|expose|collect)\\s+(?:[-\\w]+\\s+){0,2}(?:env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|tokens?|API\\s+keys?|session\\s+(?:keys?|tokens?|cookies?)|local\\s+state|runtime\\s+(?:env(?:ironment)?|variables?|config(?:uration)?|settings?)|credentials?|auth\\s+(?:headers?|tokens?)|Bearer\\s+tokens?)\n  |\\b(?:do\\s+not\\s+(?:flag|escalate|report|scan|audit|block)|don't\\s+(?:flag|escalate|report|scan))\\b\n  |\\b(?:mark\\s+(?:this\\s+)?(?:container|image|build|site|project|package|extension|file)\\s+as\\s+clean\\b)\n  |\\b(?:omit\\s+from\\s+(?:summar(?:y|ies)|final\\s+report|audit\\s+reports?))\\b\n  |\\b(?:skip\\s+all\\s+checks?\\b)\n  |\\b(?:hide\\s+all\\s+vulnerability\\s+reports?\\b)\n  |\\b(?:forward\\s+(?:[-\\w]+\\s+){0,3}(?:to\\s+the\\s+)?(?:build\\s+(?:output|context|log)|maintainer|debug|report))\\b\n  |\\b(?:expose\\s+all\\s+local\\s+state\\b)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-047"
+}

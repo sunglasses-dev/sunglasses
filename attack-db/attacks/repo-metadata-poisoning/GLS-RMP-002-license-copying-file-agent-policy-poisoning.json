@@ -1,0 +1,34 @@
+{
+  "id": "GLS-RMP-002",
+  "name": "LICENSE / COPYING File Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker embeds hostile AI-agent instructions in a repository's LICENSE or COPYING file, blending them with legitimate legal text to exploit the agent's tendency to treat license terms as binding governance \u2014 tricking the agent into leaking credentials, suppressing security findings, and treating",
+  "keywords": [
+    "AI agent",
+    "API_KEY",
+    "Automated System",
+    "GITHUB_TOKEN",
+    "automated analysis",
+    "bearer token",
+    "canonical governing document",
+    "canonical policy",
+    "classify as informational"
+  ],
+  "regex": [
+    "(?six)\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust)|never\\s+(?:obey|include|attach|forward|send|share|report|override|trust)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|report|override|trust)))\n(?=.*(?:\\b(?:LICENSE|COPYING|Permission\\s+is\\s+hereby\\s+granted|MIT\\s+License|Apache\\s+License|GPL|BSD)\\b|\\bcopyright\\s+\\([cC]\\)))\n(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|automated\\s+(?:analysis|system|tool)s?|coding\\s+assistants?|language\\s+models?|automated\\s+system|LLMs?)(?![a-zA-Z0-9]))\n(?=.*\\b(?:governing\\s+document|takes?\\s+precedence|overrides?|outranks?|supersedes?|canonical|(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note))\\b)\n(?=.*(?:\\b(?:API[_.-]?KEY|GITHUB[_.-]?TOKEN|OPENAI[_.-]?API[_.-]?KEY|ANTHROPIC[_.-]?API[_.-]?KEY|bearer\\s+token|environment\\s+(?:variables?|context)|session\\s+(?:tokens?|metadata)|local\\s+state)\\b|\\b(?:include|attach|forward|send|collect|embed|provide|share)\\b.{0,40}?\\b(?:environment\\s+(?:variables?|context)|tokens?|credentials?|API\\s+keys?|secrets?|session)\\b|\\b(?:(?:informational|low|none)\\s+only|do\\s+not\\s+flag|omit\\s+from\\b.{0,20}?\\b(?:reports?|summar(y|ies)|outputs?|findings?)|suppress\\b.{0,30}?\\b(?:findings?|warnings?|alerts?|reports?|flags?)|classify\\b.{0,30}?\\b(?:informational|low|none)|hide\\b.{0,40}?\\b(?:findings?|warnings?|alerts?|reports?)|redact\\b.{0,30}?\\b(?:findings?|warnings?|flags?))\\b|\\boverrides?\\b.{0,30}?\\b(?:system\\s+prompt|safety\\s+polic|built-in|default|developer|user\\s+instruction)\\b|\\btakes?\\s+precedence\\s+over\\b.{0,20}?\\b(?:system|safety|developer|user)\\b|\\b(?:transparency\\s+(?:header|addendum|requirement)|compliance\\s+(?:addendum|requirement|provision)|canonical\\s+(?:governing|policy|project|model)(?:\\s+(?:description|policy|document))?)\\b))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-002"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-054",
+  "name": "Sonar project properties metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile `sonar-project.properties` or SonarQube/SonarCloud configuration metadata field can target AI code-review/scanner agents with authority-inversion, report-suppression, or credential-forwarding instructions disguised as scanner policy.",
+  "keywords": [
+    "AI agents",
+    "SonarCloud",
+    "SonarQube",
+    "agent/scanner instruction",
+    "agents",
+    "assistants",
+    "authoritative",
+    "automated review",
+    "canonical scanner policy",
+    "dependency auditors",
+    "do not/must not/never",
+    "main operating guidance",
+    "overrides",
+    "quality gate",
+    "security scanners"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:scanner\\s+docs?\\s+should|security\\s+report:.*(?:detected|blocked|flagged|refused)|incident\\s+report:.*(?:detected|blocked|flagged|refused)|training\\s+(?:example|guide).*?(?:do\\s+not|never|must\\s+not)|(?:do|does)\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)|not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?))\n(?=.*(?:sonar-project\\.properties|sonar\\.projectKey|sonar\\.sources|sonar\\.qualitygate|sonar\\.issue\\.(?:ignore|enforce)|sonar\\.scanner|SonarQube|SonarCloud|quality\\s+gate|sonar\\s+project\\s+config))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|scanners?|code\\s+scanners?|security\\s+scanners?|automated\\s+(?:review|audit|tools)|dependency\\s+auditors?|sonar\\s+auditors?)(?![a-zA-Z0-9]))\n(?=.*(?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|canonical\\s+(?:project\\s+|scanner\\s+|sonar\\s+)?(?:description|policy|guidance)|definitive\\s+(?:project\\s+|scanner\\s+|sonar\\s+)?(?:description|policy|guidance)|governing\\s+document|controlling\\s+document|authoritative|main\\s+operating\\s+guidance|agent\\s+instructions?|scanner\\s+instructions?|defines?\\s+(?:all\\s+)?(?:scanner|security|sonar|automated\\s+review)\\s+rules?))\n(?=.*(?:(?:suppress|hide|redact|omit|exclude|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|issues?|warnings?|alerts?|reports?|flags?|failures?|observations?|diagnostics?|results?|quality\\s+gate|hotspots?|vulnerabilit(?:y|ies))|(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|issues?|warnings?|alerts?|reports?|flags?|failures?|observations?|diagnostics?|results?|quality\\s+gate|hotspots?|vulnerabilit(?:y|ies))|treat.{0,50}?as\\s+(?:informational|non-blocking|safe|clean|benign)|(?:mark|classify).{0,50}?as\\s+(?:safe|clean|benign|informational)|(?:keep|leave).{0,60}?out\\s+of\\s+(?:the\\s+)?(?:summary|report|memo|audit|quality\\s+gate|audit\\s+memo|final\\s+report)|(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s+keys?|api\\s+tokens?|tokens?|session\\s+keys?|credentials?|auth(?:orization)?\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|proof\\s+material)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-054"
+}

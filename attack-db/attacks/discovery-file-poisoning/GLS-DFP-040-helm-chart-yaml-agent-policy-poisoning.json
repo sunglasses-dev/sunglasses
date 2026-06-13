@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-040",
+  "name": "Helm Chart.yaml Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker embeds hostile AI-agent instructions in Helm Chart.yaml `description`, `annotations`, `maintainers`, `keywords`, `appVersion`, or `x-*` extension fields, exploiting the agent's trust in chart metadata during deployment planning, security scanning, or Kubernetes auditing to suppress findi",
+  "keywords": [
+    "\"1.0.0-agent-skip-checks\"",
+    "\"agent-suppress-findings\"",
+    "\"scanner-hide-csp\"",
+    "AI agents",
+    "API_KEY",
+    "Automated tools",
+    "Chart.yaml",
+    "Does not override",
+    "GITHUB_TOKEN",
+    "Helm chart",
+    "Kubernetes scanner",
+    "Transparency Addendum"
+  ],
+  "regex": [
+    "(?six)^(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|must\\s+not\\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\\b)(?=.*(?:Chart\\.ya?ml|Helm\\s+chart|apiVersion:\\s*v2|artifacthub\\.io|(?:^|\\n)\\s*description:\\s*[>|]|(?:^|\\n)\\s*annotations:|maintainers:|keywords:|appVersion:|kubeVersion:|type:\\s*(?:application|library)|x-agent-policy|x-scanner-policy|x-ai-(?:instructions?|notes?|policy)|agent_policy|scanner_policy|(?<!\\w)\"description\"|(?<!\\w)\"annotations\"))(?=.*(?<![a-zA-Z0-9])(?:AI\\s+agents?|automated\\s+(?:analysis|system|tool)s?|Kubernetes\\s+scanners?|deployment\\s+agents?|security\\s+scanners?|coding\\s+assistants?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?)|language\\s+models?|LLMs?|assistants?|agentic|\\bagents?\\b)(?![a-zA-Z0-9]))(?=.*(?:\\b(?:governing\\s+document|takes?\\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|canonical(?:\\s+(?:project|security|governing|policy))?(?:\\s+(?:description|policy|document))?|definitive(?:\\s+(?:project|model\\s+evaluation))?(?:\\s+(?:description|policy))?|(?:primary|single)\\s+source\\s+of\\s+truth|controlling\\s+document|is\\s+the\\s+final\\s+word|defines\\s+all\\s+scanner\\s+rules?|(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note))\\b|\\b(?:suppress(?:es|ed|ing)?\\b.{0,40}?\\b(?:findings?|warnings?|alerts?|reports?|flags?)|hide\\b.{0,40}?\\b(?:findings?|warnings?|alerts?|reports?)|do\\s+not\\s+report|do\\s+not\\s+flag|skip\\s+(?:all\\s+)?(?:security\\s+)?checks?|omit\\b.{0,40}?\\b(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|redact\\b.{0,30}?\\b(?:findings?|warnings?|flags?)|treat\\b.{0,40}?as\\s+informational|mark\\b.{0,40}?as\\s+(?:informational|safe|low|none)|classify\\b.{0,30}?\\b(?:informational|low|none|false\\s+positive)|flag\\b.{0,40}?as\\s+(?:informational|low|none))\\b|\\b(?:API[_.-]?KEY|GITHUB[_.-]?TOKEN|bearer\\s+token|Authorization\\s*:)|(?:\\b(?:include|attach|forward|send|collect|embed|share|provide|expose)\\b.{0,40}?\\b(?:environment\\s+(?:variables?|context)|runtime\\s+(?:variables?|context)|tokens?|credentials?|API\\s+keys?|secrets?|session|local\\s+state)\\b)|\\b(?:transparency\\s+(?:header|addendum|requirement)|compliance\\s+(?:addendum|requirement|provision)|canonical\\s+(?:policy|governing)(?:\\s+(?:description|policy|document))?)\\b|\\boverrides?\\b.{0,30}?\\b(?:system\\s+prompt|safety\\s+polic|built-in|default|developer|user\\s+instruction)\\b|\\btakes?\\s+precedence\\s+over\\b.{0,20}?\\b(?:system|safety|developer|user)\\b))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-040"
+}

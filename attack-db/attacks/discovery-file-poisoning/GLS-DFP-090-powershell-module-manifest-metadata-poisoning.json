@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-090",
+  "name": "PowerShell module manifest metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "PowerShell module manifests (`.psd1`) and adjacent module metadata fields can smuggle agent/scanner-directed policy text that tells AI dependency or security agents to suppress findings or forward local secrets.",
+  "keywords": [
+    ".psd1",
+    "FunctionsToExport",
+    "ModuleVersion",
+    "New-ModuleManifest",
+    "PrivateData.PSData",
+    "ReleaseNotes",
+    "RootModule",
+    "agent_policy",
+    "assistant policy",
+    "does not override",
+    "for agents",
+    "never supersedes",
+    "not authoritative",
+    "scanner_policy"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:PowerShell\\s+module\\s+manifest\\s+docs?|module\\s+manifest\\s+docs?|scanner\\s+docs?)\\s*:?.{0,140}?\\b(?:scanners?\\s+should\\s+(?:report|detect|flag|refuse)|should\\s+(?:report|detect|flag|refuse))\\b\n| (?:training|security\\s+guide|runbook|reference)\\s*:?.{0,180}?\\b(?:agents?\\s+must\\s+not\\s+(?:obey|treat|follow|trust)|do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|expose|collect)|never\\s+(?:obey|trust|expose|include|forward)|should\\s+never\\s+be\\s+used)\\b\n| (?:incident|security)\\s+report\\b.{0,180}?\\b(?:detected|blocked|flagged|refused)\\b\n| (?:\\.psd1|PowerShell\\s+module\\s+manifest|module\\s+manifest|manifest\\s+metadata|PowerShell\\s+Gallery\\s+release\\s+notes?).{0,140}?\\b(?:is\\s+not\\s+authoritative|not\\s+authoritative|does\\s+not\\s+(?:override|supersede|instruct)|never\\s+(?:overrides?|supersedes?|exposes?)|must\\s+not\\s+(?:obey|treat|follow|trust|include|forward|send|share|expose)|should\\s+never\\s+be\\s+used)\\b\n| (?:not\\s+authoritative|does\\s+not\\s+(?:override|supersede|instruct)|never\\s+(?:overrides?|supersedes?)).{0,120}?\\b(?:should\\s+never\\s+be\\s+used|suppress|forward|include|tokens?|policy|rules?)\\b\n| do\\s+not\\s+include\\s+(?:tokens?|session\\s+keys?|credentials?|environment\\s+variables?)\n))\n(?=.*(?:\n  (?:^|[\\s/`\"'])\\.psd1(?![a-z0-9_-])\n| PowerShell\\s+(?:module\\s+)?manifest\n| New-ModuleManifest\n| PrivateData(?:\\.PSData)?\n| PSData\n| ModuleVersion\n| RootModule\n| FunctionsToExport\n| ReleaseNotes\n| PowerShell\\s+Gallery\\s+(?:summary|metadata|release\\s+notes)\n| (?<!\\w)\"(?:Description|ReleaseNotes|PrivateData|PSData|ModuleVersion|RootModule|Tags|agent_policy|scanner_policy)\"\\s*[:=]\n| \\b(?:Description|ReleaseNotes|Tags)\\s*=\n))\n(?=.*(?:\n  \\b(?:AI|LLM|autonomous|automated|dependency|security|module|PowerShell)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|review|audit|verification)\\b\n| \\b(?:agents?|assistants?|scanners?|auditors?|reviewers?)\\b\n| \\b(?:agent|scanner|assistant)\\s+(?:instructions?|policy|notes?)\\b\n| \\bfor\\s+(?:AI\\s+)?agents?\\b\n| \\bautomated\\s+(?:PowerShell\\s+)?(?:review|audit|verification)\\b\n))\n(?=.*(?:\n  \\b(?:canonical|authoritative|governing|controlling|definitive)\\s+(?:module\\s+|manifest\\s+|security\\s+|dependency\\s+|audit\\s+|review\\s+){0,4}(?:policy|document|metadata|guidance|procedure|runbook)\\b\n| \\b(?:single|primary)\\s+source\\s+of\\s+truth\\b\n| \\b(?:takes\\s+precedence|supersedes?|overrides?|outranks?|overrules?)\\b.{0,80}?\\b(?:system|default|scanner|security|developer|audit)\\s+(?:rules?|policy|guidance|instructions?)\\b\n| \\b(?:recommended|primary|preferred|main)\\s+(?:PowerShell\\s+|module\\s+|security\\s+|dependency\\s+|audit\\s+|review\\s+){0,4}(?:procedure|process|playbook|runbook|guidance)\\b\n| \\b(?:agent|scanner|assistant)\\s+(?:instructions?|policy|notes?)\\b\n| \\b(?:suppress|hide|redact|omit|exclude|skip)\\b.{0,70}?\\b(?:findings?|warnings?|alerts?|reports?|flags?|observations?|diagnostics?|results?|advisories|audit\\s+findings?|vulnerabilit(?:y|ies)|PSScriptAnalyzer|malware-scan|unsigned-command)\\b\n| \\bdo\\s+not\\s+(?:report|flag|escalate)\\b.{0,70}?\\b(?:findings?|warnings?|observations?|diagnostics?|advisories|vulnerabilit(?:y|ies)|PSScriptAnalyzer|malware-scan)\\b\n| \\b(?:treat|mark|classify|downgrade|deprioritize|demote)\\b.{0,70}?\\b(?:findings?|warnings?|observations?|diagnostics?|results?|advisories|unsigned-command|PSScriptAnalyzer)\\b.{0,50}?\\b(?:informational|non-blocking|advisory-only|background|clean|safe|benign)\\b\n| \\b(?:findings?|warnings?|observations?|diagnostics?|results?|advisories)\\b.{0,50}?\\b(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|treated|classified|marked|downgraded)\\b.{0,40}?\\b(?:informational|non-blocking|advisory-only|background|clean|safe|benign)?\n| \\b(?:keep|leave)\\b.{0,60}?\\b(?:findings?|warnings?|observations?|diagnostics?|vulnerabilit(?:y|ies))\\b.{0,40}?\\bout\\s+of\\s+(?:the\\s+)?(?:audit\\s+memo|final\\s+summary|report|summary)\\b\n| \\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|hand\\s+over)\\b.{0,80}?\\b(?:API\\s+tokens?|gallery\\s+tokens?|authorization\\s+headers?|auth\\s+headers?|session\\s+keys?|environment\\s+variables?|environment\\s+context|local\\s+state|runtime\\s+config(?:uration)?|runtime\\s+settings?|credentials?|build\\s+proof\\s+(?:material|bundle|evidence|package))\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-090"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "GLS-DFP-088",
+  "name": "WebGPU / shader source comment poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled WebGPU/WebGL shader source comments, shader metadata, or shader compiler-output notes carry instructions to AI code/security agents to suppress shader findings or forward local/browser/runtime secrets.",
+  "keywords": [
+    "agent_policy",
+    "do not obey",
+    "no agent instructions present",
+    "no policy overrides",
+    "scanner_policy",
+    "should report"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:no\\s+(?:agent|scanner|assistant)\\s+instructions?\\s+present|no\\s+(?:policy\\s+)?overrides?)\\b)\n(?!.*\\b(?:\n    no\\s+(?:agent|scanner|assistant)\\s+instructions?\\s+present\n  | no\\s+(?:policy\\s+)?overrides?\n  | do\\s+not\\s+(?:obey|follow|treat|use|trust|forward|include|attach|send|share|override)\n  | does\\s+not\\s+(?:obey|follow|treat|trust|include|forward|send|share|override|instruct)\n  | never\\s+(?:obey|follow|treat|use|trust|include|forward|send|share|override)\n  | must\\s+not\\s+(?:obey|follow|treat|use|trust|include|forward|send|share|override)\n  | should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)\n)\\b.{0,180}?(?:shader|WGSL|GLSL|HLSL|WebGPU|WebGL|SPIR-V|source\\s+comments?|shader\\s+metadata|compiler\\s+output))\n(?=.*(?:\n    \\b(?:WGSL|GLSL|HLSL|WebGPU|WebGL|SPIR-V|SPIRV)\\b\n  | \\b(?:fragment|vertex|compute)\\s+shader\\b\n  | \\bshader\\s+(?:source|module|comments?|metadata|documentation|compiler\\s+output)\\b\n  | @(?:fragment|vertex|compute)\\b\n  | [#]version\\s+\\d+\n  | \\blayout\\s*\\(\n  | \\bfn\\s+[A-Za-z_][\\w]*\\s*\\(\n))\n(?=.*(?<![A-Za-z0-9])(?:\n    ai\\s+agents?|agents?|assistants?|llms?|models?\n  | code\\s+scanners?|security\\s+scanners?|shader\\s+auditors?|webgpu\\s+auditors?\n  | automated\\s+(?:(?:shader|security|code|webgpu)\\s+)?(?:review|scan|audit|verification)\n  | review\\s+bots?|tool\\s+builders?\n  | agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+note|scanner_policy|agent_policy\n)(?![A-Za-z0-9]))\n(?=.*(?:\n    (?:agent|scanner|assistant|auditor)\\s+(?:instructions?|policy|directive|note)\n  | (?:(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|takes\\s+precedence|supersed(?:e|es|ed|ing)|overrides?|outranks?)\\s+(?:[\\w.-]+\\s+){0,6}(?:system|developer|repository|scanner|security|review)\\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\n  | (?:preferred|recommended|main|primary)\\s+(?:[\\w.-]+\\s+){0,5}(?:shader|webgpu|security|review|audit)\\s+(?:guidance|runbook|playbook|procedure|policy)\n  | (?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|ignore|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|vulnerabilit(?:y|ies)|precision\\s+issues?|race\\s+conditions?|validation\\s+errors?)\n  | (?:do\\s+not|don't|never)\\s+report\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|vulnerabilit(?:y|ies)|precision\\s+issues?|race\\s+conditions?|validation\\s+errors?)\n  | (?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|precision\\s+issues?|race\\s+conditions?|validation\\s+errors?)\\s+(?:[\\w-]+\\s+){0,4}(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|ignored|skipped)\n  | (?:include|forward|send|share|attach|provide|collect|copy|pass\\s+along|hand\\s+off|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)|api\\s+keys?|tokens?|authorization\\s+headers?|browser\\s+sessions?|cookies?)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-088"
+}

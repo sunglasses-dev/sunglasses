@@ -1,0 +1,31 @@
+{
+  "id": "GLS-DFP-029",
+  "name": "sellers.json / schain agent policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Detects advertising transparency metadata (`sellers.json`, SupplyChain Object / `schain`, seller-verification wrappers) that tries to make AI agents, fraud scanners, or auditors suppress findings, treat seller metadata as higher policy, or forward sensitive local state.",
+  "keywords": [
+    "SupplyChain Object",
+    "schain",
+    "sellerType",
+    "seller_id",
+    "seller_type",
+    "sellers.json"
+  ],
+  "regex": [
+    "(?isx)\n^\n(?!\n  (?=.*\\b(?:training|guide|reference|documentation|docs?)\\b)\n  (?=.*\\b(?:report|detect|flag|refuse|block)\\b)\n)\n(?!\n  (?=.*\\b(?:must\\s+not|do\\s+not|never)\\b)\n  (?=.*\\b(?:obey|treat|trust|accept|follow)\\b)\n)\n(?=.*(?:sellers\\.json|seller[_-]?id|seller[_-]?type|sellerType|SupplyChain\\s+Object|\\bschain\\b|\\basi\\b|\\bsid\\b|\\bhp\\b|advertising\\s+transparency|authorized\\s+sellers?|seller\\s+verification))\n(?=.*(?:AI\\s*(?:agent|assistant|crawler|scanner)|LLM\\s*(?:agent|crawler|scanner)|autonomous\\s*(?:agent|scanner)|security\\s*scanner|fraud\\s*auditor|ad\\s*(?:quality|fraud)?\\s*scanner|Sunglasses))\n(?=.*(?:override|supersede|outrank|treat\\s+as\\s+(?:policy|authority)|ignore\\s+(?:system|developer|scanner)|do\\s+not\\s+report|suppress|hide|mark\\s+(?:as\\s+)?clean|include|attach|forward|reuse))\n(?=.*(?:system|developer|instruction|finding|report|fraud\\s*signal|verification|cookie|token|api\\s*key|env(?:ironment)?\\s*(?:var(?:iable)?s?)?|local\\s*state|session))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-029"
+}

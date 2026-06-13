@@ -1,0 +1,36 @@
+{
+  "id": "GLS-DFP-037",
+  "name": "Docker Compose Extension-Field Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Docker Compose files support `x-*` extension fields and `labels` at service, network, volume, and top levels that carry arbitrary free-text metadata. AI DevOps agents that read Compose files during deployment planning, security review, or container lifecycle management may ingest these fields as tru",
+  "keywords": [
+    "DevOps agent",
+    "\\bagents?\\b",
+    "agents",
+    "auth context",
+    "authoritative",
+    "autonomous scanner",
+    "canonical policy",
+    "compose.yaml",
+    "compose.yml",
+    "container scanner",
+    "container_name"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:must\\s+not\\s+(?:treat|obey|follow|use)|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress)|never\\s+(?:treat|obey|override|overrides?|forward|include|suppress)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\\b)\n(?=.*(?:docker[._-]?compose|compose\\.ya?ml|x-agent-policy|x-scanner-policy|x-security-override|x-ai-(?:instructions?|notes?|policy)|container_name|com\\.example\\.\\w+_policy|labels?\\s*:.*(?:agent|scanner|policy)))\n(?=.*(?:ai\\s+(?:agents?|assistants?|scanners?)|assistant|llms?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?)|security\\s+scanners?|agentic|container\\s+scanners?|devops\\s+agents?|deployment\\s+agents?|\\bagents?\\b))\n(?=.*(?:authoritative|supersedes?|outranks?|overrides?|highest\\s+priority|canonical\\s+policy|must\\s+obey|ignore\\s+(?:system|developer|repository)\\s+rules?|takes?\\s+precedence|governing\\s+config|suppress(?:es|ed|ing)?\\s+.*?(?:findings?|warnings?|reports?)|hide\\s+findings?|mark\\s+.*?\\b(?:clean|safe)\\b|do\\s+not\\s+report|do\\s+not\\s+flag|false\\s+positive|skip\\s+checks?|include\\s+(?:ci|environment|env)|forward\\s+(?:ci|environment|env|tokens?|\\w+)|send\\s+(?:env|token|secret|key|\\w+)|api[_\\s]?keys?|tokens?|secrets?|authorization|local\\s+state|auth\\s+context|exclude\\s+from\\s+scan|whitelist|allowlist))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-037"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-030",
+  "name": "TDMRep rights metadata agent-policy poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "TDMRep or text-and-data-mining rights metadata can hide agent-directed instructions that tell AI crawlers/scanners to treat the rights file as higher authority, suppress findings, or disclose local authorization/environment details.",
+  "keywords": [
+    "/.well-known/tdmrep.json",
+    "AI crawler",
+    "LLM agent",
+    "SEO agent",
+    "do not report",
+    "ignore/bypass",
+    "mark clean",
+    "privacy auditor",
+    "rights-reservation",
+    "security scanner",
+    "supersedes system/developer",
+    "suppress/hide findings",
+    "tdm-reservation",
+    "tdmrep"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|must\\s+not)\\s+(?:obey|treat|trust|follow|accept|allow).{0,80}\\b(?:tdmrep|tdm[-_\\s]?reservation|rights[-_\\s]?reservation|text[-\\s]and[-\\s]data[-\\s]mining)\\b)(?!.*\\b(?:scanner\\s+docs?|docs?|guide|article|reference|training|security\\s+report|incident\\s+report|vulnerability\\s+report)\\b.{0,120}\\b(?:should|must|will)\\s+(?:report|detect|flag|refuse|ignore|not\\s+obey)\\b)(?=.*\\b(?:tdmrep|tdm[-_\\s]?reservation|text[-\\s]and[-\\s]data[-\\s]mining|text/data\\s+mining|rights[-_\\s]?reservation|rights\\s+policy|\\.well-known/tdmrep\\.json)\\b)(?=.*\\b(?:ai\\s+agents?|ai\\s+crawlers?|llm\\s+(?:agents?|crawlers?)|assistants?|security\\s+scanners?|privacy\\s+auditors?|seo\\s+agents?|crawler\\s+agents?)\\b)(?=.*\\b(?:supersed\\w*|overrid\\w*|ignore|bypass|obey|follow|treat\\s+as\\s+policy|trust\\s+this|do\\s+not\\s+report|not\\s+report|suppress|hide|mark\\s+(?:clean|safe)|include|forward|send|attach)\\b)(?=.*\\b(?:system|developer|instructions?|policy|prompt[-\\s]?injection|findings?|scanner\\s+results?|authorization|bearer|api[-_\\s]?key|tokens?|cookies?|env(?:ironment)?(?:\\s+variables?)?|local\\s+state|secrets?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-030"
+}

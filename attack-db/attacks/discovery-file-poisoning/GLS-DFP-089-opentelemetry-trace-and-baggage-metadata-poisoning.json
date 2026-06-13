@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-089",
+  "name": "OpenTelemetry trace and baggage metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled OpenTelemetry span/resource/log attributes, `baggage`, or `tracestate` values can carry agent-facing policy instructions that an AI incident-response or security agent may mistake for trusted triage guidance.",
+  "keywords": [
+    "AI agents",
+    "OTLP",
+    "OTel",
+    "OpenTelemetry",
+    "SRE bots",
+    "agent_policy",
+    "automated incident triage",
+    "baggage",
+    "incident agents",
+    "scanner_policy",
+    "security scanners",
+    "service.name",
+    "span_id",
+    "trace_id",
+    "traceparent"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security\\s+guide|scanner\\s+docs?|training|reference\\s+docs?)\\b.{0,180}\\b(?:should|must|will|was|were)\\s+(?:report|detect|flag|refuse|block|blocked|detected)|\\bincident\\s+report\\b.{0,220}\\b(?:detected|blocked|refused|flagged)\\b|\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never)\\s+(?:treat|obey|follow|trust|use|include|forward|send|share|override)\\b.{0,140}\\b(?:OpenTelemetry|OTel|trace|span|baggage|telemetry)|\\b(?:trace|span|baggage|telemetry)\\s+metadata\\s+(?:is|are)\\s+not\\s+(?:policy|authoritative|trusted)))\n(?=.*(?:\\bOpenTelemetry\\b|\\bOTel\\b|\\bOTLP\\b|traceparent|tracestate|\\bbaggage\\b|span\\s+attributes?|resource\\s+attributes?|trace\\s+attributes?|log\\s+attributes?|telemetry\\s+(?:attributes?|metadata)|observability\\s+(?:trace|telemetry)|\"attributes\"\\s*:|service\\.name|trace[_-]?id|span[_-]?id))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|incident\\s+(?:agents?|bots?)|assistants?|autonomous\\s+(?:agents?|scanners?)|security\\s+scanners?|review\\s+bots?|verifiers?|auditors?|sre\\s+(?:agents?|bots?)|agent\\s+(?:instructions?|policy|note)|scanner\\s+(?:instructions?|policy|notes?)|for\\s+agents?|automated\\s+(?:incident\\s+)?(?:review|triage|audit|scan|verification))(?![A-Za-z0-9]))\n(?=.*(?:(?:primary|single)\\s+source\\s+of\\s+truth|(?:authoritative|canonical|definitive|governing|controlling|preferred|recommended)\\s+(?:telemetry\\s+|triage\\s+|incident\\s+|scanner\\s+)?(?:policy|guidance|document|runbook|playbook)|takes\\s+precedence|overrides?|supersedes?|outranks?|overrules?|defines?\\s+(?:all\\s+)?(?:scanner|security|agent|triage)\\s+rules?|(?:agent|scanner|assistant|verifier)\\s+(?:instructions?|policy|notes?)|per\\s+(?:policy|requirements?)|pursuant\\s+to|in\\s+accordance\\s+with|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)\\s+(?:are|were|must\\s+be|should\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted)|(?:hide|omit|exclude|redact|skip|downgrade|deprioritize|classify|calibrate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|do\\s+not\\s+(?:report|flag|include)\\b|treat.{0,60}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only|background[-\\s]?only)|mark.{0,60}?as\\s+(?:safe|clean|benign)|(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|hand\\s+over|relay)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|session\\s+keys?|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env\\s+vars?|local\\s+(?:state|config(?:uration)?|settings?)|runtime\\s+(?:context|config(?:uration)?|settings?|details?)|credentials?|auth(?:orization)?\\s+headers?|trace\\s+secrets?|baggage\\s+tokens?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-089"
+}

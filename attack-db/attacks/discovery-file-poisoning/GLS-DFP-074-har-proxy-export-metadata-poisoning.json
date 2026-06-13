@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-074",
+  "name": "HAR / Proxy Export Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Browser HAR files, proxy captures, and DevTools network exports can carry agent/scanner-directed instructions in comments, custom fields, response headers, or captured bodies that tell AI auditors to treat the capture as policy, suppress findings, or forward local auth/runtime material.",
+  "keywords": [
+    ".har",
+    "Authorization",
+    "Chrome DevTools network export",
+    "Firefox Network Monitor",
+    "HAR 1.2",
+    "HTTP Archive",
+    "Set-Cookie",
+    "agent_policy",
+    "assistant_note",
+    "crawler_notice",
+    "log._comment",
+    "log.entries",
+    "mitmproxy",
+    "proxy capture",
+    "request.headers"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security\\s+training|browser\\s+support\\s+guide|scanner\\s+docs?|devtools\\s+export\\s+documentation|privacy\\s+review).{0,160}?(?:should\\s+(?:redact|report|detect|flag|refuse|block)|must\\s+not\\s+(?:treat|include|forward|send|share|trust|obey)|never\\s+(?:trust|obey|include|forward|send|share|override|overrides?))\n  |(?:incident\\s+report|security\\s+report|postmortem).{0,180}?(?:detected\\s+and\\s+(?:blocked|refused|flagged|remediated)|was\\s+(?:blocked|refused|flagged|detected|remediated)\\s+by)\n  |(?:no\\s+(?:agent\\s+)?instructions?|no\\s+policy\\s+overrides?\\s+are\\s+present|not\\s+policy)\n  |(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\\s+not\\s+(?:treat|obey|include|attach|forward|send|share|overrides?|trust))\n))\n(?=.*(?:\n  (?:\\.har|HAR\\s+1\\.2|HTTP\\s+Archive|Chrome\\s+DevTools\\s+network\\s+export|Firefox\\s+Network\\s+Monitor|DevTools\\s+HAR\\s+export|network\\s+export|network\\s+log|proxy\\s+capture|mitmproxy\\s+(?:flow|dump)|proxy\\s+capture\\s+JSON)\n  |(?:log\\._comment|log\\.entries|\"entries\"\\s*:|\"request\"\\s*:|\"response\"\\s*:|response\\.headers|request\\.headers|response\\.content\\.text|\"_comment\"\\s*:|\"content\"\\s*:|\"headers\"\\s*:)\n))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|agents?|assistants?|LLM\\s+auditors?|LLMs?|models?|security\\s+scanners?|automated\\s+agents?|automated\\s+verifiers?|browser\\s+auditors?|privacy\\s+auditors?|SEO\\s+agents?|crawlers?|scanner\\s+policy|agent\\s+instructions?|assistant\\s+note|agent[_-]?policy|scanner[_-]?policy|assistant[_-]?note|crawler[_-]?notice|your\\s+(?:default\\s+)?(?:instructions?|rules?|polic(?:y|ies)))(?![A-Za-z0-9]))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|defines?\\s+(?:all\\s+)?(?:scanner|security|agent)\\s+rules?|(?:main|primary|principal|preferred|recommended|core|standard|default)\\s+(?:(?:network|browser|security|privacy|audit|verification|scanner|capture)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)\n  |(?:agent|scanner|assistant|crawler)\\s+(?:instructions?|policy|note|directive|notice)\n  |suppress(?:es|ed|ing)?.{0,80}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|CSP|CORS|TLS|cookie|redirect)\n  |(?:findings?|warnings?|alerts?|reports?|diagnostics?|results?)\\s+(?:are|is|should\\s+(?:be|remain))\\s+(?:suppressed|hidden|omitted|excluded|redacted|removed|considered|treated|classified|marked|viewed)\\s*(?:as\\s+)?(?:advisory-only|informational|non-blocking|safe|benign|secondary)?\n  |hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookie\\s+warnings?)\n  |do\\s+not\\s+(?:report|flag).{0,70}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|CSP|CORS|TLS|cookie)\n  |omit.{0,70}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|CSP|CORS|TLS|cookie|redirect)\n  |treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only)\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:Authorization\\s+headers?|auth\\s+headers?|cookies?|session\\s+tokens?|API\\s+keys?|tokens?|credentials?|secrets?|local\\s+state|runtime\\s+(?:environment|context)|environment\\s+(?:variables?|context))\n  |(?:proof|evidence|runtime|environment|debug)\\s+(?:bundle|package|material|context|details?|settings?)\\s+(?:should|must|can|may)\\s+(?:be|get|remain)\\s+(?:relayed|transferred|handed\\s+off|sent|passed\\s+along|included|attached|forwarded|shared|provided|exposed)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-074"
+}

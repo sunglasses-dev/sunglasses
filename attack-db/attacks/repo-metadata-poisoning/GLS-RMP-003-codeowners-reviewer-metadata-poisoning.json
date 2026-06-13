@@ -1,0 +1,39 @@
+{
+  "id": "GLS-RMP-003",
+  "name": "CODEOWNERS Reviewer Metadata Poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious `CODEOWNERS` / `OWNERS` reviewer-routing file can hide agent-directed instructions in comments or owner notes that tell AI coding agents and review bots to suppress findings, omit security reviewers, or attach local secrets when preparing PRs.",
+  "keywords": [
+    ".github/CODEOWNERS",
+    "CODEOWNERS",
+    "OWNERS",
+    "OWNERS_ALIASES",
+    "agent instruction",
+    "authoritative",
+    "defines review/scanner rules",
+    "governing document",
+    "overrides",
+    "review owners",
+    "scanner directive",
+    "source of truth",
+    "supersedes",
+    "takes precedence"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:security|incident|vulnerability)\\s+report.{0,120}\\b(?:flagged|detected|blocked|refused)\\b|(?:scanner|reviewer|security)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|scanners?\\s+should\\s+(?:report|detect|flag|refuse)\\s+.{0,80}\\bCODEOWNERS\\b|(?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|treat|trust|override|overrides?)\\s+.{0,80}\\b(?:CODEOWNERS|OWNERS)\\b|never\\s+(?:obey|follow|treat|trust|override|overrides?)\\s+.{0,80}\\b(?:CODEOWNERS|OWNERS)\\b|owner\\s+metadata\\s+is\\s+not\\s+(?:agent\\s+)?policy|CODEOWNERS\\s+(?:is|are)\\s+not\\s+(?:agent\\s+)?(?:policy|authority)|no\\s+(?:policy\\s+)?overrides?\\s+are\\s+present|training\\s+example.{0,120}\\b(?:must\\s+not|do\\s+not)\\s+(?:obey|follow|treat|trust)))\n(?=.*(?:\\bCODEOWNERS\\b|\\.github[/\\\\]CODEOWNERS\\b|\\bOWNERS(?:_ALIASES)?\\b|\\breview\\s+owners?\\b|\\bpath\\s+owners?\\b|@[-\\w]+/[-\\w]+\\s*$|/[\\w*./-]+\\s+@[-\\w/]+))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+)?(?:agents?|assistants?|coding\\s+assistants?|security\\s+scanners?|scanners?|review\\s+bots?|pr\\s+bots?|copilot|cursor|codex|claude|llms?)(?![a-zA-Z0-9]))\n(?=.*\\b(?:agent\\s+instructions?|scanner\\s+directives?|review\\s+bot\\s+instructions?|authoritative|canonical|definitive|governing\\s+document|controlling\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|takes?\\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|defines?\\s+(?:(?:all|the)\\s+)?(?:review|scanner|security|routing)\\s+rules?)\\b)\n(?=.*\\b(?:(?:suppress|hide|omit|redact|exclude|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|summaries?|results?|diagnostics?|observations?|checks?)|treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean)|(?:do\\s+not|don't)\\s+(?:report|mention|include|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|security\\s+team|security\\s+reviewers?|owners?|reports?|observations?)|(?:omit|remove|exclude)\\s+(?:[\\w-]+\\s+){0,3}(?:security\\s+)?(?:reviewers?|owners?|teams?)|add\\s+(?:only\\s+)?@[-\\w/]+\\s+as\\s+(?:the\\s+)?(?:only\\s+)?reviewer|route\\s+(?:only\\s+)?to\\s+@[-\\w/]+|(?:include|attach|forward|send|share|provide|expose)\\s+(?:[\\w-]+\\s+){0,4}(?:API\\s+keys?|tokens?|credentials?|secrets?|auth(?:orization)?\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?)))\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-003"
+}

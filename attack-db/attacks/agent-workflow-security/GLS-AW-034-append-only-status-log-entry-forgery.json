@@ -9,7 +9,7 @@
     "log_memory",
     "message"
   ],
-  "description": "Attacker injects or forges append-only operational status artifacts (CAVA_REPLY, wins-log, cron acknowledgements) so the agent's GO MODE reads fabricated success signals as ground truth, advancing pipelines on work that never ran or hiding failures behind ghost log lines.",
+  "description": "Attacker injects or forges append-only operational status artifacts (status-reply files, wins-logs, cron acknowledgements) so the agent's GO MODE reads fabricated success signals as ground truth, advancing pipelines on work that never ran or hiding failures behind ghost log lines.",
   "keywords": [
     "cava reply log forgery",
     "append-only status drift",

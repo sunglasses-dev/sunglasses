@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-061",
+  "name": "Archive container metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Archive-level comments, TAR/PAX headers, xattrs, or listing-tool metadata can carry agent/scanner-directed policy text that tells AI artifact reviewers to suppress findings or forward local scan context.",
+  "keywords": [
+    "7z comment",
+    "AI agents",
+    "PAXHeader",
+    "agents",
+    "archive metadata",
+    "artifact auditors",
+    "artifact bundle",
+    "assistant",
+    "automated review",
+    "central directory comment",
+    "dependency reviewers",
+    "entry comment",
+    "rar comment",
+    "scanner_policy",
+    "scanners"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat|use)\n  |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|treat|instruct)\n  |never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat|use)\n  |must\\s+not\\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat|use)\n  |should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)\n  |security\\s+report|incident\\s+report|vulnerability\\s+disclosure|postmortem|training\\s+note\n  |detected\\s+and\\s+(?:blocked|refused|flagged|remediated)\n  |was\\s+(?:blocked|refused|flagged|detected|remediated)\\s+by\n  |must\\s+be\\s+reported|not\\s+obeyed|not\\s+authoritative|not\\s+(?:a\\s+)?policy|no\\s+(?:policy\\s+)?overrides?|no\\s+agent\\s+instructions?\n))\n(?=.*(?:\n  zip\\s+(?:global\\s+)?comments?|central\\s+directory\\s+comments?|entry\\s+comments?|file\\s+comments?|\n  tar\\s+(?:pax|extended)\\s+headers?|paxheader|schily\\.xattr|libarchive\\.xattr|\n  7z\\s+comments?|rar\\s+comments?|archive\\s+(?:metadata|manifest|comments?|listing)|artifact\\s+bundle|zipinfo|unzip\\s+-z|tar\\s+--xattrs\n))\n(?=.*(?<![a-zA-Z0-9])(?:\n  ai\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?)|security\\s+scanners?|dependency\\s+(?:reviewers?|agents?)|artifact\\s+(?:auditors?|reviewers?)|\n  automated\\s+(?:(?:artifact|dependency|security|archive)\\s+)?(?:review|audit|scan|verification)|assistants?|scanners?|agents?|auditors?|reviewers?|\n  scanner[_-]policy|agent[_-]instructions?|scanner\\s+(?:policy|instructions?)|agent\\s+(?:policy|instructions?)\n)(?![a-zA-Z0-9]))\n(?=.*(?:\n  (?:single|primary)\\s+source\\s+of\\s+truth|canonical|authoritative|takes?\\s+precedence|overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|\n  governing\\s+document|controlling\\s+document|higher\\s+priority|defines?\\s+(?:all\\s+)?(?:scanner|security|agent|archive|artifact)\\s+rules?|\n  (?:agent|scanner|assistant|auditor)\\s+(?:instructions?|notes?|policy|directive|notice)|\n  (?:main|primary|principal|preferred|recommended|core|standard|default)\\s+(?:(?:archive|artifact|dependency|security|review|verification|audit|package|bundle|scanner)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|checks?|vulnerabilit(?:y|ies)|dependency\\s+findings?|token-looking\\s+strings?)|\n  hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?)|\n  do\\s+not\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies))|\n  skip\\b.{0,30}?\\b(?:checks?|scans?|reviews?|audits?|reports?|findings?|warnings?|alerts?)\\b|omit.{0,40}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|observations?|diagnostics?)|\n  exclude\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?|observations?|diagnostics?)|redact.{0,40}?(?:findings?|warnings?|flags?|tokens?|token-looking\\s+strings?)|\n  (?:mark|treat|classify|flag).{0,60}?as\\s+(?:safe|benign|informational|non[-\\s]?blocking|test\\s+fixtures?|advisory-only)|\n  (?:observations?|findings?|results?|diagnostics?|alerts?|issues?|dependency\\s+findings?)\\s+(?:are|is|should\\s+be)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary)|\n  (?:include|attach|forward|send|share|collect|copy|embed|provide|read|populate|expose|relay|transfer|hand\\s+off|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|local\\s+(?:state|context|scan\\s+context)|scan\\s+context|runtime\\s+(?:context|settings?|proof\\s+(?:bundle|package|material|evidence)|evidence|material)|auth(?:orization)?\\s+headers?|cookies?|tokens?|api\\s+keys?|bearer\\s+tokens?|session\\s+(?:tokens?|storage)|proof\\s+(?:bundle|package|material|evidence))\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-061"
+}

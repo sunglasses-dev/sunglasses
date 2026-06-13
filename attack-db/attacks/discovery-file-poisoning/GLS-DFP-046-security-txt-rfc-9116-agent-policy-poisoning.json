@@ -1,0 +1,29 @@
+{
+  "id": "GLS-DFP-046",
+  "name": "security.txt (RFC 9116) Agent-Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "A `security.txt` file (RFC 9116) hides agent/scanner instructions in comments, extension fields, `Contact` values, or a `Policy` URL, telling AI vulnerability scanners to suppress findings, forward local credentials, or treat the metadata as authority that supersedes scanner rules.",
+  "keywords": [
+    "AI agents",
+    "API token",
+    "CI_ENV",
+    "Contact:/Expires:/Encryption:"
+  ],
+  "regex": [
+    "(?isx)\n^(?!.*\\b(?:must\\s+not\\s+(?:treat|obey|follow|use)|do\\s+not\\s+(?:treat|obey|follow|forward|include|suppress|trust)|never\\s+(?:treat|obey|override|overrides?|forward|include|suppress|trust)|should\\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\\b)\n(?=.*(?:\\b(?:security\\.txt|security\\s+contact|RFC\\s*9116|Canonical:|Policy:|Acknowledgments:|Hiring:|Preferred-Languages:)\\b|(?:Contact:|Expires:|Encryption:)(?=\\s|$)))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+(?:agents?|assistants?|scanners?|auditors?)|assistants?|agents?|assistant[-_\\s]instructions?|security\\s+scanners?|autonomous\\s+(?:scanners?|crawlers?|verifiers?|agents?)|crawlers?|llms?|models?|agentic|bots?)(?![a-zA-Z0-9]))\n(?=.*\\b(?:canonical\\s+security\\s+policy|(?:primary|single)\\s+source\\s+of\\s+truth|canonical\\s+(?:project\\s+|model\\s+)?(?:description|policy)|definitive\\s+(?:project\\s+|model\\s+evaluation\\s+)?(?:description|policy)|supersed(?:e|es|ed|ing)?|outranks?|overrides?|higher\\s+priority|must\\s+obey|ignore\\s+(?:system|developer|repository|scanner)\\s+rules?|(?:agent|scanner|assistant|verifier|crawler)\\s+instructions?)\\b)\n(?=.*\\b(?:do\\s+not\\s+(?:report|flag|notify|mention)|not\\s+report|suppress(?:es|ed|ing)?|hide.{0,3}findings?|mark.{0,40}?(?:as\\s+)?(?:clean|safe|informational|false\\s+positive)|skip\\s+checks?|do\\s+not\\s+(?:flag|check)|forward.{0,2}(?:[\\w-]+\\s+){0,2}(?:Authorization|Bearer|API\\s+keys?|tokens?|env(?:ironment)?(?:\\s+(?:variables?|context))?|local\\s+state|session|auth\\s+context|secrets?|cookies?)|include.{0,2}(?:[\\w-]+\\s+){0,2}(?:Authorization|Bearer|API\\s+keys?|tokens?|env(?:ironment)?(?:\\s+(?:variables?|context))?|local\\s+state|session|auth\\s+context|secrets?|cookies?)|send.{0,2}(?:[\\w-]+\\s+){0,2}(?:Authorization|Bearer|API\\s+keys?|tokens?|env(?:ironment)?(?:\\s+(?:variables?|context))?|local\\s+state|session|auth\\s+context|secrets?|cookies?)|attach.{0,2}(?:[\\w-]+\\s+){0,2}(?:Authorization|Bearer|API\\s+keys?|tokens?|env(?:ironment)?(?:\\s+(?:variables?|context))?|local\\s+state|session|auth\\s+context|secrets?|cookies?)|treat.{0,40}?as\\s+informational|mark.{0,40}?as\\s+safe)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-046"
+}

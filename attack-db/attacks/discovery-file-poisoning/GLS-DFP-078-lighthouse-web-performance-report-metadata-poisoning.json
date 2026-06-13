@@ -1,0 +1,28 @@
+{
+  "id": "GLS-DFP-078",
+  "name": "Lighthouse / web-performance report metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Lighthouse, PageSpeed, WebPageTest, Core Web Vitals, or performance-budget report text can carry agent-directed policy, suppression, or credential-forwarding instructions that downstream AI web/release/security agents may mistake for trusted review guidance.",
+  "keywords": [
+    "audits",
+    "categories.performance",
+    "finalUrl"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|training|scanner|lighthouse|pagespeed|performance)\\s+(?:docs?|guide|reference|runbook|report|article).{0,180}?\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\b(?:incident|security|scanner|training|lighthouse|pagespeed|performance)\\s+(?:report|reference|article|corpus|example).{0,200}?\\b(?:detected|blocked|flagged|refused|reported)\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)\\b)\n(?!.*\\bshould\\s+never\\s+(?:be\\s+)?(?:used|obey|follow|treat|trusted?|include|attach|forward|send|share|override|overrides?)\\b)\n(?!.*\\b(?:not\\s+(?:authoritative|canonical)|no\\s+(?:policy\\s+)?overrides?|reported,\\s+not\\s+obeyed|must\\s+be\\s+reported,\\s+not\\s+obeyed)\\b)\n(?=.*(?:\\blighthouse\\b|\\bpagespeed\\b|\\bwebpagetest\\b|\\bcore\\s+web\\s+vitals\\b|\\bperformance\\s+budget\\b|\\bcategories\\s*[.:]\\s*performance\\b|(?<!\\w)\"audits\"\\s*:|\\bLHR\\b|\\bfinalUrl\\b|\\bperformance\\s+report\\b))\n(?=.*(?:\\bAI\\s+(?:release\\s+)?agents?\\b|\\b(?:autonomous|automated)\\s+(?:web|release|security|seo|performance)\\s+(?:review|audit|scan|verification|agents?|scanners?)\\b|\\brelease\\s+agents?\\b|\\bSEO\\s+agents?\\b|\\bperformance\\s+auditors?\\b|\\b(?:agents?|assistants?|scanners?|crawlers?|verifiers?|llms?)\\b|\\b(?:agent|scanner|assistant|verifier)\\s+(?:instructions?|policy|notes?)\\b))\n(?=.*(?:\\b(?:canonical|authoritative|definitive|controlling|governing)\\s+(?:deployment\\s+)?(?:review|policy|guidance|report)\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\b(?:overrides?|supersedes?|outranks?|overrules?|takes\\s+precedence)\\b|\\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|demote|reclassify|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?|vulnerabilit(?:y|ies)|CSP|TLS|security)\\b|\\b(?:findings?|warnings?|alerts?|diagnostics?|observations?|results?|issues?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|classified|marked|considered)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|safe)\\b|\\b(?:treat|mark|classify|consider).{0,60}?as\\s+(?:informational|advisory-only|non-blocking|safe)\\b|\\b(?:attach|include|forward|send|share|provide|expose|collect|pass\\s+along|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?|material)|local\\s+(?:state|config(?:uration)?|settings?)|API\\s+keys?|session\\s+tokens?|auth(?:orization)?\\s+headers?)\\b))\n(?=.*(?:\\b(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?|vulnerabilit(?:y|ies)|CSP|TLS|security|release\\s+notes?|environment\\s+context|runtime\\s+context|API\\s+keys?|session\\s+tokens?|auth(?:orization)?\\s+headers?)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-078"
+}

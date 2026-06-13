@@ -1,0 +1,38 @@
+{
+  "id": "GLS-DFP-062",
+  "name": "Autotools Build Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled Autotools build descriptor text (`configure.ac`, `Makefile.am`, `m4/*.m4`, `aclocal.m4`, generated configure help) can smuggle agent/scanner-directed policy claims that suppress findings or request local build/runtime context.",
+  "keywords": [
+    "--help",
+    "AI agents",
+    "Makefile.am",
+    "aclocal.m4",
+    "agent_instructions",
+    "auditor notes",
+    "automated build review",
+    "config.h.in",
+    "configure.ac",
+    "configure.in",
+    "m4/*.m4",
+    "scanner_policy",
+    "security scanners"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:Autotools|configure\\.ac|configure\\.in|Makefile\\.am|aclocal\\.m4|config\\.h\\.in|configure\\s+scripts?|build\\s+metadata)\\b.{0,180}\\b(?:does\\s+not|do\\s+not|never|must\\s+not|should\\s+never|should\\s+not|is\\s+not|are\\s+not|no)\\b.{0,120}\\b(?:authoritative|agent\\s+policy|policy|instructions?|trusted|used|obeyed|control)\\b)\n(?!.*\\b(?:scanner\\s+docs?|security\\s+(?:guide|reference|report)|training|incident\\s+report|defensive\\s+example|bug\\s+reports?)\\b.{0,220}\\b(?:report|detect|flag|refuse|blocked|detected|not\\s+obeyed|must\\s+be\\s+reported|do\\s+not\\s+include)\\b.{0,160}\\b(?:suppress|hide|omit|include|forward|token|environment|Authorization|config\\.log)\\b)\n(?!.*\\b(?:do\\s+not|never|must\\s+not|should\\s+not)\\s+(?:include|forward|attach|send|share)\\b.{0,140}\\b(?:environment|tokens?|config\\.log|Authorization|local\\s+config)\\b.{0,80}\\b(?:bug\\s+reports?|reports?|issues?)\\b)\n(?=.*(?:\\bconfigure\\.(?:ac|in)\\b|\\bMakefile\\.am\\b|\\baclocal\\.m4\\b|\\bm4/[A-Za-z0-9_.-]+\\.m4\\b|\\bconfig\\.h\\.in\\b|\\bautoconf\\b|\\bautomake\\b|\\bautoreconf\\b|\\bAC_INIT\\b|\\bAM_INIT_AUTOMAKE\\b|\\bAC_CONFIG_FILES\\b|\\bAC_ARG_(?:ENABLE|WITH)\\b|\\bPKG_CHECK_MODULES\\b|generated\\s+configure\\s+help|configure\\s+script\\s+metadata|Autotools\\s+build\\s+metadata|--help\\s+output))\n(?=.*(?:(?<![A-Za-z0-9])(?:ai|autonomous|automated|security|dependency|build|release|code|autotools)?[\\s_-]*(?:agents?|assistants?|scanners?|auditors?|reviewers?|verifiers?|bots?|models?|llms?)(?![A-Za-z0-9])|(?:agent|scanner|assistant|verifier|auditor)[_-]?(?:instructions?|policy|notes?)|automated\\s+(?:build|security|dependency)?\\s*(?:review|audit|scan|verification)))\n(?=.*(?:\n  \\b(?:agent|scanner|assistant|verifier|auditor)\\s+(?:instructions?|policy|notes?)\\b|\n  \\b(?:canonical|authoritative|definitive|governing|controlling)\\b.{0,80}\\b(?:policy|guidance|runbook|rules?|instructions?|source)\\b|\n  \\b(?:single|primary)\\s+source\\s+of\\s+truth\\b|\n  \\b(?:supersedes?|overrides?|overrules?|outranks?|takes\\s+precedence|defines?\\s+(?:the\\s+)?rules?)\\b.{0,100}\\b(?:system|developer|scanner|security|review|build|local)\\b|\n  \\b(?:main|primary|principal|preferred|recommended)\\s+(?:(?:autotools|build|security|dependency|review|audit|verification|release|operating)\\s+){0,4}(?:guidance|runbook|playbook|procedure|process|policy)\\b|\n  \\b(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:s|ted|ting)?|exclude|redact|downgrade|reclassify|ignore|skip)\\b\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|observations?|results?|diagnostics?|warnings?|alerts?|reports?|issues?|checks?|cves?|vulnerabilities|dependency\\s+findings?|build\\s+findings?)\\b|\n  \\b(?:keep|leave)\\b.{0,100}?\\b(?:findings?|observations?|results?|diagnostics?|warnings?|alerts?|issues?|cves?)\\b.{0,60}?\\bout\\s+of\\s+(?:the\\s+)?(?:report|summary|memo|audit|final\\s+report)\\b|\n  \\b(?:findings?|observations?|results?|diagnostics?|warnings?|alerts?|issues?)\\b\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:considered|treated|classified|marked|suppressed|hidden|omitted|excluded|redacted)\\b.{0,80}\\b(?:advisory-only|informational|non-blocking|background(?:-only)?|safe|clean|out\\s+of\\s+scope)\\b|\n  \\b(?:include|attach|forward|send|share|provide|pass\\s+along|hand\\s+over|transfer|relay|collect|copy|read|expose)\\b\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?|material)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+tokens?|API\\s+keys?|Authorization\\s+headers?|auth\\s+tokens?|config\\.log|config\\.cache|build\\s+proof\\s+(?:material|bundle|evidence|details))\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-062"
+}

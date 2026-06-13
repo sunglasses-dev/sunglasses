@@ -1,0 +1,38 @@
+{
+  "id": "GLS-RMP-005",
+  "name": ".gitmodules Submodule Metadata Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "repo_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Repository `.gitmodules` files can carry attacker-controlled comments or extension-like metadata that target AI dependency/security agents, falsely assert scanner authority, and instruct them to suppress submodule findings or forward local credentials/runtime state.",
+  "keywords": [
+    ".gitmodules",
+    "[submodule \"...\"]",
+    "assistant_note",
+    "branch",
+    "git config -f .gitmodules",
+    "git submodule",
+    "ignore",
+    "path",
+    "scanner_policy",
+    "shallow",
+    "submodule.<name>",
+    "update",
+    "url"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:scanner|scanners|security|incident|vulnerability|training|documentation|docs?)\\s+(?:docs?|report|guide|reference|runbook|corpus|example|exercise).{0,180}\\b(?:detected|blocked|flagged|refused|should\\s+(?:report|detect|flag|refuse)|must\\s+(?:report|detect|flag|refuse)))\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|treat|follow|trust|use|execute).{0,120}\\b(?:metadata|git\\s+submodules?|submodule|\\.gitmodules).{0,120}\\b(?:policy|authority|instruction|rules?))\n(?!.*\\b(?:not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?))\n(?=.*(?:(?:^|[\\s/`\"'])\\.gitmodules(?![A-Za-z0-9_-])|\\[\\s*submodule\\s+\"[^\"]+\"\\s*\\]|\\bgit\\s+submodules?\\b|\\bgit\\s+config\\s+-f\\s+\\.gitmodules\\b|\\bsubmodule\\.[A-Za-z0-9_.-]+\\.(?:path|url|branch|update|shallow|ignore)\\b|\\bsubmodule\\.(?:path|url|branch|update|metadata|configuration)\\b|\\bsubmodule\\s*(?:path|url|branch|update|metadata|configuration)\\b|\\b(?:path|url|branch|update|shallow|ignore)\\s*=.{0,120}\\bsubmodule\\b))\n(?=.*(?:(?<![A-Za-z0-9])(?:ai|autonomous|dependency|security|supply-chain|repository|code|review|audit)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|models?|llms?)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:agents?|assistants?|scanners?|auditors?|reviewers?|crawlers?|models?|llms?)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:agent|assistant|scanner|auditor|crawler)[._-]?(?:policy|instructions?|note)(?![A-Za-z0-9])))\n(?=.*(?:\\bauthoritative\\b|\\bcanonical\\b|\\bdefinitive\\b|\\bgoverning\\s+document\\b|\\bcontrolling\\s+document\\b|\\b(?:primary|single)\\s+source\\s+of\\s+truth\\b|\\btakes?\\s+precedence\\b|\\boverrides?\\b|\\boverrules?\\b|\\bsupersed(?:e|es|ed|ing)\\b|\\boutranks?\\b|\\bdefines?\\s+(?:all\\s+)?(?:scanner|security|agent|review|audit)?\\s*rules?\\b|\\b(?:agent|scanner|assistant|auditor|crawler)\\s+(?:instructions?|directives?|policy)\\b))\n(?=.*(?:\\b(?:suppress|hide|redact|exclude|omit|skip|ignore)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|reports?|flags?|issues?|observations?|diagnostics?|results?|anomal(?:y|ies)|dependency|submodule|provenance|url\\s+mismatch|unsigned\\s+commit|detached\\s+HEAD|supply-chain\\s+warnings?)\\b|\\b(?:keep|leave)\\s+.{0,80}?\\bout\\s+of\\s+(?:the\\s+)?(?:memo|summary|report|audit\\s+memo|review\\s+notes?|final\\s+report)\\b|\\btreat\\s+.{0,80}?\\bas\\s+(?:informational|non[- ]blocking|safe|clean|benign)\\b|\\bmark\\s+.{0,80}?\\bas\\s+(?:safe|clean|trusted|verified)\\b|\\b(?:do\\s+not|don't|do\\s+not\\s+ever)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|issues?|observations?|diagnostics?|anomal(?:y|ies)|dependency|submodule|provenance)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|read|copy|populate)\\s+(?:[\\w-]+\\s+){0,5}(?:api\\s+keys?|api\\s+tokens?|tokens?|session\\s+(?:keys?|tokens?)|cookies?|authorization\\s+headers?|auth\\s+headers?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|details?|proof\\s+material|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?))\\b))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-RMP-005"
+}

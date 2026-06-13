@@ -1,0 +1,40 @@
+{
+  "id": "GLS-DFP-083",
+  "name": "Redacted HAR Bundle Sidecar Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Redacted HAR/debug bundles can hide agent-directed instructions in adjacent redaction or replay sidecars, causing AI support/security agents to suppress auth/session findings or forward local replay/runtime context even when the HAR itself is benign.",
+  "keywords": [
+    ".har",
+    "HAR bundle",
+    "README-support-bundle.md",
+    "agent_policy",
+    "assistant_note",
+    "capture.har",
+    "debug bundle",
+    "network capture bundle",
+    "proxy capture bundle",
+    "redacted HAR",
+    "redaction rationale",
+    "redaction-summary.md",
+    "redaction.json",
+    "redaction_reason",
+    "replay manifest"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security\\s+training|support\\s+guide|browser\\s+support\\s+guide|scanner\\s+docs?|redaction\\s+guidance|sanitization\\s+documentation|privacy\\s+review).{0,180}?(?:should\\s+(?:redact|report|detect|flag|refuse|block)|must\\s+not\\s+(?:treat|include|forward|send|share|trust|obey)|never\\s+(?:trust|obey|include|forward|send|share|override|overrides?))\n  |(?:incident\\s+report|security\\s+report|postmortem).{0,200}?(?:detected\\s+and\\s+(?:blocked|refused|flagged|remediated)|was\\s+(?:blocked|refused|flagged|detected|remediated)\\s+by)\n  |(?:no\\s+(?:agent\\s+)?instructions?|no\\s+policy\\s+overrides?\\s+are\\s+present|not\\s+(?:agent\\s+)?policy|not\\s+authoritative)\n  |(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\\s+not\\s+(?:treat|obey|include|attach|forward|send|share|overrides?|trust))\n))\n(?=.*(?:\n  (?:HAR\\s+bundle|redacted\\s+HAR|sanitized\\s+HAR|support\\s+bundle|debug\\s+bundle|network\\s+capture\\s+bundle|proxy\\s+capture\\s+bundle|ticket\\s+attachment|browser\\s+capture\\s+bundle)\n  |(?:redaction[-_\\s]summary|redaction\\.json|redaction_reason|redaction\\s+rationale|sanitization[-_\\s]report|sanitized\\s+capture|replay\\.ya?ml|replay\\s+manifest|replay\\s+note|README-support-bundle|import\\s+notes?)\n  |(?:capture\\.har|\\.har\\b|HAR\\s+1\\.2|Chrome\\s+DevTools\\s+network\\s+export|mitmproxy\\s+(?:dump|flow)|DevTools\\s+HAR\\s+export)\n))\n(?=.*(?<![A-Za-z0-9])(?:AI\\s+agents?|agents?|assistants?|support[-\\s]?agents?|triage\\s+agents?|security\\s+scanners?|automated\\s+scanners?|automated\\s+review|replay\\s+bots?|browser\\s+auditors?|privacy\\s+auditors?|LLM\\s+auditors?|LLMs?|models?|agent\\s+instructions?|scanner\\s+policy|assistant\\s+note|agent[_-]?policy|scanner[_-]?policy|assistant[_-]?note|replay[_-]?note)(?![A-Za-z0-9]))\n(?=.*(?:\n  overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence|higher\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|canonical|definitive|authoritative|defines?\\s+(?:all\\s+)?(?:scanner|security|agent|support)\\s+rules?|(?:main|primary|principal|preferred|recommended|core|standard|default)\\s+(?:(?:support|debug|network|browser|security|privacy|audit|verification|scanner|capture|redaction|replay)\\s+){0,4}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)\n  |(?:agent|scanner|assistant|support[-\\s]?agent|triage\\s+agent|replay\\s+bot)\\s+(?:instructions?|policy|note|directive|notice)\n  |suppress(?:es|ed|ing)?.{0,90}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookies?|sessions?|auth[-\\s]?headers?|Authorization|leakage)\n  |(?:findings?|warnings?|alerts?|reports?|diagnostics?|results?|observations?|leakage)\\s+(?:are|is|should\\s+(?:be|remain))\\s+(?:suppressed|hidden|omitted|excluded|redacted|removed|considered|treated|classified|marked|viewed)\\s*(?:as\\s+)?(?:advisory-only|informational|non-blocking|safe|benign|secondary|user-approved)?\n  |hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookie\\s+warnings?|session\\s+findings?)\n  |do\\s+not\\s+(?:report|flag).{0,80}?(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|cookies?|sessions?|auth[-\\s]?headers?|leakage)\n  |omit.{0,80}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|cookies?|sessions?|auth[-\\s]?headers?|leakage)\n  |(?:mark|classify|label).{0,60}?(?:leakage|findings?|warnings?|results?|auth[-\\s]?headers?|cookies?|sessions?).{0,50}?(?:user-approved|safe|benign|known-good|non-blocking|informational)\n  |treat.{0,60}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only|user-approved)\n  |(?:include|attach|forward|send|collect|embed|share|provide|expose|transmit|deliver|relay|pass\\s+along|hand\\s+off)\\s+(?:[\\w-]+\\s+){0,5}(?:Authorization\\s+headers?|auth[-\\s]?headers?|cookies?|session\\s+tokens?|browser\\s+profile|local\\s+browser\\s+profile|API\\s+keys?|tokens?|credentials?|secrets?|local\\s+state|runtime\\s+(?:environment|context|details?|settings?)|environment\\s+(?:variables?|context|details?|settings?)|replay\\s+(?:context|settings?|details?))\n  |(?:proof|evidence|runtime|environment|debug|replay|browser)\\s+(?:(?:proof|evidence|runtime|environment|debug|replay|browser)\\s+)?(?:bundle|package|material|context|details?|settings?|profile)\\s+(?:should|must|can|may)\\s+(?:be|get|remain)\\s+(?:relayed|transferred|handed\\s+off|sent|passed\\s+along|included|attached|forwarded|shared|provided|exposed)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-083"
+}

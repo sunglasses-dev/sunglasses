@@ -1,0 +1,39 @@
+{
+  "id": "GLS-DFP-039",
+  "name": "`.env.example` / Dotenv Template Agent Policy Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "AI coding agents are trained to read `.env.example` (and `.env.template`, `.env.sample`) to understand required environment variables. A hostile `.env.example` can inject agent instructions that request credential forwarding, suppress scanner findings, or assert authority over system/developer rules",
+  "keywords": [
+    "# Agent instruction:",
+    "# For AI coding agents:",
+    "# agent...",
+    "$ANTHROPIC_API_KEY",
+    "$OPENAI_API_KEY",
+    ") | Handle",
+    ".cursor/rules",
+    ".env",
+    ".env.*.example",
+    ".env.development.example",
+    ".env.example",
+    ".env.local.example",
+    ".env.sample",
+    ".env.template"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:treat|obey|follow|include|forward|send|share|override|trust|report|cop(?:y|ied)|fill\\s+in)\n  |never\\s+(?:treat|obey|include|forward|send|share|override|trust|commit|include)\n  |must\\s+not\\s+(?:treat|obey|follow|include|forward|send|share|override|trust)\n  |should\\s+(?:not\\s+\\w+|report|detect|flag|refuse|block)\n  |refused|blocked|detected|flagged\n))\n(?=.*(?:\\.env\\.(?:example|template|sample|local\\.\\w+|development\\.\\w+)|\\.env\\.)\n  |(?=.*\\#.*(?:agent|scanner|assistant|copilot|claude\\s*code|codex|cursor|windsurf|verifier|crawler))\n)\n(?=.*\\b(?:\n  ai\\s+agents?|autonomous\\s+agents?|devops\\s+agents?|coding\\s+agents?\n  |agents?|scanners?|assistants?|copilot|cursor|codex|claude\\s*code|verifiers?|crawlers?\n)\\b)\n(?=.*(?:\n  canonical|supersedes?|overrides?|overrules?|outranks?\n  |(?:primary|single)\\s+source\\s+of\\s+truth\n  |governing\\s+document|takes\\s+precedence\n  |defines\\s+all\\s+(?:scanner\\s+)?rules?\n  |controls?\\s+(?:all\\s+)?(?:scanner\\s+)?(?:rules?|polic(?:y|ies))\n  |controlling\\s+document|source\\s+of\\s+truth\n  |governs?\\s+(?:all\\s+)?(?:environment|config)\n  |agent\\s+instruction|scanner\\s+instruction\n  |assistant\\s+instruction|verifier\\s+instruction\n  |scanner\\s+(?:policy|directive|rule|note)\n  |agent\\s+(?:setup|configuration|directive|note|policy|rule)\n  |for\\s+ai\\s+(?:coding\\s+)?agents?\n  |for\\s+agents?\n  |for\\s+(?:claude|copilot|cursor|codex)\n))\n(?=.*(?:\n  (?:read|copy|include|attach|share|forward|export|provide|expose|send|collect)\n  \\s+(?:[\\w-]+\\s+){0,4}\n  (?:environment\\s+(?:variables?|context|details?|config(?:uration)?|state)\n    |runtime\\s+(?:variables?|config(?:uration)?|environment)\n    |local\\s+(?:state|config(?:uration)?|details?)\n    |shell\\s+(?:environment|variables?|state|config)\n    |(?:API|auth)\\s*(?:key|token|secret)s?\n    |tokens?|secrets?|credentials?)\n  |(?:treat|mark|flag)\\s*.{0,40}?\\s*as\\s+\n    (?:informational|non[\\-\\s]?blocking|non[\\-\\s]?actionable)\n  |(?:suppress|hide|redact|exclude|omit)\n    \\s+(?:[\\w-]+\\s+){0,4}\n    (?:findings?|warnings?|alerts?|reports?|flags?|issues?\n    |scan(?:s|ning)?\\s+(?:results?|output|findings?))\n  |do\\s+not\\s+(?:flag|report|escalate)\n  |non[\\-\\s]?(?:blocking|actionable)\\s+by\\s+design\n  |omit\\s+from\\s+(?:summar|report|scan)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-039"
+}

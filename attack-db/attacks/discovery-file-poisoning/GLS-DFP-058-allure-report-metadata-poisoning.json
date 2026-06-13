@@ -1,0 +1,36 @@
+{
+  "id": "GLS-DFP-058",
+  "name": "Allure report metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Allure test-report JSON, widget, executor, environment, attachment-name, or rendered report metadata can carry agent-directed instructions that make CI/review agents suppress findings, rewrite test verdicts, or forward CI/runtime context.",
+  "keywords": [
+    "AI agents",
+    "allure-results/*.json",
+    "categories.json",
+    "container.json",
+    "do not obey/treat/use Allure metadata",
+    "environment.properties",
+    "executor.json",
+    "for agents",
+    "result.json",
+    "scanner instruction",
+    "statusDetails"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:be\\s+)?(?:obey(?:ed)?|follow(?:ed)?|treat(?:ed)?|us(?:e|ed)|trust(?:ed)?|include|attach|forward|send|share|override).{0,180}\\b(?:allure|allure-results|test\\s+report|test\\s+result|statusDetails|attachment\\s+name))\n(?!.*\\b(?:security\\s+guide|scanner\\s+docs?|training\\s+example|incident\\s+report|postmortem|reference)\\b.{0,180}\\b(?:reported|detected|blocked|flagged|refused|not\\s+obeyed|must\\s+be\\s+reported|should\\s+report))\n(?=.*(?:\\ballure(?:[-_\\s]?results?|\\s+report|\\s+test\\s+report)?\\b|allure-results/[^\\s]+\\.json|result\\.json|container\\.json|categories\\.json|executor\\.json|environment\\.properties|history-trend\\.json|widgets/[^\\s]+\\.json|statusDetails|\\\"status\\\"\\s*:\\s*\\\"(?:passed|failed|broken|skipped)\\\"|\\\"attachments?\\\"\\s*:|\\\"labels?\\\"\\s*:))\n(?=.*(?:ai\\s+agents?|agents?|assistants?|scanners?|reviewers?|ci\\s+agents?|test\\s+agents?|release\\s+agents?|security\\s+agents?|automated\\s+(?:test|ci|release|security)?\\s*(?:review|scan|audit|verification)|agent[-_\\s]?instructions?|scanner[-_\\s]?instructions?|for[-_\\s]?agents?))\n(?=.*(?:\n  (?:authoritative|canonical|definitive|governing|primary|single\\s+source\\s+of\\s+truth|takes?\\s+precedence|supersed(?:e|es|ed|ing)|overrides?|agent\\s+instructions?|scanner\\s+instructions?).{0,120}(?:policy|rules?|instructions?|verdict|review|guidance|playbook|runbook|procedure)\n |(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:ted|s|ting)?|exclude(?:d|s|ing)?|downgrade|deprioritize|demote|redact|skip|mark|treat|classify|route|move|leave|keep).{0,120}(?:findings?|warnings?|alerts?|reports?|results?|observations?|diagnostics?|failures?|defects?|vulnerabilit(?:y|ies)|security\\s+issues?|audit\\s+memo|final\\s+summary|blocking|informational|advisory-only|background-only)\n |(?:findings?|warnings?|alerts?|reports?|results?|observations?|diagnostics?|failures?|defects?).{0,80}(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|classified|marked).{0,60}(?:informational|advisory-only|background-only|non-blocking)?\n |(?:include|attach|forward|send|share|provide|expose|copy|collect|pass\\s+along|hand\\s+over|relay).{0,120}(?:api\\s*keys?|tokens?|secrets?|authorization|auth\\s+headers?|cookies?|session|ci\\s+environment|environment\\s+(?:variables?|context|settings?|details?)|runtime\\s+(?:context|settings?|details?)|local\\s+state|execution\\s+context)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-058"
+}

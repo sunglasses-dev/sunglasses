@@ -1,0 +1,28 @@
+{
+  "id": "GLS-DFP-079",
+  "name": "MIME Content-Disposition filename metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "MIME `Content-Disposition` / attachment filename metadata can carry agent-directed policy, suppression, or credential-forwarding instructions that downstream AI mail, ticket, or security agents may mistake for trusted review guidance.",
+  "keywords": [
+    "agent/scanner/reviewer/mail-ticket audience.",
+    "defensive documentation/training/incident guards.",
+    "mime/attachment filename provenance."
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never|should\\s+not)\\s+(?:be\\s+)?(?:obeyed?|followed?|treated?|used?|include|attach|forward|send|share|override|trust).{0,160}?\\b(?:content-disposition|filename\\*?|attachment\\s+filename|mime|attachment\\s+metadata|filenames?))\n(?!.*\\b(?:content-disposition|filename\\*?|attachment\\s+filename|mime|attachment\\s+metadata|filenames?).{0,120}?\\b(?:should\\s+never|should\\s+not|must\\s+not|do\\s+not|does\\s+not)\\s+(?:be\\s+)?(?:used?|treated?|obeyed?|followed?|trusted?))\n(?!.*\\b(?:scanner|security|training|runbook|guide|reference|incident|docs?|article).{0,100}?(?:reported|report|detect|flag|refuse|blocked|not\\s+obeyed|must\\s+be\\s+reported))\n(?=.*(?:content-disposition|filename\\*?\\s*=|attachment;\\s*filename|attachment\\s+filename|mime\\s+headers?|\\.eml|support\\s+attachment|ticket\\s+attachment|rfc\\s*5987))\n(?=.*(?:ai\\s+agents?|agents?|assistants?|scanners?|reviewers?|reviewer|mail\\s+agents?|ticket\\s+agents?|security\\s+agents?|automated\\s+(?:mail|ticket|security|attachment)?\\s*(?:review|scan|audit|verification)|agent[-_\\s]?instructions?|scanner[-_\\s]?instructions?|for[-_\\s]?ai[-_\\s]?agents?))\n(?=.*(?:canonical|authoritative|supersedes?|overrides?|takes\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|agent\\s+instructions?|scanner\\s+instructions?|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?)|(?:omit|exclude|redact|downgrade)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?)|treat.{0,50}?as\\s+(?:informational|advisory-only|non-blocking|safe)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified|marked)(?:.{0,50}?(?:informational|advisory-only|non-blocking|safe))?|(?:include|forward|send|share|attach|provide|expose|collect|pass\\s+along|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:env(?:ironment)?(?:\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?))?|runtime\\s+(?:context|variables?|config(?:uration)?|state|settings?|material|details?)|local\\s+(?:state|config(?:uration)?|settings?)|api\\s+keys?|tokens?|auth(?:orization)?\\s+headers?|session\\s+(?:tokens?|cookies?)|cookies?|credentials?)|(?:suppress|hide|omit|exclude|redact|downgrade).{0,60}?(?:findings?|warnings?|alerts?|reports?|diagnostics?|observations?|results?|issues?)|(?:include|forward|send|share|attach|provide|expose|collect|pass[-\\s]+along|relay|transfer).{0,80}?(?:env(?:ironment)?[-_\\s]+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime[-_\\s]+(?:context|variables?|config(?:uration)?|state|settings?|material|details?)|local[-_\\s]+(?:state|config(?:uration)?|settings?)|api[-_\\s]+keys?|tokens?|auth(?:orization)?[-_\\s]+headers?|session[-_\\s]+(?:tokens?|cookies?)|cookies?|credentials?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-079"
+}

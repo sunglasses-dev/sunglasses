@@ -1,0 +1,37 @@
+{
+  "id": "GLS-DFP-051",
+  "name": "Documentation Site Config Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content"
+  ],
+  "description": "Documentation-site configuration files such as `mkdocs.yml`, `docusaurus.config.js`, `.vitepress/config.ts`, `sidebars.js`, or Docsify config can carry agent-facing policy text that tells AI documentation/security agents to treat the config as authoritative, suppress docs/security findings, or forwa",
+  "keywords": [
+    "agent instruction:",
+    "agent_instructions",
+    "assistant_note",
+    "crawler_notice",
+    "mkdocs.yml",
+    "nav:",
+    "scanner instruction:",
+    "scanner_policy",
+    "sidebar:",
+    "sidebars.js",
+    "site_name:",
+    "theme:"
+  ],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|scanner|training|runbook|guide|reference|incident|vulnerability|documentation)\\s+(?:docs?|report|example|exercise|guidance|article|reference)?.{0,160}?\\b(?:should\\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|refused)\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+(?:not|never))\\s+(?:obey|follow|treat|use|include|attach|forward|send|share|override|overrides?|trust|expose)\\b)\n(?!.*\\b(?:not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?)\\b)\n(?=.*(?:\\b(?:mkdocs\\.ya?ml|mkdocs|docusaurus(?:\\.config)?(?:\\.(?:js|ts|mjs|cjs))?|vitepress|\\.vitepress/config\\.(?:js|ts|mjs)|docsify|documentation\\s+site\\s+config|static\\s+site\\s+config|site_name\\s*:|theme\\s*:|nav\\s*:|sidebars\\.js|sidebar\\s*:|config\\s*:\\s*\\{)\\b))\n(?=.*(?<![A-Za-z0-9])(?:ai[-_\\s]?agents?|assistants?|llms?|crawlers?|scanners?|security[-_\\s]?scanners?|docs[-_\\s]?agents?|documentation[-_\\s]?agents?|agent[_-]instructions?|scanner[_-]policy|assistant[_-]note|crawler[_-]notice)(?![A-Za-z0-9]))\n(?=.*(?:\\b(?:governing|controlling|canonical|definitive|authoritative)\\s+(?:document|policy|guidance|instructions?|source|description|configuration)\\b|(?:primary|single)\\s+source\\s+of\\s+truth|(?:primary|main|operating|review|audit|quality|scanner)\\s+guidance|takes?\\s+precedence|overrides?|supersed(?:e|es|ed|ing)|outranks?|overrules?|defines?\\s+(?:(?:all|the)\\s+)?(?:scanner|security|agent|automated|review|audit|docs?)\\s+rules?|(?:agent|scanner|assistant|crawler|docs?)\\s+(?:instructions?|directive|policy)\\s*:))\n(?=.*(?:\\b(?:suppress|hide|redact|exclude|omit|skip|downgrade|deprioriti[sz]e)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|vulnerabilities?|CVE(?:s)?|audit\\s+memos?|summaries?|notes?)\\b|(?:treat|mark|classify|flag).{0,50}?\\bas\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|background[-\\s]?only)\\b|(?:keep|leave).{0,80}?(?:findings?|warnings?|observations?|diagnostics?|results?|alerts?|issues?|vulnerabilities?).{0,40}?\\bout\\s+of\\s+(?:the\\s+)?(?:memo|memos|summary|summaries|report|reports|audit\\s+memo|final\\s+report|docs\\s+audit)\\b|do\\s+not\\s+(?:report|flag|escalate|include)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|issues?|observations?|results?|diagnostics?|security[-\\s]?team|reports?)\\b|(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s*keys?|tokens?|session\\s+(?:keys?|tokens?)|authorization\\s+headers?|auth\\s+headers?|cookies?|credentials?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?|proof\\s+material)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-13",
+  "source": "patterns.py:GLS-DFP-051"
+}
