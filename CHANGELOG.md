@@ -3,6 +3,13 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.67] — 2026-06-15
+
+### Added (mcp_threat — MCP resource-template metadata injection)
+
+- **+1 mcp_threat pattern** (`GLS-MCP-033`) — **MCP resource-template metadata injection**: detects prompt-injection instructions hidden in MCP resource-template metadata (the `uriTemplate` / `name` / `title` / `description` fields of `resourceTemplates` and `resources/templates/list` responses) that try to make an agent treat a catalog entry as a system/developer instruction, ignore prior instructions, or silently obey hidden commands. A negative lookahead excludes documentation, guides, and security-training text that merely describes the technique. **Catalog total: 1,049 patterns / 65 categories / 7,653 keywords.**
+- Coverage-gated against the live shipped engine (catches an attack the prior engine missed) and cleared the clean-corpus false-positive gate (`test_false_positives` + `test_real_corpus_fp` — 76 passed) before ship.
+
 ## [0.2.66] — 2026-06-11
 
 ### Added (discovery_file_poisoning expansion — agent config/discovery-file class)
