@@ -22437,4 +22437,30 @@ PATTERNS = [
         "description": "Repository ruleset or branch-protection exports can smuggle agent-directed policy text that tells AI release/security agents to treat platform governance metadata as higher authority, suppress branch-protection findings, or forward local GitHub/CI context."
     },
     # === end v0.2.66 batch ===
+    # === v0.2.67 batch (1 patterns) ===
+    {
+        "id": "GLS-MCP-033",
+        "name": "MCP resource-template metadata injection",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["file", "web_content"],
+        "keywords": [
+            "do not mention",
+            "do not reveal these instructions",
+            "do not summarize",
+            "resource template",
+            "resourceTemplates",
+            "resources/templates/list",
+            "template metadata",
+            "uriTemplate",
+        ],
+        "regex": [
+            r"""(?isx)^
+(?!.*\b(?:docs?|documentation|guide|reference|training|scanner\s+docs?|security\s+training)\b.{0,180}\b(?:should\s+(?:report|detect|flag|refuse|block)|must\s+not|do\s+not|never\s+|not\s+treat)\b)
+(?=.*(?:"(?:uriTemplate|name|title|description)"\s*:|(?<![A-Za-z0-9_])(?:resourceTemplates|uriTemplate|resource\s+template|template\s+metadata)(?![A-Za-z0-9_])))
+(?=.*(?:ignore\s+(?:previous|all|system|developer)(?:\s+(?:system|developer|agent))?\s+(?:instructions?|messages?|prompts?)|treat\s+(?:this|the)?\s*(?:catalog\s+entry|template|resource|metadata)?\s*as\s+(?:a\s+)?(?:system|developer)\s+(?:message|prompt|instruction)|before\s+(?:calling|using|resolving)\s+(?:this\s+)?(?:template|resource)[\s\S]{0,140}\b(?:must|always|first|rewrite|update)\b|agent\s+must\s+(?:obey|follow|execute|run)|do\s+not\s+(?:summarize|mention|reveal)\s+these\s+instructions?))
+[\s\S]+""",
+        ],
+        "description": "Detects prompt-injection instructions hidden in MCP resource-template metadata (uriTemplate/name/title/description fields of resourceTemplates or resources/templates/list responses) that try to make an agent treat a catalog entry as a system/developer instruction, ignore prior instructions, or silently obey hidden commands. Excludes documentation, guides, and security-training text that merely describes the technique."
+    },
 ]

@@ -28,26 +28,7 @@ from sunglasses.engine import SunglassesEngine
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STDLIB_DIR = os.path.dirname(json.__file__)
-
-
-def _clean_files():
-    files = []
-    # NOTE: README.md is temporarily excluded — scanning it currently triggers
-    # slow regex backtracking (tens of seconds) AND it legitimately contains
-    # attack-example strings (it's a security tool's own threat catalog), so a
-    # naive "must be 0" assert is wrong for it. Both are tracked separately.
-    # Known-clean stdlib modules — the exact thing a reviewer tries first.
-    # NOTE: deliberately small/medium modules. Very large stdlib files
-    # (argparse.py, textwrap.py) currently trigger slow regex backtracking in
-    # the scan itself — a separate performance issue tracked apart from the
-    # false-positive gate; including them here would hang the test, not measure
-    # precision. Add them back once scan-time on large inputs is bounded.
-    for mod in ("decoder.py", "encoder.py"):
-        cand = os.path.join(STDLIB_DIR, mod)
-        if os.path.exists(cand):
-            files.append(cand)
-    return files
+from fp_corpus_data import clean_files as _clean_files  # decoupled single source (Jun 12 T8)
 
 
 @pytest.fixture(scope="module")
