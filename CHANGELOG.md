@@ -3,6 +3,26 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.68] — 2026-06-19
+
+### Added (10 net-new patterns)
+
+- **+10 patterns** across existing categories (discovery_file_poisoning, identity/SCAP/agent-context, agent-contract, agent-instruction-file): `GLS-ACP-570`, `GLS-AIFP-010`, `GLS-DFP-085`, `GLS-DFP-086`, `GLS-DFP-091`, `GLS-IDP-017`, `GLS-IDP-018`, `GLS-SCAP-006`, `GLS-SCAP-007`, `GLS-SCAP-009`. Each verified to compile, fire on a realistic true-positive sample, and pass the clean-corpus false-positive gate.
+
+### Fixed (structured_metadata_poisoning detection — 16 patterns)
+
+- **16 structured_metadata_poisoning patterns** (`GLS-SMP-001..007`, `009..017`) that previously shipped without working detection now carry real keyword/regex detection (HTML meta, JSON-LD, manifest, ActivityPub, JSON Feed, OG/Twitter, C2PA, microformats, RDFa, SBOM, source map, SVG, WASM, CodeMeta, IaC carriers). `GLS-SMP-008` (CITATION.cff) held back this release — its detection over-matched clean files and is being re-tightened.
+
+### Fixed (false positives — credibility)
+
+- Expanded the engine keyword denylist with bare structured-format identifiers (`sbom`, `cyclonedx`, `spdx`, `json-ld`, `application/ld+json`, `schema.org`, `@context`, `jsonfeed.org/version`, `manifest.json`, `codemeta.json`, etc.). The scanner no longer false-positives on legitimate SBOM / JSON-LD / JSON Feed / CodeMeta / web-manifest / Dockerfile / `.env.example` files; real poisoning of those carriers is still caught by each pattern's specific regex.
+- Tightened `GLS-AW-003` (over-privileged social-scheduler) regex with word boundaries — it previously matched the letter "x" inside ordinary words.
+
+### Internal
+
+- Records mechanism metadata for the repaired and net-new patterns in the source-of-truth database and prepares the catalog for future technique-level (MITRE ATLAS-aligned) coverage reporting. Technique-level coverage is not yet claimed publicly.
+- **Catalog total: 1,059 patterns / 65 categories / 7,732 keywords.** Full clean-corpus FP gate green (236 tests passed).
+
 ## [0.2.67] — 2026-06-15
 
 ### Added (mcp_threat — MCP resource-template metadata injection)

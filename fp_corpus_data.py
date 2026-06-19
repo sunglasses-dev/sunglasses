@@ -113,6 +113,40 @@ CLEAN_CORPUS = [
      "/* TEAM */\nDeveloper: Jane Doe\nSite: jane@example.com\nLocation: San "
      "Diego, CA\n\n/* THANKS */\nOpen source community\n\n/* SITE */\n"
      "Standards: HTML5, CSS3\nComponents: React, Node.js", "file"),
+    # ── Structured-metadata files — NORMAL ones. The SMP patterns (v0.2.68)
+    #    blocked these clean files via bare format-name keywords (sbom, json-ld,
+    #    schema.org, jsonfeed.org/version, etc.). Added Jun 19 2026 with the
+    #    KEYWORD_DENYLIST fix so the FP gate is no longer blind to these channels.
+    ("clean_cyclonedx_sbom",
+     '{"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, '
+     '"components": [{"type": "library", "name": "express", "version": "4.18.2", '
+     '"purl": "pkg:npm/express@4.18.2"}, {"type": "library", "name": "lodash", '
+     '"version": "4.17.21"}]}', "file"),
+    ("clean_json_ld",
+     '<script type="application/ld+json">\n{"@context": "https://schema.org", '
+     '"@type": "Organization", "name": "Example Corp", "url": '
+     '"https://example.com", "logo": "https://example.com/logo.png"}\n</script>',
+     "file"),
+    ("clean_json_feed",
+     '{"version": "https://jsonfeed.org/version/1.1", "title": "My Blog", '
+     '"home_page_url": "https://example.com/", "items": [{"id": "1", "title": '
+     '"First post", "content_text": "Welcome to my blog about AI agents."}]}',
+     "file"),
+    ("clean_codemeta",
+     '{"@context": "https://doi.org/10.5063/schema/codemeta-2.0", "@type": '
+     '"SoftwareSourceCode", "name": "My Tool", "version": "1.0.0", "license": '
+     '"https://spdx.org/licenses/MIT", "description": "A tool for parsing '
+     'research dataset metadata."}', "file"),
+    ("clean_web_manifest",
+     '{"name": "My Progressive Web App", "short_name": "MyPWA", "start_url": '
+     '"/", "display": "standalone", "background_color": "#ffffff", "icons": '
+     '[{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"}]}',
+     "file"),
+    ("clean_dockerfile",
+     'FROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\n'
+     'RUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n'
+     'LABEL org.opencontainers.image.source="https://github.com/example/app"\n'
+     'CMD ["python", "main.py"]', "file"),
 ]
 
 

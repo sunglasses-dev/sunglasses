@@ -140,6 +140,22 @@ class SunglassesEngine:
         # source; the real attacks keep their multi-word phrases + regexes.
         "env", "group", "groups", "override", "pat", "property", "path",
         "limit", "json-rpc", "extra",
+        # ── Structured-metadata FP fix (Jun 19 2026, v0.2.68 audit) ──────────
+        # Bare FORMAT IDENTIFIERS that appear in EVERY legitimate file of that
+        # type. The SMP (structured_metadata_poisoning) patterns reused these as
+        # keywords, so the scanner BLOCKED clean SBOMs / JSON-LD / JSON-Feed /
+        # CodeMeta / web manifests / Dockerfiles — same bug class as Jun-6, new
+        # keywords. Verified safe: every pattern using these ALSO has a specific
+        # regex (agent-audience + override-verb + secrets-target lookaheads), so
+        # real poisoning still blocks; only the bare-keyword FP path is removed.
+        # Gate: tests/fp_corpus_data.py structured-channel entries (clean files
+        # must ALLOW; poisoned SBOM/JSON-LD canaries must still BLOCK).
+        "sbom", "cyclonedx", "spdx", "sbom metadata", "sbom annotations",
+        "bom-ref", "json-ld", "application/ld+json", "schema.org", "@context",
+        "jsonfeed.org/version", "manifest.json", "site.webmanifest",
+        "manifest.webmanifest", "codemeta.json", "ro-crate-metadata.json",
+        "sourcemappingurl", "c2pa manifest", ".env", ".env.example",
+        "label", "copy",
     })
 
     # Decision priority: higher severity = stronger action

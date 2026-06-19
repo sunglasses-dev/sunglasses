@@ -25,7 +25,7 @@
     "queue these posts without review"
   ],
   "regex": [
-    "(?i)(schedule|queue|post|publish).{0,70}(linkedin|twitter|x|facebook|instagram|tiktok|youtube)",
+    "(?i)\b(schedule|queue|post|publish)\b.{0,70}\b(linkedin|twitter|x|facebook|instagram|tiktok|youtube)\b",
     "(?i)(all channels|every channel|all accounts|connected channels).{0,40}(schedule|post|publish)"
   ],
   "examples": {
