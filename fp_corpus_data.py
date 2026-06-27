@@ -147,6 +147,38 @@ CLEAN_CORPUS = [
      'RUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n'
      'LABEL org.opencontainers.image.source="https://github.com/example/app"\n'
      'CMD ["python", "main.py"]', "file"),
+    # ── Clean AI-agent CODE / DOCS — NORMAL ones. v0.2.68 BLOCKED ordinary
+    #    AI-agent source (a LangChain agent, an MCP server, a prompt builder, an
+    #    agent README) because generic words — agentic, assistants, llm agent,
+    #    Claude, Codex, Copilot — were bare keywords on the agent-policy-poisoning
+    #    patterns. Added Jun 27 2026 with the KEYWORD_DENYLIST generic-AI fix so
+    #    the FP gate is no longer blind to the audience the product is FOR.
+    ("clean_agent_code",
+     '"""LangChain-style agent: an agentic LLM loop for an AI agent / assistant."""\n'
+     'class Agent:\n'
+     '    def __init__(self, model="claude", system_prompt="You are a helpful '
+     'assistant."):\n'
+     '        self.model, self.system_prompt = model, system_prompt\n'
+     '        self.tools = []\n'
+     '    def run(self, prompt):\n'
+     '        return self.llm.invoke(prompt)', "file"),
+    ("clean_mcp_server_code",
+     '"""A normal MCP server exposing tools to an AI agent. Works with Claude, '
+     'Codex, Copilot, GPT."""\n'
+     'def list_tools():\n'
+     '    return [{"name": "search", "description": "search the web for the '
+     'assistant"}]\n'
+     'def call_tool(name, args):\n'
+     '    return {"ok": True}', "file"),
+    ("clean_agent_readme",
+     "# MyAgent\nAn open-source agentic framework for building autonomous AI "
+     "agents and assistants. Supports Claude, Codex, and Copilot. The LLM agent "
+     "can call tools, plan, and reflect. Configure the model and the system "
+     "prompt; the AI assistant respects your instructions.", "file"),
+    ("clean_prompt_builder",
+     'SYSTEM = "You are Claude, an AI assistant. Be helpful, harmless, honest."\n'
+     'def build(context, task):\n'
+     '    return f"{SYSTEM}\\n{context}\\nTask: {task}"', "file"),
 ]
 
 

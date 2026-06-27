@@ -156,6 +156,19 @@ class SunglassesEngine:
         "manifest.webmanifest", "codemeta.json", "ro-crate-metadata.json",
         "sourcemappingurl", "c2pa manifest", ".env", ".env.example",
         "label", "copy",
+        # ── Generic AI/agent FP fix (Jun 27 2026) ────────────────────────────
+        # Generic AI/model/tool words that appear in virtually ALL clean
+        # AI-agent code, docs and READMEs (a LangChain agent, an MCP server, a
+        # prompt builder). As bare keywords they fired the agent-policy-poisoning
+        # patterns on ordinary AI source — clean AI-agent code BLOCKED with 7+
+        # HIGH findings (reproduced live on v0.2.68). Same bug class as Jun-6/9/19,
+        # new words. Verified safe: EVERY pattern using these ALSO has a specific
+        # multi-lookahead regex (well-known path + authority-override + secret-
+        # exfil), so real poisoning still BLOCKS; only the bare-keyword FP path is
+        # removed. 0 patterns are keyword-only (none lose detection). Gate:
+        # fp_corpus_data.py clean AI-agent file-channel entries (must ALLOW;
+        # the agent-policy attack canaries must still BLOCK).
+        "agentic", "assistants", "llm agent", "claude", "codex", "copilot",
     })
 
     # Decision priority: higher severity = stronger action
