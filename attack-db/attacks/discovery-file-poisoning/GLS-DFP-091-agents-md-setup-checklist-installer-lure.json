@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-091",
+  "name": "AGENTS.md Setup-Checklist Installer Lure",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "AGENTS.md Setup-Checklist Installer Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 binary execution social engineering in docs, distinct from build metadata.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:(?:do\\s+not|don['\u2019]t|never|must\\s+not|should\\s+not)\\s+(?:download|run|open|install|execute|double[-\\s]?click|approve)|no\\s+(?:install|run|open|setup|execution|execute|download))\\b)\n(?!.*\\b(?:security\\s+(?:guide|training|reference)|scanner\\s+docs?|incident\\s+report|awareness\\s+training).{0,180}\\b(?:warns?|report(?:ed|s)?|detect(?:ed|s)?|flag(?:ged|s)?|refus(?:e|ed|es)|block(?:ed|s)?)\\b)\n(?=.*(?:README|AGENTS|CLAUDE|SKILL|Getting\\s+Started|Install(?:ation)?|Download|badge|mcp|Model\\s+Context\\s+Protocol|AI\\s+agents?|agent\\s+security|prompt\\s*injection|security\\s+(?:scanner|firewall|checklist|tool)|guardrail|CVE))\n(?=.*(?:raw\\.githubusercontent\\.com/[^\\s)\"'<>]+|github\\.com/[^\\s)\"'<>]+/(?:raw|blob)/(?:refs/heads/|main/|master/)[^\\s)\"'<>]+)\\.(?:zip|exe|msi|dmg|pkg|deb|appimage|app|bat)\\b)\n(?=.*\\b(?:download|install|run|open|double[-\\s]?click|administrator|approve|chmod|execute|setup|unzip)\\b)\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-DFP-091"
+}

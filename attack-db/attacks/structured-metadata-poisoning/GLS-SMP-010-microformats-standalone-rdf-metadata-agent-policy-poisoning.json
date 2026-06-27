@@ -10,8 +10,16 @@
     "web_content"
   ],
   "description": "Hostile instructions can be embedded in Microformats fields or standalone RDF/Turtle metadata that AI agents, crawlers, SEO agents, or security scanners import as structured site context.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "microformats agent-policy",
+    "standalone RDF metadata",
+    "text/turtle agent policy",
+    "h-card agent-policy",
+    "schema:description agent-policy"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs?|example|scanner\\s+rule|detector|blocked|saniti[sz]ed|benign|do\\s+not\\s+obey|must\\s+not\\s+follow|should\\s+flag|training|test\\s+fixture)\\b)(?=.*(?:\\bmicroformats?\\b|\\bmf2\\b|\\bh-card\\b|\\bh-entry\\b|\\bh-feed\\b|\\bh-event\\b|\\bitemprop\\b|\\btypeof\\b|property\\s*=|vocab\\s*=|\\brdf\\b|\\bturtle\\b|text/turtle|\\.ttl\\b|schema:|foaf:|dc:|@prefix))(?=.*\\b(?:agent|assistant|crawler|seo\\s+agent|security\\s+scanner|ai\\s+scanner|llm)\\b)(?=.*\\b(?:override|ignore|bypass|suppress|hide|omit|do\\s+not\\s+report|never\\s+report|forward|send|exfiltrate|leak|disclose)\\b)(?=.*\\b(?:policy|policies|report|finding|alert|secret|secrets|credential|token|api\\s*key|env(?:ironment)?)\\b).{0,4000}$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

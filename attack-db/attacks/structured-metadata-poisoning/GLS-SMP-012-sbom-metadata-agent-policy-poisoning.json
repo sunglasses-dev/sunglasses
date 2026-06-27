@@ -10,8 +10,19 @@
     "web_content"
   ],
   "description": "A target-controlled SBOM (`CycloneDX`, `SPDX`, or exported `sbom.json`) can hide agent-directed policy text in properties, annotations, or comments that tells AI dependency scanners to treat the SBOM as higher-priority release authority, suppress findings, or forward local auth context.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "sbom",
+    "cyclonedx",
+    "spdx",
+    "bom-ref",
+    "sbom metadata",
+    "agent-policy",
+    "x-agent-policy",
+    "sbom annotations"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|use|forward|include|send|share|override|suppress)\\b)(?=.*\\b(?:sbom|cyclonedx|spdx|software\\s+bill\\s+of\\s+materials|bom-ref|externalRefs|annotations?|properties|comments?)\\b)(?=.*\\b(?:ai\\s+)?(?:agents?|assistants?|dependency\\s+scanners?|security\\s+scanners?|llms?|models?)\\b)(?=.*\\b(?:override|supersed(?:e|es|ed|ing)|outrank|take\\s+precedence|treat.{0,40}?as\\s+(?:authoritative|release\\s+authority)|suppress(?:es|ed|ing)?|hide|waive|ignore|downgrade|forward|send|include|attach|export)\\b)(?=.*\\b(?:policy|scanner\\s+policy|release\\s+authority|findings?|vulnerabilit(?:y|ies)|reports?|warnings?|auth(?:entication)?\\s+context|tokens?|secrets?|api\\s+keys?|bearer|session|environment\\s+(?:variables?|context)|local\\s+(?:auth|context|state))\\b).*"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IDP-017",
+  "name": "DNS SRV/TXT Service-Discovery Agent-Policy Injection",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "DNS SRV/TXT Service-Discovery Agent-Policy Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 dNS SRV/NAPTR records, distinct from existing SVCB/HTTPS patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|override|trust|treat)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat)|scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|(?:security|incident)\\s+report.{0,80}?\\b(?:detected|blocked|flagged|refused)))\n(?!.*\\b(?:not\\s+authoritative|no\\s+policy\\s+overrides?|should\\s+never\\s+(?:override|supersede|instruct|control)))\n(?=.*(?:\\bDNS\\b.{0,40}\\b(?:SRV|NAPTR)\\b|\\b(?:SRV|NAPTR)\\s+(?:record|RR|answer|lookup)|\\bservice[-\\s]?location\\s+(?:record|metadata)|\\b_dns-sd\\b|\\b(?:replacement|regexp|service|protocol|priority|weight|port|target)\\s*=|\\b_(?:sip|xmpp|ldap|kerberos|matrix|caldav|carddav|autodiscover)\\._(?:tcp|udp)\\b))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|llm\\s+agents?|autonomous\\s+agents?|coding\\s+agents?|security\\s+scanners?|tls\\s+auditors?|identity\\s+auditors?|crawlers?|assistants?|agents?|scanner_policy|agent_instructions|assistant_note)(?![A-Za-z0-9]))\n(?=.*(?:\\b(?:authoritative|canonical|governing|controlling|highest\\s+priority|single\\s+source\\s+of\\s+truth|overrides?|supersedes?|outranks?|takes\\s+precedence|agent\\s+instructions?)\\b|\\b(?:suppress|hide|omit|exclude|skip|redact)\\b.{0,50}?\\b(?:findings?|warnings?|reports?|diagnostics?|alerts?)\\b|\\b(?:findings?|warnings?|reports?|diagnostics?|alerts?)\\b.{0,30}?\\b(?:suppressed|hidden|omitted|excluded|redacted)\\b|\\b(?:do\\s+not|don't|not)\\s+report\\b|\\b(?:treat|mark|classify).{0,40}?\\b(?:safe|clean|benign|informational|non[-\\s]?blocking)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect)\\b\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s+keys?|tokens?|credentials?|authorization\\s+headers?|cookies?|environment\\s+(?:variables?|context)|local\\s+state|runtime\\s+config)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-IDP-017"
+}

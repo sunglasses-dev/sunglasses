@@ -52,8 +52,11 @@ def get_folder(category):
 def export():
     base_dir = os.path.join(os.path.dirname(__file__), "..", "attack-db", "attacks")
 
-    # Real export date (the JSON is a generated snapshot of patterns.py, so stamp
-    # the date it was actually generated rather than a frozen hardcoded value).
+    # Date a pattern was FIRST exported. Only genuinely new files get today's
+    # date; existing files keep their original date_added so a routine re-export
+    # doesn't churn the entire tree (every file re-dated = a noise diff that
+    # destroys real history — see the Jun-13 2026 corrector lesson "preserve
+    # date_added, no churn").
     export_date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
 
     # Track stats
@@ -67,6 +70,20 @@ def export():
         folder = get_folder(category)
         folder_path = os.path.join(base_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
+
+        # Write file
+        slug = slugify(name)
+        filename = f"{pid}-{slug}.json"
+        filepath = os.path.join(folder_path, filename)
+
+        # Preserve the original date_added if this file already exists.
+        date_added = export_date
+        if os.path.exists(filepath):
+            try:
+                with open(filepath) as ef:
+                    date_added = json.load(ef).get("date_added", export_date)
+            except (ValueError, OSError):
+                date_added = export_date
 
         # Build JSON entry matching existing format
         entry = {
@@ -85,14 +102,9 @@ def export():
             },
             "references": [],
             "contributed_by": "Sunglasses Team",
-            "date_added": export_date,
+            "date_added": date_added,
             "source": f"patterns.py:{pid}"
         }
-
-        # Write file
-        slug = slugify(name)
-        filename = f"{pid}-{slug}.json"
-        filepath = os.path.join(folder_path, filename)
 
         with open(filepath, "w") as f:
             json.dump(entry, f, indent=2)

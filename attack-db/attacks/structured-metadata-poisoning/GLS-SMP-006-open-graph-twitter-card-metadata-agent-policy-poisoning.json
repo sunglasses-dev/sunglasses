@@ -10,8 +10,16 @@
     "web_content"
   ],
   "description": "Attacker-controlled HTML social-preview metadata (`og:*`, `twitter:*`, generic description/meta fields) can embed instructions telling AI agents, scanners, crawlers, or summarizers to override policy, suppress findings, or include local secrets.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "Open Graph metadata",
+    "Twitter Card metadata",
+    "og:description",
+    "twitter:description",
+    "meta content AI agent"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|unit test|negative fixture|do not obey|should report|training example)\\b)(?=.*<meta\\b[^>]*(?:property|name)\\s*=\\s*[\"'](?:og:(?:title|description|site_name)|twitter:(?:title|description)|description)[\"'][^>]*\\bcontent\\s*=\\s*[\"'][^\"']*(?:agent|assistant|ai\\s+(?:agent|scanner|crawler|summarizer)|crawler|scanner|summarizer)[^\"']*[\"'])(?=.*\\b(?:ignore|override|bypass|disable|suppress|hide|omit|do\\s+not\\s+(?:report|flag|include)|never\\s+(?:report|flag)|forward|send|include|exfiltrate|reveal)\\b)(?=.*\\b(?:policy|policies|instruction|instructions|finding|findings|report|alerts?|secrets?|tokens?|credentials?|api[_-]?keys?|env(?:ironment)?\\s+variables?|local\\s+(?:files?|secrets?))\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

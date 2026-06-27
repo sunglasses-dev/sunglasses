@@ -10,8 +10,16 @@
     "web_content"
   ],
   "description": "Detects hostile agent/scanner instructions hidden in linked icon or SVG sidecar metadata (`<title>`, `<desc>`, `<metadata>`, comments, or generated icon notes) that try to make AI crawlers or security scanners treat decorative assets as policy, hide findings, or forward local secrets.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "linked icon",
+    "svg sidecar",
+    "svg metadata",
+    "generated icon notes",
+    "agent scanner"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign|normal|decorative only|no agent instructions|accessibility title|brand icon|license metadata)\\b)(?=.*\\b(?:linked\\s+icon|svg\\s+sidecar|<\\s*(?:title|desc|metadata)\\b|<!--|generated\\s+icon\\s+notes?)\\b)(?=.*\\b(?:ai\\s+agent|agentic\\s+(?:crawler|scanner)|security\\s+scanner|ai\\s+crawler|scanner\\s+agent|automated\\s+reviewer)\\b)(?=.*\\b(?:override|ignore|suppress|hide|omit|downgrade|forward|exfiltrate|send)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|credential|credentials|api[_-]?key|token)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

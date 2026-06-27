@@ -10,8 +10,20 @@
     "web_content"
   ],
   "description": "Machine-readable scholarly/software dataset metadata (`codemeta.json`, DataCite exports, and RO-Crate JSON-LD) can carry agent-facing instructions that falsely claim authority over AI research, provenance, or dependency scanners and direct them to suppress findings or forward local/runtime secrets.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "codemeta.json",
+    "CodeMeta",
+    "DataCite",
+    "RO-Crate",
+    "ro-crate-metadata.json",
+    "JSON-LD",
+    "agent_policy",
+    "provenance scanner",
+    "dependency scanner"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|treat|use|trust|apply|honou?r|include|attach|forward|send|share|override|overrides?)\\b)(?=.*\\b(?:codemeta(?:\\.json)?|datacite|ro-?crate|ro-crate-metadata\\.json|json-ld|scholarly\\s+metadata|dataset\\s+metadata)\\b)(?=.*(?:\\b(?:ai|llm|autonomous|agentic)?\\s*(?:research|provenance|dependency|citation|metadata)?\\s*(?:agents?|assistants?|scanners?|crawlers?|verifiers?|auditors?)\\b|\\b(?:agent|assistant|scanner)[_-]?(?:instructions?|policy)\\b))(?=.*\\b(?:override|overrides|supersede|supersedes|ignore|bypass|suppress|suppresses|hide|redact|downgrade|waive|forward|send|share|attach|exfiltrate|include)\\b)(?=.*\\b(?:polic(?:y|ies)|reports?|findings?|warnings?|issues?|secrets?|credentials?|tokens?|api\\s*keys?|environment\\s+variables?|env\\s+vars?|local\\s+state|runtime\\s+secrets?)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

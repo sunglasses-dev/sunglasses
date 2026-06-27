@@ -1,0 +1,24 @@
+{
+  "id": "GLS-IDP-018",
+  "name": "Oauth Dynamic Client Registration Metadata Prompt Smuggling",
+  "version": "1.0",
+  "category": "identity_discovery_poisoning",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Oauth Dynamic Client Registration Metadata Prompt Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 oAuth registration metadata fields specifically, distinct from consent or resource metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:dynamic\\s+client\\s+registration|client\\s+registration|registration_client_uri|registration_access_token|software_statement|redirect_uris|token_endpoint_auth_method)\\b(?=.{0,1400}\\b(?:client_name|client_uri|logo_uri|policy_uri|tos_uri|contacts|software_statement|registration_client_uri)\\b)(?=.{0,1600}\\b(?:ignore\\s+(?:all\\s+)?(?:previous|prior|earlier)|disregard\\s+(?:previous|prior|earlier)|(?:system|developer|assistant)\\s+(?:instruction|message|prompt|directive)|(?:call|invoke|use)\\s+(?:the\\s+)?(?:tool|function|mcp\\s+tool)|(?:print|return|reveal|exfiltrat(?:e|ion)|send)\\s+[^\"'`\\n]{0,120}\\b(?:secret|token|credential|api[_ -]?key|password|client_secret)|(?:run|execute)\\s+[^\"'`\\n]{0,120}\\b(?:(?:shell|bash)\\s+(?:command|script)|command|curl)|(?:authorize|approve|consent)\\s+[^\"'`\\n]{0,120}\\b(?:without\\s+review|automatically|silently)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-IDP-018"
+}

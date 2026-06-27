@@ -10,8 +10,15 @@
     "web_content"
   ],
   "description": "JavaScript source maps can embed agent-directed instructions in `sourcesContent`, comments, or extension fields that tell AI scanners/code assistants to override policy, suppress findings, or include local secrets in reports.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "source map metadata",
+    "sourcesContent",
+    "sourceMappingURL",
+    "x_google_ignoreList"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner rule|detection rule|blocked sample|benign sample|negative fixture|unit test|must not obey|do not follow|should flag|should detect|example payload)\\b)(?=.*\\b(?:source\\s*map|sourcemap|sourceMappingURL|sourcesContent|x_google_ignoreList|\\.map\\b)\\b)(?=.*\\b(?:AI\\s+scanner|security\\s+scanner|code\\s+assistant|coding\\s+agent|assistant|agent)\\b)(?=.*\\b(?:override|ignore|bypass|disable|suppress|hide|omit|forward|include|send|exfiltrate)\\b)(?=.*\\b(?:policy|policies|finding|findings|report|secret|secrets|token|api[_ -]?key|env(?:ironment)?\\s+var(?:iable)?s?|credential|credentials)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

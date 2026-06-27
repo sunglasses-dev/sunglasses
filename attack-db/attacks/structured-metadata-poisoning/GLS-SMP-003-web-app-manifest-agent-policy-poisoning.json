@@ -10,8 +10,16 @@
     "web_content"
   ],
   "description": "A target-controlled web app manifest (`/site.webmanifest`, `/manifest.webmanifest`, or `manifest.json`) can hide non-standard agent-policy text that tells AI scanners to treat the manifest as site-owner authority, include cookies or Authorization headers, and suppress reporting.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "web app manifest",
+    "site.webmanifest",
+    "manifest.webmanifest",
+    "manifest.json",
+    "agent-policy"
+  ],
+  "regex": [
+    "(?is)\\A(?!.*\\b(?:documentation|example only|security training|quoted example|blocked payload|do not follow|should not be followed|detect this|flag this)\\b)(?=.*\\b(?:site\\.webmanifest|manifest\\.webmanifest|manifest\\.json|web app manifest)\\b)(?=.*\\bagent[-_ ]?policy\\b)(?=.*\\b(?:ai|llm|agent|scanner|crawler|automated(?:\\s+security)?\\s+review|security\\s+bot)\\b)(?=.*\\b(?:override|trust|treat|accept|honou?r|regard|suppress|omit|hide|withhold|skip\\s+reporting|silence|include|forward|send|attach)\\b)(?=.*\\b(?:policy|report|findings?|cookies?|authorization\\s+headers?|auth\\s+headers?|secrets?|tokens?|credentials?)\\b).+"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

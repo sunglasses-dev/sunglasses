@@ -10,8 +10,15 @@
     "web_content"
   ],
   "description": "IaC stack/template metadata fields can smuggle agent-facing policy instructions that tell AI DevOps, cloud-security, or deployment-review agents to treat attacker-controlled descriptions as authoritative, suppress drift/security findings, or forward cloud credentials and local runtime context.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "IaC stack template metadata",
+    "CloudFormation Metadata",
+    "AWS::CloudFormation::Interface",
+    "Terraform metadata"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner rule|detector rule|detection rule|blocked payload|quarantined sample|security training|negative fixture|unit test|must not obey|should flag|should detect)\\b)(?=.*\\b(?:iac\\s+(?:stack|template)\\s+metadata|stack\\s+template\\s+metadata|template\\s+metadata|cloudformation\\s+metadata|terraform\\s+metadata|pulumi\\s+metadata|cdk\\s+metadata|AWS::CloudFormation::Interface|Metadata\\s*:|metadata\\s*=)\\b)(?=.*\\b(?:AI\\s+DevOps|cloud[-\\s]?security|deployment[-\\s]?review|review\\s+agent|security\\s+agent|devops\\s+agent|assistant|agent)\\b)(?=.*\\b(?:treat\\b.{0,80}\\bas\\s+authoritative|override|ignore|disregard|suppress|hide|conceal|do\\s+not\\s+report|never\\s+report|forward|send|exfiltrate|hand\\s+over)\\b)(?=.*\\b(?:policy|policies|report|findings?|drift|security\\s+(?:issue|finding|alert)s?|credentials?|secrets?|tokens?|AWS_ACCESS_KEY|local\\s+runtime\\s+context|environment\\s+(?:vars|variables))\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []
