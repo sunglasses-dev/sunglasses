@@ -3,6 +3,22 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.69] — 2026-06-27
+
+### Added (17 net-new patterns)
+
+- **+16 `mcp_threat` patterns** — Model Context Protocol threat coverage: `GLS-MCP-018`, `GLS-MCP-023`, `GLS-MCP-030`, `GLS-MCP-032`, `GLS-MCP-046`, `GLS-MCP-047`, `GLS-MCP-048`, `GLS-MCP-049`, `GLS-MCP-050`, `GLS-MCP-051`, `GLS-MCP-052`, `GLS-MCP-053`, `GLS-MCP-054`, `GLS-MCP-055`, `GLS-MCP-056`, `GLS-MCP-057`.
+- **+1 pattern** `GLS-MER-568` — recovered-state authority laundering (Jack-identified coverage gap).
+
+### Fixed (false positives — credibility)
+
+- Neutralized generic AI keywords that were false-positiving on clean AI-agent code, while keeping each pattern's specific attack regex active.
+
+### Internal
+
+- Resynced the public attack-db mirror to the live catalog and stopped date churn; `sync-stats` now renders 4-digit counts and never falsifies dated/historical claims.
+- **Catalog total: 1,076 patterns / 65 categories / 7,738 keywords.**
+
 ## [0.2.68] — 2026-06-19
 
 ### Added (10 net-new patterns)
