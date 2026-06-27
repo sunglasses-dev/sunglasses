@@ -16209,6 +16209,26 @@ PATTERNS = [
         "description": "Attacker seeds benign-looking exceptions before context compaction, then triggers rehydration paths so the summary or fallback snapshot reactivates poisoned directives with apparent freshness. Loaders that validate current context but not rehydrated provenance silently re-elevate stale attacker instructions back into live policy."
     },
     {
+        "id": "GLS-MER-568",
+        "name": "Recovered-State Authority Laundering",
+        "category": "memory_eviction_rehydration",
+        "severity": "high",
+        "channel": ["log_memory", "message", "tool_output", "api_response"],
+        "keywords": [
+            "satisfied_by_prior_context",
+            "human_confirmation: inherited",
+            "carry_forward=approved",
+            "approval inherited from prior context",
+            "consent carried forward",
+            "prior approval still applies",
+        ],
+        "regex": [
+            r"""(?is)(?=.*\b(?:recovered[-_\s]*state|restored?\s+from\s+(?:compaction|context|memory|prior)|context\s+restored|session\s+restored|carry[-_\s]*forward|rehydrat\w+|compaction|prior\s+context|satisfied_by_prior_context)\b)(?=.*\b(?:approval|consent|authoriz\w+|confirmation|permission|human[-_\s]*confirmation)\b[^.\n]{0,70}\b(?:inherited|carried[-_\s]*forward|carry[-_\s]*forward|already\s+(?:granted|approved|confirmed)|satisfied_by_prior_context|from\s+prior\s+context|still\s+(?:applies|valid|holds))\b).*""",
+        ],
+        "description": "Detects recovered-state / memory-compaction authority laundering: a payload claims a prior approval, consent, authorization, or human confirmation was inherited or carried forward through a restore/rehydration/compaction step, so the agent skips a fresh check. The attack avoids explicit attack verbs (it never says 'exfiltrate' or 'ignore') and rides the memory/log channel — a carrier-brittleness gap surfaced by Jack's Jun-22 drain (recovered-state payloads slipped the shipped scanner). Requires BOTH a restore/rehydration context AND an authority-inheritance claim, so legitimate 'session restored' / 'approval required' text does not trip it.",
+        "mechanism": "authority_inheritance_via_fake_recovered_state"
+    },
+    {
         "id": "GLS-MP-005",
         "name": "Persistent Policy Update Memory Poisoning",
         "category": "memory_poisoning",
