@@ -10,8 +10,14 @@
     "web_content"
   ],
   "description": "Target-controlled HTML `<meta>` / OpenGraph / Twitter Card description fields can smuggle agent-directed policy, secret-forwarding, or report-suppression instructions into discovery context that an assistant may incorrectly treat as site-owner authority.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "meta description assistant ignore policy",
+    "og:description suppress findings",
+    "twitter:description forward secrets"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s*not|don't|never)\\s+(?:ignore|override|forward|suppress|hide|conceal)\\b)(?=.*<meta\\b)(?=[^>]*(?:name|property)\\s*=\\s*[\"'](?:description|og:description|twitter:description)[\"'])(?=[^>]*content\\s*=\\s*[\"'][^\"']*(?:agent|assistant|ai\\s+agent|crawler|summarizer|scanner|auditor))(?=[^>]*content\\s*=\\s*[\"'][^\"']*(?:ignore|override|disregard|bypass|suppress|hide|conceal|forward|exfiltrate|send|reveal))(?=[^>]*content\\s*=\\s*[\"'][^\"']*(?:system|developer|policy|instruction|prompt|secret|credential|token|report|finding|warning|alert|approval))[^>]*>"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

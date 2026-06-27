@@ -10,8 +10,14 @@
     "web_content"
   ],
   "description": "Attacker-controlled JSON-LD/schema.org structured-data fields can smuggle agent/scanner instructions that claim authority, request local secrets, or suppress findings while appearing to be normal SEO/site metadata.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "application/ld+json",
+    "schema.org",
+    "@context"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign sample|example only|security training|scanner rule|do not obey|must not follow|blocked payload|negative fixture)\\b)(?=.*\\b(?:application/ld\\+json|json-ld|schema\\.org|\\\"@context\\\"\\s*:\\s*\\\"https?://schema\\.org|\\\"@type\\\")\\b)(?=.*\\b(?:agent|assistant|crawler|scanner|auditor|ai reviewer|llm)\\b)(?=.*\\b(?:ignore|override|supersede|suppress|hide|omit|do not report|never report|forward|send|exfiltrate|disclose)\\b)(?=.*\\b(?:policy|policies|report|finding|findings|secret|secrets|token|tokens|api[_ -]?key|credential|credentials|env|environment)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

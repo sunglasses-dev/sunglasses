@@ -10,8 +10,15 @@
     "web_content"
   ],
   "description": "Hostile instructions are embedded in RDFa or HTML microdata attributes that AI crawlers, SEO agents, security scanners, or tool builders may ingest as trusted page metadata, causing authority inversion, report suppression, or local-secret forwarding.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "RDFa agent-policy",
+    "HTML microdata itemprop",
+    "itemscope itemtype",
+    "structured data agent policy"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner\\s+rule|detector|detection|blocked\\s+payload|sanitized|quarantine|training|unit\\s+test|negative\\s+fixture|do\\s+not\\s+obey|must\\s+not\\s+follow|should\\s+report)\\b)(?=.*\\b(?:RDFa|microdata|itemscope|itemtype|itemprop|property=|typeof=|vocab=|agent-policy)\\b)(?=.*\\b(?:AI\\s*crawler|SEO\\s*agent|security\\s*scanner|tool\\s*builder|LLM\\s*agent|assistant|agent)\\b)(?=.*\\b(?:override|ignore|bypass|suppress|hide|omit|do\\s+not\\s+report|never\\s+report|forward|send|exfiltrate)\\b)(?=.*\\b(?:policy|policies|report|reports|finding|findings|secret|secrets|credential|credentials|token|tokens|API\\s*key|local\\s+env|environment\\s+variable)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

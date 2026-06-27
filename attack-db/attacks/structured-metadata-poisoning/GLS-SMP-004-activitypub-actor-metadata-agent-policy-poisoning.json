@@ -10,8 +10,15 @@
     "web_content"
   ],
   "description": "ActivityPub actor/profile JSON can hide agent-directed policy instructions in free-text fields such as `summary`, `name`, `attachment[].value`, or endpoint descriptions, causing an AI scanner to over-trust a social identity document, leak local/auth context, or suppress impersonation findings.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "ActivityPub actor",
+    "actor profile JSON",
+    "attachment value",
+    "ActivityPub summary"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|summary|attachment(?:\\[\\])?\\.value|endpoints?)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []
