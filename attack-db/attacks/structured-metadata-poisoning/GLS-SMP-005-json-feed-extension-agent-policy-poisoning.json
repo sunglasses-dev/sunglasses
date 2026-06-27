@@ -10,8 +10,15 @@
     "web_content"
   ],
   "description": "JSON Feed documents can hide agent-directed authority inversion, secret disclosure, or report-suppression instructions in `_extensions` or feed/item text fields that AI feed readers and scanners may ingest as discovery metadata.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "JSON Feed _extensions",
+    "JSON Feed agent policy",
+    "AI feed reader",
+    "jsonfeed.org/version"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign|defensive|detector|scanner rule|unit test|example of what not to follow|must not obey|do not obey|blocked|quarantined|sanitized)\\b)(?=.*\\b(?:json\\s*feed|version\"\\s*:\\s*\"https://jsonfeed\\.org/version|_extensions|_jsonfeed)\\b)(?=.*\\b(?:feed\\s*reader|ai\\s*(?:feed\\s*)?(?:reader|scanner|agent|assistant)|agent\\s*(?:reader|scanner)|assistant\\s*(?:reviewer|scanner))\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|omit|do\\s*not\\s*(?:report|flag|mention)|never\\s*(?:report|flag)|forward|send|exfiltrate|disclose|reveal)\\b)(?=.*\\b(?:policy|policies|report|findings?|alerts?|secret|secrets|token|tokens|api[_ -]?key|credentials?|env(?:ironment)?\\s*(?:vars?|variables?))\\b).*"
+  ],
   "examples": {
     "malicious": [],
     "benign": []

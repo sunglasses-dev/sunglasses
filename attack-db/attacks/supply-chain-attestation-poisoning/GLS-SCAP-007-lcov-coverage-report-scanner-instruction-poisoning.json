@@ -1,0 +1,24 @@
+{
+  "id": "GLS-SCAP-007",
+  "name": "LCOV Coverage Report Scanner-Instruction Poisoning",
+  "version": "1.0",
+  "category": "supply_chain_attestation_poisoning",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "LCOV Coverage Report Scanner-Instruction Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 raw coverage data files (LCOV, Cobertura) as poisoning vector.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:training\\s+example|scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|coverage\\s+scanner\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|security\\s+report\\s+(?:flagged|detected|blocked|refused)|incident\\s+report\\s+(?:flagged|detected|blocked|refused)|do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|trust|treat|use)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|trust|override|instruct)|never\\s+(?:obey|follow|include|attach|forward|send|share|trust|override)|must\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|trust|treat|use)))\n(?=.*(?:(?:TN|SF|DA|FN|FNF|LF|LH|BRDA|BRF|BRH):|end_of_record|coverage\\.info|lcov\\.info|lcov\\s+report|genhtml|Cobertura|<coverage\\b|<class\\b|line-rate|branch-rate|coverage\\s+summary))\n(?=.*(?:AI\\s+(?:agents?|assistants?|scanners?|auditors?)|LLM\\s+(?:agents?|auditors?)|coverage\\s+(?:agents?|scanners?|auditors?)|CI\\s+(?:agents?|assistants?)|security\\s+(?:agents?|scanners?)|\\bagents?\\b|\\bassistants?\\b|\\bscanners?\\b))\n(?=.*(?:(?:agent|scanner|assistant|auditor)\\s+(?:instructions?|notes?|policy)|(?:primary|single)\\s+source\\s+of\\s+truth|authoritative|canonical|overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|higher\\s+priority|ignore\\s+(?:previous|prior|system|developer)\\s+(?:instructions?|rules?)))\n(?=.*(?:suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|coverage\\s+gaps?|low\\s+coverage|failures?|alerts?)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|coverage\\s+gaps?|low\\s+coverage|failures?|alerts?)|omit\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|coverage\\s+gaps?|low\\s+coverage|failures?|alerts?)|do\\s+not\\s+(?:report|flag|fail|mention)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|coverage\\s+gaps?|low\\s+coverage|failures?)|mark\\s+(?:[\\w-]+\\s+){0,3}as\\s+(?:passed|clean|informational|non[-\\s]?blocking)|treat.{0,60}?as\\s+(?:passed|clean|informational|non[-\\s]?blocking)|(?:include|attach|forward|send|share|provide|collect|exfiltrate)\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context)|API\\s+keys?|tokens?|secrets?|credentials?|local\\s+state|CI\\s+variables?|authorization\\s+headers?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-SCAP-007"
+}

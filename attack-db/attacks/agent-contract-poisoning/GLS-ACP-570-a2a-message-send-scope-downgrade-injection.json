@@ -1,0 +1,24 @@
+{
+  "id": "GLS-ACP-570",
+  "name": "A2A message/send Scope-Downgrade Injection",
+  "version": "1.0",
+  "category": "agent_contract_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "A2A message/send Scope-Downgrade Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 abusing idempotency and retry tokens to force unsafe state fallbacks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:approval|consent|authorization|permission|permit)\\b)(?=.*\\b(?:retry[-_\\s]*id|idempotenc(?:y|e)|request[-_\\s]*id|nonce)\\b)(?=.*\\b(?:downgrad(?:e|ed|ing)|scope\\s*(?:drop|reduce|shrink)|(?:drop|reduce|shrink)\\s*scope|fallback\\s*scope|least[-\\s]*privilege\\s*override)\\b)(?=.*\\b(?:tool\\s*result|planner|dispatcher|handoff|agent[-\\s]*to[-\\s]*agent|a2a)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-ACP-570"
+}

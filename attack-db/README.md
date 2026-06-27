@@ -15,7 +15,7 @@ scanner actually loads at runtime. The JSON files in `attacks/` are a
 human-readable **export** of those patterns, generated from `patterns.py` so the
 database is easy to browse, search, and contribute to.
 
-- `patterns.py` → the single source of truth (1048 patterns / 65 categories)
+- `patterns.py` → the single source of truth (1059 patterns / 65 categories)
 - `attacks/*.json` → generated, browsable mirror
   (regenerate with `scripts/export_patterns_to_attack_db.py`)
 - Community adds new patterns via pull requests

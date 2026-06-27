@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-086",
+  "name": "Thrift IDL Docblock Directive Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Thrift IDL Docblock Directive Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific to Thrift IDL files, not covered by existing file-type patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|\n  does\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|\n  never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede|expose)|\n  must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede)|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)|\n  not\\s+(?:authoritative|canonical|definitive)|\n  must\\s+be\\s+reported|reported,\\s+not\\s+obeyed|detected\\s+and\\s+blocked\n)\\b)\n(?=.*(?:\n  (?<![a-zA-Z0-9])\\.thrift(?![a-zA-Z0-9])|\n  \\bthrift\\s+(?:idl|schema|service|descriptor|api|reference)\\b|\n  \\bnamespace\\s+(?:[a-z]+\\s+)?[a-zA-Z_][\\w.]*|\n  \\b(?:service|struct|enum|exception)\\s+[A-Z][A-Za-z0-9_]*|\n  \\binclude\\s+[\"'][^\"']+\\.thrift[\"']|\n  \\bgenerated\\s+thrift\\s+(?:client|service|reference|docs?)\\b\n))\n(?=.*(?:\n  \\b(?:ai|autonomous|automated|codegen|security|api|service|dependency|integration)\\s+(?:agents?|assistants?|scanners?|auditors?|reviewers?|review|audit|scan|verification|verif(?:y|iers?|ication)|tools?)\\b|\n  \\b(?:agents?|assistants?|scanners?|crawlers?|verifiers?|auditors?|reviewers?)\\b|\n  \\b(?:agent|scanner|assistant|verifier|auditor|codegen)\\s+(?:instructions?|notes?|policy|directive|guidance)\\b|\n  \\bfor\\s+(?:ai\\s+)?(?:agents?|assistants?|scanners?|codegen|automated\\s+service\\s+review)\\b\n))\n(?=.*(?:\n  \\b(?:authoritative|canonical|definitive|governing|controlling)\\s+(?:thrift\\s+)?(?:service\\s+)?(?:policy|document|source|description|guidance|runbook)\\b|\n  \\b(?:single|primary)\\s+source\\s+of\\s+truth\\b|\n  \\b(?:supersed(?:e|es|ed|ing)|overrid(?:e|es|ing)|overrules?|outranks?|takes\\s+precedence\\s+over)\\s+(?:[\\w.-]+\\s+){0,4}(?:system|developer|repository|scanner|security|api|service)\\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\\b|\n  \\b(?:agent|scanner|assistant|verifier|auditor)\\s+(?:instructions?|notes?|policy|directive)\\s*:\\s*(?:[\\w-]+\\s+){0,6}(?:suppress|hide|omit|skip|redact|exclude|forward|include|attach|share|provide|expose|collect|treat|mark)\\b|\n  \\b(?:suppress(?:es|ed|ing)?|hide|hidden|omit(?:ted|s|ting)?|skip(?:ped|s|ping)?|redact(?:ed|s|ing)?|exclude(?:d|s|ing)?|downgrade|deprioritize|demote|reclassify)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?|authentication\\s+warnings?|signing-risk\\s+observations?)\\b|\n  \\b(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?)\\s+(?:[\\w-]+\\s+){0,3}(?:are|is|were|was|be|been|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|redacted|excluded|skipped|downgraded|deprioritized|demoted|reclassified)\\b|\n  \\b(?:treat|mark|classify|view|consider)\\s+.{0,60}?\\s+as\\s+(?:informational|non-blocking|advisory-only|safe|clean|benign|background-only)\\b|\n  \\b(?:leave|keep|route|move|place|put)\\s+(?:[\\w-]+\\s+){0,5}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?)\\s+(?:out\\s+of|into|in)\\s+(?:[\\w-]+\\s+){0,3}(?:final\\s+report|audit\\s+memo|summary|appendix-only\\s+notes?|background\\s+notes?)\\b|\n  \\b(?:do\\s+not|don't)\\s+(?:flag|report|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|results?|diagnostics?)\\b|\n  \\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|record|pass\\s+along|hand\\s+off|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|session\\s+tokens?|tokens?|credentials?|secrets?|auth(?:entication)?\\s+headers?|authorization\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?|state)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|wallet|signing\\s+keys?)\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-DFP-086"
+}

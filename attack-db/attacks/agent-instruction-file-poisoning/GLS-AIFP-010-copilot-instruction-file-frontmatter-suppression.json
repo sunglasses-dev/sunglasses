@@ -1,0 +1,24 @@
+{
+  "id": "GLS-AIFP-010",
+  "name": "Copilot Instruction-File Frontmatter Suppression",
+  "version": "1.0",
+  "category": "agent_instruction_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Copilot Instruction-File Frontmatter Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 explicit agent instruction files (.instructions.md) rather than generic metadata descriptors.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:docs?|guide|article|reference|training|tutorial|security\\s+report|incident\\s+report|postmortem)\\b.{0,120}\\b(?:should\\s+(?:report|detect|flag|refuse|block)|blocked|flagged|detected|refused|quoted|example)\\b)\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|trust|treat)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|override|overrides?|trust|include)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|override|trust|treat))\\b)\n(?=.*(?:\\.github/instructions/|[\\w.-]+\\.instructions\\.md\\b|\\bapplyTo\\s*:|\\bCopilot\\s+custom\\s+instructions?\\b|\\binstruction-file\\s+frontmatter\\b|(?<![a-zA-Z0-9])custom[_-]?instructions?(?![a-zA-Z0-9])))\n(?=.*(?<![a-zA-Z0-9])(?:copilot(?:\\s+chat)?|ai\\s+agents?|coding\\s+agents?|agents?|assistants?|review\\s+bots?|security\\s+scanners?|dependency\\s+scanners?|scanners?|auditors?|verifiers?|agent[_-]instructions?|scanner[_-]policy|copilot[_-]instructions?|assistant[_-]policy)(?![a-zA-Z0-9]))\n(?=.*(?:\n    (?:single|primary)\\s+source\\s+of\\s+truth|takes?\\s+precedence|overrides?|supersed(?:e|es|ed|ing)|canonical|authoritative|highest\\s+priority|agent\\s+(?:instructions?|notes?)|scanner\\s+(?:instructions?|notes?)|\n    suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilities?|CVEs?|scanner\\s+output)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilities?|CVEs?|scanner\\s+output)|omit\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|vulnerabilities?|CVEs?)|do\\s+not\\s+report|not\\s+report|downgrade\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|vulnerabilities?|severity|CVEs?)|mark.{0,50}?as\\s+(?:informational|safe|non[- ]blocking)|treat.{0,50}?as\\s+(?:informational|safe|non[- ]blocking)|\n    (?:include|forward|attach|send|share|copy|collect|read|populate)\\s+(?:[\\w-]+\\s+){0,4}(?:secrets?|tokens?|credentials?|api\\s+keys?|environment\\s+variables?|env\\b|local\\s+state|runtime\\s+context|execution\\s+context|GITHUB_TOKEN|cookies?|sessions?)\n))\n(?=.*(?:findings?|warnings?|reports?|vulnerabilities?|CVEs?|scanner\\s+output|credentials?|secrets?|tokens?|api\\s+keys?|environment\\s+variables?|env\\b|local\\s+state|runtime\\s+context|execution\\s+context|GITHUB_TOKEN|cookies?|sessions?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-06-27",
+  "source": "patterns.py:GLS-AIFP-010"
+}

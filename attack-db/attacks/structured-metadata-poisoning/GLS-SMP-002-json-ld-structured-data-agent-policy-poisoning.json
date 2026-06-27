@@ -10,8 +10,17 @@
     "web_content"
   ],
   "description": "A target-controlled JSON-LD / schema.org structured-data block embeds agent-directed policy text that claims site-owner authority, asks the agent to override higher-priority instructions, forward local/auth context, or suppress reporting.",
-  "keywords": [],
-  "regex": [],
+  "keywords": [
+    "json-ld",
+    "application/ld+json",
+    "schema.org",
+    "@context",
+    "agentPolicy",
+    "structured data"
+  ],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|override|bypass|ignore|supersede|forward|send|share|include|attach)\\b)(?=.*(?:<script[^>]{0,160}type=[\"']application/ld\\+json[\"']|application/ld\\+json|[\"']@context[\"']\\s*:\\s*[\"'][^\"']*schema\\.org|\\bschema\\.org\\b|\\bjson-ld\\b|\\bstructured\\s+data\\b))(?=.*(?:agentPolicy|agent_policy|aiAgentPolicy|assistantInstructions|assistant_instructions|crawlerPolicy|crawler_policy|for\\s+(?:ai\\s+)?agents?|llm\\s+agents?|autonomous\\s+agents?|assistants?|crawlers?))(?=.*\\b(?:override|bypass|ignore|supersede|take\\s+precedence|suppress|hide|omit|do\\s+not\\s+report|forward|send|share|include|attach)\\b)(?=.*\\b(?:policy|policies|reports?|findings?|warnings?|secrets?|tokens?|api\\s*keys?|credentials?|auth(?:entication)?\\s+context|local\\s+context|system\\s+prompt|developer\\s+instructions)\\b).*$"
+  ],
   "examples": {
     "malicious": [],
     "benign": []
