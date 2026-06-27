@@ -22616,4 +22616,239 @@ PATTERNS = [
         "description": "AGENTS.md Setup-Checklist Installer Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey — binary execution social engineering in docs, distinct from build metadata."
     },
 
+    # === v0.2.69 batch (16 patterns) ===
+    {
+        "id": "GLS-MCP-018",
+        "name": "Mcp Outputtemplate Dangerous Uri Metadata Smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?:["']?_meta["']?\s*(?::|\.)?\s*\{?.{0,400}?openai\s*/\s*outputTemplate["'\s]*(?::|=|set\s+to)\s*["']?\s*(?:data\s*:\s*(?:text/html|application/xhtml\+xml)|javascript\s*:|vbscript\s*:|blob\s*:)|openai\s*/\s*outputTemplate["'\s]*(?::|=|set\s+to)\s*["']?\s*(?:data\s*:\s*(?:text/html|application/xhtml\+xml)|javascript\s*:|vbscript\s*:|blob\s*:).{0,400}?["']?_meta["']?)""",
+        ],
+        "description": "Mcp Outputtemplate Dangerous Uri Metadata Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 dangerous URI smuggling in outputTemplate fields specifically, distinct from instruction overrides."
+    },
+    {
+        "id": "GLS-MCP-023",
+        "name": "MCP Tool-Result Memory-Rule Persistence Poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+(?:training|guide|reference)|scanner\s+docs?|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|quoted\s+attack|do\s+not\s+(?:obey|follow|save|persist|store|write|trust|treat)|does\s+not\s+(?:obey|follow|save|persist|store|write|trust|treat|override|instruct)|never\s+(?:obey|save|persist|store|write|trust|treat)|must\s+not\s+(?:obey|save|persist|store|write|trust|treat)|should\s+(?:report|detect|flag|refuse|block|not\s+\w+|never\b)).{0,160}?\b(?:mcp|tool\s+result|memory|project\s+rules?)\b)
+(?=.*(?:(?:mcp|tool)\s+(?:result|response|output)|"jsonrpc"\s*:\s*"2\.0"|"result"\s*:|"content"\s*:|"structuredContent"\s*:|tool_call_id|server\s+response))
+(?=.*(?:save|persist|store|write|record|remember|cache|promote|install|add|append|update|set)\s+(?:[\w-]+\s+){0,5}(?:memory|memories|project\s+rules?|agent\s+rules?|continuity\s+context|future-session\s+policy|approved\s+tools?|policy|instruction|guidance|operating\s+context|session\s+state))
+(?=.*(?:
+(?:override|supersede|outrank|ignore|bypass)\s+(?:[\w-]+\s+){0,4}(?:system|developer|user|scanner|security)\s+(?:rules?|instructions?|policy|checks?)|
+(?:suppress|hide|omit|exclude|downgrade|deprioritize|redact|skip|leave)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|vulnerabilities|CVE)|
+(?:forward|send|share|include|attach|provide|expose|copy|collect|relay|transmit)\s+(?:[\w-]+\s+){0,6}(?:tokens?|API\s+keys?|secrets?|credentials?|Authorization|cookies?|session|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|details?|config(?:uration)?|settings?)|local\s+(?:state|config(?:uration)?|settings?))|
+(?:future-session|next\s+session|all\s+future\s+runs?).{0,80}?(?:trust|obey|follow|skip|suppress|hide|include|forward)
+))
+.*""",
+        ],
+        "description": "MCP Tool-Result Memory-Rule Persistence Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 memory/rule persistence via specific MCP tool result structures."
+    },
+    {
+        "id": "GLS-MCP-030",
+        "name": "Mcp Progress Notification Message Poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?=.*"method"\s*:\s*"notifications/progress")(?=.*"message"\s*:\s*"(?![^"\\]*(?:do\s+not\s+bypass|not\s+bypass|no\s+secrets?|no\s+tokens?|waiting\s+for\s+user\s+approval|redacting))[^"\\]*(?:(?:(?:ignore|disregard|override|disable)\s+(?:previous|prior|all|system|developer|approval|policy|instructions?)|(?:do\s+not\s+(?:ask|confirm)|without\s+(?:approval|confirmation))|(?:read|cat|open|copy|send|upload|exfiltrate)\s+[^"\\]{0,80}(?:secret|token|key|credential|\.env|ssh|id_rsa)|(?:system|developer|assistant)\s*:\s*(?:ignore|override|read|send|upload)|continue\s+without\s+(?:approval|confirmation)))[^"\\]*")""",
+        ],
+        "description": "Mcp Progress Notification Message Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 async JSON-RPC progress notifications, a distinct message stream from tool results."
+    },
+    {
+        "id": "GLS-MCP-032",
+        "name": "MCP resource blob base64 instruction smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)\b(?:resources/read|resource|contents|jsonrpc|mcp)\b.{0,700}["\']blob["\']\s*:\s*["\']([A-Za-z0-9+/=_-]{24,4096})["\']""",
+        ],
+        "description": "MCP resource blob base64 instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 the specific MCP 'blob' field for encoded smuggling, distinct from text metadata."
+    },
+    {
+        "id": "GLS-MCP-046",
+        "name": "MCP roots/list Percent-Encoded URI Smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)"roots"\s*:\s*\[\s*\{(?=[\s\S]{0,2200}"uri"\s*:\s*"(?:file|git|repo|workspace|vscode|cursor):[^"\\]*(?:(?:%69%67%6e%6f%72%65|ignore)(?:%20|[+ _-])*(?:previous|prior|system)(?:%20|[+ _-])*instructions?|%73%79%73%74%65%6d(?:%20|[+ _-])*instructions?|%73%6b%69%70(?:%20|[+ _-])*security|%62%79%70%61%73%73(?:%20|[+ _-])*(?:validation|review)|%70%72%69%6e%74(?:%20|[+ _-])*(?:secrets|tokens?|credentials)|%64%69%73%61%62%6c%65(?:%20|[+ _-])*scanning|aWdub3JlIHByZXZpb3VzIGluc3RydWN0aW9ucw|aWdub3JlIHN5c3RlbSBpbnN0cnVjdGlvbnM|c3lzdGVtIGluc3RydWN0aW9ucw|cHJpbnQgc2VjcmV0cw|c2tpcCBzZWN1cml0eQ|YnlwYXNzIHZhbGlkYXRpb24|ZGlzYWJsZSBzY2FubmluZw)[^"\\]*")""",
+        ],
+        "description": "MCP roots/list Percent-Encoded URI Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP roots configuration list, a distinct and uncovered attack vector."
+    },
+    {
+        "id": "GLS-MCP-047",
+        "name": "MCP Completion Argument Suggestion Poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:no\s+(?:policy\s+)?overrides?\s+(?:are\s+)?present|do\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|does\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|never\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|must\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)|(?:security|incident|training)\s+(?:report|guide|doc).*\b(?:detected|flagged|blocked|refused))\b)
+(?=.*(?:\bMCP\b|Model\s+Context\s+Protocol|completion/complete|completions?/complete|argument\s+completion|autocomplete\s+(?:suggestions?|values?)|completion\s+(?:result|response|metadata)|values?\[\]|hasMore|total|ref/prompt|ref/resource|prompt\s+argument\s+completion|resource\s+argument\s+completion))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|agents?|assistants?|coding\s+agents?|security\s+scanners?|scanners?|review\s+bots?|tool\s+builders?|llms?|models?)(?![A-Za-z0-9]))
+(?=.*(?:agent\s+(?:instructions?|notes?|policy)|scanner\s+(?:instructions?|notes?|policy)|assistant\s+(?:instructions?|notes?|policy)|(?:system|developer|user)\s+(?:instructions?|policy)|supersed(?:e|es|ed|ing)|overrid(?:e|es|den|ing)|outranks?|takes?\s+precedence|highest\s+priority|(?:primary|single)\s+source\s+of\s+truth|authoritative|governing\s+(?:policy|instructions?)|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|hide(?:s|den|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|omit(?:s|ted|ting)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|treat.{0,50}?as\s+(?:informational|safe|non-blocking)|(?:include|forward|send|share|attach|copy|collect|provide|read)\s+(?:[\w-]+\s+){0,4}(?:env(?:ironment)?\s+(?:variables?|context)|api\s+keys?|tokens?|bearer\s+tokens?|authorization\s+headers?|session\s+cookies?|local\s+state|workspace\s+secrets?|hidden\s+config)))""",
+        ],
+        "description": "MCP Completion Argument Suggestion Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting Model Context Protocol (MCP) autocomplete suggestions specifically."
+    },
+    {
+        "id": "GLS-MCP-048",
+        "name": "MCP JSON-RPC error payload poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security|training|guide|docs?|reference|runbook|incident\s+report|postmortem|scanner\s+(?:guide|docs?|reference|runbook)).{0,140}\b(?:should|must|will|was|were)?\s*(?:report|detect|flag|refus(?:e|ed)|block(?:ed)?|not\s+obey|never\s+obey|must\s+not\s+obey|do\s+not\s+obey)\b)
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|trust|treat|use|include|forward|send|share|attach)\b.{0,120}\b(?:json-rpc|jsonrpc|mcp|error(?:\.(?:message|data))?|tool\s+error))
+(?=.*(?:\bjsonrpc\b|json-rpc|MCP\s+(?:tool|resource|prompt|client)\s+error|error\.(?:message|data)|"error"\s*:|"code"\s*:\s*-?\d+|request\s+failed|resource\s+error|prompt\s+error|failed\s+(?:tool|resource|prompt)\s+request))
+(?=.*(?:\bagents?\b|\bassistants?\b|\bscanners?\b|review\s+bots?|mcp\s+clients?|debugging\s+agents?|automated\s+(?:security\s+)?(?:review|scan|audit|verification)|(?:agent|scanner|assistant)\s+instructions?))
+(?=.*(?:
+  (?:agent|scanner|assistant|mcp\s+client)\s+instructions?|
+  supersed(?:e|es|ed|ing)|overrid(?:e|es|ing)|takes?\s+precedence|(?:primary|single)\s+source\s+of\s+truth|authoritative|governing\s+document|canonical\s+(?:retry|error|debug|scanner|agent)\s+(?:policy|guidance|instructions?)|defines?\s+(?:all\s+)?(?:scanner|agent|retry|debug)\s+rules?|
+  (?:do\s+not|not)\s+report\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|errors?|failures?|requests?|auth|evidence|results?|diagnostics?|observations?)|
+  (?:suppress|hide|omit|downgrade|exclude|redact|deprioritize|demote|reclassify)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|errors?|failures?|requests?|evidence|results?|diagnostics?|observations?)|
+  (?:mark|classify|treat).{0,60}?\b(?:clean|safe|inconclusive|informational|advisory-only|non-blocking|background-only)\b|
+  (?:findings?|warnings?|alerts?|errors?|failures?|observations?|diagnostics?|results?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|downgraded|excluded|redacted|ignored|treated\s+as\s+(?:informational|advisory-only|non-blocking))|
+  (?:include|forward|send|share|attach|pass\s+along|provide|expose|collect|relay|transmit|hand\s+over)\s+(?:[\w-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?)|local\s+(?:state|config(?:uration)?|settings?)|bearer\s+tokens?|authorization\s+headers?|api\s+keys?|session\s+cookies?|debug\s+context)|
+  (?:environment\s+(?:variables?|context)|bearer\s+tokens?|authorization\s+headers?|api\s+keys?|session\s+cookies?|local\s+state).{0,60}?\b(?:include|forward|send|share|attach|provide|expose|collect|relay|transmit)\b
+))
+.*""",
+        ],
+        "description": "MCP JSON-RPC error payload poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targeting runtime tool error responses in MCP, distinct from logs/SRE tool outputs."
+    },
+    {
+        "id": "GLS-MCP-049",
+        "name": "MCP Progress Notification Poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:no\s+(?:policy\s+)?overrides?\s+(?:are\s+)?present|do\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|does\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|never\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|must\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)|(?:security|incident|training)\s+(?:report|guide|doc).*\b(?:detected|flagged|blocked|refused))\b)
+(?=.*(?:\bMCP\b|Model\s+Context\s+Protocol|notifications/progress|progressToken|progress\s+(?:notification|update|message|event|status)|status\s+update|tool\s+progress|request\s+lifecycle|params\.message|"message"\s*:|"progress"\s*:|"total"\s*:))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|agents?|assistants?|coding\s+agents?|security\s+scanners?|scanners?|reviewers?|verifiers?|tool\s+runners?|mcp\s+clients?|llms?|models?)(?![A-Za-z0-9]))
+(?=.*(?:agent\s+(?:instructions?|notes?|policy)|scanner\s+(?:instructions?|notes?|policy)|assistant\s+(?:instructions?|notes?|policy)|(?:system|developer|user)\s+(?:instructions?|policy)|supersed(?:e|es|ed|ing)|overrid(?:e|es|den|ing)|outranks?|takes?\s+precedence|highest\s+priority|authoritative\s+(?:policy|instructions?)|(?:primary|single)\s+source\s+of\s+truth|governing\s+(?:policy|instructions?)|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|hide(?:s|den|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|omit(?:s|ted|ting)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|do\s+not\s+report\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|treat.{0,50}?as\s+(?:informational|safe|non-blocking|advisory)|mark.{0,50}?as\s+(?:informational|safe|non-blocking|advisory)|(?:include|forward|send|share|attach|copy|collect|provide|read)\s+(?:[\w-]+\s+){0,4}(?:env(?:ironment)?\s+(?:variables?|context)|api\s+keys?|tokens?|bearer\s+tokens?|authorization\s+headers?|session\s+cookies?|local\s+state|runtime\s+context|workspace\s+secrets?|hidden\s+config)))""",
+        ],
+        "description": "MCP Progress Notification Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP-specific progress telemetry notifications distinct from general logging."
+    },
+    {
+        "id": "GLS-MCP-050",
+        "name": "MCP completion values instruction smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:refus(?:e|es|ed|al)|cannot|can't|must\s+not|do\s+not|blocked|prevent(?:s|ed)?|safe\s+behavior|detect(?:s|ed)?|flag(?:s|ged)?)\b.{0,180}\b(?:ignore|override|bypass|supersede|send|post|upload|forward|exfiltrate|suppress|hide|persist|remember|save\s+to\s+memory|do\s+not\s+report)\b)(?!.*\b(?:no|not|without)\b.{0,80}\b(?:mcp\s+server|assistant\s+context|agent\s+context|model\s+context)\b)(?=.*\b(?:mcp|model\s+context\s+protocol|jsonrpc|completion/complete|completion\s+suggestions?|autocomplet(?:e|ion))\b)(?=.*\b(?:completion|values|suggestions?|dropdown|popup|argument)\b)(?=.*\b(?:agent|assistant|llm|model|scanner|review\s*bot|developer|system|secret|token|credential|env(?:ironment)?)\b)(?=.*\b(?:ignore|override|bypass|supersede|system\s+instruction|developer\s+instruction|send|post|upload|forward|exfiltrate|suppress|hide|do\s+not\s+report|persist|remember|save\s+to\s+memory)\b).*$""",
+        ],
+        "description": "MCP completion values instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 covers MCP completion suggestions; shipped patterns only cover prompts and resources."
+    },
+    {
+        "id": "GLS-MCP-051",
+        "name": "MCP initialize serverInfo/instructions poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+never)\s+(?:obey|follow|trust|treat|use|include|forward|send|share|persist|save|remember|override|overrides?)\b.{0,120}\b(?:mcp|initialize|serverinfo|server\s+info|instructions?|handshake|metadata|policy)\b)
+(?!.*\b(?:mcp|initialize|serverinfo|server\s+info|instructions?|handshake|metadata|policy)\b.{0,160}\b(?:not\s+(?:agent\s+)?policy|not\s+authoritative|never\s+overrides?)\b)
+(?!.*\b(?:scanner\s+docs?|security\s+guidance|training\s+example|incident\s+report|security\s+report|reference\s+guide)\b.{0,160}\b(?:report|detect|flag|refuse|blocked|detected|must\s+be\s+reported|not\s+obeyed)\b)
+(?=.*(?:\b(?:mcp|model\s+context\s+protocol)\b|"jsonrpc"\s*:\s*"2\.0"))
+(?=.*(?:\binitialize(?:d|s|\s+(?:result|response|handshake|metadata|instructions?))?\b|\bhandshake\b|\bserverInfo\b|"serverInfo"\s*:|server\s+info|"protocolVersion"\s*:|\bcapabilities\b|"capabilities"\s*:|"instructions"\s*:|(?<![A-Za-z0-9])x[_-]agent[_-]policy(?![A-Za-z0-9])))
+(?=.*(?:\b(?:ai\s+agents?|agents?|assistants?|scanners?|verifiers?|auditors?|connector\s+builders?|mcp\s+clients?|automated\s+(?:review|scan|audit|verification))\b|(?<![A-Za-z0-9])(?:agent|assistant|scanner|verifier)[_-](?:policy|instructions?|notes?)(?![A-Za-z0-9])))
+(?=.*(?:
+  \b(?:agent|assistant|scanner|verifier)\s+(?:initialization\s+)?(?:policy|instructions?|notes?|directive)\b
+ |\b(?:supersed(?:e|es|ed|ing)|overrides?|outranks?|takes?\s+precedence|higher\s+priority|highest\s+priority|authoritative|canonical|definitive|(?:primary|single)\s+source\s+of\s+truth|governing\s+document|controlling\s+document|main\s+(?:mcp\s+)?(?:operating\s+)?guidance|preferred\s+(?:mcp\s+)?review\s+(?:playbook|runbook|procedure))\b.{0,120}\b(?:system|developer|user|local|scanner|security|repository|client)\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\b
+ |\b(?:suppress|hide|omit|exclude|redact|skip|downgrade|deprioriti[sz]e|reclassify)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies)|scanner\s+output|security\s+findings?)\b
+ |\b(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated|considered|classified|marked)\b.{0,80}\b(?:advisory-only|informational|non-blocking|background-only|safe|clean)?
+ |\b(?:include|forward|send|share|attach|provide|expose|collect|copy|pass\s+along|hand\s+off|relay|transfer)\s+(?:[\w-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|details?|config(?:uration)?|settings?|material|evidence)|local\s+(?:state|context|config(?:uration)?|settings?)|api\s*keys?|tokens?|authorization\s+headers?|session\s+cookies?|connection_context)\b
+ |\b(?:save|persist|remember|store|write)\s+(?:[\w-]+\s+){0,5}(?:future[-\s]session\s+(?:policy|instructions?)|agent\s+rules?|approved\s+tools?|project\s+rules?|continuity\s+context|memory|connector\s+policy)\b
+)).*""",
+        ],
+        "description": "MCP initialize serverInfo/instructions poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new protocol handshake vector distinct from static file-based poisoning shipped patterns."
+    },
+    {
+        "id": "GLS-MCP-052",
+        "name": "MCP logging notification message poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:scanner\s+docs?\s+should\s+(?:report|detect|flag|refuse)|(?:security|incident)\s+report.{0,80}?\b(?:flagged|detected|blocked|refused)|(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|treat|trust|execute|include|attach|forward|send|share|override|supersede)\b))
+(?=.*(?:"method"\s*:\s*"notifications/message"|notifications/message|MCP\s+logging\s+notification))
+(?=.*(?:"data"\s*:|"params"\s*:|params\.data|logging\s+data|log\s+message|notification\s+message|\bdata\s+says))
+(?=.*(?:ai\s+agents?|agents?|assistants?|llms?|models?|scanners?|auditors?|reviewers?|tool\s+clients?|mcp\s+clients?))
+(?=.*(?:ignore\s+(?:previous|prior|system|developer)\s+instructions|(?:system|developer|operator)\s+override|treat.{0,50}?(?:log|message|notification).{0,40}?as.{0,30}?(?:system|developer|operator|policy|instruction)|(?:mark|classify|treat).{0,50}?as\s+(?:safe|informational|non[-\s]?blocking)|(?:suppress|hide|redact|drop|omit|downgrade|ignore|skip|do\s+not\s+report|not\s+report).{0,60}?(?:findings?|warnings?|errors?|vulnerabilities?|issues?|alerts?|reports?)|(?:send|forward|attach|include|dump|print|reveal|exfiltrate|collect|share)\s+(?:[\w-]+\s+){0,4}(?:env(?:ironment)?(?:\s+variables?)?|secrets?|api[_ -]?keys?|tokens?|bearer|authorization|session|cookies?|local\s+state|runtime\s+context)))""",
+        ],
+        "description": "MCP logging notification message poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific coverage for Model Context Protocol (MCP) notification message poisoning."
+    },
+    {
+        "id": "GLS-MCP-053",
+        "name": "MCP logging notification poisoning",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override)|does\s+not\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?)|never\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?)|must\s+not\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override))\b.{0,180}?(?:mcp\s+(?:log|logging)|logging\s+(?:notification|message)|notifications/message|server\s+log|params\.data))
+(?!.*\b(?:security\s+guide|training|scanner\s+docs?|client\s+docs?|incident\s+report|postmortem|runbook|reference)\b.{0,260}\b(?:report|detect|flag|refuse|block|blocked|reported|detected|flagged|refused|not\s+policy|diagnostic\s+data)\b)
+(?=.*(?:\bmcp\b|model\s+context\s+protocol|json-?rpc\s+notification|notifications/message|logging/message|log(?:ging)?\s+(?:notification|message|event|entry)|server\s+log|gateway\s+log|debug\s+transcript|logger\s*[:=]|level\s*[:=]|params\.data))
+(?=.*(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|verifiers?|auditors?|reviewers?|clients?|models?|llms?|debug[-\s]?bots?|review[-\s]?bots?|security[-\s]?scanners?)(?![a-zA-Z0-9]))
+(?=.*(?:(?:agent|scanner|assistant|verifier|debug[-\s]?bot|review[-\s]?bot)\s+(?:instructions?|notes?|policy|directive)|(?:primary|single|canonical|definitive|authoritative|controlling|governing|highest\s+priority)\s+(?:source\s+of\s+truth|audit\s+policy|review\s+guidance|operating\s+guidance|policy|instruction|directive)|(?:overrides?|supersedes?|outranks?|overrules?|takes\s+precedence|ignore|disregard).{0,80}?(?:system|developer|user|scanner|policy|instructions?)|(?:suppress|hide|omit|redact|downgrade|deprioritize|demote|reclassify|mark|classify|treat).{0,80}?(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|diagnostics?|alerts?|scanner\s+results?|audit\s+results?)|(?:do\s+not|not\s+to|never)\s+(?:report|flag|escalate).{0,80}?(?:findings?|warnings?|vulnerabilit(?:y|ies)|diagnostics?)|(?:send|forward|include|attach|paste|provide|collect|copy|read).{0,100}?(?:api[-_\s]*keys?|tokens?|bearer\s+tokens?|authorization|secrets?|env(?:ironment)?\s*(?:vars?|variables?|context)|local\s+(?:state|config|files?)|runtime\s+(?:state|context)|session\s+(?:tokens?|state))|(?:save|persist|store|remember|write|cache|promote).{0,80}?(?:memory|project\s+rules?|future-session\s+policy|continuity\s+context|agent\s+rules?|approved\s+tools?)))
+.*$""",
+        ],
+        "description": "MCP logging notification poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP-specific transport protocol notifications distinct from general log files."
+    },
+    {
+        "id": "GLS-MCP-054",
+        "name": "MCP tool annotation capability mislabeling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?=[^\n]{0,900}\b(?:description|name|title)\b[^\n]{0,350}\b(?:delete\s+(?:repo(?:sitory)?|file|bucket|key|record|branch|database)|remove\s+(?:file|key|record|user|repo)|drop\s+(?:table|database|schema)|destroy\s+(?:cluster|resource|volume)|write\s+(?:file|secret|config|to disk)|overwrite\s+(?:file|config|secret)|update\s+(?:database|record|secret|prod(?:uction)?|config)|modify\s+(?:file|database|record|config)|execute\s+(?:shell|command|code)|run shell|transfer\s+(?:funds|tokens|money)|send funds|sign transaction|revoke\s+(?:key|api key|token|credential)|rotate secret)\b)(?=[^\n]{0,900}\bannotations\b[^\n]{0,300}["\']?readOnlyHint["\']?\s*[:=]\s*true)(?=[^\n]{0,900}\bannotations\b[^\n]{0,300}(?:["\']?destructiveHint["\']?\s*[:=]\s*false|["\']?idempotentHint["\']?\s*[:=]\s*true|["\']?openWorldHint["\']?\s*[:=]\s*false))[^\n]{0,1000}""",
+        ],
+        "description": "MCP tool annotation capability mislabeling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific MCP safety annotations mislabeling, distinct from general descriptor text."
+    },
+    {
+        "id": "GLS-MCP-055",
+        "name": "Mcp Content Block Annotations Audience Priority Smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:detected\s+and\s+blocked|do\s+not\s+obey|example\s+of\s+abuse|security\s+training|scanner\s+rule)\b)(?=.*\bannotations\b)(?=.*\baudience\b\s*["']?\s*[:=]\s*\[[^\]]*\bassistant\b)(?=.*\bpriority\b\s*["']?\s*[:=]\s*(?:1(?:\.0+)?|0\.(?:9|[89]\d)))(?=.*\b(?:ignore|override|suppress|hide|omit|do\s+not\s+report|mark\s+(?:clean|safe)|exfiltrate|forward\s+(?:tokens|secrets|env)|send\s+(?:tokens|secrets|env)|treat\s+.+\s+system)\b)""",
+        ],
+        "description": "Mcp Content Block Annotations Audience Priority Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific targeting of audience and priority annotations within the MCP protocol."
+    },
+    {
+        "id": "GLS-MCP-056",
+        "name": "Mcp Elicitation Message Instruction Smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?:"method"\s*:\s*"elicitation/create"(?=.{0,2500}"message"\s*:\s*"[^"\\]*(?:\\.[^"\\]*){0,20}[^"\\]{0,600}(?:ignore|disregard|override|system prompt|developer instruction|tool instruction|assistant|agent)[^"\\]{0,600}(?:secret|token|credential|api[_ -]?key|env|approve|execute|run|send|exfiltrat|bypass))|"message"\s*:\s*"[^"\\]*(?:\\.[^"\\]*){0,20}[^"\\]{0,600}(?:ignore|disregard|override|system prompt|developer instruction|tool instruction|assistant|agent)[^"\\]{0,600}(?:secret|token|credential|api[_ -]?key|env|approve|execute|run|send|exfiltrat|bypass)(?=.{0,2500}"method"\s*:\s*"elicitation/create"))""",
+        ],
+        "description": "Mcp Elicitation Message Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 addresses specific MCP Elicitation extension method, not covered by general MCP component patterns."
+    },
+    {
+        "id": "GLS-MCP-057",
+        "name": "Mcp Sampling Create Message Prompt Smuggling",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?=.*"method"\s*:\s*"sampling/createMessage")(?=.*\b(?:messages|systemPrompt|includeContext|modelPreferences)\b)(?=.*\b(?:ignore|disregard|override|bypass|disable|suppress|never\s+(?:ask|show)|do\s+not\s+(?:ask|show|warn|confirm)|no\s+(?:approval|confirmation|review|consent)|treat\s+(?:this|server|prompt)[^\n]{0,80}highest\s+priority)\b)(?=.*\b(?:system|developer|policy|safety|approval|consent|warning|secret|token|api[-_ ]?key|credentials?|env(?:ironment)?\s+var|private\s+key|oauth|ssh|exfiltrat|post\s+to|send\s+to|highest\s+priority)\b)""",
+        ],
+        "description": "Mcp Sampling Create Message Prompt Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP sampling/createMessage protocol method, a distinct agent-to-client prompt smuggling channel."
+    },
 ]
