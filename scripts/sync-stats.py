@@ -132,23 +132,73 @@ def sync_website_pages(stats):
         return False
 
     changed = False
-    # Pattern for "N patterns, M keywords, K categories" in any order/format
-    # Only match counts that look like our stats (3-digit numbers in stat-like contexts)
-    # Avoids replacing "50 patterns ahead" or "3 patterns per category"
-    old_pat = stats.get("_prev_patterns", r"\d{2,3}")
-    old_kw = stats.get("_prev_keywords", r"\d{3}")
-    old_cat = stats.get("_prev_categories", r"\d{2}")
+    # Pattern for "N patterns, M keywords, K categories" in any order/format.
+    # Counts must match stat-like numbers WITH the optional thousands comma —
+    # the original \d{2,3}/\d{3} froze every page once patterns/keywords crossed
+    # 1000 (4 digits): "1046 patterns" never matched \d{2,3}, so ~16 pages stuck
+    # at a stale count through every ship (Jun 27 2026 root-cause fix). 3-6 char
+    # numeric window (incl comma) covers 100..999,999; still avoids "3 patterns
+    # per category". A specific previous value (set by the ship pipeline) is
+    # preferred when available so only the real old count is rewritten.
+    old_pat = stats.get("_prev_patterns", r"[\d,]{3,6}")
+    old_kw = stats.get("_prev_keywords", r"[\d,]{3,6}")
+    old_cat = stats.get("_prev_categories", r"\d{2,3}")
     generic_replacements = [
-        # "136 patterns" or "136 detection patterns" — only 2-3 digit counts
-        (rf'\b{old_pat} (detection )?patterns\b', f'{stats["patterns"]} \\1patterns'),
-        # "748 keywords" or "742 keywords" — only 3-digit counts
-        (rf'\b{old_kw} keywords\b', f'{stats["keywords"]} keywords'),
-        # "26 categories" or "26 threat categories" — only 2-digit counts
-        (rf'\b{old_cat} (threat |attack )?categories\b', f'{stats["categories"]} \\1categories'),
+        # "1046 patterns" / "1,046 detection patterns" — 3-6 char counts (incl comma)
+        (rf'\b{old_pat} (detection )?patterns\b', lambda m: f'{stats["patterns"]} {m.group(1) or ""}patterns'),
+        # "7653 keywords" / "7,653 keywords"
+        (rf'\b{old_kw} keywords\b', lambda m: f'{stats["keywords"]} keywords'),
+        # "65 categories" / "65 threat categories"
+        (rf'\b{old_cat} (threat |attack )?categories\b', lambda m: f'{stats["categories"]} {m.group(1) or ""}categories'),
     ]
 
-    # Pages to scan (exclude index.html — handled separately)
-    pages = list(WEBSITE_ROOT.glob("**/*.html"))
+    # A count is HISTORICAL (must NOT be rewritten) when its preceding text pins
+    # it to a past release or frames it as a one-time delta — e.g. "v0.2.21
+    # brought Sunglasses to 346 patterns", "0.2.31 (890 patterns, shipped
+    # today)", "adds 10 patterns ... total 313 patterns". Rewriting those to
+    # today's count falsifies history. We look back up to 60 chars from each
+    # match; if it contains a version token or a historical verb, we leave it.
+    # (Jun 27 2026 — sync-stats had been silently falsifying every past-release
+    # claim; this guard plus the blog/reports skip makes a site-wide run safe.)
+    HIST_LOOKBACK = 60
+    _version_re = re.compile(r'\bv?\d+\.\d+\.\d+\b')
+    _hist_verb_re = re.compile(
+        r'\b(?:adds?|added|brought|bringing|grown|grew|shipped|ships|launch(?:ed|es)?|'
+        r'release[ds]?|reached?|day\s*\d|after\s+day|as\s+of)\b', re.IGNORECASE)
+
+    def _is_historical(text, start):
+        window = text[max(0, start - HIST_LOOKBACK):start]
+        return bool(_version_re.search(window) or _hist_verb_re.search(window))
+
+    def _apply(content, pattern, repl):
+        out, last = [], 0
+        for m in re.finditer(pattern, content):
+            out.append(content[last:m.start()])
+            out.append(m.group(0) if _is_historical(content, m.start()) else repl(m))
+            last = m.end()
+        out.append(content[last:])
+        return "".join(out)
+
+    # Pages to scan (exclude index.html — handled separately).
+    # CRITICAL: skip dated content (blog posts, published reports). Those make
+    # point-in-time claims like "v0.2.21 brought Sunglasses to 346 patterns" —
+    # blindly rewriting their counts to TODAY's value FALSIFIES history (a blog
+    # would read "v0.2.21 ... 1059 patterns", which is false and a credibility
+    # killer). Only EVERGREEN marketing pages get the live counts; dated
+    # artifacts keep the numbers true as of their publish date. (Jun 27 2026 —
+    # found sync-stats had been silently falsifying every historical blog.)
+    DATED_DIRS = {"blog", "reports"}
+    DATED_FILES = {"blog.html", "diary.html"}  # root-level dated indexes/journals
+
+    def _is_dated(p):
+        rel = p.relative_to(WEBSITE_ROOT)
+        if set(rel.parts) & DATED_DIRS:
+            return True
+        if p.name in DATED_FILES:
+            return True
+        return p.name.startswith("report-")  # root-level published reports
+
+    pages = [p for p in WEBSITE_ROOT.glob("**/*.html") if not _is_dated(p)]
     index_path = WEBSITE_ROOT / "index.html"
 
     for page in pages:
@@ -159,7 +209,7 @@ def sync_website_pages(stats):
         original = content
 
         for pattern, replacement in generic_replacements:
-            content = re.sub(pattern, replacement, content)
+            content = _apply(content, pattern, replacement)
 
         if content != original:
             page.write_text(content)
