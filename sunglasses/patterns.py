@@ -22851,4 +22851,219 @@ PATTERNS = [
         ],
         "description": "Mcp Sampling Create Message Prompt Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP sampling/createMessage protocol method, a distinct agent-to-client prompt smuggling channel."
     },
+    # === v0.2.70 batch (9 patterns) ===
+    {
+        "id": "GLS-DFP-063",
+        "name": "Avro Schema Registry Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|treat|trust)\b
+  |does\s+not\s+(?:obey|follow|treat|trust|override|overrides?)\b
+  |never\s+(?:obey|follow|treat|trust|override|overrides?|use)\b
+  |must\s+not\s+(?:obey|follow|treat|trust|override|overrides?|use)\b
+  |should\s+never\s+be\s+used\s+to\s+(?:hide|suppress|forward|include)
+  |not\s+(?:authoritative|canonical|definitive)\s+(?:agent\s+)?policy
+  |(?:scanners?|auditors?|reviewers?)\s+should\s+(?:report|detect|flag|refuse|block)
+  |(?:security\s+training|incident\s+report|guide\s+for\s+schema\s+auditors).{0,160}?(?:reported|not\s+obeyed|detected|blocked|do\s+not\s+obey)
+  |no\s+(?:agent\s+)?policy\s+overrides?
+  |no\s+(?:scanner|agent|assistant|reviewer|auditor)\s+(?:instructions?|directives?|polic(?:y|ies)|notes?)
+))
+(?=.*(?:
+  \.avsc\b|\bavro\s+(?:schema|idl|protocol|record|enum|union|doc(?:umentation)?|metadata)\b
+  |\bprotocol\s+[A-Za-z_][\w.-]*\s*\{
+  |@doc\s*\(
+  |(?<!\w)"doc"\s*:
+  |(?<!\w)"(?:fields|aliases|namespace|logicalType|schema)"\s*:
+  |\bschema\s+registry\b|\bregistry\s+subject\b|\bsubject\s+[\w.-]+-(?:key|value)\b
+  |\bcompatibility\s+(?:BACKWARD|FORWARD|FULL|NONE|TRANSITIVE)\b
+  |(?<![A-Za-z0-9])(?:x-agent-policy|agent_instructions|scanner_policy|assistant_note)(?![A-Za-z0-9])
+))
+(?=.*(?:
+  \b(?:ai|autonomous|automated|data|schema|security|dependency|governance)\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?|review|audit|scan|verification)\b
+  |\b(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?)\b
+  |(?:agent|assistant|scanner|reviewer|auditor|verifier)[._-]?(?:instructions?|notes?|policy|directive)
+  |for\s+(?:AI\s+)?(?:agents?|assistants?|scanners?|reviewers?|auditors?)
+))
+(?=.*(?:
+  \b(?:authoritative|canonical|definitive|governing|controlling)\b
+  |(?:primary|single)\s+source\s+of\s+truth
+  |(?:supersed(?:e|es|ed|ing)?|overrides?|overrules?|outranks?|takes?\s+precedence)\s+(?:over\s+)?(?:system|scanner|security|review|schema|governance|agent)\s+(?:rules?|polic(?:y|ies)|guidance|instructions?)
+  |(?:agent|scanner|assistant|reviewer|auditor)\s+(?:instructions?|directive|policy|note)
+  |(?:main|primary|principal|preferred|recommended)\s+(?:(?:avro|schema|registry|data|governance|security|review|audit|verification|operating)\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy|framework)
+  |(?:suppress|hide|omit|exclude|redact|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|summaries|observations?|diagnostics?|results?|issues?|PII|schema\s+validation|compatibility)
+  |(?:do\s+not|don't)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)
+  |(?:treat|mark|classify|downgrade).{0,60}?(?:informational|non-blocking|advisory-only|background\s+notes?|safe|clean)
+  |(?:observations?|findings?|warnings?|alerts?|diagnostics?|results?|issues?)\s+(?:are|is|should\s+be)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:informational|non-blocking|advisory-only|background-only)
+  |(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|relay)\s+(?:[\w-]+\s+){0,5}(?:API\s+tokens?|session\s+tokens?|registry\s+(?:auth|credentials?)|auth\s+headers?|Authorization\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?)|local\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?)
+))
+.*""",
+        ],
+        "description": "Avro Schema Registry Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets Avro schema and registry metadata poisoning specifically."
+    },
+    {
+        "id": "GLS-DFP-069",
+        "name": "Conda environment.yml metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|expose|override)|does\s+not\s+(?:obey|follow|treat|trust|override|instruct|authorize)|never\s+(?:obey|follow|treat|trust|override|include|expose|forward)|must\s+not\s+(?:obey|follow|treat|trust|override|include|forward)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?|(?:security|incident|vulnerability)\s+report.{0,140}?(?:detected|blocked|flagged|refused)|scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)|(?:training|guide|reference|documentation).{0,140}?(?:must\s+not|should\s+not|never)\s+(?:obey|treat|use|include|expose)))
+(?=.*(?:(?<![A-Za-z0-9])(?:environment\.ya?ml|conda\s+environment|conda\s+env\s+export|conda-lock|mamba\s+environment|mamba\.ya?ml|pixi\s+environment|x-conda-agent-policy|environment\s+descriptor)(?![A-Za-z0-9])|(?:^|\n)\s*(?:name|channels|dependencies|variables|prefix)\s*:|(?<!\w)"(?:name|channels|dependencies|variables|prefix|x-conda-agent-policy|agent_instructions|scanner_policy)"\s*:))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|coding\s+agents?|dependency\s+(?:agents?|reviewers?|auditors?)|security\s+scanners?|conda\s+(?:agents?|auditors?|scanners?)|automated\s+(?:dependency\s+)?(?:review|audit|scan|verification)|scanners?|auditors?|assistants?|reviewers?|agents?|llms?)(?![A-Za-z0-9])|(?=.*(?:agent|scanner|assistant|auditor|reviewer)[_-](?:policy|instructions?|note|directive)))
+(?=.*(?:\b(?:authoritative|canonical|definitive)\b|(?:primary|single)\s+source\s+of\s+truth|(?:main|primary|preferred|recommended|principal)\s+(?:(?:conda|mamba|dependency|environment|package|security|review|audit|verification|operating)\s+){0,4}(?:guidance|policy|playbook|runbook|procedure|process|instructions?)|(?:agent|scanner|assistant|auditor|reviewer)\s+(?:instructions?|directive|policy|note)|for\s+(?:AI\s+)?(?:agents?|scanners?|assistants?).{0,30}?\bthis\b|overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|defines?\s+(?:all\s+)?(?:scanner|security|dependency|conda|review)\s+rules?|suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\s+not\s+report|not\s+report|treat.{0,80}?as\s+(?:informational|advisory-only|non-blocking|safe|clean|background-only)|(?:observations?|findings?|diagnostics?|results?|warnings?|alerts?)\s+(?:are|is|should\s+be)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:advisory-only|informational|non-blocking|background-only|secondary)|(?:keep|leave).{0,100}?out\s+of.{0,50}?(?:reports?|summar(?:y|ies)|memos?|audit\s+memo|final\s+report)|(?:place|put|route|move|shift).{0,90}?(?:observations?|findings?|diagnostics?|results?|issues?|warnings?).{0,70}?(?:supplementary|appendix|background|informational|side\s+notes?|secondary)|(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\s+off|pass\s+along|relay|expose)\s+(?:[\w.-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:config(?:uration)?|settings?|context|state|details?)|local\s+(?:state|config(?:uration)?|settings?)|conda\s+(?:tokens?|credentials?|auth)|api\s+tokens?|auth\s+headers?|session\s+tokens?|credentials?|secrets?|tokens?)))
+(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?|licenses?|dependency\s+(?:findings?|warnings?|alerts?|observations?|diagnostics?)|package\s+(?:findings?|warnings?|alerts?)|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:config(?:uration)?|settings?|context|state|details?)|local\s+state|conda\s+(?:tokens?|credentials?|auth)|api\s+tokens?|auth\s+headers?|session\s+tokens?|credentials?|secrets?|tokens?))
+.*""",
+        ],
+        "description": "Conda environment.yml metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 conda-specific metadata and fields not covered by existing config-poisoning patterns."
+    },
+    {
+        "id": "GLS-DFP-070",
+        "name": "Cypress E2E Config Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?|documentation)\b.{0,220}\b(?:detected|blocked|flagged|refused|reported|must\s+(?:be\s+)?reported|must\s+report|not\s+obeyed|not\s+obey\s+it|should\s+(?:report|detect|flag|refuse|block))|(?:cypress(?:\s+(?:config|configuration|metadata))?|e2e\s+(?:test|testing)\s+(?:config|metadata)|test\s+runner\s+metadata).{0,160}\b(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share|expose)\b|\bno\s+(?:policy\s+)?overrides?\b|not\s+(?:authoritative|canonical|definitive)))
+(?=.*(?:\bcypress\.config\.(?:js|ts|mjs|cjs)\b|\bcypress\.json\b|\bcypress\.env\.json\b|\bcypress/e2e\b|\bcypress/support\b|\bcypress/plugins\b|\bcypress\s+(?:configuration|config|metadata|test\s+runner|e2e)|(?<!\w)"(?:e2e|component|env|baseUrl|setupNodeEvents|supportFile|specPattern|reporterOptions|video|screenshotsFolder|x-agent-policy|agent_policy|scanner_policy)"\s*:|\b(?:end-to-end|e2e|browser)\s+test\s+(?:config|configuration|metadata)\b|\breporterOptions\b|\bsetupNodeEvents\b|\bsupportFile\b|\bspecPattern\b))
+(?=.*(?<![a-zA-Z0-9])(?:ai[-_\s]?agents?|agents?|assistants?|scanners?|auditors?|verifiers?|reviewers?|test[-_\s]?reviewers?|qa[-_\s]?agents?|automation[-_\s]?review|automated(?:\s+(?:qa|test|security|browser|cypress))?\s+(?:review|audit|scan|verification|testing)|agent\s+instructions?|scanner\s+instructions?|assistant\s+policy|verifier\s+instructions?)(?![a-zA-Z0-9]))
+(?=.*(?:\b(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence)\b.{0,90}\b(?:system|scanner|security|repository|developer)\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\b|\b(?:authoritative|canonical|definitive|governing|controlling|single\s+source\s+of\s+truth|primary\s+source\s+of\s+truth)\b.{0,120}\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|reclassify|forward|include|attach|send|expose|provide|pass\s+along|hand\s+over)\b|\b(?:suppress|hide|omit|exclude|redact|skip)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|failures?|screenshots?|cookies?)\b|\b(?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|failures?)\b|\b(?:treat|mark|classify|reclassify).{0,60}?\bas\s+(?:informational|non[-\s]?blocking|safe|clean|benign|advisory[-\s]?only|background[-\s]?only)\b|\b(?:downgrade|deprioritize|demote|calibrate|frame|scope|route|move|place|shift|stage)\s+(?:[\w-]+\s+){0,5}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?)\s+(?:[\w-]+\s+){0,4}(?:background[-\s]?only|appendix[-\s]?only|archive[-\s]?only|supplementary|informational|non[-\s]?blocking|side\s+notes?|background\s+notes?|archive\s+notes?)\b|\b(?:keep|leave)\s+(?:[\w-]+\s+){0,5}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?)\s+out\s+of\s+(?:the\s+)?(?:final\s+report|audit\s+memo|summary|summaries|report|memo)\b|\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?|cookies?)\s+(?:[\w-]+\s+){0,3}(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated\s+as\s+informational)\b|\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\s+along|hand\s+over|transfer|relay|convey)\s+(?:[\w-]+\s+){0,6}(?:api\s+tokens?|ci\s+tokens?|session\s+(?:cookies?|keys?|tokens?|state)|browser\s+session\s+(?:cookies?|credentials?|state)|browser\s+debug\s+bundle|debug\s+bundle|authorization\s+headers?|auth\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|state)|local\s+(?:state|config(?:uration)?|settings?)|execution\s+context|credentials?)\b))
+.*""",
+        ],
+        "description": "Cypress E2E Config Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets Cypress E2E test configuration metadata poisoning specifically."
+    },
+    {
+        "id": "GLS-DFP-076",
+        "name": "HTTP Cache-Metadata Policy-Source Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|
+  does\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|
+  never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|
+  must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|
+  should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|
+  (?:security|scanner|training|incident|reference|guide|runbook)\s+.{0,90}?\b(?:reported|detected|blocked|flagged|refused|not\s+obeyed)\b|
+  no\s+(?:agent\s+)?policy\s+overrides?
+)\b)
+(?=.*(?:
+  Cache-Control|Cache-Status|CDN-Cache|CF-Cache-Status|X-Cache|Age\s*:|ETag\s*:|Last-Modified\s*:|
+  stale-if-error|stale-while-revalidate|immutable|fwd\s*=\s*stale|origin\s+revalidation|cached\s+copy|edge\s+cache|cache\s+proof
+))
+(?=.*(?:
+  AI\s+agents?|autonomous\s+(?:scanners?|crawlers?|agents?)|security\s+scanners?|crawlers?|agents?|assistants?|auditors?|verifiers?|
+  automated\s+(?:cache\s+)?(?:review|audit|scan|verification)|scanner\s+instructions?|agent\s+instructions?|for\s+agents?
+))
+(?=.*(?:
+  canonical\s+(?:cached\s+)?copy|authoritative\s+(?:cache|cached|edge)|(?:primary|single)\s+source\s+of\s+truth|
+  do\s+not\s+(?:revalidate|refresh|fetch|compare|check)|skip\s+(?:origin\s+)?(?:revalidation|fetch|checks?)|trust\s+(?:the\s+)?(?:cache|cached\s+copy|edge)|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,4}(?:stale|origin|cache|freshness|validator|mismatch|warnings?|findings?|observations?|diagnostics?|reports?)|
+  (?:warnings?|findings?|observations?|diagnostics?|mismatches?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted|treated|classified|marked)|
+  (?:include|attach|forward|send|share|provide|pass\s+along|hand\s+off)\s+(?:[\w-]+\s+){0,6}(?:Authorization\s+headers?|Cookie|cookies?|session\s+tokens?|API\s+keys?|env(?:ironment)?\s+(?:variables?|context|details?|settings?)|runtime\s+(?:cache\s+)?(?:context|proof|bundle|details?|material|evidence)|cache\s+proof\s+bundle)
+))
+.*""",
+        ],
+        "description": "HTTP Cache-Metadata Policy-Source Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets HTTP caching protocol metadata and proofs as policy sources."
+    },
+    {
+        "id": "GLS-DFP-093",
+        "name": "Checkstyle XML Error-Message Suppression Directive",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+report|incident\s+report|postmortem).{0,240}\b(?:flagged|detected|blocked|refused|reported)\b)
+(?!.*\b(?:security|scanner|training|guide|documentation|docs|runbook|reference).{0,200}\b(?:should|must)\s+(?:report|detect|flag|refuse|block)\b)
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)\b.{0,200}\b(?:checkstyle|pmd|spotbugs|findbugs|static[-\s]?analysis|analysis\s+report)\b)
+(?=.*(?:<\s*checkstyle\b|<\s*pmd\b|<\s*cpd\b|<\s*BugCollection\b|<\s*BugInstance\b|<\s*LongMessage\b|<\s*violation\b|<\s*error\b[^>]{0,120}\bseverity\s*=|\bCheckstyle\s+(?:XML|report)\b|\bPMD\s+(?:XML|report)\b|\bSpotBugs\s+(?:XML|report)\b|\bFindBugs\s+(?:XML|report)\b|\bstatic[-\s]?analysis\s+report\b))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai|llm|ci|code[-_\s]?review|security)?[-_\s]*(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])|\b(?:agents?|assistants?|scanners?|auditors?|reviewers?)\b|agent[_-]?instructions?|scanner[_-]?policy|assistant\s+policy))
+(?=.*(?:authoritative|canonical|(?:primary|single)\s+source\s+of\s+truth|supersed(?:e|es|ed|ing)|overrides?|outranks?|ignore|disregard|agent\s+instructions?|scanner\s+notes?|assistant\s+policy|for\s+(?:ai\s+)?agents?\s*:|must\s+be\s+followed|defines\s+(?:all\s+)?rules?|operating\s+(?:guidance|policy|runbook)|canonical\s+(?:audit|analysis|review)\s+verdict))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|redact|do\s+not\s+report|not\s+report|do\s+not\s+flag|downgrade|mark.{0,50}?as\s+(?:safe|clean|informational|non[-\s]?blocking)|treat.{0,50}?as\s+(?:safe|clean|informational|non[-\s]?blocking)|include\s+(?:[\w-]+\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\s+keys?|local\s+state|ci\s+variables?)|forward\s+(?:[\w-]+\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\s+keys?|local\s+state|ci\s+variables?)|send\s+(?:[\w-]+\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\s+keys?|local\s+state|ci\s+variables?)))
+(?=.*(?:findings?|violations?|warnings?|errors?|bugs?|bug\s+instances?|failures?|security\s+issues?|reports?|summar(?:y|ies)|verdicts?|release\s+gates?|env|environment|variables?|tokens?|secrets?|api\s+keys?|local\s+state|ci\s+variables?))""",
+        ],
+        "description": "Checkstyle XML Error-Message Suppression Directive: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 xML static analysis report formats (Checkstyle/PMD/SpotBugs), not covered by existing patterns."
+    },
+    {
+        "id": "GLS-DFP-094",
+        "name": "Data URI SVG metadata prompt smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|refus(?:e|ed|al)|cannot|can't|must\s+not|safe\s+decoder|quarantin(?:e|ed)|saniti[sz](?:e|ed)|strip(?:s|ped)?|ignore\s+the\s+following\s+example)\b.{0,180}\b(?:ignore|override|bypass|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide)\b)(?=.*\b(?:data:image/svg\+xml|data:\s*image/svg|base64|utf-8,|percent[-\s]*encoded|svg)\b)(?=.*\b(?:<svg|<metadata|<desc|<title|aria-label|xml)\b)(?=.*\b(?:assistant|agent|llm|model|scanner|system|developer|secret|token|credential|memory)\b)(?=.*\b(?:ignore|override|bypass|supersede|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide|do\s+not\s+report)\b).*$""",
+        ],
+        "description": "Data URI SVG metadata prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 data URI transport specifically; existing SVG patterns are bound to BIMI discovery."
+    },
+    {
+        "id": "GLS-DFP-099",
+        "name": "MIME Quoted-Printable Encoded Instruction Smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?isx)^
+(?!.*\b(?:security\s+guide|documentation|docs|test\s+fixture|unit\s+test|asserts|do\s+not\s+obey|reject|blocked|not\s+followed|explains)\b.{0,220}\b(?:quoted[- ]printable|developer\s+instruction|ignore[- ]previous|soft\s+breaks?)\b)
+(?=.*(?:content-transfer-encoding\s*:\s*quoted-printable|quoted[- ]printable|qp[- ]?decoded?))
+(?=.*(?:[A-Za-z0-9_-]{2,32}=\r?\n[A-Za-z0-9_-]{1,32}))
+(?=.*(?:igno[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*re|obe[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*(?:y|ey)|devel[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*oper|syst[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*em|cred[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*ential|appl[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*y|instr[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*uction|comm[A-Za-z0-9_-]*=\r?\n[A-Za-z0-9_-]*and))
+(?=.*(?:previous|system|developer|instruction|policy|command|tool|execute|run|apply|obey|follow|memory|credential|secret))
+.*""",
+        ],
+        "description": "MIME Quoted-Printable Encoded Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 encoding-based bypasses (Quoted-Printable soft breaks) for instruction smuggling."
+    },
+    {
+        "id": "GLS-DFP-100",
+        "name": "MCP Setup Doc Bootstrap-Bundle Lure",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:security\s+(?:guide|training|report|advisory)|incident\s+report|scanner\s+docs?|documentation|docs?|guide|article|reference)\b.{0,220}\b(?:do\s+not|does\s+not|never\s+|must\s+not|should\s+(?:report|detect|flag|block)|detected|blocked|warns?|refused)\b)
+(?!.*\b(?:tests?|unit\s+tests?|fixtures?)\b.{0,180}\b(?:fixtures?\s+only|no\s+(?:install|setup|download)|not\s+(?:for\s+)?(?:install|setup|download))\b)
+(?!.*\b(?:signed\s+github\s+release|release\s+asset.{0,100}(?:sha256|signature|signed)|package\s+manager\s+install|npm\s+install|pip\s+install|cargo\s+install|brew\s+install|checksum\s+verified)\b)
+(?=.*(?:\b(?:README|repo(?:sitory)?|source[-\s]?tree|zip_path|download_url|pushed_at|updated_at)\b|raw\.githubusercontent\.com|github\.com/[^\s]+/(?:blob|raw)/|(?:^|[\s"'=:])(?:docs?|examples?|internal|assets?|scripts?|patterns|tests|frontend/src|sentinel/rules|site/\.well-known)/))
+(?=.*\b(?:MCP|Model\s+Context\s+Protocol|AI\s+agents?|coding\s+assistants?|prompt\s+injections?|guardrails?|security\s+(?:scanner|checklist|policy|middleware|tool)|firewall|CVE|vulnerabilit(?:y|ies)|sandbox|detectors?|data\s+exfiltration)\b)
+(?=.*(?:\bzip_path\b|\bdownload_url\b|raw\.githubusercontent\.com|github\.com/.{1,140}/(?:raw|blob)/|[\w./-]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg|ps1|sh)\b))
+(?=.*\b(?:install|download|open|run|execute|fetch|expand|extract|launch|start|setup|bootstrap|onboarding\s+bundle|helper|release|asset|pushed_at|updated_at)\b)
+[\s\S]+""",
+        ],
+        "description": "MCP Setup Doc Bootstrap-Bundle Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 repository onboarding/bootstrap social engineering for binary execution."
+    },
+    {
+        "id": "GLS-DFP-102",
+        "name": "ERC-4337 UserOperation Paymaster Approval Suppression",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|does\s+not|must\s+not|never)\s+(?:obey|follow|trust|treat|accept|use|execute)\b.{0,110}\b(?:paymaster|bundler|user\s*operation|userop|erc[-\s]?4337|account\s+abstraction|gas\s+sponsor|sponsorship|entrypoint|session\s+key)\b|
+  (?:security|scanner|training|incident|postmortem|guide|docs?|reference|runbook|support\s+article)\b.{0,120}\b(?:should|must)\s+(?:report|detect|flag|refuse|block|warn|reject)\b.{0,150}\b(?:safe\s+to\s+sign|trusted\s+sponsor|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|skip\s+confirmation|ignore\s+(?:[\w-]+\s+){0,3}(?:allowance|session\s+key|risk))|
+  (?:incident|postmortem|security\s+report)\b.{0,160}(?:(?:blocked|detected|flagged|refused|warned|rejected)\b.{0,160}\b(?:agent\s+instruction|trusted\s+sponsor|safe\s+to\s+sign|skip\s+confirmation)|(?:agent\s+instruction|trusted\s+sponsor|safe\s+to\s+sign|skip\s+confirmation)\b.{0,160}\b(?:blocked|detected|flagged|refused|warned|rejected))
+))
+(?=.*\b(?:erc[-\s]?4337|account\s+abstraction|user\s*operation|userop|entry\s*point|paymaster|bundler|gas[-\s]?(?:sponsor|sponsored|sponsorship)|sponsored\s+(?:transaction|operation)|session\s+key|smart\s+account|aa\s+wallet|bundler\s+simulation|paymaster\s+reputation)\b)
+(?=.*\b(?:ai\s+agents?|wallet\s+agents?|assistants?|models?|llms?|scanners?|verifiers?|agent(?:[_-]|\s+)?(?:instruction|notice|policy|message)|assistant(?:[_-]|\s+)?(?:instruction|notice|policy|message)|wallet(?:[_-]|\s+)?agent)\b)
+(?=.*\b(?:sign(?:ature|ing)?|approve|approval|allowance|spender|session\s+key|delegate|transfer|swap|bridge|confirm(?:ation)?|warning|warnings|risk|human\s+review|sponsored\s+(?:operation|transaction)|user\s*operation)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|scanner|verifier)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:wallet\s+|paymaster\s+|bundler\s+|sponsor\s+)?(?:source\s+of\s+truth|policy|guidance|instruction|reputation)|
+  trusted\s+sponsor|verified\s+sponsor|safe\s+to\s+sign|mark\s+(?:it|this|operation|user\s*operation|transaction).{0,50}\bsafe|treat.{0,70}\bas\s+(?:safe|verified|trusted|read[-\s]?only|pre[-\s]?approved)|
+  (?:do\s+not|not)\s+(?:warn|report|ask|prompt|escalate)|skip\s+(?:the\s+)?(?:warning|confirmation|review|human\s+review)|proceed\s+without\s+(?:extra\s+|user\s+|human\s+)?(?:review|confirmation|asking)|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|session\s+key)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|allowance|risk|session\s+key)|ignore\s+(?:[\w-]+\s+){0,3}(?:allowance|spender|session\s+key|delegate|risk|warning)|
+  (?:include|forward|send|attach|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|wallet\s+state|local\s+state|environment\s+(?:variables?|context)|cookies?|api\s*keys?|authorization\s+headers?)
+)\b)""",
+        ],
+        "description": "ERC-4337 UserOperation Paymaster Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 addresses Account Abstraction (ERC-4337) and Paymaster metadata poisoning."
+    },
 ]
