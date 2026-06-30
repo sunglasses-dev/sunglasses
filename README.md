@@ -147,7 +147,7 @@ result = scanner.scan_auto("any_file.ext")
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Internal recall (attack-db fixture set) | 64/64 — 100% recall |
 | pytest (unit tests shipped in repo) | 221 passing (+7 xfailed) |
-| False-positive rate | 0 on the clean-code regression corpus (was 8.3% through v0.2.71 on 12 benign controls; root-caused and fixed in v0.2.71, zero-FP gate enforced in CI every release) |
+| False-positive rate | 0 on the clean-code regression corpus (was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release) |
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 

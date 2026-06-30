@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.71] — 2026-06-30
+
+### Added (9 net-new patterns)
+
+- **+9 `discovery_file_poisoning` patterns** — Continued DFP wallet-signing coverage: `GLS-DFP-103`, `GLS-DFP-104`, `GLS-DFP-106`, `GLS-DFP-107`, `GLS-DFP-108`, `GLS-DFP-109`, `GLS-DFP-110`, `GLS-DFP-111`, `GLS-DFP-112`. These extend the Part-3 wallet-signing surface — WalletConnect appMetadata/grantPermissions/session-proposal/session-request poisoning, hardware-wallet (Ledger) policy-approval suppression, blockchain transaction-simulation trace poisoning, EIP-712 typed-data signing-authority inversion, and Semgrep results finding-suppression — the same carrier family covered by the live Discovery File Poisoning Part 3 blog.
+
+### Context
+
+- Catalog total: **1,094 patterns / 65 categories / 7,738 keywords.**
+- No new companion blog this release — these 9 patterns extend the existing live Part-3 wallet-signing coverage rather than opening a new topic; category gate satisfied by the existing live blog.
+- All 9 patterns verified to compile, fire on realistic true-positive samples, and pass the clean-corpus false-positive gate before ship.
+
 ## [0.2.70] — 2026-06-29
 
 ### Added (9 net-new patterns)
