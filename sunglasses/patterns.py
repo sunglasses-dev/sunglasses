@@ -23066,4 +23066,225 @@ PATTERNS = [
         ],
         "description": "ERC-4337 UserOperation Paymaster Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 addresses Account Abstraction (ERC-4337) and Paymaster metadata poisoning."
     },
+    # === v0.2.71 batch (9 patterns) ===
+    {
+        "id": "GLS-DFP-103",
+        "name": "WalletConnect appMetadata Signing-Approval Suppression",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|postmortem|forensic|training|docs?|guide|reference|runbook)\b.{0,140}\b(?:detected|blocked|reported|flagged|refused|warned)\b|
+  (?:wallet\s+scanner|scanner|security\s+tool)s?\s+(?:docs?|guide|reference)\s+should\s+(?:report|detect|flag|refuse|block)\b|
+  (?:do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|
+     does\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|instruct)|
+     never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|
+     must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override))
+))
+(?=.*(?:\bdapp[_ -]?(?:metadata|manifest|info|description|label)\b|\bappMetadata\b|\bdappInfo\b|\bpeerMeta\b|\bwalletconnect\b.{0,80}\b(?:metadata|peer\s*meta|app\s*metadata)\b|\bsite\s+manifest\b|\bweb\s+app\s+manifest\b|\borigin\s+(?:metadata|label|manifest)\b|\bapp\s+(?:description|label|manifest)\b|\bpreview\s+origin\s+label\b|\bx-wallet-agent\b))
+(?=.*\b(?:wallet\s+(?:preview|signing|confirmation|approval)|signing\s+preview|transaction\s+preview|decoded\s+(?:call|calldata)|approval|allowance|spender|signature\s+request|bridge\s+route|swap\s+route|wallet\s+receipt|permission\s+prompt|confirm(?:ation)?)\b)
+(?=.*(?:\b(?:ai\s+)?(?:wallet\s+)?agents?\b|\bassistants?\b|\bcopilots?\b|\bmodels?\b|\bverifiers?\b|\bscanners?\b|\breviewers?\b|(?<![a-zA-Z0-9])(?:agent|assistant|scanner|verifier|reviewer)[_-](?:instruction|note|policy|label|description)s?(?![a-zA-Z0-9])))
+(?=.*\b(?:
+  (?:authoritative|canonical|primary|single)\s+(?:approval\s+|wallet\s+|review\s+)?(?:policy|source\s+of\s+truth|instruction|guidance)|
+  (?:override|overrides|supersede|supersedes|ignore|bypass)\s+(?:[\w-]+\s+){0,3}(?:wallet|system|developer|security|scanner|review|confirmation|warning|risk)s?|
+  (?:suppress|hide|redact|downgrade|reclassify)\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|risks?|allowance|spender|slippage|bridge|approval|signature|transaction)s?|
+  (?:do\s+not|not)\s+(?:report|warn|flag|block|escalate)\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|risks?|allowance|spender|slippage|approval|signature|transaction)s?|
+  (?:mark|classify|treat).{0,55}?\bas\s+(?:safe|trusted|benign|informational|low[- ]?risk)|
+  (?:safe\s+to\s+(?:sign|approve|confirm|proceed)|pre[- ]?approved|trusted\s+(?:dapp|app|spender|route)|proceed\s+without\s+(?:extra\s+)?confirmation|skip\s+(?:human\s+)?confirmation)|
+  (?:include|attach|forward|send|share|copy|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|authorization\s+headers?|bearer\s+tokens?|api\s+keys?|environment\s+(?:variables?|context)|local\s+state|wallet\s+state|cookies?)
+))""",
+        ],
+        "description": "WalletConnect appMetadata Signing-Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 dApp and Web3 wallet manifest metadata, a unique attack surface."
+    },
+    {
+        "id": "GLS-DFP-104",
+        "name": "Hardware-Wallet Ledger Policy Approval Suppression",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\b.{0,90}?\b(?:hardware\s+wallet|device\s+(?:prompt|screen|display)|companion\s+app|wallet\s+bridge|blind\s+signing|confirm\s+on\s+device)\b|
+  never\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\b.{0,90}?\b(?:hardware\s+wallet|device\s+(?:prompt|screen|display)|companion\s+app|wallet\s+bridge|blind\s+signing|confirm\s+on\s+device)\b|
+  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook|support\s+article)\b.{0,90}?\b(?:should|must)\s+(?:report|detect|flag|refuse|block|warn|reject)\b.{0,120}?\b(?:safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|confirm\s+on\s+device\s+without|ignore\s+(?:[\w-]+\s+){0,3}(?:blind\s+signing|allowance|risk)|include\s+(?:[\w-]+\s+){0,4}(?:session|token|cookie|env|api\s*key))|
+  (?:incident|postmortem|security\s+report)\b.{0,140}?(?:(?:blocked|detected|flagged|refused|warned|rejected)\b.{0,140}?\b(?:agent\s+instruction|safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|confirm\s+on\s+device\s+without)|(?:agent\s+instruction|safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|confirm\s+on\s+device\s+without)\b.{0,140}?\b(?:blocked|detected|flagged|refused|warned|rejected))
+))
+(?=.*(?<![a-zA-Z0-9])(?:hardware[-\s]?wallet|ledger[-\s]?(?:style|live|device)?|trezor(?:\s+suite)?|coldcard|keystone\s+wallet|device\s+(?:prompt|screen|display|review)|on[-\s]?device\s+review|companion\s+app|wallet\s+companion|usb\s+bridge|hid\s+bridge|wallet\s+bridge|blind\s+signing|contract\s+data|firmware\s+prompt|confirm\s+on\s+device)(?![a-zA-Z0-9]))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|wallet\s+agents?|browser\s+assistants?|security\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent|companion[_-]?note)(?![a-zA-Z0-9]))
+(?=.*\b(?:sign(?:ature|ing)?|approve|approval|confirm(?:ation)?|transaction|permit2?|allowance|spender|contract\s+data|blind\s+signing|unknown\s+contract|device\s+confirmation|warning|warnings|risk|human\s+review|review\s+screen|on\s+device|token)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|verifier|scanner)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:wallet\s+|device\s+|companion\s+)?(?:source\s+of\s+truth|policy|guidance|instruction)|
+  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\s+precedence\s+over|ignore|disregard)\b.{0,90}?\b(?:wallet|device|hardware|system|developer|security|warning|confirmation|approval)\b|
+  safe\s+to\s+sign|mark\s+(?:it|this|transaction|signature|approval|device\s+prompt).{0,45}?\bas\s+safe|treat.{0,60}?as\s+(?:safe|verified|read[-\s]?only|informational|pre[-\s]?approved)|
+  (?:do\s+not|not)\s+(?:warn|report|ask|prompt|escalate)|skip\s+(?:the\s+)?(?:warning|confirmation|review|human\s+review)|proceed\s+without\s+(?:extra\s+|user\s+|human\s+)?(?:review|confirmation)|confirm\s+on\s+device\s+without\s+(?:extra\s+)?review|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|blind\s+signing)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|blind\s+signing)|ignore\s+(?:[\w-]+\s+){0,3}(?:blind\s+signing|contract\s+data|allowance|spender|risk|warning|device\s+prompt)|
+  (?:include|forward|send|attach|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|wallet\s+state|local\s+state|environment\s+(?:variables?|context)|cookies?|api\s*keys?|authorization\s+headers?)
+)\b)""",
+        ],
+        "description": "Hardware-Wallet Ledger Policy Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 hardware wallet (Ledger/Trezor) and blind signing metadata poisoning."
+    },
+    {
+        "id": "GLS-DFP-106",
+        "name": "Semgrep Results Finding-Suppression Directive",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |
+  does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |
+  never\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |
+  must\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |
+  (?:scanner|semgrep|security|sast)\s+docs?\s+should\s+(?:report|detect|flag|refuse|block) |
+  (?:training|defensive)\s+example |
+  (?:security|incident)\s+report.{0,120}?\b(?:detected|flagged|blocked|refused|reported) |
+  no\s+policy\s+overrides?
+)\b)
+(?=.*(?:
+  semgrep(?:\s+(?:json|scan|result|report|finding|cli))? |
+  "check_id"\s*: |
+  "extra"\s*:\s*\{ |
+  "engine_kind"\s*:\s*"OSS" |
+  "results"\s*:\s*\[ |
+  results?\[\]\.(?:extra\.)?(?:message|metadata|fix) |
+  extra\.(?:message|metadata|severity) |
+  semgrep\s+finding\s+summary
+))
+(?=.*(?:
+  (?<![a-zA-Z0-9])(?:ai|llm|security|code|review|sast|devsecops)[-_\s]*(?:agents?|assistants?|reviewers?|scanners?|verifiers?)(?![a-zA-Z0-9]) |
+  (?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|reviewers?|verifiers?)(?![a-zA-Z0-9]) |
+  (?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|verifier)[-_\s]*(?:instructions?|policy|notes?)(?![a-zA-Z0-9]) |
+  for\s+(?:ai\s+)?(?:agents?|assistants?|security\s+agents?|code\s+reviewers?|scanners?)
+))
+(?=.*(?:
+  (?:ai\s+)?agent\s+instructions? |
+  this\s+(?:semgrep\s+)?(?:result|finding|message|report|output)\s+(?:is\s+)?(?:the\s+)?(?:authoritative|canonical|primary|single\s+source\s+of\s+truth|policy|guidance) |
+  (?:ignore|override|overrides|supersede|supersedes|replace|replaces)\s+(?:your\s+|all\s+|the\s+)?(?:previous|prior|system|developer|scanner|review)\s+(?:instructions?|policy|rules?|guidance) |
+  (?:suppress|hide|omit|exclude|redact|downgrade|deprioriti[sz]e)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|vulnerabilities?|cves?|semgrep\s+results?|taint|xss|sql\s+injection) |
+  (?:treat|mark|classify|label).{0,60}?\bas\s+(?:informational|benign|safe|non[-\s]?blocking|accepted\s+risk) |
+  do\s+not\s+(?:report|flag|mention|surface)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|vulnerabilities?|reports?|xss|sql\s+injection|secrets?) |
+  (?:include|attach|forward|send|share|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:api\s+keys?|auth\s+tokens?|bearer\s+tokens?|session\s+tokens?|tokens?|secrets?|credentials?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+context)
+))""",
+        ],
+        "description": "Semgrep Results Finding-Suppression Directive: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 semgrep-specific finding metadata not covered by generic SARIF or config patterns."
+    },
+    {
+        "id": "GLS-DFP-107",
+        "name": "WalletConnect grantPermissions Session-Key Authority Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|postmortem|forensic|training|docs?|guide|reference|runbook)\b.{0,120}\b(?:detected|blocked|reported|flagged|refused|warned)\b|
+  (?:scanner|wallet\s+scanner|security\s+tool)s?\s+(?:docs?|guide|reference)\s+should\s+(?:report|detect|flag|refuse|block)\b|
+  (?:do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|
+     does\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|instruct)|
+     never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|
+     must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override))
+))
+(?=.*(?:\bwallet[_-]?(?:grant|update|revoke)permissions?\b|\bwallet\s+(?:grant|update|revoke)\s+permissions?\b|\bwalletconnect\b.{0,80}\bpermission\s+update\b|\bpermission[_ -]?(?:update|grant|request|prompt|metadata|label|description)\b|\bsession[_ -]?(?:key|capability|permission)\b|\bcapability\s+grant\b|\baccount\s+permissions?\b|\bdelegated\s+(?:scope|capability|authority|permission)\b|\bspend\s*limit\b))
+(?=.*\b(?:permissions?|capabilit(?:y|ies)|grant|scope|session\s+key|delegat(?:e|ed|ion)|authority|spend\s*limit|account\s+access|namespace|transfer\s+rights|expiry|expiration|confirmation)\b)
+(?=.*(?:\b(?:ai\s+)?(?:wallet\s+)?agents?\b|\bassistants?\b|\bcopilots?\b|\bmodels?\b|\bverifiers?\b|\bscanners?\b|\breviewers?\b|(?<![a-zA-Z0-9])(?:agent|assistant|scanner|verifier|reviewer)[_-](?:instruction|note|policy|label|description)s?(?![a-zA-Z0-9])))
+(?=.*\b(?:
+  (?:authoritative|canonical|primary|single)\s+(?:review\s+)?(?:policy|source\s+of\s+truth|instruction|guidance)|
+  (?:override|overrides|supersede|supersedes|ignore|bypass)\s+(?:[\w-]+\s+){0,3}(?:wallet|system|developer|security|scanner|review|confirmation|warning|permission)s?|
+  (?:suppress|hide|redact|downgrade|reclassify)\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|risks?|permission|scope|grant|capability|session|authority)s?|
+  (?:do\s+not|not)\s+(?:report|warn|flag|block|escalate)\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|risks?|permission|scope|grant|capability|session|authority)s?|
+  (?:mark|classify|treat).{0,50}?\bas\s+(?:safe|trusted|benign|informational|low[- ]?risk)|
+  (?:safe\s+to\s+(?:approve|grant|update)|pre[- ]?approved|trusted\s+(?:grant|capability|session)|approve\s+without\s+(?:extra\s+)?confirmation|proceed\s+without\s+asking|skip\s+(?:human\s+)?confirmation)|
+  (?:include|attach|forward|send|share|copy|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|authorization\s+headers?|bearer\s+tokens?|api\s+keys?|environment\s+(?:variables?|context)|local\s+state|wallet\s+state|cookies?)
+))""",
+        ],
+        "description": "WalletConnect grantPermissions Session-Key Authority Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 wallet permission metadata and authority inversion in transaction previews."
+    },
+    {
+        "id": "GLS-DFP-108",
+        "name": "Wallet Preview Linked Dashboard Prompt Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)(?=.*(?:wallet[_ -]?preview|signing\s+request|transaction\s+simulation|simulation\s+receipt|decoded\s+calldata|risk\s+dashboard|security\s+dashboard|route\s+dashboard|preview\s+link|receipt\s+link|trace[_\s-]?url|explorer\s+note|tooltip|href\s+title|link\s+title|markdown\s+link))(?=.*(?:sign|approve|approval|permit|spender|allowance|unlimited|transfer|bridge|swap|route|slippage|confirmation|warning|human\s+approval))(?=.*(?:dashboard|linked\s+(?:page|summary|risk\s+note)|external\s+(?:risk|simulation)|tooltip|title|href|url|markdown\s+link|trace\s+link|preview\s+link))(?=.*(?:agent|assistant|wallet\s+agent|model|scanner))(?=.*(?:safe\s+to\s+sign|do\s+not\s+warn|skip\s+(?:human\s+)?confirmation|trusted\s+spender|hide\s+(?:the\s+)?risk|suppress\s+(?:the\s+)?warning|ignore\s+(?:the\s+)?(?:allowance|slippage)|proceed\s+without\s+asking|mark\s+(?:it|this|transaction|route).{0,50}\bsafe))""",
+        ],
+        "description": "Wallet Preview Linked Dashboard Prompt Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 wallet-specific simulation dashboard links, distinct from general API portal metadata."
+    },
+    {
+        "id": "GLS-DFP-109",
+        "name": "Blockchain Transaction Simulation Trace Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)(?=.*\b(?:wallet[_ -]?preview|transaction\s+simulation|signing\s+request|decoded\s+calldata|simulation\s+logs?|trace|receipt|swap\s+preview|bridge\s+route|risk[_ -]?assessment|spender[_ -]?label|permit\s+preview|wallet\s+receipt)\b)(?=.*\b(?:sign|approve|approval|permit|token\s+approval|spender|allowance|unlimited|transfer|bridge|swap|stake|mint|confirmation|human\s+approval|warning|slippage)\b)(?=.*\b(?:agent|assistant|wallet\s+agent|scanner|model|autonomous\s+wallet)\b)(?=.*\b(?:routine\s+allowance|house\s+spender|gasless\s+(?:approval|route|permit)|zero[-\s]?value\s+(?:approval|permit)|permit[-\s]?only|harmless\s+signature|standard\s+route|low[-\s]?risk\s+spender|no\s+material\s+risk|classif(?:y|ied).{0,60}\b(?:routine|low[-\s]?risk|safe)|treat.{0,60}\b(?:routine|gasless|permit[-\s]?only|safe|low[-\s]?risk))\b)""",
+        ],
+        "description": "Blockchain Transaction Simulation Trace Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 blockchain transaction simulation and trace metadata for authority inversion attacks."
+    },
+    {
+        "id": "GLS-DFP-110",
+        "name": "EIP-712 Typed-Data Signing Authority Inversion",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\b.{0,80}?\b(?:typed[-\s]?data|eip[-\s]?712|permit2?|wallet\s+preview|signing\s+request|siwe|session\s+key|delegation)\b|
+  never\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\b.{0,80}?\b(?:typed[-\s]?data|eip[-\s]?712|permit2?|wallet\s+preview|signing\s+request|siwe|session\s+key|delegation)\b|
+  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook)\b.{0,80}?\b(?:should|must)\s+(?:report|detect|flag|refuse|block|warn)\b.{0,100}?\b(?:safe\s+to\s+sign|do\s+not\s+warn|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|proceed\s+without\s+(?:user\s+)?confirmation|include\s+(?:[\w-]+\s+){0,4}(?:session|token|cookie|env|api\s*key))|
+  (?:incident|postmortem|security\s+report)\b.{0,120}?(?:(?:blocked|detected|flagged|refused|warned)\b.{0,120}?\b(?:agent\s+instruction|safe\s+to\s+sign|do\s+not\s+warn|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?)|(?:agent\s+instruction|safe\s+to\s+sign|do\s+not\s+warn|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?)\b.{0,120}?\b(?:blocked|detected|flagged|refused|warned))
+))
+(?=.*(?<![a-zA-Z0-9])(?:eth[_-]?signTypedData(?:_v\d)?|signTypedData|eip[-\s]?712|typed[-\s]?data|permit2?|permitSingle|permitBatch|eip[-\s]?2612|siwe|sign[-\s]?in\s+with\s+ethereum|wallet\s+signing\s+preview|signing\s+request|primaryType|verifyingContract|typed_data|userOperation|session\s+key|delegation|witness)(?![a-zA-Z0-9]))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|wallet\s+agents?|browser\s+assistants?|security\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent)(?![a-zA-Z0-9]))
+(?=.*\b(?:sign(?:ature|ing)?|permit2?|approve|approval|allowance|spender|unlimited|delegate|delegation|session\s+keys?|authorization|confirmation|warning|warnings|human\s+approval|read[-\s]?only|safe|expiry|expiration|userOperation|token)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|verifier|scanner)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:wallet\s+)?(?:source\s+of\s+truth|policy|guidance|instruction)|
+  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\s+precedence\s+over|ignore|disregard)\b.{0,80}?\b(?:wallet|system|developer|security|warning|confirmation|approval)\b|
+  safe\s+to\s+sign|mark\s+(?:it|this|transaction|signature|permit|approval).{0,40}?\bas\s+safe|treat.{0,50}?as\s+(?:safe|read[-\s]?only|informational|pre[-\s]?approved)|
+  (?:do\s+not|not)\s+(?:warn|report|ask|prompt|escalate)|skip\s+(?:the\s+)?(?:warning|confirmation|review|human\s+approval)|proceed\s+without\s+(?:extra\s+|user\s+|human\s+)?confirmation|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk)|ignore\s+(?:[\w-]+\s+){0,3}(?:allowance|spender|delegate|session|expiry|expiration|risk|warning)|
+  (?:include|forward|send|attach|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|wallet\s+state|local\s+state|environment\s+(?:variables?|context)|cookies?|api\s*keys?|authorization\s+headers?)
+)\b)""",
+        ],
+        "description": "EIP-712 Typed-Data Signing Authority Inversion: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 eIP-712 typed-data signing metadata and permit-based authority inversion."
+    },
+    {
+        "id": "GLS-DFP-111",
+        "name": "WalletConnect Session-Proposal Namespace Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:docs?|documentation|guide|reference|training|runbook|incident\s+report|postmortem|unit\s+test|fixture|security\s+report|scanner\s+docs?)\b.{0,260}\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\s+(?:obey|include|attach|forward|send|share|report|override|trust)|must\s+not\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat)|should\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|quarantined|redacted|not\s+authoritative))
+(?!.*\b(?:walletconnect|wallet\s+connect|session\s+proposal|wc_sessionPropose)\b.{0,200}\b(?:is|are)\s+not\s+(?:policy|instructions?|authoritative|trusted\s+guidance))
+(?=.*(?:\bWalletConnect\b|\bwallet\s+connect\b|\bwc_sessionPropose\b|\bsession\s+proposal\b|\bsession\s+propose\b|\brequiredNamespaces\b|\boptionalNamespaces\b|\bwallet_session\b|\bpairing\s+proposal\b|\bwalletconnect\s+proposal\b|"metadata"\s*:\s*\{|"requiredNamespaces"\s*:\s*\{|"optionalNamespaces"\s*:\s*\{))
+(?=.*(?:(?:AI\s+|LLM\s+|wallet\s+|security\s+|approval\s+|signing\s+|transaction\s+)?(?:agents?|assistants?|copilots?|scanners?|auditors?|reviewers?|summarizers?|models?|llms?)|wallet\s+(?:assistant|copilot|agent|scanner|reviewer)|approval\s+(?:agent|assistant|reviewer)|signing\s+(?:assistant|agent|reviewer)|(?<![A-Za-z0-9])(?:assistant_note|agent_note|scanner_policy|wallet_agent|approval_policy|signing_assistant)(?![A-Za-z0-9])))
+(?=.*(?:(?:authoritative|canonical|governing|definitive|primary|controlling|trusted|approved)\s+(?:approval|wallet|session|pairing|signing|review|scanner|agent)?\s*(?:policy|instructions?|guidance|playbook|procedure|source\s+of\s+truth)|(?:primary|single)\s+source\s+of\s+truth|supersed(?:e|es|ed|ing)?|overrides?|outranks?|takes?\s+precedence|ignore\s+(?:wallet|scanner|system|risk|security)\s+(?:warnings?|rules?|policy)|treat.{0,50}?as\s+(?:safe|approved|trusted|informational)|mark.{0,50}?as\s+(?:safe|approved|trusted|informational)|(?:suppress|hide|omit|exclude|downgrade|deprioriti[sz]e|demote|reclassify|redact)\s+(?:[\w-]+\s+){0,5}(?:warnings?|findings?|alerts?|risks?|permission\s+changes?|method\s+requests?|chain\s+requests?|account\s+exposure|signing\s+requests?|approval\s+prompts?|reports?)|do\s+not\s+(?:report|warn|flag|escalate|show)\s+(?:[\w-]+\s+){0,5}(?:warnings?|findings?|alerts?|risks?|methods?|chains?|permissions?|accounts?|signing\s+requests?)|(?:include|forward|send|share|attach|provide|pass\s+along|relay|transmit|copy|collect)\s+(?:[\w-]+\s+){0,5}(?:wallet\s+state|local\s+state|session\s+(?:topic|key|token|context|metadata)|pairing\s+(?:topic|secret|context)|account\s+(?:list|metadata|capabilities)|addresses?|seed\s+phrases?|private\s+keys?|mnemonics?|auth(?:entication)?\s+(?:headers?|tokens?)|api\s+keys?|environment\s+(?:variables?|context)|cookies?)))""",
+        ],
+        "description": "WalletConnect Session-Proposal Namespace Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 walletConnect session proposal and namespace metadata used to deceive wallet agents."
+    },
+    {
+        "id": "GLS-DFP-112",
+        "name": "WalletConnect Session-Request Event Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:docs?|documentation|guide|reference|training|runbook|incident\s+report|postmortem|unit\s+test|fixture|security\s+report|scanner\s+docs?)\b.{0,260}\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|trust|instruct)|never\s+(?:obey|include|attach|forward|send|share|report|override|trust)|must\s+not\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat)|should\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|quarantined|redacted|not\s+authoritative))
+(?!.*\b(?:walletconnect|wallet\s+connect|wc_sessionRequest|session\s+request|session\s+event)\b.{0,220}\b(?:is|are|was|were)\s+not\s+(?:policy|instructions?|authoritative|trusted\s+guidance))
+(?=.*(?:\bWalletConnect\b|\bwallet\s+connect\b|\bwc_sessionRequest\b|\bsession\s+request\b|\bsession\s+event\b|\brequest_event\b|\bchainChanged\b|\baccountsChanged\b|\bpersonal_sign\b|\beth_sendTransaction\b|\bwallet_switchEthereumChain\b|\bwallet_requestPermissions\b|\bsession\s+namespace\b|"method"\s*:\s*"(?:wc_sessionRequest|personal_sign|eth_sendTransaction|wallet_switchEthereumChain|wallet_requestPermissions)"))
+(?=.*(?:(?:AI\s+|LLM\s+|wallet\s+|security\s+|approval\s+|signing\s+|transaction\s+)?(?:agents?|assistants?|copilots?|scanners?|auditors?|reviewers?|summarizers?|models?|llms?)|wallet\s+(?:assistant|copilot|agent|scanner|reviewer)|approval\s+(?:agent|assistant|reviewer)|signing\s+(?:assistant|agent|reviewer)|(?<![A-Za-z0-9])(?:assistant_note|agent_note|scanner_policy|wallet_agent|approval_policy|signing_assistant|review_hint)(?![A-Za-z0-9])))
+(?=.*(?:(?:authoritative|canonical|governing|definitive|primary|controlling|trusted|approved)\s+(?:approval|wallet|session|request|event|signing|review|scanner|agent)?\s*(?:policy|instructions?|guidance|playbook|procedure|source\s+of\s+truth)|(?:primary|single)\s+source\s+of\s+truth|supersed(?:e|es|ed|ing)?|overrides?|outranks?|takes?\s+precedence|ignore\s+(?:wallet|scanner|system|risk|security|permission)\s+(?:warnings?|rules?|policy|prompts?)|treat.{0,60}?as\s+(?:safe|approved|trusted|informational|already\s+confirmed)|mark.{0,60}?as\s+(?:safe|approved|trusted|informational)|(?:suppress|hide|omit|exclude|downgrade|deprioriti[sz]e|demote|reclassify|redact)\s+(?:[\w-]+\s+){0,6}(?:warnings?|findings?|alerts?|risks?|permission\s+changes?|method\s+requests?|chain\s+switch(?:es)?|account\s+exposure|signing\s+requests?|approval\s+prompts?|reports?)|do\s+not\s+(?:report|warn|flag|escalate|show|ask|prompt)\s+(?:[\w-]+\s+){0,6}(?:warnings?|findings?|alerts?|risks?|methods?|chains?|permissions?|accounts?|signing\s+requests?|confirmations?)|(?:include|forward|send|share|attach|provide|pass\s+along|relay|transmit|copy|collect)\s+(?:[\w-]+\s+){0,6}(?:wallet\s+state|local\s+state|session\s+(?:topic|key|token|context|metadata)|pairing\s+(?:topic|secret|context)|account\s+(?:list|metadata|capabilities)|addresses?|seed\s+phrases?|private\s+keys?|mnemonics?|auth(?:entication)?\s+(?:headers?|tokens?)|api\s+keys?|environment\s+(?:variables?|context)|cookies?)))""",
+        ],
+        "description": "WalletConnect Session-Request Event Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 walletConnect session request and event metadata for deceiving transaction agents."
+    },
 ]
