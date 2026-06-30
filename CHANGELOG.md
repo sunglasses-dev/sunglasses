@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.70] — 2026-06-29
+
+### Added (9 net-new patterns)
+
+- **+9 `discovery_file_poisoning` patterns** — Extended DFP coverage for wallet signing, runtime trust boundaries, and agent-policy carriers: `GLS-DFP-063`, `GLS-DFP-069`, `GLS-DFP-070`, `GLS-DFP-076`, `GLS-DFP-093`, `GLS-DFP-094`, `GLS-DFP-099`, `GLS-DFP-100`, `GLS-DFP-102`. These patterns cover ERC-4337 paymaster metadata poisoning, wallet-signing-prompt injection, and discovery files that agents read before performing any on-chain or high-trust action — surfaces where a poisoned file can redirect funds or bypass runtime trust checks before the agent reaches a human-approval gate.
+
+### Context
+
+- Catalog total: **1,085 patterns / 65 categories / 7,738 keywords.**
+- Companion blog: Discovery File Poisoning Part 3 — wallet signing and runtime trust.
+- All 9 patterns verified to compile, fire on realistic true-positive samples, and pass the clean-corpus false-positive gate before ship.
+
 ## [0.2.69] — 2026-06-27
 
 ### Added (17 net-new patterns)
