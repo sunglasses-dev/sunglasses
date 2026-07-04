@@ -23287,4 +23287,228 @@ PATTERNS = [
         ],
         "description": "WalletConnect Session-Request Event Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 walletConnect session request and event metadata for deceiving transaction agents."
     },
+    # === v0.2.72 batch (9 patterns) ===
+    {
+        "id": "GLS-DFP-114",
+        "name": "Task-Queue / Kanban Worker-Authority Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust|treat|use)
+ |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)
+ |never\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat|use)
+ |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat|use)
+ |should\s+(?:report|detect|flag|refuse|block)
+ |(?:security\s+training|scanner\s+docs?|worker\s+guide|runbook|incident\s+report|security\s+report|postmortem).{0,180}?(?:detected|blocked|flagged|refused|reported|warns?|explains?)
+ |detected\s+and\s+(?:blocked|refused|flagged|remediated)
+ |was\s+(?:blocked|refused|flagged|detected|remediated)\s+by
+ |no\s+(?:agent|assistant|worker|scanner)\s+instructions?
+ |not\s+authoritative
+ |no\s+policy\s+overrides?
+))
+(?=.*(?:
+  \bkanban\b|work\s*queue|workqueue|task\s*(?:card|record|metadata|queue|payload)|job\s*(?:ticket|payload|queue)|queue\s*payload|queue\s*metadata
+ |kanban_complete|HERMES_KANBAN|task\.metadata|completion\s*metadata|retry_log_ref|dashboard://
+ |(?<!\w)"(?:task_id|metadata|retry_log_ref|attachment|attachment_url|dashboard_link|linked_buffers|evidence_bundle|comment_thread|retry_note)"\s*:
+))
+(?=.*(?:
+  (?:see|open|follow|read|check|view|load|references?|refer\s+to).{0,60}?(?:retry\s*log|attachment|dashboard|comment|evidence\s*bundle|artifact|linked\s*buffer|task\s*log|completion\s*bundle)
+ |linked\s*buffers?|linked_buffers?|retry_log_ref|attachment_url|dashboard_link|evidence_bundle|comment_thread|retry\s*log\s*(?:ref|id)|dashboard://
+))
+(?=.*(?:
+  downstream\s+(?:agents?|workers?)|worker\s+agents?|review\s+agents?|security\s+scanners?|automation\s+agents?|assigned\s+agents?|next\s+agent
+ |task\s+workers?|queue\s+workers?|worker\s+directive|reviewers?|schedulers?|agents?\b|assistants?\b|scanners?\b
+ |(?<![a-zA-Z0-9])(?:assistant|agent|worker|scanner)[_\s-](?:notes?|policy|instructions?)(?![a-zA-Z0-9])
+))
+(?=.*(?:
+  (?:agent|worker|assistant|scanner)\s+(?:instructions?|notes?|policy|directive)
+ |(?:primary|single)\s+source\s+of\s+truth|canonical|authoritative|highest\s+priority|approved\s+policy
+ |(?:main|primary|principal|preferred|recommended|core|standard|default)\s+(?:(?:queue|task|worker|review|security|audit|verification)\s+){0,3}(?:operating\s+)?(?:guidance|playbook|runbook|procedure|process|policy|framework|protocol)
+ |supersed(?:e|es|ed|ing)|overrides?|takes?\s+precedence|outranks?|ignore\s+(?:repo|system|scanner|review|queue)\s+(?:rules?|policy|guidance)
+ |treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|advisory)
+ |mark.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|clean|trusted)
+ |(?:suppress(?:es|ed|ing)?|hide|omit|exclude|downgrade|redact|silence|drop|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|evidence|vulnerabilities|security\s+issues?|auth\s+findings?|scanner\s+flags?|checks?|alerts?)
+ |(?:do\s+not|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|vulnerabilities|security\s+issues?|scanner\s+flags?|alerts?)
+ |(?:include|forward|send|attach|provide|copy|read|collect|populate|share|transmit|relay|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:tokens?|api\s*keys?|secrets?|credentials?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+(?:state|context)|authorization\s+headers?|session\s+cookies?)
+ |(?:findings?|warnings?|alerts?|vulnerabilities|security\s+issues?)\s+(?:are|is)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary)
+ |(?:credentials?|tokens?|api\s*keys?|auth\s+headers?|environment\s+context)\s+(?:should|must|can)\s+(?:be|get)\s+(?:relayed|forwarded|sent|included|shared|provided|attached)
+))""",
+        ],
+        "description": "Task-Queue / Kanban Worker-Authority Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 internal task-queue and Kanban metadata for worker-agent authority inversion."
+    },
+    {
+        "id": "GLS-DFP-116",
+        "name": "Web3 SIWE / CAIP-122 Auth-Challenge Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|must\s+not|never)\s+(?:obey|follow|trust|execute|accept)\b.{0,120}?\b(?:caip[-\s]?122|sign[-\s]?in\s+with\s+(?:solana|x|near|cosmos|bitcoin)|siws|wallet\s+auth(?:entication)?|auth\s+message)\b|
+  (?:scanner|security|training|docs?|guide|runbook|incident|postmortem)\b.{0,120}?\b(?:detect|flag|block|reject|refuse|warn|report)\b.{0,160}?\b(?:safe\s+to\s+sign|suppress\s+warnings?|ignore\s+(?:domain|origin|nonce|scope|risk)|skip\s+confirmation|include\s+(?:session|tokens?|cookies?|api\s*keys?))|
+  (?:incident|postmortem|report)\b.{0,120}?\b(?:blocked|rejected|refused|flagged|detected)\b.{0,160}?\b(?:agent\s+instruction|safe\s+to\s+sign|suppress\s+warnings?|skip\s+confirmation)
+)\b)
+(?=.*\b(?:caip[-\s]?122|sign[-\s]?in\s+with\s+(?:solana|x|near|cosmos|bitcoin)|siws|sign[-\s]?in\s+with\s+wallet|chain[-\s]?agnostic\s+auth|wallet\s+auth(?:entication)?\s+message|auth\s+message|login\s+challenge|wallet[_-]?auth[_-]?preview|signMessage|ed25519\s+signature|bech32\s+account|did:pkh|account\s*[:=]|origin\s*[:=]|audience\s*[:=]|nonce\s*[:=]|resources\s*[:=])\b)
+(?=.*\b(?:agent|assistant|model|llm|wallet\s+agent|auth\s+agent|verifier|scanner|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent[_-]?(?:notice|instruction|policy|message)?|auth[_-]?agent[_-]?(?:notice|instruction|policy|message)?)\b)
+(?=.*\b(?:sign|signature|login|authenticate|authentication|session|nonce|origin|domain|audience|resources?|scope|confirmation|warning|warnings|phishing|risk|token|cookie|credential)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|auth\s+agent|verifier)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:source\s+of\s+truth|policy|guidance|instruction)|
+  safe\s+to\s+sign|mark\s+(?:this|the\s+login|the\s+message|it).{0,45}?\b(?:safe|trusted)|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|risk|phishing|origin|domain|scope)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|risk|phishing)|ignore\s+(?:[\w-]+\s+){0,3}(?:origin|domain|nonce|scope|risk|warning)|
+  skip\s+(?:extra\s+)?(?:user\s+)?confirmation|proceed\s+without\s+(?:extra\s+)?(?:user\s+)?confirmation|
+  (?:include|forward|send|attach|copy|collect|provide)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|auth(?:orization)?\s+headers?|cookies?|wallet\s+state|api\s*keys?|local\s+state)
+)\b)
+.*$""",
+        ],
+        "description": "Web3 SIWE / CAIP-122 Auth-Challenge Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 web3/Wallet auth challenges (SIWE/SIWS/CAIP-122) not handled by general auth patterns."
+    },
+    {
+        "id": "GLS-DFP-117",
+        "name": "CTest / Dart Log-Artifact Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)\A(?![\s\S]{0,2000}\b(?:blocked|quarantined|redacted|unit test|fixture|example|do not obey|should flag|scanner|documentation)\b)[\s\S]*?(?:\bctest\b|Testing/Temporary/LastTest\.log|<Site\b[\s\S]{0,200}<Testing\b|<Test\b[\s\S]{0,200}<Measurement\b|DartMeasurement|Start testing:|End testing:)[\s\S]{0,1200}(?:system-out|Output|Measurement|LastTest\.log|Test\s*#?\d+|<Value>)[\s\S]{0,800}\b(?:ignore (?:previous|above|all) (?:instructions|failures|errors)|treat (?:this|the) (?:test|build|run) as (?:passing|green)|mark (?:the )?(?:build|tests|suite) (?:green|passed)|hide (?:this|these) (?:failures|errors)|do not (?:report|mention) (?:this|these) (?:failure|error|failures|errors)|send (?:secrets|tokens|credentials)|read (?:\.env|secrets|credentials|tokens))\b""",
+        ],
+        "description": "CTest / Dart Log-Artifact Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 cTest/Dart log artifacts; distinct from CMake config poisoning in GLS-BMP-004."
+    },
+    {
+        "id": "GLS-DFP-119",
+        "name": "Go test2json Output Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  do\s+not\s+(?:obey|follow|include|attach|forward|send|share|trust|treat|use|execute)
+ |does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)
+ |never\s+(?:obey|include|attach|forward|send|share|trust|treat|use|execute)
+ |must\s+not\s+(?:obey|include|attach|forward|send|share|trust|treat|use|execute)
+ |should\s+(?:report|detect|flag|refuse|block)
+ |(?:security\s+training|scanner\s+docs?|developer\s+guide|runbook|incident\s+report|security\s+report|postmortem|documentation).{0,180}?(?:detected|blocked|flagged|refused|reported|warns?|explains?)
+ |detected\s+and\s+(?:blocked|refused|flagged|remediated)
+ |was\s+(?:blocked|refused|flagged|detected|remediated)\s+by
+ |not\s+an?\s+(?:instruction|policy)
+ |no\s+(?:agent|assistant|scanner)\s+instructions?
+ |no\s+policy\s+overrides?
+))
+(?=.*(?:
+  go\s+test\s+-json|go\s+test\s+json|test2json|cmd/test2json|gotestjson|gotestsum
+ |(?<!\w)"Action"\s*:\s*"(?:output|fail|pass|run)"|(?<!\w)"Package"\s*:\s*"[^"]+"|(?<!\w)"Test"\s*:\s*"[^"]+"
+ |(?<!\w)"Output"\s*:\s*"|\b(?:RUN|PASS|FAIL):\s+Test[A-Za-z0-9_]+
+))
+(?=.*(?:
+  (?<!\w)"Output"\s*:\s*"|Action\s*=\s*output|test\s+stdout|test\s+stderr|captured\s+output|subtest\s+log|panic\s+output|failure\s+output
+))
+(?=.*(?:
+  ai\s+agents?|coding\s+agents?|review\s+agents?|security\s+scanners?|test\s+summarizers?|ci\s+agents?|automation\s+agents?|assistants?|scanners?|agents?
+ |(?:agent|assistant|scanner|ci_agent|reviewer)[_\s-](?:note|policy|instructions?|directive)
+))
+(?=.*(?:
+  (?:agent|assistant|scanner|ci\s+agent|reviewer)\s+(?:instructions?|notes?|policy|directive)
+ |(?:primary|single)\s+source\s+of\s+truth|canonical|authoritative|highest\s+priority|approved\s+policy
+ |supersed(?:e|es|ed|ing)|overrides?|takes?\s+precedence|outranks?|ignore\s+(?:repo|system|developer|scanner|test)\s+(?:rules?|policy|guidance|instructions?)
+ |treat.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|advisory|clean)
+ |mark.{0,50}?as\s+(?:informational|non[-\s]?blocking|safe|clean|trusted)
+ |(?:suppress(?:es|ed|ing)?|hide|omit|exclude|downgrade|redact|silence|drop|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|evidence|vulnerabilities|security\s+issues?|test\s+failures?|failures?|scanner\s+flags?|alerts?)
+ |(?:do\s+not|not)\s+(?:report|flag|escalate|mention)\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|vulnerabilities|security\s+issues?|test\s+failures?|failures?|alerts?)
+ |(?:include|forward|send|attach|provide|copy|read|collect|populate|share|transmit|relay|pass\s+along)\s+(?:[\w-]+\s+){0,4}(?:tokens?|api\s*keys?|secrets?|credentials?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+(?:state|context)|authorization\s+headers?|session\s+cookies?|github\s+token)
+ |(?:findings?|warnings?|alerts?|vulnerabilities|security\s+issues?|test\s+failures?|failures?)\s+(?:are|is)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary)
+))""",
+        ],
+        "description": "Go test2json Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 go test JSON output format (test2json), distinct from general logs."
+    },
+    {
+        "id": "GLS-DFP-121",
+        "name": "Jest JSON Test-Result Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:incident report|blocked|quarantined|redacted|unit test|fixture|docs?|documentation|runbook|training|detector|scanner should flag|must flag|should flag|do not obey|must not obey|never follow)\b.{0,220}\b(?:agent|assistant|suppress|token|credential|instruction|directive)\b)(?=.*\b(?:jest\s+json|jest\s+--json|--json|testResults|assertionResults|failureMessages?|failureMessage|ancestorTitles|fullName|console|numFailedTests|outputFile)\b|(?=.*\bstatus\b)(?=.*\bfailed\b))(?=.*\b(?:agent|assistant|automated\s+review|test\s+reviewer|ci\s+reviewer|scanner|bot)\b)(?=.*\b(?:directive|instruction|canonical|authoritative|source\s+of\s+truth|override|takes\s+precedence|review\s+policy|policy)\b)(?=.*\b(?:suppress|hide|ignore|omit|downgrade|green\s+path|quiet\s+mode|operator-only|include|forward|exfiltrate|dump|send|relay|pass\s+along|mark\s+(?:the\s+)?(?:suite|tests?|run)\s+pass(?:ed)?|treat\s+(?:failures?|findings|diagnostics)\s+as\s+(?:informational|non[-\s]?blocking)|do\s+not\s+report)\b.{0,100}\b(?:failures?|findings|diagnostics|coverage|tokens?|credentials?|secrets?|env(?:ironment)?(?:\s+variables?)?|api\s*keys?|runtime\s+context|ci\s+variables?)\b).*""",
+        ],
+        "description": "Jest JSON Test-Result Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jest JSON test results, distinct from general test metadata or logs."
+    },
+    {
+        "id": "GLS-DFP-122",
+        "name": "JSON Schema `$comment` / annotation instruction smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:do\s+not|does\s+not|never|must\s+not|should\s+not)\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede|use|execute)|\bno\s+(?:agent|assistant|scanner|verifier|auditor|reviewer)?\s*(?:guidance|instructions?)\s+(?:present|included|intended)\b|\b(?:documentation|docs?|guide|reference|training|security\s+scanner)\b.{0,140}\b(?:detect|flag|report|block|refuse|ignore)\b.{0,80}\b(?:prompt\s+injection|agent\s+instruction|malicious|untrusted)|\b(?:incident|security)\s+report\b.{0,160}\b(?:detected|blocked|flagged|refused)|\b(?:comments?|\$comment|descriptions?)\s+(?:are|is)\s+(?:annotation|annotations|non-authoritative|not\s+policy|ignored\s+by\s+validators)))
+(?=.*(?:\bJSON\s+Schema\b|\$schema\b|\$defs\b|\$comment\b|\bproperties\b.{0,80}\bdescription\b|schema\s+(?:description|annotation|comments?)|validation\s+schema|input\s+schema|output\s+schema|tool\s+schema|structured\s+output\s+schema))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|autonomous\s+agents?|agents?|assistants?|coding\s+agents?|review\s+bots?|reviewers?|scanners?|security\s+scanners?|verifiers?|auditors?|llms?|models?)(?![A-Za-z0-9]))
+(?=.*(?:\b(?:single|primary)\s+source\s+of\s+truth\b|\b(?:override|overrides|overridden|supersede|supersedes|superseded|outrank|outranks|take\s+precedence|highest\s+priority|canonical|authoritative|governing)\b|\b(?:agent|assistant|scanner|verifier|auditor|reviewer|model|llm)\s+(?:instruction|instructions|policy|rules|guidance)\b|\b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|omit|omits|omitted|redact|redacts|downgrade|downgrades|mark\s+clean|treat.{0,50}?as\s+(?:safe|clean|informational|non[-\s]?blocking)|do\s+not\s+(?:report|flag)|(?:findings?|reports?|warnings?)\s+(?:should\s+be\s+)?(?:suppressed|hidden|omitted|redacted|downgraded))\b|\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read)\s+(?:[\w-]+\s+){0,5}(?:env(?:ironment)?\s*(?:variables?|context)?|api\s*keys?|tokens?|secrets?|credentials?|authorization\s+headers?|session\s+(?:cookies?|keys?)|local\s+state|runtime\s+config)\b))""",
+        ],
+        "description": "JSON Schema `$comment` / annotation instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jSON Schema is a distinct format critical for structured LLM tool-calling contexts."
+    },
+    {
+        "id": "GLS-DFP-124",
+        "name": "Web3 Wallet Signing-Queue Approval-Graph Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|incident\s+report|security\s+training|defensive\s+docs?|unit\s+tests?|test\s+fixture|scanner\s+keywords\s+only|must\s+not\s+(?:trust|obey|treat|skip|suppress)|do\s+not\s+(?:trust|obey|treat|skip|suppress)|does\s+not\s+(?:trust|obey|treat|skip|suppress|override)|never\s+(?:trust|obey|treat|skip|suppress|override)|preserve\s+warnings?|keep\s+confirmation|required\s+confirmation|confirmation\s+required|structured\s+approval\s+metadata\s+(?:cannot|must\s+not|should\s+not)|approval\s+graph\s+was\s+(?:rejected|blocked))\b)(?=.*(?:wallet[_\s-]?signing[_\s-]?queue|signing\s+(?:queue|request|item)|wallet\s+(?:approval|signing|assistant|agent|review)|eth_signTypedData|personal_sign|safe\s*tx|multisig|transaction|tx\b|permit|approve|approval|spender|allowance|transfer|bridge|swap|session\s+key|human\s+confirmation|user\s+confirmation))(?=.*(?:approval[_\s-]?graph|approval[_\s-]?status|approval[_\s-]?badge|verification[_\s-]?badge|verified[_\s-]?by[_\s-]?agent|reviewer[_\s-]?score|quorum[_\s-]?(?:status|met|state|count)|vote[_\s-]?tally|signoff[_\s-]?(?:matrix|graph|path)|trust[_\s-]?score|risk[_\s-]?badge|approval[_\s-]?policy|structured\s+(?:approval|verification|quorum)\s+(?:metadata|field|badge|status)))(?=.*\b(?:verified|approved|validated|cleared|attested|greenlit|pre[-\s]?cleared|quorum(?:[_\s-]?status)?\s+(?:met|satisfied|complete)|threshold\s+satisfied|consensus\s+reached|green\s+(?:badge|path|status)|trusted\s+(?:badge|review|approval)|trust\s+(?:the\s+)?(?:badge|approval|graph|quorum|status)|carry\s+forward\s+(?:the\s+)?(?:approval|verification|quorum)|reuse\s+(?:the\s+)?(?:approval|verification))\b)(?=.*\b(?:suppress|hide|omit|downgrade|silence|skip|bypass|do\s+not\s+show|do\s+not\s+ask|no\s+need\s+to\s+(?:warn|confirm|ask)|without\s+(?:warning|confirmation)|mark\s+(?:as\s+)?(?:safe|green|approved|verified)|treat\s+(?:as\s+)?(?:safe|green|approved|verified))\b)(?=.*\b(?:warnings?|wallet\s+warnings?|allowance\s+(?:warning|alert)|risk\s+(?:banner|prompt|warning)|confirmation|confirmation\s+(?:screen|prompt)|human\s+confirmation|user\s+confirmation|review\s+prompt|mismatch\s+(?:finding|warning)|spender\s+(?:alert|warning))\b)""",
+        ],
+        "description": "Web3 Wallet Signing-Queue Approval-Graph Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 web3 wallet signing queues and approval graphs not covered elsewhere."
+    },
+    {
+        "id": "GLS-DFP-126",
+        "name": "Wallet Deep-Link URI Parameter Shadowing",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override)|does\s+not\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|override|overrides?)|never\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override|overrides?)|must\s+not\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override|overrides?)|(?:security\s+training|scanner\s+docs?|parser\s+docs?|incident\s+report).{0,140}?(?:detected|blocked|flagged|refused|reported|should\s+(?:detect|flag|report|refuse|block))))
+(?=.*(?:ethereum:|bitcoin:|wc:|walletconnect|wallet\s+(?:qr|uri|url|deep[-\s]?link|app[-\s]?link)|qr\s+(?:wallet|payment|payload|decoded)|eip[-\s]?681|payment\s+uri|deeplink|deep[-\s]?link|app[-\s]?link|message=|label=|memo=|agent[-_]?policy=|wallet[-_]?policy=))
+(?=.*(?:duplicate\s+(?:query\s+)?(?:param(?:eter)?|key)|repeated\s+(?:message|label|memo|param(?:eter)?)|last\s+value\s+wins|first\s+value\s+wins|parameter\s+precedence|param(?:eter)?\s+shadow(?:ing|ed)|homoglyph\s+(?:key|param(?:eter)?)|percent[-\s]?encoded\s+(?:query|param)|base64\s+(?:query|param)|url[-\s]?decoded|decoded\s+qr|canonicali[sz]ed\s+params?|query\s+normalization|appended\s+query))
+(?=.*(?:wallet\s+(?:agent|assistant|scanner|reviewer|copilot|auditor)|signing\s+(?:agent|assistant|reviewer)|payment\s+(?:agent|assistant)|transaction\s+(?:agent|assistant)|agents?\b|assistants?\b|scanners?\b))
+(?=.*(?:wallet|sign(?:ing|ature)?|transaction|transfer|payment|approval|allowance|spender|session|siwe|auth|human\s+confirmation|confirmation|wallet\s+warning|risk\s+summary))
+(?=.*(?:authoritative|canonical|single\s+source\s+of\s+truth|primary\s+source\s+of\s+truth|overrides?|supersed(?:e|es|ed|ing)|highest\s+priority|trusted\s+guidance|mark\s+(?:as\s+)?(?:safe|routine)|safe\s+to\s+sign|fast[-\s]?track|skip\s+(?:extra\s+)?confirmation|do\s+not\s+ask|(?:suppress|hide|omit|downgrade|redact)\s+(?:[\w-]+\s+){0,3}(?:warnings?|risks?|findings?|reports?|allowance|spender|session|domain|slippage|confirmation)|(?:include|forward|send|attach|provide|copy|read)\s+(?:[\w-]+\s+){0,4}(?:tokens?|api\s*keys?|secrets?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+(?:state|context)|authorization\s+headers?|session\s+cookies?)))""",
+        ],
+        "description": "Wallet Deep-Link URI Parameter Shadowing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 wallet deep-link/URI parameter shadowing and homoglyph attacks."
+    },
+    {
+        "id": "GLS-DFP-127",
+        "name": "Payment-Request / Invoice Instruction Smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:security|incident|postmortem|forensic|training|docs?|guide|reference|runbook|playbook)\b.{0,140}\b(?:detected|blocked|reported|flagged|refused|warned)\b|
+  (?:wallet\s+)?scanners?\s+(?:docs?|guide|reference)\s+should\s+(?:report|detect|flag|refuse|block)\b|
+  (?:do\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override)|
+     does\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|instruct)|
+     never\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override)|
+     must\s+not\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override))
+))
+(?=.*(?:\bpayment[_ -]?(?:request|intent|invoice|memo|note|message|uri|link)\b|\binvoice\b|\bcheckout\s+(?:request|link|description|memo)\b|\bwallet\s+(?:uri|dee?p[- ]?link|qr|payment)\b|\b(?:ethereum|bitcoin):[^\s]+|\beip[- ]?681\b|\btransaction\s+(?:memo|note|message|label)\b|\brecipient\s+(?:note|label|message)\b|\bmessage=|\blabel=|(?<![a-zA-Z0-9])payment_(?:memo|note|message|label|description)(?![a-zA-Z0-9])))
+(?=.*\b(?:wallet|sign(?:ing|ature)?|send\s+transaction|transfer|payment|token|spender|allowance|recipient|amount|chain|domain|session|auth|human\s+confirmation|confirmation)\b)
+(?=.*(?:\b(?:ai\s+)?(?:wallet\s+)?agents?\b|\bwallet\s+assistants?\b|\bassistants?\b|\bcopilots?\b|\bmodels?\b|\bverifiers?\b|\bscanners?\b|\breviewers?\b|(?<![a-zA-Z0-9])(?:agent|assistant|scanner|verifier|reviewer)[_-](?:instruction|note|policy|label|description)s?(?![a-zA-Z0-9])))
+(?=.*\b(?:
+  (?:authoritative|canonical|primary|single)\s+(?:checkout\s+|payment\s+|wallet\s+)?(?:policy|source\s+of\s+truth|instruction|guidance)|
+  (?:verified|approved|pre[- ]?cleared|trusted)\s+(?:payment|invoice|checkout|transfer|recipient|request)|
+  (?:suppress|hide|redact|downgrade|reclassify)\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|risks?|recipient|spender|allowance|amount|chain|domain|confirmation)s?|
+  (?:treat|mark|classify).{0,50}?\bas\s+(?:informational|safe|trusted|routine|low[- ]?risk)|
+  (?:skip|bypass|omit)\s+(?:[\w-]+\s+){0,3}(?:human\s+)?confirmation|
+  (?:approve|proceed|sign|send)\s+without\s+(?:[\w-]+\s+){0,3}(?:asking|confirmation|review|warning)|
+  (?:ignore|override|supersede)\s+(?:[\w-]+\s+){0,3}(?:wallet|system|developer|security|scanner|review|warning|confirmation|risk)s?|
+  (?:include|attach|forward|send|share|copy|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|authorization\s+headers?|bearer\s+tokens?|api\s+keys?|environment\s+(?:variables?|context)|local\s+state|wallet\s+state|cookies?)
+))""",
+        ],
+        "description": "Payment-Request / Invoice Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 malicious instructions within payment requests, invoices, and checkout metadata."
+    },
 ]
