@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.72] — 2026-07-04
+
+### Added (9 net-new patterns)
+
+- **+9 `discovery_file_poisoning` patterns** — `GLS-DFP-114`, `GLS-DFP-116`, `GLS-DFP-117`, `GLS-DFP-119`, `GLS-DFP-121`, `GLS-DFP-122`, `GLS-DFP-124`, `GLS-DFP-126`, `GLS-DFP-127`. AZ-authored DFP patterns extending the discovery-surface family that AI-built-app coding agents (Claude Code, Cursor, Lovable, Bolt, Replit Agent) encounter while building, testing, and wiring up generated apps — CI/test-runner output artifacts (ctest, Go test2json, Jest result files), Web3 wallet-signing/auth-challenge/payment-request flows, task-queue/kanban worker metadata, and JSON Schema annotation carriers.
+
+### Context
+
+- Catalog total: **1,103 patterns / 65 categories / 7,738 keywords.**
+- Companion blog: [AI-Built App Security: Sandboxes Are Not Runtime Trust](https://sunglasses.dev/blog/ai-built-app-security-sandboxes-runtime-trust) — positions runtime trust as the layer after deployment sandboxes (Northflank-style microVM isolation) in AI-built-app security.
+- All 9 patterns are hand-authored (tp=0 in DB is expected); firing-verified by the apply-bundle pytest + preflight-dogfood gates rather than a coverage_tp_sample.
+
 ## [0.2.71] — 2026-06-30
 
 ### Added (9 net-new patterns)
