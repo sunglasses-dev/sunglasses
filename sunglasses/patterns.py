@@ -23511,4 +23511,123 @@ PATTERNS = [
         ],
         "description": "Payment-Request / Invoice Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 malicious instructions within payment requests, invoices, and checkout metadata."
     },
+    # === v0.2.73 batch (9 patterns) ===
+    {
+        "id": "GLS-DFP-128",
+        "name": "Wallet Transaction-Simulation Preview Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|incident\s+report|defensive\s+docs?|security\s+training|unit\s+test|test\s+fixture|scanner\s+keywords\s+only|should\s+(?:detect|flag|block|reject)|must\s+(?:detect|flag|block|reject)|do\s+not\s+(?:decode|render|obey|trust)|never\s+(?:decode|render|obey|trust)|preserve\s+warnings?|keep\s+confirmation|required\s+confirmation)\b)(?=.*\b(?:wallet[_ -]?preview|wallet\s+ui\s+preview|signing\s+request|transaction\s+simulation|simulation\s+receipt|decoded\s+(?:calldata|instruction|message)|risk[_ -]?assessment|wallet\s+receipt|bridge\s+route|swap\s+route|permit\s+preview|permission\s+update|wallet[_ -]?grant|grantPermissions)\b)(?=.*\b(?:base64|b64|percent[-\s]?encoded|url[-\s]?encoded|html\s+entit(?:y|ies)|unicode\s+escape|escaped\s+string|qr\s+payload|quoted[-\s]?printable|mime\s+soft\s+break|encoded[_ -]?(?:notice|message|description|summary|label)|decode(?:d|s|r)?|render(?:ed|s|er)?|normaliz(?:e|ed|ation)|reassembl(?:e|ed|y)|chunk(?:ed|s)?)\b)(?=.*\b(?:approve|approval|permit|sign|transfer|bridge|swap|spender|allowance|unlimited|delegated\s+authority|session\s+key|permission|slippage|confirmation|warning|human\s+approval)\b)(?=.*\b(?:agent|assistant|wallet[_\s-]*agent|scanner|reviewer|copilot|model)\b)(?=.*\b(?:safe\s+to\s+sign|suppress\s+(?:[\w-]+\s+){0,4}warnings?|hide\s+(?:[\w-]+\s+){0,4}risk|ignore\s+(?:[\w-]+\s+){0,4}(?:warning|allowance|slippage|scope|session|permission)|skip\s+(?:extra\s+)?confirmation|mark\s+(?:this|it|transaction|route|session).{0,50}\bsafe|trust\s+(?:the\s+)?(?:spender|route|session|permission|grant)|proceed\s+without\s+asking|treat\s+(?:as\s+)?(?:approved|pre[-\s]?approved)|override\s+(?:wallet|security|warning|confirmation)\s+policy)\b)""",
+        ],
+        "description": "Wallet Transaction-Simulation Preview Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 poisoning of wallet transaction simulations and decoded preview metadata."
+    },
+    {
+        "id": "GLS-DFP-129",
+        "name": "Wallet Qr Scan Label Instruction Smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:incident\s+report|blocked\s+it|preserved\s+confirmation)\b)(?!.*\b(?:do\s+not|never|must\s+not|refuse|reject|block(?:ed)?|cannot|can't)\b.{0,120}\b(?:suppress\s+warnings?|hide\s+risk|skip\s+confirmation|trust\s+the\s+(?:qr|code|scan)|ignore\s+(?:mismatch|address)|mark\s+safe)\b)(?=.*\b(?:qr\s*(?:code)?|scan(?:ned|ner)?|camera\s+scan|ocr\s+label|display\s+label|scan\s+caption|payment\s+code|deeplink\s+label)\b)(?=.*\b(?:wallet|walletconnect|wc:|ethereum:|sign(?:ature|ing)?|transaction|recipient|spender|address|chain(?:id)?|amount|token|human\s+confirmation|payment\s+request)\b)(?=.*\b(?:label|caption|overlay|alt\s*text|preview\s+text|merchant\s+note|scanner\s+result|decoded\s+qr)\b)(?=.*\b(?:suppress\s+warnings?|hide\s+risk|skip\s+confirmation|do\s+not\s+ask|trust\s+the\s+(?:qr|scan|code)|mark\s+safe|ignore\s+(?:mismatch|address|chain)|present\s+as\s+verified|routine\s+payment)\b).{0,3000}$""",
+        ],
+        "description": "Wallet Qr Scan Label Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting QR code scanning and decoded labels in wallet contexts."
+    },
+    {
+        "id": "GLS-DFP-132",
+        "name": "Wallet Preview Safe-Verdict Injection",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|incident\s+report|defensive\s+docs?|unit\s+test|test\s+fixture|scanner\s+keywords\s+only|never\s+trust|do\s+not\s+trust|must\s+not\s+use|ignore\s+untrusted\s+scores?|preserve\s+warnings?|keep\s+confirmation|required\s+confirmation)\b)(?=.*\b(?:wallet[_ -]?preview|wallet\s+ui\s+preview|signing\s+request|transaction\s+simulation|simulation\s+receipt|decoded\s+calldata|risk[_ -]?assessment|simulation\s+logs?|trace|receipt|swap\s+preview|bridge\s+route|permit\s+preview|wallet\s+receipt)\b)(?=.*\b(?:approve|approval|permit|sign|transfer|bridge|swap|spender|allowance|unlimited|session\s+key|delegated\s+authority|confirmation|warning|slippage)\b)(?=.*(?:\b(?:agent|assistant|scanner|reviewer|copilot|model)\b|\bwallet[_\s-]*agent\b|for[_\s-]?agent|assistant[_\s-]?(?:risk|verdict|warning)|wallet[_\s-]?agent[_\s-]?(?:risk|warning)))(?=.*\b(?:(?:agent|assistant|wallet[_ -]?agent|reviewer|scanner|copilot|model)[_ -]?(?:risk[_ -]?score|warning[_ -]?level|severity[_ -]?code|verdict[_ -]?code|policy[_ -]?score|confidence)|(?:risk[_ -]?score|warning[_ -]?level|severity[_ -]?code|verdict[_ -]?code|policy[_ -]?score)[_ -]?(?:for[_ -]?(?:agent|assistant|reviewer|wallet)|override|source))\b\s*[:=]\s*['"]?(?:0(?:\.0+)?|green|none|clear|low)['"]?)""",
+        ],
+        "description": "Wallet Preview Safe-Verdict Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 direct injection of safe security verdicts/scores into wallet preview metadata."
+    },
+    {
+        "id": "GLS-DFP-133",
+        "name": "SIWE Wallet-Authentication Instruction Smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\b.{0,120}?\b(?:siwe|sign[-\s]?in\s+with\s+ethereum|eip[-\s]?4361|personal[_-]?sign|wallet\s+sign[-\s]?in|sign[-\s]?in\s+message|auth(?:entication)?\s+challenge)\b|
+  never\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\b.{0,120}?\b(?:siwe|sign[-\s]?in\s+with\s+ethereum|eip[-\s]?4361|personal[_-]?sign|wallet\s+sign[-\s]?in|sign[-\s]?in\s+message|auth(?:entication)?\s+challenge)\b|
+  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook|support\s+article)\b.{0,110}?\b(?:should|must)\s+(?:report|detect|flag|refuse|block|warn|reject)\b.{0,150}?\b(?:safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}warnings?|ignore\s+(?:[\w-]+\s+){0,3}(?:domain|nonce|session|phishing|risk)|include\s+(?:[\w-]+\s+){0,4}(?:session|tokens?|cookies?|env|api\s*keys?))|
+  (?:incident|postmortem|security\s+report)\b.{0,130}?\b(?:blocked|rejected|refused|detected|flagged|warned)\b.{0,150}?\b(?:agent\s+instruction|safe\s+to\s+sign|suppress\s+warnings?|ignore\s+domain|skip\s+confirmation)
+)\b)
+(?=.*(?<![a-zA-Z0-9])(?:siwe|sign[-\s]?in\s+with\s+ethereum|eip[-\s]?4361|personal[_-]?sign|eth[_-]?sign|wallet[_-]?signin[_-]?preview|wallet\s+sign[-\s]?in|sign[-\s]?in\s+message|auth(?:entication)?\s+challenge|login\s+challenge|siwe\s+statement|statement\s*[:=]|resources\s*[:=]|issuedAt|expirationTime|notBefore|chainId|domain\s*[:=]|uri\s*[:=]|nonce\s*[:=])(?![a-zA-Z0-9]))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|wallet\s+agents?|browser\s+assistants?|security\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent|auth[_-]?agent)(?![a-zA-Z0-9]))
+(?=.*\b(?:sign(?:ature|ing)?|personal[_-]?sign|eth[_-]?sign|login|authenticate|authentication|session|nonce|domain|uri|resources?|cookies?|tokens?|authorization|confirmation|warning|warnings|phishing|domain\s+mismatch|session\s+scope|credential)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|auth\s+agent|verifier|scanner)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:login\s+|auth(?:entication)?\s+|wallet\s+|session\s+)?(?:source\s+of\s+truth|policy|guidance|instruction)|
+  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\s+precedence\s+over|ignore|disregard)\b.{0,100}?\b(?:wallet|system|developer|security|warning|confirmation|domain|nonce|session)|
+  safe\s+to\s+sign|mark\s+(?:it|this|the\s+login|the\s+sign[-\s]?in|the\s+message).{0,45}?\bsafe|mark\s+(?:it|this|the\s+login|the\s+sign[-\s]?in|the\s+message).{0,45}?\btrusted|
+  proceed\s+without\s+(?:extra\s+)?(?:user\s+)?confirmation|skip\s+(?:extra\s+)?(?:user\s+)?confirmation|no\s+(?:extra\s+)?(?:user\s+)?confirmation\s+(?:needed|required)|
+  do\s+not\s+warn|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|domain|nonce|session|phishing|risk)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|domain|nonce|session|phishing|risk)|ignore\s+(?:[\w-]+\s+){0,3}(?:domain\s+mismatch|domain|nonce|session|phishing|risk|warning)|
+  (?:include|forward|send|attach|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|auth(?:orization)?\s+headers?|cookies?|wallet\s+state|local\s+state|environment\s+(?:variables?|context)|api\s*keys?)
+)\b)
+.*$""",
+        ],
+        "description": "SIWE Wallet-Authentication Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 malicious instructions within SIWE and wallet authentication messages."
+    },
+    {
+        "id": "GLS-DFP-134",
+        "name": "GitHub Merge-Queue Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:(?:unit\s+test|fixture|scanner\s+docs?|security\s+training|negative\s+example|incident\s+report|postmortem).{0,160}?(?:detected|blocked|flagged|reported|refused|should\s+report|must\s+not|do\s+not\s+obey)|(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|trust|treat|override|include|forward|send|share|suppress))\b)(?=.*\b(?:github\s+merge\s+queue|merge[-\s]?queue|merge_group|gh-readonly-queue|auto[-\s]?merge|mergeability|merge\s+group|queue\s+position|required\s+checks?|check\s+suite|branch\s+protection|gh\s+pr\s+merge\s+--auto|merge\s+bot\s+status|queue\s+verdict)\b)(?=.*\b(?:ai\s+agents?|coding\s+agents?|review\s+agents?|security\s+scanners?|release\s+agents?|automation\s+agents?|assistants?|reviewers?|scanners?)\b)(?=.*\b(?:single\s+source\s+of\s+truth|authoritative|canonical|supersed(?:e|es|ed|ing)|overrides?|takes?\s+precedence|already\s+(?:approved|verified|cleared)|security\s+review\s+passed|safe\s+to\s+merge|green\s+verdict|approved\s+policy|trust\s+this\s+queue)\b)(?=.*\b(?:(?:suppress|hide|omit|downgrade|redact|ignore|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|reports?|warnings?|checks?|failures?|vulnerabilit(?:y|ies)|policy\s+violations?|security\s+issues?)|(?:mark|treat).{0,40}?\b(?:safe|clean|informational|non[-\s]?blocking)|(?:include|forward|send|attach|provide|copy|read)\s+(?:[\w-]+\s+){0,4}(?:tokens?|api\s*keys?|secrets?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+(?:state|context)|authorization\s+headers?|github_token|ci\s+context)\b)).*$""",
+        ],
+        "description": "GitHub Merge-Queue Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 gitHub Merge Queue and Merge Group metadata poisoning specifically."
+    },
+    {
+        "id": "GLS-DFP-135",
+        "name": "GitLab CodeClimate Quality-Report Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:(?:unit\s+test|fixture|scanner\s+docs?|security\s+training|negative\s+example|incident\s+report|postmortem|blocked\s+example).{0,180}?(?:detected|blocked|flagged|reported|refused|should\s+report|must\s+not|do\s+not\s+obey)|(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|trust|treat|override|include|forward|send|share|suppress))\b)(?=.*\b(?:gitlab\s+code\s+quality|codequality|gl-code-quality-report|artifacts:reports:codequality|code\s+quality\s+report|codeclimate|code\s+climate|fingerprint|check_name|severity|location|description)\b)(?=.*\b(?:ai\s+agents?|coding\s+agents?|merge\s+agents?|review\s+agents?|security\s+scanners?|assistants?|reviewers?|scanners?)\b)(?=.*\b(?:single\s+source\s+of\s+truth|authoritative|canonical|supersed(?:e|es|ed|ing)|overrides?|already\s+(?:approved|triaged|cleared)|safe\s+to\s+merge|green\s+quality\s+verdict|trusted\s+quality\s+gate)\b)(?=.*\b(?:(?:suppress|hide|omit|downgrade|ignore|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|vulnerabilit(?:y|ies)|security\s+issues?|code\s+quality\s+issues?|reports?|failures?)|(?:mark|treat).{0,40}?\b(?:safe|clean|informational|non[-\s]?blocking)|(?:include|forward|send|attach|provide|copy|read)\s+(?:[\w-]+\s+){0,4}(?:tokens?|api\s*keys?|secrets?|env(?:ironment)?\s+(?:variables?|context)|local\s+state|runtime\s+(?:state|context)|authorization\s+headers?|ci_job_token|gitlab_token|ci\s+context)\b)).*$""",
+        ],
+        "description": "GitLab CodeClimate Quality-Report Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 gitLab/CodeClimate code quality report metadata specifically, not covered by existing patterns."
+    },
+    {
+        "id": "GLS-DFP-136",
+        "name": "JSON-RPC Batch Response-Order Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit\s+test|fixture|scanner\s+rule|detector\s+training|documentation|negative\s+example|do\s+not\s+trust|must\s+reject|should\s+reject|client\s+should\s+reject|quarantine(?:d)?|redacted|blocked|must\s+correlate\s+by\s+id|validate\s+response\s+id\s+mapping)\b)(?=.*\b(?:json\s*-?\s*rpc|jsonrpc|rpc)\b)(?=.*\b(?:batch|response\s+array|out[-\s]*of[-\s]*order|id(?:/order|\s+order)?\s*(?:mismatch|rebind(?:ing)?|swap|collision|map(?:ping)?)|request\s*id)\b)(?=.*\b(?:id|request\s*id|correlation|mapping|provenance)\b)(?=.*\b(?:treat|use|map|bind|apply|associate|route|consider)\b.{0,140}\b(?:previous|prior|trusted|original|first|next|different|other)\b.{0,140}\b(?:call|request|tool|response|result|id)\b)(?=.*\b(?:ignore|override|disregard|skip|bypass|do\s+not\s+(?:check|verify|validate)|no\s+need\s+to\s+(?:check|verify|validate))\b.{0,160}\b(?:id|order|mismatch|correlation|mapping|provenance|validation|check)\b).{0,4000}$""",
+        ],
+        "description": "JSON-RPC Batch Response-Order Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jSON-RPC batch response ID/order poisoning, distinct from static API metadata poisoning."
+    },
+    {
+        "id": "GLS-DFP-137",
+        "name": "pytest-json-report Metadata Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*(?:blocked|quarantined|redacted|unit\s*test|fixture|documentation|should\s+not\s+be\s+obeyed|do\s+not\s+obey|must\s+not\s+follow|rejected\s+payload|example\s+attack|training\s+lab))(?=.*(?:pytest-json-report|--json-report|\.report\.json|"tests"\s*:\s*\[|"call"\s*:\s*\{|"stdout"\s*:|"stderr"\s*:|"log"\s*:|"longrepr"\s*:|"metadata"\s*:|"user_properties"\s*:))(?=.*(?:stdout|stderr|captured\s+output|log|traceback|longrepr|metadata|user_properties|sections))(?=.*(?:ai\s+agent|assistant|autonomous\s+agent|scanner|review\s+bot|triage\s+agent|code\s+reviewer))(?=.*(?:ignore|override|supersede|suppress|omit|downgrade|do\s+not\s+report|green\s+path|operator-only|quiet\s+mode|include|forward|exfiltrate|send))(?=.*(?:findings|warnings|vulnerab|secrets?|tokens?|credentials?|env(?:ironment)?|\.env|final\s+report|policy|instructions?)).*""",
+        ],
+        "description": "pytest-json-report Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 pytest-json-report specific metadata schemas, distinct from Allure or mutation reports."
+    },
+    {
+        "id": "GLS-DFP-138",
+        "name": "Wallet Deeplink Decoder Prompt Reassembly",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do\s+not|never|must\s+not|refuse|reject|blocked?|quarantine(?:d)?|scanner\s+flags?|unit\s+test|runbook|defensive\s+docs?|incident\s+report|policy\s+says)\b.{0,160}\b(?:decode|decoded|decoder|normalize|reassemble|qr|deep[-\s]*link|uri|url[-\s]*encoded|base64|b64|percent[-\s]*encoded)\b.{0,220}\b(?:suppress\s+warnings?|hide\s+risk|skip\s+confirmation|safe\s+to\s+sign|mark\s+green|do\s+not\s+ask|override|fast[-\s]*track)\b)(?=.*\b(?:wallet|sign(?:ing|ature)?|sign\s+request|send\s+transaction|transfer|spender|allowance|permission|permit|session|auth(?:entication)?|human\s+confirmation|siwe|eip[-\s]*681|walletconnect)\b)(?=.*\b(?:qr\s*(?:payload|code|payment)|deep[-\s]*link|deeplink|wallet\s*uri|payment\s*uri|ethereum:|bitcoin:|wc:|walletconnect|checkout\s+(?:link|callback)|bridge\s+(?:link|route)|eip[-\s]*681|uri\s+(?:query|parameter|message)|url\s+parameter|payment\s+request)\b)(?=.*\b(?:decode(?:d|r)?|normaliz(?:e|ed|er|ation)|reassembl(?:e|ed|y)|rehydrat(?:e|ed|ion)|percent[-\s]*(?:encoded|decode)|url[-\s]*(?:encoded|decode)|base64|b64|unicode\s+escape|qr[-\s]*decoded|split\s+chunks?|duplicate\s+parameters?|message_b64|encoded[_\s-]*(?:message|memo|notice))\b)(?=.*\b(?:suppress\s+warnings?|hide\s+(?:risk|allowance|recipient)|skip\s+confirmation|safe\s+to\s+sign|mark\s+(?:safe|green)|do\s+not\s+ask|override\s+(?:warning|policy)|fast[-\s]*track|no\s+escalation|quiet\s+(?:approval|signing))\b).{0,3000}$""",
+        ],
+        "description": "Wallet Deeplink Decoder Prompt Reassembly: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 reassembly of fragmented/encoded deep-link parameters during wallet signing flows."
+    },
 ]

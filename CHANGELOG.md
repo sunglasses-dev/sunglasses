@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.2.73] — 2026-07-05
+
+### Added (9 net-new patterns)
+
+- **+9 `discovery_file_poisoning` patterns** — `GLS-DFP-128`, `GLS-DFP-129`, `GLS-DFP-132`, `GLS-DFP-133`, `GLS-DFP-134`, `GLS-DFP-135`, `GLS-DFP-136`, `GLS-DFP-137`, `GLS-DFP-138`. AZ-authored DFP patterns continuing the discovery-surface family — config, manifest, and discovery-artifact carriers that get promoted from validated input into runtime authority.
+
+### Context
+
+- Catalog total: **1,112 patterns / 65 categories / 7,738 keywords.**
+- Companion blog: [AI Agent URL Validation Is Not Runtime Trust](https://sunglasses.dev/blog/ai-agent-url-validation-runtime-trust) — positions runtime trust as the decision after URL/config validation passes, across redirects, MCP handoffs, and remote-config authority expansion.
+- All 9 patterns are hand-authored (tp=0 in DB is expected); firing-verified by the apply-bundle pytest + preflight-dogfood gates rather than a coverage_tp_sample.
+
 ## [0.2.72] — 2026-07-04
 
 ### Added (9 net-new patterns)
