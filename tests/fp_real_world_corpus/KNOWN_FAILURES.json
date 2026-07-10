@@ -57,35 +57,12 @@
  "browser-use__browser-use.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AGT-GHSA-001",
-   "GLS-AGT-GHSA-002",
-   "GLS-AGT-GHSA-019",
-   "GLS-AGT-GHSA-023",
    "GLS-APIP-009",
    "GLS-APIP-011",
-   "GLS-AUZ-GHSA-007",
-   "GLS-AUZ-GHSA-009",
-   "GLS-AUZ-GHSA-010",
-   "GLS-AUZ-GHSA-012",
-   "GLS-AUZ-GHSA-013",
-   "GLS-AUZ-GHSA-014",
-   "GLS-AUZ-GHSA-016",
-   "GLS-AUZ-GHSA-017",
-   "GLS-AUZ-GHSA-018",
-   "GLS-AUZ-GHSA-020",
-   "GLS-AUZ-GHSA-022",
    "GLS-AW-004",
-   "GLS-CMD-GHSA-003",
-   "GLS-CMD-GHSA-005",
-   "GLS-CMD-GHSA-015",
-   "GLS-CMD-GHSA-021",
    "GLS-DFP-045",
    "GLS-MCP-017",
-   "GLS-SC-017",
-   "GLS-SSRF-GHSA-004",
-   "GLS-SSRF-GHSA-006",
-   "GLS-SSRF-GHSA-008",
-   "GLS-SSRF-GHSA-011"
+   "GLS-SC-017"
   ]
  },
  "caddyserver__caddy.md": {
@@ -242,35 +219,12 @@
  "ollama__ollama.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AGT-GHSA-001",
-   "GLS-AGT-GHSA-002",
-   "GLS-AGT-GHSA-019",
-   "GLS-AGT-GHSA-023",
    "GLS-APIP-001",
    "GLS-APIP-005",
-   "GLS-AUZ-GHSA-007",
-   "GLS-AUZ-GHSA-009",
-   "GLS-AUZ-GHSA-010",
-   "GLS-AUZ-GHSA-012",
-   "GLS-AUZ-GHSA-013",
-   "GLS-AUZ-GHSA-014",
-   "GLS-AUZ-GHSA-016",
-   "GLS-AUZ-GHSA-017",
-   "GLS-AUZ-GHSA-018",
-   "GLS-AUZ-GHSA-020",
-   "GLS-AUZ-GHSA-022",
-   "GLS-CMD-GHSA-003",
-   "GLS-CMD-GHSA-005",
-   "GLS-CMD-GHSA-015",
-   "GLS-CMD-GHSA-021",
    "GLS-GHSA-PI-202",
    "GLS-SC-003",
    "GLS-SC-014",
-   "GLS-SC-017",
-   "GLS-SSRF-GHSA-004",
-   "GLS-SSRF-GHSA-006",
-   "GLS-SSRF-GHSA-008",
-   "GLS-SSRF-GHSA-011"
+   "GLS-SC-017"
   ]
  },
  "openai__openai-python.md": {
