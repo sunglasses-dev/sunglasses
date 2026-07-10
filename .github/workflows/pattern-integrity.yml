@@ -47,3 +47,8 @@ jobs:
 
       - name: Customer-zero real-world suite (attacks block, normal usage passes)
         run: python test_customer_zero.py
+
+      # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above
+      # only cover ~4 test families; major families ran local-only until now.
+      - name: Full test suite
+        run: pytest -q
