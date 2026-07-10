@@ -1,0 +1,450 @@
+{
+ "CompVis__stable-diffusion.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-HI-004"
+  ]
+ },
+ "Significant-Gravitas__AutoGPT.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100",
+   "GLS-SC-016",
+   "GLS-SC-017"
+  ]
+ },
+ "anchore__grype.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100",
+   "GLS-SC-014",
+   "GLS-SEM-UI-219"
+  ]
+ },
+ "apache__kafka.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-005",
+   "GLS-CS-575"
+  ]
+ },
+ "aquasecurity__trivy.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001"
+  ]
+ },
+ "axios__axios.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-003",
+   "GLS-APIP-006",
+   "GLS-APIP-009",
+   "GLS-AW-003",
+   "GLS-DFP-018",
+   "GLS-DFP-059",
+   "GLS-DFP-075",
+   "GLS-DFP-089",
+   "GLS-DFP-121",
+   "GLS-DN-578",
+   "GLS-HI-004",
+   "GLS-PI-008",
+   "GLS-PIEMN-001",
+   "GLS-SC-002",
+   "GLS-SMP-004"
+  ]
+ },
+ "browser-use__browser-use.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AGT-GHSA-001",
+   "GLS-AGT-GHSA-002",
+   "GLS-AGT-GHSA-019",
+   "GLS-AGT-GHSA-023",
+   "GLS-APIP-009",
+   "GLS-APIP-011",
+   "GLS-AUZ-GHSA-007",
+   "GLS-AUZ-GHSA-009",
+   "GLS-AUZ-GHSA-010",
+   "GLS-AUZ-GHSA-012",
+   "GLS-AUZ-GHSA-013",
+   "GLS-AUZ-GHSA-014",
+   "GLS-AUZ-GHSA-016",
+   "GLS-AUZ-GHSA-017",
+   "GLS-AUZ-GHSA-018",
+   "GLS-AUZ-GHSA-020",
+   "GLS-AUZ-GHSA-022",
+   "GLS-AW-004",
+   "GLS-CMD-GHSA-003",
+   "GLS-CMD-GHSA-005",
+   "GLS-CMD-GHSA-015",
+   "GLS-CMD-GHSA-021",
+   "GLS-DFP-045",
+   "GLS-MCP-017",
+   "GLS-SC-017",
+   "GLS-SSRF-GHSA-004",
+   "GLS-SSRF-GHSA-006",
+   "GLS-SSRF-GHSA-008",
+   "GLS-SSRF-GHSA-011"
+  ]
+ },
+ "caddyserver__caddy.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100",
+   "GLS-HI-004",
+   "GLS-MCP-003"
+  ]
+ },
+ "crewAIInc__crewAI.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-DFP-008",
+   "GLS-DFP-040",
+   "GLS-DFP-059",
+   "GLS-HI-004",
+   "GLS-MCP-017"
+  ]
+ },
+ "denoland__deno.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-SC-003",
+   "GLS-SC-014",
+   "GLS-SC-017"
+  ]
+ },
+ "eslint__eslint.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-HI-004",
+   "GLS-MCP-003",
+   "GLS-MCP-004",
+   "GLS-SC-002"
+  ]
+ },
+ "facebook__react.md": {
+  "decision": "quarantine",
+  "patterns": [
+   "GLS-MCP-003"
+  ]
+ },
+ "fastapi__fastapi.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-059",
+   "GLS-EX-008",
+   "GLS-HI-004",
+   "GLS-SEM-UI-219"
+  ]
+ },
+ "freeCodeCamp__freeCodeCamp.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AW-004"
+  ]
+ },
+ "ggml-org__llama.cpp.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-DFP-005"
+  ]
+ },
+ "gitleaks__gitleaks.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-DFP-005",
+   "GLS-DFP-094",
+   "GLS-HI-004"
+  ]
+ },
+ "godotengine__godot.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-HI-004"
+  ]
+ },
+ "huggingface__transformers.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001"
+  ]
+ },
+ "langgenius__dify.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-APIP-010",
+   "GLS-DFP-037",
+   "GLS-DFP-095",
+   "GLS-DFP-100",
+   "GLS-SMP-012"
+  ]
+ },
+ "laravel__laravel.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-DFP-100"
+  ]
+ },
+ "modelcontextprotocol__servers.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AW-004",
+   "GLS-MCP-016",
+   "GLS-MCP-017"
+  ]
+ },
+ "n8n-io__n8n.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100"
+  ]
+ },
+ "nginx__nginx.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-005",
+   "GLS-HI-004"
+  ]
+ },
+ "nodejs__node.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-003",
+   "GLS-DFP-100"
+  ]
+ },
+ "numpy__numpy.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100"
+  ]
+ },
+ "ohmyzsh__ohmyzsh.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AW-004",
+   "GLS-MCP-003",
+   "GLS-SC-016",
+   "GLS-SC-017"
+  ]
+ },
+ "ollama__ollama.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AGT-GHSA-001",
+   "GLS-AGT-GHSA-002",
+   "GLS-AGT-GHSA-019",
+   "GLS-AGT-GHSA-023",
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-AUZ-GHSA-007",
+   "GLS-AUZ-GHSA-009",
+   "GLS-AUZ-GHSA-010",
+   "GLS-AUZ-GHSA-012",
+   "GLS-AUZ-GHSA-013",
+   "GLS-AUZ-GHSA-014",
+   "GLS-AUZ-GHSA-016",
+   "GLS-AUZ-GHSA-017",
+   "GLS-AUZ-GHSA-018",
+   "GLS-AUZ-GHSA-020",
+   "GLS-AUZ-GHSA-022",
+   "GLS-CMD-GHSA-003",
+   "GLS-CMD-GHSA-005",
+   "GLS-CMD-GHSA-015",
+   "GLS-CMD-GHSA-021",
+   "GLS-GHSA-PI-202",
+   "GLS-SC-003",
+   "GLS-SC-014",
+   "GLS-SC-017",
+   "GLS-SSRF-GHSA-004",
+   "GLS-SSRF-GHSA-006",
+   "GLS-SSRF-GHSA-008",
+   "GLS-SSRF-GHSA-011"
+  ]
+ },
+ "openai__openai-python.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AIFP-004",
+   "GLS-APIP-001",
+   "GLS-APIP-003",
+   "GLS-APIP-005",
+   "GLS-APIP-009",
+   "GLS-APIP-011",
+   "GLS-C2-003",
+   "GLS-CICD-006",
+   "GLS-DFP-005",
+   "GLS-DFP-031",
+   "GLS-DFP-043",
+   "GLS-DFP-059",
+   "GLS-DFP-074",
+   "GLS-HI-004",
+   "GLS-IDP-004",
+   "GLS-IDP-017",
+   "GLS-SCAP-003",
+   "GLS-SMP-004",
+   "GLS-SMP-012",
+   "GLS-TP-002"
+  ]
+ },
+ "openai__whisper.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-TP-002"
+  ]
+ },
+ "pallets__flask.md": {
+  "decision": "quarantine",
+  "patterns": [
+   "GLS-EX-008"
+  ]
+ },
+ "pandas-dev__pandas.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-HI-004"
+  ]
+ },
+ "prometheus__prometheus.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005"
+  ]
+ },
+ "pydantic__pydantic.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AIFP-004",
+   "GLS-DFP-069"
+  ]
+ },
+ "pytorch__pytorch.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-003",
+   "GLS-APIP-005",
+   "GLS-APIP-006",
+   "GLS-APIP-009",
+   "GLS-APIP-011",
+   "GLS-BMP-004",
+   "GLS-BMP-007",
+   "GLS-CS-575",
+   "GLS-DFP-091",
+   "GLS-IDP-004",
+   "GLS-SMP-012",
+   "GLS-TP-002"
+  ]
+ },
+ "rails__rails.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-IDP-004"
+  ]
+ },
+ "redis__redis.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-DFP-036",
+   "GLS-IDP-004",
+   "GLS-SMP-004"
+  ]
+ },
+ "run-llama__llama_index.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-AW-004",
+   "GLS-DFP-043",
+   "GLS-DFP-059",
+   "GLS-DFP-094",
+   "GLS-EP-001",
+   "GLS-SMP-002"
+  ]
+ },
+ "semgrep__semgrep.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001",
+   "GLS-APIP-005",
+   "GLS-MCP-004",
+   "GLS-MCP-017",
+   "GLS-SEM-TOOL-218"
+  ]
+ },
+ "strapi__strapi.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100",
+   "GLS-MCP-003",
+   "GLS-SEM-TOOL-218"
+  ]
+ },
+ "trufflesecurity__trufflehog.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-AIFP-004",
+   "GLS-APIP-001",
+   "GLS-APIP-003",
+   "GLS-APIP-005",
+   "GLS-APIP-006",
+   "GLS-APIP-009",
+   "GLS-APIP-011",
+   "GLS-BMP-004",
+   "GLS-CICD-006",
+   "GLS-DFP-005",
+   "GLS-DFP-041",
+   "GLS-DFP-069",
+   "GLS-DFP-073",
+   "GLS-DN-578",
+   "GLS-HI-004",
+   "GLS-IDP-004",
+   "GLS-PIEMN-001",
+   "GLS-SC-003",
+   "GLS-SC-014",
+   "GLS-SC-016",
+   "GLS-SC-017",
+   "GLS-SCAP-003",
+   "GLS-SCAP-005",
+   "GLS-SD-001",
+   "GLS-SD-003",
+   "GLS-SMP-004",
+   "GLS-SMP-012",
+   "GLS-TOP-638"
+  ]
+ },
+ "vuejs__vue.md": {
+  "decision": "quarantine",
+  "patterns": [
+   "GLS-DN-001"
+  ]
+ },
+ "webpack__webpack.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-APIP-001"
+  ]
+ },
+ "zaproxy__zaproxy.md": {
+  "decision": "block",
+  "patterns": [
+   "GLS-DFP-100"
+  ]
+ }
+}

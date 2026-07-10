@@ -29,6 +29,10 @@ from sunglasses.engine import SunglassesEngine
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fp_corpus_data import clean_files as _clean_files  # decoupled single source (Jun 12 T8)
+from fp_corpus_data import real_world_files as _real_world_files  # famous READMEs (Jul 10)
+from fp_corpus_data import real_world_known_failures as _known_failures
+
+_KNOWN = _known_failures()
 
 
 @pytest.fixture(scope="module")
@@ -47,6 +51,38 @@ def test_real_clean_file_does_not_block(engine, path):
         f"with {len(blocking)} blocking finding(s); first few: "
         f"{[(f['id'], f.get('matched_text','')) for f in blocking[:3]]}"
     )
+
+
+@pytest.mark.parametrize(
+    "path", _real_world_files(), ids=[os.path.basename(p) for p in _real_world_files()]
+)
+def test_famous_readme_does_not_block(engine, path):
+    """A famous open-source README must never flag — this is the /scan demo's
+    day-1 input. Born Jul 10 2026 from the demo red-team (16/17 blocked).
+
+    RATCHET: files listed in KNOWN_FAILURES.json are pre-existing false positives
+    awaiting per-pattern carrier anchoring. They may not get WORSE, and once one
+    scans clean its entry must be deleted (this test fails until it is), so the
+    known-failure list can only shrink.
+    """
+    name = os.path.basename(path)
+    content = open(path, errors="ignore").read()
+    result = engine.scan(content, channel="file")
+
+    if name not in _KNOWN:
+        assert result.decision == "allow", (
+            f"NEW false positive — {name} decision={result.decision}; findings: "
+            f"{sorted({f['id'] for f in result.findings})[:12]}"
+        )
+        return
+
+    assert result.decision != "allow", (
+        f"{name} now scans clean — delete its entry from "
+        f"tests/fp_real_world_corpus/KNOWN_FAILURES.json (the ratchet only turns one way)"
+    )
+    fired = {f["id"] for f in result.findings}
+    regressed = fired - set(_KNOWN[name]["patterns"])
+    assert not regressed, f"{name} gained NEW false-positive patterns: {sorted(regressed)}"
 
 
 def test_plain_english_sentence_is_clean(engine):

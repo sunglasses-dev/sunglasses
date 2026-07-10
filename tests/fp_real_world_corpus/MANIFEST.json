@@ -1,0 +1,362 @@
+{
+ "CompVis__stable-diffusion.md": {
+  "fetched": "2026-07-10",
+  "repo": "CompVis/stable-diffusion",
+  "source": "https://github.com/CompVis/stable-diffusion"
+ },
+ "EbookFoundation__free-programming-books.md": {
+  "fetched": "2026-07-10",
+  "repo": "EbookFoundation/free-programming-books",
+  "source": "https://github.com/EbookFoundation/free-programming-books"
+ },
+ "OWASP__CheatSheetSeries.md": {
+  "fetched": "2026-07-10",
+  "repo": "OWASP/CheatSheetSeries",
+  "source": "https://github.com/OWASP/CheatSheetSeries"
+ },
+ "Significant-Gravitas__AutoGPT.md": {
+  "fetched": "2026-07-10",
+  "repo": "Significant-Gravitas/AutoGPT",
+  "source": "https://github.com/Significant-Gravitas/AutoGPT"
+ },
+ "anchore__grype.md": {
+  "fetched": "2026-07-10",
+  "repo": "anchore/grype",
+  "source": "https://github.com/anchore/grype"
+ },
+ "angular__angular.md": {
+  "fetched": "2026-07-10",
+  "repo": "angular/angular",
+  "source": "https://github.com/angular/angular"
+ },
+ "ansible__ansible.md": {
+  "fetched": "2026-07-10",
+  "repo": "ansible/ansible",
+  "source": "https://github.com/ansible/ansible"
+ },
+ "anthropics__anthropic-sdk-python.md": {
+  "fetched": "2026-07-10",
+  "repo": "anthropics/anthropic-sdk-python",
+  "source": "https://github.com/anthropics/anthropic-sdk-python"
+ },
+ "apache__kafka.md": {
+  "fetched": "2026-07-10",
+  "repo": "apache/kafka",
+  "source": "https://github.com/apache/kafka"
+ },
+ "aquasecurity__trivy.md": {
+  "fetched": "2026-07-10",
+  "repo": "aquasecurity/trivy",
+  "source": "https://github.com/aquasecurity/trivy"
+ },
+ "axios__axios.md": {
+  "fetched": "2026-07-10",
+  "repo": "axios/axios",
+  "source": "https://github.com/axios/axios"
+ },
+ "browser-use__browser-use.md": {
+  "fetched": "2026-07-10",
+  "repo": "browser-use/browser-use",
+  "source": "https://github.com/browser-use/browser-use"
+ },
+ "caddyserver__caddy.md": {
+  "fetched": "2026-07-10",
+  "repo": "caddyserver/caddy",
+  "source": "https://github.com/caddyserver/caddy"
+ },
+ "crewAIInc__crewAI.md": {
+  "fetched": "2026-07-10",
+  "repo": "crewAIInc/crewAI",
+  "source": "https://github.com/crewAIInc/crewAI"
+ },
+ "denoland__deno.md": {
+  "fetched": "2026-07-10",
+  "repo": "denoland/deno",
+  "source": "https://github.com/denoland/deno"
+ },
+ "docker__compose.md": {
+  "fetched": "2026-07-10",
+  "repo": "docker/compose",
+  "source": "https://github.com/docker/compose"
+ },
+ "eslint__eslint.md": {
+  "fetched": "2026-07-10",
+  "repo": "eslint/eslint",
+  "source": "https://github.com/eslint/eslint"
+ },
+ "facebook__react.md": {
+  "fetched": "2026-07-10",
+  "repo": "facebook/react",
+  "source": "https://github.com/facebook/react"
+ },
+ "fastapi__fastapi.md": {
+  "fetched": "2026-07-10",
+  "repo": "fastapi/fastapi",
+  "source": "https://github.com/fastapi/fastapi"
+ },
+ "flutter__flutter.md": {
+  "fetched": "2026-07-10",
+  "repo": "flutter/flutter",
+  "source": "https://github.com/flutter/flutter"
+ },
+ "freeCodeCamp__freeCodeCamp.md": {
+  "fetched": "2026-07-10",
+  "repo": "freeCodeCamp/freeCodeCamp",
+  "source": "https://github.com/freeCodeCamp/freeCodeCamp"
+ },
+ "ggml-org__llama.cpp.md": {
+  "fetched": "2026-07-10",
+  "repo": "ggml-org/llama.cpp",
+  "source": "https://github.com/ggml-org/llama.cpp"
+ },
+ "gitleaks__gitleaks.md": {
+  "fetched": "2026-07-10",
+  "repo": "gitleaks/gitleaks",
+  "source": "https://github.com/gitleaks/gitleaks"
+ },
+ "godotengine__godot.md": {
+  "fetched": "2026-07-10",
+  "repo": "godotengine/godot",
+  "source": "https://github.com/godotengine/godot"
+ },
+ "gohugoio__hugo.md": {
+  "fetched": "2026-07-10",
+  "repo": "gohugoio/hugo",
+  "source": "https://github.com/gohugoio/hugo"
+ },
+ "golang__go.md": {
+  "fetched": "2026-07-10",
+  "repo": "golang/go",
+  "source": "https://github.com/golang/go"
+ },
+ "grafana__grafana.md": {
+  "fetched": "2026-07-10",
+  "repo": "grafana/grafana",
+  "source": "https://github.com/grafana/grafana"
+ },
+ "hashicorp__terraform.md": {
+  "fetched": "2026-07-10",
+  "repo": "hashicorp/terraform",
+  "source": "https://github.com/hashicorp/terraform"
+ },
+ "huggingface__transformers.md": {
+  "fetched": "2026-07-10",
+  "repo": "huggingface/transformers",
+  "source": "https://github.com/huggingface/transformers"
+ },
+ "kubernetes__kubernetes.md": {
+  "fetched": "2026-07-10",
+  "repo": "kubernetes/kubernetes",
+  "source": "https://github.com/kubernetes/kubernetes"
+ },
+ "langchain-ai__langchain.md": {
+  "fetched": "2026-07-10",
+  "repo": "langchain-ai/langchain",
+  "source": "https://github.com/langchain-ai/langchain"
+ },
+ "langgenius__dify.md": {
+  "fetched": "2026-07-10",
+  "repo": "langgenius/dify",
+  "source": "https://github.com/langgenius/dify"
+ },
+ "laravel__laravel.md": {
+  "fetched": "2026-07-10",
+  "repo": "laravel/laravel",
+  "source": "https://github.com/laravel/laravel"
+ },
+ "microsoft__TypeScript.md": {
+  "fetched": "2026-07-10",
+  "repo": "microsoft/TypeScript",
+  "source": "https://github.com/microsoft/TypeScript"
+ },
+ "microsoft__autogen.md": {
+  "fetched": "2026-07-10",
+  "repo": "microsoft/autogen",
+  "source": "https://github.com/microsoft/autogen"
+ },
+ "microsoft__vscode.md": {
+  "fetched": "2026-07-10",
+  "repo": "microsoft/vscode",
+  "source": "https://github.com/microsoft/vscode"
+ },
+ "modelcontextprotocol__python-sdk.md": {
+  "fetched": "2026-07-10",
+  "repo": "modelcontextprotocol/python-sdk",
+  "source": "https://github.com/modelcontextprotocol/python-sdk"
+ },
+ "modelcontextprotocol__servers.md": {
+  "fetched": "2026-07-10",
+  "repo": "modelcontextprotocol/servers",
+  "source": "https://github.com/modelcontextprotocol/servers"
+ },
+ "n8n-io__n8n.md": {
+  "fetched": "2026-07-10",
+  "repo": "n8n-io/n8n",
+  "source": "https://github.com/n8n-io/n8n"
+ },
+ "nginx__nginx.md": {
+  "fetched": "2026-07-10",
+  "repo": "nginx/nginx",
+  "source": "https://github.com/nginx/nginx"
+ },
+ "nodejs__node.md": {
+  "fetched": "2026-07-10",
+  "repo": "nodejs/node",
+  "source": "https://github.com/nodejs/node"
+ },
+ "numpy__numpy.md": {
+  "fetched": "2026-07-10",
+  "repo": "numpy/numpy",
+  "source": "https://github.com/numpy/numpy"
+ },
+ "obsidianmd__obsidian-releases.md": {
+  "fetched": "2026-07-10",
+  "repo": "obsidianmd/obsidian-releases",
+  "source": "https://github.com/obsidianmd/obsidian-releases"
+ },
+ "ohmyzsh__ohmyzsh.md": {
+  "fetched": "2026-07-10",
+  "repo": "ohmyzsh/ohmyzsh",
+  "source": "https://github.com/ohmyzsh/ohmyzsh"
+ },
+ "ollama__ollama.md": {
+  "fetched": "2026-07-10",
+  "repo": "ollama/ollama",
+  "source": "https://github.com/ollama/ollama"
+ },
+ "openai__openai-python.md": {
+  "fetched": "2026-07-10",
+  "repo": "openai/openai-python",
+  "source": "https://github.com/openai/openai-python"
+ },
+ "openai__whisper.md": {
+  "fetched": "2026-07-10",
+  "repo": "openai/whisper",
+  "source": "https://github.com/openai/whisper"
+ },
+ "pallets__flask.md": {
+  "fetched": "2026-07-10",
+  "repo": "pallets/flask",
+  "source": "https://github.com/pallets/flask"
+ },
+ "pandas-dev__pandas.md": {
+  "fetched": "2026-07-10",
+  "repo": "pandas-dev/pandas",
+  "source": "https://github.com/pandas-dev/pandas"
+ },
+ "postgres__postgres.md": {
+  "fetched": "2026-07-10",
+  "repo": "postgres/postgres",
+  "source": "https://github.com/postgres/postgres"
+ },
+ "prettier__prettier.md": {
+  "fetched": "2026-07-10",
+  "repo": "prettier/prettier",
+  "source": "https://github.com/prettier/prettier"
+ },
+ "prometheus__prometheus.md": {
+  "fetched": "2026-07-10",
+  "repo": "prometheus/prometheus",
+  "source": "https://github.com/prometheus/prometheus"
+ },
+ "psf__requests.md": {
+  "fetched": "2026-07-10",
+  "repo": "psf/requests",
+  "source": "https://github.com/psf/requests"
+ },
+ "pydantic__pydantic.md": {
+  "fetched": "2026-07-10",
+  "repo": "pydantic/pydantic",
+  "source": "https://github.com/pydantic/pydantic"
+ },
+ "pytorch__pytorch.md": {
+  "fetched": "2026-07-10",
+  "repo": "pytorch/pytorch",
+  "source": "https://github.com/pytorch/pytorch"
+ },
+ "rails__rails.md": {
+  "fetched": "2026-07-10",
+  "repo": "rails/rails",
+  "source": "https://github.com/rails/rails"
+ },
+ "redis__redis.md": {
+  "fetched": "2026-07-10",
+  "repo": "redis/redis",
+  "source": "https://github.com/redis/redis"
+ },
+ "run-llama__llama_index.md": {
+  "fetched": "2026-07-10",
+  "repo": "run-llama/llama_index",
+  "source": "https://github.com/run-llama/llama_index"
+ },
+ "rust-lang__rust.md": {
+  "fetched": "2026-07-10",
+  "repo": "rust-lang/rust",
+  "source": "https://github.com/rust-lang/rust"
+ },
+ "semgrep__semgrep.md": {
+  "fetched": "2026-07-10",
+  "repo": "semgrep/semgrep",
+  "source": "https://github.com/semgrep/semgrep"
+ },
+ "strapi__strapi.md": {
+  "fetched": "2026-07-10",
+  "repo": "strapi/strapi",
+  "source": "https://github.com/strapi/strapi"
+ },
+ "supabase__supabase.md": {
+  "fetched": "2026-07-10",
+  "repo": "supabase/supabase",
+  "source": "https://github.com/supabase/supabase"
+ },
+ "sveltejs__svelte.md": {
+  "fetched": "2026-07-10",
+  "repo": "sveltejs/svelte",
+  "source": "https://github.com/sveltejs/svelte"
+ },
+ "tensorflow__tensorflow.md": {
+  "fetched": "2026-07-10",
+  "repo": "tensorflow/tensorflow",
+  "source": "https://github.com/tensorflow/tensorflow"
+ },
+ "traefik__traefik.md": {
+  "fetched": "2026-07-10",
+  "repo": "traefik/traefik",
+  "source": "https://github.com/traefik/traefik"
+ },
+ "trufflesecurity__trufflehog.md": {
+  "fetched": "2026-07-10",
+  "repo": "trufflesecurity/trufflehog",
+  "source": "https://github.com/trufflesecurity/trufflehog"
+ },
+ "twbs__bootstrap.md": {
+  "fetched": "2026-07-10",
+  "repo": "twbs/bootstrap",
+  "source": "https://github.com/twbs/bootstrap"
+ },
+ "vitejs__vite.md": {
+  "fetched": "2026-07-10",
+  "repo": "vitejs/vite",
+  "source": "https://github.com/vitejs/vite"
+ },
+ "vllm-project__vllm.md": {
+  "fetched": "2026-07-10",
+  "repo": "vllm-project/vllm",
+  "source": "https://github.com/vllm-project/vllm"
+ },
+ "vuejs__vue.md": {
+  "fetched": "2026-07-10",
+  "repo": "vuejs/vue",
+  "source": "https://github.com/vuejs/vue"
+ },
+ "webpack__webpack.md": {
+  "fetched": "2026-07-10",
+  "repo": "webpack/webpack",
+  "source": "https://github.com/webpack/webpack"
+ },
+ "zaproxy__zaproxy.md": {
+  "fetched": "2026-07-10",
+  "repo": "zaproxy/zaproxy",
+  "source": "https://github.com/zaproxy/zaproxy"
+ }
+}
