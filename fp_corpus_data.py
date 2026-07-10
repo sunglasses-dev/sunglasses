@@ -195,3 +195,40 @@ def clean_files():
         if os.path.exists(cand):
             files.append(cand)
     return files
+
+
+_REAL_WORLD_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "tests", "fp_real_world_corpus"
+)
+
+
+def real_world_files():
+    """Famous open-source READMEs (react, requests, kubernetes, langchain, …) —
+    the exact documents the /scan demo will be pointed at on day 1. Snapshotted
+    Jul 10 2026 (MANIFEST.json has sources) after the demo red-team found 16/17
+    of them BLOCKING: whole-doc co-occurrence lookaheads + generic vocab never
+    faced long real prose (the short-snippet corpus median is 71 chars).
+    Any of these blocking = launch-killing FP. Committed copies keep the gate
+    deterministic — no network in tests."""
+    if not os.path.isdir(_REAL_WORLD_DIR):
+        return []
+    return sorted(
+        os.path.join(_REAL_WORLD_DIR, f)
+        for f in os.listdir(_REAL_WORLD_DIR)
+        if f.endswith(".md")
+    )
+
+
+def real_world_known_failures():
+    """READMEs that still produce findings, as a RATCHET baseline.
+
+    43 of 72 were still flagging when this corpus landed (down from 71 — the
+    keyword-denylist and co-occurrence-window fixes cleared the rest). They are
+    NOT accepted as correct: each is a real false positive whose pattern needs a
+    tightened carrier anchor. The gate below lets this dict only SHRINK. Fixing a
+    file and forgetting to delete its entry fails the suite on purpose.
+    """
+    path = os.path.join(_REAL_WORLD_DIR, "KNOWN_FAILURES.json")
+    if not os.path.exists(path):
+        return {}
+    return json.load(open(path))

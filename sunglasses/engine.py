@@ -169,6 +169,53 @@ class SunglassesEngine:
         # fp_corpus_data.py clean AI-agent file-channel entries (must ALLOW;
         # the agent-policy attack canaries must still BLOCK).
         "agentic", "assistants", "llm agent", "claude", "codex", "copilot",
+        # ── Real-world README FP fix (Jul 10 2026, /scan demo red-team) ──────
+        # tests/fp_real_world_corpus/ scans 72 FAMOUS open-source READMEs
+        # (react, requests, kubernetes, langchain, trivy…) — the /scan demo's
+        # literal day-1 input. 71/72 BLOCKED; 185 keywords fired on legitimate
+        # docs. Same bug class as Jun-6/9/19/27, proven at real-world scale:
+        # every word below appears in normal READMEs (substring matching makes
+        # it worse — 'formation' fires inside "information"). None of them is
+        # attack evidence alone; real attacks keep their multi-word phrases,
+        # specific keywords and co-occurrence regexes (now window-scoped).
+        # 'openclaw' deliberately NOT denied — product-specific GHSA anchor.
+        # Gate: tests/test_real_corpus_fp.py::test_famous_readme_does_not_block.
+        '"keys"', '"message"', '"ruleid"', ');', '--help', '../', '.devcontainer',
+        '.editorconfig', '.gitignore', '.npmrc', '.pre-commit-config.yaml',
+        '.proto', '_headers', '_redirects', 'agents.md', 'ai assistants',
+        'ai coding assistant', 'ai-agent', 'ai-plugin', 'alerts', 'aliases',
+        'allowlist', 'anthropic_api_key=', 'api token', 'api_key', 'api_key=',
+        'assume you are', 'asyncapi', 'attestation', 'auditor', 'auditors',
+        'auth token', 'authorize', 'automation', 'aws credentials', 'badge.svg',
+        'binding', 'branch', 'branding', 'browser', 'buck', 'caa', 'callback',
+        'canvas', 'changelog', 'channels', 'charset', 'checks', 'checksum',
+        'ci_pipeline_source', 'classifier', 'codecov', 'codeowners',
+        'coding agent', 'coding assistants', 'collect', 'compose.yaml',
+        'compose.yml', 'config.yml', 'connector', 'coveralls', 'cp=', 'crates.io',
+        'credits', 'cross-origin', 'csaf', 'curl -f', 'curl http://',
+        'defineconfig', 'dependency scanner', 'deployment', 'description =',
+        'description=', 'devops agent', 'diagnostic', 'diagnostics', 'disable',
+        'do not', 'does not', 'downgrade', 'editorconfig', 'env var',
+        'environment', 'environment variable', 'environment variables',
+        'execute the following', 'extensions', 'false positive', 'features',
+        'file://', 'finding', 'findings', 'folders', 'follow instructions',
+        'for agents', 'formation', 'formatter', 'forward', 'git submodule',
+        'github release', 'gitlab ci', 'guardrail', 'gzip', 'helm chart', 'hooks:',
+        'html report', 'hugging face', 'ignore', 'ignores', 'include', 'jwt',
+        'keywords =', 'kubernetes scanner', 'language:', 'license:', 'link',
+        'link:', 'llms', 'llms.txt', 'makefile', 'materials', 'mcp-server',
+        'mcp.tool', 'media', 'metrics:', 'model card', 'model context protocol',
+        'mysql', 'names', 'never', 'openai_api_key', 'openai_api_key=',
+        'opentelemetry', 'otel', 'owners', 'package.json', 'pairing', 'password=',
+        'pem', 'playwright', 'postgres', 'postinstall', 'postman', 'private key',
+        'processors', 'quality gate', 'queries', 'query', 'recommendations',
+        'release notes', 'request.headers', 'rules', 'run the following script',
+        'sandbox', 'sarif', 'security notice', 'security scanner', 'service',
+        'shallow', 'sigstore', 'silently', 'slsa', 'sms:', 'sonarcloud',
+        'source map', 'statement', 'structured data', 'summary', 'suppress',
+        'system_packages', 'takes precedence', 'targets', 'tasks:', 'theme:',
+        'token=', 'traversal', 'troubleshoot', 'tuf', 'tunnel', 'unauthenticated',
+        'update', 'updates', 'vendor', 'workspace', 'x-api-key',
     })
 
     # Decision priority: higher severity = stronger action
@@ -251,6 +298,27 @@ class SunglassesEngine:
         m = re.match(r'\(\?[aiLmsux]+\)', raw)
         rest = (raw[m.end():] if m else raw).lstrip()
         return rest.startswith('(?=') or rest.startswith('(?!')
+
+    # Locality rule for whole-document co-occurrence predicates (see scan step 3).
+    # COOCCUR_WINDOW chars per view, half-overlapping so a payload straddling a
+    # boundary is still seen whole (any payload <= WINDOW/2 is fully inside some view).
+    COOCCUR_WINDOW = 1200
+    COOCCUR_STRIDE = 600
+
+    def _match_windowed(self, rx, text: str):
+        """Match an anchored (lookahead-led) predicate against overlapping windows.
+        Short inputs (the normal attack-payload case) are matched whole; long
+        documents only fire if the predicate's co-occurring signals appear inside
+        one window. Returns the first re.Match or None."""
+        if len(text) <= self.COOCCUR_WINDOW:
+            return rx.match(text)
+        for i in range(0, len(text), self.COOCCUR_STRIDE):
+            m = rx.match(text[i : i + self.COOCCUR_WINDOW])
+            if m:
+                return m
+            if i + self.COOCCUR_WINDOW >= len(text):
+                break
+        return None
 
     def _check_negation(self, text: str, match_start: int) -> bool:
         """
@@ -351,7 +419,15 @@ class SunglassesEngine:
                 # Anchored = lookahead-led whole-document predicate: evaluate once at
                 # position 0 (.match) instead of retrying every offset (.search) — avoids
                 # catastrophic O(n^2) backtracking on large files (ReDoS).
-                match = rx.match(text) if anchored else rx.search(text)
+                # On long documents an anchored predicate is evaluated per WINDOW, not
+                # once globally: its (?=.*A)(?=.*B) signals must CO-OCCUR locally to
+                # count. Attack payloads are compact; spreading the same words across a
+                # 30KB README is how 71 famous open-source READMEs came to BLOCK
+                # (Jul 10 2026 red-team). Window > every corpus attack case that fired.
+                if anchored:
+                    match = self._match_windowed(rx, text)
+                else:
+                    match = rx.search(text)
                 if match:
                     seen_ids.add(pattern["id"])
                     finding = {
