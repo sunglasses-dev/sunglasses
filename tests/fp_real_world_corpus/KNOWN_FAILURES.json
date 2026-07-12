@@ -21,9 +21,7 @@
  "axios__axios.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-003",
    "GLS-APIP-006",
-   "GLS-APIP-009",
    "GLS-AW-003",
    "GLS-DFP-018",
    "GLS-DFP-075",
@@ -39,8 +37,6 @@
  "browser-use__browser-use.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-009",
-   "GLS-APIP-011",
    "GLS-DFP-045",
    "GLS-MCP-017"
   ]
@@ -104,12 +100,6 @@
    "GLS-MCP-017"
   ]
  },
- "nodejs__node.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-APIP-003"
-  ]
- },
  "ohmyzsh__ohmyzsh.md": {
   "decision": "quarantine",
   "patterns": [
@@ -129,9 +119,6 @@
   "patterns": [
    "GLS-AIFP-004",
    "GLS-APIP-001",
-   "GLS-APIP-003",
-   "GLS-APIP-009",
-   "GLS-APIP-011",
    "GLS-C2-003",
    "GLS-CICD-006",
    "GLS-DFP-005",
@@ -167,10 +154,7 @@
  "pytorch__pytorch.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-003",
    "GLS-APIP-006",
-   "GLS-APIP-009",
-   "GLS-APIP-011",
    "GLS-BMP-004",
    "GLS-BMP-007",
    "GLS-CS-575",
@@ -213,10 +197,7 @@
   "decision": "block",
   "patterns": [
    "GLS-AIFP-004",
-   "GLS-APIP-003",
    "GLS-APIP-006",
-   "GLS-APIP-009",
-   "GLS-APIP-011",
    "GLS-BMP-004",
    "GLS-CICD-006",
    "GLS-DFP-005",

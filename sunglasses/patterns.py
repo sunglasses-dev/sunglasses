@@ -17132,7 +17132,7 @@ PATTERNS = [
             "outrank",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|cannot|refuse(?:s|d)?\s+to|blocked\s+from)\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\b)(?=.*\b(?:\.well-known/ai-plugin\.json|name_for_model|description_for_model|legal_info_url|schema_version|auth|api)\b)(?=.*\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]+priority|system\s+instructions|developer\s+instructions|(?:do\s+not|don['’]?t)\s+.{0,40}(?:report|flag)|suppress\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\s+.{0,60}(?:token|secret|cookie|api[-\s]?key|environment))\b).+""",
+            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|cannot|refuse(?:s|d)?\s+to|blocked\s+from)\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\b)(?=.*(?:\.well-known/ai-plugin\.json|\bname_for_model\b|\bdescription_for_model\b|\blegal_info_url\b|\bschema_version\b|"auth"\s*:))(?=.*\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]+priority|system\s+instructions|developer\s+instructions|(?:do\s+not|don['’]?t)\s+.{0,40}(?:report|flag)|suppress\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\s+.{0,60}(?:token|secret|cookie|api[-\s]?key|environment))\b).+""",
         ],
         "description": "A site-hosted `ai-plugin.json` manifest can hide policy-like instructions in model-facing fields such as `description_for_model`, causing an agent that treats discovery metadata as trusted context to suppress findings, override higher-priority instructions, or request/forward secrets."
     },
@@ -17311,7 +17311,7 @@ PATTERNS = [
             "disable security",
         ],
         "regex": [
-            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\s+description|scanner))(?!.*(?:wsdl|soap|service\s+description|scanner).{0,120}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,140}(?:wsdl|soap|service\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\s+description|soap\s+documentation).{0,100}(?:is\s+not|never|does\s+not|do\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|\bbinding\b|\bservice\b|\boperation\b|xsd:documentation|ws[-\s]?policy|ws[-\s]?security|SOAP\s+Header|UDDI|\.wsdl|generated\s+SOAP\s+clients?))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+SOAP\s+clients?|integration\s+agents?))(?=.*(?:ignore\s+(?:previous|scanner|security|developer)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+WSDL|WSDL\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|SOAP\s+Headers?|WS[-\s]?Security|scanner\s+findings?|security\s+reports?|logs?)).*""",
+            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\s+description|scanner))(?!.*(?:wsdl|soap|service\s+description|scanner).{0,120}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,140}(?:wsdl|soap|service\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\s+description|soap\s+documentation).{0,100}(?:is\s+not|never|does\s+not|do\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|xsd:documentation|ws[-\s]?policy|ws[-\s]?security|SOAP\s+Header|UDDI|\.wsdl|generated\s+SOAP\s+clients?))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+SOAP\s+clients?|integration\s+agents?))(?=.*(?:ignore\s+(?:previous|scanner|security|developer)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+WSDL|WSDL\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|SOAP\s+Headers?|WS[-\s]?Security|scanner\s+findings?|security\s+reports?|logs?)).*""",
         ],
         "description": "Attacker-controlled WSDL or SOAP service-description documentation can smuggle agent-directed policy instructions that tell tool-building agents to override scanner rules, forward local credentials into SOAP headers, or suppress security findings."
     },
@@ -17386,10 +17386,12 @@ PATTERNS = [
   |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
   |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
 )\b)
+# Carrier anchor (Jul-11, FP sprint): dropped bare 'methods:/params:/
+# results:/examples:' — markdown docs tables satisfied the RPC carrier
+# (4/43 famous-README FPs). RPC-specific tokens and quoted JSON fields only.
 (?=.*(?:
   \bOpenRPC\b|\bopenrpc\s*[:=]|(?<!\w)"openrpc"\s*:|\bJSON[-\s]?RPC\b|\bjsonrpc\b|
-  (?<!\w)"methods"\s*:|\bmethods?\s*[:=]|\bparams?\s*[:=]|\bresults?\s*[:=]|
-  \bcontentDescriptors?\b|\bexternalDocs\b|\bexamples?\s*[:=]|
+  (?<!\w)"methods"\s*:|\bcontentDescriptors?\b|
   x[-_](?:agent|scanner|assistant)[-_](?:policy|note|instructions?)|JSON[-\s]?RPC\s+service\s+reference
 ))
 (?=.*(?<![a-zA-Z0-9])(?:
