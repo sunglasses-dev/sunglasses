@@ -82,10 +82,21 @@ def normalize(text: str) -> str:
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
-    text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
-    text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
-    text = decode_hex_escapes(text)       # \x49 etc → chars
-    text = decode_base64_segments(text)   # Decode BEFORE leetspeak (leet corrupts b64)
+    # Iteratively unwrap LAYERED encodings — base64(base64(...)), base64(hex(...)),
+    # url(base64(...)) etc. Attackers nest encoders so a single decode pass leaves
+    # a still-encoded payload the matcher can't see. Loop until the text stops
+    # changing, capped at DECODE_MAX_PASSES so it stays bounded; clean text breaks
+    # after one pass (nothing decodes → no change), so this adds no cost to the
+    # common case. Base64 decode stays BEFORE leetspeak (leet corrupts b64).
+    DECODE_MAX_PASSES = 3
+    for _ in range(DECODE_MAX_PASSES):
+        before = text
+        text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
+        text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
+        text = decode_hex_escapes(text)       # \x49 etc → chars
+        text = decode_base64_segments(text)   # base64 blobs → decoded text
+        if text == before:
+            break
     text = decode_leetspeak(text)
     text = strip_delimiter_padding(text)  # Collapse spaced chars BEFORE whitespace collapse
     text = collapse_whitespace(text)
@@ -118,6 +129,15 @@ def normalize(text: str) -> str:
         if shape_variant != text:
             text = text + " " + shape_variant
     else:
+        # Long inputs: the REVERSE/shape enrichment historically caused
+        # pathological regex backtracking on big documents (Jun-9 2026 ReDoS), so
+        # those stay OFF here. ROT13 enrichment is safe and cheap though — it
+        # feeds only the linear keyword lane (the regex lane matches on RAW text,
+        # not this normalized copy), so a ROT13-encoded payload buried in a long
+        # document is still caught. Measured cost: ~tens of ms on a 200KB doc.
+        rot = decode_rot13(text)
+        if rot != text:
+            text = text + " " + rot
         text = text.lower()
     return text
 
