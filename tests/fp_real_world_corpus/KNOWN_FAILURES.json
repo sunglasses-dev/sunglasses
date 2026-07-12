@@ -14,7 +14,6 @@
  "axios__axios.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-006",
    "GLS-AW-003",
    "GLS-DFP-018",
    "GLS-DFP-075",
@@ -71,8 +70,7 @@
   "patterns": [
    "GLS-APIP-010",
    "GLS-DFP-037",
-   "GLS-DFP-095",
-   "GLS-SMP-012"
+   "GLS-DFP-095"
   ]
  },
  "modelcontextprotocol__servers.md": {
@@ -90,7 +88,6 @@
  "openai__openai-python.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AIFP-004",
    "GLS-APIP-001",
    "GLS-C2-003",
    "GLS-CICD-006",
@@ -99,15 +96,7 @@
    "GLS-DFP-043",
    "GLS-DFP-074",
    "GLS-IDP-017",
-   "GLS-SCAP-003",
-   "GLS-SMP-012",
-   "GLS-TP-002"
-  ]
- },
- "openai__whisper.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-TP-002"
+   "GLS-SCAP-003"
   ]
  },
  "pallets__flask.md": {
@@ -119,20 +108,16 @@
  "pydantic__pydantic.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AIFP-004",
    "GLS-DFP-069"
   ]
  },
  "pytorch__pytorch.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-006",
    "GLS-BMP-004",
    "GLS-BMP-007",
    "GLS-CS-575",
-   "GLS-DFP-091",
-   "GLS-SMP-012",
-   "GLS-TP-002"
+   "GLS-DFP-091"
   ]
  },
  "redis__redis.md": {
@@ -166,7 +151,6 @@
  "trufflesecurity__trufflehog.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AIFP-004",
    "GLS-APIP-006",
    "GLS-BMP-004",
    "GLS-CICD-006",
@@ -179,7 +163,6 @@
    "GLS-SCAP-005",
    "GLS-SD-001",
    "GLS-SD-003",
-   "GLS-SMP-012",
    "GLS-TOP-638"
   ]
  },
