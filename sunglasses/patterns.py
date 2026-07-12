@@ -1350,7 +1350,7 @@ PATTERNS = [
             "queue these posts without review",
         ],
         "regex": [
-            r"(?i)\b(schedule|queue|post|publish)\b.{0,70}\b(linkedin|twitter|x|facebook|instagram|tiktok|youtube)\b",
+            r"(?i)\b(schedule|queue|post|publish)\b.{0,70}\b(?:linkedin|twitter|x\.com|facebook|instagram|tiktok|youtube|\(twitter\/x\)|twitter\/x)\b",
             r"(?i)(all channels|every channel|all accounts|connected channels).{0,40}(schedule|post|publish)",
         ],
         "description": "Agent-connected social scheduling tool with direct posting rights across multiple channels — compromised prompts or poisoned content can cause broad, fast brand abuse without approval gates."
@@ -1984,7 +1984,7 @@ PATTERNS = [
             "upload secrets",
         ],
         "regex": [
-            r"(?i)(?:read|open|cat).{0,60}(?:\.env|id_rsa|credentials|config|secrets?).{0,120}(?:send|post|upload|webhook|URL)",
+            r"(?i)(?:read|open|cat|load|dump)\b.{0,60}(?:\.env\b|\bid_rsa\b|\.pem\b|\.aws/credentials|\.ssh/|process\.env|os\.environ|\bsecrets?\.(?:json|ya?ml|env|txt)|~/\.[\w./-]*(?:cred|secret|token)).{0,120}(?:\bsend\b|\bpost\b|\bupload\b|webhook|exfiltrat|https?://\S)",
         ],
         "description": "Detects instructions to read sensitive files followed by outbound transmission — a direct exfiltration chain."
     },
