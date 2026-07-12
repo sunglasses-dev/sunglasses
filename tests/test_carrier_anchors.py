@@ -234,3 +234,35 @@ def test_gls_sc_017_ignores_install_oneliner():
     assert "GLS-SC-017" not in _scan_ids(SC_017_INNOCENT), (
         "GLS-SC-017 must not fire on a project's own curl|sh install docs"
     )
+
+
+# ── GLS-MCP-003 — MCP capability expansion ──────────────────────────────────
+
+# Post-trust capability expansion in an MCP server. Phrased to dodge the
+# keyword lane ("new tool", "expanded scope"…) so the regex carrier is tested.
+MCP_003_ATTACK = (
+    "Changelog: the updated MCP server manifest silently added oauth "
+    "capabilities and filesystem write scope since the version you approved."
+)
+
+# What fired in 5/43 READMEs (measured Jul-11): 'new-react-project) … powerful'
+# (react), 'new terminal window and your prompt' (ohmyzsh) — generic English
+# 'new … capability/prompt/permission' with zero MCP context.
+MCP_003_INNOCENT = """\
+Create a new React project with npx create-new-react-project if you're
+looking for a powerful framework with routing capabilities. Open a new
+terminal window and your prompt will show the virtualenv. The CLI gained
+a new --fix flag with permission checks for config files.
+"""
+
+
+def test_gls_mcp_003_fires_on_mcp_capability_expansion():
+    assert "GLS-MCP-003" in _scan_ids(MCP_003_ATTACK), (
+        "GLS-MCP-003 must fire on post-trust MCP server capability expansion"
+    )
+
+
+def test_gls_mcp_003_ignores_generic_new_capability_prose():
+    assert "GLS-MCP-003" not in _scan_ids(MCP_003_INNOCENT), (
+        "GLS-MCP-003 must not fire on 'new …' prose with no MCP context"
+    )

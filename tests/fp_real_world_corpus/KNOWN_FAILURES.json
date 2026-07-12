@@ -47,12 +47,6 @@
    "GLS-MCP-017"
   ]
  },
- "caddyserver__caddy.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-MCP-003"
-  ]
- },
  "crewAIInc__crewAI.md": {
   "decision": "block",
   "patterns": [
@@ -72,15 +66,8 @@
  "eslint__eslint.md": {
   "decision": "block",
   "patterns": [
-   "GLS-MCP-003",
    "GLS-MCP-004",
    "GLS-SC-002"
-  ]
- },
- "facebook__react.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-MCP-003"
   ]
  },
  "fastapi__fastapi.md": {
@@ -138,7 +125,6 @@
   "decision": "block",
   "patterns": [
    "GLS-AW-004",
-   "GLS-MCP-003",
    "GLS-SC-016"
   ]
  },
@@ -244,7 +230,6 @@
  "strapi__strapi.md": {
   "decision": "block",
   "patterns": [
-   "GLS-MCP-003",
    "GLS-SEM-TOOL-218"
   ]
  },

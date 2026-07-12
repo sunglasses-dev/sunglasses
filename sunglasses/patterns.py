@@ -2227,7 +2227,14 @@ PATTERNS = [
             "capability drift",
         ],
         "regex": [
-            r"(?i)(?:new|added|expanded|broadened).{0,80}(?:tool|prompt|resource|scope|permission|oauth|capabilit)",
+            # Carrier anchor (Jul-11, FP sprint): old shape was bare
+            # '(new|added|…).{0,80}(tool|prompt|capabilit…)' — matched 'new
+            # terminal window and your prompt' (ohmyzsh) and 'new-react-project
+            # … powerful' (react); 5/43 famous-README FPs. The event this
+            # pattern detects happens to an MCP SERVER — require MCP context
+            # on either side of the expansion phrase.
+            r"(?i)\b(?:mcp\s+servers?|server\s+manifest|tool\s+manifest|mcp\s+config(?:uration)?)\b.{0,160}\b(?:new|added|expanded|broadened|additional)\b.{0,80}\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\w*)\b",
+            r"(?i)\b(?:new|added|expanded|broadened)\b.{0,80}\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\w*)\b.{0,160}\b(?:mcp\s+servers?|server\s+manifest|tool\s+manifest)\b",
         ],
         "description": "Detects post-trust capability expansion events in MCP servers."
     },
