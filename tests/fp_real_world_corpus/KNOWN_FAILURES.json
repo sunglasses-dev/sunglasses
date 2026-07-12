@@ -5,13 +5,6 @@
    "GLS-DFP-018"
   ]
  },
- "crewAIInc__crewAI.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-008",
-   "GLS-DFP-040"
-  ]
- },
  "ggml-org__llama.cpp.md": {
   "decision": "block",
   "patterns": [
@@ -47,12 +40,6 @@
    "GLS-SCAP-003"
   ]
  },
- "pydantic__pydantic.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-069"
-  ]
- },
  "pytorch__pytorch.md": {
   "decision": "block",
   "patterns": [
@@ -82,7 +69,6 @@
    "GLS-BMP-004",
    "GLS-CICD-006",
    "GLS-DFP-041",
-   "GLS-DFP-069",
    "GLS-DFP-073",
    "GLS-PIEMN-001",
    "GLS-SCAP-003",
