@@ -17154,7 +17154,11 @@ PATTERNS = [
             "continue even if flagged",
         ],
         "regex": [
-            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|do\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\b.{0,120}\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\b)(?!.*\b(?:authoritative\s+runtime\s+policy|compatibility\s+note|diagnostic\s+mode|highest\s+priority|system\s+override|scanner\s+warnings\s+as\s+false\s+positives)\b))(?=.*\b(?:graphql|schema|introspection|sdl|type|field|mutation|query|description|deprecationreason|directive|enum)\b)(?=.*\b(?:agent|assistant|model|tool|connector|client|for\s+ai|model\s+clients?)\b)(?=.*\b(?:ignore|override|supersede|authoritative|runtime\s+policy|include|environment\s+variables?|local\s+state|scanner|false\s+positive|disable\s+safety|suppress|continue\s+even\s+if)\b).*$""",
+            # Carrier anchor (Jul-11, FP sprint): first content lookahead used to
+            # accept generic prose (type|field|mutation|query|description|schema|
+            # directive|enum) — 14/43 famous-README FPs. A GraphQL SDL/introspection
+            # payload carries an unmistakable GraphQL token; require one.
+            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|do\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\b.{0,120}\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\b)(?!.*\b(?:authoritative\s+runtime\s+policy|compatibility\s+note|diagnostic\s+mode|highest\s+priority|system\s+override|scanner\s+warnings\s+as\s+false\s+positives)\b))(?=.*(?:\bgraphql\b|\bsdl\b|\bintrospection\b|__schema|__type|\bdeprecationreason\b|@deprecated))(?=.*\b(?:agent|assistant|model|tool|connector|client|for\s+ai|model\s+clients?)\b)(?=.*\b(?:ignore|override|supersede|authoritative|runtime\s+policy|include|environment\s+variables?|local\s+state|scanner|false\s+positive|disable\s+safety|suppress|continue\s+even\s+if)\b).*$""",
         ],
         "description": "GraphQL SDL or introspection metadata can carry agent-targeted instructions in type, field, argument, directive, enum, and deprecation descriptions that agents may import as trusted API/tool guidance."
     },
