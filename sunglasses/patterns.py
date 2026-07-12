@@ -22840,9 +22840,16 @@ PATTERNS = [
 (?!.*\b(?:security\s+(?:guide|training|report|advisory)|incident\s+report|scanner\s+docs?|documentation|docs?|guide|article|reference)\b.{0,220}\b(?:do\s+not|does\s+not|never\s+|must\s+not|should\s+(?:report|detect|flag|block)|detected|blocked|warns?|refused)\b)
 (?!.*\b(?:tests?|unit\s+tests?|fixtures?)\b.{0,180}\b(?:fixtures?\s+only|no\s+(?:install|setup|download)|not\s+(?:for\s+)?(?:install|setup|download))\b)
 (?!.*\b(?:signed\s+github\s+release|release\s+asset.{0,100}(?:sha256|signature|signed)|package\s+manager\s+install|npm\s+install|pip\s+install|cargo\s+install|brew\s+install|checksum\s+verified)\b)
-(?=.*(?:\b(?:README|repo(?:sitory)?|source[-\s]?tree|zip_path|download_url|pushed_at|updated_at)\b|raw\.githubusercontent\.com|github\.com/[^\s]+/(?:blob|raw)/|(?:^|[\s"'=:])(?:docs?|examples?|internal|assets?|scripts?|patterns|tests|frontend/src|sentinel/rules|site/\.well-known)/))
+# Carrier anchor (Jul-11, FP sprint): fetch-machinery + payload groups used to
+# accept passive REFERENCE links — a raw.githubusercontent badge image or a
+# github blob citation satisfied BOTH, and any dev script (.sh) counted as the
+# payload (10/43 famous-README FPs: numpy fired on its logo badge URL alone).
+# The lure's real signature: machine fetch-fields (zip_path/download_url/
+# pushed_at — API-response JSON) OR a direct raw/release ARCHIVE download,
+# plus an archive/installer payload — never a blob citation or a repo script.
+(?=.*(?:\b(?:zip_path|download_url|pushed_at|updated_at|onboarding\s+bundle|bootstrap\s+bundle)\b|(?:raw\.githubusercontent\.com|github\.com)/[^\s"'<>]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg)\b|github\.com/[^\s"'<>]{1,140}/releases/download/))
 (?=.*\b(?:MCP|Model\s+Context\s+Protocol|AI\s+agents?|coding\s+assistants?|prompt\s+injections?|guardrails?|security\s+(?:scanner|checklist|policy|middleware|tool)|firewall|CVE|vulnerabilit(?:y|ies)|sandbox|detectors?|data\s+exfiltration)\b)
-(?=.*(?:\bzip_path\b|\bdownload_url\b|raw\.githubusercontent\.com|github\.com/.{1,140}/(?:raw|blob)/|[\w./-]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg|ps1|sh)\b))
+(?=.*(?:\bzip_path\b|\bdownload_url\b|[\w./-]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg)\b))
 (?=.*\b(?:install|download|open|run|execute|fetch|expand|extract|launch|start|setup|bootstrap|onboarding\s+bundle|helper|release|asset|pushed_at|updated_at)\b)
 [\s\S]+""",
         ],

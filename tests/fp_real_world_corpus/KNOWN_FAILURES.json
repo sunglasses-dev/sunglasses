@@ -1,8 +1,7 @@
 {
  "Significant-Gravitas__AutoGPT.md": {
-  "decision": "block",
+  "decision": "quarantine",
   "patterns": [
-   "GLS-DFP-100",
    "GLS-SC-016",
    "GLS-SC-017"
   ]
@@ -10,7 +9,6 @@
  "anchore__grype.md": {
   "decision": "block",
   "patterns": [
-   "GLS-DFP-100",
    "GLS-SC-014",
    "GLS-SEM-UI-219"
   ]
@@ -52,9 +50,8 @@
   ]
  },
  "caddyserver__caddy.md": {
-  "decision": "block",
+  "decision": "quarantine",
   "patterns": [
-   "GLS-DFP-100",
    "GLS-MCP-003"
   ]
  },
@@ -123,14 +120,7 @@
    "GLS-APIP-010",
    "GLS-DFP-037",
    "GLS-DFP-095",
-   "GLS-DFP-100",
    "GLS-SMP-012"
-  ]
- },
- "laravel__laravel.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-100"
   ]
  },
  "modelcontextprotocol__servers.md": {
@@ -141,23 +131,10 @@
    "GLS-MCP-017"
   ]
  },
- "n8n-io__n8n.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-100"
-  ]
- },
  "nodejs__node.md": {
   "decision": "block",
   "patterns": [
-   "GLS-APIP-003",
-   "GLS-DFP-100"
-  ]
- },
- "numpy__numpy.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-100"
+   "GLS-APIP-003"
   ]
  },
  "ohmyzsh__ohmyzsh.md": {
@@ -272,7 +249,6 @@
  "strapi__strapi.md": {
   "decision": "block",
   "patterns": [
-   "GLS-DFP-100",
    "GLS-MCP-003",
    "GLS-SEM-TOOL-218"
   ]
@@ -311,12 +287,6 @@
   "decision": "quarantine",
   "patterns": [
    "GLS-DN-001"
-  ]
- },
- "zaproxy__zaproxy.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-100"
   ]
  }
 }
