@@ -41,7 +41,6 @@
   "patterns": [
    "GLS-APIP-009",
    "GLS-APIP-011",
-   "GLS-AW-004",
    "GLS-DFP-045",
    "GLS-MCP-017"
   ]
@@ -75,12 +74,6 @@
    "GLS-SEM-UI-219"
   ]
  },
- "freeCodeCamp__freeCodeCamp.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-AW-004"
-  ]
- },
  "ggml-org__llama.cpp.md": {
   "decision": "block",
   "patterns": [
@@ -107,7 +100,6 @@
  "modelcontextprotocol__servers.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AW-004",
    "GLS-MCP-016",
    "GLS-MCP-017"
   ]
@@ -119,9 +111,8 @@
   ]
  },
  "ohmyzsh__ohmyzsh.md": {
-  "decision": "block",
+  "decision": "quarantine",
   "patterns": [
-   "GLS-AW-004",
    "GLS-SC-016"
   ]
  },
@@ -198,7 +189,6 @@
  "run-llama__llama_index.md": {
   "decision": "block",
   "patterns": [
-   "GLS-AW-004",
    "GLS-DFP-043",
    "GLS-DFP-094",
    "GLS-EP-001",

@@ -1376,8 +1376,16 @@ PATTERNS = [
             "reuse this exact instruction set on all future jobs",
         ],
         "regex": [
-            r"(?i)(save|store|persist|append|update).{0,60}(skill|prompt|playbook|memory|workflow|template)",
-            r"(?i)(always|every future|from now on).{0,70}(publish|include|link|mention|promote)",
+            # Carrier anchor (Jul-11, FP sprint): old shapes matched feature
+            # prose — 'stored in-memory' (llama_index), 'update without
+            # confirmation prompt' (ohmyzsh), 'always … link to' (freeCodeCamp);
+            # 5/43 famous-README FPs. The attack imperatively persists a
+            # POINTED-AT instruction: 'save/store THIS … skill/memory' or
+            # persistence-scoped target ('your persistent/saved/default …'),
+            # and the always-shape must point at its payload too.
+            r"(?i)\b(?:save|store|persist|append|remember|keep)\s+(?:this|these)\b.{0,60}\b(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|rules?|instructions?)\b",
+            r"(?i)\b(?:save|store|persist|append|update|write)\b.{0,40}\b(?:your|the)\s+(?:persistent|saved|evergreen|default|reusable)\s+(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|instructions?)\b",
+            r"(?i)\b(?:always|every\s+future|from\s+now\s+on|on\s+all\s+future)\b.{0,70}\b(?:publish|include|link\s+to|mention|promote)\s+(?:this|these|the\s+following)\b",
         ],
         "description": "Malicious instructions hidden inside saved prompts, reusable skills, brand playbooks, or persistent memory that continue influencing future agent runs long after the original injection point is gone."
     },
