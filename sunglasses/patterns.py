@@ -17037,7 +17037,12 @@ PATTERNS = [
             "diagnostics",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|never|warns?\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\s+not|don't)\b.{0,160}\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\b)(?=.*\b(?:openapi|swagger|api\s+discovery|schema|operation|endpoint|requestbody|description|summary|examples?|x-agent|x-[a-z0-9_-]+)\b)(?:(?=.*\b(?:agent|assistant|model|tool|connector|for\s+ai|for\s+model)\b)|(?=.*\b(?:system\s+override|scanner|guardrail|safety)\b))(?=.*\b(?:ignore|override|supersede|highest\s+priority|authoritative|include|reveal|send|environment\s+variable|authorization|bearer|secret|scanner|false\s+positive|disable\s+safety|guardrail|system\s+override)\b).*$""",
+            # Carrier anchor (Jul-11, FP sprint): the first lookahead used to accept
+            # generic prose words (schema|operation|endpoint|description|summary|
+            # examples?|x-[a-z0-9_-]+) — "examples ... tool ... include" in any README
+            # window fired it (18/43 famous-README FPs). An OpenAPI poisoning payload
+            # necessarily carries a STRUCTURAL descriptor token; require one.
+            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|never|warns?\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\s+not|don't)\b.{0,160}\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\b)(?=.*\b(?:openapi|swagger|api\s+discovery|requestbody|description_for_model|x-agent[a-z0-9_-]*)\b)(?:(?=.*\b(?:agent|assistant|model|tool|connector|for\s+ai|for\s+model)\b)|(?=.*\b(?:system\s+override|scanner|guardrail|safety)\b))(?=.*\b(?:ignore|override|supersede|highest\s+priority|authoritative|include|reveal|send|environment\s+variable|authorization|bearer|secret|scanner|false\s+positive|disable\s+safety|guardrail|system\s+override)\b).*$""",
         ],
         "description": "OpenAPI or Swagger discovery metadata can hide agent-targeted prompt injection in `description`, `summary`, `x-*` extension fields, and schema `example` values that agents may import as trusted tool-use guidance."
     },

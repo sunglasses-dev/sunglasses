@@ -28,12 +28,6 @@
    "GLS-CS-575"
   ]
  },
- "aquasecurity__trivy.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-APIP-001"
-  ]
- },
  "axios__axios.md": {
   "decision": "block",
   "patterns": [
@@ -145,12 +139,6 @@
   "decision": "block",
   "patterns": [
    "GLS-HI-004"
-  ]
- },
- "huggingface__transformers.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-APIP-001"
   ]
  },
  "langgenius__dify.md": {
@@ -387,12 +375,6 @@
   "decision": "quarantine",
   "patterns": [
    "GLS-DN-001"
-  ]
- },
- "webpack__webpack.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-APIP-001"
   ]
  },
  "zaproxy__zaproxy.md": {
