@@ -2,8 +2,7 @@
  "Significant-Gravitas__AutoGPT.md": {
   "decision": "quarantine",
   "patterns": [
-   "GLS-SC-016",
-   "GLS-SC-017"
+   "GLS-SC-016"
   ]
  },
  "anchore__grype.md": {
@@ -45,8 +44,7 @@
    "GLS-APIP-011",
    "GLS-AW-004",
    "GLS-DFP-045",
-   "GLS-MCP-017",
-   "GLS-SC-017"
+   "GLS-MCP-017"
   ]
  },
  "caddyserver__caddy.md": {
@@ -68,8 +66,7 @@
   "decision": "block",
   "patterns": [
    "GLS-SC-003",
-   "GLS-SC-014",
-   "GLS-SC-017"
+   "GLS-SC-014"
   ]
  },
  "eslint__eslint.md": {
@@ -142,8 +139,7 @@
   "patterns": [
    "GLS-AW-004",
    "GLS-MCP-003",
-   "GLS-SC-016",
-   "GLS-SC-017"
+   "GLS-SC-016"
   ]
  },
  "ollama__ollama.md": {
@@ -151,8 +147,7 @@
   "patterns": [
    "GLS-GHSA-PI-202",
    "GLS-SC-003",
-   "GLS-SC-014",
-   "GLS-SC-017"
+   "GLS-SC-014"
   ]
  },
  "openai__openai-python.md": {
@@ -273,7 +268,6 @@
    "GLS-SC-003",
    "GLS-SC-014",
    "GLS-SC-016",
-   "GLS-SC-017",
    "GLS-SCAP-003",
    "GLS-SCAP-005",
    "GLS-SD-001",

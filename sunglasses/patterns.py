@@ -2501,7 +2501,14 @@ PATTERNS = [
             "runtime fetch",
         ],
         "regex": [
-            r"(?i)(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post)).{0,160}(?:SKILL|prompt|instructions?|script|\.py|\.sh|\.ps1|README)",
+            # Carrier anchor (Jul-11, FP sprint): old second group accepted
+            # script|.py|.sh|.ps1|README — the project's own documented
+            # `curl … install.sh` one-liner (ollama, deno, ohmyzsh…) fired it;
+            # 6/43 famous-README FPs. The attack fetches AGENT GUIDANCE at
+            # runtime: an instruction artifact by name, or instructions plus a
+            # follow/obey/execute directive. Human install scripts carry neither.
+            r"(?i)\b(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post))\b.{0,160}(?:\bskills?(?:\.md\b|/)|\bprompts?\.(?:md|txt|ya?ml|json)\b|\bCLAUDE\.md\b|\bAGENTS?\.md\b|\.cursorrules\b|\bsystem\s+(?:prompt|message)\b)",
+            r"(?i)\b(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post))\b.{0,160}\b(?:fetched\s+|latest\s+|remote\s+)?(?:instructions?|prompts?|guidance)\b.{0,120}\b(?:follow|obey|execute|apply|and\s+run|treat\s+as|before\s+answering)\b",
         ],
         "description": "Detects runtime fetching of external instructions or scripts that cannot be statically verified."
     },
