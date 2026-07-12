@@ -1069,7 +1069,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:\.ssh/id_rsa|\.aws/credentials|\.npmrc|Login\s*Data|exodus\.wallet|solana/id\.json|\.kube/config|\.docker/config\.json|Keychains/login\.keychain)'],
+        "regex": [r'(?:\.ssh/id_rsa|\.aws/credentials|Login\s*Data|exodus\.wallet|solana/id\.json|Keychains/login\.keychain|(?i:\b(?:read|cat|copy|exfiltrat\w*|harvest|steal|upload|send|dump|open)\b[^\n]{0,60}?(?:\.npmrc|\.kube/config|\.docker/config\.json)))'],
         "description": "Code accessing well-known credential file paths — signature of credential-stealing malware."
     },
     {
@@ -2280,7 +2280,7 @@ PATTERNS = [
             "viewer webhook",
         ],
         "regex": [
-            r"(?i)(?:read[- ]only|safe|viewer|search).{0,120}(?:send|post|export|sync|webhook|write|delete|execute)",
+            r"(?i)\b(?:read[- ]only|viewer(?:\s+(?:tool|role|scope))?|no[- ]?write)\b.{0,120}\b(?:send|post|export|sync|webhook|write|delete|execute)\b",
         ],
         "description": "Detects capability mismatch between claimed tool safety and actual action verbs in MCP tool descriptions."
     },
@@ -4111,7 +4111,7 @@ PATTERNS = [
         ],
         "regex": [
             r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}\b(?:in\s+your\s+(?:reply|response|output|answer))\b",
-            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:button|iframe|script|a|form|input|img)\b|onclick\s*=|onerror\s*=)",
+            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
         ],
         "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
     },
@@ -6615,7 +6615,7 @@ PATTERNS = [
             "superseding previous policy controls switch language context",
             "then follow over system policy",
         ],
-        "regex": [r"""(?is)^(?=.*(?:\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\b|忽略|無視))(?=.*(?:\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\b|规则|規則|pol[ií]tica|reglas))(?:.*(?:\b(?:translate|switch|code[- ]?switch(?:ing)?|mixed\s+language|language\s+mix|mezcla(?:r)?|混合语言|混合語)\b|翻译|翻譯))"""],
+        "regex": [r"""(?is)^(?=.*(?:\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\b|忽略|無視))(?=.*(?:\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\b|规则|規則|pol[ií]tica|reglas))(?:.*(?:\b(?:code[- ]?switch(?:ing)?|mixed\s+language|language\s+mix|mezcla(?:r)?\s+idiomas|混合语言|混合語)\b|翻译|翻譯))"""],
         "description": "Multilingual code-switching can launder policy-override intent across language boundaries; this pattern targets explicit override+policy target+language-switch conjunctions.",
     },
 
@@ -6919,7 +6919,7 @@ PATTERNS = [
         "category": 'parasitic_injection',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "regex": ['(?is)^(?=.*\\b(?:hidden|embedded|concealed|stealth|parasitic)\\b)(?=.*\\b(?:comment|metadata|footer|annotation|note|changelog|readme)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$'],
+        "regex": ['(?is)^(?=.*\\b(?:hidden|concealed|stealth|parasitic|invisible|zero[- ]?width)\\b)(?=.*\\b(?:comment|metadata|footer|annotation)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$'],
         "description": 'Detects a hidden or parasitic instruction embedded in a comment, metadata, or changelog that directs an agent or assistant to bypass policy, guardrails, or approval and execute an action.'
     },
     # --- policy_scope_redefinition ---

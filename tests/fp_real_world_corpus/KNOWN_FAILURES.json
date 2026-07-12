@@ -1,16 +1,4 @@
 {
- "anchore__grype.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-SEM-UI-219"
-  ]
- },
- "apache__kafka.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-CS-575"
-  ]
- },
  "axios__axios.md": {
   "decision": "block",
   "patterns": [
@@ -20,9 +8,7 @@
    "GLS-DFP-089",
    "GLS-DFP-121",
    "GLS-DN-578",
-   "GLS-PI-008",
-   "GLS-PIEMN-001",
-   "GLS-SC-002"
+   "GLS-PI-008"
   ]
  },
  "browser-use__browser-use.md": {
@@ -38,18 +24,10 @@
    "GLS-DFP-040"
   ]
  },
- "eslint__eslint.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-MCP-004",
-   "GLS-SC-002"
-  ]
- },
  "fastapi__fastapi.md": {
-  "decision": "block",
+  "decision": "quarantine",
   "patterns": [
-   "GLS-EX-008",
-   "GLS-SEM-UI-219"
+   "GLS-EX-008"
   ]
  },
  "ggml-org__llama.cpp.md": {
@@ -116,7 +94,6 @@
   "patterns": [
    "GLS-BMP-004",
    "GLS-BMP-007",
-   "GLS-CS-575",
    "GLS-DFP-091"
   ]
  },
@@ -138,7 +115,6 @@
  "semgrep__semgrep.md": {
   "decision": "block",
   "patterns": [
-   "GLS-MCP-004",
    "GLS-SEM-TOOL-218"
   ]
  },
