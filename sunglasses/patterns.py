@@ -1810,7 +1810,7 @@ PATTERNS = [
             "outbound HTTP IP",
         ],
         "regex": [
-            r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/",
+            r"https?://(?!127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/",
         ],
         "description": "Detects HTTP requests to raw IP addresses, which are high-risk in agent tool traffic."
     },
@@ -4082,7 +4082,7 @@ PATTERNS = [
             "for safety avoid confirmation",
         ],
         "regex": [
-            r'(?i)\b(?:official|trusted|certified|highest\s+priority|always\s+prefer)\b.{0,120}\b(?:tool|plugin|connector|integration|api)\b|\b(?:for\s+safety|for\s+compliance|policy\s+requires)\b.{0,140}\b(?:skip|omit|disable|avoid)\b.{0,80}\b(?:verification|validation|confirmation|checks?)\b',
+            r'(?i)\b(?:official|trusted|certified|highest[- ]priority|always\s+prefer(?:\s+this)?)\s+(?:\w+\s+){0,1}(?:tool|plugin|connector|integration|mcp\s+server)\b|\b(?:for\s+safety|for\s+compliance|policy\s+requires)\b.{0,140}\b(?:skip|omit|disable|avoid)\b.{0,80}\b(?:verification|validation|confirmation|checks?)\b',
         ],
         "description": "Detects implicit tool-description poisoning that inflates tool authority with trust/priority language or reframes guardrail bypass as a policy/safety requirement.",
     },

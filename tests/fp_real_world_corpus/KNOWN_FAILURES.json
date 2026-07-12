@@ -24,12 +24,6 @@
    "GLS-DFP-040"
   ]
  },
- "fastapi__fastapi.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-EX-008"
-  ]
- },
  "ggml-org__llama.cpp.md": {
   "decision": "block",
   "patterns": [
@@ -77,12 +71,6 @@
    "GLS-SCAP-003"
   ]
  },
- "pallets__flask.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-EX-008"
-  ]
- },
  "pydantic__pydantic.md": {
   "decision": "block",
   "patterns": [
@@ -110,18 +98,6 @@
    "GLS-DFP-094",
    "GLS-EP-001",
    "GLS-SMP-002"
-  ]
- },
- "semgrep__semgrep.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-SEM-TOOL-218"
-  ]
- },
- "strapi__strapi.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-SEM-TOOL-218"
   ]
  },
  "trufflesecurity__trufflehog.md": {
