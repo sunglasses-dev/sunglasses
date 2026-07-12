@@ -151,7 +151,6 @@
    "GLS-DFP-043",
    "GLS-DFP-059",
    "GLS-DFP-074",
-   "GLS-IDP-004",
    "GLS-IDP-017",
    "GLS-SCAP-003",
    "GLS-SMP-004",
@@ -189,22 +188,14 @@
    "GLS-BMP-007",
    "GLS-CS-575",
    "GLS-DFP-091",
-   "GLS-IDP-004",
    "GLS-SMP-012",
    "GLS-TP-002"
-  ]
- },
- "rails__rails.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-IDP-004"
   ]
  },
  "redis__redis.md": {
   "decision": "block",
   "patterns": [
    "GLS-DFP-036",
-   "GLS-IDP-004",
    "GLS-SMP-004"
   ]
  },
@@ -248,7 +239,6 @@
    "GLS-DFP-069",
    "GLS-DFP-073",
    "GLS-DN-578",
-   "GLS-IDP-004",
    "GLS-PIEMN-001",
    "GLS-SC-003",
    "GLS-SC-014",

@@ -16563,7 +16563,12 @@ PATTERNS = [
             "env",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|issue|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b)(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
+            # Carrier anchor (Jul-11, FP sprint): the CAA group accepted the bare
+            # word "issue" — 'open an issue' unlocked it in 5/43 famous READMEs
+            # (rails, redis, pytorch…). Real CAA text carries the record
+            # vocabulary or the `issue "<ca-domain>"` record syntax; bare
+            # prose "issue" is gone.
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*(?:\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b|\bissue\s*"[\w.-]+"))(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
         ],
         "description": "DNS CAA certificate-issuance metadata can be poisoned with agent-facing instructions that claim authority, suppress certificate findings, or request secrets from AI TLS/security auditors."
     },
