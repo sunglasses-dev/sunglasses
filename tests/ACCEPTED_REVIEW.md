@@ -33,6 +33,10 @@ long docs — heavier systemic change, deferred.
 
 ## Ratchet meaning going forward
 
+> Note: this file lives at `tests/` root, NOT inside `tests/fp_real_world_corpus/`
+> — the ratchet test scans every `.md` in that folder, and this doc's own attack
+> vocabulary would (correctly) trip the scanner. Keep it out of the corpus dir.
+
 `KNOWN_FAILURES.json` still only shrinks: if a future pattern change makes one
 of these 9 scan clean, its entry MUST be deleted (the gate fails until it is).
 These 9 are the accepted floor, not a to-do list.
