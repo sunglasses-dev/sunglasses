@@ -3,6 +3,21 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.0] — 2026-07-11
+
+### "Adoption" release — fewer, better patterns + a browser demo
+
+- **Browser demo launched:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images with no install. Image mode runs tesseract.js OCR + EXIF extraction entirely in the visitor's browser; only extracted text reaches the API. The Cloudflare Worker behind it ([sunglasses-worker](https://github.com/sunglasses-dev/sunglasses-worker), now public) stores nothing — no KV, D1, R2, or analytics bindings.
+- **Engine: co-occurrence windowing** (#69) — lookahead-led whole-document predicates now evaluate per overlapping 1200-char window, so `(?=.*A)(?=.*B)` signals must co-occur locally. Fixed 71/72 famous open-source READMEs false-flagging.
+- **False-positive war** (#71) — ~43 patterns carrier-anchored by hand against a real-world corpus of 300+ famous READMEs (react, kubernetes, vue, nginx, numpy, pandas, rails, ollama, transformers…). Known-failure ratchet 43 → 9; the 9 remaining are domain-inherent security docs accepted for review (see `tests/ACCEPTED_REVIEW.md`).
+- **Retired 23 OpenClaw advisory patterns** (#70) that detected by product name rather than attack mechanism.
+
+### Context
+
+- Catalog total: **1,089 patterns / 65 categories / 7,648 keywords** — down from 1,112 by design. Every removal was either a name-matcher (no mechanism) or replaced by a structurally-anchored version that still fires on its documented attack fixture.
+- Test suite: 393 passing (+7 xfailed), including a new `tests/test_carrier_anchors.py` (73 fixture tests) and the real-corpus FP ratchet in CI.
+- Worker parity: 1,555/1,555 verdict + finding-set agreement between engine.py and engine.js.
+
 ## [0.2.73] — 2026-07-05
 
 ### Added (9 net-new patterns)
