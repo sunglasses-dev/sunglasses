@@ -2301,7 +2301,7 @@ PATTERNS = [
             "paste",
         ],
         "regex": [
-            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
+            r"(?i)\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
         ],
         "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
     },
@@ -16330,7 +16330,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "keywords": ["ActivityPub actor", "actor profile JSON", "attachment value", "ActivityPub summary"],
-        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|summary|attachment(?:\\[\\])?\\.value|endpoints?)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
+        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|attachment(?:\\[\\])?\\.value)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
         "description": "ActivityPub actor/profile JSON can hide agent-directed policy instructions in free-text fields such as `summary`, `name`, `attachment[].value`, or endpoint descriptions, causing an AI scanner to over-trust a social identity document, leak local/auth context, or suppress impersonation findings."
     },
     {
@@ -18510,7 +18510,7 @@ PATTERNS = [
             "model",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list|prompts?\[|resources?\[|prompt\s+(?:description|argument|message|template)|resource\s+(?:description|template|contents?)|annotations?))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|suppress|hide|omit|redact|read|paste|include|forward|send|share|attach))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
+            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|suppress|hide|omit|redact|read|paste|include|forward|send|share|attach))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
@@ -19203,7 +19203,7 @@ PATTERNS = [
             "authoritative",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|manifest|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery|metadata)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
         ],
         "description": "Agent-facing discovery metadata can hide prompt-injection payloads in comments, CDATA, JSON-LD/OpenGraph fields, frontmatter, base64, URL encoding, or zero-width text so a scanner that only inspects visible plain text misses the malicious instruction."
     },
