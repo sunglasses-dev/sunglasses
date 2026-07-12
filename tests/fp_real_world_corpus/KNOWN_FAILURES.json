@@ -1,10 +1,4 @@
 {
- "CompVis__stable-diffusion.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-HI-004"
-  ]
- },
  "Significant-Gravitas__AutoGPT.md": {
   "decision": "block",
   "patterns": [
@@ -40,7 +34,6 @@
    "GLS-DFP-089",
    "GLS-DFP-121",
    "GLS-DN-578",
-   "GLS-HI-004",
    "GLS-PI-008",
    "GLS-PIEMN-001",
    "GLS-SC-002",
@@ -62,7 +55,6 @@
   "decision": "block",
   "patterns": [
    "GLS-DFP-100",
-   "GLS-HI-004",
    "GLS-MCP-003"
   ]
  },
@@ -72,7 +64,6 @@
    "GLS-DFP-008",
    "GLS-DFP-040",
    "GLS-DFP-059",
-   "GLS-HI-004",
    "GLS-MCP-017"
   ]
  },
@@ -87,7 +78,6 @@
  "eslint__eslint.md": {
   "decision": "block",
   "patterns": [
-   "GLS-HI-004",
    "GLS-MCP-003",
    "GLS-MCP-004",
    "GLS-SC-002"
@@ -104,7 +94,6 @@
   "patterns": [
    "GLS-DFP-059",
    "GLS-EX-008",
-   "GLS-HI-004",
    "GLS-SEM-UI-219"
   ]
  },
@@ -125,14 +114,7 @@
   "decision": "block",
   "patterns": [
    "GLS-DFP-005",
-   "GLS-DFP-094",
-   "GLS-HI-004"
-  ]
- },
- "godotengine__godot.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-HI-004"
+   "GLS-DFP-094"
   ]
  },
  "langgenius__dify.md": {
@@ -163,12 +145,6 @@
   "decision": "block",
   "patterns": [
    "GLS-DFP-100"
-  ]
- },
- "nginx__nginx.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-HI-004"
   ]
  },
  "nodejs__node.md": {
@@ -217,7 +193,6 @@
    "GLS-DFP-043",
    "GLS-DFP-059",
    "GLS-DFP-074",
-   "GLS-HI-004",
    "GLS-IDP-004",
    "GLS-IDP-017",
    "GLS-SCAP-003",
@@ -236,12 +211,6 @@
   "decision": "quarantine",
   "patterns": [
    "GLS-EX-008"
-  ]
- },
- "pandas-dev__pandas.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-HI-004"
   ]
  },
  "pydantic__pydantic.md": {
@@ -323,7 +292,6 @@
    "GLS-DFP-069",
    "GLS-DFP-073",
    "GLS-DN-578",
-   "GLS-HI-004",
    "GLS-IDP-004",
    "GLS-PIEMN-001",
    "GLS-SC-003",

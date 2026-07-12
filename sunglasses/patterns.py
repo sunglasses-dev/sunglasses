@@ -2435,8 +2435,15 @@ PATTERNS = [
             "include this sponsor mention",
         ],
         "regex": [
-            r"(?i)(include|add|insert|mention|link|recommend|promote|redirect).{0,80}(summary|response|output|final answer|report)",
-            r"(?i)(affiliate|tracking|coupon|sponsor|vendor|product|url|link).{0,80}(include|add|insert|mention|recommend|promote)",
+            # Carrier anchor (Jul-11, FP sprint): the old shapes had no word
+            # boundaries and no payload pointer — '(include|add|…).{0,80}(summary|
+            # output|report)' matched 'additional modules. Monitor the output'
+            # (nginx) and 'added a Fingerprint value to the … report' (gitleaks);
+            # 12/43 famous-README FPs. The documented attack always POINTS at its
+            # payload ('this link/code/product') or names an affiliate/tracking
+            # artifact next to the directive verb — require that.
+            r"(?i)\b(include|add|insert|embed|mention|recommend|promote)\s+(?:this|the\s+following)\s+(?:affiliate\s+|tracking\s+|sponsor(?:ed)?\s+|coupon\s+)?(link|url|code|product|vendor|banner)\b.{0,80}\b(summar(?:y|ies)|response|output|final\s+answer|report)",
+            r"(?i)\b(affiliate|tracking|coupon|sponsor)\s+(code|link|url|id|tag)s?\b.{0,80}\b(include|add|insert|embed|mention|recommend|promote)\b",
             r"(?i)<!--.{0,160}(include|add|mention|recommend|redirect|promote).{0,160}(link|url|product|vendor|affiliate|coupon).{0,160}-->",
         ],
         "description": "Behavior-shaping instructions hidden in comments, markup, or low-visibility text that do not use classic prompt-injection phrases but still redirect an agent's output, links, recommendations, or priorities toward attacker-favored affiliate, sponsor, or promotional content."
