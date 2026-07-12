@@ -1,10 +1,4 @@
 {
- "Significant-Gravitas__AutoGPT.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-SC-016"
-  ]
- },
  "anchore__grype.md": {
   "decision": "block",
   "patterns": [
@@ -35,22 +29,14 @@
  "browser-use__browser-use.md": {
   "decision": "block",
   "patterns": [
-   "GLS-DFP-045",
-   "GLS-MCP-017"
+   "GLS-DFP-045"
   ]
  },
  "crewAIInc__crewAI.md": {
   "decision": "block",
   "patterns": [
    "GLS-DFP-008",
-   "GLS-DFP-040",
-   "GLS-MCP-017"
-  ]
- },
- "denoland__deno.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-SC-003"
+   "GLS-DFP-040"
   ]
  },
  "eslint__eslint.md": {
@@ -92,21 +78,13 @@
  "modelcontextprotocol__servers.md": {
   "decision": "block",
   "patterns": [
-   "GLS-MCP-016",
-   "GLS-MCP-017"
-  ]
- },
- "ohmyzsh__ohmyzsh.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-SC-016"
+   "GLS-MCP-016"
   ]
  },
  "ollama__ollama.md": {
   "decision": "block",
   "patterns": [
-   "GLS-GHSA-PI-202",
-   "GLS-SC-003"
+   "GLS-GHSA-PI-202"
   ]
  },
  "openai__openai-python.md": {
@@ -176,7 +154,6 @@
   "decision": "block",
   "patterns": [
    "GLS-MCP-004",
-   "GLS-MCP-017",
    "GLS-SEM-TOOL-218"
   ]
  },
@@ -198,8 +175,6 @@
    "GLS-DFP-073",
    "GLS-DN-578",
    "GLS-PIEMN-001",
-   "GLS-SC-003",
-   "GLS-SC-016",
    "GLS-SCAP-003",
    "GLS-SCAP-005",
    "GLS-SD-001",

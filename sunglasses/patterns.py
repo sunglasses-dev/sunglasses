@@ -1078,7 +1078,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
+        "regex": [r'(?:(?i:\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?)curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
         "description": "Downloading remote code and executing it — classic RAT dropper behavior."
     },
     {
@@ -2497,7 +2497,7 @@ PATTERNS = [
             "script download",
         ],
         "regex": [
-            r"(?i)(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|dropbox\.com/s/|drive\.google\.com|mega\.nz|mediafire\.com).{0,120}(?:\.exe|\.sh|\.ps1|\.bat|curl|wget|Invoke-WebRequest)",
+            r"(?i)(?<![\w.-])(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|dropbox\.com/s/|drive\.google\.com|mega\.nz|mediafire\.com)(?![\w-]).{0,120}(?:\.exe|\.sh|\.ps1|\.bat|curl|wget|Invoke-WebRequest)",
         ],
         "description": "Detects suspicious download URLs from shorteners or file hosting in skill manifests."
     },
@@ -18510,7 +18510,7 @@ PATTERNS = [
             "model",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|suppress|hide|omit|redact|read|paste|include|forward|send|share|attach))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
+            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|\b(?:suppress|hide|omit|redact)\b))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
