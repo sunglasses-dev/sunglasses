@@ -5,12 +5,6 @@
    "GLS-DFP-018"
   ]
  },
- "browser-use__browser-use.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-045"
-  ]
- },
  "crewAIInc__crewAI.md": {
   "decision": "block",
   "patterns": [
@@ -25,12 +19,6 @@
    "GLS-DFP-005"
   ]
  },
- "gitleaks__gitleaks.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-DFP-094"
-  ]
- },
  "langgenius__dify.md": {
   "decision": "block",
   "patterns": [
@@ -43,12 +31,6 @@
   "decision": "block",
   "patterns": [
    "GLS-MCP-016"
-  ]
- },
- "ollama__ollama.md": {
-  "decision": "block",
-  "patterns": [
-   "GLS-GHSA-PI-202"
   ]
  },
  "openai__openai-python.md": {
@@ -89,7 +71,6 @@
   "decision": "block",
   "patterns": [
    "GLS-DFP-043",
-   "GLS-DFP-094",
    "GLS-EP-001",
    "GLS-SMP-002"
   ]
@@ -109,12 +90,6 @@
    "GLS-SD-001",
    "GLS-SD-003",
    "GLS-TOP-638"
-  ]
- },
- "vuejs__vue.md": {
-  "decision": "quarantine",
-  "patterns": [
-   "GLS-DN-001"
   ]
  }
 }
