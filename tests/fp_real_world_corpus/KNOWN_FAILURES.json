@@ -2,11 +2,7 @@
  "axios__axios.md": {
   "decision": "block",
   "patterns": [
-   "GLS-DFP-018",
-   "GLS-DFP-075",
-   "GLS-DFP-089",
-   "GLS-DFP-121",
-   "GLS-DN-578"
+   "GLS-DFP-018"
   ]
  },
  "browser-use__browser-use.md": {
@@ -107,7 +103,6 @@
    "GLS-DFP-041",
    "GLS-DFP-069",
    "GLS-DFP-073",
-   "GLS-DN-578",
    "GLS-PIEMN-001",
    "GLS-SCAP-003",
    "GLS-SCAP-005",
