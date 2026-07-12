@@ -26,7 +26,6 @@
    "GLS-APIP-009",
    "GLS-AW-003",
    "GLS-DFP-018",
-   "GLS-DFP-059",
    "GLS-DFP-075",
    "GLS-DFP-089",
    "GLS-DFP-121",
@@ -52,7 +51,6 @@
   "patterns": [
    "GLS-DFP-008",
    "GLS-DFP-040",
-   "GLS-DFP-059",
    "GLS-MCP-017"
   ]
  },
@@ -73,7 +71,6 @@
  "fastapi__fastapi.md": {
   "decision": "block",
   "patterns": [
-   "GLS-DFP-059",
    "GLS-EX-008",
    "GLS-SEM-UI-219"
   ]
@@ -149,7 +146,6 @@
    "GLS-DFP-005",
    "GLS-DFP-031",
    "GLS-DFP-043",
-   "GLS-DFP-059",
    "GLS-DFP-074",
    "GLS-IDP-017",
    "GLS-SCAP-003",
@@ -204,7 +200,6 @@
   "patterns": [
    "GLS-AW-004",
    "GLS-DFP-043",
-   "GLS-DFP-059",
    "GLS-DFP-094",
    "GLS-EP-001",
    "GLS-SMP-002"

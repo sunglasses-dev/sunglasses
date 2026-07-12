@@ -21257,7 +21257,12 @@ PATTERNS = [
         "regex": [
             r"""(?six)^
 (?!.*(?:\b(?:security\s+(?:training|guide|reference)|scanner\s+docs?|defensive\s+example|incident\s+report|quoted\s+attack|do\s+not\s+(?:obey|follow|trust|treat|use|save|persist|store|write)|does\s+not\s+(?:obey|follow|trust|treat|use|override|instruct)|never\s+(?:obey|trust|treat|use|override|forward|include)|must\s+not\s+(?:obey|trust|treat|use|override|forward|include)|should\s+(?:report|detect|flag|refuse|block|not\s+\w+|never\b)|must\s+be\s+reported|not\s+obeyed).{0,180}?\b(?:api\s+(?:portal|catalog|reference|docs?|documentation)|developer\s+portal|stoplight|readme(?:\.com)?|redocly|endpoint\s+catalog)\b|\b(?:api\s+(?:portal|catalog|reference|docs?|documentation)|developer\s+portal|stoplight|readme(?:\.com)?|redocly|endpoint\s+catalog)\b.{0,180}?\b(?:do\s+not|does\s+not|never|should\s+never|must\s+not)\b.{0,80}?\b(?:override|suppress|forward|include|obey|treat)\b))
-(?=.*(?:\b(?:stoplight|readme(?:\.com)?|redocly|api\s+(?:portal|catalog|reference|documentation|docs)|developer\s+portal|generated\s+api\s+(?:docs|reference)|reference\s+page|operation\s+reference|endpoint\s+catalog|externalDocs|api\s+styleguide|docs\s+portal)\b|(?<!\w)"(?:description|summary|externalDocs|markdown|docs|x-agent-policy|scanner_policy|agent_instructions|assistant_note)"\s*:))
+# Carrier anchor (Jul-11, FP sprint): portal vocab accepted bare 'readme'
+# and 'api reference|documentation|docs' — words every API-client README
+# contains (axios, fastapi, openai-python; 5/43 famous-README FPs). Portal
+# carrier = portal PRODUCTS (stoplight/readme.com/redocly), portal metadata
+# fields, or explicit portal/catalog phrases — not generic docs words.
+(?=.*(?:\b(?:stoplight|readme\.com|redocly|api\s+(?:portal|catalog)|developer\s+portal|generated\s+api\s+(?:docs|reference)|operation\s+reference|endpoint\s+catalog|externalDocs|api\s+styleguide|docs\s+portal)\b|(?<!\w)"(?:description|summary|externalDocs|markdown|docs|x-agent-policy|scanner_policy|agent_instructions|assistant_note)"\s*:))
 (?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|api\s+agents?|llm\s+agents?|assistants?|coding\s+agents?|security\s+scanners?|api\s+scanners?|scanners?|mcp\s+(?:bridge\s+)?builders?|tool\s+builders?|automated\s+(?:api\s+)?(?:review|audit|verification)|agents?|reviewers?)(?![A-Za-z0-9])|(?=.*(?<![A-Za-z0-9])(?:agent_instructions?|scanner_policy|assistant_note|agent\s+instructions?|scanner\s+instructions?)(?![A-Za-z0-9])))
 (?=.*(?:
   (?:overrides?|supersed(?:e|es|ed|ing)|takes?\s+precedence|outranks?|overrules?).{0,80}?(?:system|developer|scanner|security|local).{0,40}?(?:rules?|polic(?:y|ies)|instructions?)
