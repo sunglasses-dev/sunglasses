@@ -259,6 +259,39 @@ class SunglassesEngine:
     NEGATION_WINDOW = 50  # characters before the match to search for negation
     _QUOTE_CHARS = "\"'`“”‘’«»"  # straight + smart + guillemets
 
+    # DEFENSIVE FRAMING — applies to MECHANISM findings only.
+    #
+    # A mechanism matches attack SHAPE, which means it also matches a sentence
+    # DESCRIBING that shape: "This scanner detects attempts to exfiltrate API
+    # keys to an external server" has every structural half of an exfil payload
+    # and is a security tool's README. That sentence class is our single largest
+    # false-positive risk (see the Jul-10 famous-README war) and it is exactly
+    # what our OWN README is made of — the mirror test.
+    #
+    # Carrier patterns do not need this: they match a specific known phrasing, so
+    # documentation quoting that phrasing is caught by the existing negation and
+    # framing-label logic. Mechanisms generalize, so they need the generalized
+    # guard.
+    #
+    # It DOWNGRADES to `review`; it does not discard. And the residual evasion
+    # (an attacker prefixing "our scanner detects" to a novel payload) is bounded
+    # on both sides: any KNOWN payload still trips a carrier and blocks outright,
+    # and the downgraded mechanism finding is still surfaced to the caller rather
+    # than dropped. Silently blessing this prose was never an option; blocking it
+    # is how a scanner gets uninstalled.
+    DEFENSIVE_FRAMING = [
+        "detect", "detects", "detecting", "detection",
+        "scan for", "scans for", "scanning for",
+        "protect against", "protects against", "protection against",
+        "defend against", "defends against",
+        "block", "blocks", "prevent", "prevents",
+        "flag", "flags", "catch", "catches", "identifies",
+        "attempts to", "attempt to", "tries to",
+        "attackers", "adversaries", "malicious actors", "threat actors",
+        "vulnerability", "vulnerabilities", "exploit", "cve-",
+    ]
+    DEFENSIVE_WINDOW = 120  # wider than negation: the framing verb leads the clause
+
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
                  mechanisms: bool = True):
         carriers = patterns or PATTERNS
@@ -369,6 +402,24 @@ class SunglassesEngine:
             if pos != -1 and self._is_illustrative(before_text[pos + len(phrase):]):
                 return True
         return False
+
+    def _is_defensively_framed(self, text: str, match_start: int) -> bool:
+        """True if a MECHANISM match sits inside a clause that is describing the
+        attack rather than performing it ("this scanner detects attempts to ...").
+
+        Scoped to the CURRENT SENTENCE: the framing must lead the same clause the
+        payload sits in. Without that bound, one "detects" in an intro paragraph
+        would defuse every payload in the rest of the document, which is an
+        evasion, not a guard.
+        """
+        window_start = max(0, match_start - self.DEFENSIVE_WINDOW)
+        before = text[window_start:match_start].lower()
+        # Cut at the last sentence boundary — only same-sentence framing counts.
+        for stop in (". ", "! ", "? ", "\n"):
+            idx = before.rfind(stop)
+            if idx != -1:
+                before = before[idx + len(stop):]
+        return any(p in before for p in self.DEFENSIVE_FRAMING)
 
     def _is_illustrative(self, gap: str) -> bool:
         """A framing label defuses a payload only if the text between the label
@@ -483,6 +534,13 @@ class SunglassesEngine:
                     if not pattern.get("negation_immune") and self._check_negation(text, match.start()):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                    elif pattern["id"].startswith("GLS-MECH-") and \
+                            self._is_defensively_framed(text, match.start()):
+                        # Shape rules also match prose that DESCRIBES the shape.
+                        # Downgrade, don't discard — see DEFENSIVE_FRAMING.
+                        finding["severity"] = "review"
+                        finding["defensive_context"] = True
                         finding["original_severity"] = pattern["severity"]
                     findings.append(finding)
                     break
