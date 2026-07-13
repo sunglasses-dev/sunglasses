@@ -82,10 +82,21 @@ def normalize(text: str) -> str:
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
-    text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
-    text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
-    text = decode_hex_escapes(text)       # \x49 etc → chars
-    text = decode_base64_segments(text)   # Decode BEFORE leetspeak (leet corrupts b64)
+    # Iteratively unwrap LAYERED encodings — base64(base64(...)), base64(hex(...)),
+    # url(base64(...)) etc. Attackers nest encoders so a single decode pass leaves
+    # a still-encoded payload the matcher can't see. Loop until the text stops
+    # changing, capped at DECODE_MAX_PASSES so it stays bounded; clean text breaks
+    # after one pass (nothing decodes → no change), so this adds no cost to the
+    # common case. Base64 decode stays BEFORE leetspeak (leet corrupts b64).
+    DECODE_MAX_PASSES = 3
+    for _ in range(DECODE_MAX_PASSES):
+        before = text
+        text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
+        text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
+        text = decode_hex_escapes(text)       # \x49 etc → chars
+        text = decode_base64_segments(text)   # base64 blobs → decoded text
+        if text == before:
+            break
     text = decode_leetspeak(text)
     text = strip_delimiter_padding(text)  # Collapse spaced chars BEFORE whitespace collapse
     text = collapse_whitespace(text)
@@ -118,6 +129,15 @@ def normalize(text: str) -> str:
         if shape_variant != text:
             text = text + " " + shape_variant
     else:
+        # Long inputs: the REVERSE/shape enrichment historically caused
+        # pathological regex backtracking on big documents (Jun-9 2026 ReDoS), so
+        # those stay OFF here. ROT13 enrichment is safe and cheap though — it
+        # feeds only the linear keyword lane (the regex lane matches on RAW text,
+        # not this normalized copy), so a ROT13-encoded payload buried in a long
+        # document is still caught. Measured cost: ~tens of ms on a 200KB doc.
+        rot = decode_rot13(text)
+        if rot != text:
+            text = text + " " + rot
         text = text.lower()
     return text
 
@@ -208,10 +228,19 @@ def decode_base64_segments(text: str) -> str:
 
 
 def strip_delimiter_padding(text: str) -> str:
-    """Remove delimiter-based evasion (d.e.l.i.m.i.t.e.d or d-e-l-i-m or s p a c e d)."""
-    # Single char separated by dots, dashes, or underscores
+    """Remove delimiter-based evasion (d.e.l.i.m.i.t.e.d or d-e-l-i-m or s p a c e d).
+
+    Both collapse rules bottom out at THREE letters. They used to require 5
+    (dotted) / 4 (spaced), which left a hole: an attacker only had to split one
+    short word to break the phrase. "ignore a l l previous instructions"
+    normalized to "ignore a l l previous instructions" — the long words
+    collapsed, "a l l" survived, and no keyword phrase matched. Three is the
+    floor because a 2-letter group ("e.g", "P S", "U S") is overwhelmingly
+    ordinary prose, not evasion.
+    """
+    # Single char separated by dots, dashes, or underscores (3+ letters)
     text = re.sub(
-        r'\b([a-zA-Z])[.\-_]([a-zA-Z])[.\-_]([a-zA-Z])([.\-_][a-zA-Z]){2,}\b',
+        r'\b([a-zA-Z])[.\-_]([a-zA-Z])([.\-_][a-zA-Z])+\b',
         lambda m: m.group(0).replace('.', '').replace('-', '').replace('_', ''),
         text
     )
@@ -230,7 +259,7 @@ def strip_delimiter_padding(text: str) -> str:
         else:
             # Collapse "i g n o r e" within each word-group
             collapsed = re.sub(
-                r'(?<!\w)([a-zA-Z] ){3,}[a-zA-Z](?!\w)',
+                r'(?<!\w)([a-zA-Z] ){2,}[a-zA-Z](?!\w)',
                 _collapse_spaced_word,
                 part
             )

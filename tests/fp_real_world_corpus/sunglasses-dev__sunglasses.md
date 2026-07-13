@@ -148,43 +148,20 @@ result = scanner.scan_auto("any_file.ext")
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Internal recall (attack-db fixture set) | 64/64 — 100% recall |
-| pytest (unit tests shipped in repo) | 444 passing (+7 xfailed) |
+| pytest (unit tests shipped in repo) | 393 passing (+7 xfailed) |
 | False-positive rate | 0 on the clean-code regression corpus (was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release) |
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-_All performance numbers verified against `stats/current.json` (v0.3.1, updated Jul 12, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
-
-## Benchmark — the receipts
-
-Most scanners publish a pattern count. We publish precision and recall, with the command to reproduce them:
-
-```bash
-git clone https://github.com/sunglasses-dev/sunglasses && cd sunglasses
-python3 tests/benchmark/precision_recall.py
-```
-
-Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 73 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge — same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block.
-
-| Metric (v0.3.1) | Value |
-|--------|-------|
-| Precision | 78.7% |
-| Recall | 97.4% (37/38) |
-| F1 | 0.871 |
-| Known-shape attacks | 30/30 caught |
-| Novel-semantic attacks (paraphrases the pattern DB has never seen) | 7/8 caught |
-| False positives added by the v0.3.1 mechanism layer | 0 |
-
-**The known gap, stated out loud:** the one miss is `curl … | bash`. Five of the 73 clean READMEs (deno, ollama, grype) ship that exact install line — no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 5 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
+_All performance numbers verified against `stats/current.json` (v0.3.0, updated Jul 11, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
 ## 23 Languages
 
 English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-## What Works Today (v0.3.1)
+## What Works Today (v0.3.0)
 
 - ✅ Text scanning: 1089 patterns, 7,648 keywords, 23 languages, 65 attack categories
-- ✅ Mechanism layer: 11 shape-based rules that catch the attack's structure (e.g. *something sensitive + somewhere to send it*), so paraphrases the pattern database has never seen still get caught
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
