@@ -21,6 +21,7 @@ try:
 except ImportError:
     HAS_AHOCORASICK = False
 
+from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import normalize
 
@@ -258,8 +259,17 @@ class SunglassesEngine:
     NEGATION_WINDOW = 50  # characters before the match to search for negation
     _QUOTE_CHARS = "\"'`“”‘’«»"  # straight + smart + guillemets
 
-    def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None):
-        self._patterns = patterns or PATTERNS
+    def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
+                 mechanisms: bool = True):
+        carriers = patterns or PATTERNS
+        # The mechanism layer (mechanisms.py) matches attack SHAPE rather than
+        # wording, and covers the paraphrases the carrier list structurally
+        # cannot. It is counted SEPARATELY from `patterns`: the carrier count is
+        # a published number (version.json, the site, the update check), and the
+        # two layers are different kinds of thing. Conflating them would both
+        # trip the version check and overstate the pattern database.
+        self._mechanisms = list(MECHANISM_PATTERNS) if mechanisms else []
+        self._patterns = list(carriers) + self._mechanisms
         if extra_patterns:
             self._patterns = self._patterns + extra_patterns
 
@@ -301,7 +311,10 @@ class SunglassesEngine:
                 self._automaton.add_word(kw_lower, kw_lower)
             self._automaton.make_automaton()
 
-        self._pattern_count = len(self._patterns)
+        # Carrier patterns only — this is the number published in version.json and
+        # checked against the live site. Mechanisms are reported on their own line.
+        self._pattern_count = len(carriers)
+        self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
 
     @staticmethod
@@ -366,6 +379,10 @@ class SunglassesEngine:
     @property
     def pattern_count(self) -> int:
         return self._pattern_count
+
+    @property
+    def mechanism_count(self) -> int:
+        return self._mechanism_count
 
     @property
     def keyword_count(self) -> int:
@@ -470,6 +487,35 @@ class SunglassesEngine:
                     findings.append(finding)
                     break
 
+        # Step 3b: Mechanisms are a FALLBACK layer, not a second opinion.
+        # A mechanism rule earns its keep by catching what the carrier list
+        # structurally cannot (paraphrases). When a carrier of the same category
+        # already fired at equal-or-greater severity, the mechanism is reporting
+        # the same attack a second time: it adds no detection, only a duplicate
+        # finding and a second false positive on any document the carrier already
+        # misfires on. Drop it.
+        #
+        # Note this cannot be used as an evasion. Suppression requires a carrier
+        # to have ALREADY matched at >= the mechanism's severity — i.e. the input
+        # is already caught. There is no input an attacker can craft where adding
+        # a carrier match makes them safer.
+        mech_findings = [f for f in findings if f["id"].startswith("GLS-MECH-")]
+        if mech_findings:
+            carrier_max = {}
+            for f in findings:
+                if f["id"].startswith("GLS-MECH-"):
+                    continue
+                rank = self.SEVERITY_ORDER.get(f["severity"], 0)
+                cat = f["category"]
+                if rank > carrier_max.get(cat, -1):
+                    carrier_max[cat] = rank
+            findings = [
+                f for f in findings
+                if not f["id"].startswith("GLS-MECH-")
+                or carrier_max.get(f["category"], -1)
+                < self.SEVERITY_ORDER.get(f["severity"], 0)
+            ]
+
         # Step 4: Determine decision based on worst finding severity
         if not findings:
             decision = "allow"
@@ -502,6 +548,7 @@ class SunglassesEngine:
         return {
             "version": __import__('sunglasses').__version__,
             "patterns": self._pattern_count,
+            "mechanisms": self._mechanism_count,
             "keywords": self._keyword_count,
             "regex_patterns": len(self._regex_patterns),
             "channels": ["message", "file", "api_response", "web_content", "log_memory"],
