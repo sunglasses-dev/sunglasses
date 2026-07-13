@@ -228,10 +228,19 @@ def decode_base64_segments(text: str) -> str:
 
 
 def strip_delimiter_padding(text: str) -> str:
-    """Remove delimiter-based evasion (d.e.l.i.m.i.t.e.d or d-e-l-i-m or s p a c e d)."""
-    # Single char separated by dots, dashes, or underscores
+    """Remove delimiter-based evasion (d.e.l.i.m.i.t.e.d or d-e-l-i-m or s p a c e d).
+
+    Both collapse rules bottom out at THREE letters. They used to require 5
+    (dotted) / 4 (spaced), which left a hole: an attacker only had to split one
+    short word to break the phrase. "ignore a l l previous instructions"
+    normalized to "ignore a l l previous instructions" — the long words
+    collapsed, "a l l" survived, and no keyword phrase matched. Three is the
+    floor because a 2-letter group ("e.g", "P S", "U S") is overwhelmingly
+    ordinary prose, not evasion.
+    """
+    # Single char separated by dots, dashes, or underscores (3+ letters)
     text = re.sub(
-        r'\b([a-zA-Z])[.\-_]([a-zA-Z])[.\-_]([a-zA-Z])([.\-_][a-zA-Z]){2,}\b',
+        r'\b([a-zA-Z])[.\-_]([a-zA-Z])([.\-_][a-zA-Z])+\b',
         lambda m: m.group(0).replace('.', '').replace('-', '').replace('_', ''),
         text
     )
@@ -250,7 +259,7 @@ def strip_delimiter_padding(text: str) -> str:
         else:
             # Collapse "i g n o r e" within each word-group
             collapsed = re.sub(
-                r'(?<!\w)([a-zA-Z] ){3,}[a-zA-Z](?!\w)',
+                r'(?<!\w)([a-zA-Z] ){2,}[a-zA-Z](?!\w)',
                 _collapse_spaced_word,
                 part
             )
