@@ -55,15 +55,33 @@ def run():
     positives = load_positives()
     negatives = load_negatives()
 
+    # Segment by KIND, because the aggregate recall hides the only number a
+    # reader actually needs. "Novel-semantic" attacks — paraphrases of an intent
+    # no rule has seen, carrying no shape any static rule can key on — are the
+    # documented limit of static input scanning, ours and everyone's. Reporting
+    # 79% flat invites the reader to assume the misses are spread evenly. They
+    # are not: they are entirely in that one segment, and saying so is the whole
+    # point of publishing a benchmark instead of a marketing number.
+    KNOWN_SHAPE = {"canonical", "paraphrase", "obfuscated", "obfuscated_hardening"}
+
     tp = fn = 0
     misses = []
+    seg = {}
     for a in positives:
         decision = engine.scan(a["text"], a.get("channel", "message")).decision
+        kind = a.get("kind", "unspecified")
+        bucket = "known_shape" if kind in KNOWN_SHAPE else "novel_semantic"
+        s = seg.setdefault(bucket, {"total": 0, "caught": 0})
+        s["total"] += 1
         if decision in CAUGHT:
             tp += 1
+            s["caught"] += 1
         else:
             fn += 1
-            misses.append({"id": a["id"], "category": a["category"], "decision": decision})
+            misses.append({"id": a["id"], "category": a["category"],
+                           "kind": kind, "decision": decision})
+    for s in seg.values():
+        s["recall"] = round(s["caught"] / s["total"], 4) if s["total"] else 0.0
 
     fp = tn = 0
     false_positives = []
@@ -90,6 +108,7 @@ def run():
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "f1": round(f1, 4),
+        "recall_by_segment": seg,
     }
     # Determinism receipt: SHA-256 over the canonicalized metrics.
     metrics["sha256"] = hashlib.sha256(
@@ -113,6 +132,17 @@ def main():
     print(f"  precision : {m['precision']*100:5.1f}%")
     print(f"  recall    : {m['recall']*100:5.1f}%")
     print(f"  F1        : {m['f1']:.3f}")
+    seg = m.get("recall_by_segment", {})
+    if seg:
+        print(f"  {'-' * 46}")
+        print("  recall by segment (the number that matters):")
+        for label, key in (("known-shape  ", "known_shape"),
+                           ("novel-semantic", "novel_semantic")):
+            s = seg.get(key)
+            if s:
+                print(f"    {label} : {s['recall']*100:5.1f}%  "
+                      f"({s['caught']}/{s['total']})")
+    print(f"  {'-' * 46}")
     print(f"  sha256    : {m['sha256'][:16]}…  (reproducible)")
     if result["misses"]:
         print(f"\n  missed ({len(result['misses'])}): "
