@@ -121,4 +121,8 @@ def test_long_document_scan_stays_fast():
     t0 = time.perf_counter()
     engine.scan(big, "file")
     elapsed = time.perf_counter() - t0
-    assert elapsed < 6.0, f"100KB scan took {elapsed:.1f}s (perf regression / ReDoS risk)"
+    # Ceiling sized for shared CI runners: ~3.8s local (M-series, measured
+    # identical on v0.3.0 and v0.3.1) x 2-2.5x runner slowdown = 7.5-9.5s
+    # expected there; 6.0 flaked at 8.5s on a slow runner (Jul-14). The Jun-9
+    # ReDoS blow-up this guards against was MINUTES, so 15s still catches it.
+    assert elapsed < 15.0, f"100KB scan took {elapsed:.1f}s (perf regression / ReDoS risk)"
