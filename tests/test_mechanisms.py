@@ -286,12 +286,18 @@ def test_mechanisms_are_counted_separately_from_carriers():
 
     Mechanisms are a different kind of thing and must not inflate it.
     """
+    # Jul-16 2026: was a hardcoded 1089 — froze the count and broke CI on the
+    # v0.3.2 ship (1089→1098). Derive both sides so the invariant (mechanisms
+    # are never folded into the carrier count) survives every future ship.
+    from sunglasses.mechanisms import MECHANISM_PATTERNS
+    from sunglasses.patterns import PATTERNS as CARRIERS
+
     info = engine.info()
-    assert info["patterns"] == 1089, (
-        f"carrier count drifted to {info['patterns']} — the published number is "
-        f"1089; mechanisms must not be folded into it"
+    assert info["patterns"] == len(CARRIERS), (
+        f"carrier count {info['patterns']} != len(PATTERNS) {len(CARRIERS)} — "
+        f"mechanisms must not be folded into the published number"
     )
-    assert info["mechanisms"] == 11
+    assert info["mechanisms"] == len(MECHANISM_PATTERNS)
 
 
 def test_mechanisms_can_be_disabled():
