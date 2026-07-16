@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.2] — 2026-07-16
+
+### Added
+- 9 new discovery-file-poisoning patterns (GLS-DFP-139 through GLS-DFP-147) — patterns: 1,089 → 1,098 (+9), categories unchanged at 65.
+
+### Context
+- Day-5 of the 10-day DFP restart. Paired with the "Wallet & Web3 Signing Part 4" blog covering wallet signing prompt injection, WalletConnect metadata poisoning, SIWE/CAIP-122 challenge poisoning, transaction-simulation preview poisoning, and account-abstraction paymaster reputation poisoning.
+
 ## [0.3.1] — 2026-07-12
 
 ### "Receipts" release — the mechanism layer + a reproducible benchmark

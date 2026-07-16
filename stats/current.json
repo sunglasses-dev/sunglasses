@@ -1,6 +1,6 @@
 {
-  "version": "0.3.1",
-  "patterns": 1089,
+  "version": "0.3.2",
+  "patterns": 1098,
   "keywords": 7648,
   "categories": 65,
   "languages": 23,
@@ -17,8 +17,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-07-12T21:35:00-07:00",
-  "last_updated_by": "v0.3.1-ship",
+  "last_updated": "2026-07-16T04:17:03-07:00",
+  "last_updated_by": "sunglasses-publish-sh",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-07-12"
+  "released": "2026-07-16"
 }
