@@ -23487,4 +23487,132 @@ PATTERNS = [
         ],
         "description": "Wallet Deeplink Decoder Prompt Reassembly: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 reassembly of fragmented/encoded deep-link parameters during wallet signing flows."
     },
+    # === v0.3.2 batch (9 patterns) ===
+    {
+        "id": "GLS-DFP-146",
+        "name": "Account-abstraction paymaster / bundler reputation poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:
+  (?:do\s+not|does\s+not|must\s+not)\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\b.{0,100}?\b(?:erc[-\s]?4337|eip[-\s]?4337|user\s*operation|userop|paymaster|bundler|entrypoint|sponsored\s+gas|gas\s+sponsor|account\s+abstraction)\b|
+  never\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\b.{0,100}?\b(?:erc[-\s]?4337|eip[-\s]?4337|user\s*operation|userop|paymaster|bundler|entrypoint|sponsored\s+gas|gas\s+sponsor|account\s+abstraction)\b|
+  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook|support\s+article)\b.{0,100}?\b(?:should|must)\s+(?:report|detect|flag|refuse|block|warn|reject)\b.{0,140}?\b(?:safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|validation|failures?|risk)|ignore\s+(?:[\w-]+\s+){0,3}(?:paymaster|bundler|reputation|validation|allowance)|proceed\s+without\s+(?:user\s+|human\s+)?confirmation|include\s+(?:[\w-]+\s+){0,4}(?:session|token|cookie|env|api\s*key))|
+  (?:incident|postmortem|security\s+report)\b.{0,160}?(?:(?:blocked|detected|flagged|refused|warned|rejected)\b.{0,160}?\b(?:agent\s+instruction|safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|validation|failures?|risk)|proceed\s+without\s+(?:user\s+|human\s+)?confirmation)|(?:agent\s+instruction|safe\s+to\s+sign|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|validation|failures?|risk)|proceed\s+without\s+(?:user\s+|human\s+)?confirmation)\b.{0,160}?\b(?:blocked|detected|flagged|refused|warned|rejected))
+))
+(?=.*(?<![a-zA-Z0-9])(?:erc[-\s]?4337|eip[-\s]?4337|user\s*operations?|userops?|userOperation|account\s+abstraction|smart\s+account|paymaster(?:AndData)?|bundlers?|entrypoint|simulateValidation|validationData|AA\d{2}|aggregator|sponsored\s+gas|gas\s+sponsor|sponsor(?:ed)?\s+(?:transaction|operation|userop)|paymaster\s+reputation|bundler\s+simulation|aa[_-]?(?:preview|simulation|policy))(?![a-zA-Z0-9]))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|wallet\s+agents?|browser\s+assistants?|security\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent|sponsor[_-]?note|bundler[_-]?note)(?![a-zA-Z0-9]))
+(?=.*\b(?:sign(?:ature|ing)?|approve|approval|authorization|confirm(?:ation)?|warning|warnings|validation\s+(?:failure|result|error)|validation_failed|revert(?:ed)?|allowance|spender|delegate|delegation|session\s+keys?|batch|swap|transfer|sponsor(?:ed)?|paymaster|bundler|reputation|risk|human\s+review|safe|token)\b)
+(?=.*\b(?:
+  (?:agent|assistant|model|wallet\s+agent|verifier|scanner)\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|
+  (?:authoritative|canonical|primary|single)\s+(?:wallet\s+|paymaster\s+|bundler\s+|sponsor\s+)?(?:source\s+of\s+truth|policy|guidance|instruction|reputation)|
+  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\s+precedence\s+over|ignore|disregard)\b.{0,100}?\b(?:wallet|system|developer|security|warning|confirmation|approval|validation|paymaster|bundler|reputation)\b|
+  safe\s+to\s+sign|mark\s+(?:it|this|operation|userop|user\s*operation|transaction|approval).{0,50}?\bas\s+safe|treat.{0,70}?as\s+(?:safe|verified|read[-\s]?only|informational|pre[-\s]?approved|sponsored)|
+  (?:do\s+not|not)\s+(?:warn|report|ask|prompt|escalate)|skip\s+(?:the\s+)?(?:warning|confirmation|review|human\s+review)|proceed\s+without\s+(?:extra\s+|user\s+|human\s+)?(?:review|confirmation)|
+  suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|validation|failures?|allowance|risk|reputation)|hide\s+(?:[\w-]+\s+){0,3}(?:warnings?|findings?|reports?|validation|failures?|allowance|risk|reputation)|ignore\s+(?:[\w-]+\s+){0,3}(?:paymaster|bundler|reputation|validation|failure|allowance|spender|delegate|session|risk|warning)|
+  (?:include|forward|send|attach|provide|copy|read|collect)\s+(?:[\w-]+\s+){0,4}(?:session\s+tokens?|wallet\s+state|local\s+state|environment\s+(?:variables?|context)|cookies?|api\s*keys?|authorization\s+headers?)
+)\b)""",
+        ],
+        "description": "Account-abstraction paymaster / bundler reputation poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new vector for Web3/ERC-4337 account abstraction metadata and reputation fields."
+    },
+    {
+        "id": "GLS-DFP-147",
+        "name": "Card: Outbox Handoff Suppression",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:mark|ship|publish|close|deliver|write|final(?:ize)?|complete)\b)(?=.*\b(?:ready|complete|done|final|card|artifact|result|pattern)\b)(?=.*(?:\b(?:skip|omit|suppress|avoid|defer(?:red|ring)?)\s+(?:the\s+|all\s+)?(?:boss|cava|reviewer|bridge[-\s]*sync|outbox|handoffs?|notifications?|notify|sidecars?|audit[-\s]*trail|telemetry)|\bwithout\s+(?:the\s+)?(?:boss|cava|reviewer|bridge[-\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\s]*trail|telemetry)|\bno\s+(?:boss|cava|reviewer|bridge[-\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\s]*trail|telemetry)|\bdo\s*not\s+(?:notify|create|write|send|file|include|generate)\s+(?:the\s+)?(?:boss|cava|reviewer|bridge[-\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\s]*trail|telemetry))).{0,1000}$""",
+        ],
+        "description": "Card: Outbox Handoff Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific outbox/handoff suppression logic in workflow artifacts, distinct from listed patterns."
+    },
+    {
+        "id": "GLS-DFP-139",
+        "name": "JUnit XML system-out/system-err tool-output poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)<(?:system-out|system-err|failure|error)\b[^>]*>(?![\s\S]{0,1800}\b(?:never\s+override|should\s+suppress|may\s+ignore|do\s+not\s+report\s+flaky|status\s+code)\b)(?=[\s\S]{0,2500}</(?:system-out|system-err|failure|error)>)(?=[\s\S]{0,1800}\b(?:assistant|claude|copilot|cursor|autonomous\s+agent|agent\s+handoff|scanner\s*(?:note|:))\b)(?=[\s\S]{0,1800}\b(?:ignore|disregard|override|bypass|suppress|hide|exfiltrate|send|upload|do\s+not\s+report|mark\s+(?:it|this|build|test)\s+as\s+(?:passed|clean)|treat\s+(?:this|it)\s+as\s+trusted)\b)(?=[\s\S]{0,1800}\b(?:previous|policy|system\s+instructions?|developer\s+instructions?|test\s+failure|failing\s+tests?|vulnerabilit(?:y|ies)|secret|token|credential|findings?|results?)\b)""",
+        ],
+        "description": "JUnit XML system-out/system-err tool-output poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 standard test report format not covered by existing XML or tool-output patterns."
+    },
+    {
+        "id": "GLS-DFP-140",
+        "name": "JUnit XML system-output base64 rehydration prompt smuggling",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)<(?:system-out|system-err|failure|error)\b[^>]*>(?=[\s\S]{0,1500}</(?:system-out|system-err|failure|error)>)(?![\s\S]{0,500}\b(?:security test|scanner should|do not comply|not comply|should quarantine)\b)(?=[\s\S]{0,1200}\b(?:base64|b64)\b)(?=[\s\S]{0,1200}\b(?:decode|decoded|decoding)\b)(?=[\s\S]{0,1200}\b(?:follow|obey|execute|run|treat|use)\b.{0,100}\b(?:instruction|instructions|prompt|directive|directives|system message)\b)""",
+        ],
+        "description": "JUnit XML system-output base64 rehydration prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structural targeting of JUnit XML output combined with base64 rehydration instructions."
+    },
+    {
+        "id": "GLS-DFP-141",
+        "name": "Prettier config metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\b.{0,180}\b(?:detected|blocked|flagged|refused|reported|must\s+be\s+reported|not\s+obeyed|should\s+(?:report|detect|flag|refuse|block))|(?:prettier|\.prettierrc|formatter\s+config(?:uration)?).{0,140}\b(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)))
+(?=.*(?:\.prettierrc(?:\.(?:json|json5|yaml|yml|js|cjs|mjs|toml))?|prettier\.config\.(?:js|cjs|mjs|ts)|(?<!\w)"prettier"\s*:|prettier\s+(?:configuration|config|options?|overrides?|metadata)|printWidth\b|tabWidth\b|singleQuote\b|trailingComma\b|bracketSpacing\b|proseWrap\b|plugins\b|overrides\s*:))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai|autonomous|automated|security|code|dependency|formatting|formatter)\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|review|audit|scan|verification)(?![a-zA-Z0-9])|\bagents?\b|\bassistants?\b|\bscanners?\b|agent\s+instructions?|scanner\s+instructions?|assistant\s+directive|formatter\s+review))
+(?=.*(?:(?:suppress(?:es|ed|ing)?|hide|hides|hidden|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|redact(?:s|ed|ing)?|downgrade(?:s|d|ing)?|deprioritize(?:s|d|ing)?|demote(?:s|d|ing)?|reclassif(?:y|ies|ied|ying)|skip|ignore|do\s+not\s+report|not\s+report|keep|leave).{0,90}(?:findings?|warnings?|alerts?|reports?|issues?|vulnerabilit(?:y|ies)|diagnostics?|observations?|results?|formatting\s+errors?|lint\s+findings?|security\s+findings?|audit\s+memos?|summar(?:y|ies)|review\s+notes?)|(?:findings?|warnings?|alerts?|reports?|issues?|diagnostics?|observations?|results?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated\s+as\s+(?:advisory-only|informational|non-blocking)|considered\s+(?:advisory-only|informational|non-blocking))|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\s+along|hand\s+off|relay|transfer).{0,110}(?:env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?|material|evidence|artifacts?)|local\s+(?:state|config(?:uration)?|settings?)|api\s+tokens?|tokens?|secrets?|authorization\s+headers?|session\s+(?:cookies?|tokens?)|credentials?)))
+.*""",
+        ],
+        "description": "Prettier config metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 common dev tool config not covered by existing lint/CI config patterns."
+    },
+    {
+        "id": "GLS-DFP-142",
+        "name": "Readme Encoded Source Archive Helper Lure",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)(?=.*\b(?:readme|security\.md|install(?:ation)?\s+(?:note|guide)|source[-\s]*tree|repository\s+(?:archive|bundle)|repo\s+(?:archive|bundle|reviewer)|download\s+badge|audit\s+bundle|scanner\s+setup|encoded\s+archive\s+link)\b)(?=.*\b(?:ai\s+(?:agent|scanner|reviewer|auditor)|security\s+scanner|repo\s+reviewer|automated\s+(?:review|audit)|model\s+auditor)\b)(?=.*(?:https?%3a%2f%2f|base64|encoded\s+(?:url|link|archive)|[\w./:%-]+\.(?:tar\.gz|tgz|tar\.xz|7z|rar|zip|iso|sh|ps1|exe)\b|source[-\s]*tree\s+(?:archive|bundle)))(?=.*\b(?:fetch|download|curl|open|decode|expand|extract|unpack|mount|launch|run|execute|bootstrap|initialize|start)\b)(?=.*\b(?:authoritative|canonical|trusted|preferred\s+runbook|suppress|hide|omit|do\s+not\s+report|skip\s+(?:audit|scan|warning)|no\s+need\s+to\s+(?:scan|warn|report)|mark\s+(?:clean|safe))\b)""",
+        ],
+        "description": "Readme Encoded Source Archive Helper Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 doc-based lures for fetching and executing malicious encoded archives."
+    },
+    {
+        "id": "GLS-DFP-143",
+        "name": "Stylelint config metadata poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\b.{0,180}\b(?:detected|blocked|flagged|refused|reported|\breport\b|must\s+be\s+reported|not\s+obeyed|should\s+(?:report|detect|flag|refuse|block))|(?:stylelint|\.stylelintrc|css\s+linter\s+config(?:uration)?|linter\s+config(?:uration)?).{0,140}\b(?:is|are)\s+not\s+(?:authoritative|policy|instructions?)|(?:do\s+not|does\s+not|never|must\s+not|should\s+not|should\s+never)\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)))
+(?=.*(?:\.stylelintrc(?:\.(?:json|json5|yaml|yml|js|cjs|mjs|toml))?|stylelint\.config\.(?:js|cjs|mjs|ts)|(?<!\w)"stylelint"\s*:|stylelint\s+(?:configuration|config|options?|rules?|metadata)|stylelint-config-[\w-]+|stylelint-order|customSyntax\b|ignoreFiles\b|extends\s*:|plugins\s*:|rules\s*:|overrides\s*:|color-no-invalid-hex|declaration-block-no-duplicate-properties))
+(?=.*(?:(?<![a-zA-Z0-9])(?:ai|autonomous|automated|security|code|dependency|frontend|css|style|lint|linter|accessibility)\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|review|audit|scan|verification)(?![a-zA-Z0-9])|\bagents?\b|\bassistants?\b|\bscanners?\b|agent\s+instructions?|scanner\s+(?:instructions?|notes?)|assistant\s+directive|css\s+review|style\s+review|linter\s+review))
+(?=.*(?:(?:suppress(?:es|ed|ing)?|hide|hides|hidden|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|redact(?:s|ed|ing)?|downgrade(?:s|d|ing)?|deprioritize(?:s|d|ing)?|demote(?:s|d|ing)?|reclassif(?:y|ies|ied|ying)|skip|ignore|do\s+not\s+report|not\s+report|keep|leave|route|move|place).{0,100}(?:findings?|warnings?|alerts?|reports?|issues?|vulnerabilit(?:y|ies)|diagnostics?|observations?|results?|css\s+(?:errors?|findings?|issues?)|style\s+(?:violations?|findings?)|lint\s+(?:findings?|diagnostics?|warnings?)|accessibility\s+(?:findings?|issues?)|security\s+findings?|audit\s+memos?|summar(?:y|ies)|review\s+notes?|appendix-only\s+notes?)|(?:findings?|warnings?|alerts?|reports?|issues?|diagnostics?|observations?|results?|css\s+findings?|style\s+violations?|lint\s+diagnostics?)\s+(?:are|is|should\s+be|must\s+be)\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|routed|moved|placed|treated\s+as\s+(?:advisory-only|informational|non-blocking)|considered\s+(?:advisory-only|informational|non-blocking))|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\s+along|hand\s+off|relay|transfer).{0,110}(?:env(?:ironment)?\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\s+(?:context|variables?|details?|config(?:uration)?|settings?|material|evidence|artifacts?)|local\s+(?:state|config(?:uration)?|settings?)|api\s+tokens?|tokens?|secrets?|authorization\s+headers?|session\s+(?:cookies?|tokens?)|credentials?)))
+.*""",
+        ],
+        "description": "Stylelint config metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 stylelint-specific filenames and keywords not covered by existing linter patterns."
+    },
+    {
+        "id": "GLS-DFP-144",
+        "name": "Wallet Payment Uri Parameter Shadowing",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|incident\s+report|defensive\s+docs?|security\s+training|unit\s+test|test\s+fixture|scanner\s+keywords\s+only|should\s+(?:detect|flag|block|reject)|must\s+(?:detect|flag|block|reject)|do\s+not\s+(?:trust|obey|decode|render)|never\s+(?:trust|obey|decode|render)|preserve\s+(?:warnings?|confirmation|provenance)|confirmation\s+required)\b)(?=.*(?:\bwallet\s+(?:uri|payment|qr|link|assistant|signing)|\bpayment\s+(?:uri|link|request|qr|memo|message)|\bcheckout\s+(?:uri|link|request)|\binvoice\s+(?:uri|link|request)|\b(?:ethereum|bitcoin):|\beip[- ]?681\b|\bqr\s+(?:payload|payment|code)\b))(?=.*(?:duplicate\s+(?:query\s+)?(?:param(?:eter)?|key|field)|repeated\s+(?:message|label|memo|note|param(?:eter)?)|shadow(?:ed|ing)?\s+(?:param(?:eter)?|key|field)|(?:param(?:eter)?|key|field)\s+shadow(?:ed|ing)?|duplicate\s+(?:agent(?:[_-]|\s+)?policy|assistant(?:[_-]|\s+)?notice|message|label|memo|note)\s+fields?|query\s+collision|second\s+(?:message|label|memo|note|value)|(?:message|label|memo|note|agent(?:[_-]|\s+)?policy|assistant(?:[_-]|\s+)?notice)\s*=.*(?:message|label|memo|note|agent(?:[_-]|\s+)?policy|assistant(?:[_-]|\s+)?notice)\s*=|homoglyph\s+(?:message|label|memo|parameter)|parameter\s+(?:precedence|override|collision)))(?=.*\b(?:wallet|sign(?:ing|ature)?|send\s+transaction|transfer|recipient|amount|spender|allowance|chain|session|auth|human\s+confirmation|confirmation)\b)(?=.*\b(?:approved|pre[-\s]?approved|review\s+passed|already\s+(?:reviewed|cleared|verified|approved)|trusted|agent\s*policy|assistant\s*notice|suppress\s+warnings?|hide\s+(?:risk|warning)|skip\s+confirmation|fast[-\s]?track|mark\s+(?:safe|trusted)|no\s+extra\s+(?:warning|confirmation))\b).*""",
+        ],
+        "description": "Wallet Payment Uri Parameter Shadowing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting blockchain payment URI parameter shadowing to hide risks."
+    },
+    {
+        "id": "GLS-DFP-145",
+        "name": "Wallet Visual Risk Badge Prompt Poisoning",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:no|without)\s+(?:wallet|signing|signature)\b)(?!.*\b(?:do\s+not|never|must\s+not|refuse|reject|block(?:ed|ing)?|cannot|can't|should\s+not)\b.{0,120}\b(?:badge|alt[-\s]*text|ocr|svg|screenshot|visual)\b.{0,120}\b(?:suppress|hide|skip|fast[-\s]*track|mark\s+safe|green[-\s]*path|approve)\b)(?!.*\b(?:scanner|runbook|policy|training|documentation|incident\s+report)\b.{0,180}\b(?:detect|flag|report|warn|block|reject(?:ed)?|refuse)\b)(?=.*\b(?:wallet|signing|signature|typed\s*data|eth_signtypeddata|personal_sign|siwe|spender|permission|transaction|session\s*auth|human\s+confirmation)\b)(?=.*\b(?:risk\s*badge|badge|alt[-\s]*text|aria[-\s]*label|svg\s*(?:title|desc|metadata)|ocr|screenshot|visual\s*(?:preview|receipt|overlay)|image[-\s]*only)\b)(?=.*\b(?:low\s*risk|risk\s*0|safe\s*to\s*sign|verified\s*safe|green[-\s]*path|approved\s*badge|trusted\s*badge|clear(?:ed)?\s*badge|routine\s*approval)\b)(?=.*\b(?:suppress\s+warnings?|hide\s+risk|skip\s+confirmation|do\s+not\s+ask|mark\s+safe|fast[-\s]*track|ignore\s+(?:spender|domain|nonce|mismatch)|approve\s+without\s+review|no\s+escalation)\b).{0,3000}$""",
+        ],
+        "description": "Wallet Visual Risk Badge Prompt Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 visual/OCR-based wallet risk indicators, distinct from repository status badges."
+    },
 ]
