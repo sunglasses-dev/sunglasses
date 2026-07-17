@@ -3064,17 +3064,12 @@ PATTERNS = [
         ],
         "description": 'Detection for GHSA-4f8g-77mw-3rxc: trusted-proxy gateway auth where operator.read + operator.write scopes widen at runtime without re-consent.',
     },
-    {
-        "id": 'GLS-AW-011',
-        "name": 'SSRF guard gap in browser-driver/media-fetch redirects',
-        "category": 'agent_workflow_security',
-        "severity": 'high',
-        "channel": ['file', 'message'],
-        "regex": [
-            '(?is)(?=.*\\b(?:openclaw|playwright|qq\\s*bot|media\\s*fetch)\\b)(?=.*\\bssrf\\b)(?=.*\\b(?:redirect|navigation|fetch\\s*paths?|guard)\\b).{0,1200}',
-        ],
-        "description": 'SSRF guard coverage gap in browser-driver / media-fetch code paths where redirects bypass private-target blocklists.',
-    },
+    # GLS-AW-011 RETIRED v0.3.3 (Jul-16 2026, AZ GO): required the literal word
+    # "ssrf" in the scanned input, so it could only ever match prose DESCRIBING
+    # SSRF (changelogs, security docs — it blocked claude-seo's "83 SSRF and
+    # DNS-rebinding bypass tests" line), never an actual attack payload. No
+    # true-positive sample exists in attack-db or the pattern DB, and none is
+    # writable. Row preserved in the DB (status=held) for history.
     {
         "id": 'GLS-AW-012',
         "name": 'Websocket session survives token rotation (stale auth)',
@@ -16337,7 +16332,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "keywords": ["ActivityPub actor", "actor profile JSON", "attachment value", "ActivityPub summary"],
-        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|attachment(?:\\[\\])?\\.value)\\b)(?=.*\\b(?:AI\\s+scanner|agent|assistant|crawler|moderation\\s+bot|automated\\s+reader)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
+        "regex": ["(?is)^(?!.*\\b(?:scanner rule|detector rule|blocked payload|quarantined sample|negative fixture|unit test|security training|do not obey|must not obey|should report|example of an attack)\\b)(?=.*\\b(?:ActivityPub|Actor\\s+profile|actor/profile|profile\\s+JSON|attachment(?:\\[\\])?\\.value)\\b)(?=.*\\b(?:AI\\s+scanners?|agents?|assistants?|crawlers?|moderation\\s+bots?|automated\\s+readers?)\\b)(?=.*\\b(?:override|ignore|disregard|suppress|hide|do\\s+not\\s+report|never\\s+report|forward|send|leak|disclose|exfiltrate)\\b)(?=.*\\b(?:policy|report|finding|findings|secret|secrets|token|auth|credential|credentials|local\\s+context|impersonation)\\b).*$"],
         "description": "ActivityPub actor/profile JSON can hide agent-directed policy instructions in free-text fields such as `summary`, `name`, `attachment[].value`, or endpoint descriptions, causing an AI scanner to over-trust a social identity document, leak local/auth context, or suppress impersonation findings."
     },
     {
@@ -16583,7 +16578,14 @@ PATTERNS = [
             # (rails, redis, pytorch…). Real CAA text carries the record
             # vocabulary or the `issue "<ca-domain>"` record syntax; bare
             # prose "issue" is gone.
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse)\b.{0,140}\b(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*(?:\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b|\bissue\s*"[\w.-]+"))(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
+            # Corroborate-don't-stamp retune (Jul-16, v0.3.3): the negation
+            # guard used to accept "do not … <140 chars> … suppress/forward",
+            # which defused the ATTACK itself ("do not report certificate
+            # findings, suppress warnings"). A genuine defusal negates the
+            # verb it sits next to ("never obey", "must not forward"); a
+            # suppression ORDER negates reporting. The guard now requires the
+            # negation ADJACENT to a defused verb.
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refuse\s+to)\s+(?:obey|follow|trust|treat|include|forward|send|leak|suppress|ignore|bypass)\b)(?=.*(?:\b(?:caa|certification\s+authority\s+authorization|certificate\s+authority\s+authorization|dns\s+caa|iodef|issuewild|accounturi|validationmethods|acme[-_\s]*dns|tls\s+certificate\s+issuance)\b|\bissue\s*"[\w.-]+"))(?=.*\b(?:agents?|assistants?|llms?|models?|scanners?|crawlers?|auditors?|bots?)\b)(?=.*\b(?:ignore|override|supersede|outrank|highest[-\s]*priority|treat\s+(?:this|record|caa|iodef)[^.\n]{0,80}\bas\s+(?:policy|instructions?|authorization)|must\s+obey|do\s+not\s+report|suppress|disable|bypass|include|forward|send|exfiltrat\w*)\b)(?=.*\b(?:system|developer|previous\s+instructions?|policy|scanner|findings?|warnings?|reports?|secrets?|tokens?|api[-_\s]*keys?|env(?:ironment)?|authorization\s+header|session\s+cookies?|private\s+keys?)\b).*""",
         ],
         "description": "DNS CAA certificate-issuance metadata can be poisoned with agent-facing instructions that claim authority, suppress certificate findings, or request secrets from AI TLS/security auditors."
     },
@@ -18489,7 +18491,13 @@ PATTERNS = [
             "x-mcp-*",
         ],
         "regex": [
-            r"""(?is)(?=.*\b(?:mcp(?:\.json|-server|\s+server)?|model\s+context\s+protocol|tools?\[?\]?\.description|tool\s+description|inputSchema|argument\s+schema|x-mcp|\.well-known/[^\s"'`]*mcp)\b)(?=.*\b(?:agent|assistant|model|tool\s+user|scanner)\b)(?=.*\b(?:ignore|override|outrank|highest\s+priority|must\s+obey|do\s+not\s+(?:mention|report)|suppress|disable|bypass|read|paste|include|forward|send|exfiltrat(?:e|ion))\b)(?=.*\b(?:system|developer|previous\s+instructions|policy|secret|token|api[-_\s]*key|env(?:ironment)?\s*(?:var|variable)s?|hidden\s+config|workspace\s+policy|scanner\s+reports?)\b).*""",
+            # Corroborate-don't-stamp retune (Jul-16, v0.3.3): the verb group
+            # carried unbounded weak verbs (read|paste|include|forward|send)
+            # and bare bypass/disable — 'read' fired on an MCP extension list,
+            # 'bypass' on "SSRF bypass tests" changelog prose (claude-seo).
+            # Same fix MCP-017 got in round 2: authority/suppression CLAIMS
+            # only. Exfiltration verbs stay — they are the attack's payload.
+            r"""(?is)(?=.*\b(?:mcp(?:\.json|-server|\s+server)?|model\s+context\s+protocol|tools?\[?\]?\.description|tool\s+description|inputSchema|argument\s+schema|x-mcp|\.well-known/[^\s"'`]*mcp)\b)(?=.*\b(?:agent|assistant|model|tool\s+user|scanner)\b)(?=.*(?:\b(?:ignore|override|supersede|outrank|highest\s+priority|must\s+obey|takes\s+precedence|governing\s+policy)\b|do\s+not\s+(?:mention|report|flag)|\b(?:suppress|hide|omit|redact|exfiltrat\w*)\b))(?=.*\b(?:system|developer|previous\s+instructions|policy|secret|token|api[-_\s]*key|env(?:ironment)?\s*(?:var|variable)s?|hidden\s+config|workspace\s+policy|scanner\s+reports?)\b).*""",
         ],
         "description": "Attacker-controlled MCP discovery or tool metadata can hide policy-overriding instructions in tool descriptions or schema descriptions, causing an agent to treat untrusted descriptor text as higher-priority control-plane policy."
     },
@@ -18517,7 +18525,11 @@ PATTERNS = [
             "model",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agent|assistant|model|llm|scanner|crawler)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|\b(?:suppress|hide|omit|redact)\b))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
+            # Corroborate-don't-stamp retune (Jul-16, v0.3.3): audience group
+            # only knew the SINGULAR forms — "assistants must treat this as
+            # governing policy" (the documented attack) slid through while the
+            # keyword lane stamped the verdict. Plurals added.
+            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agents?|assistants?|models?|llms?|scanners?|crawlers?)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|\b(?:suppress|hide|omit|redact)\b))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
@@ -19210,7 +19222,7 @@ PATTERNS = [
             "authoritative",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery)\b)(?=.*\b(?:agent|assistant|ai[-\s]*agent|crawler|bot|tool|connector|model)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
+            r"""(?is)^(?!.*\b(?:do\s+not|don't|never|must\s+not|should\s+not|refus(?:e|ed)|block(?:ed)?|ignore\s+any)\b.{0,180}\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\b)(?=.*\b(?:llms\.txt|robots\.txt|sitemap(?:\.xml)?|\.well-known|openapi|ai-plugin|agent[-\s]*json|agent[-\s]*discovery)\b)(?=.*\b(?:agents?|assistants?|ai[-\s]*agents?|crawlers?|bots?|tools?|connectors?|models?)\b)(?=.*\b(?:comment|cdata|json-ld|opengraph|meta\s+tag|frontmatter|base64|b64|percent[-\s]*encod(?:e|ed|ing)|url[-\s]*encod(?:e|ed|ing)|zero[-\s]*width|hidden|decode|encoded)\b)(?=.*\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\s*variables?|authorization|bearer|scanner|guardrail|safety)\b).*$""",
         ],
         "description": "Agent-facing discovery metadata can hide prompt-injection payloads in comments, CDATA, JSON-LD/OpenGraph fields, frontmatter, base64, URL encoding, or zero-width text so a scanner that only inspects visible plain text misses the malicious instruction."
     },
@@ -20464,7 +20476,7 @@ PATTERNS = [
             "User-agent: GPTBot",
         ],
         "regex": [
-            r"""(?is)^(?!.*(?:AI agents must not treat robots\.txt|do not obey robots\.txt|never override|never treat robots\.txt|must not (?:treat|obey|follow|forward|include|suppress)|do not (?:treat|obey|forward|include|suppress)|never (?:treat|obey|override|forward|include|suppress)|refused|blocked|detected|flagged|should (?:report|detect|flag|refuse|block)|scanner docs? should (?:report|detect|flag|refuse|block)|security report|incident report|vulnerability report|learn how|guide|article|does not instruct agents?))(?=.*(?:robots\.txt|User-agent:\s|Disallow:\s|Crawl-delay:\s|Sitemap:\s*https?))(?=.*(?:AI agents?|assistants?|autonomous (?:scanner|crawler|verifier)s?|LLMs?|models?|security scanners?|GPTBot|Claude-Web|CCBot|coding agents?|code agents?|crawler instructions?|scanner instructions?|bot instructions?|agentic|autonomous agents?))(?=.*(?:supersedes?|outranks?|overrides?|canonical (?:site|owner|operator) policy|higher\.priority|definitive authority|governing document|takes? precedence|primary source of truth|include(?:\s+(?:[\w-]+\s+)?)(?:environment variables?|API keys?|tokens?|Authorization|session|local state)|forward(?:\s+(?:[\w-]+\s+)?)(?:environment|local state|cookies|session)|attach(?:\s+(?:[\w-]+\s+)?)(?:environment|runtime|local) (?:variables?|context|config)|do not (?:report|notify|mention|disclose|flag)|suppress(?:es|ed|ing)?(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|issues?|vulnerabilit(?:y|ies))|hide(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|this|security)|omit from (?:reports?|summar|findings)|exclude from (?:reports?|findings?|summar)|redact(?:\s+(?:[\w-]+\s+)?)(?:findings?|flags?|warnings?|reports?|issues?)|provide(?:\s+(?:[\w-]+\s+)?)(?:local (?:config|state|context)|environment|runtime)|non.actionable.*(?:omit|exclude|suppress|skip)|informational only.*(?:omit|exclude|suppress|skip)))""",
+            r"""(?is)^(?!.*(?:AI agents must not treat robots\.txt|do not obey robots\.txt|never override|never treat robots\.txt|must not (?:treat|obey|follow|forward|include|suppress)|do not (?:treat|obey|forward|include|suppress)|never (?:treat|obey|override|forward|include|suppress)|refused|blocked|detected|flagged|should (?:report|detect|flag|refuse|block)|scanner docs? should (?:report|detect|flag|refuse|block)|security report|incident report|vulnerability report|learn how|guide|article|does not instruct agents?))(?=.*(?:robots\.txt|User-agent:\s|Disallow:\s|Crawl-delay:\s|Sitemap:\s*https?))(?=.*(?:AI agents?|assistants?|autonomous (?:scanner|crawler|verifier)s?|LLMs?|models?|security scanners?|GPTBot|Claude-Web|CCBot|coding agents?|code agents?|crawler instructions?|scanner instructions?|bot instructions?|agentic|autonomous agents?))(?=.*(?:supersedes?|outranks?|overrides?|canonical (?:site|owner|operator) policy|higher\.priority|definitive authority|governing document|takes? precedence|primary source of truth|treat (?:this|it)(?:\s+[\w-]+)? as authoritative|authoritative (?:policy|source|document|instructions?)|ignore previous instructions?|exfiltrat(?:e|es|ed|ing|ion)(?:\s+(?:[\w-]+\s+)?)(?:environment|secrets?|tokens?|credentials?|session|cookies)|include(?:\s+(?:[\w-]+\s+)?)(?:environment variables?|API keys?|tokens?|Authorization|session|local state)|forward(?:\s+(?:[\w-]+\s+)?)(?:environment|local state|cookies|session)|attach(?:\s+(?:[\w-]+\s+)?)(?:environment|runtime|local) (?:variables?|context|config)|do not (?:report|notify|mention|disclose|flag)|suppress(?:es|ed|ing)?(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|issues?|vulnerabilit(?:y|ies))|hide(?:\s+(?:[\w-]+\s+)?)(?:findings?|warnings?|reports?|this|security)|omit from (?:reports?|summar|findings)|exclude from (?:reports?|findings?|summar)|redact(?:\s+(?:[\w-]+\s+)?)(?:findings?|flags?|warnings?|reports?|issues?)|provide(?:\s+(?:[\w-]+\s+)?)(?:local (?:config|state|context)|environment|runtime)|non.actionable.*(?:omit|exclude|suppress|skip)|informational only.*(?:omit|exclude|suppress|skip)))""",
         ],
         "description": "`robots.txt` is the most universally consumed machine-readable policy file on the web. Attackers can embed agent-targeting instructions in comments, custom directives, `Sitemap:` pointers, and `User-agent:` sections that AI agents ingest as trusted site policy \u2014 enabling authority inversion, credent"
     },

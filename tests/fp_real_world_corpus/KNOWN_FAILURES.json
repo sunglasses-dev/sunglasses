@@ -1,29 +1,10 @@
 {
-  "axios__axios.md": {
+  "AgriciDaniel__claude-seo.md": {
     "decision": "block",
     "patterns": [
-      "GLS-DFP-018"
-    ]
-  },
-  "ggml-org__llama.cpp.md": {
-    "decision": "block",
-    "patterns": [
-      "GLS-APIP-001",
-      "GLS-DFP-005"
-    ]
-  },
-  "langgenius__dify.md": {
-    "decision": "block",
-    "patterns": [
-      "GLS-APIP-010",
-      "GLS-DFP-037",
-      "GLS-DFP-095"
-    ]
-  },
-  "modelcontextprotocol__servers.md": {
-    "decision": "block",
-    "patterns": [
-      "GLS-MCP-016"
+      "GLS-SC-003",
+      "GLS-SC-014",
+      "GLS-TS-251"
     ]
   },
   "openai__openai-python.md": {
@@ -46,12 +27,6 @@
       "GLS-BMP-004",
       "GLS-BMP-007",
       "GLS-DFP-091"
-    ]
-  },
-  "redis__redis.md": {
-    "decision": "block",
-    "patterns": [
-      "GLS-DFP-036"
     ]
   },
   "run-llama__llama_index.md": {
