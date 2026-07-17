@@ -21,6 +21,7 @@ try:
 except ImportError:
     HAS_AHOCORASICK = False
 
+from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import normalize
@@ -219,15 +220,11 @@ class SunglassesEngine:
         'update', 'updates', 'vendor', 'workspace', 'x-api-key',
     })
 
-    # Decision priority: higher severity = stronger action
-    SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "review": 0}
-    SEVERITY_TO_DECISION = {
-        "critical": "block",
-        "high": "block",
-        "medium": "quarantine",
-        "low": "allow_redacted",
-        "review": "allow_redacted",
-    }
+    # Decision priority lives in the policy layer (sunglasses/policy.py) —
+    # the engine reports findings, policy decides. These aliases keep the
+    # public class API stable.
+    SEVERITY_ORDER = policy.SEVERITY_ORDER
+    SEVERITY_TO_DECISION = policy.SEVERITY_TO_DECISION
 
     # Two classes of context that indicate a match is a warning/example, not a
     # live attack — checked within NEGATION_WINDOW chars before the keyword.
