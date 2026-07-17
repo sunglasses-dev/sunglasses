@@ -3994,6 +3994,7 @@ PATTERNS = [
     # --- GLS-SCHEMA-LEAK-215: Hidden system prompt and tool schema leakage ---
     {
         "id": "GLS-SCHEMA-LEAK-215",
+        "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "System prompt and tool schema leakage",
         "category": "prompt_leak",
         "severity": "critical",
@@ -5871,6 +5872,7 @@ PATTERNS = [
     # --- GLS-TS-252: Frontmatter Role Priority Smuggle (CYCLE190) ---
     {
         "id": "GLS-TS-252",
+        "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "Frontmatter Role Priority Smuggle",
         "category": "token_smuggling",
         "severity": "high",
@@ -6179,6 +6181,7 @@ PATTERNS = [
     # --- GLS-TMS-236: Priority Override Bundle V1 (CYCLE0124) ---
     {
         "id": "GLS-TMS-236",
+        "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "Priority Override Bundle V1",
         "category": "tool_metadata_smuggling",
         "severity": "high",
@@ -11918,6 +11921,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-051",
+        "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "Timezone Deadline Reinterpretation Attack",
         "category": "agent_workflow_security",
         "severity": "medium",
