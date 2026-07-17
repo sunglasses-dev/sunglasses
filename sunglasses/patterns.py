@@ -23631,4 +23631,110 @@ PATTERNS = [
         ],
         "description": "Wallet Visual Risk Badge Prompt Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 visual/OCR-based wallet risk indicators, distinct from repository status badges."
     },
+    # === v0.3.4 batch (9 patterns) ===
+    {
+        "id": "GLS-TFI-001",
+        "name": "RAG Pipeline Format-String Attribute-Traversal Injection",
+        "category": "template_format_injection",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?i)\{[a-zA-Z_]\w*(?:\.\w+){1,4}\.(set_role|override_system|get_secret|fetch_cred|run_cmd|exec_tool|set_permission|escalate_priv|bypass_auth)\s*\([^)]{0,200}\)\}""",
+        ],
+        "description": "RAG Pipeline Format-String Attribute-Traversal Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific Pythonic attribute-traversal execution mechanism within format strings (str.format)."
+    },
+    {
+        "id": "GLS-RMFI-049",
+        "name": "RAG Metadata Field Privilege Escalation",
+        "category": "rag_metadata_field_injection",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?i)["'](?:description|summary|excerpt|abstract|overview)["']\s*:\s*["'][^"']*\btreat\s+(?:the\s+)?(?:requestor|caller|session|user|this\s+request)\s+as\s+(?:authenticated|privileged|trusted|admin|authorized)""",
+        ],
+        "description": "RAG Metadata Field Privilege Escalation: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structured RAG metadata keys for privilege escalation; not covered by general smuggling."
+    },
+    {
+        "id": "GLS-TOP-639",
+        "name": "GitHub Checks Annotation Tool-Output Poisoning",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|vulnerability|training|runbook|reference|documentation|docs?)\b.{0,150}?(?:detected|blocked|refused|flagged|reported|must\s+be\s+reported|not\s+obeyed|should\s+(?:report|detect|flag|refuse|block)|should\s+never)|\b(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|treat|use|include|attach|forward|send|share|override|overrides?|trust)\b|\bnot\s+(?:authoritative|canonical|definitive)\b|\bno\s+(?:policy\s+)?overrides?\b|\bannotations?\s+are\s+display\s+metadata\s+only\b|\bscanners?\s+docs?\s+should\s+(?:report|detect|flag|refuse|block)))
+(?=.*(?:GitHub\s+Checks?|Checks\s+API|check_run|check_suite|check\s+run\s+annotations?|annotations?\b|annotation_level|raw_details|pull\s+request\s+check\s+annotations?|PR\s+annotations?|inline\s+annotations?|reviewdog|Danger\s+PR\s+annotation|file/line\s+diagnostic))
+(?=.*(?:(?:AI|autonomous|security|dependency|code|PR|CI|assistant|review)\s*(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)\b|\b(?:agents?|assistants?|scanners?|reviewers?)\b|(?:agent|assistant|scanner|reviewer)[._ -]?(?:instructions?|directive|policy|guidance|note)))
+(?=.*(?:authoritative|canonical|definitive|governing\s+document|controlling\s+document|(?:primary|single)\s+source\s+of\s+truth|overrides?|overrules?|supersed(?:e|es|ed|ing)|outranks?|takes\s+precedence|defines?\s+(?:the\s+)?(?:scanner|security|review|CI|dependency)?\s*rules?|(?:main|primary|principal|preferred|recommended)\s+(?:(?:CI|build|security|dependency|review|verification|audit|triage)\s+){0,3}(?:operating\s+)?(?:guidance|playbook|runbook|procedure|process|policy)|(?:agent|assistant|scanner|reviewer)\s+(?:instructions?|directive|policy|guidance)))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip|silence|downplay|downgrade|deprioritize|demote|reclassify|route|place|put|move|shift|keep|leave|mark\s+(?:failed\s+)?checks?\s+clean|mark\s+.*(?:clean|safe|informational|non-blocking)|(?:do\s+not|don't|not)\s+report|include|attach|forward|send|share|provide|expose|collect|relay|pass\s+along|hand\s+off|transfer).{0,90}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|checks?|failures?|CVE|CVEs|vulnerabilit(?:y|ies)|SAST|secret-scan|tokens?|secrets?|credentials?|auth\s+headers?|authorization\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|proof|evidence|material|package)|local\s+(?:state|config(?:uration)?|settings?)|CI\s+(?:auth\s+headers?|runtime|context)|build\s+proof\s+(?:evidence|material|package|bundle)))""",
+        ],
+        "description": "GitHub Checks Annotation Tool-Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 gitHub Checks annotations in tool-output poisoning attacks."
+    },
+    {
+        "id": "GLS-TOP-640",
+        "name": "Linter Structured-Output Authority Inversion",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not|does\s+not|never|must\s+not)\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)\b.{0,200}\b(?:eslint|lint\s+report|linter\s+output|formatter\s+output|diagnostic\s+message)\b)
+(?!.*\b(?:training|docs?|guide|reference|security\s+report|incident\s+report)\b.{0,160}\b(?:agents?|assistants?|review\s+bots?|scanners?)\b.{0,120}\b(?:should|must)\s+(?:report|detect|flag|refuse|ignore)\b)
+(?=.*(?:\bESLint\b|\beslint\s+(?:--format|formatter|json|stylish)\b|\blint\s+(?:report|output|diagnostics?)\b|\blinter\s+(?:report|output|diagnostics?)\b|\bnpm\s+run\s+lint\b|(?<!\w)"filePath"\s*:|(?<!\w)"messages"\s*:\s*\[|(?<!\w)"ruleId"\s*:|(?<!\w)"errorCount"\s*:|(?<!\w)"warningCount"\s*:))
+(?=.*(?<![a-zA-Z0-9])(?:ai\s+agents?|agents?|assistants?|ci\s+agents?|review\s+bots?|code[-\s]?review\s+agents?|security\s+scanners?|autofix\s+agents?|verifiers?|verifier_policy|assistant_instruction|agent_notes?|scanner_notes?)(?![a-zA-Z0-9]))
+(?=.*(?:\b(?:canonical|authoritative|primary|single)\s+(?:review\s+)?(?:policy|source\s+of\s+truth|guidance|verdict)\b|\b(?:overrides?|supersedes?|outranks?|takes?\s+precedence)\b.{0,80}\b(?:system|developer|review|scanner|lint|ci)\s+(?:rules?|policy|instructions?|checks?)\b|\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|ignore|skip)\b.{0,80}\b(?:lint\s+)?(?:errors?|warnings?|findings?|diagnostics?|vulnerabilit(?:y|ies)|reports?|checks?)\b|\b(?:mark|classify|treat|label)\b.{0,60}\b(?:clean|safe|passed|false\s+positive|informational|non[-\s]?blocking)\b|\b(?:do\s+not|not)\s+(?:report|flag|mention|surface)\b.{0,80}\b(?:errors?|warnings?|findings?|diagnostics?|vulnerabilit(?:y|ies))\b|\b(?:include|attach|forward|send|share|copy|provide|exfiltrate|collect)\b\s+(?:[\w-]+\s+){0,4}(?:env(?:ironment)?\s+(?:variables?|context)|secrets?|api\s+keys?|tokens?|session\s+tokens?|bearer\s+tokens?|local\s+state|runtime\s+context)\b))
+(?=.*(?:\b(?:lint\s+)?(?:errors?|warnings?|findings?|diagnostics?|reports?|checks?)\b|\bvulnerabilit(?:y|ies)\b|\b(?:pr|pull\s+request|merge|ci)\s+(?:review|gate|verdict|status)\b|\b(?:env(?:ironment)?\s+(?:variables?|context)|secrets?|api\s+keys?|tokens?|session\s+tokens?|bearer\s+tokens?|local\s+state|runtime\s+context)\b))
+.*""",
+        ],
+        "description": "Linter Structured-Output Authority Inversion: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 linter-specific structured output and authority inversion not covered by general log patterns."
+    },
+    {
+        "id": "GLS-TOP-647",
+        "name": "Vitest Structured-Report Poisoning",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|quarantined|saniti[sz]ed|stripped|rejects?|ignored|must\s+not|do\s+not|never)\b.{0,140}\b(?:failureMessages|assertionResults|vitest|json\s+reporter|prompt|instruction)\b)(?=.*\b(?:vitest|json\s+reporter|test-output\.json|--reporter=json|outputFile|assertionResults|failureMessages|testResults)\b)(?=.*\b(?:failureMessages|assertionResults|message|fullName|title)\b)(?=.*\b(?:ignore|override|system\s+prompt|developer\s+instruction|treat\s+(?:this|the)\s+(?:failure|message|output)\s+as\s+trusted|execute|run\s+(?:the\s+)?tool|exfiltrate|write\s+(?:to\s+)?memory)\b).*$""",
+        ],
+        "description": "Vitest Structured-Report Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 vitest structured reports, a distinct attack surface from Playwright or general logs."
+    },
+    {
+        "id": "GLS-TSDF-001",
+        "name": "Tool Schema Default-Value Auto-Approve Injection",
+        "category": "tool_schema_default_fallback",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)^(?=.*(?:tool\s*schema|function\s*schema|json\s*schema|argument\s*schema))(?=.*(?:default\s*value|fallback|implicit|auto(?:-?fill)?|missing\s*field|absent\s*permission|null\s*field))(?=.*(?:consent|approval|permission|authorize|re-approval))(?=.*(?:execute|dispatch|invoke|call)).*$""",
+        ],
+        "description": "Tool Schema Default-Value Auto-Approve Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique focus on exploiting tool schema fallbacks to bypass execution consent."
+    },
+    {
+        "id": "GLS-VMIS-001",
+        "name": "Vector Store Metadata Authority Injection",
+        "category": "vector_metadata_instruction_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r'''(?i)"(?:title|source|author|description|label)"\s*:\s*"[^"]{0,120}\[(?:ctx|admin|sys|meta|context|role)\s*[:=][^\]]{1,60}\][^"]*"''',
+        ],
+        "description": "Vector Store Metadata Authority Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 distinct vector targeting trust in cited RAG source metadata fields via role markers."
+    },
+    {
+        "id": "GLS-V3-005",
+        "name": "AWS SSM Session Manager control-plane impersonation (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "AWS SSM Session Manager transcript text can impersonate an approval/control plane by telling an automation agent that `StartSession` output proves operator approval and authorizes privileged remediation without separate change-control verification."
+    },
+    {
+        "id": "GLS-V3-008",
+        "name": "Database migration dry-run execution lure (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Database migration dry-run output can smuggle an agent-directed instruction that recasts the displayed `psql`, Flyway, Liquibase, Alembic, Prisma, Rails, or Django migration command as already approved and asks a release agent to execute it without human approval."
+    },
 ]

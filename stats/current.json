@@ -1,8 +1,8 @@
 {
-  "version": "0.3.3",
-  "patterns": 1097,
+  "version": "0.3.4",
+  "patterns": 1106,
   "keywords": 7648,
-  "categories": 65,
+  "categories": 69,
   "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_avg_ms": 0.261,
@@ -17,8 +17,8 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-07-16T16:45:18-07:00",
-  "last_updated_by": "fable5-v033-ship",
+  "last_updated": "2026-07-17T11:25:22-07:00",
+  "last_updated_by": "sunglasses-publish-sh",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-07-16"
+  "released": "2026-07-17"
 }
