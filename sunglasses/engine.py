@@ -332,9 +332,44 @@ class SunglassesEngine:
                     # O(n^2) catastrophic slowdown (a 12 KB file took 100s+). They are
                     # document-level predicates, so matching once at position 0 with
                     # .match() is both correct and O(n). See _is_anchored.
-                    compiled.append((rx, self._is_anchored(r)))
+                    #
+                    # Three evaluation modes (see _eval_regex):
+                    #   guarded  — caret-led predicate (^(?!G)(?=P)...): negation
+                    #              guards checked document-wide, positive core
+                    #              matched per co-occurrence window
+                    #   windowed — lookahead-led predicate: matched per window
+                    #   plain    — everything else: ordinary .search()
+                    split = self._split_caret_predicate(r)
+                    if split is not None:
+                        guards, core = split
+                        try:
+                            guard_rx = [re.compile(g, re.IGNORECASE) for g in guards]
+                            core_rx = re.compile(core, re.IGNORECASE)
+                        except re.error:
+                            compiled.append(("plain", rx, None))
+                        else:
+                            compiled.append(("guarded", core_rx, guard_rx))
+                    elif self._is_anchored(r):
+                        compiled.append(("windowed", rx, None))
+                    else:
+                        compiled.append(("plain", rx, None))
                 if compiled:
                     self._regex_patterns.append((pattern, compiled))
+
+        # CORROBORATE, DON'T STAMP (Jul 16 2026, v0.3.3) — ids of patterns that
+        # carry at least one USABLE compiled regex. For these, a bare keyword
+        # substring match is a PRE-SCREEN, never a verdict: the pattern's own
+        # regex must confirm (on the normalized view, where homoglyph/ROT13/
+        # leet evasions are already folded) before a finding is stamped.
+        #
+        # Born of the claude-seo incident: 97% of that repo's BLOCK (39/44,
+        # 31/32, 27/27 findings) were single-keyword stamps — "authoritative"
+        # matched inside "Authoritativeness", an SEO ranking term — where the
+        # pattern's own regex never fired. A detector with a rubber stamp.
+        # Patterns with NO regex keep keyword-verdict behavior (their keywords
+        # are their whole definition, e.g. multi-word attack phrases).
+        self._regex_bearing_ids = {p["id"] for p, _ in self._regex_patterns}
+        self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
 
         # Build Aho-Corasick automaton if available (10x faster)
         self._automaton = None
@@ -361,11 +396,91 @@ class SunglassesEngine:
         rest = (raw[m.end():] if m else raw).lstrip()
         return rest.startswith('(?=') or rest.startswith('(?!')
 
+    @staticmethod
+    def _split_caret_predicate(raw: str):
+        """Decompose a caret-led co-occurrence predicate — `(?flags)^(?!G1)(?!G2)
+        (?=P1)(?=P2)...` — into its document-wide negation guards and its
+        positive core, or return None if `raw` is not that shape.
+
+        Why (Jul 16 2026, v0.3.3): these predicates used to be evaluated ONCE
+        against the whole document (`^` pins them to position 0), so their
+        `(?=.*X)` signals could co-occur ANYWHERE in a 30KB README — the same
+        spread-text false-positive mechanics the co-occurrence window was built
+        to stop (claude-seo pulled 9 findings through this hole). But windowing
+        them blind regresses the other way: the leading `(?!.*never obey...)`
+        guards were relied on to scan the FULL document, and confining a guard
+        to one window lets the attack buckets meet in a window the defusing
+        negation isn't in (that is how fastapi newly blocked in the Fix-A
+        prototype). So: guards keep DOCUMENT scope, the positive core gets
+        WINDOW scope. Both halves keep their original semantics of record.
+        """
+        m = re.match(r'\(\?[aiLmsux]+\)', raw)
+        flags = m.group(0) if m else ""
+        verbose = 'x' in flags
+        rest = raw[len(flags):]
+        if verbose:
+            rest = rest.lstrip()  # (?x): whitespace is insignificant
+        if rest.startswith('^'):
+            rest = rest[1:]
+        elif rest.startswith(r'\A'):
+            rest = rest[2:]
+        else:
+            return None
+        if verbose:
+            rest = rest.lstrip()
+        if not (rest.startswith('(?!') or rest.startswith('(?=')):
+            return None  # line/format anchor (e.g. ^Disallow:), not a predicate
+        guards = []
+        while rest.startswith('(?!'):
+            depth, in_class, j = 0, False, 0
+            while j < len(rest):
+                c = rest[j]
+                escaped = j > 0 and rest[j - 1] == '\\'
+                if not escaped:
+                    if in_class:
+                        if c == ']':
+                            in_class = False
+                    elif c == '[':
+                        in_class = True
+                    elif c == '(':
+                        depth += 1
+                    elif c == ')':
+                        depth -= 1
+                        if depth == 0:
+                            break
+                j += 1
+            guards.append(flags + rest[3:j])  # guard body, original flags kept
+            rest = rest[j + 1:]
+            if verbose:
+                rest = rest.lstrip()
+        core = flags + rest
+        return guards, core
+
     # Locality rule for whole-document co-occurrence predicates (see scan step 3).
     # COOCCUR_WINDOW chars per view, half-overlapping so a payload straddling a
     # boundary is still seen whole (any payload <= WINDOW/2 is fully inside some view).
     COOCCUR_WINDOW = 1200
     COOCCUR_STRIDE = 600
+
+    # Step 3.5 length gate — mirrors the preprocessor's ENRICH_MAX_LEN and its
+    # rationale (see scan step 3.5). Raw-input length, in chars.
+    CORROBORATE_NORM_MAX = 2000
+
+    def _eval_regex(self, mode: str, rx, guards, text: str):
+        """Evaluate one compiled pattern regex against `text` per its mode
+        (see the compile step in __init__). Returns a re.Match or None."""
+        if mode == "guarded":
+            # Negation guards keep DOCUMENT scope: a defusing context anywhere
+            # in the file defuses (the pre-window semantics these predicates
+            # were written against — the fastapi lesson). The positive core
+            # must still co-occur inside ONE window.
+            for g in guards:
+                if g.match(text):
+                    return None
+            return self._match_windowed(rx, text)
+        if mode == "windowed":
+            return self._match_windowed(rx, text)
+        return rx.search(text)
 
     def _match_windowed(self, rx, text: str):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
@@ -458,6 +573,9 @@ class SunglassesEngine:
         # Step 2: Multi-pattern match
         findings = []
         seen_ids = set()
+        # Regex-bearing patterns whose keyword matched: candidates awaiting
+        # regex corroboration (step 3 on raw text, step 3.5 on normalized).
+        candidates = {}
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -465,7 +583,12 @@ class SunglassesEngine:
                 for pattern in self._keyword_to_patterns.get(keyword, []):
                     if channel not in pattern.get("channel", []):
                         continue
-                    if pattern["id"] in seen_ids:
+                    if pattern["id"] in seen_ids or pattern["id"] in candidates:
+                        continue
+                    if pattern["id"] in self._regex_bearing_ids:
+                        # Corroborate, don't stamp: keyword is a hint, the
+                        # pattern's own regex is the verdict (steps 3 / 3.5).
+                        candidates[pattern["id"]] = pattern
                         continue
                     seen_ids.add(pattern["id"])
                     kw_start = end_idx - len(keyword) + 1
@@ -490,7 +613,10 @@ class SunglassesEngine:
                     for pattern in patterns:
                         if channel not in pattern.get("channel", []):
                             continue
-                        if pattern["id"] in seen_ids:
+                        if pattern["id"] in seen_ids or pattern["id"] in candidates:
+                            continue
+                        if pattern["id"] in self._regex_bearing_ids:
+                            candidates[pattern["id"]] = pattern
                             continue
                         seen_ids.add(pattern["id"])
                         idx = normalized.index(keyword)
@@ -512,19 +638,15 @@ class SunglassesEngine:
                 continue
             if pattern["id"] in seen_ids:
                 continue
-            for rx, anchored in regexes:
-                # Anchored = lookahead-led whole-document predicate: evaluate once at
-                # position 0 (.match) instead of retrying every offset (.search) — avoids
-                # catastrophic O(n^2) backtracking on large files (ReDoS).
-                # On long documents an anchored predicate is evaluated per WINDOW, not
-                # once globally: its (?=.*A)(?=.*B) signals must CO-OCCUR locally to
-                # count. Attack payloads are compact; spreading the same words across a
-                # 30KB README is how 71 famous open-source READMEs came to BLOCK
-                # (Jul 10 2026 red-team). Window > every corpus attack case that fired.
-                if anchored:
-                    match = self._match_windowed(rx, text)
-                else:
-                    match = rx.search(text)
+            for mode, rx, guards in regexes:
+                # Predicates (lookahead- or caret-led) are evaluated per WINDOW,
+                # not once globally: their (?=.*A)(?=.*B) signals must CO-OCCUR
+                # locally to count. Attack payloads are compact; spreading the
+                # same words across a 30KB README is how 71 famous open-source
+                # READMEs came to BLOCK (Jul 10 2026 red-team). Caret-led
+                # predicates additionally keep their negation guards at
+                # document scope — see _eval_regex and _split_caret_predicate.
+                match = self._eval_regex(mode, rx, guards, text)
                 if match:
                     seen_ids.add(pattern["id"])
                     finding = {
@@ -541,6 +663,45 @@ class SunglassesEngine:
                         # Downgrade, don't discard — see DEFENSIVE_FRAMING.
                         finding["severity"] = "review"
                         finding["defensive_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                    findings.append(finding)
+                    break
+
+        # Step 3.5: Corroboration pass for keyword candidates (see
+        # _regex_bearing_ids). Step 3 already ran these patterns' regexes on
+        # the RAW text; a candidate that is still unconfirmed gets one more
+        # chance on the NORMALIZED view — the text its keyword actually
+        # matched in — so folded evasions (homoglyphs, ROT13, leetspeak,
+        # spaced letters, layered encodings) still corroborate. A candidate
+        # whose regex fires on neither view is a keyword-only echo and is
+        # dropped: that is the whole fix.
+        #
+        # SHORT INPUTS ONLY — same length gate and same reasoning as the
+        # preprocessor's enrichment step: encoding evasions live in short
+        # crafted payloads, never in whole documents. On a long document the
+        # normalized view is COMPACTED (whitespace collapsed, ROT13 copy
+        # appended), which squeezes more words into each co-occurrence window
+        # and re-creates exactly the spread-text false positives the raw-view
+        # window exists to prevent (measured Jul-16: claude-seo README pulled
+        # 9 extra findings through this pass before the gate). Long inputs
+        # keep raw-view regex (step 3) as their corroboration lane.
+        if len(text) > self.CORROBORATE_NORM_MAX:
+            candidates = {}
+        for pid, pattern in candidates.items():
+            if pid in seen_ids:
+                continue  # regex already confirmed on raw text in step 3
+            for mode, rx, guards in self._compiled_by_id.get(pid, ()):
+                match = self._eval_regex(mode, rx, guards, normalized)
+                if match:
+                    seen_ids.add(pid)
+                    finding = {
+                        **pattern,
+                        "matched_text": match.group(0)[:50],
+                    }
+                    if not pattern.get("negation_immune") and \
+                            self._check_negation(normalized, match.start()):
+                        finding["severity"] = "review"
+                        finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
                     findings.append(finding)
                     break

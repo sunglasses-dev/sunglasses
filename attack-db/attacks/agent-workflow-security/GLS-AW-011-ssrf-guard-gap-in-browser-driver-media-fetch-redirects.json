@@ -20,5 +20,6 @@
   "references": [],
   "contributed_by": "Sunglasses Team",
   "date_added": "2026-06-06",
-  "source": "patterns.py:GLS-AW-011"
+  "source": "patterns.py:GLS-AW-011",
+  "retired": "2026-07-16 v0.3.3 \u2014 literal-'ssrf' requirement = matches prose about SSRF, never attacks; no TP exists (AZ GO)"
 }

@@ -1,4 +1,22 @@
 {
+ "AgriciDaniel__claude-seo.AGENTS.md": {
+  "fetched": "2026-07-16",
+  "note": "AGENTS.md \u2014 the Jul-16 keyword-stamp incident repo (63 keyword-only FPs); corroborate-don't-stamp regression corpus",
+  "repo": "AgriciDaniel/claude-seo",
+  "source": "https://github.com/AgriciDaniel/claude-seo"
+ },
+ "AgriciDaniel__claude-seo.CLAUDE.md": {
+  "fetched": "2026-07-16",
+  "note": "CLAUDE.md \u2014 the Jul-16 keyword-stamp incident repo (63 keyword-only FPs); corroborate-don't-stamp regression corpus",
+  "repo": "AgriciDaniel/claude-seo",
+  "source": "https://github.com/AgriciDaniel/claude-seo"
+ },
+ "AgriciDaniel__claude-seo.md": {
+  "fetched": "2026-07-16",
+  "note": "README.md \u2014 the Jul-16 keyword-stamp incident repo (63 keyword-only FPs); corroborate-don't-stamp regression corpus",
+  "repo": "AgriciDaniel/claude-seo",
+  "source": "https://github.com/AgriciDaniel/claude-seo"
+ },
  "CompVis__stable-diffusion.md": {
   "fetched": "2026-07-10",
   "repo": "CompVis/stable-diffusion",

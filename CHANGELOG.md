@@ -3,6 +3,24 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.3] — 2026-07-16
+
+### "Decision layer" release — corroborate, don't stamp
+
+- **Keywords are hints now, never verdicts** — for any pattern that carries a regex, a bare keyword substring match no longer stamps a finding; the pattern's own regex must confirm. Root cause: a real repo (AgriciDaniel/claude-seo) was blocked with 63 findings, and 55 of them fired on a single generic word with zero corroboration — "authoritative" matched *inside* "Authoritativeness", an SEO ranking term. A detector with a rubber stamp. Keyword-only patterns (multi-word attack phrases) are unchanged.
+- **Evasion recall preserved by a corroboration pass on the normalized view** — homoglyph/ROT13/leetspeak/spaced-letter payloads fold to plain text during normalization, where the confirming regex now runs (short inputs only, mirroring the preprocessor's enrichment gate — encoding evasions live in short crafted payloads, never whole documents).
+- **All 455 caret-led co-occurrence predicates now window-scoped, with guards kept document-wide** — `^(?!guard)(?=signal)` predicates used to evaluate once over the whole file, letting their signals co-occur anywhere in a 30KB README. The positive core now must co-occur inside one 1200-char window, while the defusing negation guards keep their original document scope (windowing them blind is what made fastapi newly false-positive in prototyping — that regression does not ship).
+- **Six carriers retuned by hand** so they catch their own documented attacks without the keyword crutch: GLS-IDP-004 (negation guard required adjacency — it was defusing the attack's own "do not report … suppress" order), GLS-SMP-004 / GLS-MCP-017 / GLS-DFP-005 (audience buckets knew only singular forms — real attacks say "assistants", "scanners", "bots"), GLS-DFP-045 (added treat-as-authoritative / ignore-previous-instructions / exfiltrate-environment attack forms), GLS-MCP-016 (unbounded weak verbs read/paste/include/forward/send and bare bypass/disable removed — 'bypass' fired on "SSRF bypass tests" changelog prose).
+- **Retired GLS-AW-011** — its regex required the literal word "ssrf" in the scanned input, so it could only ever match prose *describing* SSRF, never an attack. No true-positive sample exists and none is writable. Patterns: 1,098 → 1,097.
+- **Benchmark: precision 78.7% → 86.1% (+7.4 pts), recall unchanged at 97.4%, F1 0.871 → 0.914.** Same lone benchmark miss as 0.3.1/0.3.2 (the published `curl | bash` gap). Famous-README false positives 10 → 5; five repos recovered off the known-failure ratchet: axios, llama.cpp, dify, redis, modelcontextprotocol/servers.
+- **claude-seo added to the FP regression corpus** (all 3 files) — this bug class cannot return silently. Its README's remaining findings are its own real `git clone … | bash` install one-liners.
+
+### Context
+
+- Test suite: 449 passing (+7 xfailed). Two new carrier-anchor fixtures (GLS-MCP-016 attack + innocent).
+- Worker parity: 0 verdict / 0 finding-set mismatches (305-case wide corpus × 5 channels + engine-verdict harness) — the Worker engine ships the same decision layer (candidates lane, normalized-view corroboration, guarded windowing).
+- File-lane scan latency +16% on a 30KB document (1.39s → 1.60s median); short-input lane unchanged (~2ms).
+
 ## [0.3.2] — 2026-07-16
 
 ### Added
