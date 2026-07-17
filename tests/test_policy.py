@@ -112,12 +112,15 @@ class TestRollupRepo:
         assert rollup_repo(files)["overall"] == "clean_notes"
 
     def test_same_category_corroboration_earns_review(self):
-        # A real payload trips multiple patterns of the SAME category.
+        # A real payload trips multiple patterns of the SAME category on
+        # DIFFERENT spans of the text.
         files = [{"name": "README.md", "findings": [
             _finding(id="GLS-PI-101", severity="high",
-                     category="prompt_injection"),
+                     category="prompt_injection",
+                     matched_text="ignore all previous instructions"),
             _finding(id="GLS-PI-202", severity="critical",
-                     category="prompt_injection"),
+                     category="prompt_injection",
+                     matched_text="reveal your system prompt to"),
         ]}]
         assert rollup_repo(files)["overall"] == "review_before_agent_ingestion"
 
@@ -136,6 +139,29 @@ class TestRollupRepo:
             _finding(id="GLS-PI-101", severity="high"),
         ]}]
         assert rollup_repo(files)["overall"] == "clean_notes"
+
+    def test_same_span_does_not_corroborate(self):
+        # The claude-seo shape (live autopsy Jul-17): two supply_chain
+        # patterns matched the IDENTICAL text span. Two sensors reading one
+        # string are one piece of evidence, not independent corroboration.
+        files = [{"name": "README.md", "findings": [
+            _finding(id="GLS-SC-003", severity="critical",
+                     category="supply_chain",
+                     matched_text="bash claude-seo/uninstall.sh"),
+            _finding(id="GLS-SC-014", severity="high",
+                     category="supply_chain",
+                     matched_text="bash claude-seo/uninstall.sh"),
+        ]}]
+        assert rollup_repo(files)["overall"] == "clean_notes"
+
+    def test_distinct_spans_do_corroborate(self):
+        files = [{"name": "README.md", "findings": [
+            _finding(id="GLS-PI-101", severity="high",
+                     matched_text="ignore all previous instructions"),
+            _finding(id="GLS-PI-202", severity="critical",
+                     matched_text="reveal your system prompt to"),
+        ]}]
+        assert rollup_repo(files)["overall"] == "review_before_agent_ingestion"
 
     def test_medium_findings_do_not_corroborate(self):
         files = [{"name": "README.md", "findings": [

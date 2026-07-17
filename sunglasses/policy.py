@@ -105,15 +105,21 @@ def rollup_repo(files: list, tier_s: frozenset = None) -> dict:
             else:
                 notes.append(entry)
 
-        # Corroboration: 2+ DISTINCT pattern ids, SAME category, each high+
-        # regex-confirmed, in THIS file. Distinct categories scattered through
-        # prose (the mempalace shape) never corroborate.
+        # Corroboration: 2+ DISTINCT pattern ids on 2+ DISTINCT text spans,
+        # SAME category, each high+ regex-confirmed, in THIS file. Distinct
+        # categories scattered through prose (the mempalace shape) never
+        # corroborate, and two patterns matching the SAME span (the claude-seo
+        # shape) are one piece of evidence, not two independent witnesses.
         by_category = {}
         for finding in findings:
             if is_note_only(finding) or finding["id"] in tier_s:
                 continue
-            by_category.setdefault(finding["category"], set()).add(finding["id"])
-        corroborated = [cat for cat, ids in by_category.items() if len(ids) >= 2]
+            ids, spans = by_category.setdefault(
+                finding["category"], (set(), set()))
+            ids.add(finding["id"])
+            spans.add(finding.get("matched_text", ""))
+        corroborated = [cat for cat, (ids, spans) in by_category.items()
+                        if len(ids) >= 2 and len(spans) >= 2]
         if corroborated:
             review_files.append({"file": name, "categories": corroborated})
 
