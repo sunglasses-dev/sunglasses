@@ -53,14 +53,24 @@ def decide_enforce(findings: list) -> str:
 
 
 # ── Tiers ────────────────────────────────────────────────────────────────────
+# Every pattern has a tier; the pattern DB is the curation source of truth
+# and the `tier` field flows DB → patterns.py → compiler → worker:
+#   S — curated known-attack signature: the ONLY red-capable set. A pattern
+#       earns 'S' by hand review, never automatically.
+#   A — regex-confirmed detection: can corroborate toward "review".
+#   B — hint: keyword-only patterns, plus regex patterns demoted by curation
+#       (live FP evidence). Feeds notes, never verdicts.
+# An entry without an explicit tier derives: no regex → B, else A.
 
-# Tier-S: curated known-attack signatures — the only red-capable set.
-# Empty until a human reviews an entry in; see module docstring.
-TIER_S_SIGNATURE_IDS = frozenset()
+TIER_S_SIGNATURE_IDS = frozenset(
+    p["id"] for p in PATTERNS if p.get("tier") == "S")
 
-# Tier-B: keyword-only patterns have no regex of their own — their hits are
-# hints that feed notes, never verdicts.
-KEYWORD_ONLY_IDS = frozenset(p["id"] for p in PATTERNS if not p.get("regex"))
+TIER_B_IDS = frozenset(
+    p["id"] for p in PATTERNS
+    if p.get("tier") == "B" or (not p.get("tier") and not p.get("regex")))
+
+# Back-compat alias (pre-tier name); the derivation superset lives above.
+KEYWORD_ONLY_IDS = TIER_B_IDS
 
 # Corroboration requires at least this severity from each finding.
 _CORROBORATING_SEVERITIES = ("high", "critical")
@@ -70,7 +80,7 @@ BOUNDARY_LABEL = "Agent-context decision, not repo reputation."
 
 def is_note_only(finding: dict) -> bool:
     """True if this finding can only ever feed notes (Tier-B / defused)."""
-    if finding["id"] in KEYWORD_ONLY_IDS:
+    if finding["id"] in TIER_B_IDS:
         return True
     if finding["severity"] not in _CORROBORATING_SEVERITIES:
         return True

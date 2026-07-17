@@ -227,3 +227,28 @@ class TestIsNoteOnly:
     def test_regex_confirmed_high_is_not_note_only(self):
         assert not is_note_only(
             _finding(id=REGEX_CONFIRMED_ID, severity="high"))
+
+    @pytest.mark.parametrize("demoted_id", [
+        # Jul-17 curated Tier-B demotions: patterns caught stamping
+        # famous-repo prose live (verdict-redesign retune list).
+        "GLS-TS-252", "GLS-TMS-236", "GLS-AW-051", "GLS-SCHEMA-LEAK-215",
+    ])
+    def test_curated_tier_b_demotion(self, demoted_id):
+        pattern = next(p for p in PATTERNS if p["id"] == demoted_id)
+        assert pattern.get("tier") == "B"
+        assert is_note_only(_finding(id=demoted_id, severity="high"))
+
+    def test_explicit_tier_overrides_regex_derivation(self):
+        # At least one curated demotion must be a REGEX pattern — proving an
+        # explicit tier beats the has-regex→A derivation (the curation lever).
+        overridden = [p["id"] for p in PATTERNS
+                      if p.get("tier") == "B" and p.get("regex")]
+        assert overridden, "no regex pattern carries an explicit tier-B"
+        assert not is_note_only(
+            _finding(id=REGEX_CONFIRMED_ID, severity="high"))
+
+    def test_tier_s_comes_from_pattern_entries(self):
+        # No pattern has earned Tier-S yet — the set must derive from the
+        # pattern data (curation vehicle), not be hardcoded elsewhere.
+        assert TIER_S_SIGNATURE_IDS == frozenset(
+            p["id"] for p in PATTERNS if p.get("tier") == "S")
