@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.4] — 2026-07-17
+
+### "Structured tool-output is not authority" — Day 6 of the V3 drain
+
+- **+9 detection patterns (1,097 → 1,106), +4 categories (65 → 69).** This batch targets the family where *structured* tool output — CI annotations, linter and test reports, RAG metadata, tool-call schemas, cloud control-plane transcripts — gets treated as agent-directed authority instead of data to inspect.
+  - `GLS-TOP-639` / `GLS-TOP-640` / `GLS-TOP-647` — GitHub Checks annotations, linter structured-output authority inversion, and Vitest structured-report poisoning.
+  - `GLS-TFI-001`, `GLS-RMFI-049`, `GLS-VMIS-001` — RAG pipeline format-string attribute-traversal injection, RAG metadata-field privilege escalation, and vector-store metadata authority injection.
+  - `GLS-TSDF-001` — tool-schema default-value auto-approve injection.
+  - `GLS-V3-005`, `GLS-V3-008` — AWS SSM Session Manager transcript impersonation and database-migration dry-run output smuggling an agent-directed instruction.
+- Paired with the blog **"RAG & Structured Tool-Output Authority: Data Is Not Orders."**
+
 ## [0.3.3] — 2026-07-16
 
 ### "Decision layer" release — corroborate, don't stamp
