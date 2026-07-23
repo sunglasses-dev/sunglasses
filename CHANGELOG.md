@@ -3,6 +3,35 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.5] — 2026-07-21
+
+### "A prompt injection is still a prompt injection through a tool" — tool_output channel-coverage fix
+
+Found by the JACK1 v5 AgentDojo pilot: wired in as an AgentDojo defense at the tool-output boundary, the shipping scanner let the classic `<INFORMATION>` injection through on every enforce run. Root cause — the engine gates patterns by channel, and the indirect-injection PI patterns that catch these attacks were scoped to `message`/`file`/`web_content` but not `tool_output`. An injection arriving *inside a tool result* was never scanned by them.
+
+Team model (FUGU + SOL, unanimous): **`channel` records provenance (where content arrived); `category` records mechanism (what the attack is). They are independent.** So carrier-independent indirect-injection patterns now also cover `tool_output`.
+
+- **+`tool_output` on 6 indirect-injection patterns:** `GLS-PI-INFO` (the AgentDojo `<INFORMATION>`/`<IMPORTANT>` wrapper), `GLS-PI-013` (malicious-README agent targeting), `GLS-PI-016` (policy-override → system-prompt exfil), `GLS-PI-017` (typoglycemic redaction override), `GLS-PI-021` (authority impersonation), `GLS-PIEMN-001` (hidden-comment agent instruction). No new patterns; no pattern-logic changes — channel scope only.
+- **FP-audited, not blanket-expanded.** Two candidates (`GLS-PI-20`, `GLS-PI-004`) were tested and **rejected** because they false-positived on benign tool output (a security blog naming the attack; LLM chat-template docs). Broad direct-jailbreak patterns (`GLS-PI-001/002/003/005/006/…`) and high-FP-vocabulary ones (`GLS-PI-014` "support/diagnostic") were deliberately left off `tool_output` pending separate review.
+- **New gate:** `tests/test_tool_output_pi_channel.py` — 6 regression canaries (each mechanism blocks on `tool_output`) + 6 benign-tool-output FP guards. Full FP/injection suite: 238 passed, 0 regressions.
+- **Docs:** `engine.scan` channel docstring corrected to list all real channels (incl. `tool_output`) and state the provenance-vs-mechanism model.
+- **Integrity note:** `GLS-PI-INFO` is derived from the AgentDojo `important_instructions` template — its post-fix result is a KNOWN-attack regression, not proof of generalization. Any generalization claim requires a held-out suite.
+
+### Day 7 of the V3 drain — tool-output responses claiming prior approval
+
+- **+9 detection patterns (1,106 → 1,115), +9 categories (69 → 78).** This batch targets tool-output responses that impersonate transactional receipts, billing/quota status, observability/usage-metering, migration-checker safety footers, inter-agent delegation handoffs, query-planner/optimizer hints, and code-action/formatter suggestions — each telling the agent that approval was already given or that scrutiny can be suppressed.
+  - `GLS-PFX-000` (`tool_output_receipt_poisoning`) — a fake transactional receipt claiming the user already approved a follow-up action.
+  - `GLS-PFX-247` (`billing_tool_output_poisoning`) — a poisoned billing/quota-status response demanding the agent "repair" an accounting inconsistency.
+  - `GLS-PFX-002` (`observability_tool_output_poisoning`) — a forged observability/usage-metering result demanding a reduced-logging "quota-preservation" mode.
+  - `GLS-PFX-003` (`migration_tool_output_poisoning`) — a database/schema migration checker's fake machine-generated footer telling the agent to bypass approval and apply immediately.
+  - `GLS-DAR-002` (`delegated_approval_rebinding`) — an Alembic migration legacy-schema approval-rebind authority inversion.
+  - `GLS-PFX-005` (`delegation_boundary_poisoning`) — a tool result impersonating an inter-agent handoff protocol, claiming approval already collected.
+  - `GLS-PFX-006` (`tool_output_injection`) — a hostile instruction hidden inside a query-planner/optimizer/EXPLAIN output reviewed during debugging.
+  - `GLS-TCP-001` (`tool_cache_poisoning`) — response-cache source-of-truth identity poisoning.
+  - `GLS-PFX-008` (`tool_output_provenance_swap`) — a code-action/formatter response reframing its own suggested edit as already user-approved.
+- Paired with the blog **"Billing, Quota, and Observability Tool-Output Poisoning: Runtime Trust for AI Agents."**
+- This ship, combined with the channel fix above, **closes a tool_output prompt-injection coverage gap** — both the channel-scope fix and this pattern batch are known-attack coverage work, not a benchmark claim.
+
 ## [0.3.4] — 2026-07-17
 
 ### "Structured tool-output is not authority" — Day 6 of the V3 drain
