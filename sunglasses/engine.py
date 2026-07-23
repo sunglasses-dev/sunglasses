@@ -557,7 +557,12 @@ class SunglassesEngine:
 
         Args:
             text: The input to scan (message, file content, API response, etc.)
-            channel: One of: message, file, api_response, web_content, log_memory
+            channel: provenance of the content — where it arrived, NOT what the
+                attack is. One of: message, file, api_response, web_content,
+                log_memory, tool_output, agent_input, code, prompt. A prompt
+                injection is still a prompt injection whichever channel carries
+                it, so indirect-injection patterns are scoped across every
+                untrusted-content carrier (incl. tool_output), not just message.
 
         Returns:
             ScanResult with decision, findings, and timing info.
