@@ -3,6 +3,20 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.6] — 2026-07-28
+
+### Day 8 of the V3 drain — CI/CD and infrastructure tool output laundered into agent authority
+
+- **+9 detection patterns (1,115 → 1,124), +6 categories (78 → 84).** This batch covers the build-and-operate surface: static-analysis and CI diagnostic output, repository automation metadata, terminal-rendered tool output, workflow-orchestrator task returns, access/secrets audit logs, and configuration-management dry-run previews. Each is a channel where machine-generated *evidence* gets read by an agent as *permission*.
+- `GLS-PFX-001` — a malicious dependency emits a crafted SARIF/static-analysis result whose message content carries agent-directed instructions.
+- `GLS-CMP-009` — GitHub Actions Step Summary tool-output poisoning (carrier-native prompt injection through the job summary surface).
+- `GLS-CMP-010` — Renovate config metadata poisoning; `GLS-V3-058` — a transitive Renovate preset reference smuggling agent-directed policy text.
+- `GLS-TOP-643` — OSC 8 hyperlink tool-output prompt smuggling (terminal escape-sequence carrier).
+- `GLS-V3-032` — Airflow XCom task-return data laundering a delegated task result into a forged approval.
+- `GLS-V3-039` — Cloudflare Access audit/tunnel output laundering Zero Trust telemetry into authority; `GLS-V3-061` — the same shape through HashiCorp Vault audit log entries.
+- `GLS-V3-064` — Puppet `--noop`, Chef `why-run`, and adjacent configuration-management no-op previews presented as sanctioned plans.
+- **Full suite green before publish:** 506 passed, 7 xfailed, including the real-world-corpus false-positive gate.
+
 ## [0.3.5] — 2026-07-21
 
 ### "A prompt injection is still a prompt injection through a tool" — tool_output channel-coverage fix
