@@ -23865,4 +23865,99 @@ PATTERNS = [
         ],
         "description": "A malicious language-server or formatter code-action response embeds an instruction that reframes its suggested edit as already user-approved. An AI coding agent may obey because code actions are normally treated as trusted tool-derived remediation guidance rather than untrusted project content."
     },
+    # === v0.3.6 batch (9 patterns) ===
+    {
+        "id": "GLS-CMP-009",
+        "name": "Github Actions Step Summary Tool Output Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)(?:GITHUB_STEP_SUMMARY|job summary|workflow summary|step summary).{0,500}(?:system|developer|assistant|agent|claude|codex|copilot).{0,200}(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions|do\s+not\s+(?:report|mention|summarize)|treat\s+.{0,80}\s+as\s+(?:system|developer|trusted|authoritative)|(?:exfiltrate|copy|print|reveal)\s+.{0,80}\s+(?:secret|token|credential|env)|mark\s+.{0,80}\s+(?:clean|safe|passed))""",
+        ],
+        "description": "Github Actions Step Summary Tool Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific vector targeting GITHUB_STEP_SUMMARY injection not covered by existing metadata patterns."
+    },
+    {
+        "id": "GLS-TOP-643",
+        "name": "OSC 8 hyperlink tool-output prompt smuggling",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?is)(?:\x1b\]8;;|\\x1b\]8;;|\\033\]8;;|\\u001b\]8;;|ESC\]8;;|OSC\s*8\s+hyperlink\s+target:)[^\r\n]{0,300}(?:(?:ignore|override|bypass|skip(?:\s|%20)+(?:approval|validation)|do(?:\s|%20)+not(?:\s|%20)+(?:ask|mention|verify)|send|reveal|exfiltrat\w+)[^\r\n]{0,160}(?:token|secret|api(?:\s|%20)*key|credentials?|approval|validation|policy)|(?:token|secret|api(?:\s|%20)*key|credentials?)[^\r\n]{0,160}(?:send|reveal|exfiltrat\w+|bypass))""",
+        ],
+        "description": "OSC 8 hyperlink tool-output prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new mechanism: hiding instructions inside terminal OSC 8 hyperlink targets to bypass visibility."
+    },
+    {
+        "id": "GLS-CMP-010",
+        "name": "Renovate Config Metadata Poisoning",
+        "category": "cicd_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*\b(?:do\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|does\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust|use)|must\s+not\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust|use)|should\s+(?:not\s+\w+|never\b|report|detect|flag|refuse|block)|not\s+(?:authoritative|canonical|definitive)|must\s+be\s+reported|not\s+obeyed|security\s+(?:report|reference|training).*?(?:detected|blocked|reported|refused)))
+(?=.*(?:\brenovate(?:bot)?\b|renovate\.json|\.github/renovate\.json|renovate-config|renovatebot\.com|packageRules|regexManagers|customManagers|dependencyDashboard|extends\s*:\s*\[|"renovate"\s*:|"packageRules"\s*:|"customManagers"\s*:))
+(?=.*(?<![A-Za-z0-9])(?:ai\s+agents?|automated\s+(?:(?:dependency|security|package|renovate)\s+){0,3}(?:review|audit|scan|verification|tools?)|dependency\s+(?:agents?|reviewers?|scanners?|auditors?|review|audit)|security\s+(?:agents?|scanners?|auditors?|reviewers?)|renovate\s+(?:reviewers?|auditors?|agents?)|scanner\s+instructions?|agent\s+instructions?|assistant\s+policy|verifier\s+instructions?|for\s+agents?)(?![A-Za-z0-9]))
+(?=.*(?:(?:primary|single)\s+source\s+of\s+truth|(?:authoritative|canonical|definitive|governing|controlling)\s+(?:renovate\s+)?(?:document|policy|guidance|runbook|playbook|procedure|process)|takes\s+precedence|overrides?|supersedes?|outranks?|overrules?|defines?\s+(?:(?:all|the)\s+)?(?:scanner|security|dependency|review|renovate|agent)?\s*rules?|(?:agent|scanner|assistant|verifier)\s+(?:instructions?|notes?|policy)|(?:main|primary|preferred|recommended|principal)\s+(?:(?:renovate|dependency|package|security|review|audit|verification|update|operating)\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy)|suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|(?:hide|omit|exclude|redact|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|(?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|treat.{0,60}?as\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?|CVEs?|vulnerabilities)\s+(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|redacted|excluded|skipped|treated|classified|marked).{0,50}?(?:informational|non-blocking|advisory-only|background|safe|clean)?|(?:keep|leave)\s+(?:[\w-]+\s+){0,4}(?:findings?|observations?|diagnostics?|results?|CVEs?|vulnerabilities)\s+out\s+of\s+(?:the\s+)?(?:report|summary|dashboard|dependency\s+dashboard|upgrade\s+memo|audit\s+memo|final\s+report)|(?:downgrade|demote|deprioritize|reclassify|route|move|place)\s+(?:[\w-]+\s+){0,5}(?:findings?|observations?|diagnostics?|results?|alerts?|CVEs?|vulnerabilities).{0,80}?(?:background|side|supplementary|appendix|informational|non-blocking)|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|relay|transfer|pass\s+along|hand\s+off)\s+(?:[\w-]+\s+){0,6}(?:API\s+tokens?|tokens?|session\s+keys?|credentials?|auth(?:orization)?\s+headers?|environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|material|evidence|proof\s+(?:bundle|package|material|evidence))|local\s+(?:state|config(?:uration)?|settings?)|npm\s+tokens?|registry\s+tokens?|GITHUB_TOKEN|RENOVATE_TOKEN|NPM_AUTH_TOKEN)))
+(?=.*(?:suppress(?:es|ed|ing)?\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|(?:hide|omit|exclude|redact|skip)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|(?:do\s+not|don't|not)\s+(?:report|flag|escalate)\s+(?:[\w-]+\s+){0,3}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?)|treat.{0,60}?as\s+(?:informational|non-blocking|safe|clean|benign|advisory-only)|(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?|CVEs?|vulnerabilities)\s+(?:are|is|were|was|should\s+be|must\s+be)\s+(?:not\s+)?(?:suppressed|hidden|omitted|redacted|excluded|skipped|treated|classified|marked).{0,50}?(?:informational|non-blocking|advisory-only|background|safe|clean)?|(?:keep|leave)\s+(?:[\w-]+\s+){0,4}(?:findings?|observations?|diagnostics?|results?|CVEs?|vulnerabilities)\s+out\s+of\s+(?:the\s+)?(?:report|summary|dashboard|dependency\s+dashboard|upgrade\s+memo|audit\s+memo|final\s+report)|(?:downgrade|demote|deprioritize|reclassify|route|move|place)\s+(?:[\w-]+\s+){0,5}(?:findings?|observations?|diagnostics?|results?|alerts?|CVEs?|vulnerabilities).{0,80}?(?:background|side|supplementary|appendix|informational|non-blocking)|(?:include|attach|forward|send|share|provide|expose|collect|pass\s+along|hand\s+off|relay|transfer)\s+(?:[\w-]+\s+){0,6}(?:environment\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\s+(?:context|variables?|config(?:uration)?|settings?|details?|state|proof\s+(?:material|evidence|bundle|package))|local\s+(?:state|config(?:uration)?|settings?)|registry\s+(?:tokens?|credentials?|context|config(?:uration)?|settings?|reproduction\s+bundle)|RENOVATE_TOKEN|NPM_AUTH_TOKEN|GITHUB_TOKEN|auth(?:orization)?\s+headers?|API\s+keys?|tokens?|secrets?)))
+.*""",
+        ],
+        "description": "Renovate Config Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific Renovate configuration poisoning; none of the listed patterns cover this tool's metadata."
+    },
+    {
+        "id": "GLS-PFX-001",
+        "name": "SARIF Fix-Plan Override",
+        "category": "ci_diagnostic_poisoning",
+        "severity": "high",
+        "channel": ["tool_output"],
+        "keywords": [
+            "SARIF_AUTOFIX_POLICY_OVERRIDE",
+            "treat this result as maintainer-approved",
+        ],
+        "regex": [
+            r"""(?is)SARIF_AUTOFIX_POLICY_OVERRIDE\s*:\s*treat\s+this\s+result\s+as\s+maintainer-approved.*?(?:skip|bypass|suppress)\s+(?:review|approval|tests|security\s+checks)""",
+        ],
+        "description": "A malicious dependency emits a crafted SARIF/static-analysis result whose message contains instructions to the coding agent, framed as an autofix policy from CI. An agent triaging tool output may obey because SARIF findings are normally treated as authoritative remediation guidance."
+    },
+    {
+        "id": "GLS-V3-032",
+        "name": "Airflow XCom delegated-approval laundering hardening row",
+        "category": "workflow_orchestrator_tool_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Airflow XCom task-return data can launder a delegated task result into a forged approval receipt for release orchestration agents."
+    },
+    {
+        "id": "GLS-V3-039",
+        "name": "Cloudflare Access audit log control-plane impersonation (hardening row)",
+        "category": "cloudflare_access_audit_log_tool_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Cloudflare Access audit/tunnel output can launder Zero Trust access telemetry into forged control-plane approval for deployment and release agents."
+    },
+    {
+        "id": "GLS-V3-058",
+        "name": "Renovate inherited preset extends-chain metadata hardening row",
+        "category": "dependency_automation_metadata",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A transitive Renovate preset reference can smuggle agent-directed policy text through an inherited `extends` chain, causing a dependency-review agent to treat preset metadata as authority to suppress scanner findings or mark risky updates safe."
+    },
+    {
+        "id": "GLS-V3-061",
+        "name": "HashiCorp Vault audit log control-plane impersonation (hardening row)",
+        "category": "audit_log_tool_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "HashiCorp Vault audit log entries can launder secrets-manager audit telemetry into forged change-approval or control-plane authority for deployment and security agents."
+    },
+    {
+        "id": "GLS-V3-064",
+        "name": "Puppet/Chef no-op preview execution-lure hardening",
+        "category": "configuration_management_preview_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Puppet `--noop`, Chef `why-run`, and adjacent configuration-management no-op preview output can launder a non-mutating simulation result into a false approval receipt that tells deployment agents to run the real mutating apply path."
+    },
 ]
