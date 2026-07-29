@@ -23960,4 +23960,83 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Puppet `--noop`, Chef `why-run`, and adjacent configuration-management no-op preview output can launder a non-mutating simulation result into a false approval receipt that tells deployment agents to run the real mutating apply path."
     },
+    # === v0.3.7 batch (9 patterns) ===
+    {
+        "id": "GLS-MSH-034",
+        "name": "MCP Sampling Request Behavioral Directive Injection",
+        "category": "mcp_sampling_hijack",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?i)sampling/createMessage[\s\S]{0,600}systemPrompt[\s\S]{0,300}(?:after(?:\s+\w+){0,5}\s+(?:task|step|this)|before\s+(?:returning|respond|answer)|append|prepend|encode\s+(?:and\s+)?(?:send|attach|add)|include\s+(?:the\s+)?(?:session|context|memory|history))""",
+        ],
+        "description": "MCP Sampling Request Behavioral Directive Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique protocol-specific syntax for MCP sampling request redirection/hijack."
+    },
+    {
+        "id": "GLS-ADP-002",
+        "name": "GraphQL persisted-query manifest metadata poisoning",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|should\s+not|do\s+not|cannot|can't)\b.{0,80}\b(?:treat\s+(?:operation\s+registry\s+descriptions?\s+)?as\s+authoritative|treat\s+.*as\s+safe|obey|follow|include\s+auth|forward\s+environment|attach\s+local|send\s+(?:api\s+)?tokens|suppress|hide|omit|mark\s+.*non[-\s]?blocking)\b)(?=.*\b(?:graphql|persisted[-\s]?quer(?:y|ies)|operation[-\s]?(?:registry|manifest|safelist|allowlist)|registered\s+operation|sha256Hash|extensions\.persistedQuery|operationId|operationName)\b)(?=.*\b(?:ai\s+agents?|assistants?|security\s+agents?|api\s+auditors?|graphql\s+reviewers?|scanners?|tool\s+builders?)\b)(?=.*\b(?:single\s+source\s+of\s+truth|authoritative\s+policy|overrid(?:e|es|ing)|supersed(?:e|es|ing)|controls?\s+(?:the\s+)?(?:security\s+)?review|suppress(?:\s+authorization)?\s+findings?|hide\s+(?:operation\s+)?warnings?|mark\s+(?:them\s+)?non[-\s]?blocking|omit\s+from\s+(?:audit|scanner|security)\s+reports?|treat\s+(?:this\s+operation\s+)?as\s+safe|include\s+auth(?:orization)?\s+headers?|forward\s+environment\s+variables?|attach\s+local\s+state|send\s+(?:api\s+)?tokens?|runtime\s+context)\b).*$""",
+        ],
+        "description": "GraphQL persisted-query manifest metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 graphQL operation registries, a distinct manifest-based API descriptor mechanism."
+    },
+    {
+        "id": "GLS-V3-002",
+        "name": "Askpass credential prompt execution lure (hardening row)",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Credential prompts such as `GIT_ASKPASS`, `SSH_ASKPASS`, or helper-rendered `Password for ...` lines can smuggle an agent-directed instruction to run a local script as an authentication fix, causing a coding agent to execute prompt text instead of treating it as inert terminal output."
+    },
+    {
+        "id": "GLS-V3-006",
+        "name": "AWS STS cached grant replay hardening row",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Cached AWS STS credential output can include adjacent note text that tells an AI deployment agent to treat an unexpired temporary role session as fresh human release approval and skip the original approval/change-window checks."
+    },
+    {
+        "id": "GLS-V3-013",
+        "name": "Git conflict-marker resolution authority laundering",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Unresolved Git conflict markers can carry branch-local resolver metadata that launders one side of the conflict into approval/release authority for coding agents."
+    },
+    {
+        "id": "GLS-V3-019",
+        "name": "judge-rubric verdict authority laundering (hardening row)",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A forged or attacker-controlled judge/rubric scorecard can claim that high novelty or low FP-budget scores are a green-lane ship receipt, causing a pattern agent to background duplicate review, skip gate reruns, or move an artifact to READY."
+    },
+    {
+        "id": "GLS-V3-020",
+        "name": "Kubernetes TokenReview stale grant replay hardening row",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Cached Kubernetes `TokenReview` output can carry a stale-grant note that tells an AI deployment agent to treat an old authenticated service-account response as current production authorization and quietly apply manifests without fresh authz or release approval checks."
+    },
+    {
+        "id": "GLS-V3-023",
+        "name": "novelty-index verdict authority laundering (hardening row)",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A forged or attacker-controlled novelty/dedup tool result can claim that a candidate is unique, pre-approved, or safe to ship, causing a pattern agent to bypass shipped-detector checks, deterministic gates, or duplicate warnings."
+    },
+    {
+        "id": "GLS-V3-024",
+        "name": "OpenAPI securitySchemes capability-escalation laundering (hardening row)",
+        "category": "api_descriptor_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "OpenAPI security-scheme metadata can tell AI client or integration agents that OAuth/admin scopes are already pre-cleared, laundering a descriptive API contract field into a capability grant."
+    },
 ]

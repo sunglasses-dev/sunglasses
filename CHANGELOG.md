@@ -3,6 +3,19 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.7] — 2026-07-29
+
+### Day 9 of the V3 drain — the non-tool MCP surfaces, cached credential grants, and forged verdict receipts
+
+- **+9 detection patterns (1,124 → 1,133), +1 category (84 → 85).** MCP server security is usually framed as tool approval. This batch covers the surfaces *around* the tools — sampling requests, API descriptor metadata, credential-helper prompts, cached auth responses, and agent-facing verdict receipts — each a channel where machine-generated evidence gets read by an agent as permission.
+- `GLS-MSH-034` — MCP sampling-request behavioral directive injection: a carrier-native prompt injection embedding suppression / authority-inversion instructions in the sampling channel. **Opens the new `mcp_sampling_hijack` category.**
+- `GLS-ADP-002` — GraphQL persisted-query manifest metadata poisoning; `GLS-V3-024` — OpenAPI `securitySchemes` metadata claiming OAuth/admin scopes are already pre-cleared, laundering a descriptive API contract into granted authority.
+- `GLS-V3-002` — credential prompts (`GIT_ASKPASS`, `SSH_ASKPASS`, helper-rendered `Password for …` lines) smuggling an agent-directed instruction to run a local script.
+- `GLS-V3-006` — cached AWS STS credential output whose adjacent note text tells a deployment agent to treat an unexpired temporary role session as fresh human authorization; `GLS-V3-020` — the same replay shape through cached Kubernetes `TokenReview` output.
+- `GLS-V3-013` — unresolved Git conflict markers carrying branch-local resolver metadata that launders one side of a conflict into release authority for coding agents.
+- `GLS-V3-019` — forged judge/rubric scorecards claiming a high-novelty or low-FP score is a green-lane ship receipt; `GLS-V3-023` — forged novelty/dedup tool results claiming a candidate is unique, pre-approved, or safe to ship. Both target the agent's own review loop.
+- **Full suite green before publish:** 506 passed, 7 xfailed, including the real-world-corpus false-positive gate.
+
 ## [0.3.6] — 2026-07-28
 
 ### Day 8 of the V3 drain — CI/CD and infrastructure tool output laundered into agent authority
