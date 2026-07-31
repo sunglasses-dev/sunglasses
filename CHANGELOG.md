@@ -3,6 +3,20 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.8] — 2026-07-31
+
+### Day 10 of the V3 drain — phantom tool-result frames, browser accessibility metadata, and cache/transport evidence laundering
+
+- **+9 detection patterns (1,133 → 1,142), +3 categories (85 → 88).** The through-line: a tool message is *evidence*, never *authority*. Each pattern covers a channel where machine-generated output — a result frame, an accessibility label, a cache header — gets read by an agent as permission to act.
+- `GLS-TRS-001` — **Phantom Tool-Result Frame Injection**: carrier-native prompt injection that fakes the XML structural envelopes agent frameworks use to delimit tool output, embedding suppression / authority-inversion instructions inside a spoofed result. **Opens the new `tool_response_spoofing` category.**
+- `GLS-PFX-004` — agent-targeted commands planted in ARIA labels and live-region text that surface in a browser automation accessibility snapshot, arriving as structured tool output rather than visible page prose. **Opens `browser_tool_output_injection`.**
+- `GLS-PFX-007` — agent-facing instructions hidden in accessibility labels and descriptions that appear only through a browser tool's accessibility snapshot, laundering a click approval through assistive-technology metadata. **Opens `browser_tool_output_poisoning`.**
+- `GLS-V3-010` — CDN / edge KV cache-hit metadata laundering reuse evidence into a forged prior-review receipt; `GLS-V3-026` — the same shape through LLM prompt-cache hit metadata. Cache identity is not review.
+- `GLS-V3-017` — HTTP `Alt-Svc` transport metadata laundering an alternative-service route into forged pre-cleared approval; `GLS-V3-018` — rate-limit/backoff headers laundering throttling state into forged cached approval.
+- `GLS-V3-011` — `gcloud compute start-iap-tunnel` / IAP TCP-forwarding terminal text impersonating an approval control plane, telling an automation agent that network access proves operator approval.
+- `GLS-V3-027` — Pyright-style type-checker JSON diagnostics carrying agent-directed policy claims in `generalDiagnostics[].message`, laundering static analysis into authority to suppress review findings.
+- **Benchmark truth gate extended:** published precision/recall claims are now verified against the live harness on `llms.txt` and `llms-full.txt` as well as `benchmark.html` and this repo's README — the agent-facing index had been serving pre-v0.3.4 figures.
+
 ## [0.3.7] — 2026-07-29
 
 ### Day 9 of the V3 drain — the non-tool MCP surfaces, cached credential grants, and forged verdict receipts

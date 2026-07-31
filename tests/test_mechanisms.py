@@ -176,10 +176,10 @@ def test_exfil_ignores_inbound_credential_prose(benign):
 def test_curl_pipe_bash_is_deliberately_not_flagged():
     """A documented, deliberate gap — not an oversight.
 
-    Five of the 73 clean READMEs in the FP corpus (deno, ollama, grype ...) ship
+    Seven of the 76 clean READMEs in the FP corpus (deno, ollama, grype, ohmyzsh ...) ship
     `curl … | sh` as their install line. It is how a large share of open source
     distributes software, and no shape rule separates the legitimate instance
-    from the malicious one. Flagging it would buy one attack and five false
+    from the malicious one. Flagging it would buy one attack and seven false
     positives. The gap is real, it is published in the benchmark, and it belongs
     to a runtime control rather than a text scanner.
 
@@ -192,7 +192,7 @@ def test_curl_pipe_bash_is_deliberately_not_flagged():
         "file")
     assert r.decision == "allow", (
         "curl|bash is now flagged — check the FP corpus before keeping this: the "
-        "same line appears in 5 legitimate READMEs."
+        "same line appears in 7 legitimate READMEs."
     )
 
 
