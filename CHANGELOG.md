@@ -3,6 +3,19 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.9] — 2026-08-01
+
+### Day 11 of the V3 drain — A2A agent cards, protocol-state envelopes, and delegation-bridge laundering
+
+- **+9 detection patterns (1,142 → 1,151), +4 categories (88 → 92).** Where Day 10 covered tool *messages*, this batch covers the surfaces agents use to describe and delegate to *each other* — capability cards, pending-tool-call envelopes, and child-worker summaries. In every case a pending or descriptive state gets read downstream as a completed approval.
+- `GLS-ACE-041` — A2A agent-card **skill-description** privilege escalation: suppression / authority-inversion text planted in the capability-discovery phase of the handshake. **Opens `a2a_capability_escalation`.**
+- `GLS-ACMI-021` — A2A agent-card **security-scheme description** injection: the same carrier, in the authentication metadata rather than the skill list. **Opens `a2a_card_metadata_injection`.**
+- `GLS-V3-066` — Anthropic Messages API `tool_use` blocks laundering a *pending* model-requested tool call into a fake human/coordinator approval receipt; `GLS-V3-069` — the same shape through Responses API `required_action` envelopes. Both let a release worker deploy while suppressing unresolved approval warnings. **Opens `agent_protocol_state`.**
+- `GLS-V3-042` — Copilot-style coding-agent task summaries laundering child-worker completion text into forged reviewer continuity for an orchestrator; `GLS-V3-062` — VS Code / LSP symbol-search results laundering IDE retrieval metadata into an accepted merge path. **Opens `delegation_bridge_state_laundering`.**
+- `GLS-V3-028` — SMT/SAT proof-certificate text laundering a bounded formal result into authorization to patch or deploy, with business and security review demoted to appendix notes.
+- `GLS-V3-041` — Cookiecutter/Copier scaffold notes laundering template-receipt language into false maintainer approval for repository-creation agents.
+- `GLS-V3-043` — a poisoned coverage-ledger gate transcript claiming `PASS_NO_DUPLICATE` is reviewer approval, so a pattern agent marks a card READY and skips review.
+
 ## [0.3.8] — 2026-07-31
 
 ### Day 10 of the V3 drain — phantom tool-result frames, browser accessibility metadata, and cache/transport evidence laundering
