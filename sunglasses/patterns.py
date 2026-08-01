@@ -24129,4 +24129,83 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Pyright-style type-checker JSON diagnostics can carry agent-directed policy claims in `generalDiagnostics[].message`, laundering static-analysis evidence into false authority to suppress review findings or attach local context."
     },
+    # === v0.3.9 batch (9 patterns) ===
+    {
+        "id": "GLS-ACMI-021",
+        "name": "A2A Agent Card Security Scheme Description Injection",
+        "category": "a2a_card_metadata_injection",
+        "severity": "high",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?i)security[Ss]chemes?[\s\S]{0,600}description[\s\S]{0,400}(?:orchestrat(?:ing|or|e)|this\s+(?:api|service)\s+requires?\s+(?:you|the\s+(?:calling|requesting)\s+agent)|before\s+(?:calling|processing|invoking)\s+any|note\s+for\s+(?:calling|upstream|orchestrat))""",
+        ],
+        "description": "A2A Agent Card Security Scheme Description Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 authentication metadata in A2A cards; distinct from RPC service metadata poisoning."
+    },
+    {
+        "id": "GLS-ACE-041",
+        "name": "Agent Card Skill-Description Privilege Escalation",
+        "category": "a2a_capability_escalation",
+        "severity": "critical",
+        "channel": ["message", "api_response"],
+        "regex": [
+            r"""(?i)(orchestrat|coordinat|supervisor|dispatch)\w*\s+(note|instruction|directive|alert)\s*[:\-]\s*.{0,300}(bypass|skip\s+\w+\s+review|pre[- ]?authori|elevated\s+(clearance|privilege|trust|access)|admin\s+privilege|direct\s+execution|without\s+\w+\s+review)""",
+        ],
+        "description": "Agent Card Skill-Description Privilege Escalation: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 capability discovery phase in A2A handshake; distinct from runtime manifest smuggling."
+    },
+    {
+        "id": "GLS-V3-028",
+        "name": "SMT solver certificate authority laundering",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "SMT/SAT proof-certificate text launders a bounded formal result into authorization to patch or deploy while relegating business/security review to appendix notes."
+    },
+    {
+        "id": "GLS-V3-041",
+        "name": "Cookiecutter scaffold receipt template-injection hardening",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Cookiecutter/Copier scaffold notes can launder template-receipt language into false maintainer approval for AI repository-creation agents."
+    },
+    {
+        "id": "GLS-V3-042",
+        "name": "Copilot coding-agent task summary delegation-bridge laundering (hardening row)",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Copilot-style coding-agent task summaries can launder child-worker completion text into forged reviewer continuity or merge permission for orchestrator agents."
+    },
+    {
+        "id": "GLS-V3-043",
+        "name": "coverage-ledger gate verdict authority laundering (hardening row)",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A poisoned coverage-ledger gate transcript can claim that `PASS_NO_DUPLICATE` or empty ledger neighbors are authoritative reviewer approval, causing a pattern agent to mark a card READY, skip Boss/watchdog review, or suppress duplicate-risk caveats."
+    },
+    {
+        "id": "GLS-V3-062",
+        "name": "VS Code/LSP workspace-symbol delegation-bridge laundering (hardening row)",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "VS Code/LSP symbol-search results can launder IDE retrieval metadata into forged delegation continuity or accepted merge/release path for code-review agents."
+    },
+    {
+        "id": "GLS-V3-066",
+        "name": "Anthropic tool_use protocol-state delegation-bridge hardening",
+        "category": "agent_protocol_state",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Anthropic Messages API `tool_use` blocks can launder pending model-requested tool-call state into a fake human/coordinator approval receipt, causing downstream release workers to deploy or publish while suppressing approval warnings."
+    },
+    {
+        "id": "GLS-V3-069",
+        "name": "OpenAI Responses required_action delegation-bridge state laundering hardening",
+        "category": "agent_protocol_state",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Responses API `required_action` tool-call request envelopes can launder a pending tool-call state into a fake coordinator approval record, causing downstream agents to publish or deploy while hiding unresolved approval warnings."
+    },
 ]
