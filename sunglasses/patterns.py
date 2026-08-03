@@ -24208,4 +24208,83 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Responses API `required_action` tool-call request envelopes can launder a pending tool-call state into a fake coordinator approval record, causing downstream agents to publish or deploy while hiding unresolved approval warnings."
     },
+    # === v0.3.10 batch (9 patterns) ===
+    {
+        "id": "GLS-CAS-001",
+        "name": "Fake Compaction Header State Injection",
+        "category": "compaction_artifact_spoofing",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?i)\[(?:context|session|memory|prior\s+turns?|previous\s+turns?)\s+(?:compacted?|compressed?|summarized?|restored?)[^\]]{0,80}\][\s\S]{0,500}(?:previously\s+(?:agreed|confirmed|established|set)|established\s+(?:constraint|rule|permission|clearance|priority)|ongoing\s+(?:task|priority|instruction|directive))""",
+        ],
+        "description": "Fake Compaction Header State Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 system compaction artifacts; distinct from tool results or general instructions."
+    },
+    {
+        "id": "GLS-MSR-001",
+        "name": "Session-State Snapshot Revoked-Grant Replay",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:memory|checkpoint|snapshot|state(?:\s+sync)?|resume|rollback)\b)(?=.*\b(?:revoked|expired|tombstoned?|deleted|invalidated)\b)(?=.*\b(?:approval|token|scope|grant|capability|credential)s?\b)(?=.*\b(?:replay(?:ed)?|rehydrat(?:e|ed|ion)|reinject(?:ed|ion)?|resurrect(?:ed|ion)?|restore(?:d)?)\b).*$""",
+        ],
+        "description": "Session-State Snapshot Revoked-Grant Replay: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new mechanism targeting re-activation of revoked capabilities via rehydration of stale memory snapshots."
+    },
+    {
+        "id": "GLS-V3-003",
+        "name": "AutoGen GroupChat saved-state memory authority laundering (hardening row)",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "AutoGen GroupChat saved-state snapshots can launder replayed conversation state into forged prior approval or revocation override authority for resumed agents."
+    },
+    {
+        "id": "GLS-V3-021",
+        "name": "LangGraph checkpoint-memory authority laundering (hardening row)",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "LangGraph checkpoint snapshots can launder replayed state into forged recovered operator clearance for release/deploy agents."
+    },
+    {
+        "id": "GLS-V3-025",
+        "name": "OpenFeature flag evaluation response approval smuggling (hardening row)",
+        "category": "runtime_config_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "OpenFeature or feature-flag evaluation responses can carry runtime metadata that tells a release assistant the rollout is already approved, green-laned, or operator-only, causing skipped approvals or hidden risk notes."
+    },
+    {
+        "id": "GLS-V3-044",
+        "name": "CrewAI memory-store authority laundering hardening row",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "CrewAI memory-store records can launder historical task memory into forged current operator clearance for release or deployment agents."
+    },
+    {
+        "id": "GLS-V3-048",
+        "name": "GitHub Actions cache hit semantic-cache authority laundering (hardening row)",
+        "category": "semantic_cache_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "GitHub Actions cache restore telemetry can launder a dependency/build cache hit into a forged release trust receipt for deployment agents."
+    },
+    {
+        "id": "GLS-V3-056",
+        "name": "OpenAI Responses previous-response state memory authority laundering (hardening row)",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "OpenAI Responses `previous_response_id` / response-resume state can launder replayed conversation continuity into forged current approval for release or deploy agents."
+    },
+    {
+        "id": "GLS-V3-057",
+        "name": "Redis cache state trust-reuse authority laundering (hardening row)",
+        "category": "semantic_cache_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Redis or cache-state output can launder a cache hit, stale key, or previous-release value into a forged prior-review/trust receipt for a release or scanner agent."
+    },
 ]

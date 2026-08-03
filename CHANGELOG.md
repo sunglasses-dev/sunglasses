@@ -3,6 +3,22 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.10] — 2026-08-02
+
+### Day 12 of the V3 drain — compaction artifacts, memory-state replay, and semantic-cache authority laundering
+
+- **+9 detection patterns (1,151 → 1,160), +4 categories (92 → 96).** Day 11 covered how agents describe and delegate to *each other*; this batch covers what an agent believes about its own past. Every carrier here is a mechanism for *remembering* — a compacted summary, a checkpoint, a resumed session, a cache hit — and in each case a reconstruction of prior state gets read downstream as a standing approval that was never re-verified.
+- `GLS-CAS-001` — fake compaction-header state injection: suppression / authority-inversion text planted in the context-summary boundary, where a truncated transcript is handed back to the model as authoritative history. **Opens `compaction_artifact_spoofing`.**
+- `GLS-MSR-001` — session-state snapshot **revoked-grant replay**: a snapshot restores a permission that was explicitly revoked after it was taken. **Opens `memory_state_replay`.**
+- `GLS-V3-003` — AutoGen GroupChat saved-state snapshots laundering replayed conversation state into forged prior approval or revocation-override authority on resume; `GLS-V3-021` — LangGraph checkpoint snapshots laundering replayed state into forged recovered operator clearance for release/deploy agents.
+- `GLS-V3-044` — CrewAI memory-store records laundering historical task memory into forged *current* operator clearance; `GLS-V3-056` — OpenAI Responses `previous_response_id` resume state laundering conversation continuity into forged current approval.
+- `GLS-V3-048` — GitHub Actions cache-restore telemetry laundering a dependency/build cache hit into a forged release trust receipt; `GLS-V3-057` — Redis / cache-state output laundering a cache hit, stale key, or previous-release value into a forged prior-review receipt. **Opens `semantic_cache_authority_laundering`.**
+- `GLS-V3-025` — OpenFeature / feature-flag evaluation responses carrying runtime metadata that tells a release assistant the rollout is already approved and green-laned. **Opens `runtime_config_metadata_poisoning`.**
+
+### Context
+
+A cache hit proves a value was stored, not that it was ever authorized. A checkpoint proves state existed, not that the grant behind it still stands. Compaction is the sharpest case: the summary an agent trusts most is the one it can no longer check against the transcript it replaced. All nine patterns detect the same substitution — evidence of a past state presented as present authority.
+
 ## [0.3.9] — 2026-08-01
 
 ### Day 11 of the V3 drain — A2A agent cards, protocol-state envelopes, and delegation-bridge laundering
