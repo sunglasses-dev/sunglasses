@@ -24287,4 +24287,86 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Redis or cache-state output can launder a cache hit, stale key, or previous-release value into a forged prior-review/trust receipt for a release or scanner agent."
     },
+    # === v0.3.11 batch (8 patterns) ===
+    {
+        "id": "GLS-ALP-001",
+        "name": "in-toto/SLSA Attestation Lineage Pointer Swap",
+        "category": "attestation_lineage_poisoning",
+        "severity": "critical",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?is)^(?=.*\b(attestation|provenance|lineage|signed\s+chain|proof\s+chain)\b)(?=.*\b(pointer|parent|head|latest|canonical|anchor)\b)(?=.*\b(swap|replace|rebind|redirect|override|substitute|retarget)\b)(?=.*\b(approval|consent|grant|authorized?)\b).*$""",
+        ],
+        "description": "in-toto/SLSA Attestation Lineage Pointer Swap: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structural lineage/pointer swapping in signed chains, distinct from general provenance."
+    },
+    {
+        "id": "GLS-LCEPP-001",
+        "name": "Istio Sidecar mTLS OCSP-Stale Certificate Bypass",
+        "category": "long_context_exploitation_policy_pivot",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:ocsp|crl|revocation)\b)(?=.*\b(?:staple|stapling|cache|cached|ttl|freshness)\b)(?=.*\b(?:rollback|replay|stale|resurrect(?:ed)?|backdated)\b)(?=.*\b(?:mcp|tool|agent|sidecar|gateway)\b)(?=.*\b(?:mtls|client\s*cert|certificate|x509)\b).*$""",
+        ],
+        "description": "Istio Sidecar mTLS OCSP-Stale Certificate Bypass: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific certificate revocation (OCSP/CRL) layer not addressed by generic stale-marker patterns."
+    },
+    {
+        "id": "GLS-OCES-001",
+        "name": "OIDC Discovery Document Token Endpoint Substitution",
+        "category": "oidc_credential_endpoint_substitution",
+        "severity": "critical",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?i)token_endpoint["'\s]*:["'\s]*https?://\S+\s*[,}\n][\s\S]{0,500}scopes?_supported[\s\S]{0,100}(?:admin|sudo|superuser|write:all)""",
+        ],
+        "description": "OIDC Discovery Document Token Endpoint Substitution: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific OIDC discovery endpoint substitution vector with scope escalation is not covered."
+    },
+    {
+        "id": "GLS-SMP-018",
+        "name": "Source Map `sourcesContent` Metadata Poisoning",
+        "category": "structured_metadata_poisoning",
+        "severity": "high",
+        "channel": ["file", "api_response"],
+        "regex": [
+            r"""(?six)^
+(?!.*(?:\b(?:security|incident|training|documentation|docs?|runbook|reference|analysis|scanner\s+test)\b.{0,160}?(?:detected|blocked|flagged|reported|must\s+be\s+reported|should\s+(?:report|detect|flag|block|refuse)|not\s+obeyed)|\b(?:do\s+not|does\s+not|never|must\s+not|should\s+not)\s+(?:obey|follow|treat|trust|use|include|forward|send|share|override|suppress|hide|omit)\b|\bsource\s*maps?\s+are\s+(?:debug|data|metadata)\s+only\b))
+(?=.*(?:source\s*maps?|sourcemaps?|\.map\b|sourcesContent|sourceMappingURL|webpack://|rollup|vite|parcel|devtool|bundle\s+map))
+(?=.*(?:(?:AI|autonomous|coding|security|dependency|review|debug|build)\s*(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)\b|\b(?:agents?|assistants?|scanners?|reviewers?)\b|(?:agent|assistant|scanner|reviewer)[._ -]?(?:instructions?|directive|policy|guidance|note)))
+(?=.*(?:authoritative|canonical|definitive|single\s+source\s+of\s+truth|overrides?|supersed(?:e|es|ed|ing)|outranks?|takes\s+precedence|defines?\s+(?:the\s+)?(?:scanner|review|security|debug|build)?\s*rules?|(?:agent|assistant|scanner|reviewer)\s+(?:instructions?|directive|policy|guidance)))
+(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip|silence|downgrade|deprioritize|reclassify|mark\s+.*(?:safe|clean|non-blocking)|(?:do\s+not|don't|not)\s+report|include|attach|forward|send|share|provide|expose|collect|relay|pass\s+along).{0,100}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|CVE|vulnerabilit(?:y|ies)|SAST|secret-scan|tokens?|secrets?|credentials?|auth\s+headers?|environment\s+(?:variables?|context|details?|state)|runtime\s+(?:context|variables?|proof|evidence)|local\s+(?:state|config)|CI\s+(?:auth|context|runtime))).*$""",
+        ],
+        "description": "Source Map `sourcesContent` Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique vector in debug metadata artifacts; distinct from build tool configuration."
+    },
+    {
+        "id": "GLS-V3-012",
+        "name": "Git bundle list-heads provenance swap (hardening row)",
+        "category": "provenance_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Git bundle/list-heads output can carry maintainer-origin provenance claims in comment-like text that asks an AI merge agent to treat an untrusted fork bundle as upstream-originated and skip fork quarantine."
+    },
+    {
+        "id": "GLS-V3-014",
+        "name": "Git LFS batch API provenance swap (hardening row)",
+        "category": "provenance_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Git LFS batch API object metadata can be used as a tool-output carrier that asks an AI release agent to treat an LFS object `oid` or transfer endpoint as release-source provenance and skip repository/signature approval gates."
+    },
+    {
+        "id": "GLS-V3-059",
+        "name": "Search-result snippet retrieval provenance decay hardening",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Search-result snippets and cached previews can launder stale retrieval preview text into a false source-of-record for release or publishing agents."
+    },
+    {
+        "id": "GLS-V3-063",
+        "name": "Browser omnibox suggestion retrieval provenance hardening",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Browser omnibox and address-bar autocomplete suggestions can launder local retrieval hints into false approval receipts for release or deployment agents."
+    },
 ]
