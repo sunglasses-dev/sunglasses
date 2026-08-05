@@ -3,6 +3,22 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.11] — 2026-08-05
+
+### Day 13 of the V3 drain — attestation lineage, credential-endpoint substitution, and provenance decay
+
+- **+8 detection patterns (1,160 → 1,168), +4 categories (96 → 100).** Day 12 covered what an agent believes about its own past; this batch covers what an agent believes about *where things came from*. Every carrier here is a provenance surface — a signed attestation, a discovery document, a source map, a certificate chain, a retrieval preview — and in each case a valid-looking pointer to the wrong lineage gets read downstream as runtime trust.
+- `GLS-ALP-001` — in-toto/SLSA attestation lineage pointer swap: structural lineage/pointer swapping in signed chains — the signature verifies while the lineage it vouches for is not the artifact being acted on. **Opens `attestation_lineage_poisoning`.**
+- `GLS-OCES-001` — OIDC discovery document token-endpoint substitution with scope escalation: the discovery document an agent trusts to find its token endpoint is itself the injection carrier. **Opens `oidc_credential_endpoint_substitution`.**
+- `GLS-LCEPP-001` — Istio sidecar mTLS OCSP-stale certificate bypass: revocation-layer (OCSP/CRL) staleness laundered into a live trust decision. **Opens `long_context_exploitation_policy_pivot`.**
+- `GLS-SMP-018` — source map `sourcesContent` metadata poisoning: injected authority instructions riding in debug metadata artifacts, distinct from build-tool configuration.
+- `GLS-V3-012` — git bundle/list-heads output carrying maintainer-origin provenance claims that ask a merge agent to treat an untrusted fork bundle as upstream and skip fork quarantine; `GLS-V3-014` — Git LFS batch API metadata asking a release agent to treat an LFS `oid` or transfer endpoint as release-source provenance and skip signature gates.
+- `GLS-V3-059` — search-result snippets and cached previews laundering stale retrieval text into a false source-of-record; `GLS-V3-063` — browser omnibox autocomplete suggestions laundering local retrieval hints into false approval receipts. **Open `retrieval_provenance_decay_authority_laundering`.**
+
+### Context
+
+A signature answers "who signed this," not "is this the lineage your action depends on." A discovery document answers "where is the endpoint," not "is that endpoint still the one your operator approved." All eight patterns detect the same substitution — provenance evidence that verifies locally while pointing somewhere the agent never re-checked.
+
 ## [0.3.10] — 2026-08-02
 
 ### Day 12 of the V3 drain — compaction artifacts, memory-state replay, and semantic-cache authority laundering

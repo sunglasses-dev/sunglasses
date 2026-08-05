@@ -153,7 +153,7 @@ result = scanner.scan_auto("any_file.ext")
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux — anywhere Python runs |
 
-_All performance numbers verified against `stats/current.json` (v0.3.10, updated Aug 2, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
+_All performance numbers verified against `stats/current.json` (v0.3.11, updated Aug 5, 2026). Measured on Apple M3 Max, 48GB RAM, single-threaded Python 3.11. Your hardware will differ._
 
 ## Benchmark — the receipts
 
@@ -166,7 +166,7 @@ python3 tests/benchmark/precision_recall.py
 
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge — same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block.
 
-| Metric (v0.3.10) | Value |
+| Metric (v0.3.11) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
@@ -180,7 +180,7 @@ Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 
 
 English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-## What Works Today (v0.3.10)
+## What Works Today (v0.3.11)
 
 - ✅ Text scanning: 1168 patterns, 7,668 keywords, 23 languages, 100 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that catch the attack's structure (e.g. *something sensitive + somewhere to send it*), so paraphrases the pattern database has never seen still get caught
