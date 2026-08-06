@@ -3,6 +3,23 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.12] — 2026-08-06
+
+### Day 14 of the V3 drain — sampling parameters, speculative decode, and the carriers that hide in plain sight
+
+- **+8 detection patterns (1,168 → 1,176), +6 categories (100 → 106).** Day 13 covered where things came from; this batch covers *how things are rendered and parsed*. Every carrier here sits between what a human sees and what an agent consumes — generation settings, decode traces, terminal escape codes, homoglyphs, duplicate keys, MIME alternatives — and in each case the visible representation and the machine-consumed representation diverge.
+- `GLS-SPI-001` — LLM sampling parameter metadata injection: suppression / authority-inversion instructions riding in technical sampling metadata (temperature, top_p, logit_bias, stop strings) that an agent treats as trusted generation configuration. **Opens `sampling_parameter_injection`.**
+- `GLS-SDH-001` — speculative decode acceptance spoofing: injected instructions targeting internal speculative-decode draft/acceptance traces, laundering authority through a layer no human ever reviews. **Opens `speculative_decode_hijack`.**
+- `GLS-V3-033` / `GLS-V3-034` — ANSI OSC-0/OSC-2 terminal-title and OSC-8 hyperlink smuggling: approval and authorization claims hidden in window-title metadata and rendered hyperlink labels that a release agent reads as operational evidence in CI or shell transcripts. **Open `encoding_smuggling`.**
+- `GLS-V3-001` — ANSI SGR conceal spans hiding approval-laundering instructions in terminal output; reveal/normalize concealed text before trusting a transcript. **Opens `terminal_output_encoding_smuggling`.**
+- `GLS-V3-030` — Unicode Cyrillic homoglyphs preserving approval-laundering instructions visually while bypassing literal Latin-token detection; hardens `unicode_evasion`.
+- `GLS-V3-050` — JSON duplicate-key shadowing: one parser displays the safe value while the agent's parser consumes a later conflicting `green_lane` / risk-`0` value. **Opens `duplicate_key_shadowing`.**
+- `GLS-V3-054` — MIME `multipart/alternative` parser differential: the human previewer reads a benign plain-text part while the agent-facing HTML alternative carries the approval/bypass instruction. **Opens `representation_parser_differential`.**
+
+### Context
+
+A sampling parameter answers "how should this be generated," not "who authorized this action." A terminal transcript answers "what was rendered," not "what was actually there." All eight patterns detect the same divergence — a representation an agent consumes that differs from the representation a human approved.
+
 ## [0.3.11] — 2026-08-05
 
 ### Day 13 of the V3 drain — attestation lineage, credential-endpoint substitution, and provenance decay

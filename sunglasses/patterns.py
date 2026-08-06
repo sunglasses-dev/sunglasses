@@ -24369,4 +24369,75 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Browser omnibox and address-bar autocomplete suggestions can launder local retrieval hints into false approval receipts for release or deployment agents."
     },
+    # === v0.3.12 batch (8 patterns) ===
+    {
+        "id": "GLS-SPI-001",
+        "name": "LLM Sampling Parameter Metadata Injection",
+        "category": "sampling_parameter_injection",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?i)logit[_-]?bias[^{]{0,30}\{[^}]*\d{4,}[^}]*:\s*-?\d+""",
+        ],
+        "description": "LLM Sampling Parameter Metadata Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mechanism targets technical LLM sampling parameters (logit_bias) instead of natural language."
+    },
+    {
+        "id": "GLS-SDH-001",
+        "name": "Speculative Decode Acceptance Spoofing",
+        "category": "speculative_decode_hijack",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "regex": [
+            r"""(?i)\[draft[:\s]*(?:\d\.\d+|score|accepted)\].*?(?:completion[_\-]?token|verified[_\-]?token|draft[_\-]?accept).*?\[role[:\s]*(?:assistant|system|model)\]""",
+        ],
+        "description": "Speculative Decode Acceptance Spoofing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique attack targeting internal speculative decoding trace metadata formats for continuation injection."
+    },
+    {
+        "id": "GLS-V3-001",
+        "name": "2026-06-30_ansi_sgr_conceal_encoding_smuggling_hardening",
+        "category": "terminal_output_encoding_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "ANSI SGR conceal spans can hide approval-laundering instructions in terminal output; scanners should reveal/normalize concealed text before applying the parent encoding-smuggling authority/action detector."
+    },
+    {
+        "id": "GLS-V3-030",
+        "name": "2026-06-30_unicode_homoglyph_approval_laundering_hardening",
+        "category": "unicode_evasion",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Unicode Cyrillic homoglyphs can visually preserve approval-laundering instructions while bypassing literal Latin-token detection; normalize confusables before applying the parent encoding-smuggling authority/action rules."
+    },
+    {
+        "id": "GLS-V3-033",
+        "name": "ANSI OSC-0 terminal title approval laundering (hardening row)",
+        "category": "encoding_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "ANSI OSC-0/OSC-2 terminal title controls can smuggle approval and suppression claims through CI or shell transcripts when an AI release agent treats terminal window-title metadata as operational evidence."
+    },
+    {
+        "id": "GLS-V3-034",
+        "name": "ANSI OSC-8 terminal hyperlink encoding smuggling (hardening row)",
+        "category": "encoding_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "ANSI OSC-8 terminal hyperlinks can smuggle approval/authorization claims through CI or terminal output when an AI release agent treats rendered hyperlink labels as release-control evidence."
+    },
+    {
+        "id": "GLS-V3-050",
+        "name": "JSON duplicate-key shadowing approval/risk parser differential",
+        "category": "duplicate_key_shadowing",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A JSON object with duplicate risk or approval keys can make one parser display a safe value while the AI agent's parser consumes a later conflicting value such as `green_lane` or risk `0`."
+    },
+    {
+        "id": "GLS-V3-054",
+        "name": "MIME multipart/alternative parser-differential approval laundering",
+        "category": "representation_parser_differential",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A hostile MIME `multipart/alternative` message shows a benign plain-text part to a human or previewer while placing the agent-facing approval/bypass instruction in an HTML alternative that a downstream AI email/ticket agent extracts as the canonical summary."
+    },
 ]
