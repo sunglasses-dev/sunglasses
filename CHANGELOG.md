@@ -3,6 +3,24 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.3.13] — 2026-08-07
+
+### Day 15 of the V3 drain — repository instruction files, template comments, and generated receipts
+
+- **+8 detection patterns (1,176 → 1,184), +3 categories (106 → 109).** Day 14 covered how things are rendered and parsed; this batch covers *the files an agent reads before it does anything else*. Every carrier here is authored configuration or generated output that a human skims and an agent obeys — repository instruction files, non-rendered template comments, chart notes, experiment metadata, and tool receipts.
+- `GLS-V3-015` — Handlebars/Mustache template comments hiding agent-directed release-policy instructions inside non-rendered template syntax: invisible in a rendered preview, fully visible to an agent editing or reviewing the file. Hardens `discovery_file_poisoning`.
+- `GLS-V3-016` — Helm charts rendering euphemistic release-policy text into `NOTES.txt` or generated manifest comments, so a deployment agent reads chart-controlled output as a chart-owner trust receipt. **Opens `deployment_template_poisoning`.**
+- `GLS-V3-022` — Liquid template comments carrying green-path or "designer-only" routing instructions that a theme-review agent reads as publish authorization. **Opens `template_metadata_poisoning`.**
+- `GLS-V3-009` — DVC params and metrics metadata carrying euphemistic model-release instructions that route failed fairness/fraud metrics into background text and mark registry promotion green. **Opens `mlops_metadata_poisoning`.**
+- `GLS-V3-004` — AWS IAM policy-simulator output poisoned so a deployment agent treats an `EvalDecision=allowed` result as a grant to attach or exercise broader privileged IAM capabilities; hardens `authorization_bypass`.
+- `GLS-V3-045` — poisoned dedup/novelty-preflight output claiming `LOW overlap` or empty nearest-neighbor results are authoritative ship approval, pushing a pattern agent past self-index review and deterministic gates.
+- `GLS-V3-046` — evaluation scorecards and benchmark statistics laundering bounded metric evidence into human release approval while suppressing unresolved safety review.
+- `GLS-V3-055` — Nx/Angular schematic generator receipts laundering generated-file provenance into false approval for workspace-maintenance agents.
+
+### Context
+
+`.github/copilot-instructions.md` is documented by GitHub as repository-wide custom instructions — which makes it agent-readable input, not policy. The same shape repeats across every carrier in this release: a file authored to *help* an assistant gets read as authority to *skip* a check. A template comment, a chart note, a metrics file, and a generator receipt are all evidence about what happened. None of them is a decision about what is allowed.
+
 ## [0.3.12] — 2026-08-06
 
 ### Day 14 of the V3 drain — sampling parameters, speculative decode, and the carriers that hide in plain sight
