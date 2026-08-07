@@ -24440,4 +24440,69 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "A hostile MIME `multipart/alternative` message shows a benign plain-text part to a human or previewer while placing the agent-facing approval/bypass instruction in an HTML alternative that a downstream AI email/ticket agent extracts as the canonical summary."
     },
+    # === v0.3.13 batch (8 patterns) ===
+    {
+        "id": "GLS-V3-004",
+        "name": "AWS IAM policy-simulator capability escalation laundering (hardening row)",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "AWS IAM simulator output can be poisoned so an AI deployment agent treats `EvalDecision=allowed` evidence as a grant to attach or exercise broader privileged IAM capabilities."
+    },
+    {
+        "id": "GLS-V3-009",
+        "name": "DVC params/metrics release-lane metadata smuggling (hardening row)",
+        "category": "mlops_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "DVC params and metrics metadata can carry euphemistic model-release instructions that route failed fairness/fraud metrics into background text and mark registry promotion green."
+    },
+    {
+        "id": "GLS-V3-015",
+        "name": "Handlebars template comment release-policy laundering (hardening row)",
+        "category": "discovery_file_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Handlebars or Mustache template comments can hide agent-directed release-policy instructions inside non-rendered template syntax that humans and rendered previews often ignore, but AI agents read while editing or reviewing template files."
+    },
+    {
+        "id": "GLS-V3-016",
+        "name": "Helm rendered template NOTES trust-receipt laundering (hardening row)",
+        "category": "deployment_template_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A Helm chart can render euphemistic release-policy text into `NOTES.txt` or generated manifest comments, making a deployment agent treat templated output as a chart-owner trust receipt instead of untrusted chart-controlled text."
+    },
+    {
+        "id": "GLS-V3-022",
+        "name": "Liquid template comment green-path publishing smuggling (hardening row)",
+        "category": "template_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Liquid template comments can hide green-path or designer-only routing instructions that a theme-review agent may read as publish authorization even though the text is non-rendered, attacker-controlled template metadata."
+    },
+    {
+        "id": "GLS-V3-045",
+        "name": "dedup-check output verdict authority laundering (hardening row)",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "A poisoned dedup/novelty-preflight helper output can claim that `LOW overlap` or empty nearest-neighbor results are authoritative ship approval, causing a pattern agent to skip self-index review, deterministic gates, duplicate-risk notes, or status discipline."
+    },
+    {
+        "id": "GLS-V3-046",
+        "name": "Evaluation metric authority laundering",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Evaluation scorecards and benchmark statistics launder bounded metric evidence into human release approval, telling an AI release agent to deploy while suppressing unresolved safety review."
+    },
+    {
+        "id": "GLS-V3-055",
+        "name": "Nx / Angular schematic generator receipt template-injection hardening",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Nx/Angular schematic generator receipts can launder generated-file provenance into false approval for AI workspace-maintenance agents."
+    },
 ]
