@@ -459,6 +459,55 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def cmd_init(args):
+    """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
+    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+                           settings_path_for, uninstall_hook)
+
+    path = settings_path_for(args.scope_global)
+
+    if args.uninstall:
+        uninstall_hook(path)
+        print(f"\n  {GREEN}Firewall hook removed{RESET} {DIM}from {path}{RESET}")
+        print(f"  {DIM}Your other hooks were left untouched. A timestamped backup "
+              f"sits next to the file.{RESET}\n")
+        return 0
+
+    entry = build_hook_entry()
+    command = entry["hooks"][0]["command"]
+
+    # Self-test BEFORE writing. A hook that fails, fails open — so a broken
+    # wire would leave the firewall silently off. Better to refuse to install.
+    print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
+    ok, detail = self_test_hook(command)
+    if not ok:
+        print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
+        print(f"  {DIM}Command tried: {command}{RESET}")
+        print(f"\n  {YELLOW}Not installing.{RESET} A hook that cannot run fails open — "
+              f"you would have a firewall that looks on and is off.")
+        print(f"  {DIM}Usually means sunglasses is installed for a different "
+              f"interpreter. Try: {sys.executable} -m pip install sunglasses{RESET}\n")
+        return 1
+    print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
+
+    try:
+        install_hook(path)
+    except Exception as exc:
+        print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
+        return 1
+
+    print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
+    print(f"  {DIM}{command}{RESET}")
+    print(f"\n  {BOLD}What it blocks{RESET} {DIM}(deterministic facts only){RESET}")
+    print(f"    - secret material leaving in an outbound tool call")
+    print(f"    - rules you write in {CYAN}~/.sunglasses/policy.yaml{RESET}")
+    print(f"  {BOLD}What it never blocks{RESET}")
+    print(f"    - pattern/intent matches. Those escalate to you, never auto-deny.")
+    print(f"\n  {DIM}Next: `sunglasses pin` to pin MCP tool descriptors, "
+          f"`sunglasses receipts` for the audit trail.{RESET}\n")
+    return 0
+
+
 def cmd_pin(args):
     """Record (or verify) SHA-256 pins for every configured MCP tool descriptor.
 
@@ -836,6 +885,16 @@ def main():
         "--check", action="store_true",
         help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")
     pin_parser.set_defaults(func=cmd_pin)
+
+    # init
+    init_parser = subparsers.add_parser(
+        "init", help="Install the firewall as a Claude Code PreToolUse hook")
+    init_parser.add_argument(
+        "--global", dest="scope_global", action="store_true",
+        help="Write to ~/.claude/settings.json instead of ./.claude/settings.json")
+    init_parser.add_argument(
+        "--uninstall", action="store_true", help="Remove the hook cleanly")
+    init_parser.set_defaults(func=cmd_init)
 
     # demo
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")

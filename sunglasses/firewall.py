@@ -757,6 +757,17 @@ def evaluate(payload: dict, home=None) -> "tuple":
             if decision is not None:
                 return decision, None, extras
 
+    if fuzzy_enabled(home):
+        # Runs LAST and only on the way to "nothing found". Every deterministic
+        # answer above outranks it, which keeps a probabilistic signal from ever
+        # standing in front of a provable one.
+        extras["fuzzy_lane"] = True
+        decision = check_fuzzy(tool_name, tool_input)
+        if decision is not None:
+            if decision.action == "deny":  # pragma: no cover - belt and braces
+                raise AssertionError("fuzzy lane produced a deny; that is forbidden")
+            return decision, None, extras
+
     return _CLEAN, ("; ".join(errors) if errors else None), extras
 
 
@@ -819,6 +830,172 @@ def _now_iso() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+# ── Installation (`sunglasses init`) ────────────────────────────────────────
+# This edits a file the user already depends on. The rules are therefore about
+# their data, not ours: never lose a key that was already there, back up before
+# writing, refuse to touch a file we cannot parse, and leave nothing behind on
+# uninstall.
+
+# Every hook entry we own contains this string, which is how install stays
+# idempotent and uninstall stays surgical. Matching on the module path (rather
+# than storing a custom marker key) keeps the entry inside the documented hook
+# schema — an unrecognised key would be ours to explain forever.
+HOOK_MARKER = "sunglasses.firewall"
+
+_HOOK_TIMEOUT = 10
+
+
+def build_hook_entry(interpreter: str = None) -> dict:
+    """The PreToolUse entry we write into settings.json.
+
+    `interpreter` defaults to the ABSOLUTE `sys.executable` of whatever python is
+    running `init`. Writing a bare `python3` would resolve through PATH at hook
+    time, which under pipx/venv/conda can be a different interpreter with no
+    `sunglasses` installed — the hook then fails on every call, invisibly, and
+    the firewall is off while looking on.
+    """
+    import sys as _sys
+    interpreter = interpreter or _sys.executable
+    return {
+        # Everything, not just egress tools: policy `blocked_paths` has to cover
+        # Read/Edit as well, and the module filters in ~0.2ms anyway.
+        "matcher": ".*",
+        "hooks": [{
+            "type": "command",
+            "command": f"{interpreter} -m {HOOK_MARKER}",
+            # The schema default is 600s. A hook that can hang for ten minutes
+            # on every tool call is a worse outage than the attacks it prevents.
+            "timeout": _HOOK_TIMEOUT,
+        }],
+    }
+
+
+def self_test_hook(command: str) -> "tuple":
+    """Spawn the exact command we are about to write and check it answers.
+
+    Returns (ok, detail). This is the difference between finding a broken wire
+    at install time and finding it at 3am — a misconfigured hook fails open, so
+    without this check the failure mode is completely silent.
+    """
+    import json as _json
+    import subprocess
+    probe = _json.dumps({
+        "session_id": "sunglasses-self-test",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {"command": "echo sunglasses-self-test"},
+        "tool_use_id": "selftest",
+    })
+    try:
+        proc = subprocess.run(command, shell=True, input=probe,
+                              capture_output=True, text=True, timeout=30)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"could not run the hook command: {exc}"
+    if proc.returncode != 0:
+        return False, f"exit code {proc.returncode}: {(proc.stderr or '').strip()[:300]}"
+    try:
+        data = _json.loads(proc.stdout)
+        decision = data["hookSpecificOutput"]["permissionDecision"]
+    except Exception:  # noqa: BLE001
+        return False, f"did not return hook JSON: {(proc.stdout or '').strip()[:200]}"
+    if decision not in {"allow", "deny", "ask", "defer"}:
+        return False, f"unexpected permissionDecision: {decision!r}"
+    return True, decision
+
+
+def _read_settings(path):
+    import json as _json
+    import pathlib
+    path = pathlib.Path(path)
+    if not path.exists():
+        return {}
+    text = path.read_text()
+    if not text.strip():
+        return {}
+    try:
+        data = _json.loads(text)
+    except ValueError as exc:
+        # Refusing is the safe move: overwriting a config we could not parse
+        # would destroy settings the user cannot get back.
+        raise PolicyError(
+            f"{path} is not valid JSON ({exc}). Refusing to modify it — fix the "
+            f"file (or move it aside) and re-run.") from exc
+    if not isinstance(data, dict):
+        raise PolicyError(f"{path} does not contain a JSON object. Refusing to modify it.")
+    return data
+
+
+def _write_settings(path, data, backup=True):
+    import datetime
+    import json as _json
+    import pathlib
+    import shutil
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if backup and path.exists():
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(path, path.with_name(path.name + f".sunglasses-backup-{stamp}"))
+    path.write_text(_json.dumps(data, indent=2) + "\n")
+
+
+def _strip_our_hooks(pre_tool_use: list) -> list:
+    """Drop our entries, keeping everyone else's untouched."""
+    kept = []
+    for entry in pre_tool_use:
+        hooks = [h for h in (entry.get("hooks") or [])
+                 if HOOK_MARKER not in str(h.get("command", ""))]
+        if hooks:
+            kept.append({**entry, "hooks": hooks})
+        elif not entry.get("hooks"):
+            kept.append(entry)  # someone else's entry we do not understand
+    return kept
+
+
+def install_hook(settings_path, interpreter: str = None) -> dict:
+    """Add (or refresh) our PreToolUse hook. Idempotent, merging, backed up."""
+    data = _read_settings(settings_path)
+    hooks = data.setdefault("hooks", {})
+    pre = hooks.get("PreToolUse") or []
+
+    # Strip first, then append: a re-run after the user moved their venv must
+    # FIX the stale interpreter, not add a second entry pointing at a dead one.
+    pre = _strip_our_hooks(pre)
+    pre.append(build_hook_entry(interpreter))
+    hooks["PreToolUse"] = pre
+    _write_settings(settings_path, data)
+    return data
+
+
+def uninstall_hook(settings_path) -> dict:
+    """Remove our hook and any container we would otherwise leave behind."""
+    import pathlib
+    if not pathlib.Path(settings_path).exists():
+        return {}
+    data = _read_settings(settings_path)
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict) or "PreToolUse" not in hooks:
+        return data
+
+    remaining = _strip_our_hooks(hooks["PreToolUse"] or [])
+    if remaining:
+        hooks["PreToolUse"] = remaining
+    else:
+        # Leave no config litter: an empty PreToolUse array (or an empty hooks
+        # object) we created ourselves should disappear with us.
+        hooks.pop("PreToolUse")
+        if not hooks:
+            data.pop("hooks")
+    _write_settings(settings_path, data)
+    return data
+
+
+def settings_path_for(scope_global: bool, cwd=None):
+    import pathlib
+    if scope_global:
+        return pathlib.Path.home() / ".claude" / "settings.json"
+    return pathlib.Path(cwd or pathlib.Path.cwd()) / ".claude" / "settings.json"
+
+
 def main(argv=None) -> int:
     """`python3 -m sunglasses.firewall` — the PreToolUse hook entry point.
 
@@ -838,10 +1015,79 @@ def main(argv=None) -> int:
     return 0
 
 
+# ── FUZZY LANE ──────────────────────────────────────────────────────────────
+# Everything below may consult the pattern engine. NOTHING below may return
+# action="deny" — not at critical severity, not ever. That is the locked rule,
+# and `test_fuzzy_lane_never_denies_at_any_severity` holds it down.
+#
+# Why a detection this good still doesn't get to block: the engine answers "does
+# this text look like an attack?", which is a probability. A hard deny on a
+# probability is how a security tool becomes the thing that breaks the user's
+# work — and the day it blocks something legitimate is the day it gets
+# uninstalled, after which it protects nothing.
+#
+# It is also OFF by default. See `fuzzy_enabled()` for the measured reason.
+
+_FUZZY_ENGINE = None
+
+
+def fuzzy_enabled(home=None) -> bool:
+    """Opt-in via `~/.sunglasses/warn-lane` (empty marker file).
+
+    Default OFF, and that is a measurement, not a preference: the pattern engine
+    is built to read *content* — documents, web pages, tool output — and a
+    PreToolUse hook feeds it *commands*. Turning it on means an escalation
+    prompt on ordinary work, and a prompt the user learns to dismiss is worse
+    than no prompt at all. On by default would train people to click through.
+    """
+    home = home or sunglasses_home()
+    return (home / "warn-lane").exists()
+
+
+def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
+    """Pattern-engine pass. Escalates to the human; never decides for them."""
+    global _FUZZY_ENGINE
+    text = egress_surface_text(tool_name, tool_input)
+    if not text:
+        return None
+
+    # Imported here, not at module scope: the deterministic path must never pay
+    # for the pattern DB, and the hot-path import test enforces that.
+    if _FUZZY_ENGINE is None:
+        from .engine import SunglassesEngine
+        _FUZZY_ENGINE = SunglassesEngine()
+
+    result = _FUZZY_ENGINE.scan(text, channel="message")
+    if result.is_clean:
+        return None
+
+    from .policy import decide_enforce
+    # `decide_enforce` says "block" at high/critical. On THIS surface that
+    # verdict is deliberately downgraded to "ask" — the mapping it was written
+    # for is the model-input boundary, where blocking text is honest. Here we
+    # would be blocking the user's own action on a guess.
+    enforcement = decide_enforce(result.findings)
+    worst = result.findings[0]
+    return Decision(
+        action="ask",
+        lane="fuzzy",
+        rule_id=worst.get("id", "GLS-FW-FUZZY"),
+        reason=(
+            f"SUNGLASSES firewall: pattern match — {worst.get('name', 'suspicious content')} "
+            f"({worst.get('severity', 'unknown')}). This is a DETECTION, not a proven fact, "
+            f"so it is your call, not the firewall's "
+            f"(enforcement-surface mapping would have said '{enforcement}'). "
+            f"Turn this lane off by deleting ~/.sunglasses/warn-lane."
+        ),
+    )
+
+
+# ── Entry point ─────────────────────────────────────────────────────────────
+# MUST stay the last statement in this file. Under `python3 -m`, the module body
+# executes top-to-bottom, so anything defined BELOW this line does not exist yet
+# when main() runs. Living mid-file, it made every name after it a NameError in
+# the subprocess — invisible in-process, where the whole module is imported
+# first. Caught Aug 7 2026 by the fail-open receipt, not by a test.
+
 if __name__ == "__main__":  # pragma: no cover - exercised via subprocess tests
     raise SystemExit(main())
-
-
-# ── FUZZY LANE ──────────────────────────────────────────────────────────────
-# Everything below may consult the pattern engine. Nothing below may return
-# action="deny". Wired in P5.
