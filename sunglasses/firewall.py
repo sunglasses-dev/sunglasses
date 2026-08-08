@@ -42,20 +42,35 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
-from typing import Optional
+
+# Import budget note: this module is on the hot path — it is imported once per
+# tool call, so every import is paid thousands of times a day. `dataclasses`
+# measured +6.6ms and `typing` +1.8ms of interpreter start on this Mac, which is
+# ~8% of the 100ms budget spent on syntax sugar for two tiny classes. Hence the
+# plain `__slots__` classes below and string-only annotations (`from __future__
+# import annotations` means they are never evaluated). Keep new imports out of
+# module scope; lazy-import inside the function that needs them.
 
 
 # ── Decision ────────────────────────────────────────────────────────────────
 
-@dataclass(frozen=True)
 class Decision:
     """One firewall verdict. `action` maps 1:1 onto the PreToolUse contract."""
 
-    action: str          # "deny" | "ask" | "defer" | "allow"
-    lane: str            # "deterministic" | "fuzzy" | "error"
-    rule_id: str         # stable id, goes in the receipt
-    reason: str          # shown to the user/agent — NEVER contains the material
+    __slots__ = ("action", "lane", "rule_id", "reason")
+
+    def __init__(self, action: str, lane: str, rule_id: str, reason: str):
+        self.action = action      # "deny" | "ask" | "defer" | "allow"
+        self.lane = lane          # "deterministic" | "fuzzy" | "error"
+        self.rule_id = rule_id    # stable id, goes in the receipt
+        self.reason = reason      # shown to user/agent — NEVER the material
+
+    def __repr__(self):
+        return f"Decision({self.action!r}, {self.lane!r}, {self.rule_id!r})"
+
+    def __eq__(self, other):
+        return isinstance(other, Decision) and all(
+            getattr(self, f) == getattr(other, f) for f in self.__slots__)
 
     def to_hook_output(self) -> dict:
         return {
@@ -77,11 +92,15 @@ class Decision:
 # lane. If a provider's format is not precise enough to write down here, it does
 # not get to block.
 
-@dataclass(frozen=True)
 class SecretRule:
-    id: str
-    name: str
-    regex: "re.Pattern"
+    """One credential format. Plain class for the same import-budget reason."""
+
+    __slots__ = ("id", "name", "regex")
+
+    def __init__(self, id: str, name: str, regex):
+        self.id = id
+        self.name = name
+        self.regex = regex
 
 
 SECRET_RULES: tuple = (
@@ -226,7 +245,7 @@ def _fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8", "replace")).hexdigest()[:12]
 
 
-def check_egress_secrets(tool_name: str, tool_input: dict) -> Optional[Decision]:
+def check_egress_secrets(tool_name: str, tool_input: dict) -> "Decision | None":
     """HARD BLOCK if live credential material is heading out on this call.
 
     Returns None when there is nothing to say — the caller then continues to the
@@ -299,7 +318,7 @@ def load_pins(path) -> dict:
     return data
 
 
-def check_pin(tool_name: str, descriptor, pins: dict) -> Optional[Decision]:
+def check_pin(tool_name: str, descriptor, pins: dict) -> "Decision | None":
     """Compare a live MCP tool descriptor against its recorded pin.
 
     Three outcomes:
@@ -430,7 +449,7 @@ def _hosts_in(tool_name: str, tool_input: dict) -> list:
             for m in re.finditer(r"https?://([A-Za-z0-9._\-]+)", text or "")]
 
 
-def check_policy(tool_name: str, tool_input: dict, policy: dict) -> Optional[Decision]:
+def check_policy(tool_name: str, tool_input: dict, policy: dict) -> "Decision | None":
     """Enforce the user's own written rules. Empty policy blocks nothing."""
     if not policy:
         return None
@@ -469,6 +488,168 @@ def check_policy(tool_name: str, tool_input: dict, policy: dict) -> Optional[Dec
                     ),
                 )
     return None
+
+
+# ── Home, receipts, audit trail ─────────────────────────────────────────────
+# "…or act without an audit trail" — the third clause of the milestone sentence.
+# Append-only JSONL, one line per hook invocation, including the invocations
+# where we decided nothing. A log that only records blocks cannot answer "was
+# the firewall even running at 3am?", which is the question that actually gets
+# asked after an incident.
+
+def sunglasses_home():
+    """`$SUNGLASSES_HOME` or `~/.sunglasses`. Overridable so tests (and CI, and
+    anyone with an unusual HOME) never write to a real user's audit trail."""
+    import os
+    import pathlib
+    return pathlib.Path(os.environ.get("SUNGLASSES_HOME") or
+                        (pathlib.Path.home() / ".sunglasses"))
+
+
+def write_receipt(record: dict, home=None) -> None:
+    """Append one JSONL receipt. Raises on I/O failure — the caller decides
+    whether a lost audit line is worth changing the decision over (it is not)."""
+    import datetime
+    import json as _json
+    home = home or sunglasses_home()
+    directory = home / "receipts"
+    directory.mkdir(parents=True, exist_ok=True)
+    day = datetime.datetime.now().strftime("%Y-%m-%d")
+    with open(directory / f"{day}.jsonl", "a", encoding="utf-8") as handle:
+        handle.write(_json.dumps(record, ensure_ascii=False, default=str) + "\n")
+
+
+def _input_digest(tool_input) -> str:
+    """SHA-256 of the canonical tool input. The receipt stores this and never
+    the input itself: an audit trail that quotes the payload becomes the leak."""
+    import json as _json
+    try:
+        canonical = _json.dumps(tool_input, sort_keys=True, separators=(",", ":"),
+                                ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        canonical = repr(tool_input)
+    return hashlib.sha256(canonical.encode("utf-8", "replace")).hexdigest()
+
+
+# ── Evaluation ──────────────────────────────────────────────────────────────
+
+_CLEAN = Decision("defer", "deterministic", "GLS-FW-CLEAN",
+                  "SUNGLASSES firewall: no deterministic violation.")
+
+
+def evaluate(payload: dict, home=None) -> "tuple":
+    """Run the deterministic lane over one PreToolUse payload.
+
+    Returns (Decision, config_error_or_None). Config problems are returned
+    rather than raised so the caller can both fail open AND confess — and,
+    critically, so a broken policy file cannot disarm the checks that need no
+    configuration at all (the secret detector).
+    """
+    home = home or sunglasses_home()
+    tool_name = payload.get("tool_name") or ""
+    tool_input = payload.get("tool_input") or {}
+
+    # Checks that need zero configuration run first and unconditionally.
+    decision = check_egress_secrets(tool_name, tool_input)
+    if decision is not None:
+        return decision, None
+
+    config_error = None
+    try:
+        policy = load_policy(home / "policy.yaml")
+    except PolicyError as exc:
+        policy, config_error = {}, str(exc)
+    else:
+        decision = check_policy(tool_name, tool_input, policy)
+        if decision is not None:
+            return decision, None
+
+    # Descriptor pinning needs a live descriptor, which PreToolUse stdin does
+    # not carry (verified against the docs at P0). Wired in P3 once the
+    # provenance question is settled; deliberately not faked here.
+
+    return _CLEAN, config_error
+
+
+def run_hook(stdin_text: str, home=None) -> dict:
+    """stdin JSON → hook output dict. NEVER raises, NEVER exits non-zero.
+
+    Every failure mode lands on `defer`: fall through to Claude Code's own
+    permission flow. `defer` rather than `allow` is deliberate — a crashed
+    firewall must not silently grant something the harness would otherwise have
+    asked the user about.
+    """
+    import json as _json
+    import time as _time
+
+    home = home or sunglasses_home()
+    started = _time.perf_counter()
+    payload, decision, error = {}, None, None
+
+    try:
+        payload = _json.loads(stdin_text) if stdin_text.strip() else {}
+        if not isinstance(payload, dict):
+            raise ValueError("hook payload was not a JSON object")
+        decision, error = evaluate(payload, home=home)
+    except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
+        error = f"{type(exc).__name__}: {exc}"
+        decision = Decision(
+            "defer", "error", "GLS-FW-ERROR",
+            "SUNGLASSES firewall: internal error, deferring to normal permission "
+            "flow. This tool call was NOT checked. See ~/.sunglasses/receipts/.",
+        )
+
+    if error and decision.lane != "error":
+        # A config problem while the rest of the lane worked. Keep the real
+        # decision, but the receipt must record that a control was not running.
+        decision = Decision(decision.action, "error", decision.rule_id, decision.reason)
+
+    try:
+        write_receipt({
+            "ts": _now_iso(),
+            "tool_name": payload.get("tool_name"),
+            "session_id": payload.get("session_id"),
+            "decision": decision.action,
+            "lane": decision.lane,
+            "rule_id": decision.rule_id,
+            "input_sha256": _input_digest(payload.get("tool_input")),
+            "elapsed_ms": round((_time.perf_counter() - started) * 1000, 2),
+            **({"error": error} if error else {}),
+        }, home=home)
+    except Exception:  # noqa: BLE001
+        # Losing an audit line must not change a security decision. The block
+        # (or the defer) stands either way.
+        pass
+
+    return decision.to_hook_output()
+
+
+def _now_iso() -> str:
+    import datetime
+    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def main(argv=None) -> int:
+    """`python3 -m sunglasses.firewall` — the PreToolUse hook entry point.
+
+    Invoked as a module rather than through `sunglasses.cli` on purpose:
+    importing cli.py measured 109ms on this Mac (it pulls in the engine,
+    reporter, mailer and sarif at module scope), which is the entire latency
+    budget spent before the first check runs. This path imports only stdlib
+    plus this module: ~22ms cold.
+    """
+    import json as _json
+    import sys as _sys
+    try:
+        stdin_text = _sys.stdin.read()
+    except Exception:  # noqa: BLE001
+        stdin_text = ""
+    _sys.stdout.write(_json.dumps(run_hook(stdin_text)))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - exercised via subprocess tests
+    raise SystemExit(main())
 
 
 # ── FUZZY LANE ──────────────────────────────────────────────────────────────

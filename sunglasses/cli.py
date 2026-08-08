@@ -459,6 +459,13 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def cmd_firewall_hook(args):
+    """Claude Code PreToolUse hook. Reads the event JSON on stdin, prints the
+    decision JSON on stdout, always exits 0 (fail-open, with a receipt)."""
+    from .firewall import main as firewall_main
+    return firewall_main()
+
+
 def cmd_info(args):
     """Show engine info."""
     engine = SunglassesEngine()
@@ -743,6 +750,16 @@ def main():
     # info
     info_parser = subparsers.add_parser("info", help="Show engine info")
     info_parser.set_defaults(func=cmd_info)
+
+    # firewall-hook (hidden) — Claude Code PreToolUse entry point.
+    # NOTE: `sunglasses init` deliberately writes `python3 -m sunglasses.firewall`
+    # into settings.json, NOT this subcommand. Reaching here means importing
+    # cli.py, which pulls in engine + reporter + mailer + sarif at module scope
+    # and measured ~109ms on an M-series Mac — the entire per-tool-call latency
+    # budget spent before the first check. This alias exists so a human who
+    # types the obvious command gets the right behaviour, not for the hot path.
+    hook_parser = subparsers.add_parser("firewall-hook", help=argparse.SUPPRESS)
+    hook_parser.set_defaults(func=cmd_firewall_hook)
 
     # demo
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")
