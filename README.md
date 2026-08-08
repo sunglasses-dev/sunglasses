@@ -202,6 +202,85 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 - ✅ Daily protection report (local HTML)
 - ✅ MIT License
 
+## The Firewall — from detector to control (v0.4)
+
+Everything above this line *detects*. The firewall *stops*. It installs as a
+Claude Code `PreToolUse` hook and answers one question before every tool call:
+**does this action violate a fact we can prove?**
+
+```bash
+sunglasses init            # wire it into .claude/settings.json (--global for ~/.claude)
+sunglasses pin             # record a SHA-256 of every MCP tool descriptor
+sunglasses pin --check     # did a server change a tool description under you?
+sunglasses receipts        # the audit trail
+sunglasses init --uninstall
+```
+
+### The one rule it will not bend
+
+| | |
+|---|---|
+| **Deterministic facts → HARD BLOCK** | A credential in an outbound payload. A tool descriptor whose hash changed. A rule you wrote yourself. Checkable. Being wrong is a bug, not a judgement call. |
+| **Detections → escalate to you, never auto-block** | Pattern and intent matches are *probabilities*. Hard-denying on a probability is how a security tool becomes the thing that breaks your work. |
+
+That split is enforced by tests, not by good intentions: the WARN lane is swept
+across every keyword-bearing pattern in the database and asserted to only ever
+return `ask` — including at `critical`, where the enforcement mapping would have
+said "block".
+
+### What it blocks
+
+1. **Secrets leaving.** AWS, GitHub, Anthropic, OpenAI, Slack, Google, Stripe,
+   PEM private keys and signed JWTs, matched by exact format, only on tool calls
+   that can actually put bytes on a wire. `$TOKEN`, `<YOUR_KEY>` and
+   `sk-ant-REPLACE_ME` are not secrets and are never treated as such.
+2. **Tool-descriptor rug-pulls.** `sunglasses pin` records what each MCP tool
+   said when you approved it; `sunglasses pin --check` tells you if it changed.
+3. **Your own policy.** Optional `~/.sunglasses/policy.yaml`:
+
+```yaml
+blocked_paths:
+  - ~/.ssh
+  - ~/.aws
+allowed_hosts:
+  - api.github.com
+  - pypi.org
+```
+
+Default is empty. A fresh install blocks nothing you did not ask it to.
+
+### Honest limits
+
+- **Descriptor pinning is not live.** `PreToolUse` does not hand a hook the tool
+  descriptor, and fetching one would mean a network round-trip on every tool
+  call. So the hook can only see *whether a tool is pinned*; a description
+  swapped between two `pin` runs is caught by `pin --check`, not in the act.
+  Closing that window needs a resident process — that is v0.5, not this.
+- **It sees the tool call, not the file behind it.** The scan reads
+  `tool_input`, so a command that makes the shell fetch the secret —
+  `curl --data-binary @.env`, `cat .env | curl -d @-` — carries no credential
+  material in the text we are handed, and is not blocked. Verified, not
+  theoretical. Closing it means either resolving file references at hook time or
+  watching the process itself; both are v0.5 work, and claiming coverage we do
+  not have would be worse than the gap.
+- **The WARN lane is off by default**, and the reasons are measurements, not
+  taste: 1 of 39 ordinary tool calls escalates (a plain `curl -s pypi.org` reads
+  as a dangerous shell command), and it costs ~902ms per call because the
+  pattern database is rebuilt in every hook subprocess. Enable with
+  `touch ~/.sunglasses/warn-lane` if you want it anyway.
+- **It fails open.** A crash, a bad config, an unparseable policy — all fall
+  through to Claude Code's own permission flow rather than wedging your agent.
+  Every one of those writes a receipt saying the call was *not* checked, because
+  a firewall that is quietly off is worse than no firewall.
+
+### Cost
+
+~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
+is 19ms of that). Zero network calls — nothing about your work leaves the
+machine. Every invocation appends one line to
+`~/.sunglasses/receipts/YYYY-MM-DD.jsonl`, recording a SHA-256 of the tool input
+and never the input itself.
+
 ## Roadmap
 
 ### Next — In Progress

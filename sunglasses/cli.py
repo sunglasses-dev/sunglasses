@@ -459,6 +459,183 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def cmd_receipts(args):
+    """Pretty-print the firewall audit trail."""
+    import json as _json
+    from .firewall import sunglasses_home
+
+    directory = sunglasses_home() / "receipts"
+    files = sorted(directory.glob("*.jsonl"))
+    if args.today:
+        import datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        files = [f for f in files if f.stem == today]
+    if not files:
+        print(f"\n  {DIM}No receipts in {directory}. "
+              f"Run `sunglasses init` to install the firewall.{RESET}\n")
+        return 0
+
+    rows = []
+    for path in files:
+        for line in path.read_text().splitlines():
+            if line.strip():
+                try:
+                    rows.append(_json.loads(line))
+                except ValueError:
+                    continue
+
+    colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
+    print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
+          f"{len(files)} day(s)){RESET}")
+    print(f"  {DIM}{'─' * 74}{RESET}")
+    for row in rows[-args.limit:]:
+        decision = row.get("decision", "?")
+        color = colors.get(decision, "")
+        stamp = str(row.get("ts", ""))[11:19]
+        note = row.get("rule_id", "")
+        if row.get("lane") == "error":
+            note = f"{row.get('error', 'error')}"[:44]
+        print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
+              f"{DIM}{row.get('lane', ''):<13}{RESET} "
+              f"{str(row.get('tool_name') or '-'):<24} {DIM}{note}{RESET}")
+
+    counts = {}
+    for row in rows:
+        counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
+    summary = "  ".join(f"{colors.get(k, '')}{k}: {v}{RESET}" for k, v in sorted(counts.items()))
+    print(f"  {DIM}{'─' * 74}{RESET}")
+    print(f"  {summary}")
+    # An audit trail that only reports blocks cannot answer "was it even
+    # running?", so the quiet calls are counted here on purpose.
+    print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
+          f"recorded, not just the blocks.{RESET}\n")
+    return 0
+
+
+def cmd_init(args):
+    """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
+    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+                           settings_path_for, uninstall_hook)
+
+    path = settings_path_for(args.scope_global)
+
+    if args.uninstall:
+        uninstall_hook(path)
+        print(f"\n  {GREEN}Firewall hook removed{RESET} {DIM}from {path}{RESET}")
+        print(f"  {DIM}Your other hooks were left untouched. A timestamped backup "
+              f"sits next to the file.{RESET}\n")
+        return 0
+
+    entry = build_hook_entry()
+    command = entry["hooks"][0]["command"]
+
+    # Self-test BEFORE writing. A hook that fails, fails open — so a broken
+    # wire would leave the firewall silently off. Better to refuse to install.
+    print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
+    ok, detail = self_test_hook(command)
+    if not ok:
+        print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
+        print(f"  {DIM}Command tried: {command}{RESET}")
+        print(f"\n  {YELLOW}Not installing.{RESET} A hook that cannot run fails open — "
+              f"you would have a firewall that looks on and is off.")
+        print(f"  {DIM}Usually means sunglasses is installed for a different "
+              f"interpreter. Try: {sys.executable} -m pip install sunglasses{RESET}\n")
+        return 1
+    print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
+
+    try:
+        install_hook(path)
+    except Exception as exc:
+        print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
+        return 1
+
+    print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
+    print(f"  {DIM}{command}{RESET}")
+    print(f"\n  {BOLD}What it blocks{RESET} {DIM}(deterministic facts only){RESET}")
+    print(f"    - secret material leaving in an outbound tool call")
+    print(f"    - rules you write in {CYAN}~/.sunglasses/policy.yaml{RESET}")
+    print(f"  {BOLD}What it never blocks{RESET}")
+    print(f"    - pattern/intent matches. Those escalate to you, never auto-deny.")
+    print(f"\n  {DIM}Next: `sunglasses pin` to pin MCP tool descriptors, "
+          f"`sunglasses receipts` for the audit trail.{RESET}\n")
+    return 0
+
+
+def cmd_pin(args):
+    """Record (or verify) SHA-256 pins for every configured MCP tool descriptor.
+
+    Runs from the terminal, never from the hook: it spawns MCP servers and waits
+    on them, which is seconds of work and the opposite of the hook's <100ms
+    offline budget. `--check` is the half that actually catches a rug-pull.
+    """
+    import json as _json
+    from .firewall import (build_pins, default_config_paths, diff_pins,
+                           discover_mcp_servers, load_pins, sunglasses_home)
+
+    servers = discover_mcp_servers(default_config_paths())
+    if not servers:
+        print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
+        return 0
+
+    print(f"\n  {BOLD}SUNGLASSES{RESET} — reading descriptors from "
+          f"{len(servers)} MCP server(s)...")
+    current = build_pins(servers)
+    pins_path = sunglasses_home() / "pins.json"
+
+    # Report servers that answered with nothing. Silence here would look
+    # identical to "this server has no tools", and a server we failed to reach
+    # is a gap in coverage, not a clean result.
+    answered = {entry["server"] for entry in current["tools"].values()}
+    for name in sorted(set(servers) - answered):
+        print(f"  {YELLOW}!{RESET} {name}: no descriptors returned "
+              f"{DIM}(not running, not stdio, or timed out) — NOT pinned{RESET}")
+
+    if getattr(args, "check", False):
+        try:
+            previous = load_pins(pins_path)
+        except Exception as exc:
+            print(f"\n  {RED}Cannot read {pins_path}:{RESET} {exc}\n")
+            return 1
+        if not previous["tools"]:
+            print(f"\n  {YELLOW}Nothing pinned yet.{RESET} Run "
+                  f"{BOLD}sunglasses pin{RESET} first.\n")
+            return 1
+
+        drift = diff_pins(previous, current)
+        for name in drift["added"]:
+            print(f"  {CYAN}+{RESET} new tool  {name} {DIM}(unpinned){RESET}")
+        for name in drift["removed"]:
+            print(f"  {DIM}-  gone      {name}{RESET}")
+        for name in drift["changed"]:
+            print(f"  {RED}{BOLD}!  CHANGED  {name}{RESET}")
+            print(f"     {DIM}pinned {previous['tools'][name]['sha256'][:12]} "
+                  f"-> now {current['tools'][name]['sha256'][:12]}{RESET}")
+
+        if drift["changed"]:
+            print(f"\n  {RED}{BOLD}{len(drift['changed'])} tool descriptor(s) "
+                  f"changed since you pinned them.{RESET}")
+            print(f"  {DIM}The tool you approved is not the tool that will run. Review "
+                  f"the server, then re-run `sunglasses pin` to accept.{RESET}\n")
+            return 1
+        print(f"\n  {GREEN}{BOLD}No descriptor drift.{RESET} "
+              f"{DIM}{len(previous['tools'])} pinned.{RESET}\n")
+        return 0
+
+    pins_path.parent.mkdir(parents=True, exist_ok=True)
+    pins_path.write_text(_json.dumps(current, indent=2) + "\n")
+    print(f"\n  {GREEN}{BOLD}Pinned {len(current['tools'])} tool descriptor(s){RESET} "
+          f"{DIM}-> {pins_path}{RESET}")
+    print(f"  {DIM}Run `sunglasses pin --check` to detect changes later.{RESET}\n")
+    return 0
+
+
+def cmd_firewall_hook(args):
+    """Claude Code PreToolUse hook. Reads the event JSON on stdin, prints the
+    decision JSON on stdout, always exits 0 (fail-open, with a receipt)."""
+    from .firewall import main as firewall_main
+    return firewall_main()
+
+
 def cmd_info(args):
     """Show engine info."""
     engine = SunglassesEngine()
@@ -744,6 +921,42 @@ def main():
     info_parser = subparsers.add_parser("info", help="Show engine info")
     info_parser.set_defaults(func=cmd_info)
 
+    # firewall-hook (hidden) — Claude Code PreToolUse entry point.
+    # NOTE: `sunglasses init` deliberately writes `python3 -m sunglasses.firewall`
+    # into settings.json, NOT this subcommand. Reaching here means importing
+    # cli.py, which pulls in engine + reporter + mailer + sarif at module scope
+    # and measured ~109ms on an M-series Mac — the entire per-tool-call latency
+    # budget spent before the first check. This alias exists so a human who
+    # types the obvious command gets the right behaviour, not for the hot path.
+    hook_parser = subparsers.add_parser("firewall-hook", help=argparse.SUPPRESS)
+    hook_parser.set_defaults(func=cmd_firewall_hook)
+
+    # pin
+    pin_parser = subparsers.add_parser(
+        "pin", help="Pin MCP tool descriptors (SHA-256) and detect later changes")
+    pin_parser.add_argument(
+        "--check", action="store_true",
+        help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")
+    pin_parser.set_defaults(func=cmd_pin)
+
+    # init
+    init_parser = subparsers.add_parser(
+        "init", help="Install the firewall as a Claude Code PreToolUse hook")
+    init_parser.add_argument(
+        "--global", dest="scope_global", action="store_true",
+        help="Write to ~/.claude/settings.json instead of ./.claude/settings.json")
+    init_parser.add_argument(
+        "--uninstall", action="store_true", help="Remove the hook cleanly")
+    init_parser.set_defaults(func=cmd_init)
+
+    # receipts
+    receipts_parser = subparsers.add_parser(
+        "receipts", help="Show the firewall audit trail")
+    receipts_parser.add_argument("--today", action="store_true", help="Today only")
+    receipts_parser.add_argument("--limit", type=int, default=40,
+                                 help="Rows to show (default 40)")
+    receipts_parser.set_defaults(func=cmd_receipts)
+
     # demo
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")
     demo_parser.add_argument("--live", action="store_true", help="Live protected-agent demo (timeline, attacker intent, recommended action)")
@@ -769,7 +982,13 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    args.func(args)
+    # Propagate a non-zero return as the process exit code. Existing commands
+    # return None (or call sys.exit themselves), so this is additive — but it
+    # lets `sunglasses pin --check` be usable in CI, where the exit code is the
+    # whole point of running it.
+    exit_code = args.func(args)
+    if exit_code:
+        sys.exit(exit_code)
 
 
 def cmd_report(args):
