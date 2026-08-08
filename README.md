@@ -256,6 +256,13 @@ Default is empty. A fresh install blocks nothing you did not ask it to.
   call. So the hook can only see *whether a tool is pinned*; a description
   swapped between two `pin` runs is caught by `pin --check`, not in the act.
   Closing that window needs a resident process — that is v0.5, not this.
+- **It sees the tool call, not the file behind it.** The scan reads
+  `tool_input`, so a command that makes the shell fetch the secret —
+  `curl --data-binary @.env`, `cat .env | curl -d @-` — carries no credential
+  material in the text we are handed, and is not blocked. Verified, not
+  theoretical. Closing it means either resolving file references at hook time or
+  watching the process itself; both are v0.5 work, and claiming coverage we do
+  not have would be worse than the gap.
 - **The WARN lane is off by default**, and the reasons are measurements, not
   taste: 1 of 39 ordinary tool calls escalates (a plain `curl -s pypi.org` reads
   as a dangerous shell command), and it costs ~902ms per call because the

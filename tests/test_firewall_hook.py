@@ -118,8 +118,31 @@ def test_corrupt_policy_file_defers_and_confesses_rather_than_blocking(home):
     out = firewall.run_hook(json.dumps(CLEAN))
     assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
     last = _receipts(home)[-1]
-    assert last["lane"] == "error"
+    # `lane` keeps naming the lane that actually decided; the confession rides
+    # on `degraded` + `error`. Overloading `lane` with "error" used to throw the
+    # real lane away, which made a degraded receipt indistinguishable from a
+    # crashed one.
+    assert last["degraded"] is True
+    assert last["lane"] == "deterministic"
     assert "max_spend_usd" in last.get("error", "")
+
+
+def test_a_dead_policy_is_confessed_even_when_a_later_check_decides(home):
+    """T9 nit, Aug 8: a corrupt policy.yaml AND a pin TOFU on the same call.
+
+    The TOFU answer used to return early with error=None, so that receipt never
+    mentioned that the policy control was not running. A control that is down
+    has to reach the audit trail no matter which check produced the verdict.
+    """
+    (home / "policy.yaml").write_text("max_spend_usd: 50\n")
+    out = firewall.run_hook(json.dumps({
+        "session_id": "s", "tool_name": "mcp__github__create_issue", "tool_input": {}}))
+
+    assert out["hookSpecificOutput"]["permissionDecision"] == "ask"
+    last = _receipts(home)[-1]
+    assert last["rule_id"] == "GLS-FW-PIN-TOFU"
+    assert last["degraded"] is True
+    assert "max_spend_usd" in last.get("error", ""), "dead policy control never confessed"
 
 
 def test_a_bad_policy_does_not_suppress_a_real_leak_block(home):

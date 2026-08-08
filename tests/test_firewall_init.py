@@ -65,10 +65,38 @@ def _read(path):
 
 def test_hook_entry_uses_an_absolute_interpreter():
     """The whole PATH hazard in one assertion."""
-    entry = build_hook_entry()
-    command = entry["hooks"][0]["command"]
-    assert command.startswith("/"), f"relative interpreter in hook command: {command}"
-    assert sys.executable in command
+    import shlex
+    command = build_hook_entry()["hooks"][0]["command"]
+    interpreter = shlex.split(command)[0]
+    assert interpreter.startswith("/"), f"relative interpreter in hook command: {command}"
+    assert interpreter == sys.executable
+
+
+def test_hook_entry_quotes_an_interpreter_path_containing_spaces():
+    """`/Users/x/My Env/bin/python3` is ordinary for conda, and for anyone whose
+    username has a space in it. Unquoted, the shell splits it into two words and
+    the hook silently never runs."""
+    import shlex
+    spaced = "/Users/x/My Env/bin/python3"
+    command = build_hook_entry(spaced)["hooks"][0]["command"]
+    assert shlex.split(command) == [spaced, "-m", "sunglasses.firewall"]
+
+
+def test_self_test_survives_a_spaced_interpreter_path(tmp_path):
+    """End-to-end proof of the quoting fix: a real executable at a path with a
+    space must pass the self-test, which runs the command through a shell."""
+    directory = tmp_path / "My Env" / "bin"
+    directory.mkdir(parents=True)
+    fake = directory / "python3"
+    fake.write_text(
+        "#!/bin/sh\ncat > /dev/null\n"
+        "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\","
+        "\"permissionDecision\":\"defer\"}}'\n")
+    fake.chmod(0o755)
+
+    command = build_hook_entry(str(fake))["hooks"][0]["command"]
+    ok, detail = self_test_hook(command)
+    assert ok, f"spaced interpreter path failed the self-test: {detail}"
 
 
 def test_hook_entry_targets_the_fast_module_not_the_cli():

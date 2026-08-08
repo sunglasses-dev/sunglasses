@@ -732,7 +732,14 @@ def evaluate(payload: dict, home=None) -> "tuple":
     if decision is not None:
         return decision, None, extras
 
+    # Config failures accumulate instead of returning early. A control that is
+    # down has to reach the receipt even when some LATER check produced the
+    # verdict — otherwise a corrupt policy.yaml plus a pin TOFU on the same call
+    # yields a receipt that never mentions the dead policy control.
     errors = []
+
+    def confession():
+        return "; ".join(errors) if errors else None
 
     try:
         policy = load_policy(home / "policy.yaml")
@@ -741,7 +748,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
     else:
         decision = check_policy(tool_name, tool_input, policy)
         if decision is not None:
-            return decision, None, extras
+            return decision, confession(), extras
 
     if tool_name.startswith("mcp__"):
         # `pin_file` is the only source available at hook time; recording it
@@ -755,7 +762,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         else:
             decision = check_pin_by_name(tool_name, pins)
             if decision is not None:
-                return decision, None, extras
+                return decision, confession(), extras
 
     if fuzzy_enabled(home):
         # Runs LAST and only on the way to "nothing found". Every deterministic
@@ -766,9 +773,9 @@ def evaluate(payload: dict, home=None) -> "tuple":
         if decision is not None:
             if decision.action == "deny":  # pragma: no cover - belt and braces
                 raise AssertionError("fuzzy lane produced a deny; that is forbidden")
-            return decision, None, extras
+            return decision, confession(), extras
 
-    return _CLEAN, ("; ".join(errors) if errors else None), extras
+    return _CLEAN, confession(), extras
 
 
 def run_hook(stdin_text: str, home=None) -> dict:
@@ -800,9 +807,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
         )
 
     if error and decision.lane != "error":
-        # A config problem while the rest of the lane worked. Keep the real
-        # decision, but the receipt must record that a control was not running.
-        decision = Decision(decision.action, "error", decision.rule_id, decision.reason)
+        # A control was down while the rest of the lane worked. `lane` keeps
+        # saying which lane actually decided — overloading it with "error" threw
+        # that away — and `degraded` plus `error` carry the confession.
+        extras = {**extras, "degraded": True}
 
     try:
         write_receipt({
@@ -854,8 +862,14 @@ def build_hook_entry(interpreter: str = None) -> dict:
     `sunglasses` installed — the hook then fails on every call, invisibly, and
     the firewall is off while looking on.
     """
+    import shlex
     import sys as _sys
     interpreter = interpreter or _sys.executable
+    # Quoted because the command is run through a shell: an interpreter path
+    # containing a space (`/Users/x/My Env/bin/python3` — ordinary for conda and
+    # for anyone whose username has a space) would otherwise be split into two
+    # words, breaking both the hook and its own self-test.
+    interpreter = shlex.quote(interpreter)
     return {
         # Everything, not just egress tools: policy `blocked_paths` has to cover
         # Read/Edit as well, and the module filters in ~0.2ms anyway.

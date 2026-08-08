@@ -41,6 +41,11 @@ every tool call, whether the action violates a provable fact.
   all return `defer` and write a receipt saying the call was not checked. A
   broken policy file cannot disarm the secret detector, and a failed receipt
   write never changes a security decision.
+- **Known limits, stated plainly.** Secret scanning reads `tool_input`, so a
+  command that makes the shell read the file itself (`curl --data-binary @.env`)
+  is not blocked — verified, and v0.5 work to close. Descriptor pinning is not
+  live between `pin` runs. Both are documented in the README rather than left
+  for a user to discover.
 - **Cost:** ~27ms per tool call, zero network calls, no new dependencies.
 
 ## [0.3.13] — 2026-08-07
