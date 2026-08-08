@@ -24505,4 +24505,77 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Nx/Angular schematic generator receipts can launder generated-file provenance into false approval for AI workspace-maintenance agents."
     },
+    # === v0.3.14 batch (9 patterns) ===
+    {
+        "id": "GLS-V3-029",
+        "name": "Snyk JSON vulnerability title authority laundering (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Snyk-style vulnerability JSON can carry agent-directed release-policy claims inside vulnerability title/description fields, laundering dependency-scanner evidence into false authority to suppress or bypass dependency-security gates."
+    },
+    {
+        "id": "GLS-V3-035",
+        "name": "Ansible check-mode dry-run execution lure (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Ansible check-mode output can launder a dry-run preview into forged authority for an AI ops agent to run the real playbook with privilege escalation while suppressing the resulting configuration changes."
+    },
+    {
+        "id": "GLS-V3-036",
+        "name": "Argo CD sync-operation output authority laundering (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Argo CD sync-operation output can launder degraded or out-of-sync GitOps state into a forged deployment approval receipt, causing an AI deployment assistant to promote anyway and hide drift or health risk from the operator summary."
+    },
+    {
+        "id": "GLS-V3-037",
+        "name": "Azure ARM deployment-operation statusMessage approval laundering (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Azure Resource Manager deployment-operation status messages can launder cloud deployment telemetry into forged human approval evidence for deployment and security-review agents."
+    },
+    {
+        "id": "GLS-V3-040",
+        "name": "CloudFormation StackEvent status-reason approval laundering (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "CloudFormation StackEvent status-reason text can launder operational stack telemetry into forged deployment approval evidence for IaC agents."
+    },
+    {
+        "id": "GLS-V3-049",
+        "name": "Jenkins Blue Ocean stage output authority laundering (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Jenkins Blue Ocean stage output can launder an unstable or diagnostic CI stage into a forged green-lane release receipt, causing an AI deployment assistant to promote anyway and hide test risk from the release summary."
+    },
+    {
+        "id": "GLS-V3-051",
+        "name": "Kafka offset checkpoint event-stream continuation poisoning",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Kafka consumer offset/checkpoint metadata can be poisoned to make an agent treat a stream-continuation cursor as proof that a prior change-token or release gate already settled, causing it to deploy and hide blockers."
+    },
+    {
+        "id": "GLS-V3-052",
+        "name": "kubectl server-side dry-run execution lure (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Kubernetes server-side dry-run or `kubectl diff` output can launder a non-mutating manifest preview into forged approval for an AI deployment agent to run `kubectl apply` and suppress privileged Kubernetes changes."
+    },
+    {
+        "id": "GLS-V3-053",
+        "name": "Kubernetes SelfSubjectRulesReview resourceRules capability escalation (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Kubernetes SelfSubjectRulesReview and `kubectl auth can-i --list` output can launder authorization-introspection fields into forged permission to create privileged RBAC bindings or use sensitive resources."
+    },
 ]
