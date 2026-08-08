@@ -48,6 +48,22 @@ every tool call, whether the action violates a provable fact.
   for a user to discover.
 - **Cost:** ~27ms per tool call, zero network calls, no new dependencies.
 
+## [0.3.14] — 2026-08-08
+
+### Day 16 of the V3 drain — status output is not a signature: dry-runs, sync receipts, and auth introspection
+
+- **+9 detection patterns (1,184 → 1,193), all hardening `tool_output_poisoning`.** One theme, nine carriers: the operational read-outs an ops or deployment agent trusts most — dry-run previews, sync statuses, CI stage output, consumer offsets, and permission introspection — each laundered into a forged approval the tool never issued. A status field describes state; it is never consent.
+- `GLS-V3-029` — Snyk-style vulnerability JSON carrying agent-directed release-policy claims inside title/description fields, laundering dependency-scanner evidence into false authority to bypass dependency-security gates.
+- `GLS-V3-035` — Ansible check-mode output laundering a dry-run preview into forged authority to run the real playbook with privilege escalation while suppressing the resulting configuration changes.
+- `GLS-V3-036` — Argo CD sync-operation output laundering degraded or out-of-sync GitOps state into a forged deployment approval receipt that hides drift from the operator summary.
+- `GLS-V3-037` — Azure Resource Manager deployment-operation status messages laundering cloud telemetry into forged human-approval evidence for deployment and security-review agents.
+- `GLS-V3-040` — CloudFormation StackEvent status-reason text laundering operational stack telemetry into forged deployment approval evidence for IaC agents.
+- `GLS-V3-049` — Jenkins Blue Ocean stage output laundering an unstable or diagnostic CI stage into a forged green-lane release receipt that hides test risk from the release summary.
+- `GLS-V3-051` — Kafka consumer offset/checkpoint metadata poisoned so a stream-continuation cursor reads as proof that a prior change-token or release gate already settled.
+- `GLS-V3-052` — Kubernetes server-side dry-run / `kubectl diff` output laundering a non-mutating manifest preview into forged approval to run `kubectl apply` with privileged changes suppressed.
+- `GLS-V3-053` — Kubernetes SelfSubjectRulesReview / `kubectl auth can-i --list` output laundering authorization-introspection fields into forged permission to create privileged RBAC bindings.
+- Paired blog: [Tool Schema Default-Fallback Auto-Approve: An Empty Field Is Not a Yes](https://sunglasses.dev/blog/tool-schema-default-fallback-runtime-trust).
+
 ## [0.3.13] — 2026-08-07
 
 ### Day 15 of the V3 drain — repository instruction files, template comments, and generated receipts
