@@ -459,6 +459,74 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def cmd_pin(args):
+    """Record (or verify) SHA-256 pins for every configured MCP tool descriptor.
+
+    Runs from the terminal, never from the hook: it spawns MCP servers and waits
+    on them, which is seconds of work and the opposite of the hook's <100ms
+    offline budget. `--check` is the half that actually catches a rug-pull.
+    """
+    import json as _json
+    from .firewall import (build_pins, default_config_paths, diff_pins,
+                           discover_mcp_servers, load_pins, sunglasses_home)
+
+    servers = discover_mcp_servers(default_config_paths())
+    if not servers:
+        print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
+        return 0
+
+    print(f"\n  {BOLD}SUNGLASSES{RESET} — reading descriptors from "
+          f"{len(servers)} MCP server(s)...")
+    current = build_pins(servers)
+    pins_path = sunglasses_home() / "pins.json"
+
+    # Report servers that answered with nothing. Silence here would look
+    # identical to "this server has no tools", and a server we failed to reach
+    # is a gap in coverage, not a clean result.
+    answered = {entry["server"] for entry in current["tools"].values()}
+    for name in sorted(set(servers) - answered):
+        print(f"  {YELLOW}!{RESET} {name}: no descriptors returned "
+              f"{DIM}(not running, not stdio, or timed out) — NOT pinned{RESET}")
+
+    if getattr(args, "check", False):
+        try:
+            previous = load_pins(pins_path)
+        except Exception as exc:
+            print(f"\n  {RED}Cannot read {pins_path}:{RESET} {exc}\n")
+            return 1
+        if not previous["tools"]:
+            print(f"\n  {YELLOW}Nothing pinned yet.{RESET} Run "
+                  f"{BOLD}sunglasses pin{RESET} first.\n")
+            return 1
+
+        drift = diff_pins(previous, current)
+        for name in drift["added"]:
+            print(f"  {CYAN}+{RESET} new tool  {name} {DIM}(unpinned){RESET}")
+        for name in drift["removed"]:
+            print(f"  {DIM}-  gone      {name}{RESET}")
+        for name in drift["changed"]:
+            print(f"  {RED}{BOLD}!  CHANGED  {name}{RESET}")
+            print(f"     {DIM}pinned {previous['tools'][name]['sha256'][:12]} "
+                  f"-> now {current['tools'][name]['sha256'][:12]}{RESET}")
+
+        if drift["changed"]:
+            print(f"\n  {RED}{BOLD}{len(drift['changed'])} tool descriptor(s) "
+                  f"changed since you pinned them.{RESET}")
+            print(f"  {DIM}The tool you approved is not the tool that will run. Review "
+                  f"the server, then re-run `sunglasses pin` to accept.{RESET}\n")
+            return 1
+        print(f"\n  {GREEN}{BOLD}No descriptor drift.{RESET} "
+              f"{DIM}{len(previous['tools'])} pinned.{RESET}\n")
+        return 0
+
+    pins_path.parent.mkdir(parents=True, exist_ok=True)
+    pins_path.write_text(_json.dumps(current, indent=2) + "\n")
+    print(f"\n  {GREEN}{BOLD}Pinned {len(current['tools'])} tool descriptor(s){RESET} "
+          f"{DIM}-> {pins_path}{RESET}")
+    print(f"  {DIM}Run `sunglasses pin --check` to detect changes later.{RESET}\n")
+    return 0
+
+
 def cmd_firewall_hook(args):
     """Claude Code PreToolUse hook. Reads the event JSON on stdin, prints the
     decision JSON on stdout, always exits 0 (fail-open, with a receipt)."""
@@ -761,6 +829,14 @@ def main():
     hook_parser = subparsers.add_parser("firewall-hook", help=argparse.SUPPRESS)
     hook_parser.set_defaults(func=cmd_firewall_hook)
 
+    # pin
+    pin_parser = subparsers.add_parser(
+        "pin", help="Pin MCP tool descriptors (SHA-256) and detect later changes")
+    pin_parser.add_argument(
+        "--check", action="store_true",
+        help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")
+    pin_parser.set_defaults(func=cmd_pin)
+
     # demo
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")
     demo_parser.add_argument("--live", action="store_true", help="Live protected-agent demo (timeline, attacker intent, recommended action)")
@@ -786,7 +862,13 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    args.func(args)
+    # Propagate a non-zero return as the process exit code. Existing commands
+    # return None (or call sys.exit themselves), so this is additive — but it
+    # lets `sunglasses pin --check` be usable in CI, where the exit code is the
+    # whole point of running it.
+    exit_code = args.func(args)
+    if exit_code:
+        sys.exit(exit_code)
 
 
 def cmd_report(args):

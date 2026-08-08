@@ -365,6 +365,183 @@ def check_pin(tool_name: str, descriptor, pins: dict) -> "Decision | None":
     )
 
 
+def check_pin_by_name(tool_name: str, pins: dict) -> "Decision | None":
+    """The hook-time pin check — deliberately weaker than `check_pin`.
+
+    PreToolUse stdin does not carry the tool descriptor (verified against the
+    live docs, Aug 7 2026), and fetching one means an MCP `tools/list`
+    round-trip, which breaks both the <100ms and the zero-network rules. A
+    timeboxed search of the on-disk `claude-cli-nodejs` cache found no durable
+    descriptor store either — descriptors appeared in exactly one file across
+    the whole cache, and only inside an error-path debug line. So at hook time
+    the only fact available is *whether this tool is pinned at all*.
+
+    That is a real blind spot: a descriptor swapped between two `sunglasses pin`
+    runs is caught by `sunglasses pin --check`, not here. The code says so, the
+    user-facing reason says so, and the receipt records `pin_source`. Overstating
+    this would be the one thing worse than the gap itself.
+    """
+    if not tool_name or not tool_name.startswith("mcp__"):
+        return None
+    if tool_name in (pins or {}).get("tools", {}):
+        return None
+    return Decision(
+        action="ask",
+        lane="deterministic",
+        rule_id="GLS-FW-PIN-TOFU",
+        reason=(
+            f"SUNGLASSES firewall: '{tool_name}' is not pinned — this is the first time "
+            f"it has been seen. Run `sunglasses pin` to record its descriptor, then "
+            f"`sunglasses pin --check` to detect if the server changes it later."
+        ),
+    )
+
+
+# ── Reading descriptors out-of-band (`sunglasses pin`) ──────────────────────
+# This half runs from the terminal, not the hook, so it may take seconds and may
+# talk to servers. Keeping it out of the hot path is what lets the hook stay at
+# ~27ms and fully offline.
+
+_MCP_TIMEOUT = 10
+
+
+def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT) -> list:
+    """Speak MCP over stdio to one server and return its tool descriptors.
+
+    Returns [] for anything that does not work — dead server, hang, non-stdio
+    transport, protocol surprise. Never raises: `sunglasses pin` across a dozen
+    servers must not die because one of them is broken, and an empty list is
+    reported honestly by the caller rather than guessed at.
+    """
+    import json as _json
+    import os
+    import subprocess
+    import threading
+
+    config = config or {}
+    transport = config.get("type") or ("stdio" if config.get("command") else None)
+    if transport != "stdio" or not config.get("command"):
+        return []
+
+    env = dict(os.environ)
+    env.update({str(k): str(v) for k, v in (config.get("env") or {}).items()})
+
+    try:
+        proc = subprocess.Popen(
+            [config["command"], *(config.get("args") or [])],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, env=env, cwd=config.get("cwd") or None,
+        )
+    except (OSError, ValueError):
+        return []
+
+    result: list = []
+
+    def exchange():
+        def send(message):
+            proc.stdin.write(_json.dumps(message) + "\n")
+            proc.stdin.flush()
+
+        def await_id(wanted):
+            while True:
+                line = proc.stdout.readline()
+                if not line:
+                    return None
+                try:
+                    message = _json.loads(line)
+                except ValueError:
+                    continue  # servers log noise on stdout; skip, don't die
+                if message.get("id") == wanted:
+                    return message
+
+        send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2024-11-05", "capabilities": {},
+            "clientInfo": {"name": "sunglasses", "version": "0.4"}}})
+        if await_id(1) is None:
+            return
+        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+        response = await_id(2)
+        if response:
+            result.extend((response.get("result") or {}).get("tools") or [])
+
+    worker = threading.Thread(target=exchange, daemon=True)
+    worker.start()
+    worker.join(timeout)
+
+    try:
+        proc.kill()
+        proc.wait(timeout=2)
+    except Exception:  # noqa: BLE001
+        pass
+    return result if not worker.is_alive() else []
+
+
+def default_config_paths(cwd=None) -> list:
+    """Where MCP servers are declared: the user's global config, then the
+    project's `.mcp.json`. Order matters — project entries win, matching how a
+    developer expects a project-local override to behave."""
+    import pathlib
+    cwd = pathlib.Path(cwd or pathlib.Path.cwd())
+    return [pathlib.Path.home() / ".claude.json", cwd / ".mcp.json"]
+
+
+def discover_mcp_servers(paths) -> dict:
+    """Collect `mcpServers` blocks from config files. Unreadable files are
+    skipped, not fatal: one malformed config must not hide every other server."""
+    import json as _json
+    import pathlib
+    servers: dict = {}
+    for path in paths:
+        path = pathlib.Path(path)
+        if not path.exists():
+            continue
+        try:
+            data = _json.loads(path.read_text())
+        except (ValueError, OSError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("mcpServers"), dict):
+            servers.update(data["mcpServers"])
+    return servers
+
+
+def build_pins(servers: dict, _lister=None) -> dict:
+    """Connect to each server, hash every tool descriptor, return a pins dict.
+
+    Stores hashes and provenance only — never the descriptor text. Two reasons:
+    a description is server-controlled prose, so `pin --check` printing a diff
+    would pipe attacker-chosen text into someone's terminal; and pins.json is a
+    file users may reasonably share or commit, where `env` secrets and tool
+    prose have no business being.
+    """
+    lister = _lister or list_tools_stdio
+    tools: dict = {}
+    for server_name, config in (servers or {}).items():
+        for descriptor in lister(server_name, config):
+            name = descriptor.get("name")
+            if not name:
+                continue
+            tools[f"mcp__{server_name}__{name}"] = {
+                "sha256": descriptor_hash(descriptor),
+                "server": server_name,
+                "pinned_at": _now_iso(),
+            }
+    return {"tools": tools}
+
+
+def diff_pins(before: dict, after: dict) -> dict:
+    """What changed between two pin snapshots. This is where the rug-pull is
+    actually caught in v0.4-A."""
+    old = (before or {}).get("tools", {})
+    new = (after or {}).get("tools", {})
+    return {
+        "added": sorted(set(new) - set(old)),
+        "removed": sorted(set(old) - set(new)),
+        "changed": sorted(name for name in set(old) & set(new)
+                          if old[name].get("sha256") != new[name].get("sha256")),
+    }
+
+
 # ── User-written policy ─────────────────────────────────────────────────────
 # The user's own rules are deterministic facts by definition, so they may block.
 #
@@ -540,35 +717,47 @@ _CLEAN = Decision("defer", "deterministic", "GLS-FW-CLEAN",
 def evaluate(payload: dict, home=None) -> "tuple":
     """Run the deterministic lane over one PreToolUse payload.
 
-    Returns (Decision, config_error_or_None). Config problems are returned
-    rather than raised so the caller can both fail open AND confess — and,
-    critically, so a broken policy file cannot disarm the checks that need no
-    configuration at all (the secret detector).
+    Returns (Decision, config_error_or_None, receipt_extras). Config problems
+    are returned rather than raised so the caller can both fail open AND
+    confess — and, critically, so a broken policy file cannot disarm the checks
+    that need no configuration at all (the secret detector).
     """
     home = home or sunglasses_home()
     tool_name = payload.get("tool_name") or ""
     tool_input = payload.get("tool_input") or {}
+    extras: dict = {}
 
     # Checks that need zero configuration run first and unconditionally.
     decision = check_egress_secrets(tool_name, tool_input)
     if decision is not None:
-        return decision, None
+        return decision, None, extras
 
-    config_error = None
+    errors = []
+
     try:
         policy = load_policy(home / "policy.yaml")
     except PolicyError as exc:
-        policy, config_error = {}, str(exc)
+        errors.append(str(exc))
     else:
         decision = check_policy(tool_name, tool_input, policy)
         if decision is not None:
-            return decision, None
+            return decision, None, extras
 
-    # Descriptor pinning needs a live descriptor, which PreToolUse stdin does
-    # not carry (verified against the docs at P0). Wired in P3 once the
-    # provenance question is settled; deliberately not faked here.
+    if tool_name.startswith("mcp__"):
+        # `pin_file` is the only source available at hook time; recording it
+        # keeps the blind spot visible to anyone auditing these receipts later,
+        # instead of letting "no finding" read as "compared and matched".
+        extras["pin_source"] = "pin_file"
+        try:
+            pins = load_pins(home / "pins.json")
+        except PolicyError as exc:
+            errors.append(str(exc))
+        else:
+            decision = check_pin_by_name(tool_name, pins)
+            if decision is not None:
+                return decision, None, extras
 
-    return _CLEAN, config_error
+    return _CLEAN, ("; ".join(errors) if errors else None), extras
 
 
 def run_hook(stdin_text: str, home=None) -> dict:
@@ -584,13 +773,13 @@ def run_hook(stdin_text: str, home=None) -> dict:
 
     home = home or sunglasses_home()
     started = _time.perf_counter()
-    payload, decision, error = {}, None, None
+    payload, decision, error, extras = {}, None, None, {}
 
     try:
         payload = _json.loads(stdin_text) if stdin_text.strip() else {}
         if not isinstance(payload, dict):
             raise ValueError("hook payload was not a JSON object")
-        decision, error = evaluate(payload, home=home)
+        decision, error, extras = evaluate(payload, home=home)
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
         error = f"{type(exc).__name__}: {exc}"
         decision = Decision(
@@ -614,6 +803,7 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "rule_id": decision.rule_id,
             "input_sha256": _input_digest(payload.get("tool_input")),
             "elapsed_ms": round((_time.perf_counter() - started) * 1000, 2),
+            **extras,
             **({"error": error} if error else {}),
         }, home=home)
     except Exception:  # noqa: BLE001
