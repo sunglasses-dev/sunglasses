@@ -459,6 +459,59 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def cmd_receipts(args):
+    """Pretty-print the firewall audit trail."""
+    import json as _json
+    from .firewall import sunglasses_home
+
+    directory = sunglasses_home() / "receipts"
+    files = sorted(directory.glob("*.jsonl"))
+    if args.today:
+        import datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        files = [f for f in files if f.stem == today]
+    if not files:
+        print(f"\n  {DIM}No receipts in {directory}. "
+              f"Run `sunglasses init` to install the firewall.{RESET}\n")
+        return 0
+
+    rows = []
+    for path in files:
+        for line in path.read_text().splitlines():
+            if line.strip():
+                try:
+                    rows.append(_json.loads(line))
+                except ValueError:
+                    continue
+
+    colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
+    print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
+          f"{len(files)} day(s)){RESET}")
+    print(f"  {DIM}{'─' * 74}{RESET}")
+    for row in rows[-args.limit:]:
+        decision = row.get("decision", "?")
+        color = colors.get(decision, "")
+        stamp = str(row.get("ts", ""))[11:19]
+        note = row.get("rule_id", "")
+        if row.get("lane") == "error":
+            note = f"{row.get('error', 'error')}"[:44]
+        print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
+              f"{DIM}{row.get('lane', ''):<13}{RESET} "
+              f"{str(row.get('tool_name') or '-'):<24} {DIM}{note}{RESET}")
+
+    counts = {}
+    for row in rows:
+        counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
+    summary = "  ".join(f"{colors.get(k, '')}{k}: {v}{RESET}" for k, v in sorted(counts.items()))
+    print(f"  {DIM}{'─' * 74}{RESET}")
+    print(f"  {summary}")
+    # An audit trail that only reports blocks cannot answer "was it even
+    # running?", so the quiet calls are counted here on purpose.
+    print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
+          f"recorded, not just the blocks.{RESET}\n")
+    return 0
+
+
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
     from .firewall import (build_hook_entry, install_hook, self_test_hook,
@@ -895,6 +948,14 @@ def main():
     init_parser.add_argument(
         "--uninstall", action="store_true", help="Remove the hook cleanly")
     init_parser.set_defaults(func=cmd_init)
+
+    # receipts
+    receipts_parser = subparsers.add_parser(
+        "receipts", help="Show the firewall audit trail")
+    receipts_parser.add_argument("--today", action="store_true", help="Today only")
+    receipts_parser.add_argument("--limit", type=int, default=40,
+                                 help="Rows to show (default 40)")
+    receipts_parser.set_defaults(func=cmd_receipts)
 
     # demo
     demo_parser = subparsers.add_parser("demo", help="Run demo with example attacks")

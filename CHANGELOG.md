@@ -3,6 +3,46 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased] — v0.4-A firewall
+
+### From detector to control
+
+SUNGLASSES has always read text and reported evidence. This adds the first
+piece that *stops* something: a Claude Code `PreToolUse` hook that answers, on
+every tool call, whether the action violates a provable fact.
+
+- **`sunglasses init` / `--uninstall`** — installs the hook into
+  `.claude/settings.json` (or `~/.claude/settings.json` with `--global`).
+  Idempotent, merges beside your existing hooks, backs the file up first, and
+  refuses to touch a settings file it cannot parse. It writes the **absolute**
+  interpreter path, not a bare `python3`: under pipx/venv/conda a PATH lookup
+  can land on an interpreter without sunglasses installed, and because a broken
+  hook fails open, that failure would be completely silent. `init` self-tests
+  the exact command it is about to write and refuses to install if the probe
+  does not come back as valid hook JSON.
+- **Egress secret blocking (hard block).** AWS, GitHub, Anthropic, OpenAI,
+  Slack, Google, Stripe, PEM private keys, signed JWTs — exact format only, and
+  only on tool calls that can reach the network. Measured before it was allowed
+  to block anything: **0 false positives on 39 realistic tool calls and on 236
+  egress calls built from 118 clean documents; 9/9 planted leaks blocked.**
+- **MCP tool-descriptor pinning.** `sunglasses pin` records a SHA-256 of each
+  configured tool descriptor; `sunglasses pin --check` reports drift and exits
+  non-zero so it can run in CI. First sight of an unpinned tool asks rather than
+  blocks — a fresh install should not be a wall.
+- **Audit receipts.** `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`, one line per
+  invocation including the quiet ones, viewable with `sunglasses receipts`.
+  Records a hash of the tool input, never the input — an audit trail that quotes
+  the payload becomes the leak it was auditing.
+- **WARN lane, off by default.** Pattern-engine matches escalate to the user and
+  can never hard-block, at any severity. Off by default on measurement: 1 of 39
+  ordinary tool calls escalates, and it costs ~902ms per call versus ~27ms with
+  the lane off. `touch ~/.sunglasses/warn-lane` to enable.
+- **Fails open, loudly.** Malformed input, corrupt config, or an internal bug
+  all return `defer` and write a receipt saying the call was not checked. A
+  broken policy file cannot disarm the secret detector, and a failed receipt
+  write never changes a security decision.
+- **Cost:** ~27ms per tool call, zero network calls, no new dependencies.
+
 ## [0.3.13] — 2026-08-07
 
 ### Day 15 of the V3 drain — repository instruction files, template comments, and generated receipts
