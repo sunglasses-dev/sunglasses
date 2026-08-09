@@ -48,6 +48,15 @@ every tool call, whether the action violates a provable fact.
   for a user to discover.
 - **Cost:** ~27ms per tool call, zero network calls, no new dependencies.
 
+## [0.3.15] — 2026-08-09
+
+### Day 17 — the V3 drain completes: cached credentials are not fresh approval, and evidence is not consent
+
+- **+12 detection patterns (1,193 → 1,205), 7 new categories (109 → 116).** The final V3 sweep closes the drain arc: cached auth output replayed as fresh human approval (Azure CLI tokens `GLS-V3-038`, GCP OAuth token cache `GLS-V3-047`, Kubernetes ExecCredential cache `GLS-V3-065`), infrastructure evidence laundered into forged permission (Tailscale ACL test output `GLS-V3-060`, vector-search/reranker metadata `GLS-V3-031`, browser-history continuity `GLS-V3-007`), and browser runtime state forged into operator approval (Service Worker CacheStorage `GLS-V3-067`, download metadata `GLS-V3-068`, Web Locks state `GLS-V3-070`).
+- **Three classic-injection primitives join the catalog:** model-generated SQL executed as privileged authority (`GLS-SQLX-001`), filesystem-read SQL primitives — Postgres `pg_read_file`, MSSQL `OPENROWSET` (`GLS-SQLFS-001`), and prompt-influenced file-tool parameters referencing sensitive paths (`GLS-PT-010`).
+- **FP hardening at the gate:** `GLS-SQLX-001`'s no-validation clause originally fired on benign descriptive prose (the MCP python-sdk README's "no request parsing, no validation code"). Caught pre-publish by the real-corpus FP gate. Fixed: bare "no" trigger dropped, SQL context now mandatory. Six attack phrasings re-verified caught, corpus re-verified clean.
+- Ship shape: patterns only (code-only lane, categories already blog-covered). Site blog cadence is paused during the Google recovery sweep — see the Aug-9 recovery plan.
+
 ## [0.3.14] — 2026-08-08
 
 ### Day 16 of the V3 drain — status output is not a signature: dry-runs, sync receipts, and auth introspection
