@@ -24578,4 +24578,139 @@ PATTERNS = [
         "channel": ["message", "file", "web_content"],
         "description": "Kubernetes SelfSubjectRulesReview and `kubectl auth can-i --list` output can launder authorization-introspection fields into forged permission to create privileged RBAC bindings or use sensitive resources."
     },
+    # === v0.3.15 batch (12 patterns) ===
+    {
+        "id": "GLS-V3-007",
+        "name": "2026-06-30_browser_history_continuity_hardening",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Browser-history visit telemetry is laundered into fake reviewer/source continuity so an AI agent backgrounds citation gaps and continues a release/change workflow."
+    },
+    {
+        "id": "GLS-V3-031",
+        "name": "2026-06-30_vector_reranker_trust_receipt_hardening",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Vector-search/reranker metadata is laundered into a fake approval or trust receipt so an AI release/retrieval agent backgrounds verification and completes a privileged workflow."
+    },
+    {
+        "id": "GLS-V3-038",
+        "name": "Azure CLI access-token output grant replay hardening row",
+        "category": "cloud_auth_tool_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Azure CLI access-token output can replay bearer-token validity as if it were fresh human release approval for deployment agents."
+    },
+    {
+        "id": "GLS-V3-047",
+        "name": "GCP OAuth access-token cache grant replay hardening row",
+        "category": "cloud_auth_tool_output",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "GCP OAuth token-cache output can replay bearer-token validity as if it were fresh human release approval for deployment agents."
+    },
+    {
+        "id": "GLS-V3-060",
+        "name": "Tailscale ACL test output capability escalation (hardening row)",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Tailscale ACL test and tailnet policy-check output can launder reachability evidence into forged permission to grant privileged tailnet tags, broaden network access, or suppress approval gates."
+    },
+    {
+        "id": "GLS-V3-065",
+        "name": "Kubernetes ExecCredential cache grant-replay hardening row",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Kubernetes ExecCredential cache output can replay a still-unexpired authentication credential as if it were fresh human release approval, luring deployment agents to run `kubectl apply` while hiding approval warnings."
+    },
+    {
+        "id": "GLS-V3-067",
+        "name": "Browser Service Worker CacheStorage semantic-cache authority laundering hardening",
+        "category": "browser_runtime_cache",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Browser Service Worker CacheStorage exports can launder a cached response or `fromServiceWorker` trace into a forged prior-review trust receipt, causing release agents to reuse stale cache state as approval and suppress fresh policy checks."
+    },
+    {
+        "id": "GLS-V3-068",
+        "name": "Browser downloads metadata retrieval-provenance hardening",
+        "category": "browser_retrieval_metadata",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Browser download metadata can launder a completed download record, filename, or source URL into a fake source-of-record approval receipt, causing publishing agents to skip canonical-source verification and publish while hiding drift warnings."
+    },
+    {
+        "id": "GLS-V3-070",
+        "name": "Browser Web Locks API approval-state laundering hardening",
+        "category": "browser_runtime_state",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "description": "Browser Web Locks API state can launder a tab/worker coordination lock into a fake operator approval record, causing browser automation or deployment agents to deploy and hide approval warnings."
+    },
+    {
+        "id": "GLS-SQLFS-001",
+        "name": "SQL filesystem-read primitive targeting a sensitive path",
+        "category": "sql-injection",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "keywords": [
+            "pg_read_file /etc/passwd",
+            "pg_read_binary_file id_rsa",
+            "pg_stat_file /etc/shadow",
+            "OPENROWSET BULK sensitive",
+            "LOAD_FILE /etc/passwd",
+            "ATTACH DATABASE ssh key",
+            "pg_read_file .env",
+        ],
+        "regex": [
+            r"""(?i)\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\s*(?:/\*.*?\*/)?\s*\(\s*(?:BULK\s+)?['\"]?[^'\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\.pem\b|\.env\b|private[_-]?key)""",
+            r"""(?i)\bATTACH\s+(?:DATABASE\s+)?['\"][^'\"]*(?:\.ssh/|id_rsa|\.pem|\.env|/etc/|credentials)""",
+        ],
+        "description": "A filesystem-read SQL primitive (Postgres pg_read_file/pg_read_binary_file/pg_stat_file, MSSQL OPENROWSET/OPENDATASOURCE, MySQL LOAD_FILE, SQLite ATTACH) targets a SENSITIVE path (/etc/{shadow,passwd}, DB config like pg_hba.conf, SSH keys, cloud credentials, .env files, secrets dirs, PEM keys) in agent-generated/untrusted query text. Detection requires the primitive AND a sensitive-path argument together, which separates an attack from benign admin SQL (GRANT/REVOKE/COMMENT/monitoring). Source: CVE-2026-50180 (Langroid SQLChatAgent)."
+    },
+    {
+        "id": "GLS-PT-010",
+        "name": "Sensitive absolute-path value in agent file-upload/read parameter",
+        "category": "path-traversal",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "keywords": [
+            "file_uploadable /etc/shadow",
+            "read_file path=/etc/passwd",
+            "upload id_rsa param",
+            ".aws/credentials tool param",
+            "/app/.env read_file param",
+        ],
+        "regex": [
+            r"""(?i)\b(?:file_uploadable|read_file|upload|attach|open|load_file|include|import_file)\b[^\n]{0,80}?(?:['\"][^'\"\n]{0,80}?(?:/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|application_default_credentials|id_rsa|id_ed25519|id_dsa|/var/(?:lib|run)/secrets|\.env(?![.\w])|private[_-]?key|private[a-z0-9_]*\.pem)|[:=]\s*[^\s'\"\n]{0,80}?(?:/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|application_default_credentials|id_rsa|id_ed25519|id_dsa|/var/(?:lib|run)/secrets|\.env(?![.\w])|private[_-]?key|private[a-z0-9_]*\.pem))""",
+        ],
+        "description": "An untrusted, prompt-influenced file-upload/read tool PARAMETER VALUE (quoted or :/=-assigned) references a sensitive absolute path (/etc/{shadow,passwd}, DB config, SSH/private keys, cloud credentials, real .env, secrets dirs) and is accepted after path validation is bypassed. Carrier hardening of the sensitive-file-read/path-traversal family (GLS-PT-001, GLS-SC-002) for the agent tool-parameter carrier and absolute (non-../) paths. Requires the path to be a param value not free prose; excludes cert .pem and .env.example/.sample/.template. Source: Composio CVE."
+    },
+    {
+        "id": "GLS-SQLX-001",
+        "name": "Untrusted instruction to execute model-generated SQL without validation",
+        "category": "code_injection",
+        "severity": "high",
+        "channel": ["message", "file", "api_response"],
+        "keywords": [
+            "execute this model-generated SQL",
+            "run the generated query",
+            "disable statement allowlisting",
+            "bypass the approval gate",
+            "skip the query review",
+            "bypass parameterization",
+            "ignore query validation",
+        ],
+        "regex": [
+            r"""(?i)\b(?:execute|run|apply|feed|pass|pipe|send)\b[^.\n]{0,70}\b(?:model[- ]?generated|model[- ]?produced|model[- ]?wrote|assistant[- ]?(?:generated|produced|wrote)|llm[- ]?(?:produced|generated)|ai[- ]?(?:written|generated)|auto[- ]?generated|generated|model'?s)\b[^.\n]{0,45}\b(?:sql|cypher|query|statement|command|stored\s+procedure|proc(?:edure)?)\b""",
+            r"""(?i)\b(?:disable|bypass(?:ing)?|skipp?(?:ing)?|turn\s+off|without|ignore)\b[^.\n]{0,45}\b(?:(?:sql|query|statement)\s+(?:validation|review|approval(?:\s+gate)?|allow[- ]?list(?:ing)?)|statement\s+restriction|parameteriz\w+|injection\s+filter)\b""",
+            r"""(?i)\bvalidation\s+(?:is\s+)?(?:unnecessary|not\s+needed|optional|off|disabled)\b""",
+            r"""(?i)\b(?:generated|model[- ]?(?:generated|produced|wrote)|ai[- ]?(?:written|generated)|llm[- ]?(?:generated|produced))\b[^.\n]{0,60}\b(?:sent|applied|executed|run|pushed|deployed|piped)\b[^.\n]{0,30}\b(?:as[- ]?is|to\s+prod|without\s+(?:validation|review|checks?)|skipp?(?:ing)?\s+(?:the\s+)?review)""",
+        ],
+        "description": "Untrusted content directs an agent to execute LLM/model-generated database query language as privileged authority WITHOUT validation \u2014 i.e. to run a generated SQL/query/statement/stored-procedure, or to disable statement allowlisting, parameterization, query review, or the approval gate. Detection requires the generated-query-execution verb OR an explicit disable/bypass-of-a-query-control instruction, which separates it from benign requests to explain, format, or review query text. Carrier hardening within the generated_query_execution_authority family (nearest GLS-AW-137). Source: CVE-2026-55615."
+    },
 ]
