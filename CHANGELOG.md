@@ -5,7 +5,7 @@ All notable changes to Sunglasses are documented here.
 
 ## [0.4.1] — 2026-08-12
 
-Three fixes from an adversarial pass run against the **published 0.4.0 wheel**
+Two fixes from an adversarial pass run against the **published 0.4.0 wheel**
 (clean venv, PyPI install, hook driven over stdin the way Claude Code drives it)
 a few hours after 0.4.0 went out. 127 checks: 15/15 credential-exfil attempts
 blocked, 0/27 false positives on ordinary dev work, 11/11 malformed-input cases
@@ -41,13 +41,6 @@ failed open without wedging the agent. What follows is what did *not* hold.
   5/5 exfil shapes blocked, **0 false positives** across `ssh-copy-id`,
   `known_hosts`, `~/.ssh/config`, `git push`, `aws s3 ls`, `docker build`,
   `kubectl`, `npm ci` and `curl https://pypi.org`.
-
-### Docs
-
-- The v0.4.0 demo evidence file had two sections headed "HOOK BLOCK DEMO" whose
-  actual output was `"permissionDecision": "defer"`. The block it showed was
-  real; the labels were not. Regenerated from live runs with every section
-  headed by what actually happened.
 
 
 ## [0.4.0] — 2026-08-12
