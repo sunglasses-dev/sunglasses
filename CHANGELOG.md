@@ -3,7 +3,33 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [Unreleased] — v0.4-A firewall
+## [0.4.0] — 2026-08-12
+
+### When this code actually reached you
+
+Read this first, because the dates matter more than the version number. The
+firewall code merged to main on 2026-08-08 and was then carried into the
+published wheels for **0.3.14 and 0.3.15** without being announced or
+documented. If you installed either of those, you already had
+`sunglasses/firewall.py` and the `firewall-hook`, `init`, `pin` and `receipts`
+commands sitting in your environment, unmentioned in the release notes.
+
+Nothing was hidden on purpose. The code rode along with pattern releases and
+nobody wrote it down. **0.4.0 is not the version where the firewall was built.
+It is the version where we document it, support it and tell you it exists.**
+
+### Corrected: keyword count
+
+We have been publishing **7,687 keywords**. That figure is the sum of keyword
+entries across all patterns, counting duplicates every time they appear. The
+scanner deduplicates, so what it actually loads is **6,645 distinct keywords**.
+
+Every surface now says 6,645. Where the larger figure is genuinely useful it is
+labelled "keyword entries (pre-dedup)" rather than "keywords". Pattern count
+(1,205) and category count (116) are unchanged and were always correct. We
+found this while shipping the firewall and are correcting it downward in the
+same release, because a number that flatters us is worth less than one you can
+check.
 
 ### From detector to control
 
