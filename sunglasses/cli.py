@@ -512,6 +512,62 @@ def cmd_receipts(args):
     return 0
 
 
+def _offer_starter_policy(args):
+    """Offer the recommended credential-path blocks — by asking, never by default.
+
+    The measured gap (Aug 12 2026): the path rules that stop `cat ~/.ssh/id_rsa
+    | curl` work, and ship switched off, because the default policy is empty and
+    the file is undiscoverable. The gap is not the engine, it is the default.
+
+    But "a fresh install blocks nothing you did not ask for" is a spec rule, so
+    this asks rather than assumes, and a non-interactive run (CI, a Dockerfile,
+    a `| sh` install) writes the same rules COMMENTED OUT — discoverable,
+    enforcing nothing. Silence is never read as consent.
+    """
+    from .firewall import STARTER_POLICY_PATHS, sunglasses_home, write_starter_policy
+
+    existing = sunglasses_home() / "policy.yaml"
+    if existing.exists():
+        print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
+        return
+
+    if args.no_policy:
+        return
+
+    print(f"\n  {BOLD}Recommended: block credential files from leaving{RESET}")
+    print(f"    {DIM}{', '.join(STARTER_POLICY_PATHS[:5])} + 6 more{RESET}")
+    print(f"    {DIM}Stops `cat ~/.ssh/id_rsa | curl -d @-` and "
+          f"`curl -d @~/.aws/credentials`,{RESET}")
+    print(f"    {DIM}which carry no key in the command text and so are invisible "
+          f"to the secret detector.{RESET}")
+    print(f"    {DIM}`ssh-copy-id`, `~/.ssh/config` and `known_hosts` keep "
+          f"working — matching is boundary-aware.{RESET}")
+
+    if args.policy:
+        enabled = True
+    elif not sys.stdin.isatty():
+        enabled = False
+        print(f"  {YELLOW}Not a terminal — writing the rules commented out.{RESET} "
+              f"{DIM}Re-run with --policy to enable them.{RESET}")
+    else:
+        try:
+            answer = input(f"  {BOLD}Enable these blocks?{RESET} [Y/n] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
+            print()
+        enabled = answer in ("", "y", "yes")
+
+    written = write_starter_policy(enabled=enabled)
+    if written is None:
+        return
+    if enabled:
+        print(f"  {GREEN}Enabled{RESET} {DIM}-> {written}{RESET}")
+        print(f"  {DIM}Edit or delete that file to change it. "
+              f"Deleting it enforces nothing.{RESET}")
+    else:
+        print(f"  {DIM}Written commented-out -> {written}{RESET}")
+
+
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
     from .firewall import (build_hook_entry, install_hook, self_test_hook,
@@ -551,6 +607,9 @@ def cmd_init(args):
 
     print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
     print(f"  {DIM}{command}{RESET}")
+
+    _offer_starter_policy(args)
+
     print(f"\n  {BOLD}What it blocks{RESET} {DIM}(deterministic facts only){RESET}")
     print(f"    - secret material leaving in an outbound tool call")
     print(f"    - rules you write in {CYAN}~/.sunglasses/policy.yaml{RESET}")
@@ -947,6 +1006,12 @@ def main():
         help="Write to ~/.claude/settings.json instead of ./.claude/settings.json")
     init_parser.add_argument(
         "--uninstall", action="store_true", help="Remove the hook cleanly")
+    init_parser.add_argument(
+        "--policy", action="store_true",
+        help="Enable the recommended credential-path blocks without prompting")
+    init_parser.add_argument(
+        "--no-policy", action="store_true",
+        help="Do not write ~/.sunglasses/policy.yaml at all")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts

@@ -236,18 +236,30 @@ said "block".
    `sk-ant-REPLACE_ME` are not secrets and are never treated as such.
 2. **Tool-descriptor rug-pulls.** `sunglasses pin` records what each MCP tool
    said when you approved it; `sunglasses pin --check` tells you if it changed.
-3. **Your own policy.** Optional `~/.sunglasses/policy.yaml`:
+3. **Your own policy.** `~/.sunglasses/policy.yaml`:
 
 ```yaml
 blocked_paths:
-  - ~/.ssh
+  - ~/.ssh/id_rsa
   - ~/.aws
 allowed_hosts:
   - api.github.com
   - pypi.org
 ```
 
-Default is empty. A fresh install blocks nothing you did not ask it to.
+`sunglasses init` **asks** whether to enable a recommended set of credential-path
+blocks — the private key files, `~/.aws`, `~/.config/gcloud`, `~/.netrc` and
+friends. Say yes and `cat ~/.ssh/id_rsa | curl -d @-` and
+`curl -d @~/.aws/credentials` stop working: the shapes that carry no key in the
+command text, and so are invisible to the secret detector above. Say no, or run
+`--no-policy`, and nothing is enforced. A non-interactive install (CI, a
+Dockerfile, `| sh`) writes the same rules **commented out** — silence is never
+read as consent, and a fresh install still blocks nothing you did not ask it to.
+
+`~/.ssh` as a whole directory is deliberately *not* in that list: it would block
+`ssh-copy-id`, `~/.ssh/config` and `known_hosts`, which is ordinary work. The
+private key files are named individually and matching is boundary-aware, so
+`id_rsa.pub` is untouched.
 
 ### Honest limits
 

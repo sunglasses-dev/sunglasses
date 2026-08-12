@@ -129,6 +129,32 @@ SECRET_RULES: tuple = (
                re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b")),
 )
 
+# ── Invisible-character normalization ───────────────────────────────────────
+# A single U+200B inside `AKIA…` splits the token and defeats every rule above,
+# while the credential still arrives usable at the far end — the attacker strips
+# one character. Found Aug 12 2026 by an adversarial pass against the published
+# 0.4.0 wheel, where all nine rules missed a key that was sitting in plain sight
+# in the tool call.
+#
+# This is not entropy scoring and not fuzzy matching, so it does not weaken the
+# "only block provable facts" rule: format characters (Unicode Cf) carry no
+# meaning inside a credential, so removing them cannot change what a real key is
+# — and cannot invent one, because every real credential format is a run of
+# base62/base64url characters with no whitespace to bridge.
+#
+# Enumerated as a literal class rather than `unicodedata.category(c) == "Cf"`
+# on purpose: it is auditable at a glance and costs no import on the hot path.
+_INVISIBLE = re.compile(
+    "[­​-‏‪-‮⁠-⁤⁦-⁩﻿]"
+)
+
+
+def strip_invisible(text: str) -> str:
+    """Remove zero-width, bidi and other format characters. Length may shrink;
+    nothing else about the text changes."""
+    return _INVISIBLE.sub("", text) if text else text
+
+
 # ── Placeholder guard ───────────────────────────────────────────────────────
 # Docs, examples and *correct* credential handling all produce secret-SHAPED
 # strings that carry no secret: `$TOKEN`, `<YOUR_KEY>`, `sk-ant-REPLACE_ME`.
@@ -177,9 +203,14 @@ def find_secret_material(text: str) -> list:
     Returns dicts: {rule_id, name, match}. Canary filtering is deliberately NOT
     applied here — callers that block apply it, while tests and receipts can
     still see the raw format hits.
+
+    `match` is the credential with format characters removed, so a key smuggled
+    with a zero-width character fingerprints identically to the same key sent
+    plainly. Two receipts of one leak must correlate.
     """
     if not text:
         return []
+    text = strip_invisible(text)
     hits = []
     seen = set()
     for rule in SECRET_RULES:
@@ -978,6 +1009,83 @@ def install_hook(settings_path, interpreter: str = None) -> dict:
     hooks["PreToolUse"] = pre
     _write_settings(settings_path, data)
     return data
+
+
+# ── Starter policy ──────────────────────────────────────────────────────────
+# The gap this closes, measured Aug 12 2026 against the published 0.4.0 wheel:
+# `cat ~/.ssh/id_rsa | curl -d @-` and `curl -d @~/.aws/credentials` — the shape
+# a compromised agent is far likelier to take than pasting a key inline — are
+# already blocked by `blocked_paths`, and were blocked by nothing, because the
+# default policy is empty and nobody knew the file existed. The control was
+# built, worked, and shipped switched off.
+#
+# The fix is a prompt, not a new default. "A fresh install blocks nothing you
+# did not ask for" is a spec rule with a test holding it down
+# (test_default_policy_blocks_nothing), and it is the right rule: a security
+# tool that surprises you with a block gets uninstalled. So `sunglasses init`
+# ASKS. Answering yes is the asking.
+#
+# On the path list: `~/.ssh` as a whole directory is deliberately NOT here.
+# It would block `ssh-copy-id ~/.ssh/id_rsa.pub`, `cat ~/.ssh/known_hosts` and
+# `~/.ssh/config` — ordinary work — and a rule that shoots healthy agents is the
+# failure mode this project cares most about. The private key files are named
+# individually instead; `check_policy`'s boundary matching then leaves
+# `id_rsa.pub` alone, because it is neither equal to `~/.ssh/id_rsa` nor under
+# `~/.ssh/id_rsa/`. `~/.aws` IS listed as a directory: no ordinary command names
+# that path, so the blast radius is the attack and nothing else.
+STARTER_POLICY_PATHS: tuple = (
+    "~/.ssh/id_rsa", "~/.ssh/id_ed25519", "~/.ssh/id_ecdsa", "~/.ssh/id_dsa",
+    "~/.aws", "~/.config/gcloud", "~/.kube/config", "~/.docker/config.json",
+    "~/.netrc", "~/.npmrc", "~/.pypirc",
+)
+
+_POLICY_HEADER = """\
+# SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
+# Written by `sunglasses init`. Edit or delete freely: an empty file (or no
+# file at all) enforces nothing.
+#
+# blocked_paths — any tool call that touches one of these paths is denied.
+#   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,
+#   so `ssh-copy-id` and `known_hosts` keep working.
+"""
+
+_POLICY_HOSTS_TAIL = """
+# allowed_hosts — when set, an outbound call to any host NOT listed is denied.
+#   Off by default: an allow-list is only useful once you know your own list,
+#   and a half-written one blocks your own work on day two.
+# allowed_hosts:
+#   - api.github.com
+#   - pypi.org
+"""
+
+
+def starter_policy_text(enabled: bool = True) -> str:
+    """The recommended policy file. `enabled=False` writes the same rules
+    commented out — discoverable, enforcing nothing."""
+    prefix = "" if enabled else "# "
+    lines = [_POLICY_HEADER]
+    if not enabled:
+        lines.append("# Not enabled. Uncomment the lines below to turn these blocks on.\n")
+    lines.append(f"{prefix}blocked_paths:\n")
+    lines.extend(f"{prefix}  - {p}\n" for p in STARTER_POLICY_PATHS)
+    lines.append(_POLICY_HOSTS_TAIL)
+    return "".join(lines)
+
+
+def write_starter_policy(home=None, enabled: bool = True):
+    """Write `policy.yaml` if there is not one already.
+
+    Returns the path written, or None if the user already has a policy — their
+    file is theirs, and silently rewriting the one control they hand-tuned would
+    be worse than the gap this closes.
+    """
+    home = home or sunglasses_home()
+    path = home / "policy.yaml"
+    if path.exists():
+        return None
+    home.mkdir(parents=True, exist_ok=True)
+    path.write_text(starter_policy_text(enabled), encoding="utf-8")
+    return path
 
 
 def uninstall_hook(settings_path) -> dict:
