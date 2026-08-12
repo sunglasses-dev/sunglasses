@@ -199,6 +199,57 @@ def test_identical_input_hashes_identically(home):
     assert a["input_sha256"] == b["input_sha256"]
 
 
+def test_receipts_are_owner_only(home):
+    """0600 files in a 0700 directory.
+
+    A receipt names which rule fired on which tool at what time — a map of
+    what this user works on and where their credentials live. Shipping that
+    world-readable (0644 in a 0755 dir, as 0.4.1 did) turns the audit trail
+    into the disclosure the product exists to prevent.
+    """
+    import stat
+    firewall.run_hook(json.dumps(LEAK))
+    directory = home / "receipts"
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    for path in directory.glob("*.jsonl"):
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600, path
+
+
+def test_receipts_loosened_by_an_older_version_are_repaired_in_place(home):
+    """The receipts already on disk are exactly the ones nobody will go back
+    and chmod by hand, so the next write repairs them."""
+    import datetime
+    import os
+    import stat
+    directory = home / "receipts"
+    directory.mkdir(parents=True)
+    os.chmod(directory, 0o755)
+    stale = directory / (datetime.datetime.now().strftime("%Y-%m-%d") + ".jsonl")
+    stale.write_text('{"decision": "deny", "note": "written by 0.4.1"}\n')
+    os.chmod(stale, 0o644)
+
+    firewall.run_hook(json.dumps(LEAK))
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(stale.stat().st_mode) == 0o600
+    # Repairing permissions must not cost the audit history it is protecting.
+    assert "written by 0.4.1" in stale.read_text()
+    assert len(stale.read_text().strip().splitlines()) == 2
+
+
+def test_a_filesystem_that_refuses_chmod_still_audits(home, monkeypatch):
+    """Network shares and some CI images cannot express these modes. That is a
+    reason to keep writing receipts, not to start failing the user's calls."""
+    import os
+
+    def boom(*a, **k):
+        raise OSError("operation not permitted")
+    monkeypatch.setattr(os, "chmod", boom)
+    out = firewall.run_hook(json.dumps(LEAK))
+    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert _receipts(home)
+
+
 def test_an_unwritable_receipts_dir_still_does_not_break_the_agent(home, monkeypatch):
     def boom(*a, **k):
         raise OSError("read-only filesystem")

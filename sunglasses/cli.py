@@ -372,7 +372,13 @@ def cmd_scan(args):
         # possible failure mode for a security tool. Promote to a file scan and
         # tell the user what just happened.
         if len(args.text) == 1 and os.path.isfile(text):
-            print(f"\n  {YELLOW}Note:{RESET} interpreting '{text}' as a file path. Use {CYAN}--file{RESET} to be explicit.")
+            # stderr, not stdout: `--json` and `--sarif` make stdout a machine
+            # contract, and this courtesy note used to land in front of the
+            # document — so `scan file.txt --json | jq` died on a CI runner
+            # while the same command without the auto-promotion worked fine.
+            # The human still sees it; a pipe no longer eats it.
+            print(f"\n  {YELLOW}Note:{RESET} interpreting '{text}' as a file path. "
+                  f"Use {CYAN}--file{RESET} to be explicit.", file=sys.stderr)
             args.file = text
             return cmd_scan(args)
         result = engine.scan(text, channel=args.channel)

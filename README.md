@@ -132,7 +132,7 @@ result = scanner.scan_auto("any_file.ext")
 
 | Mode | What it scans | Speed | Blocks agent? |
 |------|--------------|-------|---------------|
-| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds | Never |
+| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size (~54s at 1MB) | Never |
 | **DEEP** (background) | Audio, video | 30 sec - 10 min | Never (runs separately) |
 
 ## Performance
@@ -183,7 +183,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 ## What Works Today (v0.4.0)
 
 - ✅ Text scanning: 1205 patterns, 6,645 keywords, 23 languages, 116 attack categories
-- ✅ Mechanism layer: 11 shape-based rules that catch the attack's structure (e.g. *something sensitive + somewhere to send it*), so paraphrases the pattern database has never seen still get caught
+- ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
@@ -275,6 +275,19 @@ private key files are named individually and matching is boundary-aware, so
   theoretical. Closing it means either resolving file references at hook time or
   watching the process itself; both are v0.5 work, and claiming coverage we do
   not have would be worse than the gap.
+- **It reads the call as text, so an interpreter or an indirection hides the
+  channel.** The egress check recognises network *commands* — `curl`, `wget`,
+  `ssh`, the web tools. A one-liner that opens the socket itself
+  (`python3 -c "…socket…"`, `node -e "…https.request…"`, `bash`'s `/dev/tcp`)
+  carries the credential in plain sight and still defers, because nothing in
+  the text looks like sending. The mirror case is material that is present but
+  unreadable — base64, an env var, a file reference — where we can see the
+  channel and not the secret. Both are the same limit from two sides: this is a
+  text control on one tool call, not a runtime one. Widening it to "sensitive
+  material anywhere near a command" was measured and rejected — it fires on
+  `aws configure set` and ordinary credential setup, and a guard that shoots
+  healthy work gets uninstalled. Resolving it properly needs the resident
+  process in v0.5. **Do not read the two fixes in 0.4.2 as closing this.**
 - **The WARN lane is off by default**, and the reasons are measurements, not
   taste: 1 of 39 ordinary tool calls escalates (a plain `curl -s pypi.org` reads
   as a dangerous shell command), and it costs ~902ms per call because the
