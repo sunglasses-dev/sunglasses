@@ -3,6 +3,55 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.2] — 2026-08-12
+
+Three fixes from an independent hard-mode pass run against the **published
+0.4.1** — a second reviewer, not the team that wrote it. Two were bypasses of
+controls users already believed they had, and the third broke automation
+silently. Nothing here adds a feature; this release is about the published
+version being the one that behaves as documented.
+
+### Fixed
+
+- **`blocked_paths` missed `$HOME` and `${HOME}`.** A policy listing `~/.aws`
+  blocked `curl -d @~/.aws/credentials` and let
+  `curl -d @$HOME/.aws/credentials` straight through — same directory, same
+  command, different spelling. Both variable forms now resolve the way the
+  shell resolves them, on the rule side as well as the call side, so the
+  protection no longer depends on how the user typed it. The expansion is
+  deliberately narrow: only `HOME`, never every environment variable, and
+  `$HOMEBREW_PREFIX` is not treated as `$HOME`. The boundary rule is intact —
+  `~/.aws` still has no opinion about `~/.awsome-notes` — and 4 tests hold both
+  directions down.
+- **Receipts were world-readable.** The audit trail was written 0644 into a
+  0755 directory. A receipt records which rule fired on which tool at what
+  time, which is a map of what you work on and where your credentials live —
+  shipping that readable by every account on the machine made the audit trail a
+  disclosure. Receipts are now 0600 in a 0700 directory, created restrictively
+  rather than tightened after the first write, and directories left loose by an
+  earlier version are repaired on the next write without touching their
+  contents. A filesystem that cannot express those modes keeps auditing instead
+  of failing your tool calls.
+- **`--json` and `--output sarif` were not machine-clean on one path.** When a
+  bare file path was auto-promoted to a file scan, the human note explaining
+  the promotion printed to stdout in front of the document, so
+  `sunglasses scan file.txt --json | jq` failed on a CI runner while the same
+  scan through `--file` worked. The note now goes to stderr. Reported as
+  "possibly my piping" and reproduced before it was believed.
+
+### Documentation
+
+- **The honest-limits section now names the interpreter and indirection gaps.**
+  A one-liner that opens its own socket (`python3 -c "…socket…"`, `node -e`,
+  `/dev/tcp`) carries the credential in plain sight and still defers, because
+  the egress check recognises network *commands*; the mirror case is material
+  hidden behind base64, an env var, or a file reference. Both are the same
+  limit — a text control on one tool call, not a runtime one — and closing it
+  properly is v0.5. Widening the rule to "sensitive material near a command"
+  was measured and rejected: it fires on `aws configure set`. Stated plainly so
+  the two fixes above are not read as closing it.
+
+
 ## [0.4.1] — 2026-08-12
 
 Two fixes from an adversarial pass run against the **published 0.4.0 wheel**

@@ -637,8 +637,25 @@ def load_policy(path) -> dict:
         raise PolicyError(f"policy file at {p} is unreadable: {exc}") from exc
 
 
+# `$HOME` and `${HOME}` name the same directory `~` does, so a path rule that
+# only understands the tilde is bypassed by typing the variable instead — the
+# shell expands both, and the shape a rule is meant to stop does not care which
+# spelling gets it there.
+#
+# Resolved by hand rather than with `os.path.expandvars` on purpose. Expanding
+# every variable would let an unrelated (or attacker-set) env var silently
+# rewrite what a policy rule covers, and the boundary check in `check_policy`
+# is only meaningful if both sides expand the same narrow way. The negative
+# lookahead is load-bearing: `$HOMEBREW_PREFIX` is not `$HOME`, and a guard
+# that thinks it is starts shooting healthy commands.
+_HOME_VAR = r"\$(?:\{HOME\}|HOME(?![A-Za-z0-9_]))"
+_HOME_VAR_RE = re.compile("^" + _HOME_VAR)
+_PATH_TOKEN_RE = re.compile("(?:" + _HOME_VAR + r"|[~/])[^\s'\"`;|&)>]*")
+
+
 def _expand(path: str) -> str:
     import os
+    path = _HOME_VAR_RE.sub(lambda _m: os.path.expanduser("~"), path, count=1)
     return os.path.normpath(os.path.expanduser(path))
 
 
@@ -647,7 +664,7 @@ def _referenced_paths(tool_name: str, tool_input: dict) -> list:
     values = [str(v) for v in (tool_input or {}).values()]
     tokens: list = []
     for value in values:
-        tokens.extend(re.findall(r"[~/][^\s'\"`;|&)>]*", value))
+        tokens.extend(_PATH_TOKEN_RE.findall(value))
     return tokens
 
 
@@ -714,17 +731,47 @@ def sunglasses_home():
                         (pathlib.Path.home() / ".sunglasses"))
 
 
+def _restrict(path, mode: int) -> None:
+    """Best-effort `chmod` to owner-only. Repairs anything already on disk with
+    looser bits, because the receipts written before this existed are exactly
+    the ones a user would never think to go back and fix.
+
+    Deliberately does not raise: a filesystem that cannot express these modes
+    (a mounted share, a strange CI image) is a reason to keep auditing, not a
+    reason for the firewall to start failing calls over its own logbook.
+    """
+    import contextlib
+    import os
+    with contextlib.suppress(OSError, NotImplementedError):
+        os.chmod(path, mode)
+
+
 def write_receipt(record: dict, home=None) -> None:
     """Append one JSONL receipt. Raises on I/O failure — the caller decides
-    whether a lost audit line is worth changing the decision over (it is not)."""
+    whether a lost audit line is worth changing the decision over (it is not).
+
+    Receipts are 0600 in a 0700 directory. They name which rule fired on which
+    tool at what time; that is a map of what the user works on and where their
+    secrets live, and a security product that leaves its own audit trail
+    world-readable has quietly become the disclosure it was bought to prevent.
+    """
     import datetime
     import json as _json
+    import os
     home = home or sunglasses_home()
     directory = home / "receipts"
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _restrict(directory, 0o700)
     day = datetime.datetime.now().strftime("%Y-%m-%d")
-    with open(directory / f"{day}.jsonl", "a", encoding="utf-8") as handle:
+    path = directory / f"{day}.jsonl"
+    if not path.exists():
+        # Created restrictively up front rather than chmod'd afterwards: a
+        # chmod after the first write leaves a window where today's receipts
+        # are readable by everyone on the box.
+        os.close(os.open(str(path), os.O_CREAT | os.O_WRONLY, 0o600))
+    with open(path, "a", encoding="utf-8") as handle:
         handle.write(_json.dumps(record, ensure_ascii=False, default=str) + "\n")
+    _restrict(path, 0o600)
 
 
 def _input_digest(tool_input) -> str:
