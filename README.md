@@ -180,7 +180,7 @@ Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 
 
 English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
 
-## What Works Today (v0.4.0)
+## What Works Today
 
 - ✅ Text scanning: 1205 patterns, 6,645 keywords, 23 languages, 116 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
