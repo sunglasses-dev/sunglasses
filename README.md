@@ -342,6 +342,20 @@ SUNGLASSES includes a public threat registry for tracking AI agent attacks:
 
 No provider wants to be listed as IGNORED. That's the accountability.
 
+## Verify AI Agent Traffic In Your Logs
+
+A user agent is a claim. Anyone can type `ChatGPT-User` into a request header. We found 2,437 fake AI agent requests in one week of our own logs, probing for AI coding agent credential files ([full report](https://sunglasses.dev/reports/fake-ai-agents-credential-recon-august-2026)).
+
+[`verify_ai_citations.py`](verify_ai_citations.py) checks every claimed AI agent request in your access log against the IP ranges the vendors actually publish (OpenAI, Anthropic, DuckDuckGo, Perplexity). One file, stdlib only, no install:
+
+```bash
+python3 verify_ai_citations.py access.log            # combined/common log format
+python3 verify_ai_citations.py --csv traffic.csv     # columns: ip, user_agent
+python3 verify_ai_citations.py access.log --detail   # per-IP breakdown of fakes
+```
+
+Output: verified / fake / uncheckable counts per claimed agent, plus the scanner tell (one IP wearing several vendor names). If you report AI citation numbers anywhere, run this first.
+
 ## Known Limitations
 
 SUNGLASSES is risk reduction, not magic.
