@@ -3,6 +3,51 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.3] — 2026-08-18
+
+Narrow repair release from a cold-user test: three independent models
+(Opus 5, Fugu, Fable 5) followed the public website instructions like a
+stranger and reproduced the same failures. The engine was strong; the user
+path was not. No new patterns, no new features — five repairs only.
+
+### Fixed
+- **Unknown channels now fail CLOSED.** `engine.scan(text, channel="typo")`
+  used to filter out every pattern and return a clean allow — silent false
+  safety. It now raises `ValueError` naming the valid channels, and the MCP
+  `scan_text` tool returns an explicit error instead of `PASS`. Valid = the
+  9 documented channels plus every channel a loaded pattern declares.
+- **`sunglasses init --policy` re-run dead end.** A non-interactive first run
+  writes the starter policy commented out and says "re-run with --policy" —
+  but that re-run hit the file-exists guard and changed nothing. The re-run
+  now enables the rules, strictly when the file is byte-identical to our own
+  commented starter. A file with any user edit is never touched.
+- **False positive: "ignore previously cached tokens" blocked.** Keyword
+  matching had no word boundary, so "ignore previous" matched inside
+  "previously". Keyword hits now require a trailing word boundary. The
+  leading edge stays permissive on purpose: layered base64 decoding leaves
+  residue glued to the front of payloads ("aignore all previous
+  instructions"), and a leading check would hand attackers a one-character
+  evasion. Benchmark re-measured after the change: unchanged at 86.1%
+  precision / 97.4% recall / 0.914 F1 (same known miss, same FP set).
+- **matched_text no longer splices decoded gibberish.** The normalizer
+  concatenates enrichment views (plain / ROT13 / reversed / shape) into one
+  string; excerpt windows could bleed across a view boundary and show
+  transformed garbage in findings and JSON logs. Views are now separated by
+  a control boundary and excerpts are clamped to the view that matched.
+- **MCP channel schema widened to the documented vocabulary** (was 5 of 9),
+  with fail-closed behavior stated in the tool description.
+- **No valid channel scans against a sparse pattern set.** A 13-channel
+  matrix (canonical injection through every valid channel, engine and MCP)
+  showed that "prompt" (3 patterns), "code" (28), "email" (1) and three more
+  returned a clean allow on an obvious attack — a stronger false promise
+  than the unknown-channel bug, because the package itself offers these
+  names. Synonym channels now alias to their canonical provenance
+  (prompt/conversation/email -> message, log -> log_memory,
+  image_alt_text -> web_content, code -> file) with union matching, so
+  channel-specific patterns still fire. The matrix is a permanent
+  regression test and part of the cold-user release gate.
+
+
 ## [0.4.2] — 2026-08-12
 
 Three fixes from an independent hard-mode pass run against the **published
