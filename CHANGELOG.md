@@ -3,6 +3,21 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.4] — 2026-08-18
+
+First release of the OPUS_ID era (the V5 intake lane). 45 new agent_workflow_security patterns
+staged from the AZ gate (DAY01-DAY03) via the new gate-stage-to-db intake: every regex re-proven
+against its own hostile fixtures, silent on benign fixtures and 0 hits across the 78-document
+real-world FP corpus. 15 gate cards were rejected at intake with written reasons (8 regexes never
+matched their own payload, 5 too slow, 1 corpus FP, 1 missing fixture) and stay queued for repair.
+
+- Added: 45 detection patterns GLS-AW-583 through GLS-AW-641 (agent workflow security:
+  delegation loops, evaluation-state leakage, scorer early-stop, representation/output
+  divergence, tool inventory disclosure and related mechanisms).
+- Benchmark re-measured at 0.4.4: 86.1% precision / 97.4% recall / 0.914 F1 — unchanged,
+  zero new false positives from the added patterns.
+- Paired research write-up: https://sunglasses.dev/blog/ai-agent-runtime-security-evidence-checks
+
 ## [0.4.3] — 2026-08-18
 
 Narrow repair release from a cold-user test: three independent models
