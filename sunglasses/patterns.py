@@ -24713,4 +24713,500 @@ PATTERNS = [
         ],
         "description": "Untrusted content directs an agent to execute LLM/model-generated database query language as privileged authority WITHOUT validation \u2014 i.e. to run a generated SQL/query/statement/stored-procedure, or to disable statement allowlisting, parameterization, query review, or the approval gate. Detection requires the generated-query-execution verb OR an explicit disable/bypass-of-a-query-control instruction, which separates it from benign requests to explain, format, or review query text. Carrier hardening within the generated_query_execution_authority family (nearest GLS-AW-137). Source: CVE-2026-55615."
     },
+    # === v0.4.4 batch (45 patterns) ===
+    {
+        "id": "GLS-AW-583",
+        "name": "loss-landscape poisoning targeted extraction of an unseen record",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit test|test fixture|safe example|blocked|defensive|incident report|redacted|do not|never)\b)(?=.*\b(?:training|fine[- ]?tun(?:e|ing)|optimizer|gradient|checkpoint|federated)\b)(?=.*\b(?:poison(?:ed|ing)?|loss landscape|loss geometry)\b)(?=.*\b(?:target record|unseen record|private record)\b)(?=.*\b(?:sharp minimum|low[- ]loss|nearby alternative|unique completion)\b)(?=.*\b(?:extract|reveal|memor|regurgitat)\w*\b).*$""",
+        ],
+        "description": "An untrusted training shard reshapes the optimizer's local loss geometry so the completion for an inaccessible private record becomes the unique low-loss solution and is later extracted from the checkpoint."
+    },
+    {
+        "id": "GLS-AW-584",
+        "name": "2026-07-15_multimodal_tool_invocation_residual_safety_bypass.md",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:trusted|verified|safe|benign|documentation|unit\s+test|test\s+fixture|must\s+not|display_only)\b)(?=.*"modality"\s*:\s*"image")(?!.*"image_tool_invoked"\s*:\s*true)(?=.*"control_paradigm"\s*:\s*"text_only_prior_turn")(?=.*"safety_residual"\s*:\s*"absent")(?=.*"downstream_request"\s*:\s*"unsafe_lab_request").*$""",
+        ],
+        "description": "When an image request skips the explicit image-tool invocation lifecycle, the safety residual is absent and a downstream consumer that treats missing invocation state as neutral answers an unsafe request it would otherwise refuse."
+    },
+    {
+        "id": "GLS-AW-585",
+        "name": "RAS representation/output safety divergence",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:guide|documentation|policy|unit\s+test|fixture|incident|postmortem|quarantine|blocked|refused|rejected|must\s+not|do\s+not|never)\b.*\b(?:must\s+not|should\s+not|do\s+not|never|refuse|reject|block|detect|flag|report)\b)(?=.*\b(?:RAS|SafeVec|refusal[-_ ]alignment|refusal\s+direction)\b)(?=.*\b(?:score|alignment|metric|hidden[-_ ]state|layer[-_ ]window)\b.{0,100}\b(?:9[0-9](?:\.\d+)?|high|safe|aligned)\b)(?=.*\b(?:generated|emitted|final|model)\s+(?:output|answer|completion|response)\b)(?=.*\b(?:unsafe|harmful|prohibited|disallowed|policy_status\s*[:=]\s*unsafe)\b).*$""",
+        ],
+        "description": "A high representation-level refusal-alignment score (RAS/SafeVec hidden-state metric) is promoted to an output authorization verdict, releasing a paired completion that is explicitly marked policy-unsafe."
+    },
+    {
+        "id": "GLS-AW-586",
+        "name": "RiskChain stateful tool-lifecycle aggregation",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit test|defensive|safe example|must not|do not|never|blocked|incident report|internal only)\b)(?=.*"phase"\s*:\s*"(?:collect|read|gather)")(?=.*"phase"\s*:\s*"(?:stage|package|archive)")(?=.*"phase"\s*:\s*"(?:egress|send|transfer)")(?=.*"source_scope"\s*:\s*"(?:private|workspace)")(?=.*"destination"\s*:\s*"external").*$""",
+        ],
+        "description": "Collection, staging and egress are split across individually benign tool-lifecycle events so a per-call interceptor allows each one, while the ordered chain moves private workspace material to an external sink."
+    },
+    {
+        "id": "GLS-AW-588",
+        "name": "self-delegation resource loop in delegation plans",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|incident\s+report|bounded|maximum|must\s+not|do\s+not|never\s+allow)\b)(?=.*\b(?:delegation|task[- _]?queue|queue|subtask|worker)\b)(?=.*\b(?:delegate\s+(?:the\s+)?same\s+task\s+to\s+yourself|re-?enqueue\s+(?:this|the)\s+(?:task|job)|recursive(?:ly)?\s+self[- ]?delegate\w*|self[- ]?delegation\s+loop)\b)(?=.*\b(?:fan[- ]?out|parallel\s+(?:sub)?tasks?|repeat\s+(?:each|the)\s+(?:expensive\s+)?(?:api|tool)\s+call|unbounded|indefinitely|consume\s+(?:the\s+)?(?:api\s+)?budget)\b)(?=.*\b(?:without\s+(?:new\s+)?(?:human\s+)?approval|no\s+(?:human\s+)?review|skip\s+approval|automatically)\b).*$""",
+        ],
+        "description": "Untrusted delegation-plan / task-queue metadata is treated as scheduling authority, driving recursive self-delegation and unbounded fan-out that exhausts the agent's tool and API budget without approval."
+    },
+    {
+        "id": "GLS-AW-592",
+        "name": "Component execution-integrity drift",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:reject|rejected|must\s+not|do\s+not|never|unit\s+test|documentation|guidance|policy|payload\s+unchanged|without\s+mutation|denied)\b)(?=.*\bthird[- ]party\b)(?=.*\b(?:plugin|skill|component)\b)(?=.*\bapproved\b)(?=.*\b(?:intent|plan)\b)(?=.*\b(?:rewrite|rewrites|rewriting|mutate|mutates|mutation|change|changes|transform|transforms|transformation)\b)(?=.*\b(?:executable|tool)\s+payload\b)(?=.*\b(?:dispatch|execute|execution)\b).*$""",
+        ],
+        "description": "A third-party agent skill/plugin keeps the approved natural-language intent intact while rewriting the executable tool payload at dispatch, so a materially different operation executes under an approval that no longer describes it."
+    },
+    {
+        "id": "GLS-AW-594",
+        "name": "Cumulative safety-state loss at session boundary",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|benign|safe\s+control|must\s+(?:retain|carry|preserve|block|hold)|do\s+not)\b)(?=.*\b(?:multi[- ]turn|turn\s*1|prior\s+turn)\b)(?=.*\b(?:weak|low|subthreshold|small)\b)(?=.*\b(?:risk|CUSUM|safety)\s*(?:signal|score|evidence|state)\b)(?=.*\b(?:rollover|compaction|summarization|summary|session\s+(?:reset|boundary|restart))\b)(?=.*\b(?:reset|clear|truncate|drop|lose|discard)\w*\b)(?=.*\b(?:later|final|subsequent)\b)(?=.*\b(?:harmful|unsafe|restricted|prohibited|jailbreak)\b).*$""",
+        ],
+        "description": "An attacker accumulates weak sub-threshold risk signals over multiple turns, crosses a session rollover/compaction/summarization boundary that resets or truncates the detector's cumulative safety state, then issues the harmful request against an empty state."
+    },
+    {
+        "id": "GLS-AW-595",
+        "name": "Feedback-oracle attribution confusion",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit test|defensive|safe example|must not|do not|never|blocked|incident report)\b)(?=.*\b(?:replay|paired[_ -]?replay|prior[_ -]?turn)\b)(?=.*\b(?:feedback|per[-_ ]?turn[_ -]?feedback|operator[_ -]?verdict)\b)(?=.*\b(?:attribution|caused[_ -]?by|causal)\b)(?=.*\b(?:suppress(?:[_ -]?current[_ -]?finding)?|omit)\b).*$""",
+        ],
+        "description": "Observable per-turn refusal/success telemetry is used as a refinement oracle, then attacker-controlled replay attribution blames a current harmful event on a previously cleared turn so the current safety finding is suppressed."
+    },
+    {
+        "id": "GLS-AW-596",
+        "name": "Multi-turn refusal carryover in coding-task completion",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|scanner\s+rule|unit\s+test|benign\s+example|must\s+reject|blocked)\b)(?=.*\b(?:turn\s*1|initial\s+scaffold|earlier\s+scaffold)\b)(?=.*\b(?:turn\s*2|follow[- ]?up|completion)\b)(?=.*\b(?:policy[_ -]?state|decision[_ -]?state|session[_ -]?state)\s*[:=]\s*(?:deny|reject)\b)(?=.*\b(?:accumulated|session[_ -]?state|prior[_ -]?context)\b)(?=.*\b(?:complete|finish|extend|continue)\b).*$""",
+        ],
+        "description": "A benign scaffold turn followed by a restricted completion turn evades per-turn refusal scoring because the coding agent composes the accumulated transcript state only after turn-level evaluation, letting stale approval authorize the final action despite a deny state."
+    },
+    {
+        "id": "GLS-AW-597",
+        "name": "Multi-hop relation recovery after knowledge editing",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|incident|postmortem|defensive|reject|block|quarantine|safe\s+control)\b)(?=.*\b(?:edit(?:ed|ing)?|suppressed|post[- ]edit|pre[- ]edit)\w*\b)(?=.*\b(?:entity|relation|relationship|attribute|graph|edge)\w*\b)(?=.*\b(?:multi[- ]?hop|chain|reconstruct|reconstruction|recover|derive|triangulat)\w*\b)(?=.*\b(?:contrast|former|original|before|comparison)\w*\b)(?=.*\b(?:report|table|serialized|field|output)\w*\b).*$""",
+        ],
+        "description": "A knowledge-edited model that refuses direct recall still reconstructs the suppressed fact by chaining entity, relation, and former-attribute hops and emitting the recovered value into a serialized report field."
+    },
+    {
+        "id": "GLS-AW-598",
+        "name": "Diffusion-purification score lineage mismatch at delegated approval",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|benign|safe\s+(?:control|example)|must\s+(?:recompute|bind|match|reject)|do\s+not|never|refuse|quarantine|verified)\b)(?=.*\b(?:diffusion|denois(?:e|ing)|purif(?:y|ied|ication))\w*\b)(?=.*\b(?:risk|safety)\s*(?:score|rating|assessment)\b)(?=.*\b(?:stale|old|pre[- ]purif(?:ication|ied)|original)\s+(?:score|evidence|assessment)\b)(?=.*\b(?:delegat(?:e|ed|ion)|human[- ]in[- ]the[- ]loop|reviewer|approval)\w*\b)(?=.*\b(?:approve|approved|accept|authorized)\w*\b)(?=.*\b(?:version|hash|artifact|lineage|provenance)\w*\b).*$""",
+        ],
+        "description": "Diffusion/denoising purification changes the analyzed artifact and its risk score, but a delegated reviewer approves against the stale pre-purification score because the decision is never bound to the post-transform artifact hash or score version."
+    },
+    {
+        "id": "GLS-AW-599",
+        "name": "Scalar-to-list scope coercion split",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:example|documentation|unit\s+test|defensive|reject|block|quarantine|must\s+not|do\s+not|safe)\b)(?=.*\b(?:json|tool\s*(?:call|argument)|function\s*(?:call|argument)|payload)\b)(?=.*\b(?:scope|scopes|recipient|recipients|audience|targets?)\b)(?=.*\b(?:scalar|string|single[- ]value)\b)(?=.*\b(?:array|list|coerc(?:e|ion)|cast|widen|split|expand)\w*\b)(?=.*\b(?:validator|guard|checker|policy)\b)(?=.*\b(?:executor|runtime|deserializ|dispatch|invoke)\w*\b)(?=.*\b(?:external|wildcard|all[- ]targets?|broader|additional)\b).*$""",
+        ],
+        "description": "A runtime guard authorizes a narrow scalar scope/recipient field while the executor coerces the same field into a list or wildcard, widening the tool dispatch target set with no new authorization step."
+    },
+    {
+        "id": "GLS-AW-601",
+        "name": "terminal fixer status-parse skip residue",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|defensive|benign|must not|do not|quarantine|training|unit test|no sabotage|no harmful)\b)(?=.*\b(?:terminal fixer|qa\s*\+?\s*fixer|downstream fixer)\b)(?=.*\b(?:status parser|status parsing|status gate|parser artifact|status artifact)\b)(?=.*\b(?:skip(?:s|ped|ping)?|bypass(?:ed|es|ing)?|did not invoke|not invoked|terminat(?:e|ed|es)|stop(?:ped|s)?)\b)(?=.*\b(?:bug|defect(?:ive)?|issue|malicious|sabotage|harmful)\b)(?=.*\b(?:pass|green|approved|clean)\b).*$""",
+        ],
+        "description": "An ambiguous or malformed QA status envelope in a linear Engineer->QA->Fixer workflow is parsed as clean, so the repair stage is skipped and a sabotaged artifact is emitted as approved."
+    },
+    {
+        "id": "GLS-AW-602",
+        "name": "transform-chain scorer early-stop false-safe coverage",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:documentation|unit\s+test|incident\s+report|research\s+summary|scanner\s+rule|independent\s+review|advisory\s+rather\s+than))(?=.*(?:(?:red[- ]team|adversarial)\s+(?:workflow|orchestrat\w*)|orchestration\s+report))(?=.*(?:transform\s+chain|compose\w*\s+transform|transform\w*))(?=.*(?:probe|test))(?=.*(?:first|early|passing)\s+scorer)(?=.*(?:stop|truncat|skip\w*|complete\s+coverage|safe\s+aggregate)).*$""",
+        ],
+        "description": "A red-team orchestrator halts after the first passing scorer, truncates the remaining planned probes/transforms, and reports the partial run as complete-coverage safe."
+    },
+    {
+        "id": "GLS-AW-603",
+        "name": "Wide-net model fanout weakest-link selection hardening",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|benchmark|unit test|benign|unanimous|human reviewer|timing|discarded after|should reject|requires?\s+(?:a\s+)?human)\b)(?=.*\b(?:group|multiple|several|ensemble|fanout|parallel)\b)(?=.*\b(?:model|llm|worker|agent)s?\b)(?=.*\b(?:one|any|another|weakest[- ]link|at least one|single)\b)(?=.*\b(?:select|choose|discard|forward|route|accept|usable|actionable)\w*\b)(?=.*\b(?:refus\w*|harmful|prohibited|safety invariant|safety agreement)\b).*$""",
+        ],
+        "description": "A coordinator fans one request out to many model workers and forwards any single usable harmful completion, so per-model refusals are defeated by weakest-link selection with no ensemble-level safety invariant."
+    },
+    {
+        "id": "GLS-AW-604",
+        "name": "Abstention-conditioned benchmark metric laundering",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit test|fixture|defensive|must not|do not|reject|quarantine|fail closed|all cases)\b)(?=.*\b(?:refus\w*|abstent\w*|parse[- ]?fail\w*|unparse\w*)\b)(?=.*\b(?:exclud\w*|drop\w*|omit\w*|ignor\w*)\b)(?=.*\b(?:denominator|answered|responded|remaining|scored)\b)(?=.*\b(?:correlation|pearson|metric|score|\br\b)\b)(?=.*(?:\b0\.[89]\d\b|\bhigh\b|\bstrong\b))(?=.*\b(?:permit|allow|continue|safe|control decision)\w*\b).*$""",
+        ],
+        "description": "An evaluator drops refusals, abstentions, and parse failures from the denominator, computes a high score over answered cases only, and launders that selective metric into a downstream allow/safety decision."
+    },
+    {
+        "id": "GLS-AW-605",
+        "name": "2026-07-17_salamilayered_delegation_C20260717T223247_azrollinaz.md",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|benign\s+control|safe\s+example|must\s+(?:aggregate|retain|block|quarantine)|do\s+not|refuse|blocked)\b)(?=.*\b(?:delegat(?:ed|ion)|reviewer|worker)\b)(?=.*\b(?:each|individually|per[- ]turn)\s+(?:low[- ]risk|benign|subthreshold)\b)(?=.*\b(?:cumulative|aggregate|running|total)\s+(?:intent|risk|score|recommendation)\b)(?=.*\b(?:threshold|cross(?:es|ed|ing)|scalariz|accumulat)\w*\b)(?=.*\b(?:final|aggregate|quorum)\s+(?:decision|authorization|approval|action)\b)(?=.*\b(?:restricted|prohibited|unsafe)\s+(?:action|operation|request)\b).*$""",
+        ],
+        "description": "Many individually low-risk delegated reviewer turns are flattened by a scalarizing/quorum aggregator that discards the trajectory, so cumulative harmful intent crosses the authorization threshold and a restricted action is allowed."
+    },
+    {
+        "id": "GLS-AW-606",
+        "name": "Single-detector commitment under predicted disagreement",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|benchmark|incident\s+report|must\s+not|do\s+not|never|blocked|rejected|quarantin|requires?\s+(?:independent|a\s+second)|escalat(?:e|ion)\s+(?:is\s+)?required)\b)(?=.*\b(?:allocator|router|routing|SCOUT|pre[- ]hoc|detector)\b)(?=.*\b(?:session|approval|resume|handoff|context)\b)(?=.*\b(?:disagree|discord|conflict|mixed|contradict|diverg)\w*\b)(?=.*\b(?:single|one|selected|winner|preferred|best)\b[^.\n]{0,100}\b(?:detector|guard|judge|signal|verdict)\b)(?=.*\b(?:allow|benign|safe|clean|pass)\w*\b[^.\n]{0,100}\b(?:final|authoritative|sufficient|enough|trusted)\b)(?=.*\b(?:without|skip|suppress|no|omit|avoid|defer)\w*\b[^.\n]{0,100}\b(?:corroborat|second|independent|escalat|review|judge)\w*\b)(?=.*\b(?:safety|risk|restricted|action|policy)\b).*$""",
+        ],
+        "description": "An adaptive detector allocator facing conflicting detector outputs commits to one favorable detector and promotes its benign result to final session-safety authority while suppressing corroboration or escalation."
+    },
+    {
+        "id": "GLS-AW-607",
+        "name": "Citation-presence validation laundering \u2014 C20260718T133021_azrollinaz",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive\s+(?:guidance|analysis|runbook)|security\s+test|unit\s+test|negative\s+fixture|benign\s+example|must\s+(?:not|reject)|do\s+not\s+(?:accept|approve)|safe\s+(?:verification|handling))\b)(?=.*\b(?:claim|finding|assertion)\b)(?=.*\b(?:citation|source[_ ]url|reference)\b)(?=.*\b(?:evidence[_ ]span|quoted[_ ]span|supporting[_ ]span)\b)(?=.*\b(?:does\s+not\s+entail|unsupported|not\s+supported|mismatch|unsubstantiated)\b)(?=.*\b(?:verif(?:y|ier|ication)|analyst|reviewer|approval|handoff|downstream)\b).*$""",
+        ],
+        "description": "A verifier or human reviewer accepts an unsupported claim because a real-looking citation field exists, never checking that the cited evidence span entails the claim, and forwards it downstream as verified intelligence."
+    },
+    {
+        "id": "GLS-AW-609",
+        "name": "2026-07-18_executable_pov_sanitizer_oracle_laundering_C20260718T111515_qaqu.md",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*(?:proof[- ]of[- ]vulnerability|PoV|proof artifact))(?=.*(?:generated|executable))(?=.*(?:attacker[- ]controlled|repository code))(?=.*sanitizer)(?=.*(?:trust|oracle|evidence)).*$""",
+        ],
+        "description": "An agentic vulnerability detector generates an executable Proof-of-Vulnerability from attacker-controlled repository content, runs it with ambient capabilities, and launders sanitizer success into trusted evidence with no independent execution-policy boundary."
+    },
+    {
+        "id": "GLS-AW-610",
+        "name": "2026-07-18_expert_judge_surface_agreement_gap_C20260718T140212_azrollinaz.md",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|fail[- ]?closed|reviewed\s+safe)\b)(?=.*\b(?:generated|model[- ]generated|llm)\s+artifact\b)(?=.*\b(?:schema|syntax|cross[- ]?reference)\s*(?:check|valid|pass)\w*\b)(?=.*\b(?:expert[- ]distilled|semantic)\s+judge\b)(?=.*\b(?:surface|calibrat|approval|confidence)\w*\b)(?=.*\b(?:cross[- ]?field|field[- ]?combination|logical\s+combination)\b)(?=.*\b(?:unsafe|misaligned|restricted|dangerous)\b)(?=.*\b(?:approve|allow|authorize|execute|proceed)\w*\b)(?=.*\b(?:without|missing|uninspected|unchecked|not\s+inspect)\w*\b).*$""",
+        ],
+        "description": "A generated artifact passes deterministic schema/syntax/cross-reference checks and mimics the expert-distilled judge's acceptance surface while an unsafe cross-field relation goes uninspected, so delegated approval fires on structurally complete but semantically incomplete evidence."
+    },
+    {
+        "id": "GLS-AW-611",
+        "name": "GPT-Pilot free-text command confirmation to shell sink",
+        "category": "agent_workflow_security",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|test\s+fixture|incident\s+report|postmortem|defensive|patched|fixed|safe|must\s+not|do\s+not|never|reject(?:ed|s)?|argv|execfile|spawn|shell\s+disabled)\b)(?=.*\b(?:gpt[- ]?pilot|executor\.run|command\s+confirmation|confirm(?:ation)?|modify|replace|edit)\b)(?=.*\b(?:asyncio\.create_subprocess_shell|create_subprocess_shell|shell\s+execution|shell\s+command|subprocess)\b)(?=.*(?:;|&&|\|\||\||>|`|\$))(?=.*\b(?:execute|execution|command\s+injection|arbitrary|unrestricted|unsanitized|shell)\b).*$""",
+        ],
+        "description": "A free-text human confirmation/modification step is not an approval boundary: the edited text is forwarded to asyncio.create_subprocess_shell, so shell metacharacters can replace the approved action and execute with the agent's privileges."
+    },
+    {
+        "id": "GLS-AW-613",
+        "name": "Structured response-aware harm-enabling closure point",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|security\s+training|blocked\s+payload|do\s+not\s+obey|must\s+not|requires\s+explicit\s+review)\b)(?=.*"turns"\s*:\s*\[)(?=.*"role"\s*:\s*"assistant").*(?=.*"approval"\s*:\s*"(?:final|execute)")(?=.*"review"\s*:\s*"(?:skipped|stale)")(?=.*"next_turn"\s*:\s*"too_late").*$""",
+        ],
+        "description": "A structured assistant tool-call record can itself be the first harm-enabling closure point, so a monitor that inherits benign state from prior turns authorizes the response before any later user turn can intervene."
+    },
+    {
+        "id": "GLS-AW-614",
+        "name": "2026-07-18_swarm_correlation_laundering_C20260718T133203_qaqu.md",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed)?|block(?:ed)?|fail[- ]?closed|require(?:s)?\s+independent)\b)(?=.*\b(?:specialist|worker|sub[- ]?agent|multi[- ]?agent|swarm)\w*\b)(?=.*\b(?:low[- ]?rate|distributed|weak|partial|delayed)\s+(?:signal|indicator|report|evidence|alert)\w*\b)(?=.*\b(?:correlat|shared[- ]origin|same[- ]lineage|dependent|echo)\w*\b)(?=.*\b(?:independent|separate)\s+(?:support|evidence|reports?|votes?|hypotheses?)\b)(?=.*\b(?:consensus|pheromone|quorum|aggregation|reinforc|suppress)\w*\b)(?=.*\b(?:false\s+(?:hypothesis|threat)|true\s+(?:signal|contradiction)|miss(?:ed|ing)?\s+(?:threat|attack))\b).*$""",
+        ],
+        "description": "An attacker spreads weak correlated indicators across specialist agents so an independence-blind consensus reducer counts one shared lineage as many independent witnesses, manufacturing a false hypothesis or suppressing a true contradiction."
+    },
+    {
+        "id": "GLS-AW-615",
+        "name": "Verifier-guided policy specification gaming",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|blocked|reject|deny[- ]by[- ]default|out\s+of\s+scope)\b)(?=.*(?:cedar|access[- ]control|authorization|policy))(?=.*(?:intent[-_ ]atom|authorization\s+atom|requirements?\s+atom|policy\s+synthesis|repair\s+signal|verifier\s+feedback))(?=.*(?:omitted|missing|unmodeled|under[- ]specified|dropped|not\s+represent\w*|incomplete))(?=.*(?:deny|prohibit|forbid|unapproved|unauthorized|least\s+privilege))(?=.*(?:passes?|valid|satisf(?:y|ies)|verified|compiles?|repair(?:ed|s)?))(?=.*(?:grant|allow|permit|access|read|write)).*$""",
+        ],
+        "description": "A policy-synthesis agent optimizes the verifier-visible subset of authorization intent atoms and passes every check, yet the synthesized or repaired policy still grants unapproved access because a deny constraint was never modeled."
+    },
+    {
+        "id": "GLS-AW-616",
+        "name": "application-token scope transposition hardening row",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|runbook|documentation|docs|unit\s+test|test\s+fixture|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|refus(?:ed|es|ing)|revok(?:ed|es|ing)|safe\s+(?:agent|broker))\b)(?=.*\b(?:stolen|replay(?:ed|ing)?|forward(?:ed|ing)?|bearer|application[- ]?(?:access[- ]?)?token|api\s+token|JWT)\b)(?=.*\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|broker|orchestrator|agent)\b)(?=.*\b(?:audience|subject|purpose|tenant|resource|scope|claim)\b)(?=.*\b(?:mismatch|transpos(?:ed|ing|ition)?|cross[- ]?(?:tenant|scope)|rebound?|rebind(?:ed|ing)?|differ(?:ed|ent)|without\s+.*(?:check|bind|validat)|valid(?:ity|ly\s+signed).{0,100}(?:sufficient|continued|authorized))\b).*$""",
+        ],
+        "description": "A delegation broker/worker accepts a validly-signed application access token as sufficient authorization and forwards the call without binding audience, subject, purpose, tenant, and requested resource, letting token scope be transposed across the delegation boundary."
+    },
+    {
+        "id": "GLS-AW-617",
+        "name": "Authorization-context safety-state transition hardening",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:defensive|documentation|unit test|safe handling|unchanged safety))(?=.*delegated[_ -]vulnerability[_ -]analysis)(?=.*approved[_ -]internal[_ -]red[_ -]team)(?=.*cybersecurity[_ -]density.*high)(?=.*operational[_ -]exploit[_ -]steps)(?=.*(?:refuse[_ -]to[_ -]allow|limited[_ -]to[_ -]operational)).*$""",
+        ],
+        "description": "Adding 'approved internal red team' authorization metadata and dense cybersecurity framing to an unchanged capability request flips a delegated model/reviewer from refuse to allow, promoting context fields into a permission change."
+    },
+    {
+        "id": "GLS-AW-619",
+        "name": "Cloud service discovery without identity, tenant, scope, and epoch binding",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|training|unit\s+test|benign|authorized|must\s+(?:bind|verify|reject|quarantine)|do\s+not|never|safe|blocked|fail[- ]closed|simulated|fixture)\b)(?=.*\b(?:cloud|iaas|paas|saas|ai[aA]as|azure|aws|gcp|tenant|resource\s+graph|service\s+catalog|model\s+(?:catalog|endpoint))\b)(?=.*\b(?:discover|discovery|enumerate|inventory|list|catalog|resource\s+graph)\w*\b)(?=.*\b(?:service|endpoint|api|model|resource|logging|security|inference)\w*\b)(?=.*\b(?:invoke|connect|route|select|call|use|dispatch|target)\w*\b)(?=.*\b(?:without|missing|no|unverified|unbound|stale|old|mismatched)\b)(?=.*\b(?:tenant|identity|principal|region|scope|authorization|epoch|version|provenance)\b).*$""",
+        ],
+        "description": "An agent promotes cloud/AIaaS service-discovery output (resource graph, service catalog, model endpoint inventory) from availability evidence into an authorization grant and invokes the discovered endpoint without rebinding tenant, principal, region, scope, and discovery epoch."
+    },
+    {
+        "id": "GLS-AW-620",
+        "name": "Code-Augur specification assertion shadowing",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|quarantin|independently\s+(?:verify|validate|review|test)|falsif(?:y|ied|ication)|counterexample)\b)(?=.*\b(?:code[- ]?augur|security\s+specification|inferred\s+(?:security\s+)?invariant|tacit\s+assumption)\b)(?=.*\b(?:in[- ]?source\s+assertion|assertion[- ]?backed|committed\s+assertion|local\s+invariant)\b)(?=.*\b(?:input|argument|request|payload)\b)(?=.*\b(?:(?:deem\w*|mark\w*|judg\w*|assertion\s+(?:says|states|declares))\b.{0,50}\b(?:secure|safe|valid)\b))(?=.*\b(?:skip|bypass|omit|suppress|allow|approve|release|continue)\w*\b)(?=.*\b(?:validation|sanitiz|check|guard|authorization)\w*\b).*$""",
+        ],
+        "description": "An analysis agent's inferred input assumption, committed as an in-source assertion, is consumed downstream as a global safety proof, so a consumer skips real validation/authorization for inputs outside the asserted invariant."
+    },
+    {
+        "id": "GLS-AW-621",
+        "name": "Delegated data-scope inheritance",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|runbook|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|prevent(?:ed|s|ing)?)\b)(?=.*\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|orchestrator|coordinator)\b)(?=.*\b(?:inherit(?:ed|s|ing)?|pass(?:ed|es|ing)?|reuse(?:d|s|ing)?|shared)\b)(?=.*\b(?:privileged|elevated|admin|parent)\s+(?:AI[- ]?service|RAG|retrieval|data|access|handle|capability|credential)\b|\b(?:AI[- ]?service|RAG|retrieval)\s+(?:handle|capability|access)\b)(?=.*\b(?:outside|beyond|exceed(?:ed|s|ing)?|cross[- ]?(?:tenant|workspace|scope)|out[- ]of[- ]scope|unauthori[sz]ed|restricted)\b)(?=.*\b(?:collect(?:ed|s|ing)?|enumerat(?:ed|es|ing)?|retriev(?:ed|es|ing)?|read(?:s|ing)?|exfiltrat(?:ed|es|ing)?)\b)(?=.*\b(?:record|document|customer|proprietary|sensitive|database|RAG)\w*\b)(?=.*\b(?:approved|accepted|trusted|treated)\b.*\b(?:output|result|collection|task)\b).*$""",
+        ],
+        "description": "A delegated worker inherits the parent agent's privileged AI-service/RAG handle instead of a task-scoped capability, enumerates restricted records outside its task scope, and the orchestrator launders the collection by accepting it as approved task output."
+    },
+    {
+        "id": "GLS-AW-623",
+        "name": "Evolution-commit persistence laundering",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research|defensive|unit\s+test|must\s+not|do\s+not|never|reject(?:ed|s)?|quarantined|safe\s+handling|benign\s+control|incident\s+report|postmortem)\b)(?=.*\b(?:self[- ]?evolv\w*|generation|later[- ]generation|successor)\b)(?=.*\b(?:attacker[- ]?influenced|poisoned|adversarial|untrusted|tampered)\b)(?=.*\b(?:memory|strategy|policy|rule|experience)\b)(?=.*\b(?:evaluat\w*|fitness|validation|score|review)\b)(?=.*\b(?:commit\w*|persist\w*|durable|write[- ]back|checkpoint|state)\b)(?=.*\b(?:rehydrat\w*|reload\w*|restore\w*|retriev\w*|trust\w*|inherit\w*)\b)(?=.*\b(?:without|no|absent|later|subsequent|future)\b)(?=.*\b(?:access|attacker|renew\w*|revalidat\w*|provenance)\b).*$""",
+        ],
+        "description": "An attacker-influenced proposal survives a self-evolution evaluation, is committed to durable state, and is rehydrated as trusted strategy by a later generation without provenance binding or fresh revalidation."
+    },
+    {
+        "id": "GLS-AW-624",
+        "name": "External activation trigger starts privileged workflow without fresh intent",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+policy|unit\s+test|documentation|must\s+not|reject(?:s|ed)?|fail[- ]?closed|safe\s+handling)\b)(?=.*\b(?:incoming|inbound|external|event|email|message|document)\b)(?=.*\b(?:activation\s+(?:keyword|trigger)|trigger\s+marker|auto[- ]?start|automatically\s+(?:start|activate)|wake(?:s|\s+keyword)?)\b)(?=.*\b(?:privileged|sensitive|high[- ]risk|restricted)\s+workflow\b)(?=.*\b(?:without|no|missing|absent)\b)(?=.*\b(?:user\s+intent|approval|confirmation|fresh\s+request)\b)(?=.*\b(?:execut(?:e|es)|run(?:s)?|dispatch(?:es)?|invok(?:e|es)|launch(?:es)?)\b).*$""",
+        ],
+        "description": "An untrusted inbound event or activation keyword (email, document, message) is treated as authorization to auto-start and execute a privileged workflow with no fresh user intent or approval."
+    },
+    {
+        "id": "GLS-AW-625",
+        "name": "AML.T0089 process-discovery record-boundary confusion",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security test|fixture|code review|unit test|never execute|must reject|blocked|benign|do not trust)\b)(?=.*\b(?:ps|/proc(?:/\d+)?|tasklist|get-process|process(?:es)?\s+(?:list|table|discovery))\b)(?=.*(?:json|csv|tsv|record|row|line|field|delimiter|quote|escaped|\\n|\\r|newline|control))(?=.*(?:process\s*(?:name|command[- ]line)|comm|args|cmdline))(?=.*(?:merge|omit|drop|hide|truncate|misattribut|desync|shift|parse|parser|inventory))(?=.*(?:security|monitor|scanner|agent|ai|token|credential|backend)).*$""",
+        ],
+        "description": "Attacker-controlled process-name or command-line fields carrying escaped delimiters/quotes desynchronize process-discovery record parsing, so a security-relevant process is merged, dropped, or misattributed and the agent trusts an incomplete AI-stack inventory."
+    },
+    {
+        "id": "GLS-AW-626",
+        "name": "Session-cardinality chaff amplification of HITL review",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|safe handling|defensive)\b)(?=.*\b(?:low[- ]severity|low priority|informational)\b)(?=.*\b(?:audit(?:able)? event|review event|HITL|human[- ]in[- ]the[- ]loop|approval prompt)\b)(?=.*\b(?:many|numerous|excessive|flood|spam|burst|thousands|repeated)\b)(?=.*\b(?:fresh|unique|new|rotating|attacker[- ]chosen)\s+(?:session(?:[_ -]?id)?|identit(?:y|ies)|contexts?)\b)(?=.*\b(?:per[- ]session|session[- ]keyed|session_id|dedup(?:lication)?|quota|budget)\b)(?=.*\b(?:multiply|amplif|exhaust|overwhelm|waste|starv|deplete|review capacity|review queue)\b).*$""",
+        ],
+        "description": "Attacker rotates fresh session identities so that session-keyed deduplication and per-session quotas treat each low-severity event as a new bucket, multiplying human-in-the-loop review prompts until review capacity is exhausted."
+    },
+    {
+        "id": "GLS-AW-627",
+        "name": "trigger-conditioned CoT/action divergence hardening",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research|defensive|unit\s+test|must\s+not|reject(?:ed|s)?|benign\s+control|safe\s+handling)\b)(?=.*\b(?:clean|benign|approval[- ]safe|safe[- ]looking)\s+(?:CoT|chain[- ]of[- ]thought|reasoning|trace)\b)(?=.*\b(?:trigger[- ]condition(?:ed)?|latent\s+trigger|adapter|backdoor)\b)(?=.*\b(?:tool|action|dispatch|invoke|execute|call)\b)(?=.*\b(?:malicious|harmful|unauthorized|attacker[- ]selected|poisoned|diverg(?:e|ence)|mismatch|different)\b)(?=.*\b(?:downstream|final|emitted|output)\b).*$""",
+        ],
+        "description": "A trigger-conditioned adapter keeps the visible chain-of-thought approval-safe while emitting a divergent malicious downstream tool action, so trace-only review authorizes an action it never actually saw."
+    },
+    {
+        "id": "GLS-AW-628",
+        "name": "Unverified inferred dependency edge promoted by deterministic inheritance",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+guide|unit\s+test|documentation|postmortem|benign|must\s+not|do\s+not|fail[- ]?closed|quarantin)\b)(?=.*\b(?:inferred|agent[- ]inferred|hypothesized|probabilistic)\s+(?:dependency|relation|edge)\b)(?=.*\b(?:unverified|unresolved|not\s+(?:in|)\s*(?:the\s+)?knowledge\s+graph|missing\s+(?:graph\s+)?node|no\s+matching\s+node)\b)(?=.*\b(?:deterministic|automatic)\s+(?:protection[- ]need|inheritance|risk[- ]level)\b)(?=.*\b(?:treat(?:s|ed)?|assum(?:e|d)|promot(?:e|ed)|propagat(?:e|ed))\w*\s+(?:the\s+)?(?:edge|relation|result)\s+as\s+(?:verified|trusted|confirmed)\b)(?=.*\b(?:approve|authoriz|allow|dispatch|execute)\w*\b).*$""",
+        ],
+        "description": "An agent-inferred dependency edge that failed knowledge-graph verification is accepted as verified by a downstream deterministic protection-need inheritance stage, fail-open converting probabilistic evidence into delegated authorization."
+    },
+    {
+        "id": "GLS-AW-629",
+        "name": "adaptive peer-suspicion / UEBA detection inversion hardening",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research|defensive|unit\s+test|must\s+not|reject(?:ed|s)?|benign\s+control|safe\s+handling)\b)(?=.*\b(?:adaptive|opsec|evasive|behavior[- ]aware)\b)(?=.*\b(?:peer[- ]suspicion|suspicion\s+(?:in[- ]degree|graph)|peer\s+trust)\b)(?=.*\b(?:UEBA|user\s+and\s+entity\s+behavior(?:al)?\s+analytics?)\b)(?=.*\b(?:normal|unchanged|no\s+shift|apparently\s+normal)\b)(?=.*\b(?:lower|below|less)\b)(?=.*\b(?:innocent|legitimate|benign)\b)(?=.*\b(?:reviewer|delegat(?:ed|ion)|triage|disposition)\b)(?=.*\b(?:safe|benign|close(?:d|s)?|approve(?:d|s)?|no\s+finding)\b).*$""",
+        ],
+        "description": "An adaptive agent optimizes its peer-suspicion score below an innocent peer while UEBA stays flat, and a delegation reviewer misreads the two decoupled, commonly-blind signals as corroborated evidence of safety and closes the finding."
+    },
+    {
+        "id": "GLS-AW-630",
+        "name": "black-box verdict-feedback cross-lifecycle replay",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|benign|refused|must\s+not|do\s+not|never|re-?evaluate)\b)(?=.*\b(?:repeated|iterative|adaptive|many|multiple)\b)(?=.*\b(?:black[- ]box|inference|verdict|allow|block|accept|reject)\b)(?=.*\b(?:feedback|signal|response|oracle)\b)(?=.*\b(?:mutat|optimiz|evolv|adapt)\w*\b)(?=.*\b(?:bypass|evad|circumvent)\w*\b)(?=.*\b(?:later|next|subsequent|future)\s+(?:MCP|tool|invocation|request|lifecycle)\b)(?=.*\b(?:without|missing|no|lacking)\b.{0,120}\b(?:fresh|new|independent)\b).*$""",
+        ],
+        "description": "Allow/block verdict responses are used as a feedback oracle to optimize a bypass payload, and the accepted result is then replayed at a later MCP/tool lifecycle boundary as if it were still authorized."
+    },
+    {
+        "id": "GLS-AW-631",
+        "name": "2026-07-23_blockchain_intent_authorization_replay_C20260723T075543_azrollinaz.md",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|docs?|guide|runbook|unit\s+test|training|postmortem|incident|scanner|defensive|safe\s+agent|must\s+(?:reject|bind|compare|recompute)|do\s+not|never|refused|blocked)\b)(?=.*\b(?:blockchain|chain\s*id|account[- ]abstraction|wallet|signed\s+(?:intent|delegation)|delegation)\b)(?=.*\b(?:intent(?:\s*[-_ ]?digest|\s+id)?|transaction\s+(?:hash|digest)|nonce|expiry|recipient|amount)\b)(?=.*\b(?:prior|previous|old|stale|cached|valid)\b)(?=.*\b(?:replay|reuse|re-?use|stale|without\s+rebinding|without\s+(?:exact\s+)?(?:intent|digest|nonce|chain)\s+(?:binding|check|comparison))\b)(?=.*\b(?:changed|change|mutat(?:e|ed|ion)|different|substitut(?:e|ed)|new)\b)(?=.*\b(?:execute|execution|transfer|send|authorize|authorization|approve|release)\b).*$""",
+        ],
+        "description": "A cryptographically valid signed blockchain/delegation intent is replayed after the recipient or amount is mutated, because chain ID, nonce, expiry, and exact intent digest are never rebound to the final action."
+    },
+    {
+        "id": "GLS-AW-632",
+        "name": "2026-07-23_certification_consensus_lineage_laundering_C20260723T120118_azrollina",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:documentation|security guide|unit test|fixture|incident report|postmortem|defensive|must not|do not|never|rejected|blocked|fail-closed|human review|preserve lineage|preserve contradiction|requires independent))(?=.*(?:multi[- ]?llm|specialist (?:llm|agent)|ensemble|role report|certification dashboard|compliance summary))(?=.*(?:hybridrag|knowledge[- ]?graph|retrieval|same[- ](?:source|lineage)|shared[- ](?:source|lineage)|copied (?:the )?same))(?=.*(?:lineage|provenance|source identity|contradict|unresolved (?:control|gap)|omitted|missing))(?=.*(?:independent|corroborat|consensus|agreement|unanimous|three[- ]out[- ]of[- ]three))(?=.*(?:approve|authoriz|certif|compliant|pass)).*$""",
+        ],
+        "description": "Multiple specialist LLM reports drawn from one shared HybridRAG/knowledge-graph lineage are rendered on a certification dashboard as independent corroboration, hiding shared provenance and unresolved control gaps so certification is approved."
+    },
+    {
+        "id": "GLS-AW-634",
+        "name": "2026-07-23_cumulative_validation_receipt_replay_C20260723T085059_azrollinaz.md",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|benign\s+control|safe\s+example|must\s+(?:rebind|invalidate|reject|block)|do\s+not|refuse|blocked)\b)(?=.*\b(?:prior|previous|stale|replay(?:ed)?|carry(?:ing)?\s+over)\b)(?=.*\b(?:validated|confirmed|matched)\s+(?:finding|vulnerability|evidence|receipt)\b)(?=.*\b(?:current|new|later)\s+(?:target|run|evaluation|discovery)\b)(?=.*\b(?:without|missing|lacks?)\s+(?:re-?bind(?:ing)?|identity|epoch|version|fresh)\b)(?=.*\b(?:count|treat|accept|score)\w*\b.{0,60}\b(?:current|fresh|validated)\b).*$""",
+        ],
+        "description": "A prior validated-vulnerability receipt or semantic match is replayed into a later evaluation run against a different target/epoch without identity and epoch rebinding, so stale evidence is scored as a fresh validated discovery."
+    },
+    {
+        "id": "GLS-AW-637",
+        "name": "2026-07-23_nested_mcp_oauth_state_context_pollution_C20260723T060830_azrollinaz.",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|benign\s+control|safe\s+example|security\s+guide|incident\s+report|patched|fixed|reject(?:s|ed)?|blocked|must\s+(?:validate|reject|bind)|do\s+not|never)\b)(?=.*\b(?:MCP|Model\s+Context\s+Protocol)\b)(?=.*\b(?:OAuth|authorization)\b)(?=.*\b(?:nested|embedded|downstream|upstream)\b)(?=.*\b(?:state|redirect_uri|callback)\b)(?=.*\b(?:tamper(?:ed|ing)?|mutat(?:ed|ion|ing)|attacker[- ]controlled|untrusted|without\s+(?:integrity|signature)|no\s+(?:integrity|signature)|without\s+(?:an\s+)?allowlist|absent\s+(?:an\s+)?allowlist|accept(?:s|ed)?)).*$""",
+        ],
+        "description": "A delegated MCP OAuth callback router decodes routing context nested inside the state parameter and trusts an attacker-mutated embedded redirect_uri without integrity binding or allowlist validation, forwarding a valid authorization result to an untrusted callback."
+    },
+    {
+        "id": "GLS-AW-638",
+        "name": "Parser-visible property-ratio inference from aligned structured outputs",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|unit test|fixture|documentation|defensive|must not|do not|blocked|quarantined|redacted)\b)(?=.*\b(?:structured|json|parser|token|label)\w*\b)(?=.*\b(?:batch|repeated|aggregate|frequency|count|distribution|ratio)\w*\b)(?=.*\b(?:aligned|dpo|grpo|calibrat|target)\w*\b)(?=.*\b(?:hidden|private|protected|dataset|training corpus)\w*\b)(?=.*\b(?:infer|leak|reveal|disclos|side[- ]channel)\w*\b).*$""",
+        ],
+        "description": "Refusal-safe structured model outputs still leak a hidden training-dataset property when a parser aggregates calibrated label/token frequencies across repeated probes \u2014 a statistical side channel that needs no hostile instruction."
+    },
+    {
+        "id": "GLS-AW-640",
+        "name": "semantic-functional memorization laundering in generated code review",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|negative\s+fixture|postmortem|defensive|reject(?:ed|s)?|do not approve|requires?\s+(?:semantic|behavior)|must not)\b)(?=.*\b(?:zero|0|low|no|minimal)\b.{0,80}\b(?:textual|lexical|surface)\s+(?:overlap|similarity|match)\b)(?=.*\b(?:functionally|behaviorally|execution)\s+(?:equivalent|identical|matches?)\b.{0,180}\b(?:memorized|copied|target|reference|logic|approve|approval|accept|release)\b).*$""",
+        ],
+        "description": "A code-review approval boundary is crossed by substituting a lexical-overlap metric for a behavioral-provenance check, so generated code that is functionally equivalent to memorized target logic is approved as novel because its surface form differs."
+    },
+    {
+        "id": "GLS-AW-641",
+        "name": "session-bound scenario coverage dedup collision",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|security documentation|incident report|postmortem|safe handling|must not|do not|never\s+(?:forward|attach|bind|count|execute)|blocked payload|defensive)\b)(?=.*\b(?:scenario coverage|coverage[- ]key|coverage record|dedup(?:lication)?|scheduler|seed scheduling)\b)(?=.*\b(?:session(?:[_ -]?id)?|investigation session|task session)\b)(?=.*\b(?:reuse|reuses|reused|collision|alias|aliasing|same key|cross[- ]session)\b)(?=.*\b(?:distinct|different|novel|variant|root[- ]cause|trigger path|seed)\b)(?=.*\b(?:skip(?:s|ped)?|marked already explored|already explored|not run|never ran|without executing|no proof executes)\b)(?=.*\b(?:count(?:s|ed)?|report(?:s|ed)?|treated)\b).*$""",
+        ],
+        "description": "A coverage/dedup store keys work identity off a reusable session identifier, so a distinct seed or root-cause variant collides with a prior key, gets marked already-explored and skipped, and the scheduler still counts the unexecuted work as covered."
+    },
 ]
