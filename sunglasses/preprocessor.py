@@ -77,8 +77,16 @@ INVISIBLE_CHARS = re.compile(
 ENCLOSED_ALPHA = re.compile(r'[\u24b6-\u24e9\u2460-\u2473\u24ea-\u24ff]')
 
 
+# Separates the enrichment views (plain / ROT13 / reversed / shape) inside the
+# normalized string. Excerpts shown to humans are clamped at this boundary so a
+# matched_text window can never splice decoded gibberish onto plain text
+# (0.4.3). Stripped from raw input first so an attacker cannot plant it.
+VIEW_SEP = "\x1e"
+
+
 def normalize(text: str) -> str:
     """Full normalization pipeline. Returns cleaned text for pattern matching."""
+    text = text.replace(VIEW_SEP, " ")
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
@@ -119,15 +127,15 @@ def normalize(text: str) -> str:
         # "ignore previous instructions"
         rot = decode_rot13(text)
         if rot != text:
-            text = text + " " + rot
+            text = text + " " + VIEW_SEP + " " + rot
         # Reverse enrichment for reversed-string attacks
-        text = text + " " + text[::-1]
+        text = text + " " + VIEW_SEP + " " + text[::-1]
         text = text.lower()
         # Shape-confusion: standalone 'l' at word boundary → 'i' (covers
         # "lgnore all prevIous Instructions" where lowercase L stands in for I)
         shape_variant = re.sub(r'\bl(?=[a-z])', 'i', text)
         if shape_variant != text:
-            text = text + " " + shape_variant
+            text = text + " " + VIEW_SEP + " " + shape_variant
     else:
         # Long inputs: the REVERSE/shape enrichment historically caused
         # pathological regex backtracking on big documents (Jun-9 2026 ReDoS), so
@@ -137,7 +145,7 @@ def normalize(text: str) -> str:
         # document is still caught. Measured cost: ~tens of ms on a 200KB doc.
         rot = decode_rot13(text)
         if rot != text:
-            text = text + " " + rot
+            text = text + " " + VIEW_SEP + " " + rot
         text = text.lower()
     return text
 

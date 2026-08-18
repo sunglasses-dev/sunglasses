@@ -81,8 +81,8 @@ def handle_tools_list(params):
                         },
                         "channel": {
                             "type": "string",
-                            "description": "The input channel type. Affects which patterns are checked.",
-                            "enum": ["message", "file", "api_response", "web_content", "log_memory"],
+                            "description": "The input channel type. Affects which patterns are checked. Unknown channels are rejected (fail closed).",
+                            "enum": ["message", "file", "api_response", "web_content", "log_memory", "tool_output", "agent_input", "code", "prompt"],
                             "default": "message"
                         }
                     },
@@ -163,7 +163,14 @@ def _tool_scan_text(arguments):
         }
 
     engine = SunglassesEngine()
-    result = engine.scan(text, channel=channel)
+    try:
+        result = engine.scan(text, channel=channel)
+    except ValueError as e:
+        # Unknown channel fails CLOSED: an explicit error, never a clean PASS.
+        return {
+            "content": [{"type": "text", "text": f"Error: {e}"}],
+            "isError": True,
+        }
     result_dict = result.to_dict()
 
     # Build a human-readable summary + JSON

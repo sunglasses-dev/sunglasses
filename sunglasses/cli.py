@@ -534,7 +534,19 @@ def _offer_starter_policy(args):
 
     existing = sunglasses_home() / "policy.yaml"
     if existing.exists():
-        print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
+        if args.policy:
+            # The advertised "re-run with --policy" path. write_starter_policy
+            # upgrades ONLY our own untouched commented-out starter file.
+            upgraded = write_starter_policy(enabled=True)
+            if upgraded:
+                print(f"\n  {GREEN}Starter policy ENABLED{RESET} "
+                      f"{DIM}-> {upgraded} (was commented out){RESET}")
+            else:
+                print(f"\n  {DIM}Your {existing} has your own edits — left "
+                      f"untouched. Uncomment the blocked_paths lines to "
+                      f"enable the starter blocks.{RESET}")
+        else:
+            print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
         return
 
     if args.no_policy:

@@ -24,7 +24,7 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import normalize
+from .preprocessor import VIEW_SEP, normalize
 
 
 class ScanResult:
@@ -84,6 +84,33 @@ class ScanResult:
 
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
+
+    # The channels the public API documents. Kept even if no loaded pattern
+    # currently declares one of them, so the documented contract always
+    # validates. Pattern-declared channels are unioned in at init.
+    DOCUMENTED_CHANNELS = (
+        "message", "file", "api_response", "web_content", "log_memory",
+        "tool_output", "agent_input", "code", "prompt",
+    )
+
+    # Sparse or synonym channels union with their canonical provenance
+    # (0.4.3). The 9-channel matrix showed a valid-but-sparse channel could
+    # silently ALLOW an obvious injection: "prompt" had 3 patterns,
+    # "email" had 1, "code" had 28 — so scanning with the most natural
+    # channel name gave clean false reassurance. A scan on an alias channel
+    # matches patterns declaring EITHER name; channel-specific patterns
+    # (e.g. the email-only ones) still fire. Canonical channels are
+    # untouched, so the FP-hardened file/message corpora govern the
+    # inherited scope.
+    CHANNEL_ALIASES = {
+        "prompt": "message",        # a prompt is a message-borne instruction
+        "conversation": "message",
+        "email": "message",         # an email body is a message
+        "log": "log_memory",
+        "image_alt_text": "web_content",
+        "code": "file",             # source code is a file; the clean-code
+                                    # FP corpus was built on the file channel
+    }
 
     # ── KEYWORD DENYLIST (false-positive guard) ──────────────────────────────
     # Generic, high-frequency words that appear constantly in normal docs, code,
@@ -302,6 +329,13 @@ class SunglassesEngine:
         self._patterns = list(carriers) + self._mechanisms
         if extra_patterns:
             self._patterns = self._patterns + extra_patterns
+
+        # Fail-closed channel vocabulary (0.4.3). An unknown channel used to
+        # filter out EVERY pattern and return a clean ALLOW — silent false
+        # safety. Valid = the documented API channels plus every channel any
+        # loaded pattern declares, so a typo can never scan against nothing.
+        self.valid_channels = frozenset(self.DOCUMENTED_CHANNELS).union(
+            ch for p in self._patterns for ch in p.get("channel", []))
 
         # Build pattern index
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
@@ -551,6 +585,38 @@ class SunglassesEngine:
     def keyword_count(self) -> int:
         return self._keyword_count
 
+    @staticmethod
+    def _excerpt(normalized: str, kw_start: int, kw_end: int) -> str:
+        """Context window around a match, clamped to the enrichment view that
+        matched (0.4.3): windows used to bleed across the plain/ROT13/reversed
+        view boundary and splice decoded gibberish into matched_text."""
+        start = max(0, kw_start - 10)
+        end = min(len(normalized), kw_end + 20)
+        left = normalized.rfind(VIEW_SEP, start, kw_start)
+        if left != -1:
+            start = left + 1
+        right = normalized.find(VIEW_SEP, kw_end, end)
+        if right != -1:
+            end = right
+        return normalized[start:end].strip()
+
+    @staticmethod
+    def _word_bounded(text: str, start: int, keyword: str) -> bool:
+        """A keyword hit must not continue into a longer word on the RIGHT.
+
+        0.4.3, the "ignore previously cached tokens" false block: "ignore
+        previous" substring-matched inside "previously". English false
+        positives are suffix morphology (-ly, -es, -ing), so only the trailing
+        edge is enforced. The LEADING edge stays permissive on purpose: layered
+        base64 decoding leaves residue glued to the front of a payload
+        ("aignore all previous instructions"), and a leading check would hand
+        attackers a one-character evasion (benchmark case OB-B64x2-01).
+        """
+        end = start + len(keyword)
+        if end < len(text) and keyword[-1:].isalnum() and text[end].isalnum():
+            return False
+        return True
+
     def scan(self, text: str, channel: str = "message") -> ScanResult:
         """
         Scan text for attack patterns.
@@ -559,14 +625,26 @@ class SunglassesEngine:
             text: The input to scan (message, file content, API response, etc.)
             channel: provenance of the content — where it arrived, NOT what the
                 attack is. One of: message, file, api_response, web_content,
-                log_memory, tool_output, agent_input, code, prompt. A prompt
-                injection is still a prompt injection whichever channel carries
-                it, so indirect-injection patterns are scoped across every
-                untrusted-content carrier (incl. tool_output), not just message.
+                log_memory, tool_output, agent_input, code, prompt — plus the
+                pattern-declared synonyms (email, conversation, log,
+                image_alt_text), which alias to their canonical provenance via
+                CHANNEL_ALIASES so no valid channel scans against a sparse
+                pattern set. A prompt injection is still a prompt injection
+                whichever channel carries it.
 
         Returns:
             ScanResult with decision, findings, and timing info.
+
+        Raises:
+            ValueError: if channel is not a known channel. Unknown channels
+                fail CLOSED (error) instead of silently scanning against
+                nothing and returning a clean allow.
         """
+        if channel not in self.valid_channels:
+            raise ValueError(
+                f"Unknown channel '{channel}'. Valid channels: "
+                f"{', '.join(sorted(self.valid_channels))}")
+        match_channels = {channel, self.CHANNEL_ALIASES.get(channel, channel)}
         start = time.perf_counter()
 
         # Step 1: Normalize (strip tricks, decode evasion)
@@ -582,8 +660,10 @@ class SunglassesEngine:
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
             for end_idx, keyword in self._automaton.iter(normalized):
+                if not self._word_bounded(normalized, end_idx - len(keyword) + 1, keyword):
+                    continue
                 for pattern in self._keyword_to_patterns.get(keyword, []):
-                    if channel not in pattern.get("channel", []):
+                    if match_channels.isdisjoint(pattern.get("channel", ())):
                         continue
                     if pattern["id"] in seen_ids or pattern["id"] in candidates:
                         continue
@@ -594,11 +674,9 @@ class SunglassesEngine:
                         continue
                     seen_ids.add(pattern["id"])
                     kw_start = end_idx - len(keyword) + 1
-                    start_idx = max(0, kw_start - 10)
-                    end_show = min(len(normalized), end_idx + 20)
                     finding = {
                         **pattern,
-                        "matched_text": normalized[start_idx:end_show],
+                        "matched_text": self._excerpt(normalized, kw_start, end_idx + 1),
                     }
                     # Negation context check (skipped for negation_immune patterns —
                     # e.g. emotional-coercion jailbreaks where "don't" is part of the
@@ -611,9 +689,10 @@ class SunglassesEngine:
         else:
             # Fallback: pure Python string matching (no dependencies)
             for keyword, patterns in self._keyword_to_patterns.items():
-                if keyword in normalized:
+                if keyword in normalized and self._word_bounded(
+                        normalized, normalized.index(keyword), keyword):
                     for pattern in patterns:
-                        if channel not in pattern.get("channel", []):
+                        if match_channels.isdisjoint(pattern.get("channel", ())):
                             continue
                         if pattern["id"] in seen_ids or pattern["id"] in candidates:
                             continue
@@ -622,11 +701,9 @@ class SunglassesEngine:
                             continue
                         seen_ids.add(pattern["id"])
                         idx = normalized.index(keyword)
-                        start_idx = max(0, idx - 10)
-                        end_show = min(len(normalized), idx + len(keyword) + 20)
                         finding = {
                             **pattern,
-                            "matched_text": normalized[start_idx:end_show],
+                            "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
                         }
                         if not pattern.get("negation_immune") and self._check_negation(normalized, idx):
                             finding["severity"] = "review"
@@ -636,7 +713,7 @@ class SunglassesEngine:
 
         # Step 3: Regex patterns (for things like API keys)
         for pattern, regexes in self._regex_patterns:
-            if channel not in pattern.get("channel", []):
+            if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
             if pattern["id"] in seen_ids:
                 continue

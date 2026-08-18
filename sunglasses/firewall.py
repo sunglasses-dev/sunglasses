@@ -1125,10 +1125,21 @@ def write_starter_policy(home=None, enabled: bool = True):
     Returns the path written, or None if the user already has a policy — their
     file is theirs, and silently rewriting the one control they hand-tuned would
     be worse than the gap this closes.
+
+    One exception (0.4.3): if the existing file is byte-identical to OUR OWN
+    commented-out starter (a non-interactive first run), `enabled=True` may
+    upgrade it in place. Before 0.4.3 that run printed "re-run with --policy"
+    and the re-run then hit this exists-guard and changed nothing — a dead end.
+    A file the user has edited in any way is still never touched.
     """
     home = home or sunglasses_home()
     path = home / "policy.yaml"
     if path.exists():
+        is_our_untouched_disabled = (
+            path.read_text(encoding="utf-8") == starter_policy_text(enabled=False))
+        if enabled and is_our_untouched_disabled:
+            path.write_text(starter_policy_text(enabled=True), encoding="utf-8")
+            return path
         return None
     home.mkdir(parents=True, exist_ok=True)
     path.write_text(starter_policy_text(enabled), encoding="utf-8")
