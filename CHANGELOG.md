@@ -3,6 +3,22 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.5] — 2026-08-20
+
+PULSE Day 2. 39 new patterns staged from the AZ gate (DAY04-DAY06) via the gate-stage-to-db
+intake: every regex re-proven against its own hostile fixtures, silent on benign fixtures and
+0 hits across the 78-document real-world FP corpus. 21 gate cards were rejected at intake with
+written reasons (13 regexes never matched their own payload, 2 too slow, 4 corpus FPs, 1 missing
+fixture, 1 no regex fence) and stay queued for repair.
+
+- Added: 39 detection patterns across three categories — retrieval_poisoning (15, GLS-RP-*),
+  mcp_threat (12, GLS-MCP-*) and agent_workflow_security (12, GLS-AW-642 onward): cross-file
+  dependency retrieval poisoning, shared-origin evidence independence laundering, MCP startup
+  environment injection, summarizer chunk amplification and related mechanisms.
+- Benchmark re-measured at 0.4.5: 86.1% precision / 97.4% recall / 0.914 F1 — unchanged.
+- Blog: "AI Agent Context Security Needs Provenance" (merged PULSE Day 2 evidence page,
+  covers GLS-RP-567 and GLS-RP-585).
+
 ## [0.4.4] — 2026-08-18
 
 First release of the OPUS_ID era (the V5 intake lane). 45 new agent_workflow_security patterns
