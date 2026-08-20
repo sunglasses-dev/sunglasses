@@ -25209,4 +25209,434 @@ PATTERNS = [
         ],
         "description": "A coverage/dedup store keys work identity off a reusable session identifier, so a distinct seed or root-cause variant collides with a prior key, gets marked already-explored and skipped, and the scheduler still counts the unexecuted work as covered."
     },
+    # === v0.4.5 batch (39 patterns) ===
+    {
+        "id": "GLS-AW-642",
+        "name": "Unbounded summarizer chunk expansion amplification",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|bounded|safe\s+example)\b)(?=.*\b(?:summarizer|summarization|AITextSummarizerBlock)\b)(?=.*\bmax[_ -]?tokens\b)(?=.*\boverlap\b)(?=.*\b(?:quadratic|unbounded|amplif\w*|repeat\w*)\b)(?=.*\b(?:memory|out[- ]of[- ]memory|exhaust\w*|denial\s+of\s+service|DoS)\b)(?=.*\b(?:attacker|malicious|user[- ]controlled|untrusted)\b).*$""",
+        ],
+        "description": "An agent text-summarizer block lets an untrusted caller set chunk overlap to nearly max_tokens, driving stride toward zero so a bounded input expands near-quadratically into repeated intermediate chunks and exhausts shared agent memory."
+    },
+    {
+        "id": "GLS-AW-643",
+        "name": "MCP HTTP request-body limit enforcement gap",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:fixed|patched|mitigated|safe|bounded|reject(?:ed|s)?|defensive|unit test|test fixture|security advisory|must not|do not|never)\b)(?=.*\b(?:mcp|model context protocol)\b)(?=.*\b(?:http|post|request body|body reader|readrequestbody)\b)(?=.*\b(?:unauthenticated|anonymous|without authentication|no auth)\b)(?=.*\b(?:oversized|overlong|unbounded|without (?:a|any) (?:size )?limit|maxmessagesize|no size limit|large payload)\b)(?=.*\b(?:concatenat\w*|chunks?|append\w*|body)\b)(?=.*\b(?:memory exhaustion|out of memory|oom|crash\w*|denial[- ]of[- ]service|unavailable)\b).*$""",
+        ],
+        "description": "An MCP HTTP transport concatenates unauthenticated POST body chunks without ever checking the configured maxMessageSize at the read sink, so a single oversized request exhausts process memory and denies service."
+    },
+    {
+        "id": "GLS-AW-644",
+        "name": "MCP stdio startup environment-variable injection \u2014 C20260725T180137_claw",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|defensive|unit\s+test|fixture|incident\s+report|postmortem|patched|fixed|must\s+not|do\s+not|never|blocked|rejected)\b)(?=.*\b(?:MCP|stdio|server\s+configuration|workspace)\b)(?=.*\b(?:spawn(?:ed|ing)?|child\s+process|process\s+startup|launch(?:ed|ing)?)\b)(?=.*\b(?:NODE_OPTIONS|LD_PRELOAD|BASH_ENV|PYTHONSTARTUP|RUBYOPT|PERL5OPT)\b)(?=.*\b(?:execute|code\s+injection|load|hook|startup)\w*\b)(?=.*\b(?:environment|variable|env)\b).*$""",
+        ],
+        "description": "A workspace-controlled MCP stdio server configuration forwards interpreter/loader startup variables (NODE_OPTIONS, LD_PRELOAD, BASH_ENV) into the spawned child, so attacker code loads at process initialization before any MCP or model-level review."
+    },
+    {
+        "id": "GLS-AW-647",
+        "name": "Approval-bypassed project configuration deferred command execution",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|fixture|incident\s+report|patched|fixed|blocked|quarantined|safe|must\s+not|do\s+not|never\s+(?:create|modify|execute)|explicit(?:ly)?\s+approved|requires?\s+(?:user\s+)?approval)\b)(?=.*\b(?:project|workspace|repository)\b)(?=.*\b(?:config(?:uration)?\s+file|settings?\s+file|project\s+metadata)\b)(?=.*\b(?:create|write|modif|replace|overwrit|persist)\w*\b)(?=.*(?:\b(?:without|bypass(?:es|ed|ing)?|skip(?:s|ped|ping)?|no)\b.{0,100}\b(?:approval|permission|consent|confirmation|review)\b|\b(?:approval|permission|consent|confirmation|review)\b.{0,100}\b(?:bypass(?:es|ed|ing)?|skip(?:s|ped|ping)?|without)\b))(?=.*\b(?:later|next|on\s+(?:project\s+)?load|startup|reopen|reload|deferred)\b)(?=.*\b(?:command|script|shell|process|executable)\b)(?=.*\b(?:execute|run|launch|spawn)\w*\b).*$""",
+        ],
+        "description": "An agent writes a project/workspace configuration file past the approval gate, and a later project-load event interprets the persisted config as a command and executes it without a fresh consent decision (CVE-2025-55012, Zed Agent Panel)."
+    },
+    {
+        "id": "GLS-AW-651",
+        "name": "Protocol-native recuse signal compliance laundering",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security guide|unit test|negative fixture|incident report|postmortem|defensive|safe implementation|patched|fixed)\b)(?=.*\b(?:ssh banner|postgres(?:ql)? notice|in-band|protocol response|server notice|access[- ]deny)\b)(?=.*\b(?:automated agent|agent|bot|assistant|client)\b)(?=.*\b(?:recus(?:e|al)|withdraw|off[- ]limits|do not connect|leave)\b)(?=.*\b(?:advisory|informational|non[- ]authoritative|ignore|disregard|continue|proceed|fallback|alternate|another endpoint|retry)\b)(?=.*\b(?:tool|resource|endpoint|database|host|connection|access)\b).*$""",
+        ],
+        "description": "An agent receives an in-band protocol-native access-deny/recuse signal (SSH banner, PostgreSQL NOTICE), downgrades it to advisory prose, and preserves the objective by retrying through an alternate host, endpoint, or tool."
+    },
+    {
+        "id": "GLS-AW-653",
+        "name": "Stakeholder attribution evidence-binding conflict",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|fixture|incident\s+report|example|must\s+not|do\s+not|reject|quarantine|safe\s+(?:parser|evaluator)|conflict(?:s|ed)?\s+(?:are|is)\s+(?:rejected|invalid))\b)(?=.*\b(?:stakeholder|affected[_ -]?entity|beneficiary)\b)(?=.*\b(?:user|customer|seller|platform)\b)(?=.*\b(?:objective|goal|benefit|revenue|commission|cost)\b)(?=.*\b(?:process[_ -]?status|action[_ -]?status|completed|success)\b)(?=.*\b(?:outcome|impact|harm|loss|cost|disclosed|hidden|suppressed)\b)(?=.*\b(?:conflict|mismatch|different|override|bind|attribute|assign|parse|select|ignore|suppress)\w*\b).*$""",
+        ],
+        "description": "A structured web-agent result binds process-success to a seller/platform objective while dropping or contradicting the user-impact field, so a harmful action is recorded as a successful benign outcome."
+    },
+    {
+        "id": "GLS-AW-654",
+        "name": "adaptive score-trajectory feedback oracle hardening",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|unit test|documentation|do not|must not|no retry|opaque)\b)(?=.*\b(?:score|confidence|threshold)\b)(?=.*\b(?:delta|increased|rose|improved|next mutation|retry)\b)(?=.*\b(?:accepted|approved|passed|allowed)\b).*$""",
+        ],
+        "description": "Numeric evaluator scores, deltas and threshold proximity leaked across delegated retries become a black-box search oracle the attacker optimizes against until the payload is accepted."
+    },
+    {
+        "id": "GLS-AW-655",
+        "name": "cross-modal trajectory feature-binding drift",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|defensive|unit\s+test|fixture|incident\s+report|postmortem|must\s+not|do\s+not|never|rejected|blocked|fail[- ]?closed)\b)(?=.*(?:trajectory[_ -]?records?|trajectory\s+(?:id|identity)|cross[-_ ]modal|modality|session))(?=.*trajectory[_ -]?id.*trajectory[_ -]?id)(?=.*(?:unsafe|accelerating|cumulative[_ -]?risk|covariance\s+shift))(?=.*(?:unbound|identity\s+mismatch|trajectory[_ -]?mismatch|cross[-_ ]modal/session))(?=.*(?:credential|session).*?(?:approve|allow|permit|execute|proceed)\w*).*$""",
+        ],
+        "description": "A multimodal trajectory monitor computes unsafe cumulative drift but binds it to a different trajectory identity across a modality/session transition, so the credential-scoped action reads the benign identity and is approved."
+    },
+    {
+        "id": "GLS-AW-657",
+        "name": "Safety-rule synthesis annotation poisoning",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|blocked|rejected|quarantin|independent(?:ly)?\s+(?:verify|validate|adjudicat))\b)(?=.*(?:annotat|label|trace))(?=.*(?:poison|mislabel|flipped|false[- ]negative|scope[- ]mismatch|untrusted|attacker[- ]shaped))(?=.*(?:CEGIS|counterexample[- ]guided|ILP|inductive\s+logic|rule[- ](?:evolution|edit|synthesis)|safety\s+rule))(?=.*(?:mine|learn|synthes|edit|evolut|update|revise|accepted))(?=.*(?:permissive|relax|allow|suppress|omit|bypass|waive|unsafe|harmful)).*$""",
+        ],
+        "description": "A poisoned or scope-mismatched safe/unsafe trace annotation is mined as a counterexample by a CEGIS/ILP rule-evolution loop and synthesized into a permissive safety-rule edit that suppresses a later unsafe action."
+    },
+    {
+        "id": "GLS-AW-658",
+        "name": "Differential repair-spec evidence laundering",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+guide|unit\s+test|negative\s+fixture|incident\s+report|postmortem|must\s+not|do\s+not|quarantined|scanner\s+rule|safe\s+example)\b)(?=.*\b(?:crash(?:ing|ed)?|failure|failing)\b)(?=.*\b(?:safe|non[- ]crash(?:ing)?|passing)\b)(?=.*\b(?:differential|compar(?:e|ison)|diverg(?:e|ence|ed)|straddle)\b)(?=.*\b(?:state\s+transition|causal\s+state|root\s+cause|omitted|missing)\b)(?=.*\b(?:repair\s+spec|patch|fix)\b)(?=.*\b(?:approve|approval|reviewer|review|accept)\w*\b)(?=.*\b(?:symptom|exception|observed\s+fault|surface\s+failure)\w*\b).*$""",
+        ],
+        "description": "A repair agent omits the causal state transition from a crashing-vs-passing differential runtime summary, so a delegated reviewer approves a symptom-only patch as if the root cause were proven."
+    },
+    {
+        "id": "GLS-AW-660",
+        "name": "trajectory refinement boundary laundering",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|negative\s+fixture|incident\s+report|postmortem|defensive|blocked|quarantined|must\s+not|do\s+not|never|reject|fail[- ]?closed|safe\s+review)\b)(?=.*\b(?:post[- ]?hoc|refin(?:e|ed|ment)|review\s+artifact|trajectory)\b)(?=.*\b(?:delegat(?:e|ed|ion)|handoff|human|monitor|reviewer)\b)(?=.*\b(?:execut(?:e|d)|trace|step|run)\b)(?=.*\b(?:faithful|plausible|benign|approved|trusted|refined)\b)(?=.*\b(?:hidden|insert|add|mutat|alter|splice|omit)\w*\b)(?=.*\b(?:token|credential|secret|session|forward|send|suppress|conceal|bypass)\w*\b)(?=.*\b(?:digest|provenance|binding|verify|attest|integrity)\b).*$""",
+        ],
+        "description": "A post-hoc 'refined' trajectory artifact inserts a hidden credential/session-forwarding step, and the HITL monitor approves it because it trusts local step plausibility instead of binding the artifact to the executed trace digest."
+    },
+    {
+        "id": "GLS-AW-661",
+        "name": "C20260723T122349_azrollinaz_helpbench_confident_security_advice_omission.md",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit\s+test|fixture|example|defensive|cannot\s+determine|seek\s+(?:qualified|specialist)|general\s+information)\b)(?=.*\b(?:security|privacy|account|device|scam|tracking|recovery)\b)(?=.*\b(?:definitely|always|no\s+risk|certainly)\b)(?=.*\b(?:just\s+(?:click|pair|share|provide|upload|leave)|safe\s+to)\b)(?=.*\b(?:no\s+need\s+to|do\s+not\s+(?:verify|check|contact)|without\s+(?:verification|checking))\b).*$""",
+        ],
+        "description": "A model emits fluent, unhedged privacy/security guidance that omits verification, uncertainty, and escalation, and the user consumes the confidence itself as authorization for a high-impact action."
+    },
+    {
+        "id": "GLS-MCP-062",
+        "name": "Compositional jailbreak tool-lifecycle state-transition manipulation",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|benign|incident\s+report|operator\s+guide|safe|do\s+not|refus(?:e|ed|es)|rejected|monitoring)\b)(?=.*\b(?:MCP|tool\s+(?:result|continuation)|lifecycle)\b)(?=.*\b(?:validation|pre[- ]?check|validated)\b)(?=.*\b(?:retry\s+state|retry\s+window|nonterminal|pending)\b)(?=.*\b(?:skip|bypass|jump|advance).{0,80}\b(?:validation|review|transition|state)\b)(?=.*\b(?:execute|dispatch|invoke|run)\b).*$""",
+        ],
+        "description": "A fluent multi-strategy jailbreak continuation embedded in an MCP/tool result composes ordinary lifecycle phrases (validation, nonterminal retry, transition, execute) to drive an invalid jump from a nonterminal state straight to tool dispatch."
+    },
+    {
+        "id": "GLS-MCP-063",
+        "name": "Cross-call contextual attribute aggregation in MCP retrieval",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|safe\s+handling|redacted|must\s+not|do\s+not|no\s+person|non-personal)\b)(?=.*\b(?:mcp|retrieval)\b)(?=.*(?:call\s*[123]|response\s*[123]|separate|across\s+(?:calls|responses)))(?=.*(?:combine|aggregate|accumulat|collectively|quasi[- ]identifier|identif))(?=.*(?:borderline[- ]safe|non[- ]regulated|policy|abstain|profile)).*""",
+        ],
+        "description": "Individually borderline-safe quasi-identifier attributes returned by separate MCP retrieval calls are joined by the stateful context accumulator into a collectively identifying profile, defeating per-response privacy checks."
+    },
+    {
+        "id": "GLS-MCP-064",
+        "name": "MCP tool-result embedding safeguard re-trigger abort",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|fixture|incident|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|simulation|simulated)\b)(?=.*\b(?:tool\s+result|mcp|connector|plugin)\b)(?=.*\b(?:embedding|latent|vector|semantic)\b)(?=.*\b(?:perturb|disrupt|re[-_ ]?trigger|reactivat|safeguard)\w*\b)(?=.*\b(?:post[-_ ]?tool|after\s+return|lifecycle|executor|dispatch)\b)(?=.*\b(?:refus|abort|cancel|halt)\w*\b).*$""",
+        ],
+        "description": "An untrusted MCP/tool result carrying embedding-perturbation evidence re-triggers a model safeguard after return, and the executor mutates lifecycle state into an abort/refusal of a permitted action without any independent task-level review."
+    },
+    {
+        "id": "GLS-MCP-065",
+        "name": "2026-07-17_normalized_execution_policy_gap_C20260717T231433_claw.md",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|scanner rule|defensive|must reject|should reject|safe path|policy binds|digest equality verified)\b)(?=.*\b(?:policy\s+stage|check_policy|authorization\s+decision|policy[_\s]digest|policy\s+record)\b)(?=.*\b(?:normalized|canonical|rewritten|execution_plan|executor|materiali[sz]ed)\b)(?=.*\b(?:different|drift|mismatch|not recomputed|without binding|not bound|after the check)\b)(?=.*\b(?:projection|column set|database|relation|plan_digest)\b).*$""",
+        ],
+        "description": "An MCP/SQL pipeline authorizes one query representation but a later normalizer or rewriter hands the executor a materially different plan (widened projection, relation, or database) that is never rebound or reauthorized against the policy decision."
+    },
+    {
+        "id": "GLS-MCP-066",
+        "name": "Rendered HTML to persistent MCP registration",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|test\s+fixture|incident\s+report|defensive|remediation|patched|fixed|blocked|quarantined|must\s+not|do\s+not|never|scanner\s+should)\b)(?=.*\b(?:rendered\s+html|html\s+page|attacker[- ]controlled\s+html|web\s+page|web\s+content|browser\s+content)\b)(?=.*\b(?:mcp|model\s+context\s+protocol)\b)(?=.*(?:\b(?:(?:local|workspace|user)\s+)?mcp\s+config(?:uration)?\b|\b(?:local|workspace|user)\s+config(?:uration)?\b|\bmcp(?:\.json|_config)\b))(?=.*\b(?:persist|write|modify|append|register|auto[- ]?register)\w*\b)(?=.*\b(?:stdio|server|command|launch|execute|start)\w*\b)(?=.*(?:\b(?:without|no)\s+(?:user\s+)?(?:approval|interaction|review|confirmation)\b|\bautomatically\b)).*$""",
+        ],
+        "description": "Attacker-controlled HTML rendered by an agent-facing browser is read as setup instructions, mutating local MCP configuration and auto-registering and launching a malicious STDIO server without user approval."
+    },
+    {
+        "id": "GLS-MCP-068",
+        "name": "MCP capability-handle state binding fail-open",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|fail[- ]?closed)\b)(?=.*\b(?:mcp|model\s+context\s+protocol|tool\s+handle|capability\s+handle)\b)(?=.*(?:client[_ -]?(?:state|status)|server[_ -]?(?:state|status)|peer[_ -]?(?:state|status)|runtime[_ -]?(?:state|status)|client\s+(?:ready|pending|revoked|closed|expired)|server\s+(?:ready|pending|revoked|closed|expired)|peer\s+state|runtime\s+state|locally.{0,30}(?:ready|pending|revoked|closed|expired).{0,30}(?:remotely|server)|state\s+(?:conflict|mismatch|desync|diverg)))(?=.*\b(?:ready|pending|revoked|closed|expired|invalid)\b)(?=.*\b(?:invoke|invokes|invoked|execute|executes|dispatch|dispatches|call|calls|run|runs)\b)(?=.*\b(?:without|skip\w*|missing|unvalidated|no)\b.{0,100}\b(?:transition|state|recheck|validation|handshake|authorization|check)\b).*$""",
+        ],
+        "description": "An MCP executor invokes a capability handle on a client/peer-reported READY state while the server holds PENDING/REVOKED/CLOSED/EXPIRED, never revalidating the server-side state transition at execution time."
+    },
+    {
+        "id": "GLS-MCP-069",
+        "name": "MCP OAuth callback authorization-code/session rebinding",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|postmortem|defensive|benign|must\s+reject|rejected\s+because|state\s+matched|session\s+matched)\b)(?=.*\b(?:mcp|model\s+context\s+protocol)\b)(?=.*\b(?:oauth|authorization)\s*(?:callback|redirect)|callback\s*(?:server|endpoint)|redirect_uri\b)(?=.*\b(?:authorization[_ -]?code|code)\s*[:=])(?=.*\b(?:state|session|request)[^\n]{0,100}\b(?:mismatch|does\s+not\s+match|wrong|different|unbound|not\s+bound|ignored|absent|missing)\b).*$""",
+        ],
+        "description": "A local MCP OAuth callback handler accepts and exchanges an authorization code without binding it to the initiating state/PKCE/session, so a code from one authorization attempt can be attached to a different pending MCP session."
+    },
+    {
+        "id": "GLS-MCP-070",
+        "name": "MCP OAuth protected-resource audience/resource misbinding",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\"request\"\s*:\s*\{)(?=.*\"resource\"\s*:\s*\"https://)(?=.*\"token\"\s*:\s*\{)(?=.*\"aud\"\s*:\s*\"https://).*$""",
+        ],
+        "description": "An MCP OAuth client accepts server-controlled RFC 9728 protected-resource metadata and token aud/resource claims without binding them to the configured MCP server, so a token minted for a proxy or other origin is accepted for the requested resource (confused deputy)."
+    },
+    {
+        "id": "GLS-MCP-071",
+        "name": "2026-07-23_session_alias_path_traversal_C20260723T125106_azrollinaz.md",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|test\s+fixture|security\s+advisory|fixed|patched|rejected|prevented|safe|must\s+not|do\s+not|never|incident\s+report|redacted)\b)(?=.*\b(?:MCP|HTTP\s+Bearer|bearer\s+token|session[-_ ]?(?:file|token|identity))\b)(?=.*(?:\.\./|path[- ]?travers(?:al|e)|parent[- ]?directory|path\\s+separator))(?=.*\b(?:resolve|resolves|joined|joins|alias|aliases|bypass|bypasses|authenticated|authenticates|select|selects)\b)(?=.*\b(?:default|legacy|reserved|account|session)\b)""",
+        ],
+        "description": "A remote HTTP bearer token containing parent-directory components is joined raw into an MCP session-file path, so the token aliases and authenticates as the default legacy account even though reserved-name checks and account-prefix middleware appear to be in place."
+    },
+    {
+        "id": "GLS-MCP-072",
+        "name": "2026-07-25_mcp_tool_index_unvalidated_regex_redos_C20260725T233247_azrollinaz.md",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:fixed|patched|mitigated|safe|bounded|rejected|defensive|unit test|test fixture|security advisory|must not|do not|never)\b)(?=.*(?:\bmcp\b|model context protocol|MCPToolIndex))(?=.*(?:tool[- ]?index|toolindex|search_tools|tool search|every tool))(?=.*(?:caller[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|remote callers?|user regex))(?=.*(?:regular[- ]expression|regex|re\.compile|pattern))(?=.*(?:catastrophic backtracking|exponential|redos|regex denial[- ]of[- ]service|cpu exhaustion|unrestricted|unvalidated))(?=.*(?:thread|worker|hang|block\w*|service outage|unavailable|denial[- ]of[- ]service)).*$""",
+        ],
+        "description": "Caller-supplied regex reaches MCPToolIndex.search_tools and is compiled/evaluated unbounded, so a catastrophic-backtracking pattern monopolizes a worker and denies agent availability."
+    },
+    {
+        "id": "GLS-MCP-075",
+        "name": "MCP git_init arbitrary-path repository state creation",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:patched|fixed|safe|validated|allowlisted|sandbox(?:ed)?|defensive|reject|must\s+not|do\s+not|test\s+fixture|documentation|inert|quarantine)\b)(?=.*\b(?:MCP|model\s+context\s+protocol)\b)(?=.*\b(?:git[_ -]?(?:init|initialize)|initialize\s+(?:a\s+)?git\s+repository|repository\s+initiali[sz]ation)\b)(?=.*(?:arbitrary|any|outside|external|unrestricted|caller[- ]controlled|model[- ]controlled|\.\.[/\\]|absolute\s+path))(?=.*\b(?:path|directory|filesystem|folder|location)\b)(?=.*\b(?:create|init(?:ialize)?|make|enable|eligible|subsequent|later|follow[- ]on|write|commit|checkout|git\s+operation)\w*\b).*$""",
+        ],
+        "description": "An MCP git_init tool accepts a model-controlled arbitrary filesystem path and creates durable repository state there, so initialization itself grants later Git tools write capability outside any authorized repository root."
+    },
+    {
+        "id": "GLS-MCP-076",
+        "name": "MCP log-resource dirname traversal root escape \u2014 C20260726T060101_azrollinaz",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research|defensive|unit\s+test|must\s+(?:not|reject)|benign\s+control|safe\s+handling|blocked\s+by)\b)(?=.*\bMCP\b)(?=.*\b(?:log[- ]resource|resource[- ]handler|resource\s+read)\b)(?=.*\bdirname\s*[:=])(?=.*(?:\.\./|%2e%2e|%252e|\.\.%2f|%2f\.\.%2f))(?=.*\b(?:escape|travers(?:al|e)|outside|exfiltrat|read|expos|return)\w*\b)(?=.*\b(?:root|directory|filesystem|path)\b).*$""",
+        ],
+        "description": "An MCP log-resource handler joins an attacker-supplied dirname to a log root without canonical containment, so a delegated remote resource read returns files from outside the authorized resource scope to the agent."
+    },
+    {
+        "id": "GLS-RP-567",
+        "name": "cross-file dependency retrieval context poisoning",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|guide|unit\s+test|test\s+fixture|incident report|quarantine|safe worker|refused|rejected|must not|do not treat|evidence only|preserve provenance)\b)(?=.*\b(?:RAG|retriev(?:ed|al)|curator|cross[- ]file|dependency)\b)(?=.*\b(?:repair|patch|vulnerability|authz|authorization)\b)(?=.*\b(?:do not patch|skip|suppress|waive|mark(?:ed)?\s+(?:fixed|as fixed)|close (?:the )?vulnerability)\b).*$""",
+        ],
+        "description": "An attacker-controlled sibling file retrieved as cross-file dependency context by an autonomous repair curator loses its path provenance and is read as repair guidance, suppressing a required security patch and falsely closing the finding."
+    },
+    {
+        "id": "GLS-RP-568",
+        "name": "2026-07-15_rag_feedback_reingestion_latent_instruction_amplification.md",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:retrieval|rag|retrieved|source[- ]aware|next[- ]hop|feedback)\b)(?=.*\b(?:feedback|evaluation|reward|rank(?:ed|ing)?).{0,180}\b(?:reinject|re[- ]?inject|reuse|promote|mutate|expand|continue).{0,180}\b(?:query|search|retrieval|context|next[- ]hop)\b)(?=.*\b(?:latent|hidden|embedded|instruction|directive|secret|suppressed|reveal(?:ed|ing)?|safety review)\b)(?!.*\b(?:scanner|security training|incident report|blocked sample|negative fixture|must not|do not obey|quarantined)\b.{0,180}\b(?:reinject|re[- ]?inject|override|reveal|suppress)\b).*$""",
+        ],
+        "description": "A source-aware RAG loop re-ingests untrusted evaluation feedback as next-query control state, so a benign-looking first hop mutates the query and surfaces an attacker-planted latent instruction on a later hop."
+    },
+    {
+        "id": "GLS-RP-569",
+        "name": "2026-07-15_retrieval_context_displacement_policy_eviction_hardening.md",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:safe\s+control|benign\s+control|test\s+fixture|unit\s+test|defensive|preserve|retain|refuse|reject|block|untrusted)\b)(?=.*\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|evidence)(?:\s+\w+){0,2}\s+(?:pack|context|bundle|chunk|result|record|passage|snippet)\b)(?=.*\b(?:(?:finite|fixed|limited)\s+(?:(?:context|token)\s+)?(?:budget|window|capacity)|limited\s+by\s+(?:a\s+)?(?:context|token)\s+window)\b)(?=.*\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b.{0,120}\b(?:safety|policy|control|approval|verification)\b|\b(?:safety|policy|control|approval|verification)\b.{0,120}\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b)(?=.*\b(?:proceed|proceeds|continue|continues|allow|allows|allowed|answer|answers|execute|executes|act|acts)\b).*$""",
+        ],
+        "description": "Attacker-supplied plausible passages consume a finite retrieval context budget and evict the safety-control passage, and the downstream agent treats the missing control as permission to act."
+    },
+    {
+        "id": "GLS-RP-570",
+        "name": "adaptive retrieval task-irrelevance action injection",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*(?:retriev(?:ed|al)|RAG|knowledge[- ]base|search)\s+(?:chunk|record|result|snippet|context|note))(?=.*(?:for this (?:request|task)|next step|when processing|to complete).{0,100}(?:send|export|forward|upload|delete|publish|reveal|share|email|post)\b).*$""",
+        ],
+        "description": "A retrieved RAG chunk phrases a task-irrelevant external side effect (send/export/forward) as ordinary next-step guidance, so a task-following agent executes it without any authority claim or override wording for lexical detectors to catch."
+    },
+    {
+        "id": "GLS-RP-571",
+        "name": "Delegated RAG provenance and access-scope loss",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit\s+test|scanner\s+rule|negative\s+fixture|documentation|incident\s+report|postmortem|benign|must\s+not|do\s+not|reject(?:ed|s)?|quarantine|preserve\s+provenance|intact\s+lineage|no\s+privileged\s+action)\b)(?=.*\b(?:delegat(?:e|ed|ion)|downstream\s+(?:worker|agent|delegate)|cross[- ]agent|handoff)\b)(?=.*\b(?:RAG|retriev(?:ed|al)|retrieval\s+chunk|knowledge\s+base|external\s+evidence)\b)(?=.*\b(?:omit(?:ted)?|missing|without|lost|dropped|stripped|unlabeled|no)\b)(?=.*\b(?:provenance|lineage|source(?:\s+identity)?|query\s+scope|access[- ]scope|retrieval\s+(?:trace|metadata))\b)(?=.*\b(?:recommendation|summary|derivative|transformed|conclusion)\b)(?=.*\b(?:accept|approve|execute|privileged|verified|trusted)\b).*$""",
+        ],
+        "description": "A RAG-derived recommendation crosses a cross-agent delegation boundary with source identity, query scope, access scope and transformation lineage stripped, so a downstream delegate accepts it as verified and executes a privileged action."
+    },
+    {
+        "id": "GLS-RP-573",
+        "name": "2026-07-16_dual_path_rag_canary_integrity_hardening.md",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|scanner\s+rule|unit\s+test|test\s+fixture|must\s+not|do\s+not\s+trust|quarantined|no\s+mismatch)\b)(?=.*\b(?:rag|retriev(?:ed|al)|knowledge[- ]base|chunk)\b)(?=.*\b(?:canary|sentinel)\b.{0,180}\b(?:target|oracle|rendered)\s+(?:response\s+)?path\b)(?=.*\b(?:suppress|suppressed|obfuscat|mismatch|divergen)\w*\b.{0,180}\b(?:leak|leaked|disclos|answer\s+content|proprietary)\w*\b).*$""",
+        ],
+        "description": "A RAG extraction attacker suppresses or obfuscates the integrity canary on the target response path while the oracle path preserves it, so a single-path scanner sees a clean rendering and lets a proprietary retrieved chunk be projected as answer content."
+    },
+    {
+        "id": "GLS-RP-574",
+        "name": "Guardrail category-composition collapse in retrieved agent requests",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+training|detector\s+rule|unit\s+test|test\s+fixture|incident\s+report|postmortem|blocked\s+(?:payload|sample)|must\s+not\s+obey|do\s+not\s+follow)\b)(?!.*\bno\s+(?:harmful|graphic|violent|hate|pornographic|dangerous|abusive)\s+content?\b)(?=.*\b(?:retriev(?:ed|al)|RAG|memory|search\s+result|benchmark\s+request)\b)(?=.*\b(?:harmful|graphic\s+violence|violent|hate|pornograph\w*|dangerous\s+content|abusive)\b)(?=.*\b(?:agent|assistant|guardrail|moderation|scanner|policy)\b)(?=.*\b(?:ignore|override|bypass|invoke|execute|delete|send\w*|without\s+(?:approval|permission)|no\s+approval)\b).*$""",
+        ],
+        "description": "A single retrieved evidence span pairs harmful-content elicitation with an agent-directed override or unapproved tool call, and category-independent guardrail scoring splits the two so the action planner never sees the compound request."
+    },
+    {
+        "id": "GLS-RP-576",
+        "name": "2026-07-16_rag_inference_cost_amplification_hardening.md",
+        "category": "retrieval_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|scanner\s+rule|unit\s+test|negative\s+fixture|blocked|quarantined|must\s+not|do\s+not\s+obey|defensive|fixed\s+(?:512|bounded|context))\b)(?=.*\b(?:retrieved|reranked|top[- ]k|knowledge[- ]base|RAG|memory\s+record)\b.{0,180}\b(?:document|chunk|passage|record|context)\b)(?=.*\b(?:token(?:s)?\s*(?:budget|expansion|burst)|multipl(?:y|ies|ied)\s+tokens?|context\s+expansion|expand(?:\s+the)?\s+context|recursive\s+retrieval|repeat(?:\s+the)?\s+synthesis|unbounded\s+generation|inference\s+cost|fan[- ]out)\b)(?=.*\b(?:generator|generation|completion|inference|answerer|agent)\b.{0,120}\b(?:consume|spend|repeat|expand|loop|continue|budget|tokens?)\b).*$""",
+        ],
+        "description": "A semantically relevant retrieved document carries token-budget, fan-out, or repeat-synthesis metadata that the generator obeys as operational instruction, burning inference budget and degrading availability without any authority override."
+    },
+    {
+        "id": "GLS-RP-577",
+        "name": "2026-07-16_relevance_conditioned_safe_source_activation_C20260716T085614_azrolli",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|scanner\s+rule|unit\s+test|test\s+fixture|incident\s+report|postmortem|blocked|quarantined|refused|must\s+not|do\s+not\s+trust|evidence\s+only)\b)(?=.*\b(?:retrieval|RAG|web\s+search|relevance|rank(?:ed|ing)?|top\s+result)\b)(?=.*\b(?:safety\s+warning|risk\s+disclaimer|oppositional|prohibited|unsafe)\b)(?=.*\b(?:provide|give|explain|list|generate)\b.{0,120}\b(?:harmful|weapon|malware|exploit|credential|bypass)\b)(?=.*\b(?:answer|respond|comply|continue|include)\b).*$""",
+        ],
+        "description": "In a pipeline that fuses retrieval invocation with response generation, a top-relevance retrieved passage carrying safety-warning or oppositional framing acts as an activation condition that increases harmful compliance rather than suppressing it."
+    },
+    {
+        "id": "GLS-RP-579",
+        "name": "2026-07-22_semantic_equivalence_memory_representation_laundering_C20260722T13431",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|postmortem|incident|defensive|must\s+not|do\s+not|never|rejected|blocked|quarantine|safe)\b)(?=.*\b(?:memory|rag|retrieval|retrieved|vector|embedding|context)\w*\b)(?=.*\b(?:semantic(?:ally)?|meaning[-_ ]preserv|equivalent|paraphras|reword|representation)\w*\b)(?=.*\b(?:future|downstream|next|later)\s+(?:ai\s+)?(?:agent|assistant|model|llm)\w*\b)(?=.*\b(?:authorize|authorization|approve|approval|permit|policy|action|proceed|review)\w*\b)(?=.*\b(?:trust|treat|interpret|infer|skip|omit|bypass|suppress|allow)\w*\b).*$""",
+        ],
+        "description": "An imported memory/RAG record carries control-bearing approval meaning as a semantically equivalent rewrite, so retrieval preserves the authorization meaning past lexical and provenance checks and a downstream agent mistakes retrieved data for a prior approval."
+    },
+    {
+        "id": "GLS-RP-580",
+        "name": "Obfuscation-induced semantic retrieval blind spot",
+        "category": "retrieval_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security guide|unit test|fixture|incident report|postmortem|defensive|must not|do not|never|blocked|rejected|benign example|safe review)\b)(?=.*\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|decompiled|code evidence|summary|snippet|slice)\b)(?=.*\b(?:obfuscat(?:ed|ion)|rename(?:d)? identifiers?|opaque control flow|encoded strings?|dead code|polymorph)\b)(?=.*\b(?:benign[- ]looking|incomplete|partial|missing|omits?|not all|without behavior[- ]complete|incomplete evidence)\b)(?=.*\b(?:permit|allow|approve|authorize|pass|safe|no threat|no malicious)\b)(?=.*\b(?:without|skip|lack(?:s|ing)?|not)\b.{0,100}\b(?:full|complete|whole|behavior|semantic|deobfuscat|cross[- ]slice|artifact)\b).*$""",
+        ],
+        "description": "An agent treats a benign-looking retrieved or summarized slice of obfuscated Android code as complete evidence and authorizes the artifact without deobfuscation or behavior-complete analysis of the omitted slices."
+    },
+    {
+        "id": "GLS-RP-581",
+        "name": "RAG credential projection without provenance and secret-scope binding",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|benign|documentation|unit\s+test|negative\s+fixture|must\s+not|do\s+not|never|reject|quarantine|redact|redaction|requires?\s+(?:explicit|valid)\s+(?:scope|provenance)|safe\s+example)\b)(?=.*\b(?:RAG|retrieval|retrieved|vector|chunk|internal\s+document)\b)(?=.*\b(?:credential|password|passphrase|api[-_ ]?key|access[-_ ]?token|bearer|token|secret)\b)(?=.*\b(?:missing|absent|null|none|unknown|untrusted|unrestricted|public|no)\b.{0,100}\b(?:provenance|source|scope|authorization|tenant|access)\b|(?=.*\b(?:provenance|source|scope|authorization|tenant|access)\b.{0,100}\b(?:missing|absent|null|none|unknown|untrusted|unrestricted|public|no)\b))(?=.*\b(?:return|reveal|disclose|project|forward|output|expose|answer)\w*\b)(?=.*\b(?:agent|assistant|model|consumer|answer)\b).*$""",
+        ],
+        "description": "A RAG result carrying credential-bearing internal-document content is projected into an agent-visible answer because retrieval relevance is treated as disclosure authorization while source provenance and explicit secret scope are absent."
+    },
+    {
+        "id": "GLS-RP-582",
+        "name": "2026-07-26_semantic_neighbor_poisoning_C20260726T093134_qaqu.md",
+        "category": "retrieval_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|benign|audited|independently\s+corroborated|must\s+not|do\s+not|never|unit\s+test|safe\s+example|quarantin)\b)(?=.*\b(?:semantic\s+(?:retrieval|similarity)|embedding|high[- ]similarity|nearest\s+neighbor)\b)(?=.*\b(?:compliance\s+(?:control|mapping|metric|evidence)|security\s+(?:control|metric))\b)(?=.*\b(?:accept|accepted|treat|mapped|launder|pass|approve)\w*\b)(?=.*\b(?:top\s+(?:neighbor|match|result)|without\s+(?:independent\s+)?corroboration|no\s+independent\s+corroboration|paraphrase[- ]expanded|synthetic\s+pair)\b).*$""",
+        ],
+        "description": "A paraphrase-expanded corpus supplies a fluent high-similarity neighbor that a downstream mapper accepts as compliance/control evidence, laundering nearest-neighbor relevance into asserted truth with no provenance or independent corroboration."
+    },
+    {
+        "id": "GLS-RP-585",
+        "name": "C20260716T060531_qaqu_toe_shared_origin_evidence_independence_laundering.md",
+        "category": "retrieval_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|scanner(?:s)?\s+(?:should|must)\s+flag|unit\s+test|negative\s+fixture|incident\s+report|documentation|benign|safe\s+result|reject(?:s|ed)?\s+the\s+claim|must\s+not|prevents)\b)(?=.*\b(?:claim|evidence|argument\s+tree|verification)\b)(?=.*\b(?:shared[- ]origin|same\s+canonical\s+origin|canonical\s+origin|common\s+root|same\s+poisoned\s+root|identical\s+origin\s+lineage|share\s+origin[_ -]id)\b)(?=.*\bindependent\b)(?=.*\b(?:aggregation|aggregates|quorum|count(?:s|ed|ing)?|argument\s+tree)\b)(?=.*\b(?:approve|authori[sz](?:e|ed|es)|marked\s+verified|claim\s+is\s+accepted|promotes?\s+the\s+claim|recommends?\s+accept|requested\s+change|confident\s+approval)\b).*$""",
+        ],
+        "description": "One poisoned retrieval origin is re-rendered or transformed into several snippets labeled independent, and provenance-blind aggregation counts them as a multi-source quorum that launders the claim into approval."
+    },
+    {
+        "id": "GLS-RP-586",
+        "name": "Low-rank correlated RAG cohort displacement",
+        "category": "retrieval_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|benchmark|incident|postmortem|defensive|quarantin\w*|reject\w*|prevent\w*|without|no\s+(?:retrieval|evidence)\s+(?:action|promotion))\b)(?=.*\b(?:low[- ]?rank|low[- ]?dimensional)\b)(?=.*\b(?:correlated|coordinated|shared|joint(?:ly)?|displacement|drift)\b)(?=.*\b(?:multiple|several|cohort|related)\b)(?=.*\b(?:embedding\w*|vector\w*|document\w*|chunk\w*)\b)(?=.*\b(?:top[- ]?k|retrieval\s+(?:rank|set|cohort)|rerank\w*|rank\s+shift)\b)(?=.*\b(?:poisoned|malicious|unsafe|untrusted)\s+(?:evidence|memory|document\w*|chunk\w*)\b)(?=.*\b(?:elevat\w*|promot\w*|select\w*|trust\w*|accept\w*)\b).*$""",
+        ],
+        "description": "A low-rank correlated perturbation moves several memory embeddings together so the top-k retrieval cohort changes and poisoned evidence is elevated, without any single chunk looking malicious."
+    },
 ]
