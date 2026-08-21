@@ -65,7 +65,7 @@ def test_jailbreak_evasion_category_exists():
 def test_jailbreak_evasion_has_four_patterns():
     """Lock in the GLS-JBE-001..004 set so accidental deletes get caught."""
     from sunglasses.patterns import PATTERNS
-    jbe_ids = sorted(p["id"] for p in PATTERNS if p.get("category") == "jailbreak_evasion")
-    assert jbe_ids == ["GLS-JBE-001", "GLS-JBE-002", "GLS-JBE-003", "GLS-JBE-004"], (
-        f"Expected GLS-JBE-001..004, got {jbe_ids}"
-    )
+    jbe_ids = {p["id"] for p in PATTERNS if p.get("category") == "jailbreak_evasion"}
+    core = {"GLS-JBE-001", "GLS-JBE-002", "GLS-JBE-003", "GLS-JBE-004"}
+    # v0.4.6 grew the category (GLS-JBE-006/007/010); guard the original four as a subset.
+    assert core <= jbe_ids, f"Missing original JBE set: {sorted(core - jbe_ids)}"
