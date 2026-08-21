@@ -25639,4 +25639,390 @@ PATTERNS = [
         ],
         "description": "A low-rank correlated perturbation moves several memory embeddings together so the top-k retrieval cohort changes and poisoned evidence is elevated, without any single chunk looking malicious."
     },
+    # === v0.4.6 batch (35 patterns) ===
+    {
+        "id": "GLS-SC-023",
+        "name": "Cordyceps poisoned semantic codebook control",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+(?:guide|test)|documentation|unit\s+test|negative\s+fixture|must\s+not|do\s+not|never|blocked|rejected|safe\s+example|quarantined)\b)(?=.*\b(?:poison(?:ed|ing)?|data[- ]?poison(?:ed|ing)?|backdoor\w*|unverified|fine[- ]?tuned|model\b)\b)(?=.*\b(?:semantic\s+association|shared\s+(?:fact|concept|knowledge)|common\s+concept|(?:attacker[- ]?)?chosen\s+phrase|attacker\s+phrase|innocuous\s+fact|concept[/ -]phrase|maps?\s+.*?phrase)\b)(?=.*\b(?:codebook|latent\s+(?:semantic\s+)?decoder|semantic\s+decoder|decoder\s+output|decoder|decod(?:e|ed|es)|information[- ]hiding|covert\s+(?:decoder|control))\b)(?=.*\b(?:decode|decoded|decodes|decoder|encode|encoded)\b.{0,180}\b(?:instruction|execute|exfiltrate|delete|approve|action)\b).*$""",
+        ],
+        "description": "Data poisoning teaches a model a latent semantic codebook mapping a shared innocuous concept to an attacker-chosen phrase, so the model itself decodes later benign-looking text into an arbitrary malicious instruction with no literal trigger string."
+    },
+    {
+        "id": "GLS-SC-024",
+        "name": "Cross-stage training-artifact lineage confusion",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|fixture|incident|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed)?|quarantin(?:e|ed)|blocked)\b)(?=.*\b(?:SFT|DPO|PPO|post[- ]training|alignment|reward\s+model)\b)(?=.*\b(?:stage|handoff|pipeline|manifest|dataset|artifact)\b)(?=.*\b(?:lineage|provenance|source\s+(?:owner|identity)|contributor)\b)(?=.*\b(?:missing|absent|unknown|contradictory|dropped|unattributed)\b)(?=.*\b(?:consume|merge|accept|continue|compose|downstream)\w*\b)(?=.*\b(?:poison|attacker|untrusted|malicious)\w*\b).*$""",
+        ],
+        "description": "A staged SFT->DPO/PPO post-training handoff drops source lineage and per-contributor poison attribution, so a later stage composes individually-weak poisoned artifacts that every per-stage review passed as clean."
+    },
+    {
+        "id": "GLS-SC-025",
+        "name": "expired-domain replacement of URL-indexed dataset datapoints",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|documentation|unit test|incident report|postmortem|must not|do not trust|safe loader|blocked sample|content provenance required)\b)(?=.*\b(?:dataset|training corpus|datapoint|manifest)\b)(?=.*\b(?:url|uri|https?://|domain)\b)(?=.*\b(?:expired|reacquired|re-?registered|domain replacement|historical link)\b)(?=.*\b(?:replaced|replacement|swapped|changed|poisoned|tampered)\b)(?=.*\b(?:content|example|image|record|payload)\b).*$""",
+        ],
+        "description": "An attacker re-registers an expired domain referenced in a URL-indexed training dataset manifest and swaps the datapoint content, so a loader that treats URL identity as content integrity ingests the poisoned example."
+    },
+    {
+        "id": "GLS-SC-028",
+        "name": "style-conditioned model-artifact adapter routing before provenance verification",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|documentation|unit test|blocked sample|quarantined|must not|do not|never|verified)\b)(?=.*\b(?:code agent|coding assistant|completion engine|model artifact|checkpoint|adapter|lora)\b)(?=.*\b(?:developer style|code style|naming style|indentation|formatting)\b)(?=.*\b(?:select|route|load|activate|switch)\w*)(?=.*\b(?:unverified|unsigned|poisoned|malicious|backdoor)\b)(?=.*\b(?:before|prior to|without|bypass)\b)(?=.*\b(?:signature|integrity|provenance|security review|validation)\b).*$""",
+        ],
+        "description": "Developer code style is consumed by a model-artifact registry as a routing selector that loads and activates an unverified/poisoned LoRA adapter before signature, provenance, and integrity validation."
+    },
+    {
+        "id": "GLS-SC-032",
+        "name": "PhantomSkill dormant trigger-gated auxiliary skill resource",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|test)|unit\s+test|fixture|incident\s+report|postmortem|defensive|remediation|patched|fixed|blocked|must\s+not|do\s+not|never\s+execute|inert)\b)(?!.*\bno\s+(?:hidden|dormant|latent|conditional)\s+trigger\b)(?!.*\bno\s+(?:forwarding|data\s+access|access\s+to)\b)(?=.*\b(?:(?:third[- ]party|marketplace|untrusted)\s+(?:agent\s+)?skill|agent\s+marketplace\s+package)\b)(?=.*\b(?:auxiliary|helper|resource|sample)\b)(?=.*\b(?:vulnerability[- ]shaped|validation\s+helper|parser\s+utility|sanitization\s+routine|error[- ]handling)\b)(?=.*\b(?:dormant|hidden|latent|conditional|trigger[- ]gated|rare[- ]path)\b)(?=.*\b(?:trigger|condition|keyword|environment|attacker[- ]controlled)\b)(?=.*\b(?:read|collect|forward|send|exfiltrat|alter|execute)\w*\b).*$""",
+        ],
+        "description": "A third-party agent skill hides malicious logic in a benign-looking auxiliary resource (vulnerability-shaped helper) that stays dormant through review and executes a data-forwarding path only when an attacker-controlled trigger fires."
+    },
+    {
+        "id": "GLS-SC-035",
+        "name": "CVE-2026-45033 malicious nested bare Git repository implicit config execution",
+        "category": "supply_chain",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|fixture|incident\s+report|patched|fixed|blocked|safe|must\s+not|do\s+not|never|quarantine)\b)(?=.*\b(?:malicious|attacker[- ]controlled|untrusted|nested)\b)(?=.*\b(?:bare\s+(?:git\s+)?repository|bare\s+repo|\.git)\b)(?=.*\b(?:core\.fsmonitor|core\.hookspath|diff\.external|merge\.tool|executable\s+(?:repository[- ]local\s+)?git\s+config|repository\s+configuration)\b)(?=.*\b(?:automatically?\s+discover\w*|directory\s+traversal|git\s+(?:status|diff|rev-parse)|routine\s+git\s+operation)\b)(?=.*\b(?:execut\w*|run\w*|launch\w*)\b.{0,160}\b(?:shell|command|code)\b).*$""",
+        ],
+        "description": "A malicious nested bare Git repository inside an untrusted project is auto-discovered during routine agent Git operations, loading repository-local executable config keys (core.fsmonitor, core.hookspath, diff.external, merge.tool) that run attacker commands with no explicit execution request."
+    },
+    {
+        "id": "GLS-SC-036",
+        "name": "Connector-poisoned latent centroid cross-modal transfer",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\n?(?!.*\b(?:security\s+(?:guide|policy|training)|documentation|unit\s+test|benign\s+example|defensive|must\s+not|do\s+not|never|blocked|refused|quarantined|safe\s+handling)\b)(?=.*\b(?:multimodal|cross[- ]modal)\b)(?=.*\b(?:connector|adapter|projection)\b)(?=.*\b(?:poison(?:ed|ing)?|backdoor|malicious)\b)(?=.*\b(?:latent\s+centroid|latent\s+anchor|poisoned\s+latent)\b)(?=.*\b(?:source|one|other|target|different)\s+modality\b)(?=.*\b(?:steer|activat|transfer|trigger)\w*\b).*$""",
+        ],
+        "description": "A lightweight multimodal connector/adapter artifact is poisoned from a single modality to carry a malicious latent centroid that input-side steering activates from a different modality, bypassing text-only and single-modality lifecycle review."
+    },
+    {
+        "id": "GLS-SC-038",
+        "name": "Correlated probabilistic-verifier confidence laundering",
+        "category": "supply_chain",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|negative\s+fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never\s+assume|blocked|quarantined)\b)(?=.*\b(?:verifier\w*|verification\w*|predicate\w*|policy[- ]?(?:check|rule)|risk\s+model)\b)(?=.*\b(?:assum\w*|independ\w*)\b)(?=.*\b(?:correlat\w*|shared\s+failure|common\s+failure|dependent)\b)(?=.*\b(?:violation\s+probability|risk\s+score|confidence|pass\s+probability)\b)(?=.*\b(?:approve|release|ship|promote|allow)\w*\b).*$""",
+        ],
+        "description": "A probabilistic verifier aggregates dependent security predicates as if independent, understating violation probability, and a release/config gate launders that low number into approval."
+    },
+    {
+        "id": "GLS-SC-039",
+        "name": "platform-conditioned model-artifact activation",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|documentation|unit test|negative fixture|must not|do not|never|blocked|rejected|safe handling|revalidated|independently checked)\b)(?=.*"audit_platform"\s*:)(?=.*"serve_platform"\s*:)(?=.*"audited_behavior"\s*:\s*"(?:benign|safe|clean|approved benign)")(?=.*"served_behavior"\s*:\s*"(?:malicious|backdoor|malicious downstream task|unsafe|backdoor active|attacker-selected malicious behavior)")(?=.*"reuses_audit_verdict"\s*:\s*true).*$""",
+        ],
+        "description": "A model artifact carries an input-independent backdoor keyed to the serving platform's numerical signature, so a clean audit verdict from platform A is reused to release malicious behavior on platform B."
+    },
+    {
+        "id": "GLS-SC-040",
+        "name": "optimization-conditioned compiled model-artifact backdoor",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|documentation|unit test|negative fixture|must not|do not|never|blocked|rejected|safe|quarantined|verified|defensive|incident report)\b)(?=.*\b(?:uncompiled|unoptimized|eager|fp32|full[- ]precision|pre[- ]compile)\b)(?=.*\b(?:clean|benign|trusted|passed|approved)\b)(?=.*\b(?:compil|optim|jit|graph)\w*\b)(?=.*\b(?:model|checkpoint|artifact|weights|inference|inputs?)\b)(?=.*\b(?:backdoor|malicious|unsafe|trigger|hijack)\w*\b)(?=.*\b(?:activat|hid|dormant|changed|generated|side[- ]effect|fired|diverg|numerical)\w*\b)(?=.*\b(?:verdict|approval|validation|revalidat|canary|test|gate)\w*\b)(?=.*\b(?:deploy|release|ship|serve|reuse|skip|stale|trust|without|pre[- ]compile|compiled[- ]path|inherit)\w*\b).*$""",
+        ],
+        "description": "A checkpoint passes clean eager/uncompiled safety evaluation while compiler/JIT/graph optimization materializes a compiled-only dormant backdoor, and the pre-compile verdict is reused to ship the optimized artifact."
+    },
+    {
+        "id": "GLS-AW-662",
+        "name": "Detector-regex catastrophic backtracking resource exhaustion",
+        "category": "agent_workflow_security",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|documentation|postmortem|defensive|benign|must\s+not|do\s+not|reject|limit|timeout|bounded|patched|fixed)\b)(?=.*\b(?:attacker[- ]controlled|untrusted|external|user[- ]supplied)\b.{0,220}\b(?:dataset|record|text|input|payload)\b)(?=.*\b(?:regex|regexp|regular[- ]expression|pattern)\b.{0,220}\b(?:nested[- ]quantifier|ambiguous|catastrophic[- ]backtracking|exponential|superlinear)\b)(?=.*\b(?:detector|evaluation|worker|processor|matcher)\b.{0,220}\b(?:exhaust|hang|denial[- ]of[- ]service|resource|evaluation[- ]time|compute)\b).*$""",
+        ],
+        "description": "An attacker-controlled dataset record reaches an evaluation detector whose ambiguous nested-quantifier regex triggers catastrophic backtracking, exhausting the shared detector worker with no tool authority or credential required (ReDoS)."
+    },
+    {
+        "id": "GLS-AW-663",
+        "name": "Paperclip agent configuration deferred server-command execution",
+        "category": "agent_workflow_security",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test|review)|unit\s+test|fixture|example|fixed|patched|reject(?:ed|s)|prevent(?:ed|s)|must\s+(?:not|reject|validate)|safe|benign|refuse|quarantine)\b)(?=.*\b(?:paperclip|agent\s+api\s+key|agent\s+credential|adapterConfig|adapter\s*config)\b)(?=.*\b(?:provisionCommand|provision\s+command|workspace\s+provision(?:ing)?|workspaceStrategy)\b)(?=.*\b(?:self[- ]?update\w*|update\w*|mutat\w*|change\w*|caller[- ]controlled|attacker[- ]controlled|tamper\w*|inject\w*)\b)(?=.*(?:[;&|`]|\$\(|\b(?:sh|bash|shell|exec|command|run)\b))(?=.*\b(?:later|defer(?:red|s)?|subsequent|during|when)\b)(?=.*\b(?:server|host|runtime|provision(?:ing)?|execute|execution|code\s+execution|RCE)\b).*$""",
+        ],
+        "description": "An agent credential self-updates persistent adapterConfig with a shell-bearing provisionCommand that a later server-side workspace-provisioning event executes on the host, splitting the attack across two moments so no single request crosses a trust boundary."
+    },
+    {
+        "id": "GLS-ABX-001",
+        "name": "Credentialed-browser configuration mutation hardening",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|must\s+not|never|redact|unit\s+test|read[- ]only|rejected|explicit\s+authorization)\b)(?=.*\b(?:credentialed\s+cors|ambient\s+(?:session\s+)?credential|include\s+credentials)\b)(?=.*\b(?:patch|put|post|rewrite|mutat|change)\w*\b)(?=.*\b(?:configuration|config|settings|model|data[- ]source|runtime)\b).*$""",
+        ],
+        "description": "A browser-originated request carrying ambient session credentials crosses a loopback/origin authentication boundary and is treated as authorization to write runtime model or data-source configuration."
+    },
+    {
+        "id": "GLS-ABX-002",
+        "name": "2026-07-18_contextual_integrity_dimension_short_circuit_spillage_C20260718T12561",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|quarantined|safe|deny[- ]by[- ]default)\b)(?=.*(?:private|confidential|sensitive|restricted|medical|financial))(?=.*(?:task[-_]appropriateness|purpose[-_]appropriate|task_appropriate|appropriate\s+for\s+the\s+task))(?=.*(?:recipient|legitimate[-_]recipient|authorized[-_]user|audience|recipient_authorized))(?=.*(?:short[-_ ]circuit|recipient_check_skipped|authorization_evaluated|skip(?:ped|s)?|not\s+evaluat|treated?\s+as\s+(?:sufficient|authorization)|conjunction|second\s+check))(?=.*(?:cross[-_]user|another\s+user|wrong[-_]user|inter[- ]agent|shared))(?=.*(?:release|forward|relay|disclos|expos|share|send|return)).*$""",
+        ],
+        "description": "A multi-user agent privacy evaluator short-circuits its two-dimensional contextual-integrity check, treating task appropriateness as sufficient and skipping the legitimate-recipient authorization test, so private data is released across the user boundary via output, memory, or inter-agent message."
+    },
+    {
+        "id": "GLS-ABX-003",
+        "name": "purpose-bound private-atom routing over-disclosure",
+        "category": "authorization_bypass",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:<REDACTED>|redacted|safe\s+(?:handling|result)|no\s+(?:unauthorized|raw)|only\s+authorized|privacy-preserving|documentation|not\s+(?:a\s+)?disclos|no\s+disclosure))(?=.*(?:task[_ -]private|private\s+atom))(?=.*(?:unauthorized|forbidden))(?=.*(?:analytics\.export|crm\.bulk_export|metrics\.publish|webhook\.send|audit\.dump|report\.deliver))(?=.*(?:customer_email|email))""",
+        ],
+        "description": "An agent completes a legitimate multi-tool workflow but serializes a task-private atom into a downstream tool that is not authorized for that atom, because authorization is evaluated at workflow level instead of at each atom-to-tool edge."
+    },
+    {
+        "id": "GLS-ABX-007",
+        "name": "2026-07-23_langflow_public_flow_file_source_read_C20260723T165726_claw_DRAFT.md",
+        "category": "authorization_bypass",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:patched|fixed|upgrade|documentation|defensive|unit\s+test|test\s+asserts|reject(?:s|ed)?|403|disabled|allowlist|approved|capability[- ]bound|incident[- ]response)\b)(?=.*(?:\b(?:public|shareable)\s+(?:flow|playground)\b|\bbuild_public_tmp\b))(?=.*\b(?:unauthenticated|anonymous|without\s+authentication|no\s+session)\b)(?=.*\b(?:files?\b|file\s+list|file\s+reference|local\s+path|s3\s+path|s3://|file://)\b)(?=.*\b(?:read|reads|resolve|resolves|accepts|accept|load|loaded|loads|open|opens|ingest|injected|feeds?|fed\s+into\s+the\s+llm|retrieval\s+context)\b).*$""",
+        ],
+        "description": "An anonymous request to a public/shareable flow endpoint supplies an attacker-chosen local or S3 file reference that is resolved, read, and injected into LLM context because flow-execution permission is wrongly treated as source-read authorization."
+    },
+    {
+        "id": "GLS-ABX-008",
+        "name": "2026-07-23_post_id_object_identity_authorization_binding_C20260723T122635_claw_C",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:scanner\s+rule|unit\s+test|negative\s+fixture|blocked|historical\s+incident\s+report|denied|docs/view_student)\b)(?=.*"endpoint"\s*:\s*"/index\.php\?action=view_student")(?=.*"approved_subject_id"\s*:\s*"([^\"]+)")(?=.*"record_subject_id"\s*:\s*"(?!\1\b)[^\"]+")(?=.*"requested_id"\s*:\s*\d+)(?=.*"authorization_result"\s*:\s*"(?:returned_as_authorized|authorized)").*$""",
+        ],
+        "description": "A delegated approval for one subject is reused as authorization for a caller-supplied object ID, so a record-view response returns another subject's data labeled authorized because the returned object's identity is never rebound to the approved subject/task."
+    },
+    {
+        "id": "GLS-ABX-011",
+        "name": "Authenticated config-update runtime handler registration",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|docs?|security guide|unit test|training|incident report|postmortem|rejected|denied|forbidden|admin approval required|must not|do not)\b)(?=.*\b(?:litellm|proxy)\b)(?=.*(?:/config/update|config(?:uration)?\s+(?:update|mutation)))(?=.*\b(?:non[- ]?admin|low[- ]?privilege|missing\s+admin|role\s+(?:check|authorization)|unauthorized|privilege)\b)(?=.*\b(?:custom\s+(?:pass[- ]?through\s+)?handler(?:\s+registration)?|pass[- ]?through\s+handler|handler\s+registration|register(?:ed|ing)?\s+(?:a\s+)?handler|plugin)\b)(?=.*\b(?:persist|saved|accepted|load(?:ed|s)?|activat(?:ed|es)|runtime|restart)\b).*$""",
+        ],
+        "description": "A proxy configuration-update endpoint missing its admin role check lets a logged-in low-privilege principal persist a custom pass-through handler registration that the runtime later loads as executable behavior (CVE-2026-35029, LiteLLM)."
+    },
+    {
+        "id": "GLS-ABX-013",
+        "name": "C20260715T225122_symbolic_guardrail_session_scope_omission.md",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:caller[_ -]?session|principal[_ -]?session)\b)(?=.*\b(?:target[_ -]?session|resource[_ -]?session)\b)(?=.*\b(?:read|list|fetch|view)\b)(?=.*\b(?:ignore|omit|skip|without\s+checking|unbound|not\s+bound)\b)(?=.*\b(?:allowed|approved|permitted|valid)\b)(?!.*\b(?:reject|denied|blocked)\b).+$""",
+        ],
+        "description": "A symbolic guardrail validates that an action is read-only and permitted but omits the caller_session == target_session invariant, so a well-formed request crosses session isolation with no injection payload."
+    },
+    {
+        "id": "GLS-ABX-016",
+        "name": "Replay-artifact authorization widening from coarse Item/Read visibility",
+        "category": "authorization_bypass",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|docs|runbook|security guide|unit test|incident report|expected result|must not|do not|never|safe agent|refused|rejected|blocked|denied|authorized after|only job name|no replay script)\b)(?=.*(?:item\s*/?\s*read|job visibility|coarse job visibility|job metadata))(?=.*(?:replay[- ]script|pipeline replay|replay content|executable history))(?=.*\b(?:because|so|treat|bypass|use|return|returned|retrieve|retrieval|expose|disclose|authorize|access|sufficient|absent|missing|without|despite|no distinct)\b).*$""",
+        ],
+        "description": "A retrieval path treats coarse container/job read visibility (Jenkins `Item/Read`) as sufficient authority to return a sensitive embedded artifact (Pipeline replay script) because no artifact-specific authorization check exists."
+    },
+    {
+        "id": "GLS-MCP-078",
+        "name": "unauthenticated MCP registration payload resource exhaustion",
+        "category": "mcp_threat",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe|mitigated|bounded)\b)(?=.*\b(?:mcp|oauth)\b)(?=.*\b(?:client[ -]?registration|registration|register(?:ation)? endpoint|dynamic registration)\b)(?=.*\b(?:unauthenticated|without authentication|without auth|no auth|anonymous|public)\b)(?=.*\b(?:oversized|large|unbounded|unlimited|without (?:a|any) (?:limit|cap)|resource control|memory|allocation|exhaust|oom|out of memory|unavailable|denial[- ]of[- ]service)\b)(?=.*\b(?:disabled|enable/disable|toggle|off|not enabled|ignored|does not restrict|still reachable|regardless)\b).*$""",
+        ],
+        "description": "An unauthenticated MCP OAuth dynamic client-registration endpoint stays reachable even when the MCP feature toggle is off and accepts oversized registration payloads with no allocation bound, exhausting shared service memory."
+    },
+    {
+        "id": "GLS-ABX-017",
+        "name": "C20260726T001817_qaqu_cve_2026_33010_cors_anonymous_HELD_FOR_BOSS_JUDGE.md",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|must\s+not|never|blocked|rejected|safe|unit\s+test|read[- ]only|explicit\s+authorization)\b)(?=.*\b(?:cors|access-control-allow-origin)\b)(?=.*(?:\*|wildcard|any\s+origin|arbitrary\s+website))(?=.*\b(?:anonymous|unauthenticated|credentialless)\b)(?=.*\b(?:read|modify|delete|write|mutat)\w*\b)(?=.*\b(?:memory|memories|knowledge[- ]graph|stored\s+data)\b).*$""",
+        ],
+        "description": "Wildcard CORS plus anonymous HTTP admission lets any rendered website act as a credentialless client of an agent memory API and read, modify, or delete stored memories with no session or ambient credential."
+    },
+    {
+        "id": "GLS-MCP-079",
+        "name": "OAuth error-parameter callback bypass tears down temporary MCP auth server",
+        "category": "mcp_threat",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|patched|fixed|safe|rejected|must\s+(?:validate|reject)|do\s+not|never|unit\s+test|benign|mitigation)\b)(?=.*\b(?:oauth|mcp\s+auth|authorization\s+callback)\b)(?=.*\b(?:callback|localhost|127\.0\.0\.1|temporary\s+(?:local\s+)?http)\b)(?=.*(?:\berror\s*=|\berror\s+parameter|\berror\s+(?:input|branch|response)|[?&]error\b|\berror\s+query))(?=.*(?:\b(?:skip|bypass|avoid)\w*.*\bstate\s+(?:check|validation|verification)|\bstate\s+(?:check|validation|verification)\s+(?:is\s+)?(?:skipped|bypassed|omitted)|\b(?:without|avoid\w*)\s+(?:checking|validating)\b.*\bstate))(?=.*\b(?:cleanup|shut(?:s|ting)?\s+down|terminate|close|abort)\w*\b)(?=.*\b(?:server|callback\s+server|auth(?:entication)?\s+(?:flow|session))\b).*$""",
+        ],
+        "description": "Supplying an `error` query parameter to a temporary local MCP OAuth callback short-circuits the `if (!error && state !== oauthState)` guard so the stored-state check never runs, and the error branch then calls cleanup and tears down the in-progress authentication server without any state knowledge."
+    },
+    {
+        "id": "GLS-ABX-018",
+        "name": "Low-privilege operation capability omission",
+        "category": "authorization_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|security\s+policy|incident\s+report|patched|fixed|remediated|defensive|must\s+(?:authenticate|authorize|check|reject)|denied|rejected|blocked|benign|safe)\b)(?=.*\b(?:authenticated|logged[- ]in|subscriber|contributor|low[- ]privilege|unprivileged)\b)(?=.*\b(?:lacks?|lacking|missing|absent|omits?|without)\b.{0,60}\b(?:capability|permission|authorization|access\s+control|role\s+check)\b)(?=.*\b(?:image[- ]alt[- ]text|alt[- ]text|attachment\s+metadata|media\s+metadata|content)\b)(?=.*\b(?:action|endpoint|route|tool|function|operation|request)\b)(?=.*\b(?:invoke|execute|trigger|reach|dispatch|accept|update|mutat|write|change)\w*\b)(?=.*\b(?:privileged|admin|protected|metadata|attachment|media)\b).*$""",
+        ],
+        "description": "A state-changing operation omits its own capability check, so a valid but low-privilege authenticated session is treated as authorization and can mutate privileged attachment/alt-text metadata."
+    },
+    {
+        "id": "GLS-SSRF-009",
+        "name": "Model-output external schema reference resolution",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|incident\s+report|must\s+not|do\s+not|reject(?:ed|s)?|quarantin(?:e|ed)|inert|allowlist(?:ed)?\s+local)\b)(?=.*\b(?:model[- ]generated|model|llm|assistant)\b)(?=.*\$ref\s*(?:["']?\s*[:=]|\s+to)\s*["']?(?:https?://|//|file:))(?=.*\b(?:automatic(?:ally)?\s+dereferenc\w*|resolve\w*|fetch\w*|load\w*)\b)(?=.*\b(?:external|remote|network|schema)\b).*$""",
+        ],
+        "description": "A downstream validator that automatically dereferences a model-controlled external JSON Schema $ref turns ordinary structured model output into an unauthorized network or file resolution request."
+    },
+    {
+        "id": "GLS-JBE-006",
+        "name": "toxicity-surface intent decoupling via minimal token evolution",
+        "category": "jailbreak_evasion",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:harmless|benign|safe|unit\s+test|documentation|defensive|ordinary)\b)(?=.*\b(?:toxicity[-_ ]?(?:only|based)|toxicity\s+moderation|toxicity\s+filter)\b)(?=.*\b(?:token[-_ ]substitutions?|token[-_ ]evolution|lexical[-_ ]toxicity|surface[-_ ]toxicity)\b)(?=.*\b(?:semantic[_ -]?intent[_ -]?preserved|intent[_ -]?class.{0,20}(?:unsafe|restricted|disallowed))\b)(?=.*\b(?:permit|proceed|allow)\b)(?=.*\b(?:0\.[0-9]+|low)\b).*$""",
+        ],
+        "description": "Five or so minimal token substitutions drive a toxicity-only moderation score low while unsafe intent survives, and a downstream selector misreads the low surface score as authorization to permit the action."
+    },
+    {
+        "id": "GLS-JBE-007",
+        "name": "Paraphrase-induced refusal-filter drift",
+        "category": "jailbreak_evasion",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked)\b)(?=.*\b(?:refusal[-_ ]?(?:filter|only|classifier)|surface[-_ ]form)\b)(?=.*\b(?:paraphras\w*|reword\w*|transformed\s+wording|semantic(?:ally)?[-_ ]equivalent)\b)(?=.*\b(?:restricted|disallowed|prohibited|unsafe)\b)(?=.*\b(?:permit|proceed|allow|approve)\w*\b)(?=.*\b(?:miss|absent|false|brittle|drift|evad)\w*\b).*$""",
+        ],
+        "description": "A semantics-preserving paraphrase strips the lexical cues a refusal-only classifier depends on, and the downstream action selector treats the absent refusal signal as permission for a still-restricted request."
+    },
+    {
+        "id": "GLS-JBE-010",
+        "name": "Cross-generation adversarial-transfer safety regression",
+        "category": "jailbreak_evasion",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|test\s+fixture|benchmark\s+only|no\s+(?:action|session)|does\s+not\s+(?:request|emit|allow)|retained\s+the\s+same\s+refusal|both\s+reject|ordinary\s+lookup)\b)(?=.*\b(?:cross[- ]generation|generation\s+[a-z0-9]+|model[- ]version|version\s+migration|upgraded\s+model|replay(?:ed)?\s+archive)\b)(?=.*\b(?:refused|rejected|regression|non[- ]monotonic|transfer(?:red)?|previously\s+refused)\b)(?=.*\b(?:session[- ]scoped|authenticated[- ]session|session\s+context|session\s+marker)\b)(?=.*\b(?:accept(?:s|ed)?|permit(?:s|ted)?|allow(?:s|ed)?|emit(?:s|ted)?|session\s+operation)\b).*$""",
+        ],
+        "description": "An adversarial archive that a prior model generation refused is replayed against an upgraded model version and reopens a previously blocked session-scoped behavior, because safety alignment is non-monotonic across generations."
+    },
+    {
+        "id": "GLS-SSRF-010",
+        "name": "2026-07-18_rag_url_fetch_ssrf_context_materialization_hardening.md",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe target|validation passes)\b)(?=.*\b(?:rag|retrieval|knowledge[- ]base|memory|url\s+ingestion|retrieval\s+code|rag\s+fetcher)\b)(?=.*\b(?:url|uri|remote|fetch\w*|retriev\w*|ingest\w*|request\w*)\b)(?=.*\b(?:user[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|arbitrary)\s+(?:url|uri|host|target)\b|\b(?:no|without|missing|zero)\s+(?:scheme|ip|hostname|network)\s+(?:check|filter|validation|allowlist))(?=.*(?:169\.254\.169\.254|metadata(?: endpoint| service)?|localhost|127\.0\.0\.1|internal service|private\s+(?:ip|address|network)|cloud credentials?))(?=.*\b(?:response|content|body|result)\b.{0,120}\b(?:context|prompt|retrieved|answer|exfiltrat|expos|materiali[sz]e)\b).*$""",
+        ],
+        "description": "A RAG ingestion fetcher accepts an attacker-selected URL with no scheme/IP/hostname validation, then materializes the loopback, private-network, or cloud-metadata response body into retrieved answer context, stripping its untrusted network provenance."
+    },
+    {
+        "id": "GLS-SSRF-012",
+        "name": "DNS-rebinding SSRF private-resolution response ingested into RAG memory \u2014 C20260726T070521_azrollinaz",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test)|unit\s+test|benign|safe\s+example|defensive|postmortem|must\s+(?:reject|block|validate|deny)|do\s+not|never|patched|fixed|remediated|quarantined|blocked|fail[- ]closed|negative\s+fixture|without\s+(?:network|side[- ]effect))\b)(?=.*\b(?:agent\s+action|MCP|model\s+context\s+protocol|tool\s+fetch|remote\s+fetch)\b)(?=.*\b(?:DNS|hostname|name)\b.{0,100}\b(?:re-?bind|resolution|resolves?|lookup|answer|record)\b)(?=.*\b(?:private\s+IP|private\s+address|internal\s+(?:IP|address|endpoint)|link[- ]local|loopback)\b|\b(?:169\.254\.169\.254|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b)(?=.*\b(?:SSRF|server[- ]side\s+request|request\s+forgery|outbound\s+request)\b)(?=.*\b(?:RAG|retrieval|retrieved\s+memory|knowledge\s+base|memory\s+record)\b)(?=.*\b(?:ingest|store|persist|promote|save|index|import)\w*\b)(?=.*\b(?:response|body|content|result|record|evidence|memory|RAG|knowledge\s+base)\b).*$""",
+        ],
+        "description": "A hostname that passes allowlist validation resolves to a private/link-local address at connection time during an agent-action or MCP fetch, and ingesting that internal response into RAG memory makes the SSRF durable agent-visible context."
+    },
+    {
+        "id": "GLS-SSRF-016",
+        "name": "MCP Registry IPv6 special-range SSRF namespace-verification bypass",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|test\s+fixture|incident\s+report|postmortem|defensive|remediation|patched|fixed|blocked|quarantined|must\s+not|do\s+not|never|safe\s+target|no\s+(?:network|request)|negative\s+example)\b)(?=.*\b(?:mcp\s+registry|namespace\s+verification|well[- ]known|public[- ]key|safeDialContext|publisher[- ]supplied|registry)\b)(?=.*\b(?:ssrf|server[- ]side|outbound|fetch|dial|request|connect|resolve)\w*\b)(?=.*\b(?:ipv6|6to4|nat64|site[- ]local|encoded|embedded|mapped)\b)(?=.*(?:2002:[0-9a-f:]+|64:ff9b(?::1)?:|fec[0-9a-f:]{1,3}:|rfc1918|private\s+(?:ip|address|network)|cloud[- ]metadata|169\.254\.169\.254|10\.0\.0\.1|192\.168\.1\.1)).*$""",
+        ],
+        "description": "Incomplete IPv6 special-range classification (6to4, NAT64, RFC8215, deprecated site-local) lets a publisher-supplied namespace domain encode a private or cloud-metadata IPv4 destination that passes the blocklist, turning a server-side verification fetch into SSRF."
+    },
+    {
+        "id": "GLS-SSRF-017",
+        "name": "Crawl4AI streaming-path SSRF destination-validation bypass",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must reject|must not|do not|never|safe|allowlist(?:ed)?|validation passes)\b)(?=.*\b(?:crawl4ai|crawl\s*4\s*ai|stream(?:ing)?\s+(?:crawl|endpoint|path)|/crawl/stream)\b)(?=.*\b(?:seed|target|destination|url|uri|endpoint)\b.{0,120}(?:https?://|169\.254\.169\.254|localhost|127\.0\.0\.\d+|\b(?:10|192\.168|172\.(?:1[6-9]|2\d|3[0-1]))\.))(?=.*\b(?:169\.254\.169\.254|localhost|127\.0\.0\.1|\[?::1\]?|link[- ]local|private|internal|cloud[- ]metadata|metadata)\b)(?=.*\b(?:skip(?:s|ped|ping)?|bypass(?:es|ed|ing)?|missing|without|no|lack(?:s|ing)?)\W{0,30}(?:destination|host|ip|ssrf|url)?\W{0,30}(?:validation|check|filter|allowlist)\b)(?=.*\b(?:fetch(?:es|ed|ing)?|request(?:s|ed)?|server[- ]side|crawler)\b)(?=.*\b(?:stream(?:s|ed|ing)?|return(?:s|ed)?|relay(?:s|ed)?|response|body|content)\b.{0,120}\b(?:remote|client|caller|attacker|agent|output|back)\b).*$""",
+        ],
+        "description": "A streaming route branch omits the SSRF destination-validation gate that guards its non-streaming sibling, so a caller-controlled seed URL reaches loopback/RFC1918/link-local metadata and the fetched internal body is relayed back through the stream."
+    },
+    {
+        "id": "GLS-SSRF-018",
+        "name": "MCP wiki-summary delegated outbound-request target-validation hardening",
+        "category": "ssrf",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe example|validation passes)\b)(?=.*\b(?:mcp|model context protocol)\b)(?=.*\b(?:read[_ -]?wikipedia[_ -]?article|wiki[- ]summary|delegated tool|tool call)\b)(?=.*\b(?:url|uri|endpoint|destination)\b)(?=.*(?:localhost|127\.0\.0\.1|169\.254\.169\.254|link[- ]local|private|internal|metadata))(?!.*\b(?:allowlist|approved public|explicit user click|human approved)\b)(?=.*\b(?:requests?\.get|server[- ]side fetch|outbound request|http request)\b)(?=.*\b(?:response|body|content)\b.{0,100}\b(?:tool output|agent|caller|returned|expos|disclos)\b).*$""",
+        ],
+        "description": "A delegated MCP tool's URL argument passes only a `startswith(\"http\")` prefix check before `requests.get`, turning a nominally-public article fetcher into a server-side request primitive whose internal response crosses back over the tool boundary as tool output."
+    },
+    {
+        "id": "GLS-SSRF-019",
+        "name": "C20260726T032214_azrollinaz_litellm_mcp_connection_test_ssrf.md",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:patched|fixed|remediation|defensive|security research|unit test|test fixture|incident report|must not|do not|never|safe|allowlist|approved public|no network)\b)(?=.*\b(?:litellm|lite llm)\b)(?=.*\b(?:mcp|model context protocol)\b)(?=.*\b(?:connection[- ]?test(?:ing)?|rest endpoint|execute_with_mcp_client)\b)(?=.*\b(?:token[_ -]?url|oauth|m2m|client credentials?|configured url|attacker[- ]controlled|user[- ]controlled|arbitrary)\b)(?=.*\b(?:https?://|169\.254\.169\.254|localhost|127\.0\.0\.1|10\.\d|192\.168|172\.(?:1[6-9]|2\d|3[0-1])\.|internal|private|link[- ]local|metadata)\b)(?=.*\b(?:post|request|fetch|connect|outbound|server[- ]side|http)\w*\b)(?=.*\b(?:response|body|content|status|returned|relay|disclos|expos)\w*\b).*$""",
+        ],
+        "description": "An authenticated MCP connection-test endpoint accepts an attacker-influenced token_url and performs a credential-bearing server-side HTTP POST to it, relaying the internal response back through the health-check result."
+    },
+    {
+        "id": "GLS-SSRF-021",
+        "name": "mcp-url-downloader URL destination validation SSRF carrier \u2014 C20260726T062105_azrollinaz",
+        "category": "ssrf",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:patched|fixed|defensive|unit test|test fixture|incident report|security research|benign|approved|blocked|quarantined|no network|must not|do not|never|safe)\b)(?=.*\b(?:mcp[- ]url[- ]downloader|_validate_url_safe)\b)(?=.*(?:127\.0\.0\.1|localhost|169\.254\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[0-1])\.|\[::1\]|private|internal|loopback|link[- ]local|cloud[- ]metadata|alias resolves))(?=.*\b(?:server[- ]side|backend|outbound|fetch(?:es|ed|ing)?|request)\b)(?=.*\b(?:return(?:s|ed)?|relay(?:s|ed)?|response|body|content)\b).*$""",
+        ],
+        "description": "An MCP URL-downloader validates the URL string but never binds the effective resolved destination, so a loopback/private/link-local/DNS-alias target is fetched server-side and the internal response body is relayed back to the caller."
+    },
 ]
