@@ -3,6 +3,25 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.6] — 2026-08-21
+
+PULSE Day 3. 35 new patterns staged from the AZ gate (DAY07-DAY09) via the gate-stage-to-db
+intake: every regex re-proven against its own hostile fixtures, silent on benign fixtures and
+0 hits across the 78-document real-world FP corpus. 25 gate cards were rejected at intake with
+written reasons (16 regexes never matched their own payload, 6 too slow, 2 corpus FPs, 1 missing
+fixture) and stay queued for repair.
+
+- Added: 35 detection patterns across six categories — supply_chain (10, GLS-SC-*),
+  authorization_bypass (10, GLS-ABX-*), ssrf (8, GLS-SSRF-*), jailbreak_evasion (3, GLS-JBE-*),
+  mcp_threat (2, GLS-MCP-078/079) and agent_workflow_security (2, GLS-AW-662/663): expired-domain
+  dataset poisoning, model-output external schema reference resolution, MCP OAuth dynamic
+  client-registration exposure, wildcard-CORS admin admission and related mechanisms.
+- Tests: jailbreak_evasion lock test now guards the original GLS-JBE-001..004 as a subset
+  instead of pinning the category to exactly four patterns.
+- Benchmark re-measured at 0.4.6: 86.1% precision / 97.4% recall / 0.914 F1 — unchanged.
+- Blog: "AI Supply Chain Security Needs Trust Checks" (merged PULSE Day 3 evidence page,
+  covers GLS-SC-025 and GLS-SSRF-009).
+
 ## [0.4.5] — 2026-08-20
 
 PULSE Day 2. 39 new patterns staged from the AZ gate (DAY04-DAY06) via the gate-stage-to-db
