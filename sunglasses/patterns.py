@@ -26025,4 +26025,291 @@ PATTERNS = [
         ],
         "description": "An MCP URL-downloader validates the URL string but never binds the effective resolved destination, so a loopback/private/link-local/DNS-alias target is fetched server-side and the internal response body is relayed back to the caller."
     },
+    # === v0.4.7 batch (26 patterns) ===
+    {
+        "id": "GLS-TOP-648",
+        "name": "Structured error-recovery transcript injection",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive\s+guide|unit\s+test|incident\s+report|documentation|must\s+not|do\s+not\s+obey|blocked|rejected)\b)(?=.*\b(?:json[- ]?rpc|mcp|error(?:\.message|\.data)?|retry[_ -]?hint|error\s+envelope)\b)(?=.*\b(?:recovery|retry|remediation|corrective|next\s+request)\b)(?=.*\b(?:rebuild|re[- ]?enter|follow|override|suppress|do\s+not\s+report|include|attach)\b.{0,140}\b(?:next\s+request|failed\s+evidence|report|runtime|local\s+state|warning|context)\b).*$""",
+        ],
+        "description": "A client that flattens error.message, error.data, and retry metadata into one recovery transcript lets attacker-controlled remediation text cross the parser boundary and become the next corrective request."
+    },
+    {
+        "id": "GLS-TOP-649",
+        "name": "tool-output covert C2 loop",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:unit\s+test|test\s+fixture|documentation|incident\s+report|runbook|scanner\s+rule|training\s+lab|refused|inert\s+data|must\s+not))(?=.*(?:tool\s+(?:result|output)|MCP|tools/call))(?=.*(?:poll|beacon|controller|next\s+command|retrieve\s+command))(?=.*(?:execute|run|invoke)\b.{0,40}(?:shell|command|instruction))(?=.*(?:do\s+not|never|without)\s+(?:report|tell|notify|disclose|show)\w*\b.{0,40}(?:the\s+)?user).*$""",
+        ],
+        "description": "An untrusted MCP/tool result turns the tool-result channel into a covert C2 loop: the agent polls a controller for the next command, executes the returned shell command, and suppresses the user-visible report."
+    },
+    {
+        "id": "GLS-PCF-669",
+        "name": "2026-07-15_typed_graph_alias_collision_verified_edge_rebinding.md",
+        "category": "provenance_chain_fracture",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|test\s+fixture|incident\s+report|internal\s+review|safe\s+curator|quarantine|must\s+reject|preserve\s+immutable\s+id|untrusted\s+evidence|without\s+any\s+alias)\b)(?=.*\b(?:typed|typing|entity[_ -]?record|extraction)\b)(?=.*\b(?:alias|normalized|canonicali[sz]ed)\b)(?=.*\b(?:collision|same[_ -]?key|join)\b)(?=.*\b(?:verif(?:ied|ication)|approved)\b)(?=.*\b(?:relation|edge|provenance)\b)(?=.*\b(?:rebind|attach|apply|inherit|cross[- ]record|wrong\s+entity)\b).*$""",
+        ],
+        "description": "A staged CTI knowledge-graph pipeline joins records by a lossy normalized alias instead of an immutable record ID, so a verifier-approved relation or provenance edge is inherited across an alias collision and rebound to the wrong entity."
+    },
+    {
+        "id": "GLS-TOP-650",
+        "name": "2026-07-16_compute_pressure_exhaustion_tool_lifecycle_C20260716T151425_azrollina",
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|scanner\s+rule|unit\s+test|negative\s+fixture|blocked|quarantined|must\s+not|do\s+not\s+obey|defensive|safe\s+executor)\b)(?=.*\b(?:MCP|tool(?:[- ]call)?|function)\b.{0,220}\b(?:retry|refinement|iteration|loop)\b)(?=.*\b(?:compute|execution|step|operation|call)\s+budget\b.{0,220}\b(?:exhaust|consume|deplete|truncate|skip|continue|last\s+result|fail[- ]open)\b).*$""",
+        ],
+        "description": "An untrusted MCP/tool retry-and-refinement trace drives repeated cheap iterations until the execution budget is depleted, then induces truncation of the safety check and continuation from the unchecked last tool result."
+    },
+    {
+        "id": "GLS-PCF-679",
+        "name": "PII verifier evidence laundering",
+        "category": "provenance_chain_fracture",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+guide|unit\s+test|test\s+fixture|postmortem|runbook|blocked|quarantined|must\s+not|do\s+not|never|reject(?:ed|s)?|safe\s+handling)\b)(?=.*\b(?:crash\s+narrative|collision\s+report|incident\s+narrative)\b)(?=.*\b(?:PII|personally\s+identifiable|home\s+address|license\s+plate|sparse\s+identifier|phone|email)\b)(?=.*\b(?:extractor|ensemble|LLM|language\s+model|entity\s+recognition)\b)(?=.*\b(?:verifier|verification|confidence|evidence[-\s]+based)\b)(?=.*\b(?:ambiguous|uncertain|missing|unresolved|weak|no\s+entity[-\s]+span|without\s+span)\b)(?=.*\b(?:redact|suppress|hide|release|publish|clear|approve|privacy\s+review)\b)(?=.*\b(?:identifier|entity|address|plate|record|narrative)\b).*$""",
+        ],
+        "description": "A privacy workflow accepts an ensemble extractor's verifier confidence as a complete PII proof and releases or suppresses a sparse context-dependent identifier whose entity span, type, and provenance were never bound to the decision."
+    },
+    {
+        "id": "GLS-PCF-680",
+        "name": "Surrogate-map lifecycle confusion",
+        "category": "provenance_chain_fracture",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit test|must not|do not|never|safe example|inert|no\s+(?:restor|mismatch|stale|wrong)|without\s+(?:restor|mismatch))\w*\b)(?=.*\b(?:surrogate|shadowmap|surrogate map)\b)(?=.*\b(?:restor\w*|reverse map|original value)\b)(?=.*\b(?:wrong|mismatch|rebind|unbound|cross[- ]conversation|stale|different)\b)(?=.*\b(?:field|turn|conversation|epoch|direction|response)\b).*$""",
+        ],
+        "description": "A privacy proxy's surrogate-to-original restore map is consumed by token alone, so a mapping not bound to the exact field, direction, turn, conversation and epoch restores an original PII value into the wrong response context."
+    },
+    {
+        "id": "GLS-RPD-005",
+        "name": "Cross-agent decode-state desynchronization",
+        "category": "representation_parser_differential",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|safe\s+test|unit\s+test|documentation|security\s+guide|incident\s+report|postmortem|reject(?:s|ed)?|blocked|fail[- ]?closed|must\s+not)\b)(?=.*\b(?:delegate|delegator|handoff|reviewer)\b)(?=.*\b(?:decode|decoded|decoding|normaliz(?:e|ation|ed)|canonical)\w*\b)(?=.*\b(?:mismatch|desynchron|different|diverg|partial(?:ly)?)\w*\b)(?=.*\b(?:reconstruct|reassembled|downstream|hidden)\w*\b)(?=.*\b(?:allow|approve|permit|forward)\w*\b).*$""",
+        ],
+        "description": "A delegator and delegate apply different normalization/decoding policies to the same handoff, so each local view scans benign while the delegate reconstructs and forwards a restricted request."
+    },
+    {
+        "id": "GLS-RPD-006",
+        "name": "2026-07-18_sqlbot_parser_differential_C20260718T063354_azrollinaz.md",
+        "category": "representation_parser_differential",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security test|fixture|code review|unit test|never execute|must reject|blocks?)\b)(?=.*\b(?:SQLBot|Text-to-SQL|generated SQL|database agent)\b)(?=.*(?:;\s*(?:/\*.*?\*/\s*)?COPY[^\n]{0,240}\bPROGRAM|trailing[^\n]{0,80}(?:COPY|second statement)|multi-statement[^\n]{0,80}executor)).*$""",
+        ],
+        "description": "A Text-to-SQL guard validates only the first SELECT statement while the database executor consumes the full multi-statement string, letting a semicolon- or comment-delimited COPY ... FROM PROGRAM tail turn a query-only capability into server program execution."
+    },
+    {
+        "id": "GLS-SE-006",
+        "name": "2026-07-22_runtime_sandbox_configuration_erosion_C20260722T163856_qaqu.md",
+        "category": "sandbox_escape",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|benign|simulation|fixture|must\s+(?:retain|enforce|verify|reject)|do\s+not|never|blocked|quarantined|fail[- ]closed|prevent)\b)(?=.*\b(?:agent|assistant)\b)(?=.*\b(?:runtime|launch|executor|execution)\s+(?:config(?:uration)?|profile|settings?)\b)(?=.*\b(?:overlay|merge|replace|mutat|changed?|rewrite|override)\w*\b)(?=.*\b(?:sandbox|isolat(?:ed|ion)|jail|container)\b)(?=.*\b(?:host|outside|unsandboxed)\b)(?=.*\b(?:confirm(?:ation)?|approval|safety)\w*\b)(?=.*\b(?:disabled|off|removed|bypass|skip(?:ped)?|false|0)\b)(?=.*\b(?:tool|shell|file|command)\w*\b)(?=.*\b(?:call|invocation|execution|dispatch)\w*\b).*$""",
+        ],
+        "description": "An attacker-controlled agent runtime/launch configuration overlay mutates executor scope from sandbox to host while disabling confirmation enforcement, and the subsequent tool dispatch is accepted at host privilege."
+    },
+    {
+        "id": "GLS-SE-007",
+        "name": "2026-07-23_crawl4ai_generator_frame_attribute_escape_C20260723T163446_qaqu.md",
+        "category": "sandbox_escape",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|defensive|test|benign|must\s+(?:reject|block)|do\s+not|never|blocked|quarantined)\b)(?=.*\b(?:computed[- ]?field|extraction\s+schema|safe[_ -]?eval|AST\s+validator)\b)(?=.*\b(?:gi_frame|f_back|f_builtins|generator|frame)\b)(?=.*\b(?:escape|arbitrary\s+code|execute|exec|os\.system|__import__)\b).*$""",
+        ],
+        "description": "A computed-field extraction expression reaches non-underscore generator/frame attributes (gi_frame, f_back, f_builtins) that an underscore-only AST denylist permits, recovering the evaluator frame and escaping the restricted evaluator into arbitrary code execution."
+    },
+    {
+        "id": "GLS-RPD-008",
+        "name": "Case-folding mismatch in Custom MCP environment denylist \u2014 C20260723T134055_qaqu",
+        "category": "representation_parser_differential",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+test|unit\s+test|fixture|incident\s+report|patched|fixed|mitigat|prevent|safe|must\s+reject|defensive)\b)(?=.*\bnode[_ -]?options\b)(?=.*\b(?:windows|win32|case[- ]insensitive|case[- ]fold)\b)(?=.*\b(?:denylist|deny[- ]list|blocked|forbidden|reject)\b)(?=.*(?:--require|--import|\b(?:loader|preload|code\s+load|execute)\w*)).*$""",
+        ],
+        "description": "A case-sensitive environment-variable denylist rejects only NODE_OPTIONS while Windows resolves node_options and other case variants to the same name, so a Custom MCP child process receives Node loader controls such as --require and executes attacker code before MCP logic starts."
+    },
+    {
+        "id": "GLS-SE-009",
+        "name": "2026-07-25_dspy_pythoninterpreter_sandbox_capability_file_read_C20260725T195935_",
+        "category": "sandbox_escape",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:do not execute|must reject|blocked|safe|defensive|security test|documentation|deny|allowlist|quarantined|patched|benign|cannot|rejected|must not|secure|release notes|incident report)\b)(?=.*\b(?:dspy|pythoninterpreter)\b)(?=.*(?:pyfetch|file\s*://|local filesystem|/etc/|/proc/|/var/|/home/|/opt/|sensitive file))(?=.*\b(?:read|fetch|open|return|print|exfiltrat|send)\w*\b).*$""",
+        ],
+        "description": "A permissively configured embedded PythonInterpreter exposes a fetch capability that accepts file:// URIs, so untrusted expressions read local files and return them to the agent without any shell or command execution."
+    },
+    {
+        "id": "GLS-SE-010",
+        "name": "model-controlled OpenClaude sandbox disable via BashTool schema",
+        "category": "sandbox_escape",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\s*(?!.*\b(?:defensive|documentation|unit\s+test|benign|simulation|fixture|safe|must\s+(?:reject|ignore|forbid)|do\s+not|never|blocked|quarantined|fail[- ]closed|prevent)\b)(?=.*\b(?:bash|shell|command)\w*\b)(?=.*\b(?:bash\s*tool|tool(?:_use)?|function)\w*\b)(?=.*\b(?:dangerouslyDisableSandbox|disable(?:d|s)?\s+sandbox|sandbox\s*(?:off|false|disabled))\b)(?=.*\b(?:true|yes|1)\b)(?=.*\b(?:allowUnsandboxedCommands|unsandboxed|host[- ]level|host execution)\b)(?=.*\b(?:execut\w*|run\w*|dispatch\w*|invoke\w*)\b).*$""",
+        ],
+        "description": "A tool schema exposes dangerouslyDisableSandbox as model-controlled input so an injected model can set the flag in its own BashTool call and, with a permissive unsandboxed default, execute commands on the host."
+    },
+    {
+        "id": "GLS-RPD-010",
+        "name": "vLLM/Librosa multichannel downmix human-model view divergence (CVE-2026-34760)",
+        "category": "representation_parser_differential",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?isx)^ (?!.*\b(?:defensive|documentation|unit\s+test|test\s+fixture|security\s+test|patched|fixed|safe\s+example|must\s+(?:detect|bind|normalize)|do\s+not|never|blocked|quarantined)\b) (?=.*\b(?:stereo|multichannel|multi[- ]channel|two[- ]channel|left\s+and\s+right)\b) (?=.*\b(?:downmix(?:ing)?|down[- ]mix(?:ing)?|to_mono|mono\s+(?:mix|downmix)|channel\s+(?:weight|mix))\b) (?=.*\b(?:human\s+(?:hears?|hearing)|heard\s+by\s+(?:a\s+)?human|headphones?|speakers?|playback)\b) (?=.*\b(?:model|AI\s+(?:model|agent)|classifier|encoder|tensor)\b) (?=.*\b(?:different|mismatch|diverg|inconsistent|not\s+the\s+same|semantic\s+confusion)\b) (?=.*\b(?:signal|audio|sound|content)\b).*$""",
+        ],
+        "description": "Crafted stereo/multichannel audio exploits a standards-versus-implementation mono downmix weighting mismatch so the signal a human reviewer hears differs from the tensor the model classifies, breaking review-to-execution integrity."
+    },
+    {
+        "id": "GLS-RPD-011",
+        "name": "Generated-code review evidence parser boundary truncation",
+        "category": "representation_parser_differential",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*(?:safety[- ]research|jailbreak[- ]study|security[- ]evaluation))(?=.*(?:bounded|compressed|truncated|salien|safety[- ]view|classifier[- ]view))(?=.*(?:omit|drop|evict|exclude|underweight|hide|discard))(?=.*(?:later|final|action[- ]bearing|full transcript|downstream|executor))(?=.*(?:allow|approve|authorize|permit|execute|forward|proceed)).*$""",
+        ],
+        "description": "A code-review pipeline's bounded safety view truncates at a parser/delimiter boundary and omits the later security-relevant sink, while the merge/execute path authorizes from that incomplete evidence."
+    },
+    {
+        "id": "GLS-SE-012",
+        "name": "Cursor-style working_directory sandbox scope rebinding",
+        "category": "sandbox_escape",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:documentation|security guide|unit test|test fixture|defensive|must retain|must enforce|must verify|must reject|do not|never|blocked|denied|patched|fixed|quarantined|safe example))(?=.*(?:agent|assistant|renderer|page))(?=.*working[_ -]?directory)(?=.*(?:outside|sensitive|/etc|/root|home/agent/.cursor|unintended))(?=.*(?:sandbox|isolated|isolation|writable))(?=.*(?:write|wrote|written|overwrite|overwrote|modify|modified|create|created))(?=.*(?:helper|cursorsandbox|file|path)).*$""",
+        ],
+        "description": "An agent-controlled working_directory value is used to construct the sandbox writable root, expanding write scope outside the approved workspace and permitting overwrite of a sensitive sandbox helper under the user's privileges."
+    },
+    {
+        "id": "GLS-DAR-005",
+        "name": "Delegated approval launders harmful-objective lineage after iterative reframing",
+        "category": "delegated_approval_rebinding",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:iteration|iterative|multi[- ]model|candidate|refram(?:e|ed|ing)|rewrite)\b)(?=.*\b(?:evaluator|reviewer|judge|judged|evaluation)\b)(?=.*\b(?:accepted|approved|benign|safe)\b)(?=.*\b(?:final|assembled|later|delegat(?:ed|ion)|handoff|lost|forwards?)\b)(?=.*\b(?:session|handoff|forward|action)\b)(?=.*\b(?:targeted[_ -]?harm\w*|synthetic[_ -]?session\w*|sensitive|credential|exfil)\b).*$""",
+        ],
+        "description": "An evaluator's 'benign' verdict on an iteratively reframed candidate is reused as delegated/session authorization after the original objective's lineage is dropped, so a sensitive action executes with no fresh risk assessment."
+    },
+    {
+        "id": "GLS-PT-015",
+        "name": "Cross-platform path-containment parser disagreement",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|advisory|report|test)|unit\s+test|fixed|patched|prevented|reject(?:ed|s)?|canonicalized|safe|benign|must\s+(?:reject|canonicalize|verify)|do\s+not|never|quarantined|incident\s+report)\b)(?=.*\b(?:Windows|Win32)\b)(?=.*\b(?:UNC|AnythingLLM|document(?:s)?\s+(?:folder|root|directory)|listing)\b)(?=.*(?:[A-Za-z]:\\\\|%3a|\\\\\\\\|UNC\s+path|absolute\s+Windows\s+path|Windows\s+drive\s+path|parent[- ]directory|path\.relative|relative\(\)|\.\.))(?=.*\b(?:decode|decoded|resolve|resolved|join|joined|relative|containment|listing|list|access)\b)(?=.*\b(?:outside|out[- ]of[- ]root|escape(?:s|d)?|escaped|approved|intended|documents?\s+root|boundary)\b).*$""",
+        ],
+        "description": "A decoded Windows absolute/UNC/parent path is resolved with Windows semantics while the containment guard applies POSIX assumptions, so path.relative()'s '..' result passes the check and a document listing escapes the approved root."
+    },
+    {
+        "id": "GLS-PT-016",
+        "name": "2026-07-23_symlink_target_canonicalization_workspace_boundary_C20260723T132144_q",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test)|unit\s+test|benign|safe\s+example|incident|postmortem|defensive|must\s+(?:reject|canonicalize|verify)|do\s+not|never|inert|quarantined)\b)(?=.*\b(?:workspace|configured\s+root|root\s+boundary)\b)(?=.*\b(?:symlink|symbolic\s+link|link\s+target)\b)(?=.*\b(?:outside|out[- ]of[- ]root|escape|target)\b)(?=.*\b(?:read|write|upload|open|follow)\b).*$""",
+        ],
+        "description": "A filesystem-capable agent tool validates a path lexically against its configured workspace root, passes an in-root symlink, then follows the link's canonical target outside the root during read/write/upload."
+    },
+    {
+        "id": "GLS-PT-017",
+        "name": "2026-07-25_mcp_attachment_arbitrary_filesystem_write_C20260725T215701_claw.md",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:patched|fixed|safe|validated|allowlisted|sandbox|reject|defensive|fixture|test\s+case|must\s+not|never)\b)(?=.*\b(?:mcp|model\s+context\s+protocol)\b)(?=.*\b(?:attachment|remote\s+bytes|download)\b)(?=.*\b(?:download[_ ]path|destination|output[_ ]path)\b)(?=.*\b(?:arbitrary|any|outside|unrestricted|traversal|cron|scheduler|writable)\b)(?=.*\b(?:write|overwrite|materialize|save|create)\w*\b).*$""",
+        ],
+        "description": "An MCP attachment-download tool accepts both attacker-supplied remote bytes and a caller-selected download_path, turning a read-shaped content-fetch tool into an arbitrary filesystem-write primitive that can drop a scheduler/config file for code execution."
+    },
+    {
+        "id": "GLS-PT-018",
+        "name": "recursive copy nested symlink root escape",
+        "category": "path_traversal",
+        "severity": "low",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test)|unit\s+test|benign|safe\s+example|incident|postmortem|defensive|must\s+(?:reject|canonicalize|verify)|do\s+not|never|inert|quarantined)\b)(?=.*\b(?:recursive|recursively|directory copy|copy tree|copy-file)\b)(?=.*\b(?:nested|child|inside)\b)(?=.*\b(?:symlink|symbolic link|link target)\b)(?=.*\b(?:outside|out[- ]of[- ]root|escape|external)\b)(?=.*\b(?:copy|materiali[sz]e|read|follow)\b).*$""",
+        ],
+        "description": "A recursive filesystem copy tool authorizes only the top-level source, then follows a nested child symlink whose target is outside the allowed root and materializes external file content inside the authorized destination."
+    },
+    {
+        "id": "GLS-PT-019",
+        "name": "CVE-2026-39981 AGiXT safe_join workspace containment failure",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security advisory|unit test|defensive|patched|fixed|safe_join validates|reject(?:ed|s)?|must (?:reject|remain|stay)|do not|never|inert|no file|quarantined)\b)(?=.*\b(?:AGiXT|essential_abilities|safe_join\(\))\b)(?=.*(?:\.\.[/\\]|directory traversal|absolute path|/etc/passwd|outside (?:the )?(?:agent )?workspace|outside the designated workspace|out[- ]of[- ]root|resolved path escapes))(?=.*\b(?:read|write|delete|remove|overwrite|open|access)\w*\b)(?=.*\b(?:arbitrary|server file|host file|files beyond|designated workspace|workspace boundary)\b).*$""",
+        ],
+        "description": "A safe_join() helper performs a lexical path join without proving the canonical resolved target stays beneath the designated agent workspace, so an authenticated relative-traversal or absolute path reaches arbitrary server files for read/write/delete (CVE-2026-39981, AGiXT)."
+    },
+    {
+        "id": "GLS-PT-020",
+        "name": "Markdownify MCP caller path arbitrary-file read",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|documentation|unit\s+test|test\s+fixture|must\s+(?:reject|not)|do\s+not|never|safe|patched|fixed|canonical(?:ize|ized)|allowlisted|quarantine|sandboxed|inert|no\s+file)\b)(?=.*\b(?:MCP|Model\s+Context\s+Protocol)\b)(?=.*\b(?:markdownify|markitdown|get[- ]markdown[- ]file|Markdownify\.get)\b)(?=.*\b(?:filePath|file\s+path|path\s+argument|target\s+path|absolute\s+path)\b)(?=.*(?:\.\.[/\\]|/(?:etc|proc|root|home|var|opt|tmp)/|file://|absolute\s+path|outside\s+(?:the\s+)?(?:root|workspace|sandbox)|arbitrary\s+(?:local\s+)?file))(?=.*\b(?:read|open|return|disclos|exfiltrat|retrieve)\w*\b).*$""",
+        ],
+        "description": "An MCP document-conversion tool passes a model-visible caller-supplied filePath straight to a filesystem read with no canonical root containment, so absolute paths, file:// URIs and traversal return arbitrary host files into model context (CVE-2025-5273, markdownify-mcp)."
+    },
+    {
+        "id": "GLS-PT-021",
+        "name": "destructive memory namespace path escape",
+        "category": "path_traversal",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research|defensive|unit\s+test|benign|safe\s+example|must\s+not|do\s+not|does\s+not|never|reject|blocked|quarantine|patched|fixed|remediat)\b)(?=.*\b(?:knowledge[- ]base|kb|retrieval|memory)\b)(?=.*\b(?:delete|remove|erase|purge|destroy)\b)(?=.*(?:\.\./|%2e%2e|path\s*travers|parent[- ]directory|outside|escape|root))(?=.*\b(?:filesystem|directory|folder|storage|path)\b)(?=.*\b(?:api|endpoint|request|parameter|name|identifier)\b).*$""",
+        ],
+        "description": "A traversal-bearing knowledge-base/memory identifier is concatenated into a delete path without canonical root containment, so an ordinary memory-deletion request destroys an arbitrary directory outside the storage root."
+    },
+    {
+        "id": "GLS-PT-022",
+        "name": "EDDI backup-export botFilename encoded path traversal",
+        "category": "path_traversal",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:fixed|patched|remediated|safe|benign|test|fixture|documentation|rejected|rejects|upgrade|without)\b)(?=.*\b(?:eddi|restexportservice|backup\s*export|botfilename)\b)(?=.*(?:\.\./|%2e|%2f|%5c|\.\.\\|traversal|parent\s+segments))(?=.*\b(?:path|root|filesystem|file\s+read|read|passwd|canonical|normalized|open)\b).*$""",
+        ],
+        "description": "An attacker-controlled backup-export filename field is decoded and joined to a backup root without canonical segment containment, so encoded dot segments or alternate separators escape the root and read container-readable files."
+    },
+    {
+        "id": "GLS-DAR-007",
+        "name": "MemoryWire HITL approval operation-scope replay",
+        "category": "delegated_approval_rebinding",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|refus(?:e|ed|es)|reject(?:ed|s)?|block(?:ed|s)?|prevent|defensive|unit\s+test|test\s+fixture|runbook|documentation|scanner\s+rule|safe\s+agent|requires?\s+fresh(?:\s+human)?\s+review|current\s+(?:hitl\s+)?approval|approval\s+is\s+not\s+reusable)\b)(?=.*\b(?:memorywire|memory\s+wire|remember|merge|forget|expire)\b)(?=.*\b(?:hitl|human[- ]in[- ]the[- ]loop|review(?:er)?|approval|governance)\b)(?=.*\b(?:stale|replay|reused|previous|prior|old|mismatch|different|scoped?)\b)(?=.*\b(?:operation[ _-]?(?:id|identity)|request[ _-]?id|adapter[ _-]?(?:scope|id)|target[ _-]?scope|payload[ _-]?hash)\b)(?=.*\b(?:bypass(?:es|ed)?|skip(?:s|ped)?|without|no\s+fresh|reuse(?:s|d)?|accept(?:s|ed)?|honou?r(?:s|ed)?|proceed(?:s|ed)?|continue(?:s|d)?)\b.{0,140}\b(?:review|approval|human|governance|decision|write|merge|operation)\b).*$""",
+        ],
+        "description": "A human approval token bound to one memory-wire operation is replayed against a different operation id or fan-out adapter scope, so a memory write executes without fresh human governance review."
+    },
 ]
