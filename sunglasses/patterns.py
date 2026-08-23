@@ -26312,4 +26312,313 @@ PATTERNS = [
         ],
         "description": "A human approval token bound to one memory-wire operation is replayed against a different operation id or fan-out adapter scope, so a memory write executes without fresh human governance review."
     },
+    # === v0.4.8 batch (28 patterns) ===
+    {
+        "id": "GLS-MP-009",
+        "name": "Memory-induced tool-argument drift",
+        "category": "memory_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:detector|scanner|unit\s+test|benign|safe\s+control|postmortem|blocked|quarantined|no\s+drift|task[- ]scoped)\b)(?!.*(?<!not )\bexplicitly\s+requested\b)(?=.*(?:stored|persisted|long[- ]term|retrieved)\s+(?:memory|profile|preference|bias|personality))(?=.*(?:cost[- ]conscious|impatient|risk[- ]tolerant|bias|personality))(?=.*(?:unrelated|new|later|current)\s+(?:task|request|workflow))(?=.*(?:tool[- ]call|function[- ]call|serialized\s+(?:arguments?|parameters?)|tool\s+arguments?))(?=.*(?:silently|implicitly|without\s+(?:a\s+)?fresh|not\s+(?:explicitly\s+)?requested|mutat(?:e|ed)|drift))(?=.*(?:limit|timeout|top[_ -]?k|max[_ -]?rows|batch[_ -]?size|threshold)).*$""",
+        ],
+        "description": "A persisted personality/bias memory silently mutates the serialized parameters (limit, timeout, top-k) of a later unrelated tool call, so stale personalization acts as undeclared task policy without any current-task authorization."
+    },
+    {
+        "id": "GLS-RPDA-004",
+        "name": "Calibration-summary evidence laundering of directional vulnerability failures",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|test\s+fixture|incident\s+report|postmortem|training|quarantined|blocked|safe|must\s+not|do\s+not|never|advisory\s+only|independent\s+(?:validation|test|review)\s+required)\b)(?=.*\b(?:tool|evaluation|detector|vulnerability|security|CWE)\b)(?=.*\b(?:calibrat\w*|confidence|probability|score)\b)(?=.*\b(?:directional|systematic|DFI|HDD|misclassif\w*|blind\s+spot|failure\s+mode)\b)(?=.*\b(?:omit\w*|downplay\w*|hide\w*|suppress\w*|ignore\w*|without\s+(?:reporting|showing|including))\b)(?=.*\b(?:approve|accept|trust|treat|rely|waive|release|ship|coverage|reliable)\w*\b).*$""",
+        ],
+        "description": "An evaluation or tool report launders an improved aggregate calibration score into coverage/release authority while omitting persistent directional, CWE, or DFI failure evidence, causing the downstream agent to suppress the unresolved vulnerability signal."
+    },
+    {
+        "id": "GLS-RPDA-005",
+        "name": "Knowledge Trap extraction-budget breadcrumb laundering",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|scanner|detector|security\s+guide|unit\s+test|negative\s+fixture|postmortem|documentation|benign|must\s+not|do\s+not|quarantin)\b)(?=.*\b(?:extraction|model[- ]?steal(?:ing)?|surrogate)\b)(?=.*\b(?:query|queries|query[- ]budget|budget)\b)(?=.*\b(?:breadcrumb|knowledge[- ]space|honeypot|honey[- ]trap|low[- ]transferability|decoy)\b)(?=.*\b(?:redirect|redirected|route|routed|guided|guid(?:e|ed))\w*\b)(?=.*\b(?:omit|omits|omitted|hide|hides|hidden|without)\w*\b.{0,80}\b(?:provenance|trap|budget|breadcrumb|state)\b)(?=.*\b(?:authoritative|trusted|ordinary|canonical)\b)(?=.*\b(?:answer|knowledge|result|summary|output)\b).*$""",
+        ],
+        "description": "A knowledge-honeypot defense reroutes model-extraction queries to low-transferability decoy content, and the agent-facing summary collapses that route \u2014 omitting trap provenance and query-budget state \u2014 so the decoy answer is laundered into ordinary authoritative knowledge."
+    },
+    {
+        "id": "GLS-RPDA-006",
+        "name": "Sparse explicit-flag completeness laundering",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+guide|unit\s+test|test\s+fixture|incident\s+report|remediation|patched|fixed|blocked|quarantined|must\s+not|do\s+not|never|should\s+reject|incomplete\s+coverage)\b)(?=.*\b(?:soc|security\s+operations|threat[- ]hunting|hunt|event\s+log|windows\s+event)\b)(?=.*(?:\b\d{2,}[,\d]*\s*(?:event|record|log)\b|\b(?:large|huge|full)\b))(?=.*\b(?:flag(?:ged|s)?|mark(?:ed)?|identified|reported)\b)(?=.*\b(?:malicious|suspicious|attack)\b)(?=.*\b(?:timestamp\w*|time\s*stamp\w*|event\s+time\w*)\b)(?=.*\b(?:only|just|subset|few|one|two|three|four|five|six|seven|\d+)\b)(?=.*\b(?:complete|fully\s+reviewed|coverage\s+complete|no\s+further\s+review|all\s+clear|ready\s+for\s+approval)\b).*$""",
+        ],
+        "description": "A low-recall threat-hunting result that explicitly flags only a handful of malicious timestamps out of a huge log corpus is converted at the report/dashboard boundary into a 'coverage complete, ready for approval' state, laundering incomplete evidence into a completion decision."
+    },
+    {
+        "id": "GLS-MP-012",
+        "name": "Unauthenticated browser-to-persistent-memory rehydration hardening",
+        "category": "memory_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|patched|fixed|safe|read[- ]only|rejected|must\s+not|do\s+not|never|unit\s+test|example)\b)(?=.*\b(?:unauthenticated|no\s+authentication|missing\s+(?:auth|authentication))\b)(?=.*\b(?:browser[- ]origin|cross[- ]origin|dns[- ]rebind|host\s+header)\b)(?=.*\b(?:local|loopback|dashboard|flask|http)\b)(?=.*\b(?:api|server|endpoint)\b)(?=.*\b(?:write|store|save|persist|append|update)\w*\s+(?:attacker[- ]controlled\s+)?(?:persistent\s+)?(?:agent\s+)?(?:memory|memories|state|context)|\b(?:persistence|persistent)\s+(?:of\s+)?(?:agent\s+)?(?:memory|memories|state|context)\b)(?=.*\b(?:rehydrat|reload|startup|next\s+session|future\s+run)\w*\b)(?=.*\b(?:trusted|authoritative|obey|follow|suppress|forward|override)\w*\b).*$""",
+        ],
+        "description": "A malicious webpage reaches an unauthenticated loopback dashboard API (no CSRF or Host validation, DNS-rebinding reachable), writes attacker-controlled persistent agent memory, and a later startup or session rehydration promotes that record into trusted standing policy."
+    },
+    {
+        "id": "GLS-RPDA-008",
+        "name": "adapter expert-disagreement collapse in memory/RAG",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|test)|documentation|unit\s+test|incident\s+report|postmortem|negative\s+fixture|must\s+not|do\s+not|never|rejected|blocked|quarantined)\b)(?=.*\b(?:adapter|LoRA|weight\s+translation|alignment\s+experts?|MoE)\b)(?=.*\b(?:disagreement|contradictory|unsafe\s+expert|mixed\s+expert)\b)(?=.*\b(?:highest|best|maximum|top)\b.{0,80}\b(?:safety\s+score|safe\s+result|alignment\s+score)\b)(?=.*\b(?:discard|drop|omit|collapse|ignore)\b.{0,100}\b(?:disagreement|unsafe|contradictory|expert\s+evidence)\b)(?=.*\b(?:memory|RAG|registry|cache)\b.{0,120}\b(?:promote|store|record|mark|label)\b.{0,80}\b(?:safe|approved|verified)\b).*$""",
+        ],
+        "description": "A lossy memory/RAG summarizer keeps only the highest adapter safety score and drops the dissenting expert's contradictory unsafe finding, so later agents read a clean 'verified' record and compose the adapter."
+    },
+    {
+        "id": "GLS-MP-013",
+        "name": "Unauthenticated persistent-memory poisoning through insecure deployment defaults",
+        "category": "memory_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|test)|documentation|unit\s+test|negative\s+fixture|incident\s+report|must\s+(?:set|configure|reject|deny)|should\s+(?:set|configure|reject|deny)|blocked|rejected|safe\s+example|advisory\s+recommends)\b)(?=.*\b(?:API[_ -]?TOKEN|bearer\s+token|authentication\s+secret)\b)(?=.*\b(?:unset|empty|missing|blank|not\s+configured)\b)(?=.*\b(?:memory\s+API|Knowledge[- ]Graph|knowledge[- ]graph|HTTP\s+memory\s+server)\b)(?=.*(?:system://boot|core://\*|privileged\s+(?:namespace|memory)))(?=.*\b(?:unauthenticated|without\s+(?:a\s+)?bearer|accepts?\s+(?:unauthenticated|remote)\s+writes?|(?:attacker|remote\s+client)\s+writes?|client\s+can\s+write|bearer\s+token\s+unset)\b)(?=.*\b(?:auto[- ]?load|auto[- ]?loaded|downstream\s+(?:agent\s+)?sessions?|persistent(?:[- ]memory)?\s+(?:loader|(?:prompt\s+)?injection)|later\s+(?:agent\s+)?session)\b).*$""",
+        ],
+        "description": "An unset/empty auth token on a network-exposed memory service permits unauthenticated writes to privileged auto-loaded namespaces (system://boot, core://*), making attacker text persistent context in later agent sessions."
+    },
+    {
+        "id": "GLS-MP-014",
+        "name": "Email-to-Persistent-Action-State Injection",
+        "category": "memory_poisoning",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|scanner|unit test|negative fixture|incident report|postmortem|blocked|quarantined|must not|do not|never|safe example)\b)(?=.*\b(?:email|e-mail|gmail|gmailtoolkit|mailbox|message body|thread)\b)(?=.*\b(?:retriev(?:ed|al)|fetched|ingest(?:ed|ion)?|summari[sz](?:e|ed|ation)|store(?:d|ing)?|persist(?:ed|ence)?|session memory|durable memory|long[- ]term memory)\b)(?=.*\b(?:run|execute|eval|shell|command|code|python|tool call|send|forward|delete|write)\b)(?=.*\b(?:automatically|without confirmation|no approval|next session|later agent|planner|action)\b).*$""",
+        ],
+        "description": "A crafted email retrieved via an email toolkit is persisted into durable session memory and a later planner turn executes it as trusted task state, so the retrieval turn and the action turn are different turns."
+    },
+    {
+        "id": "GLS-RPDA-010",
+        "name": "memory/RAG decomposition-state accumulation laundering",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|training|documentation|unit\s+test|benign\s+example|must\s+not|do\s+not|never|refuse|blocked|quarantined|safe\s+handling|require\s+(?:aggregate|fresh|independent)\s+(?:intent|review))\b)(?=.*\b(?:memory|RAG|retrieval|fragment|subtask)\b)(?=.*\b(?:separately|individually|each|per[- ]fragment)\s+(?:benign|low[- ]risk|safe)\b)(?=.*\b(?:combine|assemble|join|aggregate|compose)\w*\b)(?=.*\b(?:harmful|malicious|restricted|unsafe)\s+(?:objective|goal|plan|workflow|operation)\b)(?=.*\b(?:executable|carry\s+out|fulfill|complete)\w*\b)(?=.*\b(?:without|skip|lacks?|no)\b.{0,60}\b(?:aggregate|intent|review|safety|check)\b).*$""",
+        ],
+        "description": "Individually benign memory/RAG retrieval fragments pass fragment-local checks and only become a restricted, executable objective once the consumer assembles them, with no aggregate-intent review at the final action boundary."
+    },
+    {
+        "id": "GLS-RPDA-011",
+        "name": "rotated-truncated embedding retrieval collision",
+        "category": "retrieval_provenance_decay_authority_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit[- ]?test|benign|defensive|must\s+not\s+(?:be\s+)?authoritative|do\s+not\s+(?:treat|obey|promote)|blocked|quarantined|safe\s+handling)\b)(?=.*\b(?:rotated|orthogonal|SVD[- ]?truncated|truncated)\b)(?=.*\bvector\b)(?=.*\b(?:rotation|dimension|embedding\s+version|tenant|document\s+(?:id|identity))\b)(?=.*\b(?:stale|cross[- ]?tenant|mismatch|unbound|without\s+revalidation)\b)(?=.*\b(?:authoritative\s+context|treat(?:ed)?\s+as\s+authoritative|decrypted\s+reranking)\b).*$""",
+        ],
+        "description": "A stale or cross-tenant SVD-truncated, rotated vector record whose rotation epoch, dimension, embedding version, tenant, and document identity are unbound is accepted as authoritative retrieval context via its decrypted reranking result."
+    },
+    {
+        "id": "GLS-DBSL-001",
+        "name": "delegated labeling-service label poisoning hardening",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:independent\s+adjudication|provenance\s+(?:preserved|verified)|safe\s+(?:handling|aggregation)|benign|documentation|unit\s+test))(?=.*(?:label(?:ing|er)|annotation|annotator))(?=.*(?:delegat|outside|vendor|worker|service))(?=.*(?:dataset|training|evaluation|batch|record))(?=.*(?:reference_label|ground_truth)["'=:\s]{0,20}(?:unsafe|safe))(?=.*(?:worker_label|annotator_label)["'=:\s]{0,20}(?:safe|unsafe)).*$""",
+        ],
+        "description": "A compromised outside labeling-service worker flips a record's label in a delegated annotation batch and the dataset aggregator promotes the worker value over the reference label without independent adjudication or provenance binding."
+    },
+    {
+        "id": "GLS-DBSL-002",
+        "name": "coherent suffix objective mutation at delegation review",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:delegat(?:e|ed|ion)|handoff|human[- ]in[- ]the[- ]loop|reviewer)\b)(?=.*\b(?:coherent|natural|routine|ordinary|well[- ]written|low[- ]perplexity)\b)(?=.*\b(?:sub[- ]goal|secondary objective|additional objective|quietly)\b)(?=.*\b(?:approve|accept|greenlight|proceed)\b)(?=.*\b(?:without confirmation|without asking|skip(?:ping)? review|no need to ask)\b).*$""",
+        ],
+        "description": "A fluent, semantically coherent delegated-review request preserves the apparent task while appending a quiet extra objective plus an approval-bypass clause, so a task-level reviewer greenlights the added effect without independently authorizing it."
+    },
+    {
+        "id": "GLS-DBSL-003",
+        "name": "2026-07-16_mcp_result_lifecycle_state_laundering.md",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:do not|must not|never|reject|quarantine|untrusted|treat as inert|require fresh|revalidate|verify provenance|safe handling|incident report))(?=.*(?:MCP|tool)\s*(?:result|response|output))(?=.*(?:status|state|lifecycle|verified|complete|approved|trusted))(?=.*(?:queue|enqueue|work item|job))(?=.*(?:forward|handoff|relay|transmit|peer agent|next agent))(?=.*(?:automatically|without (?:a )?(?:fresh )?(?:validation|review|provenance)|skip(?:ping)? (?:revalidation|provenance)|no (?:second|fresh) check|enters the queue|without revalidation|without freshness check)).*$""",
+        ],
+        "description": "A structured tool result asserting verified/complete lifecycle metadata is promoted from evidence to workflow authority at queue admission and auto-forwarded to a peer agent without fresh provenance, freshness, or audience revalidation."
+    },
+    {
+        "id": "GLS-EX-026",
+        "name": "AI-Enabled Product Observability Policy-Branch Metadata Disclosure",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+(?:redact|restrict|hide)|do\s+not|never|safe|blocked|fail[- ]closed|authorized\s+audit)\b)(?=.*\b(?:AI[- ]enabled|AI|model|inference)\b)(?=.*\b(?:API|response|header|metadata|log|observability)\w*\b)(?=.*\b(?:hidden|internal|restricted|private|non[- ]user|unintended)\b)(?=.*\b(?:policy[- ]branch|safety[- ]branch|evaluator\s+rationale|decision\s+path|inference\s+trace)\b)(?=.*\b(?:expos(?:e|es|ed|ure)|leak(?:s|ed|age)?|return(?:s|ed)?|appear(?:s|ed|ance)?)\b)(?=.*\b(?:infer\w*|identify\w*|reverse[- ]?engineer\w*|refine\w*|probe\w*|bypass\w*)\b).*$""",
+        ],
+        "description": "An AI-enabled product leaks a hidden inference policy-branch outcome or evaluator rationale through API response metadata, headers, logs, or observability events, letting an attacker map the safety boundary and refine bypass probes."
+    },
+    {
+        "id": "GLS-EX-027",
+        "name": "CAMP cumulative masked-fragment re-identification hardening",
+        "category": "exfiltration",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit[- ]?test|benign|defensive|must\s+not|do\s+not|blocked|quarantined|safe\s+handling)\b)(?=.*\b(?:multi[- ]turn|cross[- ]turn|separate\s+(?:turns|messages)|session)\b)(?=.*\b(?:masked|redacted|low[- ]signal|individually)\b)(?=.*\b(?:fragment|piece|attribute|name|employer|location|medical|health)\b)(?=.*\b(?:accumulat|co-?occurr|combine|link|join|re-?identif|profile|reconstruct|disclos)\w*\b).*$""",
+        ],
+        "description": "Individually masked, low-signal PII fragments arriving in separate turns are linked by session co-occurrence state into a re-identifiable profile that per-turn masking never evaluated."
+    },
+    {
+        "id": "GLS-DBSL-004",
+        "name": "2026-07-23_delegated_citation_provenance_rebinding_C20260722T194520_claw.md",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guidance|reviewer\s+fetched|could\s+not\s+verify|rejected|corrected|requires?\s+(?:a\s+)?(?:human|second)\s+review|defensive|audit)\b)(?=.*\b(?:citation|cited|source\s+link)\b)(?=.*\b(?:wrong|fabricat\w*|forged|attacker[- ]controlled|adversary[- ]provided|swapped|stale)\b)(?=.*\b(?:evidence|quote|locator|digest|hash|data|conclusion|claim)\b)(?=.*\b(?:skip|bypass|suppress|approve|authori[sz]|rebind|replace|swap|accept)\w*\b).*$""",
+        ],
+        "description": "A delegated verifier sees a syntactically valid citation and correct URL while the evidence digest, locator, quote, or underlying bytes were silently rebound to attacker-supplied content at the handoff, so citation presence is mistaken for evidence provenance."
+    },
+    {
+        "id": "GLS-DBSL-005",
+        "name": "delegated threat-model profile omission laundering",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:defensive|documentation|research|unit test|test fixture|incident report|must not|rejected|requires binding|revalidation|benign control|safe handling))(?=.*(?:delegated|delegation|handoff|approver|HITL|human-in-the-loop))(?=.*(?:defense|antidistillation|distillation|robustness))(?=.*(?:effective|successful|robust|safe|approved|approve|cleared))(?=.*(?:omitted|missing|absent|unbound|unspecified|not reported))(?=.*(?:query budget|data budget|interface profile|interaction profile))(?=.*(?:universal|generalized|generalised|all attackers|threat-model)).*$""",
+        ],
+        "description": "A defense evaluation result valid only under a specific query budget, data budget, and interface profile is laundered into a universal-robustness claim when the delegated handoff omits those scope dimensions and an approver clears the unscoped result."
+    },
+    {
+        "id": "GLS-DBSL-007",
+        "name": "Delegated-workflow scope collapse via attacker-controlled issue prompt",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|defensive|test fixture|must not|do not obey|requires fresh approval)\b)(?=.*\b(?:github\s+issue|issue\s+title|issue\s+body)\b)(?=.*\b(?:opened|webhook|automatic|auto[- ]trigger)\b)(?=.*\b(?:embedded|interpolated|injected|entered|supplied)\b.{0,100}\b(?:prompt|agent)\b)(?=.*\b(?:command[- ]capable|gh\s+(?:issue|cli)|authenticated)\b)(?=.*\b(?:comment|relabel|label)\b).*$""",
+        ],
+        "description": "An automatic issues.opened event interpolates attacker-written issue title/body into a command-capable triage agent's prompt, letting external text drive authenticated gh comment and relabel mutations outside the bounded triage purpose."
+    },
+    {
+        "id": "GLS-DBSL-008",
+        "name": "2026-07-25_paired_operand_flag_invariant_bypass_C20260725T212032_azrollinaz.md",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|documentation|unit\s+test|test\s+fixture|must\s+not|do\s+not|never|safe|patched|fixed|reject(?:ed|s)?|validate(?:d|s)?|equal(?:ity)?\s+(?:check|validation)|consistent)\b)(?=.*\b(?:delegate|delegat(?:ed|ion)|approval|handoff|requeue|merge|paired|operand|two\s+records?)\b)(?=.*\b(?:flag|mode|generation|lifecycle|ownership|handle)\w*\b)(?=.*\b(?:different|mismatch(?:ed)?|incompatible|unequal|not\s+equal)\b)(?=.*\b(?:shared|common|single)\s+(?:action|operation|executor|cleanup|queue)\b)(?=.*\b(?:stale|dangling|freed|released|use[- ]after[- ]free|UAF|reuse|dereference)\w*\b)(?=.*\b(?:later|downstream|subsequent|after)\b).*?$""",
+        ],
+        "description": "A paired delegated operation accepts two operands carrying mismatched lifecycle/ownership flags into one shared action or cleanup executor, so state released under one operand's mode is later reused, reaching use-after-free."
+    },
+    {
+        "id": "GLS-EX-029",
+        "name": "2026-07-26_targeted_runtime_skill_probe_C20260726T094856_qaqu.md",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|safe\s+control|must\s+(?:reject|quarantine)|do\s+not)\b)(?=.*\b(?:SKILL\.md|skill\s+(?:contract|manifest|specification))\b)(?=.*\b(?:public[- ]only|public\s+data|read[- ]only|no\s+local|offline)\b)(?=.*\b(?:targeted|particular|specific)\s+(?:user\s+)?(?:request|prompt|trigger)\b)(?=.*\b(?:local\s+(?:asset|file|workspace)|runtime\s+(?:state|context))\b)(?=.*\b(?:browser[- ]visible|preview|rendered(?:\s+\w+){0,3}\s+output|result)\b)(?=.*\b(?:emit|include|copy|expose|render|return)\w*\b).*$""",
+        ],
+        "description": "A skill whose static manifest declares public-only read-only behavior conditionally reads a local workspace asset when a targeted request arrives and emits it into a browser-visible preview/result sink, defeating static skill review."
+    },
+    {
+        "id": "GLS-DBSL-009",
+        "name": "C20260716T084422_azrollinaz_anonymous_interleaving_state_collision.md",
+        "category": "delegation_bridge_state_laundering",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|defensive|documentation|unit test|test fixture|incident report|must not|preserve attribution|reject cross[- ]session|blocked)\b)(?=.*\b(?:anonymous|untraceable|no session identity|sessionless)\b)(?=.*\b(?:interleav|arbitrarily interleav|cross[- ]session|unrelated session)\w*\b)(?=.*\b(?:fragment|partial request|benign[- ]looking query)\w*\b)(?=.*\b(?:merge|join|aggregate|reconstruct|compose)\w*\b)(?=.*\b(?:lose|lost|loses|missing|without|no)\w*\b)(?=.*\b(?:attribution|session|identity|partition|provenance)\b)(?=.*\b(?:delegat(?:ed|ion)|task state|workflow)\b)(?=.*\b(?:suppress|hide|omit|skip|ignore|continue|proceed)\w*\b)(?=.*\b(?:review|finding|warning|approval|security|task|workflow)\b).*$""",
+        ],
+        "description": "An identityless, arbitrarily interleaved request stream lets a stateful delegated-task monitor globally join individually benign fragments from unrelated sessions into one harmful objective because task state is not partitioned by provenance."
+    },
+    {
+        "id": "GLS-AB-007",
+        "name": "poisoned model behavioral session-gate false acceptance",
+        "category": "auth_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|test)|incident\s+report|documentation|unit\s+test|negative\s+fixture|must\s+not|do\s+not|never|blocked|rejected|safe\s+example)\b)(?=.*\b(?:model[_ -]?(?:artifact|checkpoint)|published\s+model|published\s+checkpoint|fine[- ]tuned\s+model)\b)(?=.*\b(?:unverified|poisoned|backdoor|behavior[_ -]?profile|training[_ -]?provenance)\b)(?=.*\b(?:expired|revoked|invalid|stale)\b)(?=.*\b(?:session|grant|token)\b)(?=.*\b(?:accept\w*|continue\w*|resume\w*|renew\w*)\b)(?=.*\b(?:reuse|re-use|renew|forward)(?:[_ -]|\b))(?=.*\b(?:session|grant|token)\b).*$""",
+        ],
+        "description": "A fine-tune-poisoned checkpoint learns to emit continue/accept for expired or revoked sessions, and an agent that treats model behavioral output as session authority reuses credentials past validity instead of enforcing expiry independently."
+    },
+    {
+        "id": "GLS-CI-008",
+        "name": "false-safe command-template reassembly bypass \u2014 C20260718T093307_qaqu",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+test|unit\s+test|fixture|incident\s+report|never\s+execute|must\s+reject|defensive)\b)(?=.*\b(?:safety[_ -]?class|safe[_ -]?command|read[- ]only)\b)(?=.*\b(?:template|render(?:ed|ing)|health\s+probe|maintenance)\b)(?=.*\b(?:automatic|auto[_ -]?execute|no\s+approval|without\s+approval|do\s+not\s+ask)\b)(?=.*(?:\$\(|;|&&|\|\||\b(?:touch|write|redirect|shell)\b)).*$""",
+        ],
+        "description": "A model-assigned safety_class=safe plus automatic-approval field authorizes a command template whose rendered parameter reassembles shell substitution and redirection, so the side effect executes against an approval gate that only ever saw the pre-render label."
+    },
+    {
+        "id": "GLS-AB-009",
+        "name": "unauthenticated browser MCP HTTP lifecycle capability exposure \u2014 C20260723T170652_qaqu",
+        "category": "auth_bypass",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|docs|test|fixture|patched|fixed|mitigated|blocked|quarantined|safe|requires authentication|stdio-only)\b)(?=.*\b(?:mcp|model context protocol)\b)(?=.*\b(?:http|http transport|streamable)\b)(?=.*(?:\b(?:unauthenticated|anonymous|without authentication|without auth|no authentication|auth disabled|missing auth)\b|\b(?:auth|authentication)\s*["']?\s*:\s*["']?(?:disabled|none|false)))(?=.*\b(?:initialize|session|tools?/call|tool invocation|invoke|browser bridge|browser-control)\b)(?=.*\b(?:navigation|javascript evaluation|cookie|storage|real browser|browser profile)\b).*$""",
+        ],
+        "description": "An MCP HTTP/streamable transport that accepts session initialize and tools/call without authentication lets any network-reachable caller or visited website drive a connected real browser profile \u2014 navigation, JavaScript evaluation, cookies, and storage \u2014 with no human authorization step."
+    },
+    {
+        "id": "GLS-CI-011",
+        "name": "2026-07-25_mcp_download_website_outputpath_shell_interpretation_C20260725T192535",
+        "category": "command_injection",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|docs|guide|patched|fixed|safe|argv|execfile|spawn|shell\s*:\s*false|reject|defensive|fixture|test\s+case|must\s+not|never)\b)(?=.*\b(?:mcp|model\s+context\s+protocol|download_website)\b)(?=.*\b(?:outputpath|output\s*path)\b)(?=.*\b(?:shell|exec|command|child\s*process|spawn)\b)(?=.*[;&|`$])(?=.*\b(?:concatenat|interpolat|unsanitized|injection|reinterpret|execute)\w*\b).*$""",
+        ],
+        "description": "An attacker-controlled MCP outputPath argument is string-concatenated into a shell command instead of passed as an argv element with shell disabled, so a filename-shaped value becomes shell grammar at the host process boundary."
+    },
+    {
+        "id": "GLS-CI-014",
+        "name": "CVE-2025-64340 FastMCP Windows .cmd wrapper approval-boundary hardening",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|documentation|unit\s+test|test\s+fixture|must\s+not|do\s+not|never|safe|patched|fixed|argv\s+array|shell\s*[:=]\s*false|rejected)\b)(?=.*\b(?:FastMCP|fastmcp|MCP)\b)(?=.*\b(?:install|installer|approval|approved|review)\b)(?=.*\b(?:Windows|\.cmd|cmd\.exe|command\s+wrapper|batch\s+file)\b)(?=.*\b(?:server\s+name|name\s+argument|argument\s+string|flattened|rejoined|reparsed)\b)(?=.*(?:&|&&|\||\|\||\^|%[A-Za-z_][A-Za-z0-9_]*%))(?=.*\b(?:shell|command|execute\w*|execution|injection|metacharacter|unsafe|unvalidated)\b).*$""",
+        ],
+        "description": "An MCP server name approved as a single inert install argument is flattened by a Windows .cmd shim and reparsed by cmd.exe, so shell metacharacters regain command syntax after the human approval step."
+    },
+    {
+        "id": "GLS-CI-015",
+        "name": "CVE-2025-68144 mcp-server-git option-shaped ref parser carrier hardening",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|defensive|documentation|unit\s+test|test\s+fixture|must\s+not|do\s+not|never|safe|patched|argv\s+array|rev_parse|reject\s+leading)\b)(?=.*\b(?:MCP|Model\s+Context\s+Protocol)\b)(?=.*\b(?:git_diff|git_checkout|git\s+(?:diff|checkout))\b)(?=.*\b(?:ref|revision|path|worktree)\b\s*[:=])(?=.*(?:--(?:output|work-tree|git-dir|index-file|exec-path)(?:=|\s)|-[A-Za-z]))(?=.*\b(?:option|flag|CLI|overwrite|write|checkout|process)\b).*$""",
+        ],
+        "description": "A structured MCP git ref/path argument beginning with `-` is consumed by the git CLI as an option, so `--output=` turns a read-only diff request into an arbitrary file overwrite."
+    },
+    {
+        "id": "GLS-AB-011",
+        "name": "C20260726T001805_claw_mcp_streamable_http_session_hijack.md",
+        "category": "auth_bypass",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|advisory|incident report|postmortem|training|unit test|patched|fixed|hardened|blocked|rejects?|safe behavior|must not|do not|never|no attacker|benign)\b)(?=.*\b(?:mcp|model context protocol)\b)(?=.*\b(?:streamable\s*[- ]?http|server[- ]sent\s+events|\bSSE\b)\b)(?=.*\b(?:valid|obtained|stolen|reused|presented)\s+(?:session\s*(?:id|identifier)|session\s+handle)\b)(?=.*\b(?:different|attacker|other|cross[- ]client|unbound)\b)(?=.*\b(?:hijack|intercept|attach|take over|reconnect|reuse)\w*\b)(?=.*\b(?:without|missing|lacks?|no)\s+(?:client|owner|connection|origin)\s*(?:binding|association|authorization)\b).*$""",
+        ],
+        "description": "A streamable HTTP/SSE transport treats possession of a valid session ID as client identity, letting a different peer reconnect with that handle and hijack the victim's event stream because the handle is never bound to the originating authenticated client."
+    },
 ]
