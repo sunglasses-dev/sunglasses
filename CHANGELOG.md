@@ -3,6 +3,24 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.8] — 2026-08-23
+
+PULSE Day 5. 28 new patterns staged from the AZ gate (DAY13-DAY15) via the gate-stage-to-db
+intake: every regex re-proven against its own hostile fixtures, silent on benign fixtures and
+0 hits across the 78-document real-world FP corpus. 27 gate cards were rejected at intake with
+written reasons (TP_MISS, REDOS_SUSPECT, CORPUS_FP, NO_HOSTILE_FIXTURE) and stay queued for repair.
+
+- Added: 28 detection patterns across six categories — delegation_bridge_state_laundering
+  (8, GLS-DBSL-*), retrieval_provenance_decay_authority_laundering (6, GLS-RPDA-*),
+  memory_poisoning (4, GLS-MP-*), command_injection (4, GLS-CI-*), exfiltration
+  (3, GLS-EX-*) and auth_bypass (3, GLS-AB-*): unauthenticated MCP transport sessions,
+  session-ID-as-identity, shell string assembly from MCP arguments, delegated-result
+  self-promotion, cumulative PII fragment linkage, loopback memory-service writes and
+  stale cross-tenant vector records among the mechanisms.
+- Benchmark re-measured at 0.4.8: 86.1% precision / 97.4% recall / 0.914 F1 — unchanged.
+- Blog: "AI Agent Trust Boundaries for Data and Actions" (merged PULSE Day 5 evidence page,
+  covers all 28 shipped ids).
+
 ## [0.4.7] — 2026-08-22
 
 PULSE Day 4. 26 new patterns staged from the AZ gate (DAY10-DAY12) via the gate-stage-to-db
