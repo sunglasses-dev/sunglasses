@@ -141,10 +141,10 @@ result = scanner.scan_auto("any_file.ext")
 |--------|-------|
 | Average text scan | <1ms (avg 0.26ms on M3 Max, single-threaded) |
 | Throughput | ~3,800 scans/sec (single-threaded, M3 Max) |
-| Patterns | 1378 |
+| Patterns | 1407 |
 | Keywords | 6,645 |
 | Languages | 23 |
-| Attack categories | 116 |
+| Attack categories | 117 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Internal recall (attack-db fixture set) | 64/64 — 100% recall |
@@ -182,7 +182,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 
 ## What Works Today
 
-- ✅ Text scanning: 1378 patterns, 6,645 keywords, 23 languages, 116 attack categories
+- ✅ Text scanning: 1407 patterns, 6,645 keywords, 23 languages, 117 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
