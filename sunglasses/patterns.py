@@ -26621,4 +26621,324 @@ PATTERNS = [
         ],
         "description": "A streamable HTTP/SSE transport treats possession of a valid session ID as client identity, letting a different peer reconnect with that handle and hijack the victim's event stream because the handle is never bound to the originating authenticated client."
     },
+    # === v0.4.9 batch (29 patterns) ===
+    {
+        "id": "GLS-PCF-673",
+        "name": "2026-07-18_duplicate_citation_corroboration_laundering_C20260718T142525_claw.md",
+        "category": "provenance_chain",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|mitigation|patched|fixed|blocked|safe|test\s+fixture|documentation|must\s+not|do\s+not|never|deduplicat(?:e|ed|ion)|independent\s+source|verified\s+unique)\b)(?=.*\b(?:provenance|causal|lineage|attack[- ]graph|backward[- ]track)\w*\b)(?=.*\b(?:citation|reference|source|evidence)\w*\b)(?=.*\b(?:duplicate|duplicated|alias(?:ed|es)?|same\s+(?:source|id)|repeated|copy)\b)(?=.*\b(?:corroborat|independent|confirm|agreement|consensus)\w*\b)(?=.*\b(?:verif(?:y|ier|ied|ication)|trust|accept|launder|promot|hypothesis|steer)\w*\b).*$""",
+        ],
+        "description": "One attacker-controlled citation is replicated under aliases so a verifier counts the aliases as independent corroboration and promotes an unsupported causal edge into a trusted hypothesis."
+    },
+    {
+        "id": "GLS-PCF-675",
+        "name": "Correlated peer-echo consensus laundering in shared coordination memory",
+        "category": "provenance_chain",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|fail[- ]?closed|safe\s+workflow|benign)\b)(?=.*\b(?:compromised|malicious|unsafe|attacker|hostile)\b)(?=.*\b(?:peer|robot|relay|agent)\b)(?=.*\b(?:echo|re-?echo|repeat|mirror|corroborat|consensus|quorum)\w*\b)(?=.*\b(?:shared|coordination|team|memory|context|ledger)\w*\b)(?=.*\b(?:authoriz|approv|permit|execut|coordinat|proceed)\w*\b).*$""",
+        ],
+        "description": "One compromised peer seeds unsafe intent and its downstream echoes are persisted into shared coordination memory, so a planner counts correlated descendants of a single origin as independent quorum corroboration and authorizes coordinated unsafe action."
+    },
+    {
+        "id": "GLS-PCF-676",
+        "name": "Self-graded reliability proxy laundering at security-evaluation output",
+        "category": "provenance_chain",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit\s+test|documentation|defensive|benign|example|do\s+not|never|quarantine|reject)\b)(?=.*\b(?:self[- ]?graded|self[- ]?assessed|model[- ]?reported|internal)\s+(?:reliability|quality|safety)\s*(?:proxy|score|rating)\b)(?=.*\b(?:external|independent|adversarial|third[- ]?party)\s+(?:security|judge|evaluation|score|assessment)\b)(?=.*\b(?:lower|missing|absent|not comparable|weak|gap|20[-–]61|14[-–]42|24\.8[-–]88\.2)\b)(?=.*\b(?:approve|approval|pass|accept|safe|release|ship|green[- ]?light)\w*\b)(?=.*\b(?:render|display|report|summary|dashboard|output|badge)\w*\b).*$""",
+        ],
+        "description": "A model's self-graded reliability or safety score is rendered as an approval badge and consumed as security evidence downstream, even though the independent adversarial evaluation is materially weaker, missing, or not comparable."
+    },
+    {
+        "id": "GLS-SMP-021",
+        "name": "2026-07-23_multi_label_evidence_output_boundary_poisoning_C20260723T141336_azrol",
+        "category": "structured_metadata_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*\b(?:untrusted|attacker[- ]controlled|hostile)\b)(?=.*\b(?:cti|incident\s+sentence|unstructured\s+evidence)\b)(?=.*(?:labels?\s*[:=]\s*\[|<label[- ]set>|\[labels?))(?=.*\b(?:classifier|parser|downstream)\b)(?=.*\b(?:evidence|report|text|sentence)\b)(?=.*\b(?:label[- ]set|authoritative|misclassif|poison|inject|wrong)\w*\b)(?=.*\b(?:allow|approve|route|authorize|downstream)\w*\b).*$""",
+        ],
+        "description": "Untrusted CTI evidence carries label-set-shaped delimiters (labels=[...], <label-set>) that a classifier/parser conflates with its own authoritative multi-label output, and downstream safety routing then acts on the attacker-supplied label set."
+    },
+    {
+        "id": "GLS-PCF-681",
+        "name": "2026-07-23_tri_context_personalization_provenance_collapse_hardening.md",
+        "category": "provenance_chain",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|runbook|unit\s+test|postmortem|benign|safe\s+(?:path|merger)|must\s+(?:preserve|bind|separate|reject)|fail[- ]closed|negative\s+fixture|do\s+not\s+(?:merge|treat|accept))\b)(?=.*\b(?:tri[- ]context|device\s+(?:diagnostic|evidence)|user\s+(?:profile|proficiency|inference)|service\s+(?:recommend(?:er|ation)|context))\b)(?=.*\b(?:merge|combine|conflat|corroborat|cross[- ]channel|(?:without|no|missing|lost)\s+(?:source|field)?[ -]?(?:identity|provenance|lineage)|field\s+identity)\w*\b)(?=.*\b(?:stale|attacker[- ]controlled|low[- ]trust|untrusted|poisoned|profile\s+claim)\b)(?=.*\b(?:device|security)\s+(?:fact|evidence|signal)|treat\w*\s+.*(?:device|security))(?=.*\b(?:unsafe|remote\s+support|install|forward|upload|execute|proceed|remediat|service\s+action)\w*\b).+$""",
+        ],
+        "description": "A troubleshooting agent fuses device diagnostics, user-profile inference and service-recommender output into one personalization record without preserving channel provenance, letting a stale or attacker-controlled low-trust profile claim acquire the authority of a device/security fact and steer remediation."
+    },
+    {
+        "id": "GLS-SMP-023",
+        "name": "20260723_structured_threat_relation_rebinding_C20260723T112119_azrollinaz.md",
+        "category": "structured_metadata_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|reject|quarantine|fail[- ]closed|benign|safe\s+example)\b)(?=.*(?:schema[- ]valid|valid[- ]schema|valid\s+schema|structured\s+threat|json)).*(?=.*(?:cross[- ]bound|cross[- ]bind|mis[- ]bind|rebind|wrong\s+(?:actor|entity|location)|relation\s+mismatch|field\s+binding)).*(?=.*(?:accept|allow|authoriz|rank|verif|trust)).*$""",
+        ],
+        "description": "An LLM extractor emits a schema-valid structured record whose threat/actor/location relations are cross-bound to the wrong entity, so a downstream risk consumer accepts a genuine threat under a false actor or location."
+    },
+    {
+        "id": "GLS-MSR-002",
+        "name": "multimodal safety-defense result rebinding across visual inputs",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security guide|documentation|unit test|incident report|postmortem|defensive|must not|do not|never)\b)(?=.*\b(?:retrieved memory|memory record|RAG|knowledge[- ]base|cache)\b)(?=.*\b(?:cached|stale|prior|previous)\b)(?=.*\b(?:defen[cs]e|safety)\b)(?=.*\b(?:safe|passed|over[- ]?refusal)\b)(?=.*\b(?:new visual|later visual|different visual|new image|attacker[- ]image|new multimodal)\b)(?=.*\b(?:reuse|rebind|apply|carry|reused|applied)\b)(?=.*\b(?:skip|omit|without|no fresh|no input)\b)(?=.*\b(?:fresh safety|fresh analysis|identity check|input hash|visual analysis|safety analysis)\b).*$""",
+        ],
+        "description": "A cached multimodal safety-defense verdict from a prior visual input is rebound to a different later visual input because the cache key omits canonical input identity, so the new item's fresh safety analysis is skipped."
+    },
+    {
+        "id": "GLS-DOAS-001",
+        "name": "2026-07-22_adversarial_compute_amplification.md",
+        "category": "denial_of_ai_service",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never)\b)(?=.*\b(?:batch(?:_size| size)?|fan[- ]?out|recursive|expand(?:s|ed|ing)?|repeat(?:s|ed|ing)?|nested)\b)(?=.*\b(?:model calls?|tool calls?|inference|requests?|jobs?|tasks?)\b)(?=.*\b(?:unbounded|without a limit|ignore the cap|no limit|exhaust|overload|starve|compute budget|resource budget|expensive)\b).*$""",
+        ],
+        "description": "Attacker-controlled batch_size/recursive/fan_out request metadata is interpreted as execution cardinality, so a single accepted request expands into nested model and tool calls and exhausts a shared compute budget before any per-request cap is applied."
+    },
+    {
+        "id": "GLS-DOAS-002",
+        "name": "Aggregate request-budget exhaustion via normal concurrent queries \u2014 C20260722T185728_claw",
+        "category": "denial_of_ai_service",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|safe handling|defensive|quarantine|bounded|no\s+(?:flood|cost\s+spike|service\s+degradation))\b)(?=.*\b(?:concurrent|simultaneous|high[- ]volume|sustained|burst|flood|excessive|many)\b)(?=.*\b(?:ordinary|normal|low[- ]complexity|otherwise normal|simple)\b)(?=.*\b(?:actor|tenant|principal|client)\b)(?=.*\b(?:aggregate|shared|global|per[- ]actor|per[- ]tenant|request budget|quota|rate limit|admission)\b)(?=.*\b(?:autoscal|scale out|pay[- ]per[- ]use|cost|billing|queue|latency|overload|exhaust|degrad|availability)\b).*$""",
+        ],
+        "description": "Many individually ordinary low-complexity requests each pass per-request admission checks, but because the shared actor/tenant budget is absent or evaluated only after scheduling, concurrent volume crosses the aggregate budget into queueing, autoscaling, and billing amplification."
+    },
+    {
+        "id": "GLS-DOAS-003",
+        "name": "2026-07-22_ui_output_continuation_compute_amplification.md",
+        "category": "denial_of_ai_service",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked|quarantined|must not|do not|never|defensive|safe)\b)(?=.*\b(?:browser|web|UI|rendered|chat)\b.{0,220}\b(?:continue|next page|pagination|load more|expand output|more tokens)\b)(?=.*\b(?:long(?:er)? output|(?:max_)?tokens?|completion|generation|response)\b.{0,220}\b(?:repeat|again|multiple|unbounded|extend|expand|consume|spend|exhaust|budget|cost)\b)(?=.*\b(?:inference|generation|completion|compute|resource|token)\b.{0,180}\b(?:budget|cost|exhaust|amplif|repeat|unbounded|overload)\b).*$""",
+        ],
+        "description": "A rendered Continue / Load-more / pagination control is promoted from output presentation state into generation authority, so one accepted response schedules repeated long completions and drains the shared inference budget below any ingress rate limit."
+    },
+    {
+        "id": "GLS-DOAS-004",
+        "name": "Compressed-media decompression-bomb resource exhaustion",
+        "category": "denial_of_ai_service",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe)\b)(?=.*\b(?:audio|sound|opus|vorbis|mp3|media|transcription|transcribe)\b)(?=.*\b(?:compress(?:ed|ion)?|decode(?:r|d|s|ing)?|expand(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?)\b)(?=.*\b(?:pcm|float32|decoded output|materiali[sz]e|buffer|allocation|memory|ram)\b)(?=.*\b(?:unbounded|unlimited|without (?:a|any) (?:limit|cap)|amplif(?:y|ied|ication)|exhaust|out of memory|oom|crash|unavailable|denial[- ]of[- ]service)\b).*$""",
+        ],
+        "description": "A compressed audio upload passes the compressed-size check but forces the decoder to materialize an unbounded float32 PCM buffer (25MB OPUS to ~14.9GB), exhausting shared service memory and denying service."
+    },
+    {
+        "id": "GLS-MSR-004",
+        "name": "Cross-task multimodal retention disclosure \u2014 C20260723T173526_qaqu",
+        "category": "memory_state_replay",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|rejected|blocked|quarantined|safe|policy)\b)(?=.*\b(?:image[- ]derived|visual|vision|OCR|multimodal)\b)(?=.*\b(?:sensitive|private|personal|confidential)\b)(?=.*\b(?:retained|persist(?:ed|s)?|stored|memory)\b)(?=(?:.*\b(?:different|unrelated|later)\s+task\b|.*\bcross[- ]task\b))(?=.*\b(?:disclos|render|expos|retriev)\w*\b)(?=.*(?:\b(?:without|missing|lack\w*)\s+(?:(?:modality\s+)?provenance|modality|purpose|recipient|scope)(?:\s+binding)?\b|\bpurpose\s+is\s+not\s+checked\b|\bno\s+(?:recipient|modality|purpose|provenance)\s+binding\b)).*$""",
+        ],
+        "description": "Sensitive content extracted from an image is retained in multimodal memory and rendered into a later, unrelated task's output because the memory path carries no modality provenance, collection-purpose, recipient-scope, or expiry binding."
+    },
+    {
+        "id": "GLS-DOAS-005",
+        "name": "Unbounded unauthenticated upload storage exhaustion with absolute-path disclosure",
+        "category": "denial_of_ai_service",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe|defensive guidance)\b)(?=.*\b(?:upload|file transfer|multipart|attachment)\b)(?=.*\b(?:unauthenticated|anonymous|no auth|no authentication|without auth(?:entication)?|no token)\b)(?=.*\b(?:unbounded|unlimited|no quota|no size limit|no storage cap|no cap|arbitrary amount)\b)(?=.*\b(?:disk|storage|space|exhaust|full|resource exhaustion|denial[- ]of[- ]service)\b)(?=.*\b(?:absolute path|absolute file path|full path|server path|path disclosure|information leak)\b).*$""",
+        ],
+        "description": "An unauthenticated upload endpoint accepts unlimited attacker data with no cumulative storage quota, exhausting the shared filesystem while its success response discloses the absolute uploaded-file path that downstream agents then treat as operational evidence."
+    },
+    {
+        "id": "GLS-MMP-003",
+        "name": "Graph-correlated benign-like federated model-update poisoning",
+        "category": "mlops_metadata_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|research\s+summary|benchmark|unit\s+test|audit\s+report|security\s+policy|safe\s+aggregator|normal\s+federated|must\s+reject|reject(?:ed|s)?|quarantin(?:e|ed)|unchanged|independently\s+validat(?:e|ion)|no\s+attack)\b)(?=.*\b(?:federated|federated\s+fine[- ]tuning|federated\s+participant)\b)(?=.*\b(?:update|parameter\s+delta|gradient)\b)(?=.*\b(?:graph\s*[_ -]?similarity|graph[- ]correlated|benign[- ]like|feature\s+correlation)\b)(?=.*\b(?:malicious|poison(?:ed|ing)?|unsafe|refusal[_ -]?delta|steer(?:ed|ing)?\s+shared\s+model)\b)(?=.*\b(?:accept|aggregate|aggregation|shared\s+model|objective|completion\s+behavior)\b).*$""",
+        ],
+        "description": "A federated participant shapes a malicious parameter delta to look graph-correlated and benign-like so the aggregator's trust scoring accepts it, steering the shared model's refusal behavior."
+    },
+    {
+        "id": "GLS-UINJ-004",
+        "name": "GUI semantic overlay persistent grounding",
+        "category": "ui_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:benign|documentation|unit test|test fixture|incident report|postmortem|safe|reject|quarantine|no click|do not click|not an overlay|unrelated|normal dashboard|ordinary grounding)\b)(?=.*\b(?:screenshot|rendered view|ui canvas|viewport)\b)(?=.*\b(?:overlay|injected element|floating element|badge|button)\b)(?=.*\b(?:semantic(?:ally)? salient|recommended|continue|harmless|safety[- ]aligned|persistent attractor)\b)(?=.*\b(?:ground(?:ing)?|visual target|click target|select|click)\b).*$""",
+        ],
+        "description": "A harmless-looking injected screenshot overlay becomes a persistent semantic attractor that wins visual grounding and displaces the task-relevant click target, with no hostile instruction text for text-only defenses to see."
+    },
+    {
+        "id": "GLS-MMP-004",
+        "name": "C20260723T144142_claw_historical_scan_poisoning_lookahead_mtd.md",
+        "category": "mlops_metadata_poisoning",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:defensive|detector|unit\s+test|negative\s+fixture|postmortem|incident\s+report|blocked|quarantined|must\s+not|do\s+not|never|safe\s+example))(?=.*(?:historical\s+(?:(?:malicious[- ]?)?scan|reconnaissance)\s+(?:telemetry|log|window)|scan[- ]history|malicious[- ]scan\s+events|reconnaissance\s+telemetry))(?=.*(?:LSTM|look[- ]ahead|forecast|predic(?:t|tion)|ensemble))(?=.*(?:poison|inject|spoof|fabricat|manipulat|pollut|contaminat))(?=.*(?:mutation|moving[- ]target|IP[- ]shuffl|address\s+(?:rotation|reassignment)|reconfigure))(?=.*(?:actual\s+target|real\s+target|next\s+target|divert|misdirect|decoy|wrong\s+address|leave\s+exposed)).*$""",
+        ],
+        "description": "Fabricated events injected into an attacker-influenced historical scan-telemetry training window steer an LSTM look-ahead forecast, so the moving-target mutation controller rotates a decoy address and leaves the real next target exposed."
+    },
+    {
+        "id": "GLS-EE-003",
+        "name": "2026-07-17_hpaa_typographic_render_tokenization_mismatch_hardening.md",
+        "category": "encoding_evasion",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|benchmark|unit\s+test|negative\s+fixture|incident\s+report|must\s+not|does\s+not|do\s+not|without\s+(?:an?\s+)?(?:override|bypass)|safe\s+rendering|preserve\s+(?:dom|html)\s+provenance)\b)(?=.*\b(?:browser|rendered|html|css|visual|typograph|layout|accessibility|ui)\b)(?=.*(?:<\s*(?:span|div)|style\s*=|letter-spacing|display\s*:\s*(?:inline|flex)|aria[-\w]*\s*=))(?=.*\b(?:agent|assistant|model|security\s+review)\b)(?=.*(?:i(?:<[^>]{0,160}>)*g(?:<[^>]{0,160}>)*n(?:<[^>]{0,160}>)*o(?:<[^>]{0,160}>)*r(?:<[^>]{0,160}>)*e|b(?:<[^>]{0,160}>)*y(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*a(?:<[^>]{0,160}>)*s(?:<[^>]{0,160}>)*s|s(?:<[^>]{0,160}>)*u(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*r(?:<[^>]{0,160}>)*e(?:<[^>]{0,160}>)*s(?:<[^>]{0,160}>)*s))(?=.*\b(?:policy|guardrails?|safety|scanner|findings?|checks?)\b).*$""",
+        ],
+        "description": "Hostile agent-directed instructions are split across inline HTML/CSS spans so the raw token scan sees fragments while the rendered or accessibility projection reassembles a readable 'ignore guardrails / suppress findings' directive."
+    },
+    {
+        "id": "GLS-ALP-002",
+        "name": "Assessment scope/result rebinding",
+        "category": "attestation_lineage_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident|postmortem|defensive|must\s+not|do\s+not|never|reject|blocked|invalidate|reassess|fail[- ]?closed)\b)(?=.*\b(?:assessment|threat[- ]model|STRIDE[- ]?AI|security\s+scan)\b)(?=.*\b(?:scope|target|asset|system)\b)(?=.*\b(?:changed|change|modified|switched|reduced|narrowed|updated)\b)(?=.*\b(?:score|result|finding|attack[- ]success|report)\b)(?=.*\b(?:preserv|retain|keep|kept|reuse|carry|remain|carr)\w*\b)(?=.*\b(?:old|prior|previous|favorable|80\s*%|15\s*%)\b)(?=.*\b(?:approve|approval|clear|clearance|deploy|authorize|sign[- ]?off)\w*\b)(?=.*\b(?:without|no|skip|missing|unbound|unlinked)\b)(?=.*\b(?:reassess|rebind|verify|hash|provenance|integrity|fresh)\w*\b).*$""",
+        ],
+        "description": "A security/threat-model assessment result stays reusable after the assessed target scope changes, so a stale favorable score is consumed as clearance for a different (or reduced) system without rebinding or integrity verification."
+    },
+    {
+        "id": "GLS-ALP-003",
+        "name": "Post-Hoc Code Watermark Collision Provenance Laundering",
+        "category": "attestation_lineage_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training)|documentation|unit\s+test|test\s+fixture|blocked|must\s+not|do\s+not|reject(?:ed)?|quarantine)\b)(?=.*\b(?:post[- ]hoc|code|source)\s+(?:watermark|provenance)\b)(?=.*\b(?:variable\s+names?|semantically\s+equivalent|multi[- ]channel|keyed)\b)(?=.*\b(?:reproduc|collid|preserv|forge|clone|mimic)\w*\b)(?=.*\b(?:trusted|model[- ]origin|authorship|attribution)\b)(?=.*\b(?:accept|approve|bypass|skip|suppress|unsafe|malicious)\w*\b).*$""",
+        ],
+        "description": "An attacker preserves or reproduces a trusted model's post-hoc multi-channel code watermark through variable-name and semantically equivalent pattern choices while inserting unsafe code, laundering the watermark into trusted-origin authorship evidence."
+    },
+    {
+        "id": "GLS-ALP-005",
+        "name": "2026-07-23_proof_context_scope_laundering_C20260723T114302_azrollinaz.md",
+        "category": "attestation_lineage_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)(?=.*"proof_status"\s*:\s*"pass")(?=.*"environment_model"\s*:\s*"mocked[^\"]*")(?=.*"current_component"\s*:\s*"[^\"]+")(?=.*"downstream_action"\s*:\s*"treat as verified for current component[^\"]*")(?=.*"current_source_sha256"\s*:\s*"[^\"]+")""",
+        ],
+        "description": "A locally valid unit-proof PASS artifact is accepted as safety authorization for a different component, digest, or environment because scope, loop bounds, and environment model are never bound to the current verification target."
+    },
+    {
+        "id": "GLS-IP-003",
+        "name": "2026-07-15_audio_transcript_confidence_bypass.md",
+        "category": "indirect_prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:trusted|verified|safe|benign|documentation|unit\s+test|test\s+fixture|must\s+not|display_only)\b)(?=.*"asr_segments"\s*:\s*\[)(?=.*"confidence"\s*:\s*0\.[0-4]\d*)(?=.*"text"\s*:\s*"[^"\n]*(?:send|upload|forward|delete|execute)[^"\n]*")(?=.*"audible_summary"\s*:\s*"[^"]+")(?=.*"downstream_action"\s*:\s*"(?:send|upload|forward|delete|execute)[^"]*").*$""",
+        ],
+        "description": "A low-confidence ASR segment carrying an action verb, hidden behind a benign audible summary, is stripped of its confidence/provenance metadata and treated as executable action intent by the downstream voice agent."
+    },
+    {
+        "id": "GLS-PE-006",
+        "name": "configuration composition permission shadowing hardening",
+        "category": "privilege_escalation",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|defensive|documentation|test\s+fixture|simulation|must\s+not|deny|rejected|approval\s+required)\b)(?=.*\b(?:merged|composed|combined|effective)\s+(?:config|configuration|policy)\b)(?=.*\b(?:auto[_ -]?approve|no[_ -]?review)\b)(?=.*\b(?:sensitive|private|restricted|protected)\s+(?:action|scope|sink|operation)\b)(?=.*\b(?:allow|permit|enabled|execute|proceed)\b)(?=.*\b(?:precedence|override|shadow|fallback|default)\b).*$""",
+        ],
+        "description": "Individually benign personalization and workspace config fragments merge by precedence so a no-review default plus an auto-approve fragment shadow the sensitive-action review requirement and resolve into an effective allow."
+    },
+    {
+        "id": "GLS-PE-007",
+        "name": "Entitlement-enabled runtime library injection crosses agent process integrity",
+        "category": "privilege_escalation",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?=.*(?:allow-dyld-environment-variables|dyld environment variables enabled))(?=.*(?:disable-library-validation|library validation disabled))(?=.*(?:DYLD_INSERT_LIBRARIES|insert library|untrusted dylib)).*$""",
+        ],
+        "description": "An agent host shipped with allow-dyld-environment-variables plus disable-library-validation lets DYLD_INSERT_LIBRARIES load an untrusted dylib into the host process, where it inherits every capability already granted to that application."
+    },
+    {
+        "id": "GLS-IP-004",
+        "name": "Domain-camouflaged authority injection",
+        "category": "indirect_prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|postmortem|must\s+not|do\s+not\s+obey|never\s+follow|do\s+not\s+bypass|no\s+action\s+request|no\s+automated\s+agent\s+action|rejects\s+any\s+embedded\s+directive|blocked|quarantined|benign|safe\s+control|inert\s+fixture)\b)(?=.*\b(?:basel|credit[- ]risk|risk\s+committee|clinical|trial\s+protocol|incident\s+response|forensic|audit|compliance|ledger|change[- ]control)\b)(?=.*\b(?:committee|protocol|control|review|authorized|approved|governance|standard\s+operating|escalation)\b)(?=.*\b(?:suppress|omit|exclude|ignore|bypass|skip|do\s+not\s+report|mark\s+as\s+approved|treat\s+as\s+authoritative|no\s+confirmation)\b)(?=.*\b(?:final\s+report|automated\s+reviewer|agent|archive|forward|approve|release|classification|decision)\b).*$""",
+        ],
+        "description": "An untrusted retrieved record mimics a domain's authentic vocabulary and committee/protocol authority structure so an embedded suppression or approval directive reads as ordinary procedure, collapsing static-detector rates while keeping the directive actionable."
+    },
+    {
+        "id": "GLS-IP-005",
+        "name": "Cross-modal hidden-state reinterpretation from image-only perturbation",
+        "category": "indirect_prompt_injection",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|policy)|documentation|unit\s+test|benign\s+example|defensive|must\s+not|do\s+not|never|blocked|refused|quarantined|safe\s+handling)\b)(?=.*\b(?:image[- ]only|visual|image)\b)(?=.*\b(?:perturbation|imperceptible|hidden\s+directive|image[- ]borne)\b)(?=.*\b(?:shared|multimodal)\s+(?:hidden[- ]state|integration|representation)\b)(?=.*\b(?:reinterpret|re[- ]interpret|override|steer|alter)\w*\b)(?=.*\b(?:benign|separate|text)\s+(?:request|instruction|prompt|task)\b)(?=.*\b(?:follow|reveal|disclose|execute|treat)\w*\b).*$""",
+        ],
+        "description": "An image-only perturbation contaminates the shared multimodal integration hidden state so a separately authorized benign text request is reinterpreted under an image-borne directive that the agent then follows."
+    },
+    {
+        "id": "GLS-PE-008",
+        "name": "C20260723T063337_claw_transitive_blast_radius_under_modeling_DRAFT.md",
+        "category": "privilege_escalation",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|defensive|safe|denied|blocked|fail[- ]closed)\b)(?=.*\"edge\"\s*:\s*\"indirect\")(?=.*\"resolved\"\s*:\s*false)(?=.*\"source\"\s*:\s*\"(?:tool_output|resource_handle)\")(?=.*\"sink_scope\"\s*:\s*\"(?:privileged|external)\")(?=.*\"decision\"\s*:\s*\"(?:allow|authorize|execute)\")(?=.*\b(?:transitive|downstream|blast\s+radius)\b).*$""",
+        ],
+        "description": "An authorization policy that inventories only direct tool permissions authorizes an unresolved indirect tool-output/resource-handle edge that transitively reaches a privileged or external sink."
+    },
+    {
+        "id": "GLS-DKS-002",
+        "name": "2026-07-16_rubric_parser_duplicate_key_collision.md",
+        "category": "duplicate_key_shadowing",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|training lab|incident report|postmortem|defensive analysis|documentation|docs say|reject(?:ed|s)? duplicate|do not award|must not|expected result)\b)(?=.*\b(?:student[_ -]?answer|submission|student|answer)\b)(?=.*\b(?:json|yaml|serialized|serialization|parser|duplicate|repeated|last[- ]key|field)\b|\{\s*")(?=.*"([^"]+)"\s*:\s*"[^"]*"\s*,\s*"\1"\s*:)(?=.*\b(?:rubric|grading(?:[_ -]?policy)?|criterion|policy)\b)(?=.*\b(?:award|full[- ]credit|score\s*[:=]?\s*10|accept any|ignore (?:missing|errors?|proof|steps)|replace|override)\b).*$""",
+        ],
+        "description": "A student-controlled serialized answer repeats a rubric/policy key so a last-key-wins JSON/YAML parser resolves the attacker's later value as the active grading rule, awarding credit without changing the visible answer evidence."
+    },
+    {
+        "id": "GLS-CAI-717",
+        "name": "covert tool-trace steganography in peer-agent coordination",
+        "category": "cross_agent_injection",
+        "severity": "medium",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:defensive|security\s+(?:guide|test)|documentation|unit\s+test|negative\s+fixture|incident\s+report|runbook|must\s+not|do\s+not|never|inert|quarantined)\b)(?=.*\b(?:agent\s*[ab]|peer\s+agent|worker\s*[ab])\b)(?=.*\b(?:tool\s+(?:call|result|output)|search|browser|retrieval)\b)(?=.*\b(?:third|second|first|choice|ordering|selected|omitted|result\s+index|rank)\b)(?=.*\b(?:decode|encode|bit|signal|state|codebook|coordinate|correlat(?:ed|ion))\b).*$""",
+        ],
+        "description": "Cooperating agents encode shared state in ordinary tool-call selection, omission, ranking and result ordering, creating a covert inter-agent channel that plaintext-only monitoring cannot see."
+    },
+    {
+        "id": "GLS-DKS-003",
+        "name": "x402 duplicate-field metadata laundering",
+        "category": "duplicate_key_shadowing",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?six)^(?!.*(?:documentation|security test|benign fixture|must reject|never forward))(?=.*(?:x402|payment\s+(?:metadata|facilitator|request|parser)))(?=.*(?:duplicate|repeated)\s+(?:json\s+)?(?:field|key|member))(?=.*(?:sanitizer|redact|filter).*(?:first|one|sanitized))(?=.*(?:last|downstream|client|facilitator|parser).*(?:parse|consume|forward|send))(?=.*(?:session|bearer|authorization|credential)).*$""",
+        ],
+        "description": "A duplicate JSON member in x402 payment metadata makes the pre-execution PII sanitizer redact one view while the downstream payment client/facilitator serializes and forwards the other, leaking session/authorization material past a filter that reported clean."
+    },
 ]
