@@ -3,6 +3,23 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.4.9] — 2026-08-24
+
+PULSE Day 6, the final week-1 ship. 29 new patterns staged from the AZ gate (DAY16-DAY21) via
+the gate-stage-to-db intake: every regex re-proven against its own hostile fixtures, silent on
+benign fixtures and 0 hits across the 78-document real-world FP corpus. 18 gate cards were
+rejected at intake with written reasons (TP_MISS, REDOS_SUSPECT, CORPUS_FP, NO_HOSTILE_FIXTURE)
+and stay queued for repair.
+
+### Added
+- 29 patterns across 12 categories: attestation_lineage_poisoning (3), cross_agent_injection (1),
+  denial_of_ai_service (5, new category), duplicate_key_shadowing (2), encoding_evasion (1),
+  indirect_prompt_injection (3), memory_state_replay (2), mlops_metadata_poisoning (2),
+  privilege_escalation (3), provenance_chain (4), structured_metadata_poisoning (2),
+  ui_injection (1). IDs GLS-ALP-002 through GLS-UINJ-004.
+- Blog: "AI Agent Evidence Must Stay Bound to Its Source" — merged evidence page covering all 29.
+
+
 ## [0.4.8] — 2026-08-23
 
 PULSE Day 5. 28 new patterns staged from the AZ gate (DAY13-DAY15) via the gate-stage-to-db
