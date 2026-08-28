@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "FP-PROSE-EDIT-01",
+      "suite": "B",
+      "kind": "false_positive",
+      "class": "prose mention of a blocked path in an Edit/Write body",
+      "captured_at": "2026-08-28",
+      "source": "receipt",
+      "note": "Found by the firewall denying its own builders mid-task during dogfooding. Not synthetic.",
+      "tuned_from_pattern_ids": []
+    },
+    {
+      "id": "FP-PROSE-BASH-01",
+      "suite": "B",
+      "kind": "false_positive",
+      "class": "prose mention of a blocked path inside a Bash command argument",
+      "captured_at": "2026-08-28",
+      "source": "receipt",
+      "note": "Same family as FP-PROSE-EDIT-01, different carrier: the path appeared in a command string while building an unrelated JSON payload; nothing touched the file.",
+      "tuned_from_pattern_ids": []
+    }
+  ]
+}
