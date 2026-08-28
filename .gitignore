@@ -18,3 +18,8 @@ venv/
 incoming/
 sunglasses/patterns.py.pre-*
 sunglasses/*.bak
+
+# Gauntlet run artifacts are per-machine measurements, not source. The page
+# renders from the artifact the scheduled run produces; committing every
+# nightly JSON would bury the corpus changes that actually need review.
+gauntlet/runs/*.json
