@@ -29,12 +29,22 @@ All notable changes to Sunglasses are documented here.
   servers had been silently unpinned while `pin` printed a success line. `probe_server` now
   returns a named status; `list_tools_stdio` remains as the descriptors-only wrapper.
 
+- **Plugin-declared MCP servers are discovered and pinned.** Plugins ship real stdio servers and
+  we were blind to every one of them, for two boring reasons: their `.mcp.json` lives in the
+  plugin install directory, and it uses a flat `{"<name>": {...}}` shape with no `mcpServers`
+  wrapper — so a wrapper-only reader pointed straight at the file still returned nothing.
+  Discovery now reads the plugin install manifest (not the whole plugin cache, which also holds
+  checkouts the user does not run) and accepts both shapes. Servers are keyed the way the hook
+  will see them, `plugin_<plugin>_<server>`: pinning them under the bare server name would
+  produce a pins file that looks healthy and matches nothing at hook time.
+
 ### Known limits (stated plainly)
-- Pinning still reads **stdio servers declared in `~/.claude.json` / `.mcp.json` only**. Servers
-  provided by connectors, plugins or an extension are not merely unpinned — they are invisible to
-  discovery, and non-stdio transports cannot be read at all. On the author's machine that is 14
-  pinned tools against a live surface many times larger. Sizing this is the next piece of work;
-  the number above is published rather than rounded up.
+- Pinning reads **stdio servers only** — those declared in `~/.claude.json` / `.mcp.json` and
+  those shipped by installed plugins. **Non-stdio transports (HTTP/SSE) cannot be read yet**, and
+  servers provided by hosted connectors or a browser extension have no local command to spawn and
+  no durable descriptor store, so there is nothing to hash: they cannot be pinned at all. On the
+  author's machine that is 3 discoverable servers, one of which was down, against 5 live hosted
+  connectors plus an extension. We pin what we can read; this is exactly what we cannot.
 
 
 ## [0.4.9] — 2026-08-24

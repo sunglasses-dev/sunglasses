@@ -670,9 +670,12 @@ def _pin_run(args):
     from .firewall import (PROBE_EMPTY, PROBE_TIMEOUT, PROBE_UNREACHABLE,
                            PROBE_UNSUPPORTED, build_pin_state, build_pins,
                            default_config_paths, diff_pins, discover_mcp_servers,
-                           load_pins, sunglasses_home)
+                           discover_plugin_servers, load_pins, sunglasses_home)
 
-    servers = discover_mcp_servers(default_config_paths())
+    # Plugins first, config files second: a project's own `.mcp.json` should be
+    # able to override a plugin entry, matching how a developer expects a
+    # project-local override to behave.
+    servers = {**discover_plugin_servers(), **discover_mcp_servers(default_config_paths())}
     if not servers:
         print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
         return 0

@@ -562,3 +562,73 @@ def test_quiet_still_speaks_up_on_drift(tmp_path):
     assert proc.returncode == 1
     assert "drift" in proc.stdout.lower()
     assert json.loads((home / "pin_state.json").read_text())["drifted"]
+
+
+# ── plugin-declared servers (Aug-28) ────────────────────────────────────────
+# Plugins ship real stdio MCP servers, and we were blind to every one of them
+# for two boring reasons: their `.mcp.json` lives in the plugin install dir, and
+# it uses a FLAT `{"<name>": {...}}` shape with no `mcpServers` wrapper. A
+# wrapper-only reader pointed straight at the file still returned nothing.
+
+def test_discovery_accepts_the_flat_plugin_shape(tmp_path):
+    flat = tmp_path / "flat.mcp.json"
+    flat.write_text(json.dumps({"vision": {"command": "npx", "args": ["-y", "x@latest"]}}))
+    assert set(discover_mcp_servers([flat])) == {"vision"}
+
+
+def test_discovery_still_accepts_the_wrapped_shape(tmp_path):
+    wrapped = tmp_path / "wrapped.json"
+    wrapped.write_text(json.dumps({"mcpServers": {"alpha": {"type": "stdio", "command": "a"}}}))
+    assert set(discover_mcp_servers([wrapped])) == {"alpha"}
+
+
+def test_a_json_object_that_is_not_a_server_map_is_ignored(tmp_path):
+    """Shape tolerance must not turn every stray JSON file into 'servers'."""
+    junk = tmp_path / "junk.json"
+    junk.write_text(json.dumps({"name": "thing", "version": "1.0", "scripts": {}}))
+    assert discover_mcp_servers([junk]) == {}
+
+
+def test_plugin_servers_are_keyed_the_way_the_hook_will_see_them(tmp_path):
+    """The namespacing IS the feature. A plugin tool reaches the hook as
+    `mcp__plugin_<plugin>_<server>__<tool>`; pinning it under the bare server
+    name yields a pins file that looks healthy and matches nothing."""
+    from sunglasses.firewall import discover_plugin_servers
+    install = tmp_path / "cache" / "vision" / "1.0.0"
+    install.mkdir(parents=True)
+    (install / ".mcp.json").write_text(json.dumps(
+        {"video": {"command": "npx", "args": ["-y", "video@latest"]}}))
+    manifest = tmp_path / "installed_plugins.json"
+    manifest.write_text(json.dumps({"version": 2, "plugins": {
+        "vision-plugin@some-marketplace": [{"installPath": str(install)}]}}))
+
+    servers = discover_plugin_servers(manifest)
+    assert set(servers) == {"plugin_vision-plugin_video"}
+
+
+def test_plugin_discovery_reads_the_manifest_not_the_whole_cache(tmp_path):
+    """The cache also holds marketplace checkouts that are NOT installed.
+    Pinning a server the user does not run makes the coverage line lie the
+    other way."""
+    from sunglasses.firewall import discover_plugin_servers
+    installed = tmp_path / "cache" / "installed" / "1.0.0"
+    installed.mkdir(parents=True)
+    (installed / ".mcp.json").write_text(json.dumps({"live": {"command": "a"}}))
+    checkout = tmp_path / "marketplaces" / "not-installed"
+    checkout.mkdir(parents=True)
+    (checkout / ".mcp.json").write_text(json.dumps({"ghost": {"command": "b"}}))
+    manifest = tmp_path / "installed_plugins.json"
+    manifest.write_text(json.dumps({"plugins": {
+        "real@mkt": [{"installPath": str(installed)}]}}))
+
+    servers = discover_plugin_servers(manifest)
+    assert set(servers) == {"plugin_real_live"}
+    assert not any("ghost" in k for k in servers)
+
+
+def test_plugin_discovery_survives_a_missing_or_corrupt_manifest(tmp_path):
+    from sunglasses.firewall import discover_plugin_servers
+    assert discover_plugin_servers(tmp_path / "absent.json") == {}
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert discover_plugin_servers(bad) == {}
