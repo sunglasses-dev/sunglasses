@@ -428,6 +428,110 @@ def check_pin_by_name(tool_name: str, pins: dict) -> "Decision | None":
     )
 
 
+# ── Drift state: what the out-of-band check found, enforced at hook time ────
+# The hook cannot fetch a descriptor (no descriptor on stdin, and a `tools/list`
+# round-trip is ~1,000x the measured hook budget: p50 0.37ms over 429 receipts,
+# 2026-08-28). So detection happens out-of-band and leaves a verdict on disk;
+# the hook only READS it. That split is what lets a drifted tool be DENIED
+# without a single byte of network in the hot path.
+#
+# Why deny and not ask: measured on this machine 2026-08-28 — a hook `ask` for
+# an unpinned MCP tool did not surface to the user at all under their permission
+# mode; the call simply ran. An `ask` is advice the harness may decline to give.
+# A deny is honored. A rug-pull verdict that resolves to advice is decoration.
+
+PIN_STATE_MAX_AGE_S = 24 * 60 * 60
+
+
+def load_pin_state(path) -> "dict | None":
+    """Read pin_state.json. Absent = None (never checked). Corrupt = PolicyError.
+
+    Absent is NOT an error and must not block: a fresh install has no state yet,
+    and a firewall that denies every MCP tool on day one gets uninstalled before
+    it ever catches anything.
+    """
+    import json as _json
+    import pathlib as _pathlib
+    p = _pathlib.Path(path)
+    if not p.exists():
+        return None
+    try:
+        data = _json.loads(p.read_text())
+    except (ValueError, OSError) as exc:
+        raise PolicyError(f"pin state at {p} is unreadable: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("drifted", {}), dict):
+        raise PolicyError(f"pin state at {p} has an unexpected shape")
+    data.setdefault("drifted", {})
+    return data
+
+
+def pin_state_age_s(state: dict, now=None) -> "float | None":
+    """Seconds since the recorded check. None if unparseable — which callers must
+    treat as 'unknown', never as 'fresh'."""
+    import datetime as _dt
+    stamp = (state or {}).get("checked_at")
+    if not stamp:
+        return None
+    try:
+        when = _dt.datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return None
+    now = now or _dt.datetime.now(when.tzinfo)
+    return (now - when).total_seconds()
+
+
+def check_pin_drift(tool_name: str, state: dict) -> "Decision | None":
+    """Deny a tool whose descriptor changed since it was pinned.
+
+    Staleness deliberately does NOT block. An old state file means we do not
+    know, and denying on 'we do not know' is how a control earns a reputation
+    for crying wolf and gets switched off. Unknown is reported in the receipt
+    (`pin_state_stale`), where an auditor can see it, and nowhere else.
+    """
+    if not tool_name or not tool_name.startswith("mcp__") or not state:
+        return None
+    entry = (state.get("drifted") or {}).get(tool_name)
+    if not entry:
+        return None
+    # Hashes only. The changed descriptor is attacker-controlled prose; echoing
+    # it into the user's terminal would turn this very block into the injection.
+    pinned = str(entry.get("pinned", ""))[:12]
+    now_hash = str(entry.get("now", ""))[:12]
+    return Decision(
+        action="deny",
+        lane="deterministic",
+        rule_id="GLS-FW-PIN-DRIFT",
+        reason=(
+            f"SUNGLASSES firewall: blocked — '{tool_name}' changed since you pinned it "
+            f"(pinned sha256:{pinned}, now sha256:{now_hash}), found by "
+            f"`sunglasses pin --check` at {state.get('checked_at', 'an earlier run')}. "
+            f"The tool you approved is not the tool about to run. Review the server, "
+            f"then re-run `sunglasses pin` to accept the new descriptor."
+        ),
+    )
+
+
+def build_pin_state(previous: dict, current: dict, coverage=None) -> dict:
+    """The on-disk verdict `pin --check` leaves for the hook to enforce.
+
+    Records hashes and provenance only — same rule as pins.json, for the same
+    reason (this file is shareable and descriptor text is server-controlled).
+    """
+    drift = diff_pins(previous, current)
+    old = (previous or {}).get("tools", {})
+    new = (current or {}).get("tools", {})
+    return {
+        "checked_at": _now_iso(),
+        "drifted": {
+            name: {"pinned": old[name].get("sha256", ""),
+                   "now": new[name].get("sha256", "")}
+            for name in drift["changed"]
+        },
+        "checked_tools": len(new),
+        "coverage": coverage or (current or {}).get("coverage") or {},
+    }
+
+
 # ── Reading descriptors out-of-band (`sunglasses pin`) ──────────────────────
 # This half runs from the terminal, not the hook, so it may take seconds and may
 # talk to servers. Keeping it out of the hot path is what lets the hook stay at
@@ -436,13 +540,36 @@ def check_pin_by_name(tool_name: str, pins: dict) -> "Decision | None":
 _MCP_TIMEOUT = 10
 
 
-def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT) -> list:
-    """Speak MCP over stdio to one server and return its tool descriptors.
+# A server that answered with nothing is not the same fact as a server that has
+# no tools, and folding the two together is how a coverage hole hides. Every
+# probe outcome gets a name (2026-08-28): `sunglasses pin` prints them, and the
+# pin file records them so "we pinned 14 tools" can never again be read as
+# "14 tools is the whole surface".
+PROBE_OK = "ok"                                  # spoke MCP, got descriptors
+PROBE_EMPTY = "empty"                            # spoke MCP, server has no tools
+PROBE_UNREACHABLE = "unreachable"                # could not start / died / spoke nonsense
+PROBE_TIMEOUT = "timeout"                        # started, never finished the exchange
+PROBE_UNSUPPORTED = "unsupported_transport"      # not stdio — we cannot read it at all
 
-    Returns [] for anything that does not work — dead server, hang, non-stdio
-    transport, protocol surprise. Never raises: `sunglasses pin` across a dozen
-    servers must not die because one of them is broken, and an empty list is
-    reported honestly by the caller rather than guessed at.
+
+def probe_server(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT) -> dict:
+    """Speak MCP over stdio to one server. Returns {status, tools, detail}.
+
+    Never raises: `sunglasses pin` across a dozen servers must not die because
+    one of them is broken. But it no longer LIES BY OMISSION either — the four
+    ways of getting zero descriptors are four different facts, and the caller
+    needs them apart:
+
+      unsupported_transport  we cannot read this server AT ALL (http/sse). A
+                             permanent coverage gap, not a transient miss.
+      unreachable            the command would not start, or died mid-exchange.
+      timeout                started, never answered inside `timeout`.
+      empty                  answered honestly: this server exposes no tools.
+      ok                     descriptors in hand.
+
+    `detail` is drawn from a FIXED vocabulary — never server output and never an
+    exception message. A descriptor is attacker-controllable text and this
+    string gets printed to a terminal and written to a file the user may share.
     """
     import json as _json
     import os
@@ -452,7 +579,8 @@ def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT
     config = config or {}
     transport = config.get("type") or ("stdio" if config.get("command") else None)
     if transport != "stdio" or not config.get("command"):
-        return []
+        return {"status": PROBE_UNSUPPORTED, "tools": [],
+                "detail": f"transport={transport or 'unknown'}; only stdio can be read"}
 
     env = dict(os.environ)
     env.update({str(k): str(v) for k, v in (config.get("env") or {}).items()})
@@ -464,9 +592,11 @@ def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT
             text=True, env=env, cwd=config.get("cwd") or None,
         )
     except (OSError, ValueError):
-        return []
+        return {"status": PROBE_UNREACHABLE, "tools": [],
+                "detail": "command could not be started"}
 
     result: list = []
+    reached = {"initialize": False, "tools": False}
 
     def exchange():
         def send(message):
@@ -490,22 +620,47 @@ def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT
             "clientInfo": {"name": "sunglasses", "version": "0.4"}}})
         if await_id(1) is None:
             return
+        reached["initialize"] = True
         send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
         send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         response = await_id(2)
         if response:
+            reached["tools"] = True
             result.extend((response.get("result") or {}).get("tools") or [])
 
     worker = threading.Thread(target=exchange, daemon=True)
     worker.start()
     worker.join(timeout)
+    hung = worker.is_alive()
 
     try:
         proc.kill()
         proc.wait(timeout=2)
     except Exception:  # noqa: BLE001
         pass
-    return result if not worker.is_alive() else []
+
+    if hung:
+        return {"status": PROBE_TIMEOUT, "tools": [],
+                "detail": f"no answer within {timeout}s"}
+    if not reached["tools"]:
+        return {"status": PROBE_UNREACHABLE, "tools": [],
+                "detail": ("server closed before answering tools/list"
+                           if reached["initialize"] else
+                           "server never completed the MCP handshake")}
+    if not result:
+        return {"status": PROBE_EMPTY, "tools": [], "detail": "server exposes no tools"}
+    return {"status": PROBE_OK, "tools": result, "detail": ""}
+
+
+def list_tools_stdio(server_name: str, config: dict, timeout: int = _MCP_TIMEOUT) -> list:
+    """Descriptors only — the thin back-compat face of `probe_server`.
+
+    Kept because callers that genuinely only want the list should not have to
+    care about status. Anything reporting COVERAGE must use `probe_server`: a
+    bare [] here is exactly the ambiguity that hid a dead server behind a clean
+    'pinned successfully' for three weeks.
+    """
+    return probe_server(server_name, config, timeout)["tools"]
 
 
 def default_config_paths(cwd=None) -> list:
@@ -545,10 +700,18 @@ def build_pins(servers: dict, _lister=None) -> dict:
     file users may reasonably share or commit, where `env` secrets and tool
     prose have no business being.
     """
-    lister = _lister or list_tools_stdio
     tools: dict = {}
+    coverage: dict = {}
     for server_name, config in (servers or {}).items():
-        for descriptor in lister(server_name, config):
+        if _lister is not None:                      # test seam: descriptors only
+            descriptors = _lister(server_name, config)
+            status = PROBE_OK if descriptors else PROBE_EMPTY
+            detail = ""
+        else:
+            probe = probe_server(server_name, config)
+            descriptors, status, detail = probe["tools"], probe["status"], probe["detail"]
+        pinned = 0
+        for descriptor in descriptors:
             name = descriptor.get("name")
             if not name:
                 continue
@@ -557,7 +720,13 @@ def build_pins(servers: dict, _lister=None) -> dict:
                 "server": server_name,
                 "pinned_at": _now_iso(),
             }
-    return {"tools": tools}
+            pinned += 1
+        # Coverage is recorded even (especially) when it is zero. "We pinned 14
+        # tools" is only meaningful next to "and these servers we could not read
+        # at all" — without this line a dead server is indistinguishable from a
+        # clean one, which is how graphify-brain sat unpinned and unnoticed.
+        coverage[server_name] = {"status": status, "pinned": pinned, "detail": detail}
+    return {"tools": tools, "coverage": coverage}
 
 
 def diff_pins(before: dict, after: dict) -> dict:
@@ -833,6 +1002,30 @@ def evaluate(payload: dict, home=None) -> "tuple":
         # keeps the blind spot visible to anyone auditing these receipts later,
         # instead of letting "no finding" read as "compared and matched".
         extras["pin_source"] = "pin_file"
+
+        # Drift verdict FIRST. `pin --check` did the descriptor comparison
+        # out-of-band and left the answer on disk; reading it costs one small
+        # file read and upgrades this lane from "is it pinned at all" to a real
+        # hash comparison — the blind spot the docstring above admits to.
+        try:
+            state = load_pin_state(home / "pin_state.json")
+        except PolicyError as exc:
+            errors.append(str(exc))
+        else:
+            if state:
+                age = pin_state_age_s(state)
+                extras["pin_source"] = "pin_state"
+                extras["pin_checked_at"] = state.get("checked_at")
+                extras["pin_state_age_s"] = None if age is None else round(age, 1)
+                # Stale or unknown-age state is REPORTED, never enforced: we do
+                # not know, and denying on not-knowing is how a control gets
+                # turned off. The receipt carries the doubt instead.
+                if age is None or age > PIN_STATE_MAX_AGE_S:
+                    extras["pin_state_stale"] = True
+                decision = check_pin_drift(tool_name, state)
+                if decision is not None:
+                    return decision, confession(), extras
+
         try:
             pins = load_pins(home / "pins.json")
         except PolicyError as exc:

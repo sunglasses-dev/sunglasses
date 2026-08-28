@@ -3,6 +3,40 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Added
+- **MCP descriptor drift is now enforced, not just reported.** `sunglasses pin --check` writes
+  its verdict to `~/.sunglasses/pin_state.json`; the hook reads that file and **denies** a tool
+  whose descriptor changed since you pinned it (`GLS-FW-PIN-DRIFT`). Detection stays out-of-band
+  — the hook still makes zero network calls, and the measured hook cost is p50 0.37ms / p99 7ms
+  across 429 real receipts, against ~10-1,000ms for an MCP `tools/list` round-trip.
+  The lane escalates to `deny` rather than `ask` because an `ask` is advice the harness may
+  decline to surface: measured 2026-08-28, a TOFU `ask` for an unpinned MCP tool never reached
+  the user under their permission mode and the call simply ran. A rug-pull verdict that resolves
+  to advice is decoration.
+- `sunglasses pin --quiet` — silent on a clean run, speaks up on drift. For the two unattended
+  callers: a launchd timer, or a Claude Code `SessionStart` hook.
+- **`sunglasses pin` now names what it could NOT read.** Each server reports one of `ok`,
+  `empty`, `unreachable`, `timeout`, `unsupported_transport`, and the run prints a coverage line
+  (`Coverage: 1/2 server(s) read`). Pin coverage is recorded in the pin file too.
+
+### Fixed
+- **A server we could not reach no longer looks identical to a server with no tools.**
+  `list_tools_stdio` returned a bare `[]` for four different facts — dead process, non-stdio
+  transport, timeout, and genuinely-empty — and `build_pins` folded all four into "pinned
+  nothing". Found by dogfooding on the author's own machine, where one of two configured MCP
+  servers had been silently unpinned while `pin` printed a success line. `probe_server` now
+  returns a named status; `list_tools_stdio` remains as the descriptors-only wrapper.
+
+### Known limits (stated plainly)
+- Pinning still reads **stdio servers declared in `~/.claude.json` / `.mcp.json` only**. Servers
+  provided by connectors, plugins or an extension are not merely unpinned — they are invisible to
+  discovery, and non-stdio transports cannot be read at all. On the author's machine that is 14
+  pinned tools against a live surface many times larger. Sizing this is the next piece of work;
+  the number above is published rather than rounded up.
+
+
 ## [0.4.9] — 2026-08-24
 
 PULSE Day 6, the final week-1 ship. 29 new patterns staged from the AZ gate (DAY16-DAY21) via

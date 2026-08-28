@@ -644,10 +644,33 @@ def cmd_pin(args):
     Runs from the terminal, never from the hook: it spawns MCP servers and waits
     on them, which is seconds of work and the opposite of the hook's <100ms
     offline budget. `--check` is the half that actually catches a rug-pull.
+
+    `--quiet` exists for the two unattended callers (a launchd timer, a
+    SessionStart hook). Their whole job is to refresh the drift state on disk,
+    and a wall of terminal output injected into a session start is noise that
+    gets the hook removed. Quiet still SPEAKS UP on drift — silence is for
+    "nothing changed", never for "something did".
     """
+    if getattr(args, "quiet", False):
+        import contextlib as _contextlib
+        import io as _io
+        buffer = _io.StringIO()
+        with _contextlib.redirect_stdout(buffer):
+            code = _pin_run(args)
+        if code != 0:
+            print("SUNGLASSES: MCP tool descriptor drift detected — "
+                  "`sunglasses pin --check` for detail. Affected tools are blocked "
+                  "until you re-run `sunglasses pin`.")
+        return code
+    return _pin_run(args)
+
+
+def _pin_run(args):
     import json as _json
-    from .firewall import (build_pins, default_config_paths, diff_pins,
-                           discover_mcp_servers, load_pins, sunglasses_home)
+    from .firewall import (PROBE_EMPTY, PROBE_TIMEOUT, PROBE_UNREACHABLE,
+                           PROBE_UNSUPPORTED, build_pin_state, build_pins,
+                           default_config_paths, diff_pins, discover_mcp_servers,
+                           load_pins, sunglasses_home)
 
     servers = discover_mcp_servers(default_config_paths())
     if not servers:
@@ -659,13 +682,30 @@ def cmd_pin(args):
     current = build_pins(servers)
     pins_path = sunglasses_home() / "pins.json"
 
-    # Report servers that answered with nothing. Silence here would look
-    # identical to "this server has no tools", and a server we failed to reach
-    # is a gap in coverage, not a clean result.
-    answered = {entry["server"] for entry in current["tools"].values()}
-    for name in sorted(set(servers) - answered):
-        print(f"  {YELLOW}!{RESET} {name}: no descriptors returned "
-              f"{DIM}(not running, not stdio, or timed out) — NOT pinned{RESET}")
+    # Report coverage per server, by NAMED outcome. "No descriptors returned"
+    # used to cover four different facts at once; a server we cannot read at all
+    # (http/sse) is a permanent hole, a server that was merely asleep is not, and
+    # the user needs to act differently on each. Aug-28: this is the line that
+    # would have shown graphify-brain sitting unpinned for weeks.
+    coverage = current.get("coverage") or {}
+    unreadable = [n for n, c in coverage.items() if c["status"] == PROBE_UNSUPPORTED]
+    missed = [n for n, c in coverage.items()
+              if c["status"] in (PROBE_UNREACHABLE, PROBE_TIMEOUT)]
+    empty = [n for n, c in coverage.items() if c["status"] == PROBE_EMPTY]
+
+    for name in sorted(unreadable):
+        print(f"  {RED}✗{RESET} {name}: {BOLD}cannot be pinned{RESET} "
+              f"{DIM}({coverage[name]['detail']}) — permanent coverage gap{RESET}")
+    for name in sorted(missed):
+        print(f"  {YELLOW}!{RESET} {name}: not reached this run "
+              f"{DIM}({coverage[name]['detail']}) — NOT pinned{RESET}")
+    for name in sorted(empty):
+        print(f"  {DIM}·  {name}: answered, exposes no tools{RESET}")
+
+    if unreadable or missed:
+        covered = len(coverage) - len(unreadable) - len(missed)
+        print(f"\n  {BOLD}Coverage: {covered}/{len(coverage)} server(s) read.{RESET} "
+              f"{DIM}Pins protect what was read — nothing else.{RESET}")
 
     if getattr(args, "check", False):
         try:
@@ -688,11 +728,22 @@ def cmd_pin(args):
             print(f"     {DIM}pinned {previous['tools'][name]['sha256'][:12]} "
                   f"-> now {current['tools'][name]['sha256'][:12]}{RESET}")
 
+        # Leave the verdict on disk for the hook to ENFORCE. This is the half
+        # that makes `--check` more than a report: the hook cannot fetch a
+        # descriptor (~1,000x its measured budget), so detection out here plus
+        # enforcement in there is the only shape that both works and stays fast.
+        state_path = pins_path.parent / "pin_state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(_json.dumps(
+            build_pin_state(previous, current), indent=2) + "\n")
+
         if drift["changed"]:
             print(f"\n  {RED}{BOLD}{len(drift['changed'])} tool descriptor(s) "
                   f"changed since you pinned them.{RESET}")
             print(f"  {DIM}The tool you approved is not the tool that will run. Review "
-                  f"the server, then re-run `sunglasses pin` to accept.{RESET}\n")
+                  f"the server, then re-run `sunglasses pin` to accept.{RESET}")
+            print(f"  {RED}Until you do, the firewall BLOCKS these tools.{RESET} "
+                  f"{DIM}-> {state_path}{RESET}\n")
             return 1
         print(f"\n  {GREEN}{BOLD}No descriptor drift.{RESET} "
               f"{DIM}{len(previous['tools'])} pinned.{RESET}\n")
@@ -700,6 +751,11 @@ def cmd_pin(args):
 
     pins_path.parent.mkdir(parents=True, exist_ok=True)
     pins_path.write_text(_json.dumps(current, indent=2) + "\n")
+    # Pinning IS acceptance, so the drift verdict resets with it. Without this a
+    # tool the user deliberately re-pinned would stay blocked by a stale deny —
+    # the fastest possible way to teach someone to disable the firewall.
+    (pins_path.parent / "pin_state.json").write_text(_json.dumps(
+        build_pin_state(current, current), indent=2) + "\n")
     print(f"\n  {GREEN}{BOLD}Pinned {len(current['tools'])} tool descriptor(s){RESET} "
           f"{DIM}-> {pins_path}{RESET}")
     print(f"  {DIM}Run `sunglasses pin --check` to detect changes later.{RESET}\n")
@@ -1014,6 +1070,10 @@ def main():
     pin_parser.add_argument(
         "--check", action="store_true",
         help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")
+    pin_parser.add_argument(
+        "--quiet", action="store_true",
+        help="Print nothing unless drift is found. For launchd timers and "
+             "SessionStart hooks; the exit code still carries the verdict.")
     pin_parser.set_defaults(func=cmd_pin)
 
     # init
