@@ -672,9 +672,27 @@ def default_config_paths(cwd=None) -> list:
     return [pathlib.Path.home() / ".claude.json", cwd / ".mcp.json"]
 
 
+def _looks_like_server_map(data) -> bool:
+    """A bare `{"<name>": {...}}` map of server configs, with no `mcpServers`
+    wrapper. Plugins ship their `.mcp.json` in exactly that shape, which is why
+    a wrapper-only reader found zero plugin servers while their tools were
+    live in the session (measured 2026-08-28)."""
+    if not isinstance(data, dict) or not data or "mcpServers" in data:
+        return False
+    return all(
+        isinstance(cfg, dict) and ("command" in cfg or "type" in cfg or "url" in cfg)
+        for cfg in data.values()
+    )
+
+
 def discover_mcp_servers(paths) -> dict:
-    """Collect `mcpServers` blocks from config files. Unreadable files are
-    skipped, not fatal: one malformed config must not hide every other server."""
+    """Collect server declarations from config files. Unreadable files are
+    skipped, not fatal: one malformed config must not hide every other server.
+
+    Accepts BOTH shapes — `{"mcpServers": {...}}` and the bare `{"<name>": {...}}`
+    that plugin `.mcp.json` files use. Requiring the wrapper was a silent
+    coverage hole, not a validation win.
+    """
     import json as _json
     import pathlib
     servers: dict = {}
@@ -688,6 +706,55 @@ def discover_mcp_servers(paths) -> dict:
             continue
         if isinstance(data, dict) and isinstance(data.get("mcpServers"), dict):
             servers.update(data["mcpServers"])
+        elif _looks_like_server_map(data):
+            servers.update(data)
+    return servers
+
+
+def plugin_mcp_paths(installed_plugins_path=None) -> list:
+    """Every installed plugin's `.mcp.json`, from the install manifest.
+
+    Read from the manifest rather than globbing the plugin cache on purpose: the
+    cache also holds marketplace checkouts that are NOT installed, and pinning a
+    server the user does not actually run is noise that makes the coverage line
+    lie in the other direction.
+    """
+    import json as _json
+    import pathlib
+    path = pathlib.Path(installed_plugins_path or
+                        (pathlib.Path.home() / ".claude/plugins/installed_plugins.json"))
+    if not path.exists():
+        return []
+    try:
+        data = _json.loads(path.read_text())
+    except (ValueError, OSError):
+        return []
+    out = []
+    for plugin_id, entries in (data.get("plugins") or {}).items():
+        plugin_name = str(plugin_id).split("@", 1)[0]
+        for entry in entries if isinstance(entries, list) else []:
+            install = (entry or {}).get("installPath")
+            if not install:
+                continue
+            candidate = pathlib.Path(install) / ".mcp.json"
+            if candidate.exists():
+                out.append((plugin_name, candidate))
+    return out
+
+
+def discover_plugin_servers(installed_plugins_path=None) -> dict:
+    """Plugin-declared MCP servers, keyed the way the HOOK will see them.
+
+    The namespacing is the whole point. A plugin server's tools arrive at the
+    hook as `mcp__plugin_<plugin>_<server>__<tool>` (verified against a live
+    session, 2026-08-28). Pinning them under the bare server name would produce
+    a pins file that looks healthy and matches NOTHING at hook time — coverage
+    theatre, which is worse than the gap it appears to close.
+    """
+    servers: dict = {}
+    for plugin_name, path in plugin_mcp_paths(installed_plugins_path):
+        for name, config in discover_mcp_servers([path]).items():
+            servers[f"plugin_{plugin_name}_{name}"] = config
     return servers
 
 
