@@ -38,6 +38,15 @@ All notable changes to Sunglasses are documented here.
   will see them, `plugin_<plugin>_<server>`: pinning them under the bare server name would
   produce a pins file that looks healthy and matches nothing at hook time.
 
+- **Gauntlet suite A is live** — credential-exfil shapes driven through the firewall over stdin,
+  with two CONTROL cases (an ordinary outbound call, and a local write of credential-shaped
+  material) so the suite can tell "the right things are blocked" from "everything is blocked".
+  Fixtures live in `gauntlet/corpus/suite_a.json` and only there; a miss records `case_id` and
+  `class`, never the payload. Notably, **no entry was added to `KNOWN_PUBLIC_CANARIES`** — that
+  list exempts a literal credential for every user of this package, permanently, and buying a
+  global exemption to solve a local authoring problem is the wrong trade. It stays reserved for
+  genuinely published third-party revoked fixtures.
+
 ### Known limits (stated plainly)
 - Pinning reads **stdio servers only** — those declared in `~/.claude.json` / `.mcp.json` and
   those shipped by installed plugins. **Non-stdio transports (HTTP/SSE) cannot be read yet**, and

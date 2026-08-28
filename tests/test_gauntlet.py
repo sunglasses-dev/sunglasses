@@ -97,13 +97,12 @@ def test_a_failed_run_still_writes_an_artifact(tmp_path, monkeypatch):
     assert artifact["run"]["finished_at"]
 
 
-def test_a_suite_that_did_not_run_says_so_instead_of_scoring_zero():
-    """0 blocked / 0 delivered reads as 'nothing got through'. That is the exact
-    lie this page exists to avoid."""
-    suite = gauntlet.suite_a_exfil()
-    assert suite["status"] == "not_run"
-    assert suite["reason"]
-    assert suite["corpus_n"] == 0
+# The original version of this test asserted suite A was permanently `not_run`,
+# which was true while it was a stub and became a lie the day it was built. The
+# contract it protected — a suite that cannot run says so rather than scoring a
+# clean 0/0, because 0 blocked / 0 delivered reads as "nothing got through" —
+# now lives in test_suite_a_reports_not_run_when_its_corpus_is_missing, which
+# tests the behaviour instead of the stub.
 
 
 # ── freeze: where "held-out" stops being a promise ──────────────────────────
@@ -156,3 +155,50 @@ def test_a_frozen_corpus_is_immutable(tmp_path, monkeypatch):
 
     assert gauntlet.cmd_freeze(Args()) == 0
     assert gauntlet.cmd_freeze(Args()) == 1, "a second freeze must refuse"
+
+
+# ── suite A: exfil shapes at the firewall (built 2026-08-28) ────────────────
+# The fixtures live in gauntlet/corpus/suite_a.json and nowhere else. These
+# tests assert the two things that make the suite meaningful rather than
+# decorative: that a real credential shape is DENIED, and that ordinary work is
+# NOT — a suite that only ever asserts deny cannot tell "the right things are
+# blocked" from "everything is blocked".
+
+def test_suite_a_blocks_every_exfil_shape_and_passes_both_controls():
+    suite = gauntlet.suite_a_exfil()
+    assert suite["status"] == "ok"
+    assert suite["corpus_n"] >= 5, "the attack corpus should not silently shrink"
+    assert suite["delivered"] == 0, f"credential material got out: {suite['misses']}"
+    assert suite["controls_passed"] == suite["controls_n"], \
+        f"a control was denied — that is a false positive, not a leak: {suite['misses']}"
+
+
+def test_suite_a_fixtures_never_reach_the_artifact():
+    """A miss records case_id and class. The payload stays in the corpus file:
+    a miss is an unpatched hole, and publishing its text is a cookbook entry."""
+    artifact = {"suites": {"A_exfil": gauntlet.suite_a_exfil()}}
+    assert gauntlet.assert_publishable(artifact) == []
+
+
+def test_suite_a_reports_not_run_when_its_corpus_is_missing(tmp_path, monkeypatch):
+    """Missing fixtures must say so rather than score a clean 0/0."""
+    monkeypatch.setattr(gauntlet, "CORPUS", str(tmp_path))
+    suite = gauntlet.suite_a_exfil()
+    assert suite["status"] == "not_run"
+    assert suite["corpus_n"] == 0
+
+
+def test_the_local_write_control_is_the_one_that_unblocked_this_suite():
+    """Locks in the rule that made suite A buildable at all: a local write of
+    credential-shaped material is not exfiltration, so authoring fixtures on a
+    machine running our own firewall is possible. If this control ever starts
+    being denied, the corpus becomes unmaintainable and someone will reach for
+    a canary exemption instead — which is the trade we deliberately refused."""
+    import json as _json
+    import os as _os
+    from sunglasses.firewall import find_secret_material, is_egress_tool
+    cases = _json.load(open(_os.path.join(gauntlet.CORPUS, "suite_a.json")))["cases"]
+    local = next(c for c in cases if c["id"] == "A-CONTROL-LOCAL-01")
+    assert is_egress_tool(local["tool_name"], local["tool_input"]) is False
+    assert find_secret_material(_json.dumps(local["tool_input"])), \
+        "the control is worthless unless the material in it is genuinely detectable"
