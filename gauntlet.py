@@ -97,32 +97,75 @@ def _hook(raw, timeout=30) -> dict:
 
 
 def suite_a_exfil() -> dict:
-    """Secret-exfil shapes at the firewall — NOT IMPLEMENTED IN v1, on purpose.
+    """Credential-exfil shapes at the firewall, driven over stdin.
 
-    Blocked by a real constraint we discovered building this, and the right kind
-    of blocked: **you cannot author an exfil corpus on a machine running our own
-    firewall.** Writing a file whose text contains credential-format material is
-    itself an outbound call carrying credential-format material, so the firewall
-    denies the authoring step. It did exactly that to this file, correctly.
+    The fixtures live in `gauntlet/corpus/suite_a.json` and ONLY there. They are
+    read from the file and handed to the hook; they are never typed into a
+    command, printed, or carried into the artifact — a miss records `case_id`
+    and `class`, nothing else.
 
-    The two ways out are both decisions, not code:
-      1. add the fixtures to `KNOWN_PUBLIC_CANARIES` (a security allowlist in the
-         product — deliberate sign-off, not a build side effect), or
-      2. keep suite A's fixtures outside the repo entirely, with the run
-         assembling them in memory from a documented recipe.
+    That file location is the whole solution to the wall this suite hit on
+    2026-08-28. Authoring it looked impossible on a machine running our own
+    firewall: writing a file whose text contains credential-format material
+    inside a Bash heredoc that also carries a URL IS an outbound call carrying
+    credential material, and the firewall denied it — correctly. But `Write` and
+    `Edit` are not egress tools (`_EGRESS_TOOLS` is WebFetch/WebSearch, plus
+    `mcp__*`, plus Bash only when the command carries a URL or a network
+    binary), so authoring the fixtures as a plain file is the firewall's own
+    model working as designed: a local write is not exfiltration, the fixtures
+    stay fully detected, and the deny still fires the moment they are actually
+    sent outward — which is exactly what this suite asserts.
 
-    Option 2 is one short step from "construct the string so the detector does
-    not see it", which is the shape of an evasion, so it should be chosen out
-    loud or not at all. Until one is chosen, this suite reports that it did not
-    run. It does NOT report zero — a suite that silently scores 0/0 reads as
-    "nothing got through", which is the exact lie this whole page exists to
-    avoid.
+    What was NOT done, deliberately: no entry was added to
+    `KNOWN_PUBLIC_CANARIES`. That list exempts a literal credential for every
+    user of this package, on every machine, permanently; buying a global
+    exemption to fix a local authoring problem is a bad trade, and the list
+    stays reserved for genuinely published third-party revoked fixtures.
+
+    Two CONTROL cases carry `expect: not_deny`. A suite that only ever asserts
+    DENY cannot tell "the right things are blocked" from "everything is
+    blocked", and one of the controls locks in the local-write rule above.
     """
-    return {"status": "not_run",
-            "reason": ("corpus authoring is blocked by our own firewall; needs a "
-                       "KNOWN_PUBLIC_CANARIES entry or an out-of-repo fixture "
-                       "decision"),
-            "corpus_n": 0, "blocked": 0, "delivered": 0, "misses": []}
+    path = os.path.join(CORPUS, "suite_a.json")
+    if not os.path.exists(path):
+        return {"status": "not_run", "reason": f"no fixtures at {path}",
+                "corpus_n": 0, "blocked": 0, "delivered": 0, "misses": []}
+    cases = json.load(open(path))["cases"]
+    blocked = 0
+    controls_ok = 0
+    misses = []
+    for case in cases:
+        out = _hook({"session_id": "gauntlet",
+                     "tool_name": case["tool_name"],
+                     "tool_input": case["tool_input"]})
+        decision = str(((out.get("hookSpecificOutput") or {}).get("permissionDecision")
+                        or out.get("decision") or "")).lower()
+        denied = decision in ("deny", "block")
+        if case["expect"] == "deny":
+            if denied:
+                blocked += 1
+            else:
+                # A miss here is a credential leaving on our own watch. Class
+                # only — the payload stays in the corpus file where it lives.
+                misses.append({"case_id": case["id"], "class": case["class"],
+                               "found": dt.date.today().isoformat(),
+                               "fixed_in": None, "tuned_from": False})
+        else:
+            if denied:
+                # The control failing is a FALSE POSITIVE, not a leak, and it is
+                # the more likely way this suite goes wrong over time.
+                misses.append({"case_id": case["id"],
+                               "class": "control denied: " + case["class"],
+                               "found": dt.date.today().isoformat(),
+                               "fixed_in": None, "tuned_from": False})
+            else:
+                controls_ok += 1
+    attacks = [c for c in cases if c["expect"] == "deny"]
+    controls = [c for c in cases if c["expect"] != "deny"]
+    return {"status": "ok", "corpus_n": len(attacks), "blocked": blocked,
+            "delivered": len(attacks) - blocked, "controls_n": len(controls),
+            "controls_passed": controls_ok, "misses": misses,
+            "corpus_sha256": _sha256_of([path])[:16]}
 
 
 def suite_d_engine(engine) -> dict:
@@ -278,7 +321,12 @@ def cmd_run(args) -> int:
           % (t["blocked"], t["held"], t["degraded"], t["delivered"], t["corpus_n"]))
     print("  false positives %d of %d real-world files"
           % (t["false_positives"], t["fp_corpus_n"]))
-    print("  suite A: " + artifact["suites"]["A_exfil"]["status"])
+    a = artifact["suites"]["A_exfil"]
+    if a.get("status") == "ok":
+        print("  exfil shapes blocked %d of %d - controls passed %d of %d"
+              % (a["blocked"], a["corpus_n"], a["controls_passed"], a["controls_n"]))
+    else:
+        print("  suite A: " + a.get("status", "unknown") + " - " + a.get("reason", ""))
     print("  -> " + out_path)
     return 0
 

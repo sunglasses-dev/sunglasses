@@ -22,4 +22,8 @@ sunglasses/*.bak
 # Gauntlet run artifacts are per-machine measurements, not source. The page
 # renders from the artifact the scheduled run produces; committing every
 # nightly JSON would bury the corpus changes that actually need review.
-gauntlet/runs/*.json
+gauntlet/runs/
+# (was gauntlet/runs/*.json — the nightly launchd job also writes
+# launchd.out/launchd.err there, which left the repo permanently dirty
+# after the first scheduled run. A dirty tree is how a real change gets
+# lost in the noise.)
