@@ -79,6 +79,73 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def _git_branch() -> str:
+    """The sha alone does not say WHICH tree produced a number: a branch and
+    main can sit on the same commit, and only one of them is a release."""
+    try:
+        out = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=HERE,
+                             capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() or "unknown"
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def _git_dirty():
+    """An artifact from a modified working copy is indistinguishable from a
+    clean one at the same sha unless the run says so itself. None = unknown,
+    which is not the same claim as False."""
+    try:
+        out = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode != 0:
+            return None
+        return bool(out.stdout.strip())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _prior_artifact() -> dict:
+    """The most recent COMPLETED artifact, or {} if there is none.
+
+    Completed-only on purpose: a failed run writes an artifact with no suites,
+    and carrying dates forward from it would silently re-stamp every open miss
+    as found-today - the exact lie this function exists to stop.
+
+    Today's own file counts as prior when it already exists: a second run on the
+    same day must keep the dates the first one carried, not reset them.
+    """
+    for path in sorted(glob.glob(os.path.join(RUNS, "*.json")), reverse=True):
+        try:
+            prior = json.load(open(path))
+        except (ValueError, OSError):
+            continue
+        if prior.get("run", {}).get("completed") is True:
+            return prior
+    return {}
+
+
+def _carry_forward_found(artifact: dict, prior: dict) -> None:
+    """A miss that is still open keeps the date it was FIRST seen.
+
+    Re-stamping `found` on every run makes an old, unfixed miss read as
+    "found today, not yet fixed" forever - which is the flattering version by
+    accident, and it destroys the only thing the miss table proves: how long we
+    sat on it. A case that was NOT a miss in the prior run is a new find (or a
+    regression) and is stamped today, deliberately.
+
+    Keyed by (suite, case_id): the suites are separate namespaces and an id
+    collision across them must not hand one suite the other's history.
+    """
+    for suite_name, suite in (artifact.get("suites") or {}).items():
+        was = {miss.get("case_id"): miss.get("found")
+               for miss in (prior.get("suites", {}).get(suite_name, {})
+                            .get("misses") or [])
+               if miss.get("found")}
+        for miss in suite.get("misses") or []:
+            if miss.get("case_id") in was:
+                miss["found"] = was[miss["case_id"]]
+
+
 def _hook(raw, timeout=30) -> dict:
     """Drive the firewall the way Claude Code does: subprocess, JSON on stdin.
 
@@ -278,6 +345,9 @@ def cmd_run(args) -> int:
     }
     out_path = args.out or os.path.join(RUNS, dt.date.today().isoformat() + ".json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    # Read before anything is written: this run's own artifact overwrites
+    # today's file, and reading after that would compare us against ourselves.
+    prior = _prior_artifact()
 
     def write():
         # Written on EVERY exit path, failure included. A run that dies without
@@ -293,11 +363,16 @@ def cmd_run(args) -> int:
         from sunglasses.engine import SunglassesEngine
         engine = SunglassesEngine()
         artifact["versions"] = {"scanner": __version__, "git": _git_sha(),
+                                "branch": _git_branch(), "dirty": _git_dirty(),
                                 "corpus_release": args.release or "unfrozen"}
         artifact["suites"]["D_engine"] = suite_d_engine(engine)
         artifact["suites"]["B_false_positives"] = suite_b_false_positives(engine)
         artifact["suites"]["A_exfil"] = suite_a_exfil()
         artifact["suites"]["C_malformed"] = suite_c_malformed()
+        # Every suite stamps found=today as it runs; this is the one place that
+        # knows what was already open yesterday, so it is the one place that
+        # corrects them.
+        _carry_forward_found(artifact, prior)
         d = artifact["suites"]["D_engine"]
         b = artifact["suites"]["B_false_positives"]
         artifact["totals"] = {
