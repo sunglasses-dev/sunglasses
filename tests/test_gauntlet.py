@@ -202,3 +202,124 @@ def test_the_local_write_control_is_the_one_that_unblocked_this_suite():
     assert is_egress_tool(local["tool_name"], local["tool_input"]) is False
     assert find_secret_material(_json.dumps(local["tool_input"])), \
         "the control is worthless unless the material in it is genuinely detectable"
+
+
+# ── the miss ledger: a miss must be able to age ─────────────────────────────
+# Every suite stamps `found` with today's date as it runs, so before this the
+# whole diff between two nights' artifacts was the timestamps: the SAME open
+# miss reported itself as found-today, every day, forever. That is the
+# flattering reading by accident — "found today, not yet fixed" is a fresh
+# discovery, while the truth may be that we have sat on it for a month — and it
+# empties the one column the page uses to prove how long a hole stayed open.
+
+def _artifact(misses, suite="D_engine", completed=True):
+    return {"run": {"completed": completed},
+            "suites": {suite: {"misses": misses}}}
+
+
+def test_a_miss_that_is_still_open_keeps_the_date_it_was_first_found():
+    prior = _artifact([{"case_id": "HARD-08", "class": "tool_poisoning",
+                        "found": "2026-08-01", "fixed_in": None}])
+    today = _artifact([{"case_id": "HARD-08", "class": "tool_poisoning",
+                        "found": "2026-08-29", "fixed_in": None}])
+    gauntlet._carry_forward_found(today, prior)
+    assert today["suites"]["D_engine"]["misses"][0]["found"] == "2026-08-01", \
+        "an unfixed miss reported as found-today hides how long it stayed open"
+
+
+def test_a_case_that_was_fixed_and_broke_again_is_stamped_today():
+    """A regression is a new find. Carrying the ORIGINAL date across a period
+    when the case was passing would claim we never fixed it — the opposite
+    lie, and just as wrong."""
+    prior = _artifact([])  # the case was not a miss in the last run
+    today = _artifact([{"case_id": "HARD-08", "class": "tool_poisoning",
+                        "found": "2026-08-29", "fixed_in": None}])
+    gauntlet._carry_forward_found(today, prior)
+    assert today["suites"]["D_engine"]["misses"][0]["found"] == "2026-08-29"
+
+
+def test_the_first_ever_run_stamps_today():
+    today = _artifact([{"case_id": "HARD-08", "class": "tool_poisoning",
+                        "found": "2026-08-29", "fixed_in": None}])
+    gauntlet._carry_forward_found(today, {})
+    assert today["suites"]["D_engine"]["misses"][0]["found"] == "2026-08-29"
+
+
+def test_one_suite_never_inherits_another_suites_history():
+    """The suites are separate namespaces. If an id ever collides across them,
+    handing one suite the other's date would be an invented measurement."""
+    prior = _artifact([{"case_id": "X-1", "found": "2026-08-01"}], suite="A_exfil")
+    today = _artifact([{"case_id": "X-1", "found": "2026-08-29"}], suite="D_engine")
+    gauntlet._carry_forward_found(today, prior)
+    assert today["suites"]["D_engine"]["misses"][0]["found"] == "2026-08-29"
+
+
+def test_a_failed_run_is_never_used_as_the_prior(tmp_path, monkeypatch):
+    """A dead run writes an artifact with no suites. Reading dates from it
+    would find no prior misses and re-stamp every open one as found-today —
+    the exact failure this ledger exists to stop, reintroduced by a crash."""
+    monkeypatch.setattr(gauntlet, "RUNS", str(tmp_path))
+    (tmp_path / "2026-08-01.json").write_text(json.dumps(
+        _artifact([{"case_id": "HARD-08", "found": "2026-08-01"}])))
+    (tmp_path / "2026-08-28.json").write_text(json.dumps(
+        {"run": {"completed": False, "error": "engine unavailable"},
+         "suites": {}, "versions": {}}))
+    prior = gauntlet._prior_artifact()
+    assert prior["run"]["completed"] is True
+    assert prior["suites"]["D_engine"]["misses"][0]["found"] == "2026-08-01"
+
+
+def test_a_second_run_on_the_same_day_does_not_reset_the_dates(tmp_path, monkeypatch):
+    monkeypatch.setattr(gauntlet, "RUNS", str(tmp_path))
+    (tmp_path / "2026-08-29.json").write_text(json.dumps(
+        _artifact([{"case_id": "HARD-08", "found": "2026-08-01"}])))
+    assert gauntlet._prior_artifact()["suites"]["D_engine"]["misses"][0]["found"] \
+        == "2026-08-01"
+
+
+def test_an_unreadable_prior_artifact_does_not_kill_the_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(gauntlet, "RUNS", str(tmp_path))
+    (tmp_path / "2026-08-01.json").write_text(json.dumps(
+        _artifact([{"case_id": "HARD-08", "found": "2026-08-01"}])))
+    (tmp_path / "2026-08-28.json").write_text("{truncated")
+    assert gauntlet._prior_artifact()["suites"]["D_engine"]["misses"][0]["found"] \
+        == "2026-08-01"
+
+
+# ── which tree produced the number ──────────────────────────────────────────
+
+def _repo(tmp_path):
+    run = lambda *a: subprocess.run(list(a), cwd=str(tmp_path), capture_output=True)
+    run("git", "init", "-q", "-b", "trunk")
+    run("git", "config", "user.email", "t@t")
+    run("git", "config", "user.name", "t")
+    (tmp_path / "f.txt").write_text("one\n")
+    run("git", "add", "f.txt")
+    run("git", "commit", "-qm", "one")
+    return run
+
+
+def test_the_artifact_records_the_branch_not_just_the_sha(tmp_path, monkeypatch):
+    """A branch and main can sit on the same commit and only one of them is a
+    release. The sha alone cannot tell them apart."""
+    _repo(tmp_path)
+    monkeypatch.setattr(gauntlet, "HERE", str(tmp_path))
+    assert gauntlet._git_branch() == "trunk"
+
+
+def test_a_dirty_tree_says_so(tmp_path, monkeypatch):
+    """Without this, a number produced from someone's half-finished afternoon
+    is indistinguishable from one produced by the release it names."""
+    _repo(tmp_path)
+    monkeypatch.setattr(gauntlet, "HERE", str(tmp_path))
+    assert gauntlet._git_dirty() is False
+    (tmp_path / "f.txt").write_text("two\n")
+    assert gauntlet._git_dirty() is True
+
+
+def test_a_real_run_records_the_tree_it_measured(tmp_path):
+    out = tmp_path / "run.json"
+    assert _cli(["run", "--out", str(out)]).returncode == 0
+    versions = json.loads(out.read_text())["versions"]
+    assert versions["branch"] and versions["branch"] != "unknown"
+    assert versions["dirty"] in (True, False)
