@@ -5,6 +5,19 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-30
+
+### Hardening milestone
+- **The Gauntlet**: adversarial self-test suite (D_engine corpus + false-positive,
+  exfiltration-shape, and control suites) now runs nightly at 03:30 via launchd from a
+  pinned worktree — the artifact records `branch`, `dirty`, and git sha so a score can
+  never silently come from an untested tree.
+- **Honest miss aging**: an open miss keeps its original `found` date across runs
+  (a regression re-stamps as a new find; a crashed run cannot wipe history).
+- **Frozen scoring corpus**: `gauntlet freeze --release 0.5.0` promotes the case pool
+  into an immutable scoring set — published scores are measured against a corpus that
+  cannot drift after the fact.
+
 ### Added
 - **MCP descriptor drift is now enforced, not just reported.** `sunglasses pin --check` writes
   its verdict to `~/.sunglasses/pin_state.json`; the hook reads that file and **denies** a tool

@@ -166,7 +166,7 @@ python3 tests/benchmark/precision_recall.py
 
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge — same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block.
 
-| Metric (v0.4.9) | Value |
+| Metric (v0.5.0) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
