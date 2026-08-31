@@ -96,7 +96,15 @@ def measure():
             "document_median_bytes": int(statistics.median(doc_bytes)),
             "throughput_kb_per_sec": round(kb_per_sec, 1),
         },
+        # Public copy renders THESE strings verbatim. Director's ruling, 2026-08-30:
+        # two independent runs of this script differed by 6% (0.725 vs 0.774), which
+        # proves that hand-typing a perf number into a page re-creates H1 in
+        # miniature. A page that needs a different phrasing shape gets a new field
+        # here; it never gets a number typed by a human.
         "scan_speed_display": _display(quickstart_median, attack_median),
+        "scan_speed_display_short": _display(quickstart_median, attack_median),
+        "scan_speed_display_long": _display_long(
+            quickstart_median, attack_median, kb_per_sec),
         "scan_speed_measured_on": {
             "machine": platform.machine(),
             "processor": platform.processor() or platform.machine(),
@@ -112,6 +120,19 @@ def measure():
 def _display(quickstart_ms, attack_ms):
     """One short public phrase, covering the range rather than its floor."""
     return f"~{quickstart_ms:.1f}ms short input, ~{attack_ms:.0f}ms typical attack string"
+
+
+def _display_long(quickstart_ms, attack_ms, kb_per_sec):
+    """The fuller phrase, for pages with room to be precise.
+
+    Leads with the fact that makes the single-number claim impossible — cost
+    scales with input length — and names the script, so the reader can check it
+    rather than trust it.
+    """
+    return (f"Scan cost scales with input length: ~{quickstart_ms:.1f}ms on a short "
+            f"input, ~{attack_ms:.0f}ms on a typical attack string, "
+            f"~{kb_per_sec:.0f} KB/sec sustained. Every figure here is regenerated "
+            f"by tools/gen_perf_stats.py.")
 
 
 def main():
@@ -148,6 +169,15 @@ def main():
         for dead in ("scan_speed_avg_ms", "scans_per_second_single_thread"):
             stats.pop(dead, None)
         stats.update(measured)
+        # Engine-truth counts, from the same source CHECK 24 validates against.
+        # publish.sh writes these at ship time; regenerating them here keeps the
+        # repo copy honest between ships, which is when the site copy is edited.
+        from sunglasses.patterns import PATTERNS
+        info = SunglassesEngine().info()
+        stats["patterns"] = info["patterns"]
+        stats["keywords"] = info["keywords"]
+        stats["categories"] = len({(p.get("category") or "").strip()
+                                   for p in PATTERNS if (p.get("category") or "").strip()})
         with open(path, "w") as fh:
             json.dump(stats, fh, indent=2)
             fh.write("\n")
