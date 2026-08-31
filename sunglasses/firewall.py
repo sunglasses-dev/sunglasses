@@ -1094,6 +1094,21 @@ def evaluate(payload: dict, home=None) -> "tuple":
     tool_input = payload.get("tool_input") or {}
     extras: dict = {}
 
+    # Audit L5: answer only the event we are installed for. The hook accepted any
+    # hook_event_name, so a PostToolUse payload was scanned and could come back
+    # "deny" — a veto on an action that had already run. Meaningless rather than
+    # dangerous, but a firewall that appears to block something it cannot block is
+    # a claim it does not hold. Absent is treated as PreToolUse: some harnesses
+    # omit the field, and refusing to check a real tool call over a missing label
+    # would trade a cosmetic bug for a hole.
+    event = payload.get("hook_event_name")
+    if event and event != "PreToolUse":
+        return (Decision(action="defer", lane="deterministic",
+                         rule_id="GLS-FW-NOT-PRETOOLUSE",
+                         reason=(f"SUNGLASSES firewall: {event} is not the event this "
+                                 f"hook decides. Only PreToolUse can prevent a call.")),
+                None, {"skipped_event": event})
+
     # Checks that need zero configuration run first and unconditionally.
     decision = check_egress_secrets(tool_name, tool_input)
     if decision is not None:

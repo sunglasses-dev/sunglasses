@@ -44,7 +44,11 @@ setup(
         ],
     },
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        # 30+ releases, a full CI suite on five Python versions, a reproducible
+        # benchmark and a firewall in production use. "Alpha" understated it to
+        # every package index reader; Beta is the honest rung, and Production/Stable
+        # would overstate it while the API can still move in a minor.
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",

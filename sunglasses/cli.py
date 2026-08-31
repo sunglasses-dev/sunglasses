@@ -517,6 +517,42 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def _warn_if_hook_interpreter_missing():
+    """Say so if an installed hook can no longer start. Silence here is the bug."""
+    import json as _json
+    import shlex
+    from pathlib import Path as _Path
+
+    for settings in (_Path.home() / ".claude" / "settings.json",
+                     _Path.cwd() / ".claude" / "settings.json"):
+        if not settings.exists():
+            continue
+        try:
+            hooks = _json.loads(settings.read_text()).get("hooks", {}).get("PreToolUse", [])
+        except (ValueError, OSError):
+            continue
+        for matcher in hooks:
+            for hook in matcher.get("hooks", []):
+                command = hook.get("command", "")
+                if "sunglasses.firewall" not in command:
+                    continue
+                try:
+                    interpreter = shlex.split(command)[0]
+                except ValueError:
+                    continue
+                if interpreter and not os.path.exists(interpreter):
+                    print(f"\n  {RED}{BOLD}THE FIREWALL CANNOT START{RESET}")
+                    print(f"  {RED}{settings} points at an interpreter that no longer "
+                          f"exists:{RESET}")
+                    print(f"    {DIM}{interpreter}{RESET}")
+                    print(f"  {YELLOW}Every tool call since it disappeared ran unchecked, "
+                          f"and none of them\n  wrote a receipt — nothing ran to write "
+                          f"one.{RESET}")
+                    print(f"  {CYAN}Fix: sunglasses init{RESET} "
+                          f"{DIM}(re-points the hook at this python){RESET}\n")
+                    return
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
@@ -532,6 +568,15 @@ def cmd_receipts(args):
         print(f"\n  {DIM}No receipts in {directory}. "
               f"Run `sunglasses init` to install the firewall.{RESET}\n")
         return 0
+
+    # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+    # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
+    # and can find an interpreter with no sunglasses installed. But it means a
+    # recreated venv or an upgraded python leaves a hook that cannot start, and that
+    # is the ONE failure mode which writes no receipt, because nothing runs to write
+    # it. A firewall that is quietly off is worse than no firewall, so the place a
+    # user goes to read the audit trail is where it has to be said.
+    _warn_if_hook_interpreter_missing()
 
     rows = []
     for path in files:
@@ -1095,7 +1140,10 @@ def main():
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
-                             choices=["message", "file", "api_response", "web_content", "log_memory"])
+                             choices=["message", "file", "api_response", "web_content", "log_memory"],
+                             help="Where the content came from, not what the attack is. "
+                                  "Patterns are scoped by channel, so this changes which "
+                                  "rules apply (default: message)")
     scan_parser.add_argument("--deep", action="store_true", help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -1122,7 +1170,10 @@ def main():
     # and measured ~109ms on an M-series Mac — the entire per-tool-call latency
     # budget spent before the first check. This alias exists so a human who
     # types the obvious command gets the right behaviour, not for the hot path.
-    hook_parser = subparsers.add_parser("firewall-hook", help=argparse.SUPPRESS)
+    # No `help=` at all: argparse.SUPPRESS is honoured for OPTIONS but not for
+    # subparsers, where it renders the literal sentinel "==SUPPRESS==" in the
+    # command list. Omitting the key is what actually hides an internal command.
+    hook_parser = subparsers.add_parser("firewall-hook")
     hook_parser.set_defaults(func=cmd_firewall_hook)
 
     # pin
