@@ -57,6 +57,49 @@ class ScanResult:
         worst = max(self.findings, key=lambda f: severities.get(f["severity"], 0))
         return worst["severity"]
 
+    # Severity ranking, duplicated from the engine so a ScanResult can rank its
+    # own findings without reaching back into it.
+    _SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+    def reported_findings(self) -> list:
+        """The findings a HUMAN should see: one per matched span.
+
+        Audit M9: an 8-word attack produced seven findings across four distinct
+        spans — three of them quoting the identical text under three different
+        attack names, two of those mislabelled. A non-expert cannot tell seven
+        findings from seven problems, and a reviewer who sees the same span
+        attributed three ways stops trusting the whole verdict.
+
+        This is a VIEW, deliberately. `self.findings` stays complete, because it
+        is an API contract: callers enumerate it to ask "did pattern X fire?", and
+        collapsing it there answers that question wrongly. Presentation collapses;
+        detection does not.
+
+        The survivor of each span carries `also_matched` — the ids it absorbed —
+        so every pattern that fired is still reachable from the rendered output.
+        Severity wins; ties break on first-registered order, so the result is
+        deterministic run to run.
+        """
+        groups, order = {}, []
+        for finding in self.findings:
+            span = finding.get("matched_text", "")
+            if span not in groups:
+                groups[span] = []
+                order.append(span)
+            groups[span].append(finding)
+
+        reported = []
+        for span in order:
+            group = groups[span]
+            if len(group) == 1:
+                reported.append(group[0])
+                continue
+            best = max(group, key=lambda f: self._SEVERITY_ORDER.get(f["severity"], 0))
+            survivor = dict(best)
+            survivor["also_matched"] = [f["id"] for f in group if f is not best]
+            reported.append(survivor)
+        return reported
+
     def to_dict(self) -> dict:
         return {
             "event_id": self.event_id,
@@ -67,7 +110,8 @@ class ScanResult:
             # extraction_complete=false is not a clean bill of health.
             "extraction_complete": self.extraction_complete,
             "extraction_warnings": list(self.extraction_warnings),
-            "findings_count": len(self.findings),
+            "findings_count": len(self.reported_findings()),
+            "patterns_fired": len(self.findings),
             "findings": [
                 {
                     "id": f["id"],
@@ -76,8 +120,9 @@ class ScanResult:
                     "category": f["category"],
                     "matched_text": f.get("matched_text", ""),
                     "reason": f.get("description", ""),
+                    "also_matched": f.get("also_matched", []),
                 }
-                for f in self.findings
+                for f in self.reported_findings()
             ],
             "latency_ms": self.latency_ms,
         }

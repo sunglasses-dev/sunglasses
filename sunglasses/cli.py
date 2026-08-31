@@ -53,14 +53,26 @@ def print_result(result, verbose=False):
         print(f"\n  {RED}{BOLD}{result.decision.upper()}{RESET} "
               f"{sev_color}[{result.severity.upper()}]{RESET} "
               f"{DIM}({result.latency_ms}ms){RESET}")
-        print(f"  {BOLD}{len(result.findings)} threat(s) found:{RESET}\n")
+        # The deduped VIEW, not result.findings — one matched span, one threat
+        # line. Audit M9: three findings quoting the identical text under three
+        # different attack names is how a reader stops trusting the verdict.
+        reported = result.reported_findings()
+        folded_total = sum(len(f.get("also_matched") or []) for f in reported)
+        extra = (f" {DIM}({folded_total} overlapping pattern(s) folded){RESET}"
+                 if folded_total else "")
+        print(f"  {BOLD}{len(reported)} threat(s) found:{RESET}{extra}\n")
 
-        for i, f in enumerate(result.findings, 1):
+        for i, f in enumerate(reported, 1):
             fc = severity_colors.get(f["severity"], YELLOW)
             print(f"  {fc}{i}. [{f['severity'].upper()}] {f['name']}{RESET}")
             print(f"     {DIM}ID: {f['id']} | Category: {f['category']}{RESET}")
             if f.get("matched_text"):
                 print(f"     {DIM}Matched: \"{f['matched_text']}\"{RESET}")
+            if f.get("also_matched"):
+                # Named, not hidden: the reader can still see everything that
+                # fired on this span.
+                print(f"     {DIM}Also matched this span: "
+                      f"{', '.join(f['also_matched'])}{RESET}")
             if f.get("description"):
                 print(f"     {f['description']}")
             print()
