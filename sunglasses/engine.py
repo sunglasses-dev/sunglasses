@@ -27,6 +27,18 @@ from .patterns import PATTERNS
 from .preprocessor import VIEW_SEP, normalize
 
 
+# Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
+# 0.055s, 100 KB is 4.9s, 1 MB is 49.6s. Uncapped, a front-line filter handed a
+# 10 MB page stalls an agent for about eight minutes, which is a denial of service
+# an attacker can trigger by sending a large benign document.
+#
+# 1 MB is deliberately generous: it is the worst case the README already documents,
+# so nothing an ordinary caller scans changes. The cap bounds the tail, and a scan
+# that hit it says so — a partial scan reported as clean is the failure this whole
+# release is about.
+MAX_SCAN_BYTES = 1024 * 1024
+
+
 class ScanResult:
     """Result of a SUNGLASSES scan."""
 
@@ -39,6 +51,13 @@ class ScanResult:
         self.normalized_input = normalized_input[:200]
         self.channel = channel
         self.latency_ms = round(latency_ms, 2)
+        # Populated by scan_file(). A direct scan() of a string is complete by
+        # definition — there was no file to fail to read.
+        self.truncated = False
+        self.bytes_scanned = len(raw_input)
+        self.extraction_complete = True
+        self.extraction_warnings = []
+        self.extraction_sources = []
 
     @property
     def is_clean(self) -> bool:
@@ -52,13 +71,63 @@ class ScanResult:
         worst = max(self.findings, key=lambda f: severities.get(f["severity"], 0))
         return worst["severity"]
 
+    # Severity ranking, duplicated from the engine so a ScanResult can rank its
+    # own findings without reaching back into it.
+    _SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+    def reported_findings(self) -> list:
+        """The findings a HUMAN should see: one per matched span.
+
+        Audit M9: an 8-word attack produced seven findings across four distinct
+        spans — three of them quoting the identical text under three different
+        attack names, two of those mislabelled. A non-expert cannot tell seven
+        findings from seven problems, and a reviewer who sees the same span
+        attributed three ways stops trusting the whole verdict.
+
+        This is a VIEW, deliberately. `self.findings` stays complete, because it
+        is an API contract: callers enumerate it to ask "did pattern X fire?", and
+        collapsing it there answers that question wrongly. Presentation collapses;
+        detection does not.
+
+        The survivor of each span carries `also_matched` — the ids it absorbed —
+        so every pattern that fired is still reachable from the rendered output.
+        Severity wins; ties break on first-registered order, so the result is
+        deterministic run to run.
+        """
+        groups, order = {}, []
+        for finding in self.findings:
+            span = finding.get("matched_text", "")
+            if span not in groups:
+                groups[span] = []
+                order.append(span)
+            groups[span].append(finding)
+
+        reported = []
+        for span in order:
+            group = groups[span]
+            if len(group) == 1:
+                reported.append(group[0])
+                continue
+            best = max(group, key=lambda f: self._SEVERITY_ORDER.get(f["severity"], 0))
+            survivor = dict(best)
+            survivor["also_matched"] = [f["id"] for f in group if f is not best]
+            reported.append(survivor)
+        return reported
+
     def to_dict(self) -> dict:
         return {
             "event_id": self.event_id,
             "decision": self.decision,
             "severity": self.severity,
             "channel": self.channel,
-            "findings_count": len(self.findings),
+            # A machine consumer needs the same caveat the human gets: "allow" plus
+            # extraction_complete=false is not a clean bill of health.
+            "truncated": self.truncated,
+            "bytes_scanned": self.bytes_scanned,
+            "extraction_complete": self.extraction_complete,
+            "extraction_warnings": list(self.extraction_warnings),
+            "findings_count": len(self.reported_findings()),
+            "patterns_fired": len(self.findings),
             "findings": [
                 {
                     "id": f["id"],
@@ -67,8 +136,9 @@ class ScanResult:
                     "category": f["category"],
                     "matched_text": f.get("matched_text", ""),
                     "reason": f.get("description", ""),
+                    "also_matched": f.get("also_matched", []),
                 }
-                for f in self.findings
+                for f in self.reported_findings()
             ],
             "latency_ms": self.latency_ms,
         }
@@ -317,7 +387,11 @@ class SunglassesEngine:
     DEFENSIVE_WINDOW = 120  # wider than negation: the framing verb leads the clause
 
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
-                 mechanisms: bool = True):
+                 mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES):
+        # 0 disables the cap. Configurable because a batch job scanning archives has
+        # different tolerances from a hook in front of an agent, and picking one
+        # number for both is how a default becomes something people work around.
+        self.max_scan_bytes = max_scan_bytes
         carriers = patterns or PATTERNS
         # The mechanism layer (mechanisms.py) matches attack SHAPE rather than
         # wording, and covers the paraphrases the carrier list structurally
@@ -647,6 +721,16 @@ class SunglassesEngine:
         match_channels = {channel, self.CHANNEL_ALIASES.get(channel, channel)}
         start = time.perf_counter()
 
+        # Step 0: Bound the input (audit M8). Cost is linear in length, so an
+        # oversized input is a stall an attacker can trigger with a large benign
+        # document. Truncation is recorded on the result rather than applied
+        # silently — the caller has to be able to tell a full clean scan from a
+        # partial one.
+        full_length = len(text)
+        truncated = bool(self.max_scan_bytes) and full_length > self.max_scan_bytes
+        if truncated:
+            text = text[: self.max_scan_bytes]
+
         # Step 1: Normalize (strip tricks, decode evasion)
         normalized = normalize(text)
 
@@ -826,7 +910,7 @@ class SunglassesEngine:
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        return ScanResult(
+        result = ScanResult(
             decision=decision,
             findings=findings,
             raw_input=text,
@@ -834,12 +918,30 @@ class SunglassesEngine:
             channel=channel,
             latency_ms=elapsed_ms,
         )
+        result.truncated = truncated
+        result.bytes_scanned = len(text)
+        return result
 
     def scan_file(self, filepath: str) -> ScanResult:
-        """Scan a file's contents."""
-        with open(filepath, 'r', errors='ignore') as f:
-            content = f.read()
-        return self.scan(content, channel="file")
+        """Scan a file, routing images and PDFs through their extractors.
+
+        Audit finding C1: this used to be a raw ``open().read()``, so the CLI's
+        ``scan --file`` reported "no threats detected" on a PDF whose payload sat in
+        a compressed content stream, while ``SunglassesScanner.scan_auto()`` caught
+        the same file. The extractors existed; this path never dispatched to them.
+
+        The returned result carries ``extraction_complete``. When it is False we could
+        not read part of the file, and a caller must not render the verdict as a clean
+        bill of health — see ``cli.py`` for the exit-code contract.
+        """
+        from .extractors.dispatch import extract_file_sources
+
+        extraction = extract_file_sources(filepath)
+        result = self.scan(extraction.text, channel="file")
+        result.extraction_complete = extraction.complete
+        result.extraction_warnings = list(extraction.warnings)
+        result.extraction_sources = extraction.labels
+        return result
 
     def info(self) -> dict:
         """Return engine stats."""

@@ -23,13 +23,20 @@ on:
 jobs:
   integrity:
     runs-on: ubuntu-latest
+    # One version was tested while setup.py claimed five. A support claim backed by
+    # no run is the same class of defect as a published number with no generator:
+    # believable, unverified, and only discovered by the user it breaks.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install package + dev deps
         run: |

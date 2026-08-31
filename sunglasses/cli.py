@@ -53,14 +53,26 @@ def print_result(result, verbose=False):
         print(f"\n  {RED}{BOLD}{result.decision.upper()}{RESET} "
               f"{sev_color}[{result.severity.upper()}]{RESET} "
               f"{DIM}({result.latency_ms}ms){RESET}")
-        print(f"  {BOLD}{len(result.findings)} threat(s) found:{RESET}\n")
+        # The deduped VIEW, not result.findings — one matched span, one threat
+        # line. Audit M9: three findings quoting the identical text under three
+        # different attack names is how a reader stops trusting the verdict.
+        reported = result.reported_findings()
+        folded_total = sum(len(f.get("also_matched") or []) for f in reported)
+        extra = (f" {DIM}({folded_total} overlapping pattern(s) folded){RESET}"
+                 if folded_total else "")
+        print(f"  {BOLD}{len(reported)} threat(s) found:{RESET}{extra}\n")
 
-        for i, f in enumerate(result.findings, 1):
+        for i, f in enumerate(reported, 1):
             fc = severity_colors.get(f["severity"], YELLOW)
             print(f"  {fc}{i}. [{f['severity'].upper()}] {f['name']}{RESET}")
             print(f"     {DIM}ID: {f['id']} | Category: {f['category']}{RESET}")
             if f.get("matched_text"):
                 print(f"     {DIM}Matched: \"{f['matched_text']}\"{RESET}")
+            if f.get("also_matched"):
+                # Named, not hidden: the reader can still see everything that
+                # fired on this span.
+                print(f"     {DIM}Also matched this span: "
+                      f"{', '.join(f['also_matched'])}{RESET}")
             if f.get("description"):
                 print(f"     {f['description']}")
             print()
@@ -286,6 +298,39 @@ def _scan_repo(args, engine):
     sys.exit(0 if total_threats == 0 else 1)
 
 
+# Exit-code contract for a scan (audit finding C1).
+#   0 = scanned completely, nothing found
+#   1 = threat found
+#   3 = we could not read part of the file, and found nothing in what we could read
+# 3 exists because 0 is a claim. "I read the whole file and it is clean" and "I could
+# not open the text layer and saw nothing" must not be the same signal to a CI job.
+EXIT_CLEAN = 0
+EXIT_THREAT = 1
+EXIT_INCOMPLETE = 3
+
+
+def _scan_exit_code(result):
+    if not result.is_clean:
+        return EXIT_THREAT
+    if not getattr(result, "extraction_complete", True):
+        return EXIT_INCOMPLETE
+    return EXIT_CLEAN
+
+
+def _print_extraction_warnings(result, stream=None):
+    """Announce anything we could not read. Never let it be inferred from silence."""
+    warnings = getattr(result, "extraction_warnings", None)
+    if not warnings:
+        return
+    out = stream or sys.stdout
+    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— part of this file was not read{RESET}", file=out)
+    for w in warnings:
+        print(f"  {YELLOW}!{RESET} {w}", file=out)
+    if result.is_clean:
+        print(f"  {DIM}No threats were found in what could be read. That is not the "
+              f"same as clean.{RESET}", file=out)
+
+
 def cmd_scan(args):
     """Run a scan."""
     engine = SunglassesEngine()
@@ -390,18 +435,25 @@ def cmd_scan(args):
     if args.output == "sarif":
         sarif_log = to_sarif([result], source=source)
         print(json.dumps(sarif_log, indent=2))
-        sys.exit(0 if result.is_clean else 1)
+        # stdout is a machine contract here; the warning goes to stderr.
+        _print_extraction_warnings(result, stream=sys.stderr)
+        sys.exit(_scan_exit_code(result))
 
     if args.json:
         output = result.to_dict()
         output["source"] = source
         print(json.dumps(output))
-        sys.exit(0 if result.is_clean else 1)
+        _print_extraction_warnings(result, stream=sys.stderr)
+        sys.exit(_scan_exit_code(result))
 
-    print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({args.channel} channel)")
+    # The channel the scan actually used, not the flag default: scan_file() forces
+    # channel="file", so printing args.channel here contradicted the JSON output of
+    # the same scan (audit L6).
+    print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
-    sys.exit(0 if result.is_clean else 1)
+    _print_extraction_warnings(result)
+    sys.exit(_scan_exit_code(result))
 
 
 def cmd_check(args):
@@ -465,6 +517,42 @@ def cmd_check(args):
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
 
+def _warn_if_hook_interpreter_missing():
+    """Say so if an installed hook can no longer start. Silence here is the bug."""
+    import json as _json
+    import shlex
+    from pathlib import Path as _Path
+
+    for settings in (_Path.home() / ".claude" / "settings.json",
+                     _Path.cwd() / ".claude" / "settings.json"):
+        if not settings.exists():
+            continue
+        try:
+            hooks = _json.loads(settings.read_text()).get("hooks", {}).get("PreToolUse", [])
+        except (ValueError, OSError):
+            continue
+        for matcher in hooks:
+            for hook in matcher.get("hooks", []):
+                command = hook.get("command", "")
+                if "sunglasses.firewall" not in command:
+                    continue
+                try:
+                    interpreter = shlex.split(command)[0]
+                except ValueError:
+                    continue
+                if interpreter and not os.path.exists(interpreter):
+                    print(f"\n  {RED}{BOLD}THE FIREWALL CANNOT START{RESET}")
+                    print(f"  {RED}{settings} points at an interpreter that no longer "
+                          f"exists:{RESET}")
+                    print(f"    {DIM}{interpreter}{RESET}")
+                    print(f"  {YELLOW}Every tool call since it disappeared ran unchecked, "
+                          f"and none of them\n  wrote a receipt — nothing ran to write "
+                          f"one.{RESET}")
+                    print(f"  {CYAN}Fix: sunglasses init{RESET} "
+                          f"{DIM}(re-points the hook at this python){RESET}\n")
+                    return
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
@@ -481,6 +569,15 @@ def cmd_receipts(args):
               f"Run `sunglasses init` to install the firewall.{RESET}\n")
         return 0
 
+    # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+    # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
+    # and can find an interpreter with no sunglasses installed. But it means a
+    # recreated venv or an upgraded python leaves a hook that cannot start, and that
+    # is the ONE failure mode which writes no receipt, because nothing runs to write
+    # it. A firewall that is quietly off is worse than no firewall, so the place a
+    # user goes to read the audit trail is where it has to be said.
+    _warn_if_hook_interpreter_missing()
+
     rows = []
     for path in files:
         for line in path.read_text().splitlines():
@@ -490,20 +587,26 @@ def cmd_receipts(args):
                 except ValueError:
                     continue
 
+    # A receipts file is bytes on disk: it may predate the write-side sanitize
+    # (audit H2) or have been edited since. Everything pulled out of it is treated
+    # as untrusted before it reaches the terminal.
+    from .firewall import sanitize_receipt_field as _clean
+
     colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
     print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
           f"{len(files)} day(s)){RESET}")
     print(f"  {DIM}{'─' * 74}{RESET}")
     for row in rows[-args.limit:]:
-        decision = row.get("decision", "?")
+        decision = _clean(row.get("decision", "?"), limit=10)
         color = colors.get(decision, "")
-        stamp = str(row.get("ts", ""))[11:19]
-        note = row.get("rule_id", "")
+        stamp = _clean(str(row.get("ts", ""))[11:19], limit=8)
+        note = _clean(row.get("rule_id", ""), limit=44)
         if row.get("lane") == "error":
-            note = f"{row.get('error', 'error')}"[:44]
+            note = _clean(row.get("error", "error"), limit=44)
+        tool = _clean(row.get("tool_name"), limit=24) or "-"
         print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
-              f"{DIM}{row.get('lane', ''):<13}{RESET} "
-              f"{str(row.get('tool_name') or '-'):<24} {DIM}{note}{RESET}")
+              f"{DIM}{_clean(row.get('lane', ''), limit=13):<13}{RESET} "
+              f"{tool:<24} {DIM}{note}{RESET}")
 
     counts = {}
     for row in rows:
@@ -1021,7 +1124,7 @@ def cmd_demo(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="sunglasses",
-        description="SUNGLASSES — AI Agent Input Filter. The antivirus for AI agents.",
+        description="SUNGLASSES — The input firewall for AI agents.",
     )
     parser.add_argument(
         "--version", "-V",
@@ -1037,7 +1140,10 @@ def main():
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
-                             choices=["message", "file", "api_response", "web_content", "log_memory"])
+                             choices=["message", "file", "api_response", "web_content", "log_memory"],
+                             help="Where the content came from, not what the attack is. "
+                                  "Patterns are scoped by channel, so this changes which "
+                                  "rules apply (default: message)")
     scan_parser.add_argument("--deep", action="store_true", help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -1064,7 +1170,10 @@ def main():
     # and measured ~109ms on an M-series Mac — the entire per-tool-call latency
     # budget spent before the first check. This alias exists so a human who
     # types the obvious command gets the right behaviour, not for the hot path.
-    hook_parser = subparsers.add_parser("firewall-hook", help=argparse.SUPPRESS)
+    # No `help=` at all: argparse.SUPPRESS is honoured for OPTIONS but not for
+    # subparsers, where it renders the literal sentinel "==SUPPRESS==" in the
+    # command list. Omitting the key is what actually hides an internal command.
+    hook_parser = subparsers.add_parser("firewall-hook")
     hook_parser.set_defaults(func=cmd_firewall_hook)
 
     # pin

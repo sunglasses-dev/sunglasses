@@ -77,7 +77,16 @@ def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
     log_path = _log_file(date)
 
     if not log_path.exists():
-        return f"No scan data for {date}. Run some scans first!"
+        # Audit M4: this used to read "Run some scans first!", which a user
+        # reached by running scans. `sunglasses scan` does not feed the report —
+        # only scans made through reporter.ProtectedEngine are recorded. Naming
+        # the actual condition beats repeating an instruction that cannot work.
+        return (
+            f"No recorded scans for {date}.\n"
+            "The daily report covers scans made through the Python API's\n"
+            "ProtectedEngine wrapper. `sunglasses scan` on the command line is\n"
+            "not recorded, so running more of those will not populate this."
+        )
 
     # Parse log entries
     entries = []

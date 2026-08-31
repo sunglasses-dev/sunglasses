@@ -364,7 +364,8 @@ def cmd_run(args) -> int:
         engine = SunglassesEngine()
         artifact["versions"] = {"scanner": __version__, "git": _git_sha(),
                                 "branch": _git_branch(), "dirty": _git_dirty(),
-                                "corpus_release": args.release or "unfrozen"}
+                                "corpus_release": derive_corpus_release(
+                                    __version__, claimed=getattr(args, "release", None))}
         artifact["suites"]["D_engine"] = suite_d_engine(engine)
         artifact["suites"]["B_false_positives"] = suite_b_false_positives(engine)
         artifact["suites"]["A_exfil"] = suite_a_exfil()
@@ -404,6 +405,45 @@ def cmd_run(args) -> int:
         print("  suite A: " + a.get("status", "unknown") + " - " + a.get("reason", ""))
     print("  -> " + out_path)
     return 0
+
+
+def derive_corpus_release(scanner_version: str, claimed: str = None) -> str:
+    """What corpus this run is ACTUALLY scored against, read from disk.
+
+    This used to be ``args.release or "unfrozen"`` — the caller's own argument,
+    recorded as fact. A run invoked with ``--release 0.5.0`` claimed a frozen
+    scoring corpus whether or not one existed. The whole point of the freeze is
+    that a published score is measured against a set that cannot drift after the
+    fact; a field that repeats its own input verifies nothing.
+
+    ``claimed`` is accepted and deliberately ignored for the verdict. It stays in
+    the signature so a caller can pass what it believes and a mismatch can be
+    reported, but it can never manufacture a freeze.
+
+    Returns the release string only when a manifest for THIS scanner version
+    exists, parses, and agrees with the directory it sits in. Everything else —
+    no directory, empty directory, unreadable manifest, a manifest naming a
+    different release, a freeze belonging to another version — is "unfrozen".
+    A missing or inconsistent freeze is not a freeze, and the permissive default
+    only ever moves the claim in the flattering direction.
+    """
+    target = os.path.join(CORPUS, "frozen", scanner_version)
+    manifest_path = os.path.join(target, "manifest.json")
+    if not os.path.exists(manifest_path):
+        return "unfrozen"
+    try:
+        with open(manifest_path) as handle:
+            manifest = json.load(handle)
+    except (ValueError, OSError):
+        return "unfrozen"
+    if not isinstance(manifest, dict):
+        return "unfrozen"
+    # The directory name is the claim the filesystem makes; the manifest is the
+    # claim the file makes. If they disagree, one of them was edited, and an
+    # edited freeze is exactly what the freeze exists to rule out.
+    if manifest.get("release") != scanner_version:
+        return "unfrozen"
+    return scanner_version
 
 
 def cmd_freeze(args) -> int:

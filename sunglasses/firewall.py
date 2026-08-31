@@ -982,6 +982,58 @@ def _restrict(path, mode: int) -> None:
         os.chmod(path, mode)
 
 
+# ── Receipt field sanitize ──────────────────────────────────────────────────
+# Audit finding H2. `tool_name` is chosen by the MCP server, i.e. by the party the
+# pin lane exists to defend against, and it was stored and re-rendered verbatim. A
+# name carrying ANSI escapes made `sunglasses receipts` clear the screen and print a
+# forged all-clear; an embedded newline forged an extra row; a 300-character name
+# destroyed the table. An audit trail the audited party can write into is not one.
+#
+# Applied on WRITE so a poisoned line never lands in the jsonl, and again on RENDER
+# so a file written by an older build — or edited on disk — still cannot paint the
+# terminal. Sanitizing only on write would leave every existing receipts file live.
+RECEIPT_FIELD_LIMIT = 128
+
+# C0 (00-1F), DEL (7F), C1 (80-9F): the escape introducer and its friends.
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def sanitize_receipt_field(value, limit: int = RECEIPT_FIELD_LIMIT):
+    """Make an externally-supplied string safe to store and to print.
+
+    Strips control characters and the invisible/bidi set, then truncates. Returns
+    non-strings unchanged except that they are rendered with str(); None stays None
+    so a missing field stays missing rather than becoming the text "None".
+
+    The name is kept readable on purpose — the point is an audit line you can still
+    use, not a redacted one. `\x1b[92mmcp__evil__tool` becomes `[92mmcp__evil__tool`:
+    the escape is dead, the identity survives.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    cleaned = strip_invisible(_CONTROL_CHARS.sub("", value))
+    if len(cleaned) > limit:
+        # Say it was trimmed. A silently truncated audit field is a small lie.
+        cleaned = cleaned[: limit - 1] + "\u2026"
+    return cleaned
+
+
+# Every field in a receipt whose value can be influenced from outside the process.
+# `decision`, `lane` and `rule_id` are ours on write, but a receipts FILE is just
+# bytes on disk, so the render path sanitizes them too.
+_UNTRUSTED_RECEIPT_FIELDS = ("tool_name", "session_id", "error", "rule_id")
+
+
+def _sanitize_record(record: dict) -> dict:
+    out = dict(record)
+    for field in _UNTRUSTED_RECEIPT_FIELDS:
+        if field in out:
+            out[field] = sanitize_receipt_field(out[field])
+    return out
+
+
 def write_receipt(record: dict, home=None) -> None:
     """Append one JSONL receipt. Raises on I/O failure — the caller decides
     whether a lost audit line is worth changing the decision over (it is not).
@@ -1006,7 +1058,8 @@ def write_receipt(record: dict, home=None) -> None:
         # are readable by everyone on the box.
         os.close(os.open(str(path), os.O_CREAT | os.O_WRONLY, 0o600))
     with open(path, "a", encoding="utf-8") as handle:
-        handle.write(_json.dumps(record, ensure_ascii=False, default=str) + "\n")
+        handle.write(_json.dumps(_sanitize_record(record), ensure_ascii=False,
+                                 default=str) + "\n")
     _restrict(path, 0o600)
 
 
@@ -1040,6 +1093,21 @@ def evaluate(payload: dict, home=None) -> "tuple":
     tool_name = payload.get("tool_name") or ""
     tool_input = payload.get("tool_input") or {}
     extras: dict = {}
+
+    # Audit L5: answer only the event we are installed for. The hook accepted any
+    # hook_event_name, so a PostToolUse payload was scanned and could come back
+    # "deny" — a veto on an action that had already run. Meaningless rather than
+    # dangerous, but a firewall that appears to block something it cannot block is
+    # a claim it does not hold. Absent is treated as PreToolUse: some harnesses
+    # omit the field, and refusing to check a real tool call over a missing label
+    # would trade a cosmetic bug for a hole.
+    event = payload.get("hook_event_name")
+    if event and event != "PreToolUse":
+        return (Decision(action="defer", lane="deterministic",
+                         rule_id="GLS-FW-NOT-PRETOOLUSE",
+                         reason=(f"SUNGLASSES firewall: {event} is not the event this "
+                                 f"hook decides. Only PreToolUse can prevent a call.")),
+                None, {"skipped_event": event})
 
     # Checks that need zero configuration run first and unconditionally.
     decision = check_egress_secrets(tool_name, tool_input)
