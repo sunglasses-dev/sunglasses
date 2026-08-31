@@ -5,6 +5,84 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Audit remediation
+Everything below came out of an independent clean-room audit of v0.5.0 run on
+2026-08-30 by a session that had not built the product, followed by a second pass that
+corrected the audit's own numbers. Findings are referenced by their audit id.
+
+### Fixed
+- **`scan --file` now reaches the extractors (C1).** `SunglassesEngine.scan_file()` was
+  a raw `open().read()`, so `sunglasses scan --file document.pdf` — the command printed
+  in the README quickstart — returned "PASS, no threats detected" on a PDF carrying a
+  prompt injection in a compressed content stream, while the Python
+  `SunglassesScanner` API caught the same file. One file, two surfaces, two verdicts.
+  Routing now lives in `extractors/dispatch.py` and both file entry points use it; they
+  previously carried separate extension tables, which is the drift that produced the
+  bug. A file we cannot fully read carries `extraction_complete=False` and a warning,
+  and **new exit code 3** means "read incompletely, found nothing" — `0` is a claim,
+  and it must not cover both a verified-clean scan and an unreadable one.
+- **Receipt fields are sanitized (H2).** `tool_name` is chosen by the MCP server — the
+  party the pin lane exists to defend against — and was stored and re-rendered
+  verbatim. A name carrying ANSI escapes made `sunglasses receipts` clear the screen
+  and print a forged all-clear; a newline forged an extra row. Control characters are
+  stripped and values truncated on **write and on render**, because a receipts file is
+  bytes on disk that may predate this build.
+- **Mislabelled detections (H3/M9).** A low-resource-language jailbreak pattern led its
+  regex with an English phrase and a navigation-constraints pattern carried the bare
+  2-gram "ignore previous", so every English injection was reported as a Swahili
+  jailbreak and a navigation attack. Both anchors removed; the languages and the
+  navigation shape still catch. Overlapping patterns on one span now fold into
+  `also_matched` in the rendered output — `findings` stays complete for API callers.
+  An 8-word attack reported 7 findings; it reports 4, correctly labelled, same verdict.
+- **`corpus_release` is derived, not echoed.** It was `args.release or "unfrozen"` —
+  the caller's own argument recorded as fact, so a run claimed a frozen scoring corpus
+  whether or not one existed. It now reads disk and believes it over the caller.
+- **The daily report's error message (M4)** told a user to "run some scans first" when
+  they had just run scans; only `ProtectedEngine` scans are recorded. It now names the
+  actual condition.
+- **`sunglasses --help` printed the literal `==SUPPRESS==` (L1).** `argparse.SUPPRESS`
+  is honoured for options but not for subparsers.
+- **The hook answered any event (L5).** A `PostToolUse` payload could return `deny` — a
+  veto on an action that had already run. Non-PreToolUse events defer and say why; a
+  *missing* event is still checked, since some harnesses omit the field.
+- **`sitemap.xml` listed a redirecting URL (L7).** Replaced with the canonical
+  destination; all 107 entries return 200 with no hops.
+
+### Added
+- **`tools/gen_perf_stats.py` (H1).** The published `0.26ms` figure had no generator
+  anywhere in the repository, and on the hardware the README named it was the cost of
+  scanning an **empty string** — the project's own `sunglasses demo` printed 2.78ms on
+  the same machine. Performance is now measured against a public in-repo corpus and
+  reported as a distribution, because scan cost is linear in input length and one
+  number cannot describe both an 18-character command and an 8 KB document.
+- **Input size cap, 1 MB default, configurable (M8).** At ~50 µs/byte an uncapped
+  filter handed a 10 MB page stalls an agent for minutes — a denial of service an
+  attacker triggers with a large *benign* document. `result.truncated` and
+  `bytes_scanned` mean a partial scan can never read as a clean one.
+- **`sunglasses receipts` reports a dead firewall (L4).** The hook embeds an absolute
+  interpreter path (correct — a bare `python3` can resolve to an interpreter without
+  sunglasses), but a recreated venv leaves a hook that cannot start, and that is the
+  one failure mode which writes no receipt. The audit trail now says so.
+- Four ship gates: published performance must be measured and not stale (CHECK 25),
+  rendered site prose must match stats truth (CHECK 26), packaging claims must match
+  the package (CHECK 27), and the built wheel's description must equal the repo README
+  before upload (CHECK 27b) — the 0.5.0 wheel shipped a README labelled v0.4.9.
+
+### Changed
+- `python_requires` `>=3.8` → `>=3.9`, and CI now tests 3.9 through 3.13. Five versions
+  were claimed and one was tested; 3.8 has been EOL since October 2024.
+- PyPI classifier `3 - Alpha` → `4 - Beta`.
+- The README publishes latency as a range, names the corpus beside the "0
+  false positives" figure, and prints the command for the test count instead of a
+  number that drifts (it read 444 against a suite of 855).
+
+### Removed
+- **`sunglasses/_version_check.py` (M3).** 6.5 KB of never-imported code that did
+  `urlopen()` inside a package whose headline claim is "zero network calls, zero
+  telemetry". The claim held because nothing imported it; it was one import away from
+  not holding, and any reviewer grepping the wheel found it first.
+
+
 ## [0.5.0] — 2026-08-30
 
 ### Hardening milestone
