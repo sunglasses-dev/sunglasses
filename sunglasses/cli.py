@@ -434,7 +434,10 @@ def cmd_scan(args):
         _print_extraction_warnings(result, stream=sys.stderr)
         sys.exit(_scan_exit_code(result))
 
-    print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({args.channel} channel)")
+    # The channel the scan actually used, not the flag default: scan_file() forces
+    # channel="file", so printing args.channel here contradicted the JSON output of
+    # the same scan (audit L6).
+    print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
     _print_extraction_warnings(result)
@@ -527,20 +530,26 @@ def cmd_receipts(args):
                 except ValueError:
                     continue
 
+    # A receipts file is bytes on disk: it may predate the write-side sanitize
+    # (audit H2) or have been edited since. Everything pulled out of it is treated
+    # as untrusted before it reaches the terminal.
+    from .firewall import sanitize_receipt_field as _clean
+
     colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
     print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
           f"{len(files)} day(s)){RESET}")
     print(f"  {DIM}{'─' * 74}{RESET}")
     for row in rows[-args.limit:]:
-        decision = row.get("decision", "?")
+        decision = _clean(row.get("decision", "?"), limit=10)
         color = colors.get(decision, "")
-        stamp = str(row.get("ts", ""))[11:19]
-        note = row.get("rule_id", "")
+        stamp = _clean(str(row.get("ts", ""))[11:19], limit=8)
+        note = _clean(row.get("rule_id", ""), limit=44)
         if row.get("lane") == "error":
-            note = f"{row.get('error', 'error')}"[:44]
+            note = _clean(row.get("error", "error"), limit=44)
+        tool = _clean(row.get("tool_name"), limit=24) or "-"
         print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
-              f"{DIM}{row.get('lane', ''):<13}{RESET} "
-              f"{str(row.get('tool_name') or '-'):<24} {DIM}{note}{RESET}")
+              f"{DIM}{_clean(row.get('lane', ''), limit=13):<13}{RESET} "
+              f"{tool:<24} {DIM}{note}{RESET}")
 
     counts = {}
     for row in rows:
