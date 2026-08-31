@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "patterns": 1407,
   "keywords": 6642,
   "categories": 117,
@@ -15,10 +15,10 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-08-30T06:41:57-07:00",
+  "last_updated": "2026-08-31T03:22:47-07:00",
   "last_updated_by": "sunglasses-publish-sh",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-08-30",
+  "released": "2026-08-31",
   "scan_speed": {
     "quickstart_median_ms": 0.74,
     "quickstart_input_chars": 18,
