@@ -286,6 +286,39 @@ def _scan_repo(args, engine):
     sys.exit(0 if total_threats == 0 else 1)
 
 
+# Exit-code contract for a scan (audit finding C1).
+#   0 = scanned completely, nothing found
+#   1 = threat found
+#   3 = we could not read part of the file, and found nothing in what we could read
+# 3 exists because 0 is a claim. "I read the whole file and it is clean" and "I could
+# not open the text layer and saw nothing" must not be the same signal to a CI job.
+EXIT_CLEAN = 0
+EXIT_THREAT = 1
+EXIT_INCOMPLETE = 3
+
+
+def _scan_exit_code(result):
+    if not result.is_clean:
+        return EXIT_THREAT
+    if not getattr(result, "extraction_complete", True):
+        return EXIT_INCOMPLETE
+    return EXIT_CLEAN
+
+
+def _print_extraction_warnings(result, stream=None):
+    """Announce anything we could not read. Never let it be inferred from silence."""
+    warnings = getattr(result, "extraction_warnings", None)
+    if not warnings:
+        return
+    out = stream or sys.stdout
+    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— part of this file was not read{RESET}", file=out)
+    for w in warnings:
+        print(f"  {YELLOW}!{RESET} {w}", file=out)
+    if result.is_clean:
+        print(f"  {DIM}No threats were found in what could be read. That is not the "
+              f"same as clean.{RESET}", file=out)
+
+
 def cmd_scan(args):
     """Run a scan."""
     engine = SunglassesEngine()
@@ -390,18 +423,22 @@ def cmd_scan(args):
     if args.output == "sarif":
         sarif_log = to_sarif([result], source=source)
         print(json.dumps(sarif_log, indent=2))
-        sys.exit(0 if result.is_clean else 1)
+        # stdout is a machine contract here; the warning goes to stderr.
+        _print_extraction_warnings(result, stream=sys.stderr)
+        sys.exit(_scan_exit_code(result))
 
     if args.json:
         output = result.to_dict()
         output["source"] = source
         print(json.dumps(output))
-        sys.exit(0 if result.is_clean else 1)
+        _print_extraction_warnings(result, stream=sys.stderr)
+        sys.exit(_scan_exit_code(result))
 
     print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({args.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
-    sys.exit(0 if result.is_clean else 1)
+    _print_extraction_warnings(result)
+    sys.exit(_scan_exit_code(result))
 
 
 def cmd_check(args):

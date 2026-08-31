@@ -23,6 +23,9 @@ setup(
         "image": ["Pillow", "pytesseract"],
         "pdf": ["PyPDF2"],
         "qr": ["pyzbar", "Pillow"],
+        # One name for "everything that reads a file that is not plain text".
+        # The per-format extras stay for anyone who wants exactly one of them.
+        "media": ["Pillow", "pytesseract", "PyPDF2", "pyzbar"],
         "audio": ["openai-whisper"],
         "video": ["openai-whisper"],
         "all": ["Pillow", "pytesseract", "PyPDF2", "pyzbar", "openai-whisper"],

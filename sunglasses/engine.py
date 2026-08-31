@@ -39,6 +39,11 @@ class ScanResult:
         self.normalized_input = normalized_input[:200]
         self.channel = channel
         self.latency_ms = round(latency_ms, 2)
+        # Populated by scan_file(). A direct scan() of a string is complete by
+        # definition — there was no file to fail to read.
+        self.extraction_complete = True
+        self.extraction_warnings = []
+        self.extraction_sources = []
 
     @property
     def is_clean(self) -> bool:
@@ -58,6 +63,10 @@ class ScanResult:
             "decision": self.decision,
             "severity": self.severity,
             "channel": self.channel,
+            # A machine consumer needs the same caveat the human gets: "allow" plus
+            # extraction_complete=false is not a clean bill of health.
+            "extraction_complete": self.extraction_complete,
+            "extraction_warnings": list(self.extraction_warnings),
             "findings_count": len(self.findings),
             "findings": [
                 {
@@ -836,10 +845,25 @@ class SunglassesEngine:
         )
 
     def scan_file(self, filepath: str) -> ScanResult:
-        """Scan a file's contents."""
-        with open(filepath, 'r', errors='ignore') as f:
-            content = f.read()
-        return self.scan(content, channel="file")
+        """Scan a file, routing images and PDFs through their extractors.
+
+        Audit finding C1: this used to be a raw ``open().read()``, so the CLI's
+        ``scan --file`` reported "no threats detected" on a PDF whose payload sat in
+        a compressed content stream, while ``SunglassesScanner.scan_auto()`` caught
+        the same file. The extractors existed; this path never dispatched to them.
+
+        The returned result carries ``extraction_complete``. When it is False we could
+        not read part of the file, and a caller must not render the verdict as a clean
+        bill of health — see ``cli.py`` for the exit-code contract.
+        """
+        from .extractors.dispatch import extract_file_sources
+
+        extraction = extract_file_sources(filepath)
+        result = self.scan(extraction.text, channel="file")
+        result.extraction_complete = extraction.complete
+        result.extraction_warnings = list(extraction.warnings)
+        result.extraction_sources = extraction.labels
+        return result
 
     def info(self) -> dict:
         """Return engine stats."""

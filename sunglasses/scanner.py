@@ -108,17 +108,28 @@ class SunglassesScanner:
 
         Handles: images (OCR + EXIF), PDFs, QR codes, text files.
         Returns dict with scan results.
-        """
-        ext = os.path.splitext(file_path)[1].lower()
 
-        if ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'):
-            return self._scan_image_fast(file_path)
-        elif ext == '.pdf':
-            return self._scan_pdf(file_path)
-        elif ext in ('.txt', '.md', '.html', '.csv', '.json', '.xml'):
-            return self._scan_text_file(file_path)
-        else:
-            return {"file": file_path, "error": f"Unsupported fast scan type: {ext}"}
+        Routing is delegated to ``extractors.dispatch`` so this and
+        ``SunglassesEngine.scan_file()`` cannot drift apart. Audit finding C1 was
+        exactly that drift: two file-scanning surfaces with two extension tables,
+        returning opposite verdicts on one PDF. An unknown extension is now read as
+        text rather than refused — refusing it was the older, quieter version of the
+        same bug, since the caller got no scan and no threat either.
+        """
+        from .extractors.dispatch import extract_file_sources
+
+        extraction = extract_file_sources(file_path)
+        result = self.engine.scan(extraction.text, channel="file")
+        return {
+            "file": file_path,
+            "sources_found": len(extraction.sources),
+            "sources": extraction.labels,
+            "is_clean": result.is_clean,
+            "decision": result.decision,
+            "threats": result.findings,
+            "extraction_complete": extraction.complete,
+            "warnings": list(extraction.warnings),
+        }
 
     def _scan_image_fast(self, path: str) -> dict:
         """FAST: Image scan (OCR + EXIF + QR codes)."""

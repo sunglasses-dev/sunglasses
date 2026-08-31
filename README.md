@@ -49,7 +49,8 @@ Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapte
 
 ```bash
 # Install
-pip install sunglasses              # text, images, PDFs, QR — zero heavy dependencies
+pip install sunglasses              # text scanning — zero dependencies
+pip install sunglasses[media]       # + images (OCR/EXIF), PDFs, QR codes
 pip install sunglasses[all]         # + audio & video scanning (installs Whisper)
 
 # Check what's installed on your system
@@ -58,7 +59,8 @@ sunglasses check
 # Scan text
 sunglasses scan "some text to check"
 
-# Scan a file (images, PDFs, text files)
+# Scan a file — text and code always; images/PDFs/QR need sunglasses[media]
+# (without the extra, SUNGLASSES says so and exits 3 — never a silent clean pass)
 sunglasses scan --file document.pdf
 
 # Scan audio/video (needs sunglasses[all] + ffmpeg)
@@ -92,6 +94,8 @@ sunglasses scan --file meeting.mp4 --deep      # scan video
 ```
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
+
+**Exit codes.** `0` = read the whole input, found nothing. `1` = threat found. `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 
 ## Integration
 
