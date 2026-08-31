@@ -5,6 +5,8 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-08-31
+
 ### Audit remediation
 Everything below came out of an independent clean-room audit of v0.5.0 run on
 2026-08-30 by a session that had not built the product, followed by a second pass that

@@ -1,8 +1,6 @@
 # SUNGLASSES
 
-**Sunglasses for AI agents.**
-
-Protection layer + neighborhood watch for AI agents.
+**The input firewall for AI agents.**
 
 **🕶 Try it in your browser — no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images. Image OCR runs locally in your browser; the image never leaves your device.
 

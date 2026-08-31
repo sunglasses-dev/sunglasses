@@ -1124,7 +1124,7 @@ def cmd_demo(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="sunglasses",
-        description="SUNGLASSES — AI Agent Input Filter. The antivirus for AI agents.",
+        description="SUNGLASSES — The input firewall for AI agents.",
     )
     parser.add_argument(
         "--version", "-V",
