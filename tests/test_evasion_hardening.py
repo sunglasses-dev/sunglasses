@@ -115,14 +115,34 @@ def test_long_document_scan_stays_fast():
     # enrichment must add negligible cost here vs a no-enrichment baseline.
     # (Separately noted: the regex lane is ~linear-heavy above this — a 200KB
     # doc is ~8s on the shipped engine, a PRE-EXISTING perf item, not H3.)
+    # 2026-08-31: converted from a wall-clock ceiling to a RATIO against this
+    # machine's own measured speed. History of the absolute version: 6.0s flaked at
+    # 8.5s (Jul-14), was raised to 15.0s, and flaked again at 15.5s the first time
+    # the suite ran on a 3.10 runner. Each fix bought time and re-armed the same
+    # trap, because the number was tracking runner speed, not the engine.
+    #
+    # The threat this guards is unchanged and the ratio catches it BETTER: the
+    # Jun-9 ReDoS blow-up was MINUTES against a ~4s baseline — three orders of
+    # magnitude. Scan cost is near-linear in length, so 100KB should land within a
+    # small multiple of 10KB. A catastrophic backtrack cannot hide inside 4x.
     import time
-    big = "def handler(request):\n    return process(request.body)\n" * 1900  # ~100KB
+    unit = "def handler(request):\n    return process(request.body)\n"
+    small = unit * 190                      # ~10KB
+    big = unit * 1900                       # ~100KB
     assert len(big) >= 100_000
+
+    t0 = time.perf_counter()
+    engine.scan(small, "file")
+    baseline = time.perf_counter() - t0
+
     t0 = time.perf_counter()
     engine.scan(big, "file")
     elapsed = time.perf_counter() - t0
-    # Ceiling sized for shared CI runners: ~3.8s local (M-series, measured
-    # identical on v0.3.0 and v0.3.1) x 2-2.5x runner slowdown = 7.5-9.5s
-    # expected there; 6.0 flaked at 8.5s on a slow runner (Jul-14). The Jun-9
-    # ReDoS blow-up this guards against was MINUTES, so 15s still catches it.
-    assert elapsed < 15.0, f"100KB scan took {elapsed:.1f}s (perf regression / ReDoS risk)"
+
+    # 10x the input at ~linear cost, so 4x headroom over the expected ratio.
+    # Machine-independent: a slow runner slows BOTH measurements equally.
+    assert elapsed < baseline * 40 + 1.0, (
+        f"100KB scan took {elapsed:.1f}s against {baseline:.2f}s for 10KB "
+        f"({elapsed / max(baseline, 1e-9):.1f}x for 10x the input) — "
+        f"perf regression / ReDoS risk"
+    )
