@@ -1,15 +1,15 @@
 {
   "metrics": {
-    "engine_version": "0.3.1",
+    "engine_version": "0.5.0",
     "positives": 38,
-    "negatives": 73,
+    "negatives": 76,
     "true_positives": 37,
     "false_negatives": 1,
-    "false_positives": 10,
-    "true_negatives": 63,
-    "precision": 0.7872,
+    "false_positives": 6,
+    "true_negatives": 70,
+    "precision": 0.8605,
     "recall": 0.9737,
-    "f1": 0.8706,
+    "f1": 0.9136,
     "recall_by_segment": {
       "known_shape": {
         "total": 30,
@@ -22,7 +22,7 @@
         "recall": 0.875
       }
     },
-    "sha256": "d3200d2a3344e06887dfc12993728a8e82aaca5ce7bbf5e30abc961534516b88"
+    "sha256": "763d095f91af640d482063840c61a1f009876cc501eb9dca66ab2cece0a95492"
   },
   "misses": [
     {
@@ -33,13 +33,9 @@
     }
   ],
   "false_positives": [
-    "axios__axios.md",
-    "ggml-org__llama.cpp.md",
-    "langgenius__dify.md",
-    "modelcontextprotocol__servers.md",
+    "AgriciDaniel__claude-seo.md",
     "openai__openai-python.md",
     "pytorch__pytorch.md",
-    "redis__redis.md",
     "run-llama__llama_index.md",
     "sunglasses-dev__sunglasses.md",
     "trufflesecurity__trufflehog.md"

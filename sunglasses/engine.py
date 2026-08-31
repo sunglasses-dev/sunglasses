@@ -27,6 +27,18 @@ from .patterns import PATTERNS
 from .preprocessor import VIEW_SEP, normalize
 
 
+# Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
+# 0.055s, 100 KB is 4.9s, 1 MB is 49.6s. Uncapped, a front-line filter handed a
+# 10 MB page stalls an agent for about eight minutes, which is a denial of service
+# an attacker can trigger by sending a large benign document.
+#
+# 1 MB is deliberately generous: it is the worst case the README already documents,
+# so nothing an ordinary caller scans changes. The cap bounds the tail, and a scan
+# that hit it says so — a partial scan reported as clean is the failure this whole
+# release is about.
+MAX_SCAN_BYTES = 1024 * 1024
+
+
 class ScanResult:
     """Result of a SUNGLASSES scan."""
 
@@ -41,6 +53,8 @@ class ScanResult:
         self.latency_ms = round(latency_ms, 2)
         # Populated by scan_file(). A direct scan() of a string is complete by
         # definition — there was no file to fail to read.
+        self.truncated = False
+        self.bytes_scanned = len(raw_input)
         self.extraction_complete = True
         self.extraction_warnings = []
         self.extraction_sources = []
@@ -108,6 +122,8 @@ class ScanResult:
             "channel": self.channel,
             # A machine consumer needs the same caveat the human gets: "allow" plus
             # extraction_complete=false is not a clean bill of health.
+            "truncated": self.truncated,
+            "bytes_scanned": self.bytes_scanned,
             "extraction_complete": self.extraction_complete,
             "extraction_warnings": list(self.extraction_warnings),
             "findings_count": len(self.reported_findings()),
@@ -371,7 +387,11 @@ class SunglassesEngine:
     DEFENSIVE_WINDOW = 120  # wider than negation: the framing verb leads the clause
 
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
-                 mechanisms: bool = True):
+                 mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES):
+        # 0 disables the cap. Configurable because a batch job scanning archives has
+        # different tolerances from a hook in front of an agent, and picking one
+        # number for both is how a default becomes something people work around.
+        self.max_scan_bytes = max_scan_bytes
         carriers = patterns or PATTERNS
         # The mechanism layer (mechanisms.py) matches attack SHAPE rather than
         # wording, and covers the paraphrases the carrier list structurally
@@ -701,6 +721,16 @@ class SunglassesEngine:
         match_channels = {channel, self.CHANNEL_ALIASES.get(channel, channel)}
         start = time.perf_counter()
 
+        # Step 0: Bound the input (audit M8). Cost is linear in length, so an
+        # oversized input is a stall an attacker can trigger with a large benign
+        # document. Truncation is recorded on the result rather than applied
+        # silently — the caller has to be able to tell a full clean scan from a
+        # partial one.
+        full_length = len(text)
+        truncated = bool(self.max_scan_bytes) and full_length > self.max_scan_bytes
+        if truncated:
+            text = text[: self.max_scan_bytes]
+
         # Step 1: Normalize (strip tricks, decode evasion)
         normalized = normalize(text)
 
@@ -880,7 +910,7 @@ class SunglassesEngine:
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        return ScanResult(
+        result = ScanResult(
             decision=decision,
             findings=findings,
             raw_input=text,
@@ -888,6 +918,9 @@ class SunglassesEngine:
             channel=channel,
             latency_ms=elapsed_ms,
         )
+        result.truncated = truncated
+        result.bytes_scanned = len(text)
+        return result
 
     def scan_file(self, filepath: str) -> ScanResult:
         """Scan a file, routing images and PDFs through their extractors.

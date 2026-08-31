@@ -95,6 +95,8 @@ sunglasses scan --file meeting.mp4 --deep      # scan video
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
+**Input size cap.** `engine.scan()` reads at most **1 MB** by default. Scan cost is linear in input length (~50 µs/byte), so an uncapped filter handed a 10 MB page stalls an agent for minutes — a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
+
 **Exit codes.** `0` = read the whole input, found nothing. `1` = threat found. `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 
 ## Integration
@@ -188,7 +190,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 
 ## What Works Today
 
-- ✅ Text scanning: 1407 patterns, 6,645 keywords, 23 languages, 117 attack categories
+- ✅ Text scanning: 1407 patterns, 6,642 keywords, 23 languages, 117 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
@@ -205,7 +207,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 - ✅ SARIF 2.1.0 output for CI integration
 - ✅ 64/64 internal recall on shipped attack fixture set — 100% recall
 - ✅ 100% local — zero network calls, zero telemetry
-- ✅ Daily protection report (local HTML)
+- ✅ Daily protection report (local HTML) — covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
 - ✅ MIT License
 
 ## The Firewall — from detector to control (v0.4)

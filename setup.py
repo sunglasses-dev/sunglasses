@@ -16,7 +16,11 @@ setup(
     },
     license="MIT",
     packages=find_packages(),
-    python_requires=">=3.8",
+    # Claim only what CI proves. 3.8 has been EOL since Oct 2024 and was never
+    # in the matrix; ">=3.8" was a claim about five versions backed by tests on
+    # one. The matrix in .github/workflows/pattern-integrity.yml now covers every
+    # version named here.
+    python_requires=">=3.9",
     install_requires=[],
     extras_require={
         "dev": ["pytest"],
