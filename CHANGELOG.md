@@ -5,6 +5,22 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-09-01
+
+### Added
+- **30 new `memory_retrieval` detection patterns (`GLS-MR-001` through `GLS-MR-040`,
+  30 IDs).** First release of the memory and retrieval category: records that gain
+  trust while losing information. Admission (redirected links, malformed resolver
+  answers, unsigned artifacts, last-write conflicts, spoofed authorship), binding
+  (identity, tenant, session, fail-open auth and policy gates), replay (stale approvals,
+  dormant activation predicates, stale containment proofs), laundering (dashboard and
+  stability scores, cascade confidence, decoy completions, telemetry spoofing) and
+  leakage (membership probes, paired subset attribution, memorized records, shared
+  serving caches, DNS-rebound local proxies). Every pattern fired on its own attack
+  fixture, stayed silent on its benign fixture and produced zero hits on the 78
+  document benign corpus at intake. Category count 117 → 118, pattern count 1407 → 1437.
+- Companion write up: https://sunglasses.dev/blog/ai-agent-memory-is-evidence-not-authority
+
 ## [0.5.1] — 2026-08-31
 
 ### Audit remediation
