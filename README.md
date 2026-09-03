@@ -147,7 +147,7 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency — typical attack string (median of 38) | ~4.2 ms |
 | Scan latency — real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
-| Patterns | 1437 |
+| Patterns | 1460 |
 | Keywords | 6,642 |
 | Languages | 23 |
 | Attack categories | 118 |
@@ -172,7 +172,7 @@ python3 tests/benchmark/precision_recall.py
 
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge — same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block.
 
-| Metric (v0.5.2) | Value |
+| Metric (v0.5.3) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
@@ -188,7 +188,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 
 ## What Works Today
 
-- ✅ Text scanning: 1437 patterns, 6,642 keywords, 23 languages, 118 attack categories
+- ✅ Text scanning: 1460 patterns, 6,642 keywords, 23 languages, 118 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
