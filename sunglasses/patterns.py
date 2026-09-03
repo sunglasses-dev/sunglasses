@@ -27268,4 +27268,258 @@ PATTERNS = [
         ],
         "description": "A stale containment proof can claim a universal guarantee over an older typed-action universe while a newly reachable action is omitted; the agent treats that unmodeled action as contained and dispatches it."
     },
+    # === v0.5.3 batch (23 patterns) ===
+    {
+        "id": "GLS-MR-041",
+        "name": "Model Serving Parameter Amplification Resource Exhaustion",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\s*(?!.*\b(?:security\s+(?:advisory|guide|rule|training)|scanner\s+(?:rule|test)|blocked\s+(?:payload|sample)|negative\s+fixture|incident\s+report|must\s+not\s+(?:obey|trust)|do\s+not\s+(?:accept|run|allow)|patched|fixed|capped|bounded\s+request|remains\s+responsive)\b)(?=.*\b(?:vllm|ilab|model[- ]serv(?:e|ing)|completion\s+api)\b)(?=.*[\"']?best[_ -]?of[\"']?\s*(?:(?:[:=])|(?:\bvalue\s+of\b))\s*(?:\d{5,}|(?:1e|10\^?)\d{3,}|(?:large|extreme|unbounded))\b)(?=.*\b(?:resource|cpu|gpu|memory|worker|timeout|fan[- ]?out|candidate[- ]generation|excessive\s+(?:work|generation))\b)(?=.*\b(?:accepted|admitted|without\s+(?:a\s+)?(?:hard\s+)?(?:limit|cap|timeout)|not\s+bounded|unbounded|exhaust(?:s|ed|ing)?|out\s+of\s+memory|unresponsive|unavailable|denial\s+of\s+service|availability\s+failure)\b).*$""",
+        ],
+        "description": "A valid model-completion request can amplify internal candidate generation through an extreme best_of value before admission limits or timeout enforcement, exhausting service resources and denying availability."
+    },
+    {
+        "id": "GLS-MR-042",
+        "name": "Archive Member Path Traversal Memory Staging Escape",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*(?:patched|fixed|blocked|safe|benign|defensive|test\s+fixture|must\s+not|never\s+extract|validated\s+relative|no\s+parent\s+segments|remain\s+within))(?=.*(?:litellm|skill\s+(?:upload|archive)|skills?\s+zip|zip\s+skill\s+upload))(?=.*(?:(?:zip|archive).{0,80}(?:member|entry|filename)|(?:member|entry|filename).{0,80}(?:zip|archive)))(?=.*(?:\.\./|\.\.\\|%2e%2e|path\s+traversal|\btraversal\b|parent[-\s]+segments?))(?=.*(?:extract|unpack|staging|memory|write|escape|outside)).*$""",
+        ],
+        "description": "A crafted LiteLLM Skills ZIP member name can escape the intended memory staging directory during extraction when parent segments or encoded dot segments are not canonicalized and contained before writing."
+    },
+    {
+        "id": "GLS-MR-043",
+        "name": "Structured Knowledge Graph Fact Poisoning",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|review|policy)|unit\s+test|test\s+fixture|incident\s+report|postmortem|runbook|blocked\s+payload|negative\s+example|defensive|must\s+not\s+(?:trust|accept|use|obey)|do\s+not\s+(?:trust|accept|use|obey)|quarantined)\b)(?=.*\b(?:knowledge[- ]graph|graph\s+(?:query|retrieval|result|node|edge)|structured\s+(?:graph|retrieval))\b)(?=.*\b(?:fact|claim|relation|node|edge)\b)(?=.*\b(?:poison(?:ed|ing)?|fabricat(?:ed|e)|forged|attacker[- ]controlled|untrusted)\b)(?=.*\b(?:retriev(?:ed|al)|query|result|evidence|answer)\b)(?=.*\b(?:security|vulnerab(?:ility|le)|safe|risk|policy|finding)\b)(?=.*\b(?:trust|accept(?:s|ed)?|treat|conclude|assert|report)\b)(?=.*\b(?:without|missing|no|unverified|unvalidated|stale|provenance)\b).*$""",
+        ],
+        "description": "An attacker poisons a structured knowledge graph so a trusted query response contains a fabricated security fact, and the agent reaches a wrong conclusion through otherwise correct reasoning."
+    },
+    {
+        "id": "GLS-MR-044",
+        "name": "Temporal Fragment Fusion Access Control Bypass",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|training|policy)|unit\s+test|test\s+fixture|incident\s+report|blocked|quarantined|defensive|must\s+(?:reject|block|not\s+obey)|do\s+not\s+promote)\b)(?=.*\b(?:memory|persistent\s+store|RAG|retrieval)\b)(?=.*\b(?:marker|tag|carrier|fragment|part|piece)\w*\b)(?=.*\b(?:write|store|inject|save|record)\w*\b)(?=.*\b(?:retriev|recall|fetch|later|follow-up|subsequent)\w*\b)(?=.*\b(?:fuse|fusion|join|combine|reconstruct|reassembl|merge)\w*\b)(?=.*(?:\b(?:per[- ]?(?:fragment|query)|individually|separately|local)\b.{0,80}\b(?:allow|authoriz|approv|pass)\w*\b|\b(?:allow|authoriz|approv|pass)\w*\b.{0,80}\b(?:per[- ]?(?:fragment|query)|individually|separately|local)\b))(?=.*(?:\b(?:final\s+query|request)\s+(?:does\s+not|never|cannot)\s+(?:contain|show|include|expose)|hidden\s+(?:from|in)\s+the\s+final))(?=.*\b(?:restricted|private|confidential|secret|protected|unauthorized)\b).*$""",
+        ],
+        "description": "Marker-tagged memory writes can each pass access control, then a later request joins hidden fragments into a restricted disclosure that was absent from the final query."
+    },
+    {
+        "id": "GLS-MR-045",
+        "name": "Mid Task Goal State Fusion Poisoning",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|documentation)|scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+(?:payload|sample)|incident\s+report|postmortem|defensive|must\s+not|should\s+(?:reject|block|refuse)|safe\s+(?:handling|implementation))\b)(?=.*\b(?:browser|web)\s+(?:agent|automation)|navigation\s+(?:page|content|state)|page\s+content\b)(?=.*\b(?:current\s+)?task\s+(?:state|memory|context)|active\s+(?:task|goal)\s+(?:state|memory))(?=.*\b(?:fuse|merge|inject|insert|preserve|persist)\w*.{0,90}\b(?:secondary|attacker|hidden|injected)\b.{0,35}\b(?:goal|task|objective)\b|\b(?:secondary|attacker|hidden|injected)\b.{0,90}\b(?:fuse|merge|preserve|persist)\w*)(?=.*\b(?:execute|perform|carry\s+out|dispatch|upload|transfer|send|delete|purchase)\w*\b)(?=.*\b(?:resume|continue|return)\w*\b.{0,100}\b(?:original|user)\s+(?:task|goal)|\b(?:normal|seamless)\s+continuity\b).*$""",
+        ],
+        "description": "A hostile navigation page fuses a secondary goal into the active browser task memory, executes it, and then resumes the original task so the unauthorized transition looks like normal continuity."
+    },
+    {
+        "id": "GLS-MR-046",
+        "name": "Falsifier Result Polarity Inversion",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)\A(?!.*(?:security\s+(?:guide|policy|training|documentation)|scanner\s+(?:rule|docs?)|unit\s+test|test\s+fixture|incident\s+report|postmortem|blocked\s+(?:payload|sample)|negative\s+example|must\s+not|should\s+reject|do\s+not\s+(?:promote|trust|interpret|reuse)|fail[- ]closed))(?=.*\b(?:VCG|vulnerability\s+concept\s+graph|concept[- ]graph|persistent\s+(?:concept|attack)[- ]memory)\b)(?=.*\b(?:falsif(?:ier|ication)|counterexample|negative\s+evidence|inconclusive|refute|disconfirm)\b)(?=.*\b(?:result|verdict|status|outcome|finding)\b)(?=.*\b(?:serializ|deserializ|retriev|load|write|store|promot|import|persist)\w*\b)(?=.*\b(?:positive|confirmed|validated|pass(?:ed)?|safe|approved|support(?:ed)?)\b)(?=.*\b(?:reinterpret|flip|invert|map|coerce|treat|treated|recorded|stored|read|use|accept)\w*\b)(?=.*\b(?:promot|publish|admit|accept|reuse|authorize|approv)\w*\b).*$""",
+        ],
+        "description": "A negative or inconclusive falsifier result is serialized or retrieved as positive confirmation, allowing a VCG concept to be promoted without a real counterexample check."
+    },
+    {
+        "id": "GLS-MR-047",
+        "name": "Telemetry Only Routing Camouflage",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\s*(?!.*\b(?:security\s+(?:guide|training|review|policy)|unit\s+test|test\s+fixture|incident\s+report|postmortem|blocked|quarantined|must\s+(?:not|never)|do\s+not\s+(?:trust|treat|accept|infer|use))\b)(?=.*\b(?:MoE|mixture[- ]of[- ]experts|expert[- ]routing)\b)(?=.*\b(?:GPU|active\s+threads?|prefill(?:ing)?|execution\s+telemetry|routing\s+footprint)\b)(?=.*\b(?:harmful|malicious|unsafe|dangerous)\b)(?=.*\b(?:benign[- ]like|camouflage|mimic|evade|evasion|look(?:s|ing)?\s+benign)\b)(?=.*\b(?:audit(?:or|ing)?|detector|safety\s+(?:audit|monitor)|fingerprint)\b)(?=.*\b(?:miss(?:ed|es|ing)?|evad(?:e|es|ed)|false[- ]negative|fail(?:s|ed)?\s+to\s+(?:detect|flag)|accept(?:s|ed)?\s+as\s+safe)\b).*$""",
+        ],
+        "description": "A harmful prompt is optimized to produce a benign-like MoE expert-routing footprint, so a privacy-preserving routing-only safety auditor accepts the telemetry and misses the harmful behavior."
+    },
+    {
+        "id": "GLS-MR-048",
+        "name": "Controllability-Constrained-Adversarial-Transfer",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|blocked|quarantined|example\s+of)\b)(?=.*\b(?:network[- ]flow|traffic[- ]flow|flow\s+record|network\s+traffic\s+classifier|IDS)\b)(?=.*\b(?:directly\s+)?controllable\b)(?=.*\b(?:feature|field|input|dimension)\b)(?=.*\b(?:perturb\w*|modif(?:y|ied|ying)\w*|alter\w*|tweak\w*|change\w*|shift\w*)\b)(?=.*\b(?:indirect(?:ly)?\s+controllable|uncontrollable|frozen|held\s+constant)\b)(?=.*\b(?:surrogate|transfer|black[- ]box|coordinate|PGD|NES)\b)(?=.*\b(?:benign|allow(?:ed)?|safe|normal)\s+(?:label|classification|verdict|decision|prediction)\b).*$""",
+        ],
+        "description": "An attacker changes only directly controllable network-flow features, freezes indirect/uncontrollable context, and transfers a surrogate-crafted benign label across an agent-facing IDS classifier boundary."
+    },
+    {
+        "id": "GLS-MR-049",
+        "name": "Embedding Nearest Neighbor Ttp Semantic Collision",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\s*(?!.*\b(?:security\s+(?:guide|documentation|training)|scanner\s+(?:rule|test)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|blocked\s+(?:sample|payload)|must\s+not\s+(?:trust|accept|promote)|preserve(?:s)?\s+(?:top[- ]?k|uncertainty|provenance)|requires?\s+independent\s+validation)\b)(?=.*\b(?:ThreatForest|attack[- ]tree|TTP(?:\s+mapping)?|ATT&CK|CAPEC)\b)(?=.*\b(?:embedding|cosine|nearest[- ]neighbor|similarity\s+(?:score|mapping))\b)(?=.*\b(?:wrong|incorrect|misclassif\w*|collision|semantically\s+mismatch\w*|drops?\s+(?:the\s+)?(?:alternative|uncertainty)|discard\w*\s+(?:the\s+)?(?:alternative|uncertainty)|treats?\s+(?:the\s+)?(?:nearest|mapped)\s+(?:TTP|technique|label)\s+as\s+verified)\b)(?=.*\b(?:mitigation|close\w*\s+(?:the\s+)?(?:finding|alert)|suppress\w*\s+(?:the\s+)?(?:finding|alert)|hide\w*\s+(?:the\s+)?(?:finding|alert)|credential|secret|token)\b).*$""",
+        ],
+        "description": "An embedding-only TTP mapper makes a plausible but wrong nearest-technique assignment, drops uncertainty, and lets downstream mitigation or finding closure treat the label as verified evidence."
+    },
+    {
+        "id": "GLS-MR-051",
+        "name": "Legitimate Syscall Self State Mutation",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:scanner|detector|unit\s+test|negative\s+fixture|blocked\s+sample|incident\s+report|postmortem|security\s+(?:guide|training|documentation)|defensive|must\s+not|do\s+not\s+(?:trust|accept)|safe\s+(?:example|control))\b)(?=.*\b(?:self[- ]hosted|agent[- ]owned|agent\s+(?:memory|configuration)|self[- ]state|durable\s+state)\b)(?=.*\b(?:atomic\s+rename|rename|replace|restore|rollback|snapshot)\b)(?=.*\b(?:stale|replay(?:ed)?|prior\s+version|attacker[- ]controlled|tampered|mutat(?:ed|ion))\b[^\n]{0,180}\b(?:state|snapshot|memory|configuration|config|bytes)\b)(?=.*\b(?:no|missing|without|lacks?)\b[^\n]{0,120}\b(?:epoch|version|digest|integrity|provenance|freshness|writer)\b)(?=.*\b(?:restart|reload|rehydrat|retriev|trusted|prior\s+approval|privileged\s+tool)\b).*$""",
+        ],
+        "description": "A normal-looking atomic rename or restore makes a stale attacker-controlled self-state snapshot win at restart, and the later consumer trusts it without epoch/digest binding."
+    },
+    {
+        "id": "GLS-MR-053",
+        "name": "Retrieved Financial Mandate Replay Without Current Binding",
+        "category": "memory_retrieval",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:documentation|unit\s+test|security\s+training|runbook|benign\s+memory\s+summary|reconciliation\s+report|ordinary\s+retrieval|must\s+not\s+use)\b)(?=.*\b(?:retrieved|retrieval|RAG|memory|cached)\b)(?=.*\b(?:payment|transfer|wire|beneficiar(?:y|ies)|payee|invoice|mandate)\b)(?=.*\b(?:stale|old|changed|mismatch|unbound|unbound\s+to|without\s+(?:current|fresh)|not\s+(?:bound|revalidated|verified)|different\s+(?:payee|account|beneficiary|amount))\b)(?=.*\b(?:send|transfer|wire|pay|release|execute)\b)(?=.*\b(?:without|skip|no|do\s+not)\b.{0,100}\b(?:confirm|confirmation|approval|recheck|revalidat|verif)\w*\b).*$""",
+        ],
+        "description": "A stale or attacker-planted retrieved payment mandate is treated as current authorization, allowing a changed beneficiary or amount to reach a transfer sink without current revalidation."
+    },
+    {
+        "id": "GLS-MR-054",
+        "name": "Self Evolution Fitness Invariant Regression",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)\A(?!.*\b(?:security\s+(?:guide|documentation|training|policy)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|blocked|quarantined|defensive|must\s+(?:run|retain|include|require|reject|recheck|hold)|should\s+(?:run|retain|include|require|reject|recheck))\b)(?=.*\b(?:SE[- ]AOS|self[- ]evolving|evolution)\b)(?=.*\b(?:fitness|benchmark|known\s+regression|regression\s+suite)\b)(?=.*\b(?:hidden|unseen|holdout|safety[- ]invariant|invariant)\b)(?=.*\b(?:omit(?:ted|s)?|skip(?:ped)?|never\s+(?:run|test)|without|no\s+(?:hidden\s+)?holdout|no\s+hidden\s+(?:invariant|safety)|not\s+(?:covered|tested))\b)(?=.*\b(?:weaken|regress|degrad|generaliz|drift)\w*\b)(?=.*\b(?:commit|hot[- ]load|load|promot|activate)\w*\b).*$""",
+        ],
+        "description": "A self-evolving agent passes target-specific fitness and a familiar regression suite, omits hidden safety-invariant holdout coverage, and hot-loads a capability whose unseen behavior regresses."
+    },
+    {
+        "id": "GLS-MR-055",
+        "name": "Retrieval Primitive Placement Laundering",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|rule|training)|scanner\s+(?:rule|test)|blocked\s+(?:payload|sample)|negative\s+fixture|incident\s+report|postmortem|quarantined|must\s+not\s+(?:obey|trust|use|follow)|do\s+not\s+trust)\b)(?=.*\b(?:retriev(?:ed|al)|RAG|memory|knowledge[- ]base|indexed)\b)(?=.*\b(?:microarchitectural|Spectre|cache[- ]flush|serialization\s+fence|branch[- ]predictor|side[- ]channel)\b)(?=.*\b(?:misplac|wrong\s+order|after\s+the\s+(?:victim|measurement)|omit(?:ted)?|skip(?:ping)?|missing|remove)\b)(?=.*\b(?:primitive|fence|flush|barrier|gadget|speculation)\b)(?=.*\b(?:agent|assistant|PoC|proof[- ]of[- ]concept|generate|synthesi[sz])\b)(?=.*\b(?:authoritative|validated\s+(?:recipe|record|memory)|must\s+use|do\s+not\s+re-?check|without\s+re-?validat|treat\s+this\s+(?:memory|record)\s+as)\b).*$""",
+        ],
+        "description": "A retrieved memory recipe can launder authority for a microarchitectural PoC whose critical attack primitive is deliberately misplaced or omitted, causing an agent to synthesize an invalid or unsafe test without revalidation."
+    },
+    {
+        "id": "GLS-MR-056",
+        "name": "Unprotected Mcp Auth Gate Auto Minted Session Projection",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\s*(?!.*\b(?:security\s+(?:guide|documentation|training|review)|unit\s+test|negative\s+fixture|blocked\s+(?:payload|sample)|incident\s+report|postmortem|runbook|defensive|safe\s+(?:implementation|example)|must\s+(?:reject|protect|gate|verify)|should\s+(?:reject|protect|gate|verify)|do\s+not|never|patched|fixed|mitigated|advisory\s+summary)\b)(?=.*\b(?:Presenton|MCP|model\s+context\s+protocol)\b)(?=.*(?:/mcp|\bnginx\b|\bauth_request\b|\bMCP\s+endpoint\b))(?=.*\b(?:unauthenticated|anonymous|without\s+(?:any\s+)?authentication|missing\s+authentication)\b)(?=.*\b(?:remote|external|network)\b.{0,30}\b(?:caller|client|request|attacker|access)\b)(?=.*\b(?:auto[- ]?mint(?:s|ed)?|automatically\s+(?:mint|issue|create)|valid\s+internal\s+session\s+token)\b)(?=.*\b(?:invoke(?:s|d)?|call(?:s|ed)?|execute(?:s|d)?|trigger(?:s|ed)?)\b.{0,100}\b(?:MCP\s+)?(?:tool|action|operation|generate_presentation)\b).*$""",
+        ],
+        "description": "An unauthenticated remote caller reaches an MCP endpoint omitted from the reverse-proxy auth gate, then receives an auto-minted internal session token and performs an authenticated MCP action."
+    },
+    {
+        "id": "GLS-MR-057",
+        "name": "Cross Metric Identity Denominator Laundering",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+payload|quarantined|security\s+(?:guide|training)|incident\s+report|postmortem|must\s+not|do\s+not\s+(?:trust|obey|flag|report))\b)(?=.*\b(?:privacy|healthcare|hospital|patient|medical)\b)(?=.*\b(?:risk\s+(?:evaluation|score)|composite\s+(?:risk|score)|AHP|analytic\s+hierarchy|weighted\s+aggregation)\b)(?=.*\b(?:similarity|uncertainty|adversary[_ -]?success|information[_ -]?(?:gain|loss)|privacy\s+metrics?)\b)(?=.*\b(?:cross[- ]?(?:dataset|cohort|scope)|different\s+(?:dataset|cohort|version|population)|identity\s+(?:mismatch|collision|join)|denominator\s+(?:mismatch|drift|collision)|misjoin(?:ed|ment)?)\b)(?=.*\b(?:understat(?:e|ed|es)|underestimat(?:e|ed|es)|falsely\s+low|low\s+(?:risk|privacy\s+loss)|insufficient\s+(?:protection|mitigation)|weak\s+(?:protection|privacy))\b).*$""",
+        ],
+        "description": "A privacy evaluator joins similarity, uncertainty, adversary-success, and information-loss metrics from different dataset scopes or denominators under one record key, yielding a coherent but falsely low composite risk and insufficient protection recommendation."
+    },
+    {
+        "id": "GLS-MR-058",
+        "name": "Factcheck Verdict Propagation Provenance Collapse",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|review)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|defensive|blocked|quarantined|must\s+(?:bind|reject|reconcile|recheck)|do\s+not\s+(?:publish|propagate|trust|reuse))\b)(?=.*\b(?:automated\s+fact[- ]?check(?:ing|er)?|fact[- ]?check(?:ing|er)?|claim\s+verification)\b)(?=.*\b(?:claim|assertion|evidence|source|citation|retriev(?:al|ed)|snapshot)\b)(?=.*\b(?:stale|wrong|mismatched|foreign|different|outdated|changed|unbound|missing|another|prior|previous|earlier)\b)(?=.*\b(?:verdict|judg(?:e|ment)|true|false|misinformation|label)\b)(?=.*\b(?:publish\w*|posting|social\s+media|downstream|propagat\w*|share\w*|broadcast\w*)\b).*$""",
+        ],
+        "description": "An automated fact-checker accepts a stale or foreign evidence bundle for the current claim, preserves the resulting wrong verdict, and propagates it into a social-media publication record as if it were current evidence."
+    },
+    {
+        "id": "GLS-MR-059",
+        "name": "Synthetic Task Reconstruction Poisoning",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|review|training|documentation)|unit\s+test|negative\s+fixture|blocked|quarantined|postmortem|defensive|incident\s+report|must\s+(?:not|reject|flag)|should\s+(?:reject|flag)|safe\s+example|scanner\s+rule)\b)(?=.*\b(?:MPC[- ]?Patch[- ]?Bench|multi[- ]party\s+computation|MPC)\b)(?=.*\b(?:synthesi[sz]ed|reconstruct(?:ed|ion)?|completion\s+engine|generated)\b)(?=.*\b(?:task\s+statement|issue\s+description|(?:patch|task)\s+requirements?|retrieved\s+(?:task|record)|memory|RAG)\b)(?=.*\b(?:patch|code\s+repair|fix)\w*\b)(?=.*\b(?:cryptographic|constant[- ]time|secret[- ]sharing|numerical[- ]fidelity|security\s+invariant)\b)(?=.*\b(?:functional|fail[- ]to[- ]pass|tests?\s+pass|test\s+suite)\b)(?=.*\b(?:shortcut|out[- ]of[- ]scope|waiv(?:e|ed|ing)|skip|bypass|no\s+(?:need|requirement)|without)\b).*$""",
+        ],
+        "description": "A benchmark completion engine reconstructs a missing MPC task statement, and an agent persists attacker-shaped requirements that make a functionally passing patch appear security-safe while bypassing cryptographic and numerical review."
+    },
+    {
+        "id": "GLS-MR-060",
+        "name": "Metadata Instruction Smuggling",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+guide|unit\s+test|test\s+fixture|incident\s+report|blocked\s+(?:payload|sample)|negative\s+fixture|must\s+not|do\s+not\s+(?:trust|obey|forward)|documentation)\b)(?=.*\b(?:Chroma(?:DB)?|vector\s+memory|memory\s+match)\b)(?=.*\b(?:confidence[-\s]?aware|confidence\s+gate|low[- ]confidence|Gate[- ]?[123]|calibrat(?:ed|ion)|IDS|intrusion[- ]detection)\b)(?=.*\b(?:promote|upgrade|skip|bypass|suppress|hide|forward|send|disclose)\b.{0,140}\b(?:review|LLM|approval|warning|alert|finding|token|credential|benign|event)\b)(?=.*\b(?:stale|prior|reused|different|without|no|not|current|rebind|model\s+version|feature\s+schema|calibration\s+epoch|current\s+layer)\b).*$""",
+        ],
+        "description": "A stale or over-broad Chroma memory match can upgrade a low-confidence cloud IDS event and bypass LLM escalation or review when the match is not bound to the current layer and calibration epoch."
+    },
+    {
+        "id": "GLS-MR-063",
+        "name": "Shared Prompt Delete Path Scope Escape",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^\A(?!.*\b(?:documentation|unit\s+test|patched|security\s+guidance|incident\s+report|historical|negative\s+fixture|must\s+(?:reject|deny|canonicalize|resolve)|reject(?:s|ed)?|fail\s+closed|server[- ]controlled|allowlisted)\b)(?=.*\b(?:MCP|JSON[- ]RPC|Model\s+Context\s+Protocol)\b)(?=.*\b(?:shared[- ]prompt|prompt[- ]manager|delete_shared_prompt|prompt[- ]store)\b)(?=.*\b(?:detail|prompt[- ](?:name|path)|file_path)\b)(?=.*(?:\.\.[/\\]|%2e|%2f|%252e|\babsolute\b|\bsymlink\b|\boutside\b|\bcaller[- ]controlled\b|\bmodel[- ]controlled\b))(?=.*(?:\btravers(?:al|e)\b|\bout[- ]of[- ]root\b|\bcontainment\s+(?:validation|check)\s+(?:is\s+)?(?:absent|missing)\b|\bvalidation\s+is\s+missing\b|\bno\s+(?:workspace\s+)?(?:boundary|containment)\b|\bwithout\s+(?:canonical|root|scope|containment)\b|\bescap(?:e|es|ed)\b|\bunrestricted\b))(?=.*(?:os\.path\.exists|os\.remove|\b(?:exists|remove|delete|unlink|filesystem)\w*\b|file\s+sink)).*\Z""",
+        ],
+        "description": "An attacker-controlled `detail` value in an MCP shared-prompt deletion flow can escape the intended prompt store when path canonicalization and root containment are missing, reaching `os.remove` on an unrelated file."
+    },
+    {
+        "id": "GLS-MR-064",
+        "name": "Memory Backed Operation Authorization Omission",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|review|test)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|runbook|defensive|patched|fixed|must\s+(?:bind|reject|verify|check)|do\s+not|never|denied|not\s+vulnerable|safe\s+(?:implementation|example))\b)(?=.*\b(?:memory|RAG|retrieval|durable\s+state|snapshot)\b)(?=.*\b(?:low[- ]privilege|unprivileged|low[- ]trust|subscriber|non[- ]admin|unauthenticated)\b)(?=.*\b(?:owner[- ]only|privileged|higher[- ]privilege|admin|elevated)\b)(?=.*\b(?:action|operation|tool|dispatch|execute|invoke|call|mutation|update)\w*\b)(?=.*\b(?:missing|omitted|absent|without|no)\b)(?=.*\b(?:authorization|permission|capability|principal|scope|binding|access[- ]control)\b).*$""",
+        ],
+        "description": "A low-privilege requester reaches an owner-only agent operation because a remembered grant is treated as current permission while the final handler omits operation-level authorization."
+    },
+    {
+        "id": "GLS-MR-065",
+        "name": "Verification Boundary Sparse Evidence Operationalization",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|rule|training)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|defensive|blocked|quarantined|must\s+not|do\s+not\s+trust|should\s+not\s+(?:execute|proceed))\b)(?=.*\b(?:RAG|retriev(?:ed|al)|knowledge[- ]base|security\s+playbook)\b)(?=.*\b(?:single\s+source|only\s+source|sparse[- ]evidence|no\s+independent\s+(?:refutation|corroboration|verification)|zero[- ]day)\b)(?=.*\b(?:claim|finding|exploit|CVE|vulnerability)\b)(?=.*\b(?:verified|confirmed|proven|treat\w*\s+.{0,30}\s+verified|accept\w*\s+.{0,30}\s+proof)\b)(?=.*\b(?:execute|run|exploit|proceed|approve|operationalize)\b).*$""",
+        ],
+        "description": "A single retrieved security playbook can be operationalized as verified exploit evidence when sparse or zero-day conditions provide no independent refutation."
+    },
+    {
+        "id": "GLS-MR-066",
+        "name": "Semantic Cache Authority Laundering",
+        "category": "memory_retrieval",
+        "severity": "high",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|review|training|documentation)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|blocked|quarantined|defensive|must\s+(?:not|never)|preserve|reject(?:ed)?|fail[- ]closed)\b)(?=.*\b(?:long[- ]term\s+memory|memory\s+(?:item|record|snapshot)|retrieval\s+(?:cache|index)|cross[- ]agent\s+(?:replica|memory)|stale\s+(?:cache|replica))\b)(?=.*\b(?:rollback|restore|rehydrat\w*|resurrect\w*|reintroduc\w*)\b)(?=.*\b(?:forgotten|deleted|deletion|revoked|tombstone|deletion\s+epoch|revocation)\b)(?=.*\b(?:stale|old|prior|cross[- ]agent|replica|cache)\b)(?=.*\b(?:ignore\w*|bypass\w*|drop\w*|discard\w*|without\s+(?:revalidation|checking)|treat\s+as\s+current|continue\w*|rehydrat\w*)\b)(?=.*\b(?:current\s+memory|trusted\s+(?:memory|state)|tool\s+action|dispatch|revalidation|epoch)\b).*$""",
+        ],
+        "description": "A stale retrieval cache or cross-agent memory replica resurrects a record after Forget/Rollback, and the agent treats it as current without binding the tombstone and deletion epoch."
+    },
+    {
+        "id": "GLS-MR-072",
+        "name": "Active Content Url Scheme Validation Bypass",
+        "category": "memory_retrieval",
+        "severity": "critical",
+        "channel": ["message", "file", "web_content"],
+        "regex": [
+            r"""(?isx)\A(?!.*\b(?:security\s+training|blocked\s+payload|quarantined|sanitized\s+negative|must\s+not\s+execute|never\s+allow)\b.{0,180}\b(?:data\s*:\s*image/svg|<\s*svg|onload\s*=|<\s*script)\b)(?=.*\b(?:href|src|url\s+(?:validation|sanitization)|rendered\s+(?:link|image|icon)|browser\s+(?:renderer|output))\b)(?=.*\bdata\s*:\s*(?:image/svg\+xml|image/svg|text/html)\b)(?=.*(?:<\s*(?:svg|script)\b|\b(?:onload|onerror|onclick)\s*=|%3c\s*(?:svg|script)|javascript\s*:)).*$""",
+        ],
+        "description": "A URL validator that removes `javascript:` but permits `data:` can pass a script-capable `data:image/svg+xml` value into an href/src sink, where the browser treats attacker-controlled URL data as executable active content."
+    },
 ]
