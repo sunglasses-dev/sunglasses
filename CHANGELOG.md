@@ -5,6 +5,26 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-09-02
+
+### Added
+- **23 new `memory_retrieval` detection patterns (`GLS-MR-041` through `GLS-MR-072`,
+  23 IDs).** Second memory and retrieval release: stored state that outlives its
+  proof. Escape (best_of amplification, ZIP path traversal into memory staging,
+  poisoned knowledge graph facts), fusion (temporal fragment fusion, mid task goal
+  fusion, falsifier polarity inversion, routing telemetry camouflage, controllability
+  constrained transfer, embedding nearest neighbor collisions), verdict laundering
+  (stale self state snapshots, replayed financial mandates, self evolution fitness
+  gaps, primitive placement laundering, unprotected MCP auth gates, cross metric
+  denominators, fact check verdict propagation, synthetic task reconstruction, stale
+  Chroma matches), revocation (shared prompt delete path escape, remembered grants,
+  sparse evidence operationalization, semantic cache resurrection after Forget or
+  Rollback) and sink checks (data: URL scheme bypass). Every pattern fired on its own
+  attack fixture, stayed silent on its benign twin and produced zero hits on the 78
+  document benign corpus at intake. Category count unchanged at 118, pattern count
+  1437 → 1460.
+- Companion write up: https://sunglasses.dev/blog/ai-agent-memory-needs-current-proof
+
 ## [0.5.2] — 2026-09-01
 
 ### Added
