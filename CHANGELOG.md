@@ -5,6 +5,20 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Firewall hook: a clean call now answers `{}` instead of `"permissionDecision": "defer"`.**
+  `defer` was the firewall's internal name for "no opinion, fall through to Claude Code's
+  own permission flow", and it was written to the wire as a literal. Claude Code documents
+  `allow`, `deny` and `ask`. An interactive session tolerates the unknown value, but a
+  subagent or a headless `claude -p` run has nowhere to defer to: the tool call is marked
+  deferred, never executes, and the turn ends with an empty result
+  (`terminal_reason: tool_deferred`). Anyone running the hook with subagents, the Agent SDK
+  or `claude -p` automation hit this silently. The empty object is the documented
+  "no opinion" shape, so behaviour in interactive sessions is unchanged; deny / ask output
+  and the receipts (which still record `defer`) are untouched. Reproduced and fixed
+  2026-09-03; `sunglasses firewall` self-test accepts both shapes so an older installed
+  hook is not reported as broken.
+
 ## [0.5.3] — 2026-09-02
 
 ### Added

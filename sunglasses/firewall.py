@@ -32,8 +32,9 @@ Design constraints (all load-bearing):
   * < 100ms, zero network calls. This runs on EVERY tool call. Local-first is
     the moat — nothing about the user's work leaves their machine.
   * Fail-open, but CONFESS. A crashed firewall must not brick the agent; it
-    must also not silently vanish. Errors return `defer` (fall through to Claude
-    Code's own permission flow) and write a receipt saying the firewall failed.
+    must also not silently vanish. Errors return `defer` — on the wire an empty
+    `{}`, the documented "no opinion" that falls through to Claude Code's own
+    permission flow — and write a receipt saying the firewall failed.
   * FP rate 0 on the clean corpus before this lane is allowed to deny anything.
     A guard that greps a bare pattern shoots healthy agents (Jul 22 2026).
 """
@@ -73,6 +74,18 @@ class Decision:
             getattr(self, f) == getattr(other, f) for f in self.__slots__)
 
     def to_hook_output(self) -> dict:
+        # `defer` is the firewall's internal name for "no opinion — fall through to
+        # Claude Code's own permission flow". On the wire that is an EMPTY object,
+        # not a permissionDecision. Claude Code documents allow / deny / ask only;
+        # an unknown value is fine in an interactive session (it falls through to
+        # the permission prompt or bypass mode) but a subagent or a headless
+        # `claude -p` run has nowhere to defer to: the tool call is marked
+        # deferred, never executes, and the turn ends with an empty result
+        # (`terminal_reason: tool_deferred`). Found Sep 3 2026 after six days of
+        # "server-side outage" that was this line. The receipt still records
+        # `defer`, so the audit trail is unchanged; only the wire shape moved.
+        if self.action == "defer":
+            return {}
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -1188,9 +1201,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
     """stdin JSON → hook output dict. NEVER raises, NEVER exits non-zero.
 
     Every failure mode lands on `defer`: fall through to Claude Code's own
-    permission flow. `defer` rather than `allow` is deliberate — a crashed
-    firewall must not silently grant something the harness would otherwise have
-    asked the user about.
+    permission flow (emitted as `{}` — see Decision.to_hook_output for why it
+    must never be a literal "defer" on the wire). `defer` rather than `allow` is
+    deliberate — a crashed firewall must not silently grant something the harness
+    would otherwise have asked the user about.
     """
     import json as _json
     import time as _time
@@ -1315,9 +1329,18 @@ def self_test_hook(command: str) -> "tuple":
         return False, f"exit code {proc.returncode}: {(proc.stderr or '').strip()[:300]}"
     try:
         data = _json.loads(proc.stdout)
+    except Exception:  # noqa: BLE001
+        return False, f"did not return hook JSON: {(proc.stdout or '').strip()[:200]}"
+    if data == {}:
+        # A clean probe answers with no opinion — the documented way to fall
+        # through to Claude Code's own permission flow (see Decision.to_hook_output).
+        return True, "defer"
+    try:
         decision = data["hookSpecificOutput"]["permissionDecision"]
     except Exception:  # noqa: BLE001
         return False, f"did not return hook JSON: {(proc.stdout or '').strip()[:200]}"
+    # "defer" is still accepted here: an older installed firewall answers the
+    # clean probe with it, and a working-but-old hook is not a broken wire.
     if decision not in {"allow", "deny", "ask", "defer"}:
         return False, f"unexpected permissionDecision: {decision!r}"
     return True, decision

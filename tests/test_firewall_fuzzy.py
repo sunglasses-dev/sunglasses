@@ -179,7 +179,7 @@ def test_a_crash_in_the_fuzzy_lane_still_fails_open(home, monkeypatch):
     monkeypatch.setattr(firewall, "check_fuzzy", boom)
 
     out = firewall.run_hook(json.dumps(INJECTION))
-    assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
+    assert out == {}
     assert _receipts(home)[-1]["lane"] == "error"
 
 
