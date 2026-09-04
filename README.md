@@ -147,7 +147,7 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency — typical attack string (median of 38) | ~4.2 ms |
 | Scan latency — real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
-| Patterns | 1460 |
+| Patterns | 1540 |
 | Keywords | 6,642 |
 | Languages | 23 |
 | Attack categories | 118 |
@@ -188,7 +188,7 @@ English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian
 
 ## What Works Today
 
-- ✅ Text scanning: 1460 patterns, 6,642 keywords, 23 languages, 118 attack categories
+- ✅ Text scanning: 1540 patterns, 6,642 keywords, 23 languages, 118 attack categories
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
