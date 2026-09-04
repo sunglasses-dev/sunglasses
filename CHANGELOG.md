@@ -5,6 +5,11 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-09-04
+
+> Hotfix release: firewall hook fixes only, no new patterns (1540 patterns / 118 categories unchanged).
+> The first entry below shipped as code in 0.5.4 (PR #122) and is documented here.
+
 ### Fixed
 - **Firewall hook: no more "approve to pin" prompt on every call for tools that cannot be
   pinned.** `sunglasses pin` reads stdio servers only; a browser extension (Claude in Chrome),
