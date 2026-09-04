@@ -19,6 +19,13 @@ All notable changes to Sunglasses are documented here.
   2026-09-03; `sunglasses firewall` self-test accepts both shapes so an older installed
   hook is not reported as broken.
 
+## [0.5.4] — 2026-09-04
+
+### Added
+- **80 new `agent_workflow_security` detection patterns (`GLS-AW-666` through `GLS-AW-745`, 80 IDs).** Examples: Trigger Payload Relational Memory Backdoor; Digital Twin Command Context Drift; Reverse Shell Control Channel Smuggling; Search Time Benchmark Contamination. Every pattern fired on its own attack fixture, stayed silent on its benign twin and produced zero hits on the 78 document benign corpus at intake.
+- Pattern count 1460 → 1540, 118 categories.
+- Companion write up: https://sunglasses.dev/blog/ai-agent-workflow-security-needs-proof
+
 ## [0.5.3] — 2026-09-02
 
 ### Added
