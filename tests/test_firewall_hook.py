@@ -53,10 +53,18 @@ def _receipts(home):
 
 # ── the happy paths ─────────────────────────────────────────────────────────
 
-def test_clean_call_defers(home):
+def test_clean_call_emits_no_opinion(home):
+    """A clean call is `{}` on the wire — never a literal "defer".
+
+    Claude Code documents allow / deny / ask. In an interactive session an
+    unknown value falls through, but a subagent or a headless `claude -p` run
+    marks the tool call deferred, never executes it, and ends the turn with an
+    empty result (`terminal_reason: tool_deferred`). That was six days of
+    "server-side outage" in Aug/Sep 2026. The receipt still says `defer`.
+    """
     out = firewall.run_hook(json.dumps(CLEAN))
-    assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
-    assert out["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+    assert out == {}
+    assert _receipts(home)[-1]["decision"] == "defer"
 
 
 def test_leak_is_denied_with_a_reason(home):
@@ -76,21 +84,21 @@ def test_output_matches_the_verified_hook_contract(home):
     inner = out["hookSpecificOutput"]
     assert set(inner) <= {"hookEventName", "permissionDecision",
                           "permissionDecisionReason", "updatedInput", "additionalContext"}
-    assert inner["permissionDecision"] in {"allow", "deny", "ask", "defer"}
+    assert inner["permissionDecision"] in {"allow", "deny", "ask"}
 
 
 # ── fail-open, loudly ───────────────────────────────────────────────────────
 
 def test_malformed_stdin_defers_and_confesses(home):
     out = firewall.run_hook("{not json at all")
-    assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
+    assert out == {}
     receipts = _receipts(home)
     assert receipts and receipts[-1]["lane"] == "error"
     assert receipts[-1]["decision"] == "defer"
 
 
 def test_empty_stdin_defers(home):
-    assert firewall.run_hook("")["hookSpecificOutput"]["permissionDecision"] == "defer"
+    assert firewall.run_hook("") == {}
 
 
 def test_internal_crash_defers_and_confesses(home, monkeypatch):
@@ -100,8 +108,7 @@ def test_internal_crash_defers_and_confesses(home, monkeypatch):
     monkeypatch.setattr(firewall, "check_egress_secrets", boom)
 
     out = firewall.run_hook(json.dumps(LEAK))
-    assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
-    assert "firewall" in out["hookSpecificOutput"]["permissionDecisionReason"].lower()
+    assert out == {}  # no opinion on the wire; the confession lives in the receipt
 
     last = _receipts(home)[-1]
     assert last["lane"] == "error"
@@ -116,7 +123,7 @@ def test_corrupt_policy_file_defers_and_confesses_rather_than_blocking(home):
     """
     (home / "policy.yaml").write_text("max_spend_usd: 50\n")
     out = firewall.run_hook(json.dumps(CLEAN))
-    assert out["hookSpecificOutput"]["permissionDecision"] == "defer"
+    assert out == {}
     last = _receipts(home)[-1]
     # `lane` keeps naming the lane that actually decided; the confession rides
     # on `degraded` + `error`. Overloading `lane` with "error" used to throw the
@@ -299,7 +306,19 @@ def test_cli_exit_code_is_zero_even_on_garbage(home):
              "PYTHONPATH": str(__import__("pathlib").Path(__file__).parent.parent)},
     )
     assert proc.returncode == 0
-    assert json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"] == "defer"
+    assert json.loads(proc.stdout) == {}
+
+
+def test_cli_clean_call_is_an_empty_object_on_the_wire(home):
+    """The exact bytes Claude Code sees for a clean call: `{}`.
+
+    Guarded at the CLI boundary on purpose — this is the shape that killed
+    subagents and headless runs when it was a "defer" string.
+    """
+    proc = _run_cli(CLEAN, home)
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout) == {}
+    assert "defer" not in proc.stdout
 
 
 def test_cli_cold_start_is_under_100ms(home):
