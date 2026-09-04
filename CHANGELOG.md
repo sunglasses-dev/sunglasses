@@ -6,6 +6,18 @@ All notable changes to Sunglasses are documented here.
 ## [Unreleased]
 
 ### Fixed
+- **Firewall hook: no more "approve to pin" prompt on every call for tools that cannot be
+  pinned.** `sunglasses pin` reads stdio servers only; a browser extension (Claude in Chrome),
+  a hosted connector or an HTTP/SSE server has no descriptor to hash, and the changelog said so.
+  The hook nevertheless answered `ask` (`GLS-FW-PIN-TOFU`) for every unpinned MCP tool, so on
+  those servers the prompt came back on every single call, even in bypass mode, and approving
+  pinned nothing. Now the hook asks only where approving can pin something: a new tool on a
+  server `sunglasses pin` did read, or a machine where `sunglasses pin` has never run. A server
+  pin could not read gets no opinion and the receipt records `pin_reach: unpinnable`, so the
+  blind spot stays on the audit trail instead of in the user's face. Measured on the maintainer's
+  machine: 224 such prompts between Aug 28 and Sep 4 2026, all on Claude in Chrome tools.
+
+### Fixed
 - **Firewall hook: a clean call now answers `{}` instead of `"permissionDecision": "defer"`.**
   `defer` was the firewall's internal name for "no opinion, fall through to Claude Code's
   own permission flow", and it was written to the wire as a literal. Claude Code documents

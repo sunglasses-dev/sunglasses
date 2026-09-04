@@ -31,6 +31,7 @@ from sunglasses.firewall import (
     build_pins,
     check_pin,
     check_pin_by_name,
+    pin_reach,
     descriptor_hash,
     diff_pins,
     discover_mcp_servers,
@@ -217,6 +218,37 @@ def test_hook_tofu_never_denies():
     for pins in ({"tools": {}}, {}, {"tools": {"other": {}}}):
         decision = check_pin_by_name("mcp__whatever__tool", pins)
         assert decision is None or decision.action == "ask"
+
+
+def test_hook_stays_quiet_for_a_server_pin_could_not_read():
+    """A browser extension, hosted connector or HTTP server has no descriptor to hash.
+    Asking "approve to pin" there is unanswerable: approval pins nothing and the same
+    prompt returns on the next call (Claude in Chrome, Aug 28 – Sep 4 2026: a prompt on
+    every browser action even in bypass mode). Coverage says pin ran and could not read
+    this server → no opinion, confessed via pin_reach."""
+    pins = {"tools": {"mcp__github__create_issue": {"sha256": "0" * 64}},
+            "coverage": {"github": {"status": "ok", "pinned": 1},
+                         "openseo": {"status": "unsupported_transport", "pinned": 0}}}
+    assert check_pin_by_name("mcp__claude-in-chrome__navigate", pins) is None   # not in coverage at all
+    assert check_pin_by_name("mcp__openseo__research_keywords", pins) is None    # read attempted, unsupported
+    assert pin_reach("mcp__claude-in-chrome__navigate", pins) == "unpinnable"
+    assert pin_reach("mcp__openseo__research_keywords", pins) == "unpinnable"
+
+
+def test_hook_still_asks_for_a_new_tool_on_a_server_pin_did_read():
+    """The ask keeps its value where approving CAN pin something."""
+    pins = {"tools": {"mcp__github__create_issue": {"sha256": "0" * 64}},
+            "coverage": {"github": {"status": "ok", "pinned": 1}}}
+    decision = check_pin_by_name("mcp__github__delete_repo", pins)
+    assert decision is not None and decision.action == "ask"
+    assert pin_reach("mcp__github__delete_repo", pins) == "unpinned"
+
+
+def test_hook_still_asks_when_pin_has_never_run():
+    """No coverage at all means nothing was ever probed: the ask is the nudge to run
+    `sunglasses pin`, and staying quiet here would turn the control off silently."""
+    assert check_pin_by_name("mcp__claude-in-chrome__navigate", {"tools": {}}).action == "ask"
+    assert pin_reach("mcp__claude-in-chrome__navigate", {"tools": {}}) == "never_pinned"
 
 
 def test_hook_ignores_non_mcp_tools():
