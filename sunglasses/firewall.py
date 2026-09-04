@@ -409,6 +409,31 @@ def check_pin(tool_name: str, descriptor, pins: dict) -> "Decision | None":
     )
 
 
+def pin_reach(tool_name: str, pins: dict) -> str:
+    """What the hook can honestly say about a tool's pin status.
+
+    "pinned"       — its descriptor hash is on file.
+    "unpinned"     — its server was read by `sunglasses pin` (coverage status ok) but this
+                     tool is not on file: a new or renamed tool on a pinnable server.
+    "unpinnable"   — `sunglasses pin` has run on this machine (coverage exists) and this
+                     server is not in it, or was recorded as unreachable / unsupported
+                     transport. Nothing can be hashed, so nothing can be approved.
+    "never_pinned" — no coverage at all: `sunglasses pin` has never run here.
+    """
+    pins = pins or {}
+    if tool_name in pins.get("tools", {}):
+        return "pinned"
+    coverage = pins.get("coverage") or {}
+    if not isinstance(coverage, dict) or not coverage:
+        return "never_pinned"
+    parts = tool_name.split("__")
+    server = parts[1] if len(parts) >= 3 else ""
+    entry = coverage.get(server)
+    if isinstance(entry, dict) and entry.get("status") == "ok":
+        return "unpinned"
+    return "unpinnable"
+
+
 def check_pin_by_name(tool_name: str, pins: dict) -> "Decision | None":
     """The hook-time pin check — deliberately weaker than `check_pin`.
 
@@ -428,6 +453,15 @@ def check_pin_by_name(tool_name: str, pins: dict) -> "Decision | None":
     if not tool_name or not tool_name.startswith("mcp__"):
         return None
     if tool_name in (pins or {}).get("tools", {}):
+        return None
+    if pin_reach(tool_name, pins) == "unpinnable":
+        # An ask must be answerable. `sunglasses pin` already probed this machine and
+        # could not read this server (browser extension, hosted connector, HTTP/SSE
+        # transport, or down), so approving would pin nothing and the same prompt
+        # would come back on the very next call — which is exactly what happened to
+        # Claude in Chrome users: a permission prompt on every browser action, even in
+        # bypass mode, forever. No fact to check means no opinion here; the receipt
+        # records `pin_reach: unpinnable` so the blind spot stays visible.
         return None
     return Decision(
         action="ask",
@@ -1179,6 +1213,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         except PolicyError as exc:
             errors.append(str(exc))
         else:
+            extras["pin_reach"] = pin_reach(tool_name, pins)
             decision = check_pin_by_name(tool_name, pins)
             if decision is not None:
                 return decision, confession(), extras
