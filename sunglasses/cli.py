@@ -935,6 +935,81 @@ def cmd_init(args):
     return 0
 
 
+# The ONE environment variable that grants consent. It is read from the process
+# environment and NOWHERE else: never from a scanned repository, a `.env` file, a
+# `.mcp.json`, or project settings. A target must never be able to authorise the
+# thing it is the target of.
+_PIN_CONSENT_ENV = "SUNGLASSES_PIN_CONSENT"
+
+
+def _describe_launch(servers):
+    """The exact command lines that are about to run, one per line."""
+    lines = []
+    for name in sorted(servers):
+        config = servers[name] or {}
+        command = config.get("command")
+        if not command:
+            # http/sse servers are not spawned; say so rather than listing them
+            # as if they were about to be executed.
+            lines.append((name, None))
+            continue
+        argv = " ".join([str(command), *(str(a) for a in config.get("args") or [])])
+        lines.append((name, argv))
+    return lines
+
+
+def _pin_consent(args, servers):
+    """Ask before launching the user's MCP servers. Returns True to proceed.
+
+    Non-interactive callers must say yes IN ADVANCE (`--yes` or the env var).
+    They may not be asked, because there is nobody there to answer: a prompt
+    written to a launchd job's stdout is a hang, and a hang in a SessionStart
+    hook is a broken session. So unattended-without-consent FAILS, visibly and
+    immediately, rather than either launching or waiting.
+    """
+    if getattr(args, "yes", False) or os.environ.get(_PIN_CONSENT_ENV) == "1":
+        return True
+
+    launches = _describe_launch(servers)
+    spawning = [(n, c) for n, c in launches if c]
+
+    if not spawning:
+        # Nothing will be executed; there is nothing to consent to.
+        return True
+
+    interactive = sys.stdin.isatty() and sys.stderr.isatty()
+    stream = sys.stderr if getattr(args, "quiet", False) else sys.stdout
+
+    print(f"\n  {BOLD}sunglasses pin{RESET} is about to {BOLD}start "
+          f"{len(spawning)} MCP server(s){RESET} to read their tool lists.", file=stream)
+    print(f"  {DIM}They run with your environment, exactly as your agent would "
+          f"start them.{RESET}\n", file=stream)
+    for name, argv in spawning:
+        print(f"    {CYAN}{name}{RESET}: {argv}", file=stream)
+    skipped = [n for n, c in launches if not c]
+    if skipped:
+        print(f"\n  {DIM}Not started (not a local command): "
+              f"{', '.join(skipped)}{RESET}", file=stream)
+
+    if not interactive:
+        print(f"\n  {RED}Refusing to start them without consent.{RESET}", file=stream)
+        print(f"  {DIM}No terminal to ask. Re-run with {RESET}{BOLD}--yes{RESET}"
+              f"{DIM}, or set {RESET}{BOLD}{_PIN_CONSENT_ENV}=1{RESET}"
+              f"{DIM} for unattended runs (the installer writes this in).{RESET}\n",
+              file=stream)
+        return False
+
+    try:
+        answer = input(f"\n  Start them now? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n  {DIM}Cancelled. Nothing was started.{RESET}\n", file=stream)
+        return False
+    if answer not in ("y", "yes"):
+        print(f"\n  {DIM}Cancelled. Nothing was started.{RESET}\n", file=stream)
+        return False
+    return True
+
+
 def cmd_pin(args):
     """Record (or verify) SHA-256 pins for every configured MCP tool descriptor.
 
@@ -954,7 +1029,12 @@ def cmd_pin(args):
         buffer = _io.StringIO()
         with _contextlib.redirect_stdout(buffer):
             code = _pin_run(args)
-        if code != 0:
+        # Only code 1 means drift. v0.5.6 added code 2 (refused to start servers
+        # without consent), and `!= 0` reported that as "descriptor drift
+        # detected" — a false alarm telling the user their tools were tampered
+        # with when in fact nothing had been read at all. The consent gate prints
+        # its own reason to stderr.
+        if code == EXIT_THREAT:
             print("SUNGLASSES: MCP tool descriptor drift detected — "
                   "`sunglasses pin --check` for detail. Affected tools are blocked "
                   "until you re-run `sunglasses pin`.")
@@ -976,6 +1056,17 @@ def _pin_run(args):
     if not servers:
         print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
         return 0
+
+    # ── CONSENT GATE (v0.5.6, contract 1e) ──────────────────────────────────
+    # Everything below this line LAUNCHES PROCESSES. `build_pins` starts every
+    # configured stdio MCP server with the user's full environment to read its
+    # tool list. Before this release it did that with no prompt and no warning —
+    # including from `--quiet`, which is wired into a launchd timer and a
+    # SessionStart hook, so servers were being started silently every time a
+    # session opened. "Reading descriptors from N server(s)" is not consent; it
+    # is a status line printed while it is already happening.
+    if not _pin_consent(args, servers):
+        return EXIT_USAGE
 
     print(f"\n  {BOLD}SUNGLASSES{RESET} — reading descriptors from "
           f"{len(servers)} MCP server(s)...")
@@ -1385,7 +1476,13 @@ def main():
     pin_parser.add_argument(
         "--quiet", action="store_true",
         help="Print nothing unless drift is found. For launchd timers and "
-             "SessionStart hooks; the exit code still carries the verdict.")
+             "SessionStart hooks; the exit code still carries the verdict. "
+             "Requires --yes or SUNGLASSES_PIN_CONSENT=1, because it starts "
+             "your MCP servers and there is nobody there to ask.")
+    pin_parser.add_argument(
+        "--yes", "-y", action="store_true",
+        help="Consent, in advance, to starting the configured MCP servers so "
+             "their tool lists can be read. Required for unattended runs.")
     pin_parser.set_defaults(func=cmd_pin)
 
     # init

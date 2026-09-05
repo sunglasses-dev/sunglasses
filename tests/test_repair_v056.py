@@ -552,3 +552,104 @@ def test_curl_credential_upload_is_detected_at_the_cli():
     doc = _one_json_doc(proc)
     assert proc.returncode == EXIT_THREAT
     assert "GLS-EX-007" in [f["id"] for f in doc["findings"]] or doc["threat_found"] is True
+
+
+# ==========================================================================
+# 9. Pin consent (contract 1e, option A)
+#
+# `sunglasses pin` starts every configured stdio MCP server, with the user's
+# full environment, to read its tool list. Before v0.5.6 it did that with no
+# prompt: it printed "reading descriptors from N server(s)" WHILE already doing
+# it. `--quiet` is wired into a launchd timer and a SessionStart hook, so
+# servers were being launched silently every time a session opened.
+#
+# Consent is read from the process environment and nowhere else. A scanned
+# repository must never be able to authorise the launching of processes — that
+# would let the target of the inspection approve the inspection.
+# ==========================================================================
+
+@pytest.fixture
+def fake_mcp_config(tmp_path, monkeypatch):
+    """Two stdio servers that would be spawned, if anything got that far."""
+    config = tmp_path / ".mcp.json"
+    config.write_text(json.dumps({"mcpServers": {
+        "alpha": {"command": "echo", "args": ["alpha-should-never-run"]},
+        "beta": {"command": "echo", "args": ["beta-should-never-run"]},
+    }}))
+    return config
+
+
+def _run_pin(*args, env=None, stdin=""):
+    full_env = dict(os.environ)
+    full_env.pop("SUNGLASSES_PIN_CONSENT", None)
+    if env:
+        full_env.update(env)
+    return subprocess.run(
+        [sys.executable, "-m", "sunglasses", "pin", *args],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+        input=stdin, timeout=120, env=full_env,
+    )
+
+
+def test_unattended_pin_without_consent_refuses_and_does_not_hang():
+    """The launchd / SessionStart case. Must fail fast and visibly.
+
+    A prompt here would be a hang: there is no terminal to answer it, so the
+    job would block forever and the session would never start.
+    """
+    proc = _run_pin("--quiet")
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == EXIT_USAGE
+    assert "without consent" in combined.lower()
+    assert "SUNGLASSES_PIN_CONSENT" in combined
+
+
+def test_refusal_is_not_reported_as_descriptor_drift():
+    """`--quiet` mapped every non-zero code to "drift detected", so refusing to
+    start servers announced that the user's tools had been tampered with.
+    """
+    proc = _run_pin("--quiet")
+    assert proc.returncode == EXIT_USAGE
+    assert "drift detected" not in (proc.stdout + proc.stderr).lower()
+
+
+def test_refusal_lists_the_exact_commands_it_would_have_run():
+    """Consent is meaningless without saying what is being consented to."""
+    proc = _run_pin()
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == EXIT_USAGE
+    assert "about to" in combined.lower()
+    # every spawnable server is named with its argv, not just counted
+    assert "MCP server" in combined
+
+
+def test_consent_env_var_is_read_from_the_environment_only():
+    """It must not be sourced from a scanned repo, a .env, or project settings.
+
+    Proven by construction: nothing in the package reads a dotenv file. This
+    test fails loudly if that ever changes.
+    """
+    pkg = os.path.join(REPO_ROOT, "sunglasses")
+    offenders = []
+    for dirpath, _dirs, files in os.walk(pkg):
+        if "__pycache__" in dirpath:
+            continue
+        for name in files:
+            if not name.endswith(".py"):
+                continue
+            text = open(os.path.join(dirpath, name), errors="ignore").read()
+            if "load_dotenv" in text or "dotenv" in text:
+                offenders.append(name)
+    assert not offenders, f"a dotenv loader appeared in the package: {offenders}"
+
+
+def test_consent_flag_and_env_var_both_allow_the_run():
+    """Both advance past the gate. We assert the GATE opened, not that the
+    servers answered — this machine's real MCP config is not the subject.
+    """
+    for args, env in ((["--check", "--yes"], None),
+                      (["--check"], {"SUNGLASSES_PIN_CONSENT": "1"})):
+        proc = _run_pin(*args, env=env)
+        combined = (proc.stdout + proc.stderr).lower()
+        assert "without consent" not in combined, \
+            f"consent via {args}/{env} did not open the gate"

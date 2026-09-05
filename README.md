@@ -77,6 +77,36 @@ sunglasses demo
 sunglasses info
 ```
 
+### Exit codes
+
+Every scan exits through one contract, on every path — text, file, repo, deep
+scan, and errors. `0` is a claim, so it is reserved for scans that earned it.
+
+| code | meaning |
+|---|---|
+| `0` | Read all of it, found nothing. |
+| `1` | Threat found. Incompleteness, if any, is still reported alongside it. |
+| `2` | Usage or operational error — **nothing was scanned**. A path that does not exist, a directory, a socket, a failed deep scan. |
+| `3` | **Incomplete**: found nothing in the part that could be read. An archive we do not extract, a PDF whose text layer needs `sunglasses[media]`, audio without `--deep`, or input past the size cap. |
+
+Precedence is `1 > 3 > 2 > 0`: a threat we did find outranks the part we could
+not read, and both outrank a usage complaint.
+
+The distinction between `0` and `3` is the whole point. "I read the file and it
+is clean" and "I could not open it and therefore saw nothing" must never be the
+same signal to a CI job. In JSON output the same split is explicit as
+`threat_found`, `inspection_complete` and `is_clean` (which is both), alongside
+`truncated` and `extraction_complete`.
+
+```bash
+sunglasses scan --file bundle.zip; echo $?     # 3 — we do not extract archives
+sunglasses scan --file podcast.mp3; echo $?    # 3 — nothing transcribed without --deep
+sunglasses scan ./typo.txt; echo $?            # 2 — no such file; nothing was scanned
+```
+
+A path-shaped argument that does not exist is a usage error, not text. Pass
+`--text` if you really do mean to scan the string `./typo.txt` itself.
+
 ### Deep Scan Setup (Audio & Video)
 
 Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:
@@ -218,9 +248,26 @@ Claude Code `PreToolUse` hook and answers one question before every tool call:
 sunglasses init            # wire it into .claude/settings.json (--global for ~/.claude)
 sunglasses pin             # record a SHA-256 of every MCP tool descriptor
 sunglasses pin --check     # did a server change a tool description under you?
+sunglasses pin --yes       # same, pre-consented (for unattended runs)
 sunglasses receipts        # the audit trail
 sunglasses init --uninstall
 ```
+
+### What runs, and what does not
+
+Two sentences, because the difference matters and vague reassurance is worse
+than none:
+
+- **The static scanner does not execute scanned content.** Files, text, images,
+  PDFs and archives are read as data. Nothing in them is run.
+- **`sunglasses pin` launches your configured MCP servers** to read their tool
+  lists — that is the only way to learn what a tool descriptor says — **and it
+  asks first.** It prints the exact command lines it is about to start and waits
+  for you. With no terminal to ask (a timer, a `SessionStart` hook, CI) it
+  refuses instead of launching, unless you pre-consent with `--yes` or
+  `SUNGLASSES_PIN_CONSENT=1`. That consent is read from your environment only —
+  never from a repository, a `.env`, or project settings, so a scanned project
+  can never authorise the launching of your servers.
 
 ### The one rule it will not bend
 
