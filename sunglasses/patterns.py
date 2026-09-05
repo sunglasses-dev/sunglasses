@@ -1792,9 +1792,33 @@ PATTERNS = [
             "curl --upload-file",
         ],
         "regex": [
-            r"curl\b[^\n]{0,200}\b(?:-X\s+(?:POST|PUT|PATCH)|--data(?:-binary)?\b|-F\b|--upload-file\b)",
+            # v0.5.6. The old expression was fully dead: every alternative began with
+            # "-", and a `\b` before "-" can only assert when the preceding character
+            # is a word character — which it never is after a space. So this pattern
+            # matched nothing, ever, from the day it shipped.
+            #
+            # Repairing the boundary alone would have made it fire on ANY curl upload,
+            # including `curl --data @customer.csv`, and at severity high that is a
+            # block on ordinary work. So the repair also narrows it to what it was
+            # always meant to catch: an upload whose PAYLOAD is a credential file.
+            # A generic upload is not evidence of anything; `-d @` a dotfile is.
+            # Branch A — a payload reference: some upload flag, then `@<credential file>`.
+            r"curl\b[^\n]{0,200}?(?:\b|(?<!\S))"
+            r"(?:-X\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)"
+            r"(?:\b|(?!\S))[^\n]{0,160}?@[^\s;|&]{0,120}?"
+            r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
+            r"|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)"
+            r"(?:\b|(?!\S))"
+            # Branch B — `-T` / `--upload-file` take a BARE path, no `@`. Kept separate
+            # and anchored directly to the flag: allowing a bare path in branch A would
+            # let any later word in a URL satisfy it.
+            r"|curl\b[^\n]{0,200}?(?:\b|(?<!\S))(?:--upload-file|-T)(?:\b|(?!\S))\s+"
+            r"[^\s;|&]{0,120}?"
+            r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
+            r"|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)"
+            r"(?:\b|(?!\S))",
         ],
-        "description": "Detects curl commands used for outbound data upload, a common exfiltration technique in agent workflows."
+        "description": "Detects a curl command uploading a credential file (.env, .npmrc, SSH or AWS credentials, tokens) to a remote endpoint — the payload shape of agent-workflow exfiltration. A plain upload of ordinary data is not flagged."
     },
 
     # --- GLS-EX-008: Raw IP address as HTTP destination ---
@@ -3703,7 +3727,7 @@ PATTERNS = [
             "prepare script silently patches",
         ],
         "regex": [
-            r'(?is)\b(pip\s+install|npm\s+(i|install)|poetry\s+add|uv\s+pip\s+install)\b.{0,220}\b(--extra-index-url|--index-url\s+http|--trusted-host|--no-verify|disable\s+hash|skip\s+signature|latest\s+from\s+fork)\b|\b(postinstall|preinstall|setup\.py|prepare\s+script|install\s+hook)\b.{0,180}\b(read|collect|upload|exfil|send)\b.{0,120}\b(token|credential|api[_\s-]?key|\.npmrc|\.pypirc|env)\b|\b(typosquat|dependency\s+confusion|internal\s+package\s+name)\b.{0,180}\b(install|publish|override)\b',
+            r'(?is)\b(pip\s+install|npm\s+(i|install)|poetry\s+add|uv\s+pip\s+install)\b.{0,220}(?:\b|(?<!\S))(--extra-index-url|--index-url\s+http|--trusted-host|--no-verify|disable\s+hash|skip\s+signature|latest\s+from\s+fork)\b|\b(postinstall|preinstall|setup\.py|prepare\s+script|install\s+hook)\b.{0,180}\b(read|collect|upload|exfil|send)\b.{0,120}(?:\b|(?<!\S))(token|credential|api[_\s-]?key|\.npmrc|\.pypirc|env)\b|\b(typosquat|dependency\s+confusion|internal\s+package\s+name)\b.{0,180}\b(install|publish|override)\b',
         ],
         "description": "Detects malicious package install/update vectors targeting AI agents via setup hooks, postinstall scripts, dependency confusion, typosquats, and poisoned transitive deps.",
     },
@@ -8771,7 +8795,7 @@ PATTERNS = [
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$'],
+        "regex": ['(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*(?:\\b|(?<!\\S))(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$'],
         "description": 'Detects text in which a container, sandbox, or jail escape or breakout via namespace switching, nsenter, docker.sock, or setns is described as ignoring, bypassing, overriding, or disabling policy, guardrail, isolation boundary, or approval-check controls.'
     },
     {
@@ -8807,7 +8831,7 @@ PATTERNS = [
         "category": 'sandbox_escape',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)\\b)(?=.*\\b(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
+        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*(?:\\b|(?<!\\S))(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*(?:\\b|(?<!\\S))(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)(?:\\b|(?!\\S)))(?=.*(?:\\b|(?<!\\S))(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects text — excluding negated forms — in which docker.sock or socket paths, host namespace or /proc/ references, and privileged flags such as --privileged, CAP_SYS_ADMIN, or namespace rebind are combined with override, bypass, ignore, or disregard language targeting policy, guardrail, or safety approval checks.'
     },
     # === v0.2.36 batch (15 patterns) — Pipeline Trust Signal Corruption ===
@@ -20392,7 +20416,7 @@ PATTERNS = [
             "pipeline_tag:",
         ],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security report|incident report|vulnerability report|docs|guide|article|reference)\b.{0,80}?\b(?:blocked|flagged|detected|refused|should report|should detect)\b)(?!.*\b(?:must not|do not|never)\s+(?:treat|obey|follow|use|override|supersede)\b.{0,80}?\b(?:model card|model description|hugging\s*face|pipeline_tag|hf\s*hub)\b)(?=.*\b(?:---\s*\n|pipeline_tag|model.?index|model.?card|model\s+description|hugging\s*face\s+(?:hub|model)|hf\s*hub|language:\s|license:\s|datasets:|metrics:|library_name)\b)(?=.*(?:(?<![a-zA-Z0-9])(?:ai\s+agents?|security\s+scanners?|model\s+evaluators?|autonomous\s+agents?|devops\s+agents?|agents?|scanners?|assistants?|crawlers?|llms?|copilot|cursor|codex|claude)(?![a-zA-Z0-9])|for\s+(?:agents?|scanners?|evaluators?)\b))(?=.*\b(?:(?:primary|single)\s+source\s+of\s+truth|governing\s+document|takes?\s+precedence|canonical\s+(?:project\s+|model\s+)?(?:description|policy)|definitive\s+(?:project\s+|model\s+evaluation\s+)?(?:description|policy)|overrides?\s+(?:system|scanner|security|repository|developer)\s+(?:rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\s+(?:system|scanner|security)\s+(?:rules?|polic(?:y|ies)|instructions?)|outranks?\s+(?:system|scanner|security)\s+(?:rules?|polic(?:y|ies))|(?:agent|scanner|assistant|verifier|crawler|evaluator)\s+instructions?)\b)(?=.*\b(?:suppress(?:es|ed|ing)?\s+(?:[a-zA-Z-]+\s+){0,3}(?:findings?|warnings?|reports?|flags?|vulnerabilit(?:y|ies)|issues?)|hide\s+(?:[a-zA-Z-]+\s+){0,3}(?:findings?|warnings?|reports?|flags?)|omit\s+(?:[a-zA-Z-]+\s+){0,2}(?:from\s+)?(?:findings?|reports?|summar(?:y|ies)|warnings?)|exclude\s+(?:[a-zA-Z-]+\s+){0,2}(?:from\s+)?(?:findings?|reports?|warnings?)|redact\s+(?:[a-zA-Z-]+\s+){0,2}(?:findings?|flags?|warnings?)|treat.{0,40}?as\s+informational|mark.{0,40}?as\s+(?:safe|clean|pre.?verified)|disable\s+(?:[a-zA-Z-]+\s+){0,3}(?:scanners?|checks?|verifications?|audits?)|do\s+not\s+(?:run|execute|perform)\s+(?:[a-zA-Z-]+\s+){0,3}(?:scans?|checks?|audits?)|attach\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|include\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|forward\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|send\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|share\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|provide\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|collect\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|embed\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|expos(?:e|ing)\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state))\b)""",
+            r"""(?is)^(?!.*\b(?:security report|incident report|vulnerability report|docs|guide|article|reference)\b.{0,80}?\b(?:blocked|flagged|detected|refused|should report|should detect)\b)(?!.*\b(?:must not|do not|never)\s+(?:treat|obey|follow|use|override|supersede)\b.{0,80}?\b(?:model card|model description|hugging\s*face|pipeline_tag|hf\s*hub)\b)(?=.*(?:\b|(?<!\S))(?:---\s*\n|pipeline_tag|model.?index|model.?card|model\s+description|hugging\s*face\s+(?:hub|model)|hf\s*hub|language:\s|license:\s|datasets:|metrics:|library_name)(?:\b|(?!\S)))(?=.*(?:(?<![a-zA-Z0-9])(?:ai\s+agents?|security\s+scanners?|model\s+evaluators?|autonomous\s+agents?|devops\s+agents?|agents?|scanners?|assistants?|crawlers?|llms?|copilot|cursor|codex|claude)(?![a-zA-Z0-9])|for\s+(?:agents?|scanners?|evaluators?)\b))(?=.*\b(?:(?:primary|single)\s+source\s+of\s+truth|governing\s+document|takes?\s+precedence|canonical\s+(?:project\s+|model\s+)?(?:description|policy)|definitive\s+(?:project\s+|model\s+evaluation\s+)?(?:description|policy)|overrides?\s+(?:system|scanner|security|repository|developer)\s+(?:rules?|polic(?:y|ies)|instructions?)|supersed(?:e|es|ed|ing)\s+(?:system|scanner|security)\s+(?:rules?|polic(?:y|ies)|instructions?)|outranks?\s+(?:system|scanner|security)\s+(?:rules?|polic(?:y|ies))|(?:agent|scanner|assistant|verifier|crawler|evaluator)\s+instructions?)\b)(?=.*\b(?:suppress(?:es|ed|ing)?\s+(?:[a-zA-Z-]+\s+){0,3}(?:findings?|warnings?|reports?|flags?|vulnerabilit(?:y|ies)|issues?)|hide\s+(?:[a-zA-Z-]+\s+){0,3}(?:findings?|warnings?|reports?|flags?)|omit\s+(?:[a-zA-Z-]+\s+){0,2}(?:from\s+)?(?:findings?|reports?|summar(?:y|ies)|warnings?)|exclude\s+(?:[a-zA-Z-]+\s+){0,2}(?:from\s+)?(?:findings?|reports?|warnings?)|redact\s+(?:[a-zA-Z-]+\s+){0,2}(?:findings?|flags?|warnings?)|treat.{0,40}?as\s+informational|mark.{0,40}?as\s+(?:safe|clean|pre.?verified)|disable\s+(?:[a-zA-Z-]+\s+){0,3}(?:scanners?|checks?|verifications?|audits?)|do\s+not\s+(?:run|execute|perform)\s+(?:[a-zA-Z-]+\s+){0,3}(?:scans?|checks?|audits?)|attach\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|include\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|forward\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|send\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|share\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|provide\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|collect\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|embed\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state)|expos(?:e|ing)\s+(?:[a-zA-Z-]+\s+){0,2}(?:auth|API|Bearer|session|token|environment|runtime|config(?:uration)?|context|variables?|keys?|local\s+state))\b)""",
         ],
         "description": "A Hugging Face model card (README.md with YAML frontmatter) carries agent-targeted instructions \u2014 authority inversion, report suppression, or credential forwarding \u2014 that an AI agent browsing HF Hub for model evaluation will treat as trusted model-documentation policy."
     },
