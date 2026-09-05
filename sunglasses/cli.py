@@ -435,7 +435,21 @@ def _usage_error(args, message, hint=None):
 
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
-    warnings = getattr(result, "extraction_warnings", None)
+    warnings = list(getattr(result, "extraction_warnings", None) or [])
+    # Truncation is incompleteness too, and it lives on its own attribute rather
+    # than in extraction_warnings — so before v0.5.6 an oversized file printed
+    # nothing at all about the part that was never scanned. Worse, when the first
+    # megabyte DID contain a finding, the output showed the threat and stayed
+    # silent about the rest of the file, which is precisely the invariant this
+    # release exists to hold: findings survive incompleteness, and incompleteness
+    # survives findings. Both get shown.
+    if getattr(result, "truncated", False):
+        scanned = getattr(result, "bytes_scanned", None)
+        warnings.append(
+            f"Input larger than the {scanned:,}-byte scan cap — only the first "
+            f"{scanned:,} bytes were scanned. Anything after that was not read."
+            if scanned else
+            "Input exceeded the scan cap — the remainder was not read.")
     if not warnings:
         return
     out = stream or sys.stdout

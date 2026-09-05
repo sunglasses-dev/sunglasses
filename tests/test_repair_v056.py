@@ -829,3 +829,55 @@ def test_repo_scan_does_not_count_an_unread_file_as_a_file_with_threats(tmp_path
     # The walker branches on these two, and they must disagree here — that
     # disagreement is the whole point of the three-property split.
     assert result.inspection_complete is False
+
+
+# ==========================================================================
+# 11. "Findings survive incompleteness; incompleteness survives findings"
+#
+# The contract's invariant, in the output a human actually reads. Truncation
+# lives on its own attribute rather than in extraction_warnings, so the warning
+# block skipped it entirely: an oversized file said nothing about the part
+# never scanned, and an oversized file WITH a finding showed the threat and
+# stayed silent about the rest. Exit codes were right; the page was not.
+# ==========================================================================
+
+@pytest.fixture(scope="module")
+def oversized(tmp_path_factory):
+    root = tmp_path_factory.mktemp("v056-oversized")
+    filler = "lorem ipsum dolor sit amet " * 45000          # ~1.2 MB, over the 1 MB cap
+    (root / "benign.txt").write_text(filler)
+    (root / "threat.txt").write_text(INJECTION + "\n" + filler)
+    return root
+
+
+def test_truncation_is_stated_not_left_to_silence(oversized):
+    proc = _run([sys.executable, "-m", "sunglasses"],
+                "--file", str(oversized / "benign.txt"), timeout=600)
+    assert proc.returncode == EXIT_INCOMPLETE
+    out = proc.stdout + proc.stderr
+    assert "INCOMPLETE" in out
+    assert "scan cap" in out, "the reason for incompleteness was not given"
+
+
+def test_a_finding_does_not_hide_the_part_we_never_read(oversized):
+    """Both halves, in the same output. This is the invariant, not a nicety:
+    'we found something' must not be read as 'we looked at everything'.
+    """
+    proc = _run([sys.executable, "-m", "sunglasses"],
+                "--file", str(oversized / "threat.txt"), timeout=600)
+    assert proc.returncode == EXIT_THREAT          # a real finding still outranks
+    out = proc.stdout + proc.stderr
+    assert "BLOCK" in out, "the finding vanished"
+    assert "INCOMPLETE SCAN" in out, "the unread remainder was not mentioned"
+    assert "scan cap" in out
+
+
+def test_json_carries_both_axes_when_a_truncated_scan_finds_something(oversized):
+    proc = _run([sys.executable, "-m", "sunglasses"],
+                "--file", str(oversized / "threat.txt"), "--json", timeout=600)
+    doc = _one_json_doc(proc)
+    assert doc["threat_found"] is True
+    assert doc["truncated"] is True
+    assert doc["inspection_complete"] is False
+    assert doc["is_clean"] is False
+    assert doc["findings"], "findings must survive incompleteness"
