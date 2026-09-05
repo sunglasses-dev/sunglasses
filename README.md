@@ -269,6 +269,18 @@ than none:
   never from a repository, a `.env`, or project settings, so a scanned project
   can never authorise the launching of your servers.
 
+**Upgrading to v0.5.6:** if you wired `sunglasses pin --quiet` into a timer or a
+`SessionStart` hook, add `--yes` (or set `SUNGLASSES_PIN_CONSENT=1` in that job's
+environment). From v0.5.6 an unattended `pin` without consent refuses with exit 2
+and a one-line notice on stderr instead of starting your servers. Nothing in
+`sunglasses init` creates those jobs — it wires the firewall hook and nothing
+else — so if you have one, you wrote it, and it is yours to update.
+
+Also new in v0.5.6: a single positional argument that looks like a path and does
+not exist is a usage error (exit 2) rather than text to scan. `sunglasses scan
+./missing.txt` used to scan the 15-character *string* and report a clean pass.
+If you meant the string, use `--text`.
+
 ### The one rule it will not bend
 
 | | |

@@ -1103,9 +1103,14 @@ def _pin_consent(args, servers):
 
     if not interactive:
         print(f"\n  {RED}Refusing to start them without consent.{RESET}", file=stream)
+        # NOT "the installer writes this in" — it does not. `sunglasses init`
+        # wires the PreToolUse firewall hook and nothing else; the launchd timer
+        # and SessionStart hook that run `pin --quiet` are configured by the user.
+        # Telling them otherwise would be this release's own sin: claiming a thing
+        # does something it does not.
         print(f"  {DIM}No terminal to ask. Re-run with {RESET}{BOLD}--yes{RESET}"
               f"{DIM}, or set {RESET}{BOLD}{_PIN_CONSENT_ENV}=1{RESET}"
-              f"{DIM} for unattended runs (the installer writes this in).{RESET}\n",
+              f"{DIM} in that job's environment for unattended runs.{RESET}\n",
               file=stream)
         return False
 

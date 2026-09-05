@@ -119,3 +119,18 @@ exported. Nothing was regenerated in v0.5.6 (a 460-file diff inside a scoped
 repair release would not have been reviewable). The engine is the source of
 truth; treat `attack-db/` as a lagging mirror until v0.6 re-syncs it and gates
 it.
+
+## v0.5.6 — the pin consent gate is at the command, not in the library
+
+`sunglasses pin` asks before starting your MCP servers. That gate lives in the
+CLI (`_pin_run`), so a Python caller that imports `sunglasses.firewall` and calls
+`probe_server()` or `build_pins()` directly still spawns the configured servers
+with no prompt.
+
+The CLI is the only shipped surface that reaches those functions (verified: their
+only callers are inside `firewall.py` and `cli.py`), so nothing we distribute
+launches a server unasked. But the boundary is real, it is not covered by the
+consent tests, and anyone embedding the library should know where the gate is
+before assuming they inherited it. Moving the gate into the library is a v0.6
+item; it changes a public API signature, which a scoped repair release is the
+wrong place for.
