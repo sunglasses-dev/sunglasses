@@ -11,6 +11,8 @@ Usage:
     from sunglasses.extractors.video import scan_video
     result = scan_video("/path/to/meeting.mp4")
 
+
+
 Install: pip install sunglasses[all]  (requires whisper + ffmpeg)
 """
 
@@ -20,6 +22,23 @@ import json
 import tempfile
 import re
 from typing import List, Tuple
+
+
+def _brief(exc, limit=180):
+    """First meaningful line of an exception, capped.
+
+    ffmpeg answers a failure with its full build configuration: 1.5 KB of banner
+    for one real sentence. A warning nobody reads is only marginally better than
+    no warning, so keep the sentence and drop the banner.
+    """
+    for line in str(exc).splitlines():
+        line = line.strip()
+        if line and not line.startswith(("built with", "configuration:", "lib")):
+            return line[:limit] + ("..." if len(line) > limit else "")
+    text = " ".join(str(exc).split())
+    return text[:limit] + ("..." if len(text) > limit else "")
+
+
 
 
 def _check_deps():
@@ -54,12 +73,15 @@ class VideoExtractor:
             self._model = whisper.load_model(self._model_name)
         return self._model
 
+    warnings: List[str] = []
+
     def extract(self, video_path: str) -> List[Tuple[str, str]]:
         """Extract all text from a video file."""
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video not found: {video_path}")
 
         results = []
+        self.warnings = []
 
         # 1. Subtitle tracks
         subs = self._extract_subtitles(video_path)
@@ -170,7 +192,12 @@ class VideoExtractor:
                     pass
 
         except Exception as e:
-            return f"[Audio extraction error: {e}]"
+            # Same repair as audio.py: an error string is not a transcript. Returning
+            # it made a file we could not open look like a file we cleared.
+            self.warnings.append(
+                f"Video audio track not transcribed ({e.__class__.__name__}: {_brief(e)})."
+            )
+            return ""
 
     def _extract_metadata(self, video_path: str) -> List[Tuple[str, str]]:
         """Extract text from video metadata."""
@@ -219,10 +246,13 @@ def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dic
             is_clean = False
             threats.extend(result.findings)
 
+    warnings = list(getattr(extractor, "warnings", []))
     return {
         "file": video_path,
         "sources_found": len(texts),
-        "is_clean": is_clean,
+        "is_clean": is_clean and not warnings,
+        "extraction_complete": not warnings,
+        "warnings": warnings,
         "threats": threats,
         "results": results,
     }

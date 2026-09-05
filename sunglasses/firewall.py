@@ -1624,7 +1624,12 @@ def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
         _FUZZY_ENGINE = SunglassesEngine()
 
     result = _FUZZY_ENGINE.scan(text, channel="message")
-    if result.is_clean:
+    # `threat_found`, NOT `is_clean` (v0.5.6). `is_clean` is now False for an
+    # oversized command that merely got truncated, and this lane reads `findings[0]`
+    # two lines down — on `is_clean` that is an IndexError on a benign long command,
+    # and the escalation it would raise is the "broad primitive becomes a block"
+    # failure the release forbids. A byte we did not read is not a detection.
+    if not result.threat_found:
         return None
 
     from .policy import decide_enforce

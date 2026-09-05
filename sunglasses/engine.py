@@ -60,8 +60,36 @@ class ScanResult:
         self.extraction_sources = []
 
     @property
+    def threat_found(self) -> bool:
+        """A pattern fired. Independent of how much of the input we managed to read.
+
+        Use this — never ``is_clean`` — to answer "did the scanner find something?".
+        The two questions are different and v0.5.6 stopped conflating them.
+        """
+        return self.decision != "allow"
+
+    @property
+    def inspection_complete(self) -> bool:
+        """We read all of it: nothing truncated, no extractor gave up."""
+        return self.extraction_complete and not self.truncated
+
+    @property
     def is_clean(self) -> bool:
-        return self.decision == "allow"
+        """Read the whole thing AND found nothing.
+
+        v0.5.6 API CHANGE (repair, deliberate). This used to be
+        ``decision == "allow"``, which made "I found no threats in the 5% of this
+        file I could read" indistinguishable from "this file is clean" — the exact
+        misleading-success class this release exists to close. Uninspected content
+        can never contribute to CLEAN.
+
+        MIGRATION for callers: if you meant "no findings", use ``threat_found``
+        (inverted) or compare ``decision`` yourself; ``is_clean`` now also requires
+        ``inspection_complete``. A caller that branches to "block/deny" on
+        ``not is_clean`` MUST migrate — an unread byte is not an attack, and
+        ``findings`` can be empty here.
+        """
+        return not self.threat_found and self.inspection_complete
 
     @property
     def severity(self) -> str:
@@ -125,6 +153,12 @@ class ScanResult:
             "truncated": self.truncated,
             "bytes_scanned": self.bytes_scanned,
             "extraction_complete": self.extraction_complete,
+            # v0.5.6: the three questions, answered separately and explicitly, so a
+            # machine consumer never has to re-derive them from `decision` + flags
+            # (and never has to guess which one `is_clean` meant this release).
+            "threat_found": self.threat_found,
+            "inspection_complete": self.inspection_complete,
+            "is_clean": self.is_clean,
             "extraction_warnings": list(self.extraction_warnings),
             "findings_count": len(self.reported_findings()),
             "patterns_fired": len(self.findings),
@@ -146,6 +180,11 @@ class ScanResult:
     def summary(self) -> str:
         if self.is_clean:
             return f"[SUNGLASSES] PASS ({self.latency_ms}ms) — clean"
+        if not self.threat_found:
+            # No findings, but we did not read all of it. Saying PASS here is the
+            # bug; saying THREAT here would be a lie in the other direction.
+            return (f"[SUNGLASSES] INCOMPLETE ({self.latency_ms}ms) — "
+                    f"no findings in the inspected scope; part of the input was not read")
         return (
             f"[SUNGLASSES] {self.decision.upper()} ({self.latency_ms}ms) — "
             f"{len(self.findings)} finding(s), severity: {self.severity}"

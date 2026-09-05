@@ -174,8 +174,14 @@ def _tool_scan_text(arguments):
     result_dict = result.to_dict()
 
     # Build a human-readable summary + JSON
-    if result.is_clean:
-        summary = f"PASS — No threats detected ({result.latency_ms}ms)"
+    # threat_found, not is_clean: a truncated-but-findingless scan must not render
+    # as "ALLOW — 0 threat(s) found", and must not render as PASS either.
+    if not result.threat_found:
+        if result.inspection_complete:
+            summary = f"PASS — No threats detected ({result.latency_ms}ms)"
+        else:
+            summary = (f"INCOMPLETE — no findings in the inspected scope "
+                       f"({result.latency_ms}ms); part of the input was not read")
     else:
         summary = (
             f"{result.decision.upper()} — {len(result.findings)} threat(s) found, "

@@ -15,6 +15,8 @@ Usage:
     from sunglasses.extractors.audio import scan_audio
     result = scan_audio("/path/to/voicemail.mp3")
 
+
+
 Install: pip install sunglasses[all]  (requires whisper + ffmpeg)
 """
 
@@ -22,6 +24,23 @@ import os
 import subprocess
 import json
 from typing import List, Tuple
+
+
+def _brief(exc, limit=180):
+    """First meaningful line of an exception, capped.
+
+    ffmpeg answers a failure with its full build configuration: 1.5 KB of banner
+    for one real sentence. A warning nobody reads is only marginally better than
+    no warning, so keep the sentence and drop the banner.
+    """
+    for line in str(exc).splitlines():
+        line = line.strip()
+        if line and not line.startswith(("built with", "configuration:", "lib")):
+            return line[:limit] + ("..." if len(line) > limit else "")
+    text = " ".join(str(exc).split())
+    return text[:limit] + ("..." if len(text) > limit else "")
+
+
 
 
 def _check_deps():
@@ -58,6 +77,8 @@ class AudioExtractor:
             self._model = whisper.load_model(self._model_name)
         return self._model
 
+    warnings: List[str] = []
+
     def extract(self, audio_path: str) -> List[Tuple[str, str]]:
         """
         Extract all text from an audio file.
@@ -68,6 +89,9 @@ class AudioExtractor:
             raise FileNotFoundError(f"Audio not found: {audio_path}")
 
         results = []
+        # Reset per call: a failure from a previous file must never be reported
+        # against this one, and a success must never inherit a stale warning.
+        self.warnings = []
 
         # 1. Speech-to-text via Whisper
         transcript = self._transcribe(audio_path)
@@ -83,13 +107,24 @@ class AudioExtractor:
         return results
 
     def _transcribe(self, audio_path: str) -> str:
-        """Transcribe audio to text using Whisper."""
+        """Transcribe audio to text using Whisper.
+
+        v0.5.6: a failure here used to RETURN the error message as the transcript.
+        The engine then scanned "[Transcription error: ...]", found no attack in it —
+        because there is none in an ffmpeg error — and the CLI reported PASS on a
+        file it had never heard a second of. The failure text became the evidence.
+        Failures are now recorded as warnings and produce NO content, so the scan is
+        reported incomplete instead of clean.
+        """
         try:
             model = self._get_model()
             result = model.transcribe(audio_path)
             return result.get("text", "").strip()
         except Exception as e:
-            return f"[Transcription error: {e}]"
+            self.warnings.append(
+                f"Audio not transcribed ({e.__class__.__name__}: {_brief(e)})."
+            )
+            return ""
 
     def _extract_metadata(self, audio_path: str) -> List[Tuple[str, str]]:
         """Extract text from audio file metadata using ffprobe."""
@@ -149,10 +184,14 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
             is_clean = False
             threats.extend(result.findings)
 
+    warnings = list(getattr(extractor, "warnings", []))
     return {
         "file": audio_path,
         "sources_found": len(texts),
-        "is_clean": is_clean,
+        # An extraction failure means we did not read it; that can never be clean.
+        "is_clean": is_clean and not warnings,
+        "extraction_complete": not warnings,
+        "warnings": warnings,
         "threats": threats,
         "results": results,
     }
