@@ -881,3 +881,99 @@ def test_json_carries_both_axes_when_a_truncated_scan_finds_something(oversized)
     assert doc["inspection_complete"] is False
     assert doc["is_clean"] is False
     assert doc["findings"], "findings must survive incompleteness"
+
+
+# ==========================================================================
+# 12. Repo mode (T9 spot-check, both must-fixes)
+#
+# `--repo` is a scan surface like any other, and it had its own versions of
+# every bug in this release: an operational failure answering with a threat
+# code, and skipped files vanishing from the output entirely.
+# ==========================================================================
+
+def _make_repo(root, paths):
+    """git init + commit. `scan --repo` CLONES, and cloning a repo with no
+    commits yields an empty working tree — so an uncommitted fixture silently
+    tests "empty repo" instead of what it looks like it tests.
+    """
+    run = lambda *a: subprocess.run(a, cwd=root, check=True, timeout=60,
+                                    capture_output=True)
+    run("git", "init", "-q", ".")
+    run("git", "add", *paths)          # explicit paths, never -A
+    run("git", "-c", "user.email=t@example.com", "-c", "user.name=t",
+        "commit", "-qm", "fixture")
+
+
+@pytest.fixture(scope="module")
+def fixture_repo(tmp_path_factory):
+    """A repo the walker cannot fully read: one readable note, one file over
+    the 1 MB cap, and a ZIP wearing a `.bin` suffix."""
+    root = tmp_path_factory.mktemp("v056-repo")
+    (root / "ok.md").write_text("hello notes\n")
+    (root / "big.txt").write_text("lorem ipsum " * 110000)          # ~1.3 MB
+    archive = root / "renamed.bin"
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("SKILL.md", INJECTION)
+    _make_repo(root, ["ok.md", "big.txt", "renamed.bin"])
+    return root
+
+
+def test_clone_failure_is_an_operational_error_not_a_threat(tmp_path):
+    """It exited 1 — the threat code — on both surfaces. A CI job cannot tell
+    a typo'd URL from a repo full of attacks if both answer 1.
+    """
+    missing = str(tmp_path / "definitely-not-a-repo")
+    human = _run([sys.executable, "-m", "sunglasses"], "--repo", missing, timeout=300)
+    as_json = _run([sys.executable, "-m", "sunglasses"], "--repo", missing, "--json", timeout=300)
+    assert human.returncode == EXIT_USAGE
+    assert as_json.returncode == EXIT_USAGE
+    doc = _one_json_doc(as_json)
+    assert doc["scanned"] is False
+    _assert_not_clean(doc)
+
+
+def test_repo_scan_reports_the_files_it_never_read(fixture_repo):
+    """WAS: `files_scanned: 1 ... This repo looks clean` — with a 1.3 MB file
+    and an archive sitting right there, mentioned nowhere in the output.
+    """
+    proc = _run([sys.executable, "-m", "sunglasses"],
+                "--repo", str(fixture_repo), "--json", timeout=600)
+    assert proc.returncode == EXIT_INCOMPLETE
+    doc = _one_json_doc(proc)
+    assert doc["is_clean"] is False
+    assert doc["inspection_complete"] is False
+    assert doc["files_skipped"] >= 2
+    skipped = {s["file"] for s in doc["skipped"]}
+    assert "big.txt" in skipped, "the oversized file vanished from the output"
+    assert "renamed.bin" in skipped, "the archive vanished from the output"
+    reasons = " ".join(s["reason"] for s in doc["skipped"])
+    assert "1 MB" in reasons and "ZIP" in reasons, "skips reported without a reason"
+
+
+def test_repo_scan_does_not_invent_findings_from_compressed_bytes(fixture_repo):
+    """The archive named `.bin` was READ AS TEXT by the walker, and its deflate
+    stream matched five patterns — so the old behaviour did not merely count it
+    as inspected, it manufactured threats out of compressed bytes.
+    """
+    proc = _run([sys.executable, "-m", "sunglasses"],
+                "--repo", str(fixture_repo), "--json", timeout=600)
+    doc = _one_json_doc(proc)
+    assert doc["total_threats"] == 0, (
+        "findings were invented from a file that is not text: "
+        f"{doc.get('category_breakdown')}")
+    assert doc["threat_found"] is False
+
+
+def test_repo_with_nothing_inspectable_is_not_clean(tmp_path):
+    """Zero files inspected can never be CLEAN — it is not a result about the
+    repo's contents at all.
+    """
+    root = tmp_path / "empty-repo"
+    root.mkdir()
+    (root / "big.txt").write_text("lorem ipsum " * 110000)
+    _make_repo(root, ["big.txt"])
+    proc = _run([sys.executable, "-m", "sunglasses"], "--repo", str(root), "--json", timeout=300)
+    assert proc.returncode == EXIT_INCOMPLETE
+    doc = _one_json_doc(proc)
+    assert doc["files_scanned"] == 0
+    assert doc["is_clean"] is False

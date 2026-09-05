@@ -158,22 +158,53 @@ _BINARY_EXTENSIONS = {
 
 
 def _walk_repo_files(repo_dir):
-    """Walk repo directory, yielding text file paths. Skip binaries and junk."""
-    for root, dirs, files in os.walk(repo_dir):
+    """Walk repo directory, yielding text file paths. Skip binaries and junk.
+
+    Kept for callers that only want the paths; `_walk_repo_files_with_skips` is
+    what the scan uses, because the skips are half the truth.
+    """
+    for filepath, _reason in _walk_repo_files_with_skips(repo_dir)[0]:
+        yield filepath
+
+
+def _walk_repo_files_with_skips(repo_dir):
+    """Return (files, skips). `skips` is [(relpath, reason)], and it is the point.
+
+    v0.5.6: this walker silently `continue`d past three whole classes of file —
+    anything over 1 MB, anything with a binary extension, and anything that
+    raised OSError — and none of it reached a counter. A repo containing one
+    readable note and one 1.2 MB document reported "files_scanned: 1 ... This
+    repo looks clean". The unread document did not appear anywhere in the
+    output, which is the contract's merge stop condition in one sentence:
+    skipped content must not vanish.
+
+    This is NOT the walker rewrite (fstat, symlink policy, caps) — that stays
+    v0.6. It counts what it already decided to skip, and says so.
+    """
+    files, skips = [], []
+    for root, dirs, filenames in os.walk(repo_dir):
         # Prune skip dirs in-place
         dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.endswith('.egg-info')]
-        for f in files:
+        for f in filenames:
+            filepath = os.path.join(root, f)
+            rel = os.path.relpath(filepath, repo_dir)
             ext = os.path.splitext(f)[1].lower()
             if ext in _BINARY_EXTENSIONS:
+                skips.append((rel, f"binary file type ({ext}) — not inspected"))
                 continue
-            filepath = os.path.join(root, f)
-            # Skip files larger than 1MB
             try:
-                if os.path.getsize(filepath) > 1_000_000:
-                    continue
-            except OSError:
+                size = os.path.getsize(filepath)
+            except OSError as exc:
+                skips.append((rel, f"could not be read ({exc.__class__.__name__}) — not inspected"))
                 continue
-            yield filepath
+            if size > 1_000_000:
+                skips.append((rel, f"larger than the 1 MB repo-scan limit ({size:,} bytes) — not inspected"))
+                continue
+            if not os.path.isfile(filepath):
+                skips.append((rel, "not a regular file — not inspected"))
+                continue
+            files.append((filepath, None))
+    return files, skips
 
 
 def _scan_repo(args, engine):
@@ -198,17 +229,13 @@ def _scan_repo(args, engine):
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:
-            if args.json:
-                print(json.dumps({"error": f"git clone failed: {result.stderr.strip()}"}))
-            else:
-                print(f"\n  {RED}Clone failed:{RESET} {result.stderr.strip()}\n")
-            sys.exit(1)
+            # Exit 2, not 1. The clone failed, so nothing was scanned — and
+            # exit 1 means "threat found". A CI job cannot tell a typo'd URL
+            # from a repo full of attacks if both answer 1.
+            _usage_error(args, f"Clone failed: {result.stderr.strip()}",
+                         "Nothing was scanned.")
     except subprocess.TimeoutExpired:
-        if args.json:
-            print(json.dumps({"error": "git clone timed out (120s)"}))
-        else:
-            print(f"\n  {RED}Clone timed out (120s).{RESET}\n")
-        sys.exit(1)
+        _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
 
     if not args.json:
         print(f"  {GREEN}Cloned.{RESET} Scanning files...")
@@ -224,16 +251,31 @@ def _scan_repo(args, engine):
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     file_results = []
 
-    for filepath in _walk_repo_files(tmp_dir):
+    walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
+    for filepath, _reason in walked:
+        rel_path = os.path.relpath(filepath, tmp_dir)
+
+        # Content routing, same rule as `--file` (1a-3): the walker's extension
+        # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
+        # at all — used to be read as text here and counted as inspected, which
+        # is the original bug one level up.
+        from .extractors.dispatch import identify
+        kind, label = identify(filepath)
+        if kind in ("opaque", "media"):
+            walker_skips.append((rel_path, f"{label} — not inspected"))
+            continue
+
         try:
             with open(filepath, 'r', errors='ignore') as f:
                 content = f.read()
-        except (OSError, PermissionError):
+        except (OSError, PermissionError) as exc:
+            # Was a silent `continue`. An unreadable file is not an absent one.
+            walker_skips.append(
+                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
 
         scan_result = engine.scan(content, channel="file")
         files_scanned += 1
-        rel_path = os.path.relpath(filepath, tmp_dir)
 
         if not scan_result.inspection_complete:
             # A file we could only partly read. NOT a threat — counting it as one
@@ -307,11 +349,19 @@ def _scan_repo(args, engine):
 
     # Same contract as every other scan path (1b): a repo we could only partly
     # read is not a repo that came back clean.
+    # `files_skipped` is the half that used to vanish: every file the walker
+    # declined, with the reason it declined it.
+    summary["files_skipped"] = len(walker_skips)
+    summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
+    # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
+    # is not a repo we cleared.
+    nothing_inspected = files_scanned == 0
+    incomplete = bool(files_incomplete or walker_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
-                 EXIT_INCOMPLETE if files_incomplete else EXIT_CLEAN)
+                 EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
     summary["threat_found"] = bool(total_threats)
-    summary["inspection_complete"] = not files_incomplete
-    summary["is_clean"] = not total_threats and not files_incomplete
+    summary["inspection_complete"] = not incomplete
+    summary["is_clean"] = not total_threats and not incomplete
     summary["exit_code"] = repo_exit
 
     if args.json:
@@ -326,6 +376,12 @@ def _scan_repo(args, engine):
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
+    if walker_skips:
+        print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
+        for name, reason in walker_skips[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+        if len(walker_skips) > 10:
+            print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
     print(f"  Scan time:       {DIM}{elapsed_ms:.0f}ms{RESET}")
 
@@ -360,10 +416,15 @@ def _scan_repo(args, engine):
                     print(f"    {DIM}... and {remaining} more findings{RESET}")
                 break
         print()
-    elif files_incomplete:
+    elif incomplete:
         print(f"\n  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
-        print(f"  {DIM}{files_incomplete} file(s) could not be fully read, so this "
-              f"is not a clean bill of health for the repo.{RESET}\n")
+        if nothing_inspected:
+            print(f"  {DIM}No files were inspected at all, so this is not a "
+                  f"result about the repo's contents.{RESET}\n")
+        else:
+            print(f"  {DIM}{files_incomplete + len(walker_skips)} file(s) were not "
+                  f"read in full, so this is not a clean bill of health for the "
+                  f"repo.{RESET}\n")
     else:
         print(f"\n  {GREEN}{BOLD}No threats found.{RESET} This repo looks clean.\n")
 
