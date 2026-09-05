@@ -788,3 +788,44 @@ def test_consent_flag_and_env_var_both_allow_the_run():
         combined = (proc.stdout + proc.stderr).lower()
         assert "without consent" not in combined, \
             f"consent via {args}/{env} did not open the gate"
+
+
+# ==========================================================================
+# 10. The is_clean blast radius, second sweep
+#
+# Found by reading every call site rather than trusting the first three. Both
+# of these were introduced BY the semantic change: neither case could arise
+# while `is_clean` merely meant "no findings".
+# ==========================================================================
+
+def test_incomplete_scan_renders_as_incomplete_not_as_a_threat(bundle):
+    """It used to print `ALLOW [NONE] 0 threat(s) found` in THREAT red.
+
+    Alarming and wrong in the opposite direction from the bug we set out to
+    fix: the point of this release is that the tool says what it actually did.
+    """
+    proc = _run([sys.executable, "-m", "sunglasses"], "--file", str(bundle / "opaque.zip"))
+    assert proc.returncode == EXIT_INCOMPLETE
+    out = proc.stdout
+    assert "INCOMPLETE" in out
+    assert "0 threat(s) found" not in out
+    assert "PASS" not in out
+
+
+def test_repo_scan_does_not_count_an_unread_file_as_a_file_with_threats(tmp_path, monkeypatch):
+    """`not is_clean` in the repo walker would have made every truncated file a
+    "file with threats" carrying zero findings — and still exited 0, because the
+    exit was computed from the threat COUNT. Incompleteness is now counted
+    separately and carries the scan's exit code.
+    """
+    sys.path.insert(0, REPO_ROOT)
+    from sunglasses.engine import SunglassesEngine
+
+    engine = SunglassesEngine(max_scan_bytes=32)
+    result = engine.scan("a benign sentence that is definitely longer than the cap")
+    assert result.truncated is True
+    assert result.threat_found is False, "the fixture must be benign"
+    assert result.is_clean is False, "and incomplete"
+    # The walker branches on these two, and they must disagree here — that
+    # disagreement is the whole point of the three-property split.
+    assert result.inspection_complete is False

@@ -43,6 +43,15 @@ def print_result(result, verbose=False):
     if result.is_clean:
         print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({result.latency_ms}ms){RESET}")
         print(f"  {DIM}No threats detected.{RESET}\n")
+    elif not result.threat_found:
+        # Incomplete, not clean and not a threat. Before v0.5.6 `is_clean` was a
+        # synonym for "no findings", so this case could not arise; once it could,
+        # the else-branch below rendered it as `ALLOW [NONE] 0 threat(s) found` in
+        # THREAT red — alarming and wrong in the opposite direction. The reasons
+        # print immediately after this, from _print_extraction_warnings.
+        print(f"\n  {YELLOW}{BOLD}INCOMPLETE{RESET} {DIM}({result.latency_ms}ms){RESET}")
+        print(f"  {DIM}No findings in the inspected scope. Part of this input was "
+              f"not read, so this is not a clean result.{RESET}")
     else:
         severity_colors = {
             "critical": RED, "high": RED,
@@ -208,6 +217,7 @@ def _scan_repo(args, engine):
     start = time.perf_counter()
     files_scanned = 0
     files_with_threats = 0
+    files_incomplete = 0
     total_threats = 0
     all_findings = []
     category_counts = {}
@@ -225,7 +235,14 @@ def _scan_repo(args, engine):
         files_scanned += 1
         rel_path = os.path.relpath(filepath, tmp_dir)
 
-        if not scan_result.is_clean:
+        if not scan_result.inspection_complete:
+            # A file we could only partly read. NOT a threat — counting it as one
+            # (which `not is_clean` now would) inflates "files with threats" with
+            # zero findings behind it — but it must not leave the scan looking
+            # complete either.
+            files_incomplete += 1
+
+        if scan_result.threat_found:
             files_with_threats += 1
             total_threats += len(scan_result.findings)
 
@@ -263,7 +280,9 @@ def _scan_repo(args, engine):
             })
 
         if not args.json and args.verbose:
-            status = f"{GREEN}PASS{RESET}" if scan_result.is_clean else f"{RED}THREAT{RESET}"
+            status = (f"{GREEN}PASS{RESET}" if scan_result.is_clean
+                      else f"{RED}THREAT{RESET}" if scan_result.threat_found
+                      else f"{YELLOW}INCOMPLETE{RESET}")
             print(f"  {status}  {rel_path}")
 
     elapsed_ms = (time.perf_counter() - start) * 1000
@@ -278,6 +297,7 @@ def _scan_repo(args, engine):
         "repo_name": repo_name,
         "files_scanned": files_scanned,
         "files_with_threats": files_with_threats,
+        "files_incomplete": files_incomplete,
         "total_threats": total_threats,
         "severity_breakdown": severity_counts,
         "category_breakdown": category_counts,
@@ -285,9 +305,18 @@ def _scan_repo(args, engine):
         "file_results": file_results,
     }
 
+    # Same contract as every other scan path (1b): a repo we could only partly
+    # read is not a repo that came back clean.
+    repo_exit = (EXIT_THREAT if total_threats else
+                 EXIT_INCOMPLETE if files_incomplete else EXIT_CLEAN)
+    summary["threat_found"] = bool(total_threats)
+    summary["inspection_complete"] = not files_incomplete
+    summary["is_clean"] = not total_threats and not files_incomplete
+    summary["exit_code"] = repo_exit
+
     if args.json:
         print(json.dumps(summary, indent=2))
-        sys.exit(0 if total_threats == 0 else 1)
+        sys.exit(repo_exit)
 
     # Human-readable output
     print(f"\n  {BOLD}SCAN COMPLETE{RESET}")
@@ -295,6 +324,8 @@ def _scan_repo(args, engine):
     print(f"  Repo:            {CYAN}{repo_name}{RESET} ({repo_url})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
+    if files_incomplete:
+        print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
     print(f"  Scan time:       {DIM}{elapsed_ms:.0f}ms{RESET}")
 
@@ -329,10 +360,14 @@ def _scan_repo(args, engine):
                     print(f"    {DIM}... and {remaining} more findings{RESET}")
                 break
         print()
+    elif files_incomplete:
+        print(f"\n  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
+        print(f"  {DIM}{files_incomplete} file(s) could not be fully read, so this "
+              f"is not a clean bill of health for the repo.{RESET}\n")
     else:
         print(f"\n  {GREEN}{BOLD}No threats found.{RESET} This repo looks clean.\n")
 
-    sys.exit(0 if total_threats == 0 else 1)
+    sys.exit(repo_exit)
 
 
 # Exit-code contract for a scan (audit finding C1; extended by the v0.5.6 repair).
