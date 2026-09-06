@@ -240,6 +240,54 @@ def test_missing_file_flag_is_a_usage_error_not_a_threat(entrypoint, bundle):
     assert proc.returncode == EXIT_USAGE
 
 
+@pytest.mark.parametrize("entrypoint", ENTRYPOINTS)
+def test_unreadable_file_is_an_operational_error_not_a_threat(entrypoint, tmp_path):
+    """A file we cannot open exited 1 -- the same code as "threat found".
+
+    `_read_raw` opened the path with no OSError guard, so a PermissionError
+    escaped and Python terminated with its default exit code 1. Every caller
+    that keys on 1 (the GitHub Action among them) reported a permissions
+    problem as an agent-targeted injection. Trip evidence, measured on
+    339d356 before this fix: exit 1, stdout empty, traceback on stderr from
+    extractors/dispatch.py:62.
+    """
+    if os.getuid() == 0:
+        pytest.skip("running as root: mode 000 is not enforced")
+    target = tmp_path / "unreadable.md"
+    target.write_text("ordinary content\n")
+    os.chmod(target, 0o000)
+    try:
+        proc = _run(entrypoint, "--file", str(target), "--json")
+        assert proc.returncode == EXIT_USAGE, (
+            "an unreadable file must be an operational error, never a threat; "
+            f"got {proc.returncode} (1 = threat found)"
+        )
+        doc = _one_json_doc(proc)
+        assert doc["scanned"] is False
+        _assert_not_clean(doc)
+        # The reason has to name what actually went wrong, not just "failed".
+        assert "could not read" in (doc.get("error") or "")
+    finally:
+        os.chmod(target, 0o644)
+
+
+def test_unreadable_file_in_human_mode_says_it_was_not_inspected(tmp_path):
+    """Human mode must not print a traceback and must not imply a verdict."""
+    if os.getuid() == 0:
+        pytest.skip("running as root: mode 000 is not enforced")
+    target = tmp_path / "unreadable.md"
+    target.write_text("ordinary content\n")
+    os.chmod(target, 0o000)
+    try:
+        proc = _run([sys.executable, "-m", "sunglasses"], "--file", str(target))
+        assert proc.returncode == EXIT_USAGE
+        combined = proc.stdout + proc.stderr
+        assert "Traceback" not in combined
+        assert "NOT inspected" in combined
+    finally:
+        os.chmod(target, 0o644)
+
+
 def test_non_regular_files_are_refused_before_reading(tmp_path):
     """A FIFO blocks forever on read. Refusing it is the only safe answer."""
     fifo = tmp_path / "pipe.txt"

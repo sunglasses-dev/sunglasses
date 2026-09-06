@@ -35,6 +35,24 @@ PDF_EXTENSIONS = {".pdf"}
 _DISABLE_ENV = "SUNGLASSES_DISABLE_EXTRACTORS"
 
 
+class UnreadableFile(OSError):
+    """The file exists but could not be read: permissions, I/O error, bad symlink.
+
+    This is an OPERATIONAL failure, not a verdict, and it has to be raised as its
+    own type rather than left to escape as a bare OSError. An uncaught OSError
+    terminates the process with Python's default exit code 1 — which is the code
+    this package uses for "threat found" — so before this guard a permissions
+    problem was reported to the caller as an agent-targeted injection. Callers
+    map this to the usage/operational exit code (2), never to a finding.
+    """
+
+    def __init__(self, path, cause):
+        self.path = path
+        self.cause = cause
+        detail = getattr(cause, "strerror", None) or str(cause)
+        super().__init__(f"could not read {path}: {detail}")
+
+
 class ExtractionResult:
     """Text pulled out of a file, plus an honest account of what we could not read."""
 
@@ -59,8 +77,11 @@ def _extractors_disabled() -> bool:
 
 
 def _read_raw(path: str) -> str:
-    with open(path, "r", errors="ignore") as fh:
-        return fh.read()
+    try:
+        with open(path, "r", errors="ignore") as fh:
+            return fh.read()
+    except OSError as exc:
+        raise UnreadableFile(path, exc) from exc
 
 
 def _extract_image(path: str):
@@ -229,7 +250,22 @@ def _opaque_result(path: str, label: str) -> ExtractionResult:
 
 
 def extract_file_sources(path: str) -> ExtractionResult:
-    """Route a file to the right extractor. Text and unknown types read as text."""
+    """Route a file to the right extractor. Text and unknown types read as text.
+
+    Raises UnreadableFile if the file cannot be read at all. Every extractor
+    branch is swept, not just the text one: a PDF, image or media file we cannot
+    open must reach the caller as an operational failure, and an OSError allowed
+    to escape here would exit the process with code 1 = "threat found".
+    """
+    try:
+        return _extract_file_sources(path)
+    except UnreadableFile:
+        raise
+    except OSError as exc:
+        raise UnreadableFile(path, exc) from exc
+
+
+def _extract_file_sources(path: str) -> ExtractionResult:
     kind, label = identify(path)
 
     if _extractors_disabled():

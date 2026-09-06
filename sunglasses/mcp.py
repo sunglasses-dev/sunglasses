@@ -24,6 +24,7 @@ if _pkg_dir not in sys.path:
 from sunglasses import __version__
 from sunglasses.engine import SunglassesEngine
 from sunglasses.scanner import SunglassesScanner
+from sunglasses.extractors.dispatch import UnreadableFile
 
 # Protocol constants
 JSONRPC = "2.0"
@@ -218,7 +219,16 @@ def _tool_scan_file(arguments):
         }
 
     scanner = SunglassesScanner()
-    result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+    try:
+        result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+    except UnreadableFile as exc:
+        # An operational failure must surface as an error, not as a scan result.
+        # Returning a "0 threats" document here would be the same lie the
+        # exit-code repair removes from the CLI.
+        return {
+            "content": [{"type": "text", "text": f"Error: {exc} — NOT inspected. Nothing was scanned."}],
+            "isError": True,
+        }
 
     output = json.dumps(result, indent=2, default=str)
     return {

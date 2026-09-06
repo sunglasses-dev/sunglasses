@@ -23,6 +23,7 @@ import time
 
 from . import __version__
 from .engine import SunglassesEngine
+from .extractors.dispatch import UnreadableFile
 from .reporter import ProtectedEngine, generate_report
 from .mailer import set_email, get_email, send_report
 from .sarif import to_sarif
@@ -714,7 +715,14 @@ def cmd_scan(args):
                         "brew install ffmpeg (Mac) or apt install ffmpeg (Linux).",
                     )
         else:
-            result = engine.scan_file(filepath)
+            try:
+                result = engine.scan_file(filepath)
+            except UnreadableFile as exc:
+                # The file exists but we could not read it. That is an operational
+                # failure (exit 2), never a finding: letting the OSError escape
+                # exited 1, which callers read as "threat found".
+                _usage_error(args, f"{exc} — NOT inspected",
+                             "Nothing was scanned. Check the file's permissions.")
             source = filepath
     elif args.stdin:
         text = sys.stdin.read()
