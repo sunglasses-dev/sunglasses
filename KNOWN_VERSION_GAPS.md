@@ -157,3 +157,41 @@ divergence is asserted as the current behaviour in the acceptance matrix
 (`cli_repo` / `truncated + finding`, carried as a note rather than hidden in an
 N/A) so a later change has to update a test that says what it used to do.
 Unification is a v0.6 item.
+
+## v0.5.6 — Languages: the shipped coverage is English-first, and "23 languages" was not true
+
+The README claimed 23 languages in four places. That number counted every language *named*
+anywhere in the ruleset as though it were covered. Measured against `sunglasses/patterns.py`
+at this release:
+
+| tier | count | languages | what actually exists |
+|---|---|---|---|
+| full ruleset | 1 | English | all 1,540 patterns |
+| dedicated patterns | 13 | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese | **exactly 2 patterns each**: an "ignore previous instructions" injection and one credential-exfiltration shape |
+| keyword-level only | 7 | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew | keywords appear inside English-scoped patterns; **no dedicated pattern** |
+| named only | 2 | Persian, Bengali | **no dedicated pattern and no keyword** — listed as covered, present nowhere |
+
+How to reproduce both halves:
+
+```sh
+# dedicated patterns per language: 13 languages x 2
+grep -oE '"([A-Z][a-z]+)-language' sunglasses/patterns.py | sed 's/"//; s/-language//' | sort | uniq -c
+# keyword presence for a named language (Persian and Bengali return nothing)
+grep -c 'نادیده\|دستورالعمل' sunglasses/patterns.py
+grep -c 'উপেক্ষা\|নির্দেশ' sunglasses/patterns.py
+```
+
+Two patterns is a seed, not coverage: it catches the single most literal phrasing of one attack
+and nothing else, so a non-English deployment should not be assumed to have English parity. The
+normalization layer (romanization, Unicode confusables, 17 other obfuscation techniques) is
+language-independent and does apply everywhere.
+
+Nothing about detection changed here — no pattern was added, removed or edited for this entry.
+Only the claim was corrected. Deepening real coverage is a v0.6+ lane, and it needs per-language
+false-positive corpora before per-language claims: a language whose false-positive rate we cannot
+measure separately is a language we cannot honestly advertise.
+
+**Related correction in the same sweep:** the README's keyword count read **6,642**. Measured at
+this release it is **6,944 unique keywords** (7,683 entries summed across patterns). The old
+figure predates the +80 patterns that landed in v0.5.4. Pattern count (1,540) and category count
+(118) were both verified correct and are unchanged.

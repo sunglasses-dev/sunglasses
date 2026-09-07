@@ -27,7 +27,7 @@ It flags; it does not silently strip. Content it cannot inspect — an archive, 
 - QR Codes: decode QR codes and barcodes, scan content
 
 **What it catches:**
-- Prompt injection (23 languages)
+- Prompt injection (English-first; dedicated non-English patterns in 13 languages — see [Language coverage](#language-coverage-measured))
 - Credential exfiltration
 - Command injection
 - Memory poisoning
@@ -186,9 +186,9 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency — typical attack string (median of 38) | ~4.2 ms |
 | Scan latency — real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
-| Patterns | 1540 |
-| Keywords | 6,642 |
-| Languages | 23 |
+| Patterns | 1,540 |
+| Keywords | 6,944 unique (7,683 entries across all patterns) |
+| Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 118 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
@@ -221,13 +221,30 @@ Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 
 
 **The known gap, stated out loud:** the one miss is `curl … | bash`. Seven of the 76 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line — no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
 
-## 23 Languages
+## Language coverage (measured)
 
-English, Spanish, Portuguese, French, German, Italian, Dutch, Russian, Ukrainian, Polish, Czech, Turkish, Azerbaijani, Arabic, Hebrew, Persian, Chinese, Japanese, Korean, Hindi, Bengali, Indonesian, Vietnamese — plus normalization handles romanization, Unicode confusables, and 17 other obfuscation techniques. Community language contributions welcome.
+**SUNGLASSES is English-first.** This section used to say "23 languages", which counted every
+language mentioned anywhere in the ruleset as if it were covered. Here is what is actually in the
+shipped patterns, counted from `sunglasses/patterns.py`:
+
+| tier | languages | what exists |
+|---|---|---|
+| **English** | English | the full 1,540-pattern ruleset |
+| **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** — "ignore previous instructions" and one credential-exfiltration shape |
+| **Keyword-level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English-scoped patterns; **no dedicated pattern** |
+| **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** — previously listed as covered |
+
+So a two-pattern seed is not language coverage, and you should not deploy SUNGLASSES expecting
+non-English parity with English. Normalization (romanization, Unicode confusables and 17 other
+obfuscation techniques) is language-independent and does apply throughout.
+
+Deepening this is a v0.6+ lane with per-language controls and per-language false-positive corpora
+— a language you cannot measure separately is a language you cannot honestly claim. Community
+language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured detail.
 
 ## What Works Today
 
-- ✅ Text scanning: 1540 patterns, 6,642 keywords, 23 languages, 118 attack categories
+- ✅ Text scanning: 1,540 patterns, 6,944 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
@@ -436,7 +453,7 @@ SUNGLASSES is risk reduction, not magic.
 
 - **Pattern-based**: catches known attack patterns and variants. Novel zero-day attacks may pass until patterns are added.
 - **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist — report them.
-- **Multilingual depth varies**: English has the deepest coverage. Other languages cover core injection + exfiltration. Community contributions welcome.
+- **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 13 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
 - **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
