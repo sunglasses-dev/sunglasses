@@ -17,10 +17,10 @@ partial, and no traceback on any path.
 declarations proves the table and the tests read the same source. It cannot
 prove the tests assert anything -- ASTRA demonstrated exactly that by replacing
 one cell's human output with `CLEAN. All content was inspected.` and watching
-the cell still pass. So `tests/test_v056_matrix.py` carries 18 MUTATION cases:
+the cell still pass. So `tests/test_v056_matrix.py` carries 22 MUTATION cases:
 for every outcome and format, a response with its coverage evidence stripped is
 fed to the same assertion functions the real cells use, and each must FAIL --
-plus 8 unmutated controls that must PASS, so the mutation suite cannot be
+plus 12 unmutated controls that must PASS, so the mutation suite cannot be
 satisfied by assertions that reject everything. No cell may skip: a grid-level
 test asserts generated cells == declared non-N/A cells, exactly.
 

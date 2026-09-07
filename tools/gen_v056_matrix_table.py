@@ -33,6 +33,37 @@ _CELL = {
 #   `⇄`        additionally compared, by execution, against the surface it wraps
 
 
+def _mutation_counts():
+    """Count the mutation cases and controls FROM THE SOURCE, never by hand.
+
+    A hand-typed denominator beside a generated table is the same defect the
+    receipt was pulled up for: it is right on the day it is written and silently
+    wrong afterwards. These are read out of the test module itself.
+    """
+    import ast
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "tests", "test_v056_matrix.py")
+    tree = ast.parse(open(path).read())
+
+    mutations = controls = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "_MUTATIONS":
+                    mutations = len(node.value.elts)
+        if (isinstance(node, ast.FunctionDef)
+                and node.name == "test_the_mutations_are_mutations_of_something_that_passes"):
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Assign) and isinstance(sub.targets[0], ast.Name)
+                        and sub.targets[0].id == "good"):
+                    controls = len(sub.value.elts)
+    if not mutations or not controls:  # pragma: no cover - the guard IS the point
+        raise SystemExit("could not read the mutation/control counts from the test "
+                         "module; refusing to publish a hand-typed denominator")
+    return mutations, controls
+
+
 def main() -> int:
     counts = M.coverage_counts()
     out = []
@@ -57,11 +88,12 @@ def main() -> int:
     w("**What this table cannot prove, and what does.** A table generated from the")
     w("declarations proves the table and the tests read the same source. It cannot")
     w("prove the tests assert anything -- ASTRA demonstrated exactly that by replacing")
+    muts, controls = _mutation_counts()
     w("one cell's human output with `CLEAN. All content was inspected.` and watching")
-    w("the cell still pass. So `tests/test_v056_matrix.py` carries 18 MUTATION cases:")
+    w(f"the cell still pass. So `tests/test_v056_matrix.py` carries {muts} MUTATION cases:")
     w("for every outcome and format, a response with its coverage evidence stripped is")
     w("fed to the same assertion functions the real cells use, and each must FAIL --")
-    w("plus 8 unmutated controls that must PASS, so the mutation suite cannot be")
+    w(f"plus {controls} unmutated controls that must PASS, so the mutation suite cannot be")
     w("satisfied by assertions that reject everything. No cell may skip: a grid-level")
     w("test asserts generated cells == declared non-N/A cells, exactly.")
     w("")
