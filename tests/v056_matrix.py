@@ -92,10 +92,12 @@ OUTCOMES = {
 NA_CLAIMS = {
     # a property of THIS SURFACE'S API, checkable against the signature/source
     "interface": "the surface's own interface makes the state unreachable",
-    # a property of the FORMAT's specification, checkable against that spec
-    "format": "the input format's specification makes the state impossible",
-    # a property of the STORAGE layer, checkable by trying it
-    "storage": "the storage layer cannot represent the input this state needs",
+    # NOTE round 5: `format` and `storage` used to live here. Both were retired
+    # when their only two cells became asserted -- the QR 2,953-byte capacity
+    # argument (true of ONE symbol, not of the surface) and the git-cannot-store-
+    # a-FIFO argument (true of git, and silent about symlinks). Deleting them
+    # rather than leaving them empty is this module's own rule: an unused kind is
+    # a slot the next unexamined reason gets quietly filed under.
     # true of THIS MACHINE, not of the software. ASTRA accepted the ARG_MAX
     # reason only on these terms, so the limit travels with the cell.
     "host": "true of this host's limits, not of the software",
@@ -171,6 +173,19 @@ STATES = [
     ("empty",             "empty", "a VALID input of this format that legitimately "
                                    "carries no content (0-byte text file, blank image, "
                                    "silent audio) -- read in full, nothing there"),
+    # --- round 5: the three mechanisms ASTRA's NO-GO #4 found, as their own
+    # states. Each one is a way to lose a COMPONENT of a file while the file as a
+    # whole still parses -- which is why none of the previous states caught them:
+    # nothing failed, something was simply never looked at.
+    ("later_component",   "finding in a later component",
+                          "a multi-frame GIF/TIFF or multi-page document whose "
+                          "finding lives after the first component"),
+    ("byte_metadata",     "byte-valued metadata",
+                          "embedded text carried as BYTES needing its field's own "
+                          "encoding (EXIF XP*/UserComment, GIF comment)"),
+    ("converter_failed",  "external converter failed",
+                          "a helper process (ffmpeg) exits nonzero or writes "
+                          "nothing, so a component never became text"),
 ]
 
 # --- surfaces -------------------------------------------------------------
@@ -180,7 +195,10 @@ SURFACES = [
     # CLI
     ("cli_file",            "cli", "CLI `scan --file`",             ("human", "json", "sarif")),
     ("cli_positional",      "cli", "CLI `scan <path>`",             ("human", "json", "sarif")),
-    ("cli_console",         "cli", "`sunglasses` console script",   ("json",)),
+    # JSON only, stated rather than implied: this row proves the ENTRY SYMBOL,
+    # and the three-format behaviour is already asserted on `cli_file`, which it
+    # is compared against cell by cell.
+    ("cli_console",         "cli", "`sunglasses` console script (JSON only)", ("json",)),
     ("cli_text",            "cli", "CLI `scan --text`",             ("human", "json", "sarif")),
     ("cli_stdin",           "cli", "CLI `scan --stdin`",            ("human", "json", "sarif")),
     ("cli_repo",            "cli", "CLI `scan --repo`",             ("human", "json", "sarif")),
@@ -206,6 +224,10 @@ SURFACES = [
     ("lib_conv_video",      "lib", "`extractors.video.scan_video()`", ("dict",)),
     # library -- the normalizer boundary itself
     ("lib_normalize",       "lib", "`result.normalize()`",          ("dict",)),
+    # ASTRA: the exported fold is exercised only through its wrappers. It is the
+    # single place child coverage is combined, so "covered indirectly" is exactly
+    # the argument round 4 stopped accepting for everything else.
+    ("lib_aggregate",       "lib", "`result.aggregate()`",          ("dict",)),
     # MCP
     ("mcp_scan_text",       "mcp", "MCP `scan_text`",               ("mcp",)),
     ("mcp_scan_file_false", "mcp", "MCP `scan_file` deep=false",    ("mcp",)),
@@ -269,6 +291,18 @@ def _text_surface(extra):
         "corrupt_parser_fail": NotApplicable(_NO_PARSER),
         "nonregular":         NotApplicable(_NO_PATH),
         "undecodable":        NotApplicable(_STR_PARAM),
+        "later_component":    NotApplicable(
+        "this surface's input is a content string; it has no container, so it has "
+        "no second frame, page or track to omit",
+        claim="interface"),
+        "byte_metadata":      NotApplicable(
+        "no image or document metadata block is parsed on this surface, so no "
+        "field arrives as bytes needing its own encoding",
+        claim="interface"),
+        "converter_failed":   NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
     }
     base.update(extra)
     return base
@@ -289,6 +323,14 @@ def _file_surface(extra=None):
         "nonregular": "operational",
         "undecodable": "incomplete",               # bytes that do not decode are unread
         "empty": "clean",                          # 0 of 0 bytes read IS complete
+        # round 5. A router reaches the image extractor, so all three mechanisms
+        # are live on any surface that takes a path.
+        "later_component": "threat",               # frame 2 fires; every frame inspected
+        "byte_metadata": "threat",                 # XPComment decodes and fires
+        "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
     }
     base.update(extra or {})
     return base
@@ -348,13 +390,22 @@ _row("cli_repo", {
     "missing_dependency": "incomplete",        # a media file in the tree
     "truncated_finding": "incomplete",
     "corrupt_parser_fail": "incomplete",
-    "nonregular": NotApplicable(
-        "git's object model stores regular files, symlinks and directories only; "
-        "a FIFO, socket or device node cannot be committed, so no clone can "
-        "contain one. Verified by attempting `git add` on a FIFO fixture",
-        claim="storage"),
+    # ASTRA: the storage argument overlooks SYMLINK RESOLUTION. Git cannot store a
+    # FIFO, which is true and was the whole reason -- but it stores a symlink
+    # happily, and a committed symlink whose target is a FIFO survives a clone and
+    # puts a non-regular file in the walker's path. The reason was right about git
+    # and wrong about the state. The product already answers correctly.
+    "nonregular": "incomplete",
     "undecodable": "incomplete",               # a committed non-UTF-8 file
     "empty": "clean",                          # a committed empty file
+    # the walker hands each member to the same file path, so a committed
+    # multi-frame GIF and a committed byte-EXIF JPEG behave as they do on --file
+    "later_component": "threat",
+    "byte_metadata": "threat",
+    "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
 })
 
 NOTES[("cli_repo", "truncated_finding")] = (
@@ -400,6 +451,17 @@ _row("cli_deep", {
         "state -- both arrive through the same `_transcribe` except branch -- so "
         "it is asserted under that alias rather than declared impossible"),
     "empty": "clean",                          # decoder ran, produced no speech
+    # The deep path is the one that shells out, so this is where a converter's
+    # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
+    "converter_failed": "incomplete",
+    "later_component": NotApplicable(
+        "this surface handles a single-component input only; there is no second "
+        "frame, page or track for it to omit",
+        claim="interface"),
+    "byte_metadata": NotApplicable(
+        "this surface parses no image or document metadata block, so no field "
+        "arrives as bytes needing its own encoding",
+        claim="interface"),
 })
 NOTES[("cli_deep", "corrupt_parser_fail")] = (
     "EXPLICIT EQUIVALENCE MAPPING, as ASTRA required. The decoder-failure fixture "
@@ -470,6 +532,17 @@ _row("lib_scan_deep", {
     "undecodable": Alias("corrupt_parser_fail",
                          "see cli_deep: the same `_transcribe` except branch"),
     "empty": "clean",
+    # The deep path is the one that shells out, so this is where a converter's
+    # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
+    "converter_failed": "incomplete",
+    "later_component": NotApplicable(
+        "this surface handles a single-component input only; there is no second "
+        "frame, page or track for it to omit",
+        claim="interface"),
+    "byte_metadata": NotApplicable(
+        "this surface parses no image or document metadata block, so no field "
+        "arrives as bytes needing its own encoding",
+        claim="interface"),
 })
 
 # =========================================================================
@@ -497,8 +570,16 @@ _row("lib_helper_image", {
     "truncated_finding": "threat_incomplete",
     "corrupt_parser_fail": "incomplete",       # PNG header, not a PNG
     "nonregular": "operational",
-    "undecodable": _HELPER_WRONG_TYPE,
+    # ASTRA G2 split: the OUTER format decodes fine here -- what does not is the
+    # EMBEDDED text inside it, which round 5 made a real, reachable state.
+    "undecodable": "threat_incomplete",
     "empty": "clean",                          # a valid blank image: decoded, no text
+    "later_component": "threat",               # ASTRA G1: frame 2 carries it
+    "byte_metadata": "threat",                 # ASTRA G2: XPComment decodes
+    "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
 })
 
 _row("lib_helper_pdf", {
@@ -512,16 +593,40 @@ _row("lib_helper_pdf", {
     "nonregular": "operational",
     "undecodable": _HELPER_WRONG_TYPE,
     "empty": "clean",                          # a valid PDF with a blank page
+    "later_component": "threat",               # the finding on page 2
+    "byte_metadata": NotApplicable(
+        "this surface parses no image or document metadata block, so no field "
+        "arrives as bytes needing its own encoding",
+        claim="interface"),
+    "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
 })
 
 _row("lib_helper_text", _file_surface({
     "missing_dependency": _HELPER_WRONG_TYPE,
     "corrupt_parser_fail": _HELPER_WRONG_TYPE,
-    "incomplete_clean": _HELPER_WRONG_TYPE,
+    # ASTRA: reachable with an ordinary file over the DEFAULT cap -- truncation is
+    # a way to lose coverage that needs no extractor at all, so calling it
+    # "wrong type for this helper" was answering a different question.
+    "incomplete_clean": "incomplete",
     "incomplete_finding": Alias(
         "truncated_finding",
         "this helper runs no extractor, so the size cap is its only way to lose "
         "coverage -- same input as `truncated + finding`"),
+    "later_component": NotApplicable(
+        "this surface handles a single-component input only; there is no second "
+        "frame, page or track for it to omit",
+        claim="interface"),
+    "byte_metadata": NotApplicable(
+        "this surface parses no image or document metadata block, so no field "
+        "arrives as bytes needing its own encoding",
+        claim="interface"),
+    "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
 }))
 
 # =========================================================================
@@ -556,34 +661,68 @@ def _conv_row(name, extra=None):
         # produced nothing, which is a complete inspection of an empty document.
         # Contrast `corrupt_parser_fail`, where the decoder could not run at all.
         "empty": "clean",
+        # round 5 defaults; each convenience row overrides what its format can host
+        "later_component": NotApplicable(
+        "this surface handles a single-component input only; there is no second "
+        "frame, page or track for it to omit",
+        claim="interface"),
+        "byte_metadata": NotApplicable(
+        "this surface parses no image or document metadata block, so no field "
+        "arrives as bytes needing its own encoding",
+        claim="interface"),
+        "converter_failed": NotApplicable(
+        "no external converter process runs on this path; text is produced by an "
+        "in-process parser, so there is no helper exit status to ignore",
+        claim="interface"),
     }
     base.update(extra or {})
     _row(name, base)
 
-for _name in ("lib_conv_image", "lib_conv_pdf", "lib_conv_audio", "lib_conv_video"):
-    _conv_row(_name)
+_conv_row("lib_conv_image", {
+    # Both image mechanisms are this surface's, and its `undecodable` is the
+    # EMBEDDED-text one ASTRA asked us to split out from outer-format failure.
+    "later_component": "threat",
+    "byte_metadata": "threat",
+    "undecodable": "threat_incomplete",
+})
+_conv_row("lib_conv_pdf", {
+    "later_component": "threat",               # the finding on page 2
+})
+_conv_row("lib_conv_audio", {})
+_conv_row("lib_conv_video", {
+    # The only surface that shells out to a converter for a text component.
+    "converter_failed": "incomplete",
+})
 
 # QR is the one convenience function with exactly ONE content source, and that
 # changes which states can exist on it. Round 3 would have written these as N/A
 # with the reason "not tested"; each of these is a claim about the surface.
 _conv_row("lib_conv_qr", {
-    "incomplete_clean": Alias(
-        "missing_dependency",
-        "a decoded symbol is this surface's only content source, so the only way "
-        "to lose coverage on it is for the decoder to be unavailable -- the same "
-        "input as `missing decoder`, asserted under that alias"),
-    "incomplete_finding": NotApplicable(
-        "this surface has exactly one content source. If QR decoding does not "
-        "run there is no extracted text at all, so a finding and a coverage loss "
-        "cannot coexist here -- unlike the image surface, which still has EXIF "
-        "when OCR fails, and the PDF surface, which still has pages when an "
-        "annotation fails"),
-    "truncated_finding": NotApplicable(
-        "the QR specification caps a symbol's payload at 2,953 bytes (version 40, "
-        "level L, binary), three orders of magnitude below the engine's 1 MiB "
-        "scan cap, so decoded QR text cannot reach truncation",
-        claim="format"),
+    # An image can carry several symbols, so a later one IS a later component --
+    # which is the same fact that killed my one-source reason above.
+    "later_component": "threat",
+    "incomplete_clean": "incomplete",
+    # My round-4 reason said "exactly one content source". That was simply WRONG:
+    # an image can carry SEVERAL symbols, and ASTRA's mixed fixture decodes two --
+    # so one symbol can fire while another is lost, which is the state itself. I
+    # inferred the premise from the extractor's shape instead of decoding an image
+    # with two symbols in it, which is the move this whole review keeps punishing.
+    "incomplete_finding": "threat_incomplete",
+    # The 2,953-byte figure is right about ONE SYMBOL and was wrong as a statement
+    # about the surface: a caller-configured cap truncates decoded QR text at any
+    # size, and several symbols concatenate. Kept as a scoped remark rather than
+    # an N/A -- at the DEFAULT 1 MiB cap it still holds, and that is what it is
+    # allowed to say.
+    "truncated_finding": "threat_incomplete",
 })
+
+NOTES[("lib_conv_qr", "truncated_finding")] = (
+    "SCOPED REMARK, not an impossibility. A single QR symbol caps at 2,953 bytes "
+    "(version 40, level L, binary), so at the DEFAULT 1 MiB engine cap one symbol "
+    "cannot truncate. This cell is asserted with a caller-configured cap, which is "
+    "a supported constructor argument -- and several symbols in one image "
+    "concatenate, so even the default is not the bound my round-4 reason claimed."
+)
 
 # =========================================================================
 # the normalizer boundary
@@ -608,6 +747,9 @@ _row("lib_normalize", {
     "nonregular": _NORMALIZE_NO_IO,
     "undecodable": _NORMALIZE_NO_IO,
     "empty": "incomplete",                     # `{}` -- silence is not a pass
+    "later_component": _NORMALIZE_NO_IO,
+    "byte_metadata": _NORMALIZE_NO_IO,
+    "converter_failed": _NORMALIZE_NO_IO,
 })
 NOTES[("lib_normalize", "empty")] = (
     "INVERTED on purpose, and it is invariant 2. Everywhere else `empty` means "
@@ -617,6 +759,39 @@ NOTES[("lib_normalize", "empty")] = (
     "pass. The same test asserts the round-4 hardening: `normalize(None)` and "
     "`normalize(object())` raise TypeError rather than defaulting every axis to "
     "the optimistic value."
+)
+
+_AGGREGATE_NO_IO = NotApplicable(
+    "`aggregate()` folds child results that are already in memory. It opens no "
+    "path, runs no parser, launches no converter and decodes no bytes, so every "
+    "state defined by one of those reaches it only as children that ALREADY "
+    "record the loss -- which is the `incomplete_*` and `truncated_finding` cells",
+    claim="interface")
+
+_row("lib_aggregate", {
+    "clean": "clean", "finding": "threat",
+    # The fold's whole job: one child incomplete makes the aggregate incomplete,
+    # and a finding in a sibling never cancels that.
+    "incomplete_clean": "incomplete",
+    "incomplete_finding": "threat_incomplete",
+    "truncated_finding": "threat_incomplete",
+    "empty": "clean",                          # no children at all: nothing unread
+    "unreadable": _AGGREGATE_NO_IO,
+    "missing": _AGGREGATE_NO_IO,
+    "missing_dependency": "incomplete",        # a caller-supplied decoder warning
+    "corrupt_parser_fail": _AGGREGATE_NO_IO,
+    "nonregular": _AGGREGATE_NO_IO,
+    "undecodable": _AGGREGATE_NO_IO,
+    "later_component": _AGGREGATE_NO_IO,
+    "byte_metadata": _AGGREGATE_NO_IO,
+    "converter_failed": _AGGREGATE_NO_IO,
+})
+NOTES[("lib_aggregate", "empty")] = (
+    "Zero children is CLEAN here, and that is not the same claim as `normalize({})`. "
+    "An empty child list means the producer folded nothing because there was "
+    "nothing to fold -- it still passed its own `extraction_complete` in. A `{}` "
+    "handed to `normalize()` is a document that asserts nothing about coverage, "
+    "which is invariant 2 and stays incomplete."
 )
 
 # =========================================================================
@@ -642,28 +817,17 @@ _row("mcp_scan_file_true", _file_surface())
 # The real transport. In-process handler tests cannot catch a framing, encoding or
 # serialization bug between the handler and the client, and ASTRA's F3 (a FIFO
 # stalling the server before it answered) was only visible over the wire.
-_WIRE_EQUIV = NotApplicable(
-    "the stdio leg exists to prove the TRANSPORT carries the document -- framing, "
-    "Content-Length, JSON-RPC envelope, no stdout pollution. The verdict logic "
-    "behind it is literally the same function object asserted in mcp_scan_file_*, "
-    "and the four states below are the ones whose documents differ in SHAPE "
-    "(error vs verdict, complete vs not), so they exercise every branch the "
-    "transport has to carry")
-
-_row("mcp_stdio", {
-    "clean": _WIRE_EQUIV,
-    "finding": "threat",
-    "incomplete_clean": "incomplete",
-    "incomplete_finding": _WIRE_EQUIV,
-    "unreadable": "operational",
-    "missing": _WIRE_EQUIV,
-    "missing_dependency": _WIRE_EQUIV,
-    "truncated_finding": _WIRE_EQUIV,
-    "corrupt_parser_fail": _WIRE_EQUIV,
-    "nonregular": "operational",
-    "undecodable": _WIRE_EQUIV,
-    "empty": _WIRE_EQUIV,
-})
+# ASTRA sent all twelve states over real JSON-RPC and got replies. The round-4
+# reason ("the stdio leg exists to prove the TRANSPORT carries the document")
+# described the coverage we had CHOSEN, not an impossibility -- and his sentence
+# for it is the one to keep: "the product's replies need not be wrong for this
+# claim kind to be wrong." A surface that answers a state has that state.
+#
+# So the wire row is now a full row. It is also the row most worth having: the
+# in-process handler tests cannot see a framing, encoding or serialization bug
+# between the handler and the client, and F3 (a FIFO stalling the server before
+# it answered) was only ever visible out here.
+_row("mcp_stdio", _file_surface())
 
 
 # =========================================================================

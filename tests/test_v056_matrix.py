@@ -158,6 +158,18 @@ def space(tmp_path_factory):
             pass
 
 
+def _text_image(text: str, size=(240, 60)):
+    """Render text into an image so OCR has something real to read."""
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", size, "white")
+    draw = ImageDraw.Draw(img)
+    y = 4
+    for chunk in [text[i:i + 34] for i in range(0, len(text), 34)]:
+        draw.text((3, y), chunk, fill="black")
+        y += 12
+    return img
+
+
 def _build_image_fixtures(root, f):
     from PIL import Image
     from PIL.PngImagePlugin import PngInfo
@@ -192,8 +204,49 @@ def _build_image_fixtures(root, f):
     here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "v056")
     f["qr_clean"] = os.path.join(here, "qr-ordinary.png")
     f["qr_finding"] = os.path.join(here, "qr-injection.png")
-    for _p in (f["qr_clean"], f["qr_finding"]):
-        assert os.path.exists(_p), f"missing committed QR fixture: {_p}"
+
+    # ASTRA's round-4 fixtures, committed. These are HIS files, byte for byte,
+    # not my reconstruction of them: a fixture I rebuild from his description is
+    # a fixture that agrees with my reading of the report, which is the thing
+    # under review. The 1.3 MB multi-page TIFF is the one exception -- it is
+    # generated below rather than committed, because a megabyte in git to prove
+    # a two-page container is a poor trade.
+    f["frames_finding"] = os.path.join(here, "two-frame.gif")        # finding on frame 2
+    f["byte_meta_finding"] = os.path.join(here, "exif-xpcomment.jpg")  # UTF-16LE XPComment
+    f["byte_meta_xmp"] = os.path.join(here, "xmp-description.jpg")   # XML text as bytes
+    f["byte_meta_control"] = os.path.join(here, "exif-description.jpg")  # plain str EXIF
+    f["embedded_undecodable"] = os.path.join(here, "invalid-comment.gif")   # all comment bytes bad
+    f["embedded_partial"] = os.path.join(here, "partial-comment.gif")   # finding + 3 bad bytes
+    for _p in (f["qr_clean"], f["qr_finding"], f["frames_finding"],
+               f["byte_meta_finding"], f["byte_meta_xmp"], f["byte_meta_control"],
+               f["embedded_undecodable"], f["embedded_partial"]):
+        assert os.path.exists(_p), f"missing committed fixture: {_p}"
+
+    # A multi-PAGE TIFF, generated: same mechanism as the GIF, different container.
+    from PIL import Image as _Im
+    _pages = [_Im.new("RGB", (240, 60), "white"), _text_image(INJECTION)]
+    f["frames_tiff"] = str(root / "two-page.tiff")
+    _pages[0].save(f["frames_tiff"], save_all=True, append_images=_pages[1:],
+                   compression="tiff_deflate")
+
+    # An ordinary file over the DEFAULT cap, whitespace-separated so it is the
+    # cheap shape. Generated, never committed -- a megabyte of filler in git to
+    # prove a cap is exactly the trade the fixtures above avoid.
+    f["over_cap_clean"] = root / "over-cap-clean.txt"
+    f["over_cap_clean"].write_text("benign filler. " * 90000)
+    assert f["over_cap_clean"].stat().st_size > CAP
+
+    # Two QR symbols in ONE image: one ordinary, one carrying the instruction.
+    # This is the fixture that disproves the round-4 "exactly one content source"
+    # reason -- a later symbol IS a later component, and one can fire while
+    # another is lost.
+    from PIL import Image as _Image
+    a, b = _Image.open(f["qr_clean"]), _Image.open(f["qr_finding"])
+    sheet = _Image.new("RGB", (a.width + b.width + 20, max(a.height, b.height)), "white")
+    sheet.paste(a, (0, 0))
+    sheet.paste(b, (a.width + 20, 0))
+    f["qr_two_symbols"] = str(root / "qr-two-symbols.png")
+    sheet.save(f["qr_two_symbols"])
 
 
 def _build_pdf_fixtures(root, f):
@@ -258,6 +311,15 @@ def _build_pdf_fixtures(root, f):
     # A valid PDF with a blank page and no metadata or annotations.
     f["pdf_empty"] = write("pdf-blank.pdf", page_text=b"")
 
+    # The finding on the SECOND page: the document-shaped twin of the multi-frame
+    # image. PDF extraction already walks every page, so this asserts that it
+    # keeps doing so rather than repairing anything.
+    _EXTRA["pdf-page2.pdf"] = [
+        b"<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (%s) >>"
+        % INJECTION.encode(),
+    ]
+    f["pdf_page2_finding"] = write("pdf-page2.pdf", annots=b"[5 0 R]")
+
     # Over the engine cap through a REAL extractor: the annotation carries the
     # instruction first and then more than 1 MiB of filler, so PyPDF2 hands the
     # engine a string that truncates. `scan_pdf` used to drop the child's
@@ -317,6 +379,27 @@ def repos(tmp_path_factory):
         os.symlink(str(target), str(root / "linked.txt"))
         return ["linked.txt"]
 
+    def _commit_fixture(name, key):
+        """Commit one of the committed binary fixtures into a repo under `name`."""
+        def add(root):
+            import shutil as _sh
+            here = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "fixtures", "v056")
+            src = {"frames_finding": "two-frame.gif",
+                   "byte_meta_finding": "exif-xpcomment.jpg"}[key]
+            _sh.copy(os.path.join(here, src), os.path.join(root, name))
+            return [name]
+        return add
+
+    def _symlink_to_fifo(root):
+        fifo_dir = base / "fifo-target"
+        fifo_dir.mkdir(exist_ok=True)
+        target = fifo_dir / "pipe"
+        if not target.exists():
+            os.mkfifo(str(target))
+        os.symlink(str(target), str(root / "linked-pipe"))
+        return ["linked-pipe"]
+
     repos_map = {
         "clean": make("clean", {"ok.md": ORDINARY + "\n"}),
         "finding": make("finding", {"bad.md": INJECTION + "\n"}),
@@ -338,6 +421,15 @@ def repos(tmp_path_factory):
                                             "bytes.dat": b"\xff\xfe\x00\x41" * 64}),
         "empty": make("empty", {"ok.md": ""}),
         "missing": str(base / "no-such-repo"),
+        "later_component": make("frames", {"ok.md": "notes\n"}, extra=_commit_fixture(
+            "later.gif", "frames_finding")),
+        "byte_metadata": make("bytemeta", {"ok.md": "notes\n"}, extra=_commit_fixture(
+            "meta.jpg", "byte_meta_finding")),
+        # ASTRA's counterexample to my `storage` claim: git cannot store a FIFO,
+        # which is true -- but it stores a SYMLINK, and a symlink to a FIFO
+        # survives a clone and puts a non-regular file in the walker's path. The
+        # reason was right about git and wrong about the state.
+        "nonregular": make("nonreg", {"ok.md": "notes\n"}, extra=_symlink_to_fifo),
     }
     yield repos_map
     try:
@@ -523,6 +615,15 @@ _SEAM = {
     # ASTRA's REJECT of the "indistinguishable from a missing decoder" N/A.
     "corrupt_parser_fail": ([], [], "decoder_error"),
     "empty":              ([], [], "texts"),
+    # ASTRA G3: ffmpeg exits nonzero (or writes nothing) converting a subtitle
+    # track, so a component never became text. The seam reports it exactly as the
+    # product does -- a named track and lost coverage -- while the ordinary audio
+    # and metadata sources still arrive, which is what makes it a COMPONENT loss
+    # rather than a whole-file failure.
+    "converter_failed":   ([["metadata:title", ORDINARY]],
+                           ["Subtitle track 0 (eng) not converted (ffmpeg exit 1, "
+                            "0 bytes written) — its text was NOT inspected."],
+                           "texts"),
 }
 
 
@@ -578,6 +679,13 @@ def _file_for(state, space):
         "nonregular": space["fifo"],
         "undecodable": space["undecodable_file"],
         "empty": space["empty_file"],
+        # round 5: the three component-loss mechanisms, on ASTRA's own fixtures
+        "later_component": space["frames_finding"],
+        "byte_metadata": space["byte_meta_finding"],
+        # only the deep surfaces declare this state; every path surface calls it
+        # N/A, so this entry exists so the deep lookup does not have to special-case
+        # its way past a KeyError before the seam takes over.
+        "converter_failed": space["media_file"],
     }[state]
 
 
@@ -714,6 +822,28 @@ def _rendered_a_finding(out: str) -> bool:
     return any(x in out for x in ("threat(s) found", "THREATS FOUND"))
 
 
+def _banner_names_its_scope(both: str) -> bool:
+    """Does the coverage banner actually say WHAT went unread?
+
+    v0.5.6 round 5 (ASTRA G4). The banner alone passed the round-4 assertion, so a
+    renderer that printed `INCOMPLETE SCAN` and then nothing would have been
+    accepted -- which is a header promising a list and delivering none. The
+    warning lines are the part a human acts on, so the banner is only evidence if
+    at least one named reason follows it.
+    """
+    if _COVERAGE_SENTENCE not in both:
+        return False
+    tail = both.split(_COVERAGE_SENTENCE, 1)[1]
+    for line in tail.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("!") and len(stripped) > 12:
+            return True
+        # the repo summary names its skipped members on their own indented lines
+        if "not inspected" in stripped and len(stripped) > 20:
+            return True
+    return False
+
+
 def _assert_human(stdout, stderr, outcome, where):
     """Assert the human OUTCOME LINE, both directions.
 
@@ -756,6 +886,12 @@ def _assert_human(stdout, stderr, outcome, where):
         assert _COVERAGE_SENTENCE in both, (
             f"{where}: incomplete scan does not carry the '{_COVERAGE_SENTENCE}' "
             f"block naming what went unread\n{both[:600]}")
+        assert _banner_names_its_scope(both), (
+            f"{where}: the coverage banner names nothing — a header that promises a "
+            f"list of what went unread and delivers none\n{both[:600]}")
+        assert not any(x in out for x in _CLEAN_SENTENCE), (
+            f"{where}: a clean sentence printed beside a coverage banner — the two "
+            f"contradict each other and a reader takes the reassuring one\n{out[:600]}")
         assert "PASS" not in out, f"{where}: an incomplete scan rendered PASS"
         assert not _rendered_a_finding(out), (
             f"{where}: a findingless scan rendered a finding\n{out[:400]}")
@@ -776,6 +912,12 @@ def _assert_human(stdout, stderr, outcome, where):
         assert _COVERAGE_SENTENCE in both, (
             f"{where}: a finding SUPPRESSED the coverage warning — this is exactly "
             f"the defect the release is about\n{both[:600]}")
+        assert _banner_names_its_scope(both), (
+            f"{where}: the coverage banner names nothing — a header that promises a "
+            f"list of what went unread and delivers none\n{both[:600]}")
+        assert not any(x in out for x in _CLEAN_SENTENCE), (
+            f"{where}: a clean sentence printed beside a coverage banner — the two "
+            f"contradict each other and a reader takes the reassuring one\n{out[:600]}")
         assert "PASS" not in out, f"{where}: threat+incomplete rendered PASS"
         return
 
@@ -908,6 +1050,13 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "truncated_finding": space["img_truncated_finding"],
             "corrupt_parser_fail": space["img_corrupt"],
             "nonregular": space["fifo"], "empty": space["img_empty"],
+            # round 5
+            "later_component": space["frames_finding"],
+            "byte_metadata": space["byte_meta_finding"],
+            # the EMBEDDED-text undecodable state, split from outer-format
+            # failure: the GIF itself parses, its comment bytes do not, and the
+            # readable part still fires (ASTRA G2's `partial-comment.gif`).
+            "undecodable": space["embedded_partial"],
         }[state]
         if state in ("incomplete_clean", "incomplete_finding"):
             # The REAL mechanism ASTRA used for F2, with no seam at all: Tesseract
@@ -936,10 +1085,24 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "nonregular": space["fifo"],
             # a valid image that simply carries no symbol
             "empty": space["img_empty"],
+            # TWO symbols in one image -- the fixture that disproves my round-4
+            # "exactly one content source" reason.
+            "later_component": space["qr_two_symbols"],
+            "incomplete_clean": space["qr_clean"],
+            "incomplete_finding": space["qr_two_symbols"],
+            "truncated_finding": space["qr_two_symbols"],
         }[state]
-        if state == "missing_dependency":
+        if state in ("missing_dependency", "incomplete_clean"):
             from sunglasses.extractors import qr as qr_mod
             monkeypatch.setattr(qr_mod, "_check_deps", _raise_missing_package)
+        if state in ("incomplete_finding", "truncated_finding"):
+            # A CONFIGURED cap, which is a supported constructor argument. One
+            # symbol cannot reach the default 1 MiB cap -- that part of my
+            # round-4 reason was right -- but the cap is not a constant, and
+            # several symbols in one image concatenate. Either way the state is
+            # reachable, which is what the N/A denied.
+            from sunglasses.engine import SunglassesEngine
+            return scan_qr(path, engine=SunglassesEngine(max_scan_bytes=40))
         return scan_qr(path, engine=engine)
 
     if surface in ("lib_helper_pdf", "lib_conv_pdf"):
@@ -952,6 +1115,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "truncated_finding": space["pdf_truncated_finding"],
             "corrupt_parser_fail": space["corrupt_pdf"],
             "nonregular": space["fifo"], "empty": space["pdf_empty"],
+            "later_component": space["pdf_page2_finding"],
         }[state]
         if state == "missing_dependency":
             from sunglasses.extractors import pdf as pdf_mod
@@ -974,6 +1138,34 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
 
     if surface == "lib_normalize":
         return normalize(_NORMALIZE_INPUT[state])
+
+    if surface == "lib_aggregate":
+        # Real engine children, not mocks: the fold's whole job is to combine
+        # what a child actually reports, so a hand-built stand-in would assert
+        # my idea of a ScanResult rather than the one the engine emits.
+        from sunglasses.result import aggregate
+        from sunglasses.engine import SunglassesEngine
+
+        capped = SunglassesEngine(max_scan_bytes=40)
+        over_cap = INJECTION + " " + ("filler " * 40)
+        children = {
+            "clean": [("a", ORDINARY, engine.scan(ORDINARY, channel="file"))],
+            "finding": [("a", INJECTION, engine.scan(INJECTION, channel="file"))],
+            "incomplete_clean": [("a", ORDINARY, engine.scan(ORDINARY, channel="file"))],
+            "incomplete_finding": [
+                ("a", ORDINARY, engine.scan(ORDINARY, channel="file")),
+                ("b", INJECTION, engine.scan(INJECTION, channel="file")),
+            ],
+            "truncated_finding": [("a", over_cap, capped.scan(over_cap, channel="file"))],
+            "missing_dependency": [],
+            "empty": [],
+        }[state]
+        warnings = {
+            "incomplete_clean": ["part of this input was not read"],
+            "incomplete_finding": ["part of this input was not read"],
+            "missing_dependency": ["Audio scanning requires: pip install sunglasses[audio]"],
+        }.get(state, [])
+        return aggregate(children, source="<aggregate>", warnings=warnings)
 
     # --- generic file surfaces
     path = _file_for(state, space)
@@ -1051,6 +1243,11 @@ class _MediaSeam:
         "truncated_finding":   ([("speech", INJECTION + " " + _OVER_CAP)], []),
         "corrupt_parser_fail": ([], ["Audio not transcribed (RuntimeError: corrupt stream)."]),
         "empty":               ([], []),
+        # ASTRA G3: the ordinary sources still arrive; only the converted
+        # component is missing, which is what makes it a COMPONENT loss.
+        "converter_failed":    ([("metadata:title", ORDINARY)],
+                                ["Subtitle track 0 (eng) not converted (ffmpeg exit 1, "
+                                 "0 bytes written) — its text was NOT inspected."]),
     }
 
     def __init__(self, state):
@@ -1350,6 +1547,25 @@ _MUTATIONS = [
      "incomplete", "human", 3,
      "\n  SCAN COMPLETE\n  Files NOT inspected: 1\n"
      "  No threats found in the inspected scope.\n", ""),
+    # --- round 5, ASTRA G4: both of these PASSED the round-4 assertion.
+    ("incomplete/human: banner_without_named_scope — the header names nothing",
+     "incomplete", "human", 3,
+     "\n  INCOMPLETE (1.0ms)\n  No findings in the inspected scope.\n"
+     "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+    ("threat_incomplete/human: banner_without_named_scope",
+     "threat_incomplete", "human", 1,
+     "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n"
+     "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+    ("incomplete/human: conflicting_clean_sentence — banner beside 'No threats detected'",
+     "incomplete", "human", 3,
+     "\n  INCOMPLETE (1.0ms)\n  No threats detected.\n"
+     "\n  INCOMPLETE SCAN — part of this file was not read\n"
+     "  ! bundle.zip not inspected — SUNGLASSES does not extract this format\n", ""),
+    ("threat_incomplete/human: conflicting_clean_sentence",
+     "threat_incomplete", "human", 1,
+     "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n  No threats detected.\n"
+     "\n  INCOMPLETE SCAN — part of this file was not read\n"
+     "  ! big.txt truncated at the 1 MiB cap\n", ""),
 ]
 
 
@@ -1377,11 +1593,13 @@ def test_the_mutations_are_mutations_of_something_that_passes():
          "\n  PASS (1.0ms)\n  0 bytes inspected — the input was empty.\n", ""),
         ("incomplete", "human", 3,
          "\n  INCOMPLETE (1.0ms)\n  No findings in the inspected scope.\n"
-         "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+         "\n  INCOMPLETE SCAN — part of this file was not read\n"
+         "  ! bundle.zip not inspected — SUNGLASSES does not extract this format\n", ""),
         ("threat", "human", 1, "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n", ""),
         ("threat_incomplete", "human", 1,
          "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n"
-         "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+         "\n  INCOMPLETE SCAN — part of this file was not read\n"
+         "  ! big.txt truncated at the 1 MiB cap\n", ""),
         # the other two renderers, unmutated, must also pass
         ("threat", "human", 1,
          "\n  SCAN COMPLETE\n  Files scanned: 1\n  Files w/ threats: 1\n"
@@ -1392,10 +1610,12 @@ def test_the_mutations_are_mutations_of_something_that_passes():
         ("incomplete", "human", 3,
          "\n  SCAN COMPLETE\n  Files NOT inspected: 1\n"
          "\n  INCOMPLETE SCAN — part of this repo was not read\n"
+         "    ! big.txt: larger than the 1 MB repo-scan limit — not inspected\n"
          "  No threats found in the inspected scope.\n", ""),
         ("threat_incomplete", "human", 1,
          "\n  THREATS FOUND (1.7s)\n  - Bypass instructions\n"
-         "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+         "\n  INCOMPLETE SCAN — part of this file was not read\n"
+         "  ! Audio not transcribed (RuntimeError: decoder failed).\n", ""),
         ("operational", "human", 2, "", "  could not read x — NOT inspected\n"
                                         "  Nothing was scanned. Check permissions.\n"),
         ("incomplete", "json", 3,
