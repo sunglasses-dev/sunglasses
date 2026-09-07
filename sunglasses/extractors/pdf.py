@@ -159,10 +159,19 @@ def scan_pdf(pdf_path: str, engine=None) -> dict:
     which is how one malformed annotation could hide the next one silently.
     """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.extractors.dispatch import _probe_readable
     from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
+
+    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # point probes readability BEFORE it routes, so an unreadable, missing or
+    # non-regular path is an OPERATIONAL failure here exactly as it is on
+    # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
+    # a partial SCAN DOCUMENT for a file they had never opened -- a verdict-shaped
+    # answer to a question that was never asked -- and a FIFO blocked on open.
+    _probe_readable(pdf_path)
 
     extractor = PDFExtractor()
     texts = extractor.extract(pdf_path)

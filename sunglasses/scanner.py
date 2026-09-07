@@ -306,15 +306,27 @@ class SunglassesScanner:
 
     def _scan_text_file(self, path: str) -> dict:
         """FAST: Plain text file scan."""
-        from .extractors.dispatch import _probe_readable
+        from .extractors.dispatch import _probe_readable, read_text_source
         from .result import normalize
 
         _probe_readable(path)
-        with open(path, 'r', errors='ignore') as f:
-            text = f.read()
+        # `open(..., errors='ignore')` here had the same defect dispatch had: bytes
+        # that did not decode were dropped and the result still said complete.
+        text, warnings = read_text_source(path)
         result = self.engine.scan(text, channel="file")
-        return normalize(result, source=path,
-                         extra={"file": path, "threats": list(result.findings)})
+        return normalize(
+            {
+                "threat_found": bool(result.threat_found),
+                "extraction_complete": not warnings,
+                "truncated": bool(result.truncated),
+                "warnings": warnings,
+                "findings": list(result.findings),
+                "decision": result.decision,
+                "channel": "file",
+            },
+            source=path,
+            extra={"file": path, "bytes_scanned": len(text),
+                   "threats": list(result.findings)})
 
     # =========================================================================
     # DEEP MODE — Background, for heavy media

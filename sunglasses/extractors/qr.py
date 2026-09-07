@@ -103,10 +103,19 @@ def scan_qr(image_path: str, engine=None) -> dict:
     round 4: it used to build its own aggregate and drop the child's coverage.
     """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.extractors.dispatch import _probe_readable
     from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
+
+    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # point probes readability BEFORE it routes, so an unreadable, missing or
+    # non-regular path is an OPERATIONAL failure here exactly as it is on
+    # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
+    # a partial SCAN DOCUMENT for a file they had never opened -- a verdict-shaped
+    # answer to a question that was never asked -- and a FIFO blocked on open.
+    _probe_readable(image_path)
 
     extractor = QRExtractor()
     texts = extractor.extract(image_path)

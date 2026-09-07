@@ -119,11 +119,48 @@ def _extractors_disabled() -> bool:
 
 
 def _read_raw(path: str) -> str:
+    """Bytes as text, dropping what will not decode. Prefer `read_text_source()`.
+
+    Kept because two callers want the lossy string and already report incomplete
+    for their own reasons (the PDF raw-bytes fallback, the extractors-disabled
+    branch). Anything that reports on coverage must use `read_text_source()`.
+    """
+    return read_text_source(path)[0]
+
+
+def read_text_source(path: str):
+    """Return (text, warnings). Bytes we could not decode are named, not hidden.
+
+    v0.5.6 round 4, found while probing the expanded matrix -- same class as F1/F4,
+    one surface over. Every text read in this package was `open(..., errors="ignore")`,
+    which DROPS undecodable bytes and reports nothing. A 256-byte file of 0xff/0x00
+    pairs scanned as 128 bytes and came back `inspection_complete: true, is_clean:
+    true`: half the file was discarded and the document claimed a full inspection.
+    That is the release's own invariant -- content we did not read cannot be counted
+    as content we cleared -- and it was reachable from `scan --file` on any file that
+    is not valid UTF-8.
+
+    Latin-1 text, a mis-labelled binary and a truncated multi-byte sequence all land
+    here. We still scan what decodes (dropping the file entirely would lose real
+    coverage), but the answer is INCOMPLETE and says how many bytes went unread.
+    """
     try:
-        with open(path, "r", errors="ignore") as fh:
-            return fh.read()
+        with open(path, "rb") as fh:
+            raw = fh.read()
     except OSError as exc:
         raise UnreadableFile(path, exc) from exc
+
+    try:
+        return raw.decode("utf-8"), []
+    except UnicodeDecodeError:
+        pass
+
+    text = raw.decode("utf-8", errors="replace")
+    undecodable = text.count("\ufffd")
+    return text.replace("\ufffd", ""), [
+        f"{os.path.basename(path)} is not valid UTF-8 — {undecodable} byte(s) could "
+        f"not be decoded and were NOT inspected. Only the text that decoded was scanned."
+    ]
 
 
 def _extract_image(path: str):
@@ -371,7 +408,8 @@ def _extract_file_sources(path: str) -> ExtractionResult:
         # we identified as needing an extractor is therefore incomplete here, not
         # merely "read as bytes and cleared".
         if kind == "text":
-            return ExtractionResult([("file", _read_raw(path))])
+            text, warnings = read_text_source(path)
+            return ExtractionResult([("file", text)], warnings, complete=not warnings)
         return ExtractionResult(
             [("raw-bytes", _read_raw(path))],
             [f"Extractors disabled by {_DISABLE_ENV} — {label} read as raw bytes only. "
@@ -393,7 +431,8 @@ def _extract_file_sources(path: str) -> ExtractionResult:
             complete=False,
         )
 
-    # Text, source code, config, and anything unrecognised: read it as text. This is
-    # the pre-existing behaviour and it is correct for these — no warning, because
-    # nothing was skipped.
-    return ExtractionResult([("file", _read_raw(path))])
+    # Text, source code, config, and anything unrecognised: read it as text. Correct
+    # for these, and complete — UNLESS the bytes did not all decode, in which case
+    # something WAS skipped and saying so is the whole point of this module.
+    text, warnings = read_text_source(path)
+    return ExtractionResult([("file", text)], warnings, complete=not warnings)
