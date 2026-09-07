@@ -193,6 +193,7 @@ class SunglassesScanner:
             extra={
                 "file": file_path,
                 "sources_found": len(extraction.sources),
+                "bytes_scanned": len(extraction.text),
                 "sources": extraction.labels,
                 # kept for callers that predate the canonical name
                 "threats": list(result.findings),

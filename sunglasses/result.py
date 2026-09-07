@@ -304,8 +304,10 @@ def aggregate(children, *, source: Optional[str] = None,
     truncated = False
     complete = bool(extraction_complete)
     threat_found = False
+    scanned_bytes = 0
 
     for label, text, result in children:
+        scanned_bytes += len(text or "")
         child = normalize(result, source=label)
         preview = text if len(text) <= 100 else text[:100] + "..."
         per_source.append({
@@ -331,6 +333,11 @@ def aggregate(children, *, source: Optional[str] = None,
 
     merged_extra = dict(extra or {})
     merged_extra.setdefault("sources_found", len(per_source))
+    # How much text actually reached the engine. An empty input is fully inspected
+    # -- 0 of 0 bytes -- and that is a true, clean result; but a reader must be able
+    # to tell a clean scan of a document from a clean scan of nothing, so the count
+    # is published rather than left to be inferred from silence.
+    merged_extra.setdefault("bytes_scanned", scanned_bytes)
     merged_extra["sources"] = [row["source"] for row in per_source]
     merged_extra["results"] = per_source
     # Kept for callers that predate the canonical name.

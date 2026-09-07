@@ -154,12 +154,24 @@ def handle_tools_call(params):
 
 def _tool_scan_text(arguments):
     """Execute scan_text tool."""
-    text = arguments.get("text", "")
     channel = arguments.get("channel", "message")
 
-    if not text:
+    # v0.5.6 round 4: `if not text` collapsed two different situations into one
+    # error. A MISSING `text` argument is a usage error -- the caller broke the
+    # tool's API contract and nothing was submitted. An EMPTY STRING is content:
+    # the caller submitted a document that happens to have no bytes in it, and the
+    # honest answer is a clean, complete scan of 0 bytes -- which is also what the
+    # CLI now says for `--text ""` and empty stdin, so the two surfaces agree.
+    if "text" not in arguments:
         return {
             "content": [{"type": "text", "text": "Error: 'text' parameter is required."}],
+            "isError": True,
+        }
+    text = arguments.get("text")
+    if not isinstance(text, str):
+        return {
+            "content": [{"type": "text",
+                         "text": "Error: 'text' parameter must be a string."}],
             "isError": True,
         }
 
@@ -179,7 +191,12 @@ def _tool_scan_text(arguments):
     # as "ALLOW — 0 threat(s) found", and must not render as PASS either.
     if not result.threat_found:
         if result.inspection_complete:
-            summary = f"PASS — No threats detected ({result.latency_ms}ms)"
+            if not result.bytes_scanned:
+                summary = (f"PASS — 0 bytes inspected: the input was empty, so "
+                           f"nothing was found because there was nothing to read "
+                           f"({result.latency_ms}ms)")
+            else:
+                summary = f"PASS — No threats detected ({result.latency_ms}ms)"
         else:
             summary = (f"INCOMPLETE SCAN — no findings in the inspected scope "
                        f"({result.latency_ms}ms); part of the input was not read. "

@@ -43,7 +43,18 @@ def print_result(result, verbose=False):
     """Pretty-print a scan result."""
     if result.is_clean:
         print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({result.latency_ms}ms){RESET}")
-        print(f"  {DIM}No threats detected.{RESET}\n")
+        if not getattr(result, "bytes_scanned", None):
+            # Empty input is the one case where "we inspected all of it" costs
+            # nothing and is exactly true: 0 of 0 bytes read, nothing unread. It
+            # would be a lie in the other direction to call that an operational
+            # failure -- an empty README in a repo walk, or a CI step piping an
+            # empty diff, is a legitimate input. But a reader who sees only "PASS,
+            # no threats detected" cannot tell a clean scan of a document from a
+            # clean scan of nothing, so the count is stated rather than implied.
+            print(f"  {DIM}0 bytes inspected — the input was empty. "
+                  f"Nothing was found because there was nothing to read.{RESET}\n")
+        else:
+            print(f"  {DIM}No threats detected.{RESET}\n")
     elif not result.threat_found:
         # Incomplete, not clean and not a threat. Before v0.5.6 `is_clean` was a
         # synonym for "no findings", so this case could not arise; once it could,
@@ -614,27 +625,6 @@ def _read_stdin_text(args) -> str:
         )
 
 
-def _refuse_empty_input(args, text, where) -> None:
-    """One empty-input policy for every surface (T9 brief, item C4).
-
-    The CLI used to return exit 0 / "no threats detected" for empty `--text` and
-    empty stdin, while MCP `scan_text` refused the same input with `isError: true`.
-    Both were defensible in isolation; having BOTH is not, because the matrix claims
-    one contract across surfaces and a reviewer is entitled to hold us to it.
-
-    MCP's answer wins, and the CLI adopts it: "clean" is a claim about content that
-    was inspected, and there was no content. Reporting a pass on nothing is the
-    smallest possible version of the misleading-success bug this whole release is
-    about, so the two surfaces now agree that it is a usage error.
-    """
-    if text == "":
-        _usage_error(
-            args,
-            f"No content to scan: {where} was empty.",
-            "Nothing was scanned. A scan of nothing is not a clean scan.",
-        )
-
-
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
     warnings = list(getattr(result, "extraction_warnings", None) or [])
@@ -714,7 +704,6 @@ def cmd_scan(args):
     # Explicit beats inferred: --text is the documented escape hatch from the
     # path-shape rule below, so it is checked before any filesystem guess.
     if getattr(args, "explicit_text", None) is not None:
-        _refuse_empty_input(args, args.explicit_text, "--text")
         result = engine.scan(args.explicit_text, channel=args.channel)
         _emit_scan_result(args, result, source="text")
 
@@ -895,7 +884,6 @@ def cmd_scan(args):
             source = filepath
     elif args.stdin:
         text = _read_stdin_text(args)
-        _refuse_empty_input(args, text, "stdin")
         result = engine.scan(text, channel=args.channel)
         source = "stdin"
     elif args.text:
