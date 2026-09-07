@@ -62,6 +62,7 @@ STATES = [
     ("missing",           "missing", "path does not exist"),
     ("missing_dependency","missing decoder", "readable media, no decoder installed"),
     ("truncated_finding", "truncated + finding", "over the 1 MiB cap, finding in the read part"),
+    ("corrupt_parser_fail","corrupt (parser fails)", "readable bytes whose format parser gives up"),
 ]
 
 # --- surfaces -------------------------------------------------------------
@@ -93,6 +94,7 @@ _TEXT_SURFACE_NA = {
     "unreadable":         (NA, "no file is opened on a string surface"),
     "missing":            (NA, "no path is resolved on a string surface"),
     "missing_dependency": (NA, "no extractor runs on a string surface"),
+    "corrupt_parser_fail": (NA, "a string surface has no format parser to fail"),
 }
 
 MATRIX = {}
@@ -115,6 +117,9 @@ _row("cli_file", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",        # audio without --deep
     "truncated_finding": "threat_incomplete",
+    # readable bytes the parser cannot make sense of: %PDF header, a Flate
+    # stream, no xref. A parser that gives up costs COVERAGE, never the scan.
+    "corrupt_parser_fail": "incomplete",
 })
 
 _ARGV_NA = (NA, "an over-cap input cannot reach `--text`: ARG_MAX is 1 MiB, exactly the "
@@ -142,6 +147,7 @@ _row("cli_repo", {
     "missing": "operational",                  # clone failure
     "missing_dependency": "incomplete",        # a media file in the tree, never transcribed
     "truncated_finding": "incomplete",
+    "corrupt_parser_fail": "incomplete",       # the corrupt PDF committed into the tree
 })
 
 NOTES[("cli_repo", "truncated_finding")] = (
@@ -165,6 +171,9 @@ _row("cli_deep", {
     "missing_dependency": "incomplete",
     "truncated_finding": (NA, "the deep path scans a transcript produced under the cap; "
                               "truncation is covered on the file and string surfaces"),
+    "corrupt_parser_fail": (NA, "a corrupt-media parser failure and a missing decoder produce the "
+                                "SAME document (extraction failed, coverage lost); the "
+                                "distinguishable assertion is `incomplete, no finding` via the seam"),
 })
 
 _row("lib_scan_fast", {
@@ -174,6 +183,7 @@ _row("lib_scan_fast", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",
 })
 
 _row("lib_scan_auto_false", {
@@ -183,6 +193,7 @@ _row("lib_scan_auto_false", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",        # the needs_deep_scan document
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",
 })
 
 _row("lib_scan_auto_true", {
@@ -192,6 +203,7 @@ _row("lib_scan_auto_true", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",        # routed to deep, no decoder present
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",       # .pdf never routes to deep
 })
 
 _row("lib_scan_email", {
@@ -202,6 +214,7 @@ _row("lib_scan_email", {
     "missing": "incomplete",
     "missing_dependency": "incomplete",        # <- ASTRA R1: the deferred attachment
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",
 })
 
 _row("lib_scan_deep", {
@@ -211,6 +224,7 @@ _row("lib_scan_deep", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",
     "truncated_finding": (NA, "see cli_deep: the transcript is produced under the cap"),
+    "corrupt_parser_fail": (NA, "see cli_deep: indistinguishable from a missing decoder"),
 })
 
 _row("mcp_scan_text", dict({
@@ -226,6 +240,7 @@ _row("mcp_scan_file_false", {
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",
 })
 
 _row("mcp_scan_file_true", {
@@ -236,6 +251,7 @@ _row("mcp_scan_file_true", {
     "missing": "operational",
     "missing_dependency": "incomplete",        # <- ASTRA R1: was an axis-free document
     "truncated_finding": "threat_incomplete",
+    "corrupt_parser_fail": "incomplete",
 })
 
 

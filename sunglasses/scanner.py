@@ -200,8 +200,18 @@ class SunglassesScanner:
         )
 
     def _scan_image_fast(self, path: str) -> dict:
-        """FAST: Image scan (OCR + EXIF + QR codes)."""
+        """FAST: Image scan (OCR + EXIF + QR codes).
+
+        Same contract as `_scan_pdf`: a decoder that gives up costs COVERAGE,
+        never the scan, and never a traceback. A file with a `\x89PNG` header
+        that is not actually a PNG raised `PIL.UnidentifiedImageError` straight
+        through to the caller -- the identical defect the corrupt-PDF case
+        exposed, one extractor over. Unreadable still propagates as operational.
+        """
+        from .extractors.dispatch import _probe_readable
         from .result import normalize
+
+        _probe_readable(path)                    # UnreadableFile -> operational
 
         results = {"file": path, "sources": [], "threats": [],
                    "threat_found": False, "extraction_complete": True,
@@ -223,6 +233,11 @@ class SunglassesScanner:
             results["warnings"].append(
                 "Image scanning requires: pip install sunglasses[image] — "
                 "OCR/EXIF content was NOT inspected.")
+        except Exception as exc:
+            results["extraction_complete"] = False
+            results["warnings"].append(
+                f"Image extraction failed ({exc.__class__.__name__}) — "
+                f"OCR/EXIF content was NOT inspected.")
 
         # QR codes in the image
         try:
@@ -242,13 +257,32 @@ class SunglassesScanner:
             results["warnings"].append(
                 "QR scanning requires: pip install sunglasses[image] — "
                 "QR content was NOT inspected.")
+        except Exception as exc:
+            results["extraction_complete"] = False
+            results["warnings"].append(
+                f"QR extraction failed ({exc.__class__.__name__}) — "
+                f"QR content was NOT inspected.")
 
         return normalize(results, source=path,
                          extra={"findings": list(results["threats"])})
 
     def _scan_pdf(self, path: str) -> dict:
-        """FAST: PDF scan."""
+        """FAST: PDF scan.
+
+        Mirrors ``extractors.dispatch._extract_pdf``: a parser that gives up
+        costs COVERAGE, never the scan. With PyPDF2 installed, a structurally
+        corrupt PDF (`%PDF` header, a Flate stream, no xref) raised
+        `PdfReadError: EOF marker not found` straight through to the caller.
+        Not reachable from the CLI or MCP -- `scan_fast` routes through dispatch,
+        which already answered 3/incomplete on the same bytes -- but this is a
+        public method, and "no traceback on any supported path" is the contract.
+        Unreadable is still an OPERATIONAL failure and still propagates: a file
+        we could not open is not a file we partly read.
+        """
+        from .extractors.dispatch import _probe_readable
         from .result import normalize
+
+        _probe_readable(path)                    # UnreadableFile -> operational
         try:
             from .extractors.pdf import scan_pdf
             return normalize(scan_pdf(path, engine=self.engine), source=path)
@@ -257,6 +291,13 @@ class SunglassesScanner:
                 {"extraction_complete": False,
                  "warnings": ["PDF scanning requires: pip install sunglasses[pdf] — "
                               "nothing in this PDF was inspected."]},
+                source=path, extra={"file": path})
+        except Exception as exc:
+            # Same sentence dispatch uses, deliberately: one vocabulary for one fact.
+            return normalize(
+                {"extraction_complete": False,
+                 "warnings": [f"PDF extraction failed ({exc.__class__.__name__}) — "
+                              f"file not read."]},
                 source=path, extra={"file": path})
 
     def _scan_text_file(self, path: str) -> dict:
