@@ -398,10 +398,12 @@ _row("cli_repo", {
     "nonregular": "incomplete",
     "undecodable": "incomplete",               # a committed non-UTF-8 file
     "empty": "clean",                          # a committed empty file
-    # the walker hands each member to the same file path, so a committed
-    # multi-frame GIF and a committed byte-EXIF JPEG behave as they do on --file
-    "later_component": "threat",
-    "byte_metadata": "threat",
+    # MEASURED, not assumed -- and my first declaration here was wrong. The repo
+    # walker declines binary file types outright ("later.gif: binary file type
+    # (.gif) — not inspected") rather than handing them to the image extractor,
+    # so on this surface both image mechanisms are named skips, not findings.
+    "later_component": "incomplete",
+    "byte_metadata": "incomplete",
     "converter_failed": NotApplicable(
         "no external converter process runs on this path; text is produced by an "
         "in-process parser, so there is no helper exit status to ignore",
@@ -424,6 +426,19 @@ NOTES[("cli_repo", "unreadable")] = (
     "returns 3, NOT the operational 2 that `--file` returns for the same target: "
     "one unreadable member does not make a whole tree unscannable."
 )
+
+NOTES[("cli_repo", "later_component")] = (
+    "SURFACE DIVERGENCE, recorded not fixed, and the same shape as the oversized-"
+    "file one above. `--file` scans a GIF or JPEG through the image extractor and "
+    "finds the instruction in frame 2 or in an EXIF field; `--repo` declines binary "
+    "members by extension and NAMES each one it skipped. So an image-carried "
+    "injection in a repository is reported as uninspected scope (exit 3), not found "
+    "(exit 1). Both surfaces are truthful about what they read, which is why this "
+    "is a gap and not a false clean -- and widening the walker to run OCR over "
+    "every committed image is a scope and performance decision for v0.6, not a "
+    "coverage repair. `byte_metadata` diverges identically."
+)
+NOTES[("cli_repo", "byte_metadata")] = NOTES[("cli_repo", "later_component")]
 
 _row("cli_deep", {
     # clean / finding / incomplete_* / truncated / parser-fail use the test-only

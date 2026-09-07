@@ -1441,13 +1441,21 @@ def test_mcp_stdio_cell(surface, state, outcome, space):
          "params": {"name": "scan_file",
                     "arguments": {"file_path": path, "allow_deep": False}}},
     ]
+    env = dict(os.environ)
+    if state == "incomplete_finding":
+        # same degraded-extraction switch the in-process cells use; without it
+        # this cell scans a real PNG and finds nothing to report.
+        env["SUNGLASSES_DISABLE_EXTRACTORS"] = "1"
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.mcp"],
         input="".join(json.dumps(m) + "\n" for m in msgs),
-        capture_output=True, text=True, cwd=TEST_ROOT,
-        # A FIFO used to block the server forever here. The timeout IS the
-        # assertion for that cell: a server that never answers fails this test.
-        timeout=60,
+        capture_output=True, text=True, cwd=TEST_ROOT, env=env,
+        # A FIFO used to block the server forever here, so for THAT state the
+        # timeout IS the assertion: a server that never answers fails the test.
+        # The truncation state legitimately scans a full 1 MiB at ~52 s, so a
+        # 60-second ceiling there would assert the machine's speed rather than
+        # the product's behaviour -- the two need different numbers.
+        timeout=60 if state == "nonregular" else 900,
     )
     where = f"mcp_stdio/{state}"
     assert "Traceback (most recent call last)" not in proc.stdout + proc.stderr, (

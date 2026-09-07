@@ -289,6 +289,7 @@ def _scan_repo(args, engine):
     files_scanned = 0
     files_with_threats = 0
     files_incomplete = 0
+    partially_read = []          # (path, reason) for members read only in part
     total_threats = 0
     all_findings = []
     category_counts = {}
@@ -339,6 +340,16 @@ def _scan_repo(args, engine):
             # zero findings behind it — but it must not leave the scan looking
             # complete either.
             files_incomplete += 1
+            # v0.5.6 round 5: this used to be a COUNT and nothing else, so the
+            # report said "Files not fully read: 1" and never which file or why —
+            # while the walker's own skips were listed by name right beside it.
+            # A count is not a name: a reader cannot act on "one of these is
+            # partly unread". The reasons already exist on the result; nothing
+            # was collecting them.
+            reason = "; ".join(scan_result.extraction_warnings) or (
+                "truncated at the scan cap" if scan_result.truncated
+                else "part of this file was not read")
+            partially_read.append((rel_path, reason))
 
         if scan_result.threat_found:
             files_with_threats += 1
@@ -415,6 +426,10 @@ def _scan_repo(args, engine):
     # declined, with the reason it declined it.
     summary["files_skipped"] = len(walker_skips)
     summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
+    # Same fact, same names, in the machine document: a consumer keeping only the
+    # JSON could previously see the COUNT of partly-read members and never learn
+    # which they were.
+    summary["partially_read"] = [{"file": f, "reason": r} for f, r in partially_read]
     # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
@@ -431,7 +446,8 @@ def _scan_repo(args, engine):
         {
             "threat_found": bool(total_threats),
             "extraction_complete": not incomplete,
-            "warnings": [f"{path}: {reason}" for path, reason in walker_skips],
+            "warnings": ([f"{path}: {reason}" for path, reason in walker_skips]
+                         + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
             "channel": "file",
         },
@@ -443,7 +459,8 @@ def _scan_repo(args, engine):
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
         sarif_doc = to_sarif(repo_results, source=repo_url)
-        not_inspected = [f"{path}: {reason}" for path, reason in walker_skips]
+        not_inspected = ([f"{path}: {reason}" for path, reason in walker_skips]
+                         + [f"{path}: {reason}" for path, reason in partially_read])
         not_inspected += [
             f"{r.source}: not fully inspected"
             for r in repo_results if not getattr(r, "inspection_complete", True)
@@ -469,8 +486,19 @@ def _scan_repo(args, engine):
     print(f"  Repo:            {CYAN}{repo_name}{RESET} ({repo_url})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
+    if files_incomplete or walker_skips:
+        # The banner introduces the list. Round 5: it was printed in the verdict
+        # block BELOW, so a reader met the named skips first and the header last,
+        # and a header that promises a list of what went unread has to arrive
+        # before the list. Caught by the round-5 `banner_without_named_scope`
+        # assertion on this surface.
+        _print_coverage_banner("part of this repo was not read")
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
+        for name, reason in partially_read[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+        if len(partially_read) > 10:
+            print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
@@ -513,12 +541,12 @@ def _scan_repo(args, engine):
         if incomplete:
             # A finding never cancels a coverage failure -- the invariant this
             # release exists for, stated on the surface a human actually reads.
-            _print_coverage_banner("part of this repo was not read")
-            print(f"  {DIM}Findings below are from the inspected scope only.{RESET}")
+            # The banner itself is printed above, next to the list it heads.
+            print(f"  {DIM}Findings above are from the inspected scope only; see "
+                  f"the INCOMPLETE SCAN list.{RESET}")
         print()
     elif incomplete:
-        _print_coverage_banner("part of this repo was not read")
-        print(f"  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
+        print(f"\n  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
         if nothing_inspected:
             print(f"  {DIM}No files were inspected at all, so this is not a "
                   f"result about the repo's contents.{RESET}\n")
