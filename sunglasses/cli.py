@@ -410,9 +410,22 @@ def _scan_repo(args, engine):
     incomplete = bool(files_incomplete or walker_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
-    summary["threat_found"] = bool(total_threats)
-    summary["inspection_complete"] = not incomplete
-    summary["is_clean"] = not total_threats and not incomplete
+    # Through the one normalizer, like every other document. This block used to
+    # compute the three axes itself. It computed them CORRECTLY -- but "correct
+    # duplicate of the invariant" is the exact shape the other four consumers had
+    # right up until one of them drifted, so the duplicate goes too. Only the exit
+    # code is this function's own.
+    from .result import normalize as _normalize
+    summary.update(_normalize(
+        {
+            "threat_found": bool(total_threats),
+            "extraction_complete": not incomplete,
+            "warnings": [f"{path}: {reason}" for path, reason in walker_skips],
+            "findings": summary.get("findings") or [],
+            "channel": "file",
+        },
+        source=repo_url,
+    ))
     summary["exit_code"] = repo_exit
 
     if args.output == "sarif":

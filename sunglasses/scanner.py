@@ -201,7 +201,11 @@ class SunglassesScanner:
 
     def _scan_image_fast(self, path: str) -> dict:
         """FAST: Image scan (OCR + EXIF + QR codes)."""
-        results = {"file": path, "sources": [], "threats": [], "is_clean": True}
+        from .result import normalize
+
+        results = {"file": path, "sources": [], "threats": [],
+                   "threat_found": False, "extraction_complete": True,
+                   "warnings": []}
 
         # EXIF + OCR
         try:
@@ -211,11 +215,14 @@ class SunglassesScanner:
             for source, text in texts:
                 r = self.engine.scan(text, channel="file")
                 results["sources"].append({"source": source, "decision": r.decision})
-                if not r.is_clean:
-                    results["is_clean"] = False
+                if r.threat_found:
+                    results["threat_found"] = True
                     results["threats"].extend(r.findings)
         except ImportError:
-            results["warning"] = "Image scanning requires: pip install sunglasses[image]"
+            results["extraction_complete"] = False
+            results["warnings"].append(
+                "Image scanning requires: pip install sunglasses[image] — "
+                "OCR/EXIF content was NOT inspected.")
 
         # QR codes in the image
         try:
@@ -225,33 +232,44 @@ class SunglassesScanner:
             for source, text in codes:
                 r = self.engine.scan(text, channel="file")
                 results["sources"].append({"source": f"qr:{source}", "decision": r.decision})
-                if not r.is_clean:
-                    results["is_clean"] = False
+                if r.threat_found:
+                    results["threat_found"] = True
                     results["threats"].extend(r.findings)
         except ImportError:
-            pass  # QR scanning optional
+            # "Optional" described the dependency, not the coverage. A QR code we
+            # never decoded is content we never read.
+            results["extraction_complete"] = False
+            results["warnings"].append(
+                "QR scanning requires: pip install sunglasses[image] — "
+                "QR content was NOT inspected.")
 
-        return results
+        return normalize(results, source=path,
+                         extra={"findings": list(results["threats"])})
 
     def _scan_pdf(self, path: str) -> dict:
         """FAST: PDF scan."""
+        from .result import normalize
         try:
             from .extractors.pdf import scan_pdf
-            return scan_pdf(path, engine=self.engine)
+            return normalize(scan_pdf(path, engine=self.engine), source=path)
         except ImportError:
-            return {"file": path, "warning": "PDF scanning requires: pip install sunglasses[pdf]"}
+            return normalize(
+                {"extraction_complete": False,
+                 "warnings": ["PDF scanning requires: pip install sunglasses[pdf] — "
+                              "nothing in this PDF was inspected."]},
+                source=path, extra={"file": path})
 
     def _scan_text_file(self, path: str) -> dict:
         """FAST: Plain text file scan."""
+        from .extractors.dispatch import _probe_readable
+        from .result import normalize
+
+        _probe_readable(path)
         with open(path, 'r', errors='ignore') as f:
             text = f.read()
         result = self.engine.scan(text, channel="file")
-        return {
-            "file": path,
-            "is_clean": result.is_clean,
-            "decision": result.decision,
-            "threats": result.findings,
-        }
+        return normalize(result, source=path,
+                         extra={"file": path, "threats": list(result.findings)})
 
     # =========================================================================
     # DEEP MODE — Background, for heavy media
