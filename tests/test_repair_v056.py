@@ -1182,6 +1182,10 @@ def test_r2_ocr_failure_is_never_returned_as_scan_text(monkeypatch, tmp_path):
     With pyzbar installed nothing else set incomplete, so the file scanned clean.
     """
     pytest.importorskip("PIL")
+    # ImageExtractor.__init__ calls _check_deps(), which requires pytesseract as
+    # well. Guarding on PIL alone made this ERROR rather than skip on a
+    # pillow-only machine -- caught by the wheel gate, which is what it is for.
+    pytest.importorskip("pytesseract")
     from sunglasses.extractors.image import ImageExtractor, OCRUnavailable
 
     png = tmp_path / "x.png"
@@ -1202,6 +1206,7 @@ def test_r2_ocr_failure_is_never_returned_as_scan_text(monkeypatch, tmp_path):
 def test_r2_ocr_failure_makes_the_scan_incomplete(monkeypatch, tmp_path):
     """The dispatcher must turn a recorded OCR failure into a named warning."""
     pytest.importorskip("PIL")
+    pytest.importorskip("pytesseract")
     from PIL import Image
     from sunglasses.extractors import dispatch as dispatch_mod
     from sunglasses.extractors.image import OCRUnavailable
