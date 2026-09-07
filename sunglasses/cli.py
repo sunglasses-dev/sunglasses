@@ -435,7 +435,21 @@ def _scan_repo(args, engine):
     if args.output == "sarif":
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
-        print(json.dumps(to_sarif(repo_results, source=repo_url), indent=2))
+        sarif_doc = to_sarif(repo_results, source=repo_url)
+        not_inspected = [f"{path}: {reason}" for path, reason in walker_skips]
+        not_inspected += [
+            f"{r.source}: not fully inspected"
+            for r in repo_results if not getattr(r, "inspection_complete", True)
+        ]
+        if not_inspected and sarif_doc.get("runs"):
+            # Without this a repo where nothing could be read emits results:[] --
+            # which a SARIF consumer reads as "scanned, nothing there". The empty
+            # results array is exactly the lie the release exists to remove, and it
+            # is the same one the deep path already guards against.
+            props = sarif_doc["runs"][0].setdefault("properties", {})
+            props["inspectionComplete"] = False
+            props["notInspected"] = not_inspected
+        print(json.dumps(sarif_doc, indent=2))
         sys.exit(repo_exit)
 
     if args.json or args.output == "json":

@@ -1342,6 +1342,35 @@ def test_r4_repo_mode_honours_sarif(tmp_path):
     _assert_sarif_shaped(proc)
 
 
+def test_r4_repo_sarif_carries_incompleteness(tmp_path):
+    """A repo SARIF with results:[] must not read as "scanned, nothing there".
+
+    T9 caught this after the first R4 fix: the deep path set
+    properties.inspectionComplete, repo mode did not, so a repo whose only
+    interesting file could not be read emitted an empty results array with no
+    indication that anything had been skipped.
+    """
+    repo = tmp_path / "repo_inc"
+    repo.mkdir()
+    with zipfile.ZipFile(repo / "t.zip", "w") as z:
+        z.writestr("i.txt", "harmless\n")
+    (repo / "archive.md").write_bytes((repo / "t.zip").read_bytes())
+    (repo / "t.zip").unlink()
+    (repo / "ok.md").write_text("ordinary\n")
+    subprocess.run(["git", "init", "-q", "."], cwd=repo, check=True)
+    subprocess.run(["git", "add", "archive.md", "ok.md"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "fixture"], cwd=repo, check=True)
+
+    proc = _run([sys.executable, "-m", "sunglasses"], "--repo", str(repo),
+                "-o", "sarif", timeout=300)
+    doc = _assert_sarif_shaped(proc)
+    props = doc["runs"][0].get("properties", {})
+    assert props.get("inspectionComplete") is False, \
+        "repo SARIF omitted incompleteness; results:[] reads as 'nothing there'"
+    assert props.get("notInspected"), "no skipped file was named"
+
+
 def test_r4_deep_media_honours_sarif(tmp_path):
     """`--file <media> --deep -o sarif` exited 3 but printed the human screen."""
     media = tmp_path / "clip.mp3"
