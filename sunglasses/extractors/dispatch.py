@@ -128,6 +128,49 @@ def _read_raw(path: str) -> str:
     return read_text_source(path)[0]
 
 
+def decode_lossy(raw: bytes):
+    """Decode UTF-8 keeping every byte that decodes, and count exactly those that do not.
+
+    Returns ``(text, undecodable_bytes, first_bad_offset)``.
+
+    v0.5.6 round 5 (ASTRA G5). The previous version decoded with
+    ``errors="replace"``, counted the U+FFFD characters and then stripped every
+    U+FFFD from the result. Three things were wrong with that, and ASTRA found
+    all three:
+
+      * a two-byte unfinished sequence produces ONE replacement character, so it
+        was reported as one unread byte when two went unread;
+      * a file containing a LEGITIMATE U+FFFD -- a perfectly valid character --
+        had it counted as damage and then deleted from the text we scanned, so a
+        payload could hide behind a real replacement character;
+      * the count was therefore a number about the decoder's output rather than
+        about the input, while being published as a statement about the input.
+
+    The bytes are counted where the failure actually is: each ``UnicodeDecodeError``
+    reports the exact ``[start, end)`` span it could not decode, so the count is
+    the sum of those spans. Everything outside them is kept verbatim, U+FFFD
+    included.
+    """
+    if not raw:
+        return "", 0, None
+
+    parts = []
+    undecodable = 0
+    first_bad = None
+    index = 0
+    while index < len(raw):
+        try:
+            parts.append(raw[index:].decode("utf-8"))
+            break
+        except UnicodeDecodeError as exc:
+            parts.append(raw[index:index + exc.start].decode("utf-8"))
+            if first_bad is None:
+                first_bad = index + exc.start
+            undecodable += exc.end - exc.start
+            index += exc.end
+    return "".join(parts), undecodable, first_bad
+
+
 def read_text_source(path: str):
     """Return (text, warnings). Bytes we could not decode are named, not hidden.
 
@@ -150,17 +193,10 @@ def read_text_source(path: str):
     except OSError as exc:
         raise UnreadableFile(path, exc) from exc
 
-    try:
-        return raw.decode("utf-8"), []
-    except UnicodeDecodeError as exc:
-        # NOT swallowed -- handled on the next line. Written as a named binding so
-        # a grep for silent handlers in this package comes back empty and stays
-        # that way; the round-4 receipt is that grep.
-        first_bad = exc.start
-
-    text = raw.decode("utf-8", errors="replace")
-    undecodable = text.count("\ufffd")
-    return text.replace("\ufffd", ""), [
+    text, undecodable, first_bad = decode_lossy(raw)
+    if not undecodable:
+        return text, []
+    return text, [
         f"{os.path.basename(path)} is not valid UTF-8 — {undecodable} byte(s) could "
         f"not be decoded and were NOT inspected (first at offset {first_bad}). "
         f"Only the text that decoded was scanned."
@@ -180,8 +216,7 @@ def _extract_image(path: str):
             # incomplete: an image whose text was never read is not a clean image.
             complete = False
             warnings.append(
-                f"OCR text not read from {os.path.basename(path)} — {failure}. "
-                f"Visible text in this image was NOT inspected."
+                f"{os.path.basename(path)} not fully read — {failure}."
             )
     except ImportError:
         complete = False

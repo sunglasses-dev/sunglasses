@@ -127,12 +127,33 @@ class VideoExtractor:
                 with tempfile.NamedTemporaryFile(suffix='.srt', delete=False) as tmp:
                     tmp_path = tmp.name
 
+                lang = stream.get('tags', {}).get('language', f'track{i}')
                 try:
                     cmd = [
                         'ffmpeg', '-v', 'quiet', '-i', video_path,
                         '-map', f'0:s:{i}', '-f', 'srt', tmp_path, '-y'
                     ]
-                    subprocess.run(cmd, capture_output=True, timeout=30)
+                    conv = subprocess.run(cmd, capture_output=True, timeout=30)
+
+                    # v0.5.6 round 5 (ASTRA G3). This return code was never read.
+                    # ffmpeg fails, writes nothing, and the empty temp file was
+                    # then read as "this track has no subtitles" -- so a failed
+                    # conversion looked exactly like a track with no text in it,
+                    # and the scan reported complete. ASTRA injected a nonzero
+                    # code at this one subprocess and watched seven findings
+                    # become zero, complete, clean.
+                    #
+                    # Both halves are checked, because either alone is passable:
+                    # a nonzero code with output, and a zero code with an empty
+                    # file, both mean we did not get the subtitles.
+                    written = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+                    if conv.returncode != 0 or written == 0:
+                        self.warnings.append(
+                            f"Subtitle track {i} ({lang}) not converted "
+                            f"(ffmpeg exit {conv.returncode}, {written} bytes written) — "
+                            f"its text was NOT inspected."
+                        )
+                        continue
 
                     with open(tmp_path, 'r', errors='ignore') as f:
                         srt_text = f.read()
@@ -140,7 +161,6 @@ class VideoExtractor:
                     # Strip SRT formatting (timestamps, sequence numbers)
                     clean = self._clean_srt(srt_text)
                     if clean.strip():
-                        lang = stream.get('tags', {}).get('language', f'track{i}')
                         results.append((f"subtitle:{lang}", clean))
                 finally:
                     try:

@@ -193,7 +193,10 @@ class SunglassesScanner:
             extra={
                 "file": file_path,
                 "sources_found": len(extraction.sources),
-                "bytes_scanned": len(extraction.text),
+                # What the engine actually read, not what extraction produced:
+                # over the cap those differ, and the smaller one is the true claim.
+                "bytes_scanned": int(getattr(result, "bytes_scanned", 0)
+                                     or len(extraction.text)),
                 "sources": extraction.labels,
                 # kept for callers that predate the canonical name
                 "threats": list(result.findings),
@@ -239,8 +242,7 @@ class SunglassesScanner:
                 children.append((source, text, self.engine.scan(text, channel="file")))
             for failure in getattr(extractor, "failures", []):
                 warnings.append(
-                    f"OCR/metadata text not read from {os.path.basename(path)} — "
-                    f"{failure}. That content was NOT inspected.")
+                    f"{os.path.basename(path)} not fully read — {failure}.")
         except ImportError:
             warnings.append(
                 "Image scanning requires: pip install sunglasses[image] — "

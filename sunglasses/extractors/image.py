@@ -81,17 +81,8 @@ class ImageExtractor:
         # is clean, it means we did not read the part of it OCR would have read.
         self.failures = []
 
-        # 1. OCR — visible text in the image
-        try:
-            ocr_text = self._extract_ocr(image_path)
-        except OCRUnavailable as exc:
-            # Partial extraction, honestly labelled: EXIF and hidden-text detection
-            # below still run and can still catch something, but the image is no
-            # longer fully inspected and the dispatcher has to say so.
-            self.failures.append(str(exc))
-            ocr_text = ""
-        if ocr_text.strip():
-            results.append(("ocr", ocr_text))
+        # 1. OCR — visible text in EVERY frame, not just the one PIL opens on.
+        results.extend(self._ocr_all_frames(image_path))
 
         # 2. EXIF metadata — hidden text in photo properties
         exif_texts = self._extract_exif(image_path)
@@ -114,10 +105,10 @@ class ImageExtractor:
         img = Image.open(io.BytesIO(image_bytes))
         results = []
 
-        # OCR
-        ocr_text = self._ocr_from_pil(img)
-        if ocr_text.strip():
-            results.append(("ocr", ocr_text))
+        self.failures = []
+
+        # OCR every frame, same contract as `extract()`.
+        results.extend(self._ocr_frames_of(img, source=filename))
 
         # EXIF from PIL object
         exif_texts = self._exif_from_pil(img)
@@ -125,6 +116,77 @@ class ImageExtractor:
             if text.strip():
                 results.append((f"exif:{field}", text))
 
+        return results
+
+    # A GIF or a multi-page TIFF is ONE file with N images in it. PIL opens on
+    # frame 0 and stays there unless you seek, so OCR read the first frame and the
+    # scan reported a complete inspection of the whole file.
+    #
+    # v0.5.6 round 5 (ASTRA G1): `two-frame.gif` and `two-page.tiff` came back
+    # exit 0, complete, clean -- while exporting frame 2 on its own and handing it
+    # to the identical scanner produced five findings. Nothing was broken; the
+    # attack simply lived in a component nothing looked at, and the document said
+    # everything had been looked at.
+    #
+    # The cap exists because a GIF can carry thousands of frames and OCR is
+    # seconds each: an unbounded loop turns a scanner into a denial of service,
+    # which is the same reason `MAX_SCAN_BYTES` exists. Frames past the cap are
+    # NOT silently dropped -- they are named in `failures`, which costs coverage.
+    MAX_OCR_FRAMES = 64
+
+    def _ocr_all_frames(self, image_path: str) -> List[Tuple[str, str]]:
+        from PIL import Image
+        try:
+            img = Image.open(image_path)
+        except Exception as exc:
+            self.failures.append(f"image could not be opened for OCR: {exc}")
+            return []
+        return self._ocr_frames_of(img, source=os.path.basename(image_path))
+
+    def _ocr_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
+        """OCR each frame. Complete only if EVERY frame reached OCR."""
+        from PIL import ImageSequence
+
+        total = getattr(img, "n_frames", 1) or 1
+        results: List[Tuple[str, str]] = []
+
+        if total == 1:
+            # The ordinary case, and the label stays `ocr` so nothing downstream
+            # of a single-frame image sees a new source name.
+            try:
+                text = self._ocr_from_pil(img)
+            except OCRUnavailable as exc:
+                # Partial extraction, honestly labelled: EXIF and hidden-text
+                # detection still run and can still catch something, but the image
+                # is no longer fully inspected and the dispatcher has to say so.
+                self.failures.append(str(exc))
+                return results
+            if text.strip():
+                results.append(("ocr", text))
+            return results
+
+        inspected = 0
+        for index, frame in enumerate(ImageSequence.Iterator(img)):
+            if index >= self.MAX_OCR_FRAMES:
+                break
+            try:
+                text = self._ocr_from_pil(frame)
+            except OCRUnavailable as exc:
+                # One frame's failure costs that frame, not the rest of them.
+                self.failures.append(f"frame {index} not read by OCR ({exc})")
+                continue
+            except Exception as exc:
+                self.failures.append(
+                    f"frame {index} not read ({exc.__class__.__name__}: {exc})")
+                continue
+            inspected += 1
+            if text.strip():
+                results.append((f"ocr:frame:{index}", text))
+
+        if total > self.MAX_OCR_FRAMES:
+            self.failures.append(
+                f"{total - self.MAX_OCR_FRAMES} of {total} frames not inspected — "
+                f"{source} exceeds the {self.MAX_OCR_FRAMES}-frame OCR cap")
         return results
 
     def _extract_ocr(self, image_path: str) -> str:
@@ -175,6 +237,101 @@ class ImageExtractor:
             return []
         return self._exif_from_pil(img)
 
+    # EXIF text tags whose value can legitimately arrive as BYTES, and how the
+    # spec says to read them. v0.5.6 round 5 (ASTRA G2): the extractor named
+    # XPComment as a supported field and then admitted `str` values only, so a
+    # byte-valued XPComment -- which is the ONLY way Windows writes it -- was
+    # dropped, and `exif-xpcomment.jpg` came back exit 0, complete, clean while
+    # the same bytes decoded by hand and handed to the same engine produced five
+    # findings. Naming a field as supported and then not reading it is the
+    # release's own defect in miniature.
+    #
+    # Scope is deliberately narrow: ONLY these text-typed tags. MakerNote, ICC
+    # profiles and other binary blocks are not text and must NOT be reported as
+    # failed text -- ASTRA asked for that explicitly, and a scanner that calls
+    # every binary EXIF block "undecodable text" is one nobody reads the warnings
+    # of.
+    _EXIF_TEXT_FIELDS = {
+        'ImageDescription', 'Make', 'Model', 'Software',
+        'Artist', 'Copyright', 'UserComment', 'XPComment',
+        'XPAuthor', 'XPKeywords', 'XPSubject', 'XPTitle',
+    }
+    # EXIF 2.3: the XP* tags (0x9C9B-0x9C9F) are UTF-16LE, NUL-terminated.
+    _EXIF_UTF16_FIELDS = {'XPComment', 'XPAuthor', 'XPKeywords', 'XPSubject', 'XPTitle'}
+    # EXIF UserComment: an 8-byte character-code header, then the payload.
+    _USER_COMMENT_CHARSETS = {
+        b"ASCII\x00\x00\x00": "ascii",
+        b"UNICODE\x00": "utf-16",
+        b"JIS\x00\x00\x00\x00\x00": "shift_jis",
+        b"\x00" * 8: "utf-8",          # "undefined" -- try UTF-8 and say if it fails
+    }
+
+    def _decode_exif_text(self, tag_name: str, value: bytes):
+        """Decode one byte-valued EXIF text field per its field encoding.
+
+        Returns (text, failure). Exactly one of them is None. A field we cannot
+        decode is NOT dropped silently -- it comes back as a failure, which costs
+        coverage, because bytes we did not read are bytes we did not inspect.
+        """
+        if tag_name in self._EXIF_UTF16_FIELDS:
+            try:
+                return value.decode("utf-16-le").rstrip("\x00"), None
+            except UnicodeDecodeError:
+                return None, (f"EXIF {tag_name} not decoded ({len(value)} bytes, "
+                              f"not valid UTF-16LE) — its text was NOT inspected")
+
+        if tag_name == "UserComment" and len(value) >= 8:
+            encoding = self._USER_COMMENT_CHARSETS.get(bytes(value[:8]))
+            payload = value[8:]
+            if encoding:
+                try:
+                    return payload.decode(encoding).rstrip("\x00"), None
+                except UnicodeDecodeError:
+                    return None, (f"EXIF UserComment not decoded ({len(payload)} bytes, "
+                                  f"declared {encoding}) — its text was NOT inspected")
+            return None, (f"EXIF UserComment not decoded ({len(payload)} bytes, "
+                          f"unrecognised character-code header) — text NOT inspected")
+
+        try:
+            return value.decode("utf-8").rstrip("\x00"), None
+        except UnicodeDecodeError:
+            return None, (f"EXIF {tag_name} not decoded ({len(value)} bytes, not "
+                          f"valid UTF-8) — its text was NOT inspected")
+
+    # PIL puts BINARY blocks in `img.info` beside the text chunks: the raw EXIF
+    # segment, ICC profiles, Photoshop resources, palettes. Those are not text and
+    # must not be reported as undecodable text -- ASTRA asked for that boundary
+    # explicitly, and it matters: on `exif-xpcomment.jpg` the raw `exif` blob has
+    # a few bytes that are not UTF-8, which made the file read as INCOMPLETE for a
+    # reason that was not true. The XPComment inside it is read properly by the
+    # EXIF path above; the container it arrived in is not a text field.
+    _BINARY_INFO_KEYS = {
+        "exif", "icc_profile", "photoshop", "adobe", "adobe_transform",
+        "xmp", "mpinfo", "palette", "transparency", "background",
+        "extension", "chromaticity", "gamma", "srgb", "interlace",
+        "dpi", "aspect", "loop", "duration", "version",
+    }
+
+    def _decode_embedded_text(self, key: str, value: bytes):
+        """Decode an embedded text chunk (PNG tEXt/iTXt/zTXt, GIF comment).
+
+        Returns (text, failure). Unlike the EXIF path this KEEPS what decoded: a
+        GIF comment with three bad bytes and a paragraph of readable instructions
+        must still yield the instructions AND report the loss. `errors="ignore"`
+        used to do the first half and silently skip the second, which is how
+        `partial-comment.gif` produced six findings beside `inspection_complete:
+        true` (ASTRA G2).
+        """
+        try:
+            return value.decode("utf-8"), None
+        except UnicodeDecodeError:
+            pass
+        from .dispatch import decode_lossy
+        text, undecodable, first_bad = decode_lossy(value)
+        return text, (f"embedded text {key!r}: {undecodable} byte(s) undecodable and "
+                      f"NOT inspected (first at offset {first_bad}); the rest of the "
+                      f"field was scanned")
+
     def _exif_from_pil(self, img) -> List[Tuple[str, str]]:
         """Extract text from EXIF data of a PIL Image."""
         from PIL.ExifTags import TAGS
@@ -188,35 +345,38 @@ class ImageExtractor:
         try:
             exif_data = img._getexif() if hasattr(img, "_getexif") else None
             if exif_data:
-                # Fields attackers could hide text in
-                text_fields = {
-                    'ImageDescription', 'Make', 'Model', 'Software',
-                    'Artist', 'Copyright', 'UserComment', 'XPComment',
-                    'XPAuthor', 'XPKeywords', 'XPSubject', 'XPTitle',
-                }
                 for tag_id, value in exif_data.items():
                     tag_name = TAGS.get(tag_id, str(tag_id))
-                    if tag_name in text_fields and isinstance(value, str) and len(value) > 5:
-                        results.append((tag_name, value))
+                    if tag_name not in self._EXIF_TEXT_FIELDS:
+                        continue          # not a text tag: not ours to decode
+                    if isinstance(value, str):
+                        if len(value) > 5:
+                            results.append((tag_name, value))
+                        continue
+                    if isinstance(value, (bytes, bytearray)):
+                        text, failure = self._decode_exif_text(tag_name, bytes(value))
+                        if failure:
+                            self.failures.append(failure)
+                        elif text and len(text) > 5:
+                            results.append((tag_name, text))
         except Exception as exc:
             self.failures.append(
                 f"EXIF text fields not read ({exc.__class__.__name__}: {exc})")
 
-        # PNG text chunks (tEXt, iTXt, zTXt)
+        # Embedded text: PNG chunks (tEXt/iTXt/zTXt) and the GIF comment block.
         try:
             if hasattr(img, 'info') and img.info:
                 for key, value in img.info.items():
                     if isinstance(value, str) and len(value) > 5:
                         results.append((f"png:{key}", value))
-                    elif isinstance(value, bytes):
-                        try:
-                            decoded = value.decode('utf-8', errors='ignore')
-                            if len(decoded) > 5:
-                                results.append((f"png:{key}", decoded))
-                        except Exception as exc:
-                            self.failures.append(
-                                f"embedded text chunk {key!r} not decoded "
-                                f"({exc.__class__.__name__})")
+                    elif isinstance(value, (bytes, bytearray)):
+                        if key.lower() in self._BINARY_INFO_KEYS:
+                            continue      # a binary block, not a text field
+                        text, failure = self._decode_embedded_text(key, bytes(value))
+                        if failure:
+                            self.failures.append(failure)
+                        if text and len(text) > 5:
+                            results.append((f"png:{key}", text))
         except Exception as exc:
             self.failures.append(
                 f"embedded text chunks not read ({exc.__class__.__name__}: {exc})")
@@ -326,8 +486,7 @@ def scan_image(image_path: str, engine=None) -> dict:
             f"{os.path.basename(image_path)} was inspected.")
 
     warnings = [
-        f"OCR/metadata text not read from {os.path.basename(image_path)} — {failure}. "
-        f"That content was NOT inspected."
+        f"{os.path.basename(image_path)} not fully read — {failure}."
         for failure in getattr(extractor, "failures", None) or []
     ]
     if _failed:
