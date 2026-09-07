@@ -126,7 +126,7 @@ def main() -> int:
         for state, _sl, _sd in M.STATES:
             value = M.MATRIX[(sid, state)]
             if M.is_na(value):
-                cells.append("N/A (host)" if value.scope == "host" else "N/A")
+                cells.append(f"N/A ({value.claim})")
             else:
                 mark = " ⚠" if (sid, state) in M.NOTES else ""
                 if (sid, state) in M.EQUIVALENCE:
@@ -145,12 +145,19 @@ def main() -> int:
     w("An omitted cell and a covered cell look identical in a table. These are the")
     w("cells the space does not contain, each with a claim a reviewer can check.")
     w("")
-    w("| surface | state | reason |")
-    w("|---|---|---|")
+    w("Each reason declares WHAT KIND of argument it is, because \"N/A\" was being")
+    w("used for four different arguments and a reviewer could not tell which:")
+    w("")
+    w("| claim | means |")
+    w("|---|---|")
+    for kind, meaning in M.NA_CLAIMS.items():
+        w(f"| `{kind}` | {meaning} |")
+    w("")
+    w("| surface | state | claim | reason |")
+    w("|---|---|---|---|")
     for sid, _g, label, _f, state, value in M.cells():
         if M.is_na(value):
-            scope = " **(HOST-SCOPED)**" if value.scope == "host" else ""
-            w(f"| {label} | `{state}` | {value.why}{scope} |")
+            w(f"| {label} | `{state}` | `{value.claim}` | {value.why} |")
 
     aliases = [(label, state, value) for _s, _g, label, _f, state, value
                in M.cells() if M.is_alias(value)]

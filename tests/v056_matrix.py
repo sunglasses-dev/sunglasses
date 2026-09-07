@@ -84,26 +84,53 @@ OUTCOMES = {
 }
 
 
+# What KIND of claim an N/A reason is. Declared, never inferred: the round-3
+# reasons ASTRA rejected all read like impossibility claims and were really "we
+# did not test this", and no amount of reading the prose separates those two --
+# only saying which one you are making does. Anything not on this list is not a
+# reason, it is a shrug.
+NA_CLAIMS = {
+    # a property of THIS SURFACE'S API, checkable against the signature/source
+    "interface": "the surface's own interface makes the state unreachable",
+    # a property of the FORMAT's specification, checkable against that spec
+    "format": "the input format's specification makes the state impossible",
+    # a property of the STORAGE layer, checkable by trying it
+    "storage": "the storage layer cannot represent the input this state needs",
+    # true of THIS MACHINE, not of the software. ASTRA accepted the ARG_MAX
+    # reason only on these terms, so the limit travels with the cell.
+    "host": "true of this host's limits, not of the software",
+}
+
+
 class NotApplicable:
     """This state cannot be constructed on this surface, and here is why.
 
-    The reason is a claim about the SURFACE'S INTERFACE that a reviewer can check
-    against the source -- "this parameter is a `str`, no path is resolved" -- never
-    a claim about what we happened to test. ASTRA rejected five round-3 reasons for
-    exactly that slippage; those five are asserted cells now.
+    ``claim`` names what KIND of argument the reason is, because "N/A" was being
+    used for four different arguments and a reviewer could not tell which one was
+    being made. ``why`` then has to substantiate that kind: an ``interface`` claim
+    points at this surface's signature or source, a ``format`` claim at the format
+    spec, a ``host`` claim says HOST-SCOPED out loud.
+
+    ASTRA rejected five round-3 reasons for claiming a state was IMPOSSIBLE when it
+    was merely untested. Those five are asserted cells now, and this field exists so
+    the same slippage cannot be smuggled back in as confident prose.
     """
 
     kind = "N/A"
 
-    def __init__(self, why, scope=None):
+    def __init__(self, why, claim="interface"):
+        if claim not in NA_CLAIMS:  # pragma: no cover - import-time guard
+            raise AssertionError(
+                f"unknown N/A claim kind {claim!r}; must be one of {sorted(NA_CLAIMS)}")
         self.why = why
-        # "host" marks a reason that is true of THIS machine rather than of the
-        # interface (ARG_MAX). ASTRA accepted the ARG_MAX reason only host-scoped,
-        # so the scope travels with the cell into the published table.
-        self.scope = scope
+        self.claim = claim
+
+    @property
+    def scope(self):  # pragma: no cover - kept for the table generator's older name
+        return self.claim
 
     def __repr__(self):
-        return f"NotApplicable({self.why[:40]!r})"
+        return f"NotApplicable({self.claim}: {self.why[:40]!r})"
 
 
 class Alias:
@@ -227,7 +254,7 @@ _ARGV_HOST = NotApplicable(
     "bytes -- exactly the scan cap -- so execve() fails with E2BIG before the "
     "scanner runs. HOST-SCOPED: true of this machine, not of every OS or of a "
     "caller-configured cap. `--stdin` carries these two cells on every host",
-    scope="host")
+    claim="host")
 
 
 def _text_surface(extra):
@@ -324,7 +351,8 @@ _row("cli_repo", {
     "nonregular": NotApplicable(
         "git's object model stores regular files, symlinks and directories only; "
         "a FIFO, socket or device node cannot be committed, so no clone can "
-        "contain one. Verified by attempting `git add` on a FIFO fixture"),
+        "contain one. Verified by attempting `git add` on a FIFO fixture",
+        claim="storage"),
     "undecodable": "incomplete",               # a committed non-UTF-8 file
     "empty": "clean",                          # a committed empty file
 })
@@ -551,9 +579,10 @@ _conv_row("lib_conv_qr", {
         "when OCR fails, and the PDF surface, which still has pages when an "
         "annotation fails"),
     "truncated_finding": NotApplicable(
-        "the QR interface caps a symbol's payload at 2,953 bytes (version 40, "
+        "the QR specification caps a symbol's payload at 2,953 bytes (version 40, "
         "level L, binary), three orders of magnitude below the engine's 1 MiB "
-        "scan cap, so decoded QR text cannot reach truncation"),
+        "scan cap, so decoded QR text cannot reach truncation",
+        claim="format"),
 })
 
 # =========================================================================

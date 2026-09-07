@@ -1466,19 +1466,38 @@ def test_no_cell_is_silently_skipped():
 
 
 def test_every_na_reason_states_what_kind_of_claim_it_is():
-    """ASTRA rejected five round-3 N/A reasons because they claimed a state was
-    IMPOSSIBLE when it was merely untested. A surviving N/A must be a claim about
-    the surface's INTERFACE, or explicitly host-scoped."""
+    """ASTRA rejected five round-3 N/A reasons for claiming a state was IMPOSSIBLE
+    when it was merely untested. No amount of reading the prose separates those two
+    -- only DECLARING which argument you are making does -- so every surviving N/A
+    carries a `claim` kind from a fixed vocabulary, and the reason has to
+    substantiate that kind.
+
+    An earlier version of this test grepped the reason for keywords, which is the
+    same mistake one level up: it graded the wording rather than the argument, and
+    it rejected a perfectly good interface claim ("this surface has exactly one
+    content source") for using different words.
+    """
     for sid, _g, _l, _f, state, value in M.cells():
         if not M.is_na(value):
             continue
-        why = value.why
-        if value.scope == "host":
-            assert "HOST-SCOPED" in why, f"{sid}/{state}: host-scoped N/A must say so"
-            continue
-        assert any(k in why for k in (
-            "parameter", "interface", "no path", "no file", "object model",
-            "in-memory", "per-format", "router", "transport", "no format parser",
-            "no extractor", "content sniffing", "no I/O")), (
-            f"{sid}/{state}: N/A reason does not say what about the surface makes "
-            f"the state impossible: {why!r}")
+        assert value.claim in M.NA_CLAIMS, (
+            f"{sid}/{state}: N/A claim kind {value.claim!r} is not one of "
+            f"{sorted(M.NA_CLAIMS)}")
+        assert isinstance(value.why, str) and len(value.why) > 40, (
+            f"{sid}/{state}: an N/A reason has to be substantive enough to check")
+        if value.claim == "host":
+            assert "HOST-SCOPED" in value.why, (
+                f"{sid}/{state}: a host-scoped N/A must say so in the published "
+                f"table -- it is not a property of the software")
+
+
+def test_no_na_claim_kind_is_unused_boilerplate():
+    """Every kind in the vocabulary is used by at least one cell.
+
+    A vocabulary with an unused entry is a category someone added to feel
+    thorough. If a kind stops being used, delete it rather than leave it as a
+    slot the next reason can be quietly filed under.
+    """
+    used = {v.claim for *_x, v in M.cells() if M.is_na(v)}
+    assert used == set(M.NA_CLAIMS), (
+        f"declared kinds {sorted(M.NA_CLAIMS)} but only {sorted(used)} are used")
