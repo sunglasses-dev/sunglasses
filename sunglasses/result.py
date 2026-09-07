@@ -48,7 +48,7 @@ them to produce anything new.
 
 from typing import Any, Optional
 
-__all__ = ["normalize", "CANONICAL_KEYS", "NormalizedResult"]
+__all__ = ["normalize", "aggregate", "CANONICAL_KEYS", "NormalizedResult"]
 
 
 CANONICAL_KEYS = (
@@ -227,15 +227,127 @@ def normalize(obj: Any, *, source: Optional[str] = None, extra: Optional[dict] =
     if isinstance(obj, dict):
         core = _normalize_mapping(obj, source)
         passthrough = {k: v for k, v in obj.items() if k not in CANONICAL_KEYS}
-    else:
+    elif _is_scan_result(obj):
         core = _normalize_scanresult(obj, source)
         passthrough = {}
+    else:
+        # Round-4 hardening (ASTRA's API observation). `getattr(obj, ..., default)`
+        # meant `normalize(None)` and `normalize(object())` came back complete and
+        # CLEAN: every axis defaulted to the optimistic value because nothing
+        # contradicted it. Silence is not a pass -- and an input this function does
+        # not understand is not silence, it is a caller bug. Refuse it loudly rather
+        # than answer a question about a scan that never happened.
+        raise TypeError(
+            f"normalize() accepts a ScanResult or a scan-result mapping, "
+            f"got {type(obj).__name__}. An unrecognised object is not a clean scan."
+        )
 
     merged = dict(passthrough)
     if extra:
         merged.update({k: v for k, v in extra.items() if k not in CANONICAL_KEYS})
     merged.update(core)
     return merged
+
+
+def _is_scan_result(obj: Any) -> bool:
+    """Does this object carry the ScanResult surface ``normalize`` reads?
+
+    ``findings`` is the discriminator: every result shape in this package has it,
+    and nothing else that gets handed to ``normalize`` does.
+    """
+    return hasattr(obj, "findings")
+
+
+def aggregate(children, *, source: Optional[str] = None,
+              warnings=None, extraction_complete: bool = True,
+              extra: Optional[dict] = None) -> dict:
+    """Fold N child scans into ONE canonical document, losing no child's coverage.
+
+    WHY THIS EXISTS (v0.5.6 repair, round 4).
+    -----------------------------------------
+    Round 3 gave every CONSUMER one place to decide "was it clean". Round 4 is the
+    same fix one layer down, on the PRODUCERS. Five extractor ``scan_*`` convenience
+    functions and two scanner helpers each built their own per-source dictionaries
+    out of the child ``ScanResult`` -- copying ``decision``, ``severity`` and
+    ``findings``, and dropping ``truncated`` and ``extraction_complete`` on the
+    floor. ``normalize()`` then saw an aggregate that had never been told about the
+    loss, and could only report what it was given.
+
+    That is how a 1.2 M-character transcript with ``truncated: true`` on the engine
+    child came back through ``scan_deep()`` as ``inspection_complete: true,
+    is_clean: true, exit 0``: the truncation was real, was recorded, and was
+    discarded one frame above the normalizer.
+
+    THE INVARIANT, stated once so it cannot be re-derived per producer:
+
+        A non-empty ``sources`` list proves that content was PRODUCED.
+        It never proves that every requested component was INSPECTED.
+
+    So coverage folds pessimistically and findings fold additively:
+
+      * ``truncated``            -- any child truncated  => True
+      * ``extraction_complete``  -- every child complete AND the extractor reported
+                                    no failures AND no warnings were raised => True
+      * ``warnings``             -- the caller's, plus every child's, concatenated
+      * ``findings``             -- every child's, concatenated
+
+    ``children`` is an iterable of ``(label, text, result)`` triples, where
+    ``result`` is an ``engine.ScanResult``. The per-source ``results`` list this
+    builds keeps the fields the previous aggregates published (``source``,
+    ``text_preview``, ``decision``, ``severity``, ``findings``) so existing callers
+    keep working, and ADDS the two coverage fields they used to discard, so the
+    loss is visible per source and not only in the fold.
+    """
+    per_source = []
+    findings: list = []
+    folded_warnings = _as_list(warnings)
+    truncated = False
+    complete = bool(extraction_complete)
+    threat_found = False
+
+    for label, text, result in children:
+        child = normalize(result, source=label)
+        preview = text if len(text) <= 100 else text[:100] + "..."
+        per_source.append({
+            "source": label,
+            "text_preview": preview,
+            "decision": child["decision"],
+            "severity": child["severity"],
+            "findings": child["findings"],
+            # The two fields every previous aggregate dropped.
+            "truncated": child["truncated"],
+            "inspection_complete": child["inspection_complete"],
+        })
+        findings.extend(child["findings"])
+        if child["truncated"]:
+            truncated = True
+        if not child["extraction_complete"]:
+            complete = False
+        if child["threat_found"]:
+            threat_found = True
+        for warning in child["warnings"]:
+            if warning not in folded_warnings:
+                folded_warnings.append(warning)
+
+    merged_extra = dict(extra or {})
+    merged_extra.setdefault("sources_found", len(per_source))
+    merged_extra["sources"] = [row["source"] for row in per_source]
+    merged_extra["results"] = per_source
+    # Kept for callers that predate the canonical name.
+    merged_extra["threats"] = list(findings)
+
+    return normalize(
+        {
+            "threat_found": threat_found,
+            "extraction_complete": complete,
+            "truncated": truncated,
+            "warnings": folded_warnings,
+            "findings": findings,
+            "channel": "file",
+        },
+        source=source,
+        extra=merged_extra,
+    )
 
 
 class NormalizedResult:

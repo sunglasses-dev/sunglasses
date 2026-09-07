@@ -127,7 +127,14 @@ class AudioExtractor:
             return ""
 
     def _extract_metadata(self, audio_path: str) -> List[Tuple[str, str]]:
-        """Extract text from audio file metadata using ffprobe."""
+        """Extract text from audio file metadata using ffprobe.
+
+        v0.5.6 round 4: this used to `except Exception: pass`. ffprobe missing,
+        ffprobe crashing, or unparseable JSON all produced an empty tag list that
+        is INDISTINGUISHABLE from a file with no tags -- so an attack hidden in a
+        comment tag was reported as a fully inspected, clean file. Recovering the
+        tags is not required; hiding that we gave up looking is the bug.
+        """
         results = []
         try:
             cmd = [
@@ -135,17 +142,25 @@ class AudioExtractor:
                 '-show_format', audio_path
             ]
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            if proc.returncode == 0:
-                data = json.loads(proc.stdout)
-                tags = data.get('format', {}).get('tags', {})
-                text_fields = ['title', 'artist', 'album', 'comment',
-                               'description', 'lyrics', 'genre', 'composer']
-                for field in text_fields:
-                    for key, value in tags.items():
-                        if key.lower() == field and isinstance(value, str) and len(value) > 3:
-                            results.append((field, value))
-        except Exception:
-            pass
+            if proc.returncode != 0:
+                self.warnings.append(
+                    f"Audio metadata tags not read (ffprobe exit {proc.returncode}) — "
+                    f"text in title/comment/lyrics tags was NOT inspected."
+                )
+                return results
+            data = json.loads(proc.stdout)
+            tags = data.get('format', {}).get('tags', {})
+            text_fields = ['title', 'artist', 'album', 'comment',
+                           'description', 'lyrics', 'genre', 'composer']
+            for field in text_fields:
+                for key, value in tags.items():
+                    if key.lower() == field and isinstance(value, str) and len(value) > 3:
+                        results.append((field, value))
+        except Exception as exc:
+            self.warnings.append(
+                f"Audio metadata tags not read ({exc.__class__.__name__}: {_brief(exc)}) — "
+                f"text in title/comment/lyrics tags was NOT inspected."
+            )
         return results
 
 
@@ -153,13 +168,18 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
     """
     Convenience function: extract text from audio and scan with SUNGLASSES.
 
-    Returns dict with:
-        - sources: list of (source, text) extracted
-        - results: list of scan results
-        - is_clean: True if ALL extractions are clean
-        - threats: list of findings from non-clean results
+    Returns the canonical result document (see ``sunglasses.result``): the three
+    axes, coverage detail, findings, plus ``sources``/``results`` per extracted
+    source.
+
+    v0.5.6 round 4: this built its own per-source dictionaries out of the child
+    ``ScanResult``, copying ``decision``/``severity``/``findings`` and DISCARDING
+    ``truncated`` and ``extraction_complete``. A 1.2 M-character transcript with
+    ``truncated: true`` on the child therefore came back through ``scan_deep()``
+    as complete and clean. The fold now lives in one place for every extractor.
     """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
@@ -167,31 +187,9 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
     extractor = AudioExtractor(whisper_model=whisper_model)
     texts = extractor.extract(audio_path)
 
-    results = []
-    threats = []
-    is_clean = True
-
-    for source, text in texts:
-        result = engine.scan(text, channel="file")
-        results.append({
-            "source": source,
-            "text_preview": text[:100] + "..." if len(text) > 100 else text,
-            "decision": result.decision,
-            "severity": result.severity,
-            "findings": result.findings,
-        })
-        if not result.is_clean:
-            is_clean = False
-            threats.extend(result.findings)
-
-    warnings = list(getattr(extractor, "warnings", []))
-    return {
-        "file": audio_path,
-        "sources_found": len(texts),
-        # An extraction failure means we did not read it; that can never be clean.
-        "is_clean": is_clean and not warnings,
-        "extraction_complete": not warnings,
-        "warnings": warnings,
-        "threats": threats,
-        "results": results,
-    }
+    return aggregate(
+        ((source, text, engine.scan(text, channel="file")) for source, text in texts),
+        source=audio_path,
+        warnings=list(getattr(extractor, "warnings", [])),
+        extra={"file": audio_path},
+    )

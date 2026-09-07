@@ -578,6 +578,63 @@ def _usage_error(args, message, hint=None):
     sys.exit(EXIT_USAGE)
 
 
+def _read_stdin_text(args) -> str:
+    """Read stdin as text, or refuse operationally. Never a traceback, never exit 1.
+
+    v0.5.6 round 4 (ASTRA F5). `sys.stdin.read()` sat outside every error handler,
+    so a byte stream that is not valid UTF-8 -- `PYTHONIOENCODING=utf-8:strict` and
+    one 0xff -- raised `UnicodeDecodeError` out of `main()`. Python exits 1 on an
+    uncaught exception, and 1 is this package's code for THREAT FOUND. A CI job
+    piping a binary file into the scanner was told it had been attacked, and got a
+    traceback instead of a document. That is the same class as the `UnreadableFile`
+    repair: an operational failure wearing a verdict's exit code.
+
+    POLICY, stated because there were two defensible answers (T9's brief, item C2):
+    an undecodable stream is an OPERATIONAL error (exit 2), not a partial scan.
+    Decoding with `errors="replace"` was the alternative, and it is worse here: it
+    would silently substitute U+FFFD for the attacker-controlled bytes and then
+    report on the substitution, which is a scan of something the caller never sent.
+    Refusing names exactly what happened and scans nothing.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:
+        # A caller (or a test) replaced stdin with a text-mode object. Nothing to
+        # decode: it is already str.
+        return sys.stdin.read()
+    raw = buffer.read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        _usage_error(
+            args,
+            f"Input is not valid UTF-8: {len(raw)} bytes read, "
+            f"first undecodable byte 0x{raw[exc.start]:02x} at offset {exc.start}.",
+            "Nothing was scanned. SUNGLASSES scans text; pipe a decoded stream, "
+            "or use --file to scan a binary as a file.",
+        )
+
+
+def _refuse_empty_input(args, text, where) -> None:
+    """One empty-input policy for every surface (T9 brief, item C4).
+
+    The CLI used to return exit 0 / "no threats detected" for empty `--text` and
+    empty stdin, while MCP `scan_text` refused the same input with `isError: true`.
+    Both were defensible in isolation; having BOTH is not, because the matrix claims
+    one contract across surfaces and a reviewer is entitled to hold us to it.
+
+    MCP's answer wins, and the CLI adopts it: "clean" is a claim about content that
+    was inspected, and there was no content. Reporting a pass on nothing is the
+    smallest possible version of the misleading-success bug this whole release is
+    about, so the two surfaces now agree that it is a usage error.
+    """
+    if text == "":
+        _usage_error(
+            args,
+            f"No content to scan: {where} was empty.",
+            "Nothing was scanned. A scan of nothing is not a clean scan.",
+        )
+
+
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
     warnings = list(getattr(result, "extraction_warnings", None) or [])
@@ -657,6 +714,7 @@ def cmd_scan(args):
     # Explicit beats inferred: --text is the documented escape hatch from the
     # path-shape rule below, so it is checked before any filesystem guess.
     if getattr(args, "explicit_text", None) is not None:
+        _refuse_empty_input(args, args.explicit_text, "--text")
         result = engine.scan(args.explicit_text, channel=args.channel)
         _emit_scan_result(args, result, source="text")
 
@@ -836,7 +894,8 @@ def cmd_scan(args):
                              "Nothing was scanned. Check the file's permissions.")
             source = filepath
     elif args.stdin:
-        text = sys.stdin.read()
+        text = _read_stdin_text(args)
+        _refuse_empty_input(args, text, "stdin")
         result = engine.scan(text, channel=args.channel)
         source = "stdin"
     elif args.text:
@@ -1657,16 +1716,41 @@ class _MachineAwareParser(argparse.ArgumentParser):
     this point. Exit code and stderr behaviour for human callers are unchanged.
     """
 
-    _MACHINE_FLAGS = ("--json", "--output=json", "--output=sarif", "-o=json", "-o=sarif")
+    _MACHINE_VALUES = ("json", "sarif")
 
     @staticmethod
     def _argv_wants_machine_output(argv) -> bool:
+        """Every spelling of "give me a machine document" that argparse accepts.
+
+        v0.5.6 round 4 (ASTRA F5): this listed `--output=json`, `-o=json` and
+        `-o json`, and missed the ATTACHED short form `-ojson` -- which argparse
+        accepts and which people write. So `sunglasses scan -ojson --channel nope`
+        exited 2 with an EMPTY stdout: the caller asked for JSON, the parser failed
+        before `args` existed, this said "human", and the error paragraph went to
+        stderr. A JSON consumer got nothing at all on the one path where the
+        contract's "exactly one document, always" matters most.
+
+        The rule is now the same one argparse uses: a short option may carry its
+        value attached, a long option may carry it after `=`, and either may take
+        the next token. Anything not in that grammar is not our concern here.
+        """
         for i, tok in enumerate(argv):
-            if tok in ("--json",) or tok.startswith(("--output=", "-o=")):
-                if tok == "--json" or tok.split("=", 1)[1] in ("json", "sarif"):
+            if tok == "--json":
+                return True
+            # long form: --output=json
+            if tok.startswith("--output="):
+                if tok.split("=", 1)[1] in _MachineAwareParser._MACHINE_VALUES:
                     return True
+                continue
+            # short form: -o=json (tolerated), -ojson (argparse's attached value)
+            if tok.startswith("-o") and not tok.startswith("--") and len(tok) > 2:
+                value = tok[3:] if tok[2] == "=" else tok[2:]
+                if value in _MachineAwareParser._MACHINE_VALUES:
+                    return True
+                continue
+            # separated form: --output json / -o json
             if tok in ("--output", "-o") and i + 1 < len(argv):
-                if argv[i + 1] in ("json", "sarif"):
+                if argv[i + 1] in _MachineAwareParser._MACHINE_VALUES:
                     return True
         return False
 

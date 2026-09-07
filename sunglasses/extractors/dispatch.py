@@ -23,6 +23,7 @@ carried in the return value rather than swallowed.
 """
 
 import os
+import stat
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif", ".webp",
@@ -51,6 +52,47 @@ class UnreadableFile(OSError):
         self.cause = cause
         detail = getattr(cause, "strerror", None) or str(cause)
         super().__init__(f"could not read {path}: {detail}")
+
+
+class NonRegularFile(UnreadableFile):
+    """The path exists but is not a regular file: FIFO, socket, device, directory.
+
+    v0.5.6 round 4 (ASTRA F3). ``_probe_readable`` used to prove readability by
+    OPENING the path. Opening a read-only FIFO with no writer BLOCKS in the kernel,
+    so an MCP ``scan_file`` on a named pipe never returned a result at all -- the
+    server simply stopped answering, which is worse than a wrong answer because a
+    caller cannot even time it out meaningfully. The CLI reached exit 2 only
+    because it happened to hit a different guard first.
+
+    So the type check now happens on ``os.stat`` metadata, before any file object
+    exists. This subclasses ``UnreadableFile`` deliberately: every caller in the
+    package -- CLI, MCP, library helpers -- already maps that to the operational
+    outcome (exit 2 / ``isError: true``), and an operational refusal is exactly the
+    right answer for "this is not a thing we can scan". Inheriting the mapping is
+    subtraction; a parallel error path would be one more place to disagree.
+    """
+
+    def __init__(self, path, kind):
+        self.path = path
+        self.kind = kind
+        # Deliberately NOT an OSError cause: nothing failed, we refused. The
+        # sentence has to survive into the CLI/MCP message unchanged.
+        OSError.__init__(self, f"not a regular file: {path} is a {kind}")
+
+
+def _describe_file_type(mode) -> str:
+    """Name the thing we were handed, so the refusal is checkable by a human."""
+    for predicate, label in (
+        (stat.S_ISDIR, "directory"),
+        (stat.S_ISFIFO, "named pipe (FIFO)"),
+        (stat.S_ISSOCK, "socket"),
+        (stat.S_ISCHR, "character device"),
+        (stat.S_ISBLK, "block device"),
+        (stat.S_ISLNK, "symbolic link"),
+    ):
+        if predicate(mode):
+            return label
+    return "non-regular file"
 
 
 class ExtractionResult:
@@ -126,10 +168,27 @@ def _extract_image(path: str):
 
 
 def _extract_pdf(path: str):
-    """Page text + document metadata + annotations."""
+    """Page text + document metadata + annotations.
+
+    v0.5.6 round 4 (ASTRA F4): the extractor's ``failures`` list was never read
+    here. A valid PDF whose annotation array held one malformed element made
+    ``_extract_annotations`` abandon the loop, the following instruction-bearing
+    annotation was never extracted, and this returned ``complete=True`` -- CLI
+    exit 0, clean, no warning. The sub-parser knew it had given up; nothing asked.
+    """
     try:
         from .pdf import PDFExtractor
-        return ExtractionResult(PDFExtractor().extract(path))
+        extractor = PDFExtractor()
+        sources = extractor.extract(path)
+        failures = list(getattr(extractor, "failures", []))
+        if failures:
+            return ExtractionResult(
+                sources,
+                [f"PDF partly unread — {failure}. That content was NOT inspected."
+                 for failure in failures],
+                complete=False,
+            )
+        return ExtractionResult(sources)
     except ImportError:
         # Fall back to the raw bytes so an uncompressed PDF still gets looked at —
         # but flag it, because the common case (FlateDecode) yields nothing and a
@@ -216,7 +275,7 @@ def _sniff(path: str) -> bytes:
 
 
 def _probe_readable(path: str) -> None:
-    """Raise UnreadableFile unless we can actually open and read the file.
+    """Raise UnreadableFile unless this is a regular file we can actually read.
 
     This runs BEFORE identify(), deliberately. identify() falls back to the file
     suffix when the magic sniff comes back empty, and `_sniff` swallows OSError --
@@ -224,7 +283,19 @@ def _probe_readable(path: str) -> None:
     read, and the scan came back "incomplete" (3) instead of "operational error" (2).
     Guarding the branches that read is not enough when a branch that does not read
     can be selected by filename alone. Checking first covers every branch at once.
+
+    ORDER MATTERS (round 4, ASTRA F3). The file TYPE is checked on stat metadata
+    first, because the readability check opens the path and opening a FIFO with no
+    writer blocks forever. A probe that hangs is not a probe.
     """
+    try:
+        st = os.stat(path)
+    except OSError as exc:
+        raise UnreadableFile(path, exc) from exc
+
+    if not stat.S_ISREG(st.st_mode):
+        raise NonRegularFile(path, _describe_file_type(st.st_mode))
+
     try:
         with open(path, "rb") as fh:
             fh.read(1)

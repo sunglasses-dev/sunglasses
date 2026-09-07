@@ -97,8 +97,13 @@ class QRExtractor:
 
 
 def scan_qr(image_path: str, engine=None) -> dict:
-    """Convenience function: extract QR/barcode text and scan with SUNGLASSES."""
+    """Convenience function: extract QR/barcode text and scan with SUNGLASSES.
+
+    Returns the canonical result document (see ``sunglasses.result``). v0.5.6
+    round 4: it used to build its own aggregate and drop the child's coverage.
+    """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
@@ -106,27 +111,8 @@ def scan_qr(image_path: str, engine=None) -> dict:
     extractor = QRExtractor()
     texts = extractor.extract(image_path)
 
-    results = []
-    threats = []
-    is_clean = True
-
-    for source, text in texts:
-        result = engine.scan(text, channel="file")
-        results.append({
-            "source": source,
-            "text_preview": text[:100] + "..." if len(text) > 100 else text,
-            "decision": result.decision,
-            "severity": result.severity,
-            "findings": result.findings,
-        })
-        if not result.is_clean:
-            is_clean = False
-            threats.extend(result.findings)
-
-    return {
-        "file": image_path,
-        "sources_found": len(texts),
-        "is_clean": is_clean,
-        "threats": threats,
-        "results": results,
-    }
+    return aggregate(
+        [(source, text, engine.scan(text, channel="file")) for source, text in texts],
+        source=image_path,
+        extra={"file": image_path},
+    )

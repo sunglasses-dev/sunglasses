@@ -207,15 +207,27 @@ class SunglassesScanner:
         that is not actually a PNG raised `PIL.UnidentifiedImageError` straight
         through to the caller -- the identical defect the corrupt-PDF case
         exposed, one extractor over. Unreadable still propagates as operational.
+
+        v0.5.6 round 4 (ASTRA F2). This checked whether ``extract()`` RAISED, and
+        nothing else. ``ImageExtractor.extract()`` returns normally when OCR could
+        not run -- it records the loss in ``failures`` and hands back whatever EXIF
+        it did get -- so with Tesseract absent from PATH and pyzbar decoding fine,
+        this helper started from ``extraction_complete: True``, never consulted
+        ``failures``, and returned complete/clean with no warnings for an image
+        whose visible text was never read. ``scan_fast()`` on the identical PNG
+        said incomplete, because dispatch DOES consume ``failures``.
+
+        The fix is the round-4 principle: stop hand-rolling the fold. The child
+        scans and the extractor's own failure list go to the one shared aggregate
+        builder, so this helper cannot disagree with `scan_fast` about coverage.
         """
         from .extractors.dispatch import _probe_readable
-        from .result import normalize
+        from .result import aggregate
 
         _probe_readable(path)                    # UnreadableFile -> operational
 
-        results = {"file": path, "sources": [], "threats": [],
-                   "threat_found": False, "extraction_complete": True,
-                   "warnings": []}
+        children = []
+        warnings = []
 
         # EXIF + OCR
         try:
@@ -223,48 +235,39 @@ class SunglassesScanner:
             extractor = ImageExtractor()
             texts = extractor.extract(path)
             for source, text in texts:
-                r = self.engine.scan(text, channel="file")
-                results["sources"].append({"source": source, "decision": r.decision})
-                if r.threat_found:
-                    results["threat_found"] = True
-                    results["threats"].extend(r.findings)
+                children.append((source, text, self.engine.scan(text, channel="file")))
+            for failure in getattr(extractor, "failures", []):
+                warnings.append(
+                    f"OCR/metadata text not read from {os.path.basename(path)} — "
+                    f"{failure}. That content was NOT inspected.")
         except ImportError:
-            results["extraction_complete"] = False
-            results["warnings"].append(
+            warnings.append(
                 "Image scanning requires: pip install sunglasses[image] — "
                 "OCR/EXIF content was NOT inspected.")
         except Exception as exc:
-            results["extraction_complete"] = False
-            results["warnings"].append(
+            warnings.append(
                 f"Image extraction failed ({exc.__class__.__name__}) — "
                 f"OCR/EXIF content was NOT inspected.")
 
         # QR codes in the image
         try:
             from .extractors.qr import QRExtractor
-            qr = QRExtractor()
-            codes = qr.extract(path)
-            for source, text in codes:
-                r = self.engine.scan(text, channel="file")
-                results["sources"].append({"source": f"qr:{source}", "decision": r.decision})
-                if r.threat_found:
-                    results["threat_found"] = True
-                    results["threats"].extend(r.findings)
+            for source, text in QRExtractor().extract(path):
+                children.append((f"qr:{source}", text,
+                                 self.engine.scan(text, channel="file")))
         except ImportError:
             # "Optional" described the dependency, not the coverage. A QR code we
             # never decoded is content we never read.
-            results["extraction_complete"] = False
-            results["warnings"].append(
+            warnings.append(
                 "QR scanning requires: pip install sunglasses[image] — "
                 "QR content was NOT inspected.")
         except Exception as exc:
-            results["extraction_complete"] = False
-            results["warnings"].append(
+            warnings.append(
                 f"QR extraction failed ({exc.__class__.__name__}) — "
                 f"QR content was NOT inspected.")
 
-        return normalize(results, source=path,
-                         extra={"findings": list(results["threats"])})
+        return aggregate(children, source=path, warnings=warnings,
+                         extra={"file": path})
 
     def _scan_pdf(self, path: str) -> dict:
         """FAST: PDF scan.

@@ -113,6 +113,10 @@ class VideoExtractor:
             ]
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if proc.returncode != 0:
+                self.warnings.append(
+                    f"Subtitle tracks not read (ffprobe exit {proc.returncode}) — "
+                    f"text in embedded subtitles was NOT inspected."
+                )
                 return results
 
             data = json.loads(proc.stdout)
@@ -144,8 +148,14 @@ class VideoExtractor:
                     except OSError:
                         pass
 
-        except Exception:
-            pass
+        except Exception as exc:
+            # v0.5.6 round 4: this `pass` made "no subtitle tracks" and "we could
+            # not read the subtitle tracks" the same answer. Subtitles are a
+            # first-class injection surface; losing them silently is a false clean.
+            self.warnings.append(
+                f"Subtitle tracks not read ({exc.__class__.__name__}: {_brief(exc)}) — "
+                f"text in embedded subtitles was NOT inspected."
+            )
         return results
 
     def _clean_srt(self, srt_text: str) -> str:
@@ -180,6 +190,10 @@ class VideoExtractor:
                 ]
                 proc = subprocess.run(cmd, capture_output=True, timeout=120)
                 if proc.returncode != 0:
+                    self.warnings.append(
+                        f"Video audio track not transcribed (ffmpeg exit "
+                        f"{proc.returncode}) — spoken content was NOT inspected."
+                    )
                     return ""
 
                 model = self._get_model()
@@ -214,14 +228,29 @@ class VideoExtractor:
                 for key, value in tags.items():
                     if isinstance(value, str) and len(value) > 5:
                         results.append((key.lower(), value))
-        except Exception:
-            pass
+            else:
+                self.warnings.append(
+                    f"Video metadata tags not read (ffprobe exit {proc.returncode}) — "
+                    f"text in the container tags was NOT inspected."
+                )
+        except Exception as exc:
+            self.warnings.append(
+                f"Video metadata tags not read ({exc.__class__.__name__}: {_brief(exc)}) — "
+                f"text in the container tags was NOT inspected."
+            )
         return results
 
 
 def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dict:
-    """Convenience function: extract text from video and scan with SUNGLASSES."""
+    """Convenience function: extract text from a video and scan with SUNGLASSES.
+
+    Returns the canonical result document (see ``sunglasses.result``). v0.5.6
+    round 4: it built its own per-source dicts and dropped the child's
+    ``truncated`` / ``extraction_complete`` -- a long transcript over the engine
+    cap came back complete and clean.
+    """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
@@ -229,30 +258,9 @@ def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dic
     extractor = VideoExtractor(whisper_model=whisper_model)
     texts = extractor.extract(video_path)
 
-    results = []
-    threats = []
-    is_clean = True
-
-    for source, text in texts:
-        result = engine.scan(text, channel="file")
-        results.append({
-            "source": source,
-            "text_preview": text[:100] + "..." if len(text) > 100 else text,
-            "decision": result.decision,
-            "severity": result.severity,
-            "findings": result.findings,
-        })
-        if not result.is_clean:
-            is_clean = False
-            threats.extend(result.findings)
-
-    warnings = list(getattr(extractor, "warnings", []))
-    return {
-        "file": video_path,
-        "sources_found": len(texts),
-        "is_clean": is_clean and not warnings,
-        "extraction_complete": not warnings,
-        "warnings": warnings,
-        "threats": threats,
-        "results": results,
-    }
+    return aggregate(
+        [(source, text, engine.scan(text, channel="file")) for source, text in texts],
+        source=video_path,
+        warnings=list(getattr(extractor, "warnings", [])),
+        extra={"file": video_path},
+    )

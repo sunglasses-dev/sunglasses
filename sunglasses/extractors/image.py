@@ -58,8 +58,12 @@ class OCRUnavailable(RuntimeError):
 class ImageExtractor:
     """Extract text from images for SUNGLASSES scanning."""
 
+    failures: List[str] = []
+
     def __init__(self):
         _check_deps()
+        # Reset per instance; `extract()` resets again per call.
+        self.failures = []
 
     def extract(self, image_path: str) -> List[Tuple[str, str]]:
         """
@@ -156,13 +160,20 @@ class ImageExtractor:
         return text.strip()
 
     def _extract_exif(self, image_path: str) -> List[Tuple[str, str]]:
-        """Extract text-containing EXIF metadata fields."""
+        """Extract text-containing EXIF metadata fields.
+
+        v0.5.6 round 4: `except Exception: return []` made "this image has no
+        metadata" and "we could not read this image's metadata" the same answer.
+        The second one is a coverage loss and now says so.
+        """
         from PIL import Image
         try:
             img = Image.open(image_path)
-            return self._exif_from_pil(img)
-        except Exception:
+        except Exception as exc:
+            self.failures.append(
+                f"image metadata not read ({exc.__class__.__name__}: {exc})")
             return []
+        return self._exif_from_pil(img)
 
     def _exif_from_pil(self, img) -> List[Tuple[str, str]]:
         """Extract text from EXIF data of a PIL Image."""
@@ -170,9 +181,12 @@ class ImageExtractor:
 
         results = []
 
-        # Standard EXIF
+        # Standard EXIF. A format that simply has no EXIF block (PNG, most GIFs)
+        # is NOT a failure -- it is an honest absence -- so that case is detected
+        # by capability rather than by catching the AttributeError it used to
+        # raise into a bare `pass`. Only a real read error is a coverage loss.
         try:
-            exif_data = img._getexif()
+            exif_data = img._getexif() if hasattr(img, "_getexif") else None
             if exif_data:
                 # Fields attackers could hide text in
                 text_fields = {
@@ -184,8 +198,9 @@ class ImageExtractor:
                     tag_name = TAGS.get(tag_id, str(tag_id))
                     if tag_name in text_fields and isinstance(value, str) and len(value) > 5:
                         results.append((tag_name, value))
-        except (AttributeError, Exception):
-            pass
+        except Exception as exc:
+            self.failures.append(
+                f"EXIF text fields not read ({exc.__class__.__name__}: {exc})")
 
         # PNG text chunks (tEXt, iTXt, zTXt)
         try:
@@ -198,10 +213,13 @@ class ImageExtractor:
                             decoded = value.decode('utf-8', errors='ignore')
                             if len(decoded) > 5:
                                 results.append((f"png:{key}", decoded))
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+                        except Exception as exc:
+                            self.failures.append(
+                                f"embedded text chunk {key!r} not decoded "
+                                f"({exc.__class__.__name__})")
+        except Exception as exc:
+            self.failures.append(
+                f"embedded text chunks not read ({exc.__class__.__name__}: {exc})")
 
         return results
 
@@ -252,21 +270,30 @@ class ImageExtractor:
                 return "SUSPICIOUS: " + "; ".join(suspicious[:5])
             return ""
 
-        except Exception:
+        except Exception as exc:
+            # This pass looks for text placed to be invisible -- tiny glyphs, edge
+            # placement. Swallowing its failure meant "we looked and found nothing
+            # hidden" was returned by a detector that never ran.
+            self.failures.append(
+                f"hidden-text detection did not run ({exc.__class__.__name__}: {exc})")
             return ""
 
 
 def scan_image(image_path: str, engine=None) -> dict:
     """
-    Convenience function: extract text from image and scan with SUNGLASSES.
+    Convenience function: extract text from an image and scan with SUNGLASSES.
 
-    Returns dict with:
-        - sources: list of (source, text) extracted
-        - results: list of scan results
-        - is_clean: True if ALL extractions are clean
-        - threats: list of findings from non-clean results
+    Returns the canonical result document (see ``sunglasses.result``).
+
+    v0.5.6 round 4 (ASTRA F2): this returned ``is_clean: true`` with no axes and
+    no warnings when OCR could not run. ``ImageExtractor`` recorded the loss in
+    ``failures`` and ``extract()`` returned normally, so a caller who trusted the
+    convenience function got "clean" for an image whose visible text was never
+    read -- while ``scan_fast()`` on the same PNG correctly said incomplete. The
+    failures are consumed here and folded by the one shared aggregate builder.
     """
     from sunglasses.engine import SunglassesEngine
+    from sunglasses.result import aggregate
 
     if engine is None:
         engine = SunglassesEngine()
@@ -274,27 +301,14 @@ def scan_image(image_path: str, engine=None) -> dict:
     extractor = ImageExtractor()
     texts = extractor.extract(image_path)
 
-    results = []
-    threats = []
-    is_clean = True
-
-    for source, text in texts:
-        result = engine.scan(text, channel="file")
-        results.append({
-            "source": source,
-            "text_preview": text[:100] + "..." if len(text) > 100 else text,
-            "decision": result.decision,
-            "severity": result.severity,
-            "findings": result.findings,
-        })
-        if not result.is_clean:
-            is_clean = False
-            threats.extend(result.findings)
-
-    return {
-        "file": image_path,
-        "sources_found": len(texts),
-        "is_clean": is_clean,
-        "threats": threats,
-        "results": results,
-    }
+    warnings = [
+        f"OCR/metadata text not read from {os.path.basename(image_path)} — {failure}. "
+        f"That content was NOT inspected."
+        for failure in getattr(extractor, "failures", [])
+    ]
+    return aggregate(
+        [(source, text, engine.scan(text, channel="file")) for source, text in texts],
+        source=image_path,
+        warnings=warnings,
+        extra={"file": image_path},
+    )
