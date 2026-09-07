@@ -230,7 +230,27 @@ def _tool_scan_file(arguments):
             "isError": True,
         }
 
-    output = json.dumps(result, indent=2, default=str)
+    # An explicit error document from the library is an operational failure.
+    if isinstance(result, dict) and result.get("error"):
+        return {
+            "content": [{"type": "text", "text": f"Error: {result['error']} — nothing was scanned."}],
+            "isError": True,
+        }
+
+    # A completed invocation over content we could not fully read is a SUCCESSFUL
+    # tool call whose document says "incomplete, not clean". It is not isError --
+    # nothing went wrong operationally -- but it must never read as a clean scan.
+    # Prepending the notice matters: an agent reading the first line of this text
+    # is the caller we are actually protecting.
+    if isinstance(result, dict) and result.get("inspection_complete") is False:
+        warnings = result.get("warnings") or []
+        reason = warnings[0] if warnings else "content was not fully inspected"
+        notice = (f"INCOMPLETE SCAN — {reason} This is NOT a clean result; "
+                  f"do not treat {file_path} as inspected.\n\n")
+    else:
+        notice = ""
+
+    output = notice + json.dumps(result, indent=2, default=str)
     return {
         "content": [{"type": "text", "text": output}],
         "isError": False,

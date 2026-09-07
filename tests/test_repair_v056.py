@@ -1025,3 +1025,332 @@ def test_repo_with_nothing_inspectable_is_not_clean(tmp_path):
     doc = _one_json_doc(proc)
     assert doc["files_scanned"] == 0
     assert doc["is_clean"] is False
+
+
+# ==========================================================================
+# ASTRA RERUN (2026-09-06) — R1..R4. Every case here reproduced a real defect
+# on 42da838 before it was fixed; the trip evidence is in each docstring.
+# ==========================================================================
+
+def _flate_pdf_bytes(text):
+    """A REAL PDF: compressed content stream, valid xref. Not a stub.
+
+    A stub would let repo mode "pass" by finding nothing in bytes it never
+    decoded, which is precisely the defect under test.
+    """
+    import zlib
+    comp = zlib.compress(f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode())
+    objs = [
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+        b"4 0 obj\n<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(comp) + comp
+        + b"\nendstream\nendobj\n",
+        b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for obj in objs:
+        offsets.append(len(out))
+        out += obj
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    for off in offsets:
+        out += b"%010d 00000 n \n" % off
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return out
+
+
+def _mcp_call(path, timeout=180):
+    """Speak real JSON-RPC to the stdio MCP server and return the tool result.
+
+    R1 was only visible on the wire: the CLI reported the ZIP incomplete while
+    the MCP surface returned the same scan as clean. Testing the library alone
+    would have missed it, so this test speaks the protocol.
+    """
+    msgs = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                    "clientInfo": {"name": "acceptance", "version": "1"}}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+         "params": {"name": "scan_file", "arguments": {"file_path": str(path)}}},
+    ]
+    proc = subprocess.run(
+        [sys.executable, "-m", "sunglasses.mcp"],
+        input="".join(json.dumps(m) + "\n" for m in msgs),
+        capture_output=True, text=True, timeout=timeout, cwd=TEST_ROOT,
+    )
+    for line in proc.stdout.splitlines():
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        if msg.get("id") == 2:
+            return msg.get("result", {})
+    pytest.fail(f"no tools/call response.\nstdout={proc.stdout[:400]!r}\nstderr={proc.stderr[-400:]!r}")
+
+
+def _mcp_doc(result):
+    """The JSON body of an MCP tool result, past any human notice line."""
+    text = (result.get("content") or [{}])[0].get("text", "")
+    body = text.split("\n\n", 1)[-1] if text.startswith("INCOMPLETE") else text
+    try:
+        return json.loads(body), text
+    except ValueError:
+        return {}, text
+
+
+# -- R1 ---------------------------------------------------------------------
+
+def test_r1_library_aggregate_never_claims_clean_on_incomplete_extraction(tmp_path):
+    """scan_fast copied engine is_clean next to extraction_complete without folding.
+
+    Trip evidence on 42da838: a ZIP named .md returned is_clean=True with
+    extraction_complete=False in the same document.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    target = tmp_path / "archive.md"
+    with zipfile.ZipFile(tmp_path / "a.zip", "w") as z:
+        z.writestr("inner.txt", "harmless\n")
+    target.write_bytes((tmp_path / "a.zip").read_bytes())
+
+    out = SunglassesScanner().scan_fast(str(target))
+    assert out["extraction_complete"] is False
+    assert out["inspection_complete"] is False
+    assert out["is_clean"] is False, "library aggregate claimed clean on uninspected content"
+    assert out["threat_found"] is False
+
+
+def test_r1_mcp_wire_reports_incomplete_and_never_clean(tmp_path):
+    """The MCP surface returned isError:false AND is_clean:true for a ZIP."""
+    target = tmp_path / "archive.md"
+    with zipfile.ZipFile(tmp_path / "a.zip", "w") as z:
+        z.writestr("inner.txt", "harmless\n")
+    target.write_bytes((tmp_path / "a.zip").read_bytes())
+
+    result = _mcp_call(target)
+    doc, text = _mcp_doc(result)
+    # A completed invocation over unsupported content is NOT an operational error...
+    assert result.get("isError") is False
+    # ...but it can never read as clean, and the notice must be visible without
+    # parsing JSON, because an agent reads the first line of the tool result.
+    assert doc.get("is_clean") is False
+    assert doc.get("inspection_complete") is False
+    assert text.startswith("INCOMPLETE SCAN"), f"no visible incompleteness notice: {text[:120]!r}"
+
+
+def test_r1_mcp_wire_flags_unreadable_as_operational_error(tmp_path):
+    """An unreadable file is isError:true — not a scan result of any kind."""
+    if os.getuid() == 0:
+        pytest.skip("running as root: mode 000 is not enforced")
+    target = tmp_path / "secret.md"
+    target.write_text("content\n")
+    os.chmod(target, 0o000)
+    try:
+        result = _mcp_call(target)
+        assert result.get("isError") is True
+        text = (result.get("content") or [{}])[0].get("text", "")
+        assert "could not read" in text
+    finally:
+        os.chmod(target, 0o644)
+
+
+def test_r1_untranscribed_media_carries_the_axes(tmp_path):
+    """scan_auto's needs_deep_scan document had NO axes at all.
+
+    A caller checking is_clean on an untranscribed MP3 read silence as a pass.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    media = tmp_path / "clip.mp3"
+    media.write_bytes(b"ID3\x03\x00\x00\x00" + b"\x00" * 128)
+    out = SunglassesScanner().scan_auto(str(media), allow_deep=False)
+    assert out.get("needs_deep_scan") is True
+    assert out.get("is_clean") is False
+    assert out.get("inspection_complete") is False
+
+
+# -- R2 ---------------------------------------------------------------------
+
+def test_r2_ocr_failure_is_never_returned_as_scan_text(monkeypatch, tmp_path):
+    """`return f"[OCR error: {e}]"` made the error message the document we scanned.
+
+    Trip evidence on 42da838, tesseract off PATH:
+        sources=['ocr'] text="[OCR error: tesseract is not installed...]"
+    With pyzbar installed nothing else set incomplete, so the file scanned clean.
+    """
+    pytest.importorskip("PIL")
+    from sunglasses.extractors.image import ImageExtractor, OCRUnavailable
+
+    png = tmp_path / "x.png"
+    from PIL import Image
+    Image.new("RGB", (8, 8), "white").save(png)
+
+    extractor = ImageExtractor()
+    monkeypatch.setattr(extractor, "_ocr_from_pil",
+                        lambda img: (_ for _ in ()).throw(OCRUnavailable("OCR did not run: forced")))
+    sources = extractor.extract(str(png))
+
+    assert not any(label == "ocr" for label, _ in sources), \
+        "an OCR failure was returned as extracted content"
+    assert extractor.failures, "OCR failure was not recorded for the dispatcher"
+    assert "forced" in extractor.failures[0]
+
+
+def test_r2_ocr_failure_makes_the_scan_incomplete(monkeypatch, tmp_path):
+    """The dispatcher must turn a recorded OCR failure into a named warning."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    from sunglasses.extractors import dispatch as dispatch_mod
+    from sunglasses.extractors.image import OCRUnavailable
+
+    png = tmp_path / "x.png"
+    Image.new("RGB", (8, 8), "white").save(png)
+
+    real_extract = dispatch_mod.ImageExtractor if hasattr(dispatch_mod, "ImageExtractor") else None
+    from sunglasses.extractors.image import ImageExtractor
+
+    def _boom(self, path):
+        self.failures = ["OCR did not run: forced"]
+        return []
+
+    monkeypatch.setattr(ImageExtractor, "extract", _boom)
+    result = dispatch_mod.extract_file_sources(str(png))
+    assert result.complete is False
+    assert any("OCR" in w for w in result.warnings), result.warnings
+
+
+@pytest.mark.parametrize("name", ["shot.png", "clip.mp3"])
+def test_r2_unreadable_media_is_operational_not_incomplete(name, tmp_path):
+    """chmod-000 png/mp3 returned 3. The contract says 2.
+
+    identify() falls back to the SUFFIX when the magic sniff comes back empty,
+    and the image/media branches never attempt a read — so the OSError guard on
+    the text branch could not fire. The CLI's own _is_media_file shortcut had the
+    same shape one level higher.
+    """
+    if os.getuid() == 0:
+        pytest.skip("running as root: mode 000 is not enforced")
+    target = tmp_path / name
+    target.write_bytes(b"\x89PNG\r\n\x1a\n" if name.endswith(".png") else b"ID3\x03\x00\x00\x00")
+    os.chmod(target, 0o000)
+    try:
+        proc = _run([sys.executable, "-m", "sunglasses"], "--file", str(target), "--json")
+        assert proc.returncode == EXIT_USAGE, \
+            f"unreadable {name} must be operational (2), got {proc.returncode}"
+        doc = _one_json_doc(proc)
+        assert doc["scanned"] is False
+    finally:
+        os.chmod(target, 0o644)
+
+
+# -- R3 ---------------------------------------------------------------------
+
+def test_r3_repo_mode_uses_supported_extraction(tmp_path):
+    """Repo mode read a real compressed PDF as raw text and called it inspected.
+
+    Trip evidence on 42da838: file mode 3, repo mode 0 with
+    files_scanned=2, inspection_complete=true, is_clean=true.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "ok.md").write_text("# ok\n\nordinary text\n")
+    (repo / "renamed.txt").write_bytes(_flate_pdf_bytes(INJECTION))
+    subprocess.run(["git", "init", "-q", "."], cwd=repo, check=True)
+    subprocess.run(["git", "add", "ok.md", "renamed.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "fixture"], cwd=repo, check=True)
+
+    proc = _run([sys.executable, "-m", "sunglasses"], "--repo", str(repo), "--json", timeout=300)
+    doc = _one_json_doc(proc)
+    # Whether the PDF is extracted (PyPDF2 present -> threat) or refused
+    # (absent -> incomplete), the one answer it may never give is "clean".
+    assert proc.returncode in (EXIT_THREAT, EXIT_INCOMPLETE), \
+        f"repo mode returned {proc.returncode} for a repo holding a disguised PDF"
+    assert doc["is_clean"] is False
+
+
+def test_r3_repo_and_file_modes_agree_on_the_same_file(tmp_path):
+    """One scanner may not hold two opinions about one file."""
+    target = tmp_path / "repo2" / "renamed.txt"
+    target.parent.mkdir()
+    target.write_bytes(_flate_pdf_bytes(INJECTION))
+    (target.parent / "ok.md").write_text("ordinary\n")
+    subprocess.run(["git", "init", "-q", "."], cwd=target.parent, check=True)
+    subprocess.run(["git", "add", "ok.md", "renamed.txt"], cwd=target.parent, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "fixture"], cwd=target.parent, check=True)
+
+    as_file = _run([sys.executable, "-m", "sunglasses"], "--file", str(target), "--json")
+    as_repo = _run([sys.executable, "-m", "sunglasses"], "--repo", str(target.parent),
+                   "--json", timeout=300)
+    assert as_file.returncode == as_repo.returncode, (
+        f"file mode said {as_file.returncode}, repo mode said {as_repo.returncode} "
+        f"about the same file")
+    file_doc, repo_doc = _one_json_doc(as_file), _one_json_doc(as_repo)
+    if file_doc.get("threat_found"):
+        # The counts must match too: repo mode counted raw pattern fires while
+        # --file publishes deduplicated findings (7 vs 6 on this fixture).
+        assert repo_doc["total_threats"] == file_doc["findings_count"], (
+            f"repo counted {repo_doc['total_threats']}, file reported "
+            f"{file_doc['findings_count']} on one file")
+
+
+# -- R4 ---------------------------------------------------------------------
+
+@pytest.mark.parametrize("entrypoint", ENTRYPOINTS)
+def test_r4_no_input_is_a_usage_error_with_one_document(entrypoint):
+    """`scan --json` with no input exited 1 — the THREAT code — with no JSON."""
+    proc = _run(entrypoint, "--json")
+    assert proc.returncode == EXIT_USAGE, \
+        f"a usage mistake returned {proc.returncode}; 1 means 'threat found'"
+    doc = _one_json_doc(proc)
+    assert doc["scanned"] is False
+    _assert_not_clean(doc)
+
+
+def _assert_sarif_shaped(proc):
+    """SARIF must be SARIF — structure, not merely parseable JSON."""
+    doc = _one_json_doc(proc)
+    assert "runs" in doc, f"not a SARIF log: {sorted(doc)}"
+    assert doc["runs"], "SARIF log carried no runs"
+    driver = doc["runs"][0].get("tool", {}).get("driver", {})
+    assert driver.get("name"), "SARIF run had no tool.driver.name"
+    assert "results" in doc["runs"][0], "SARIF run had no results array"
+    return doc
+
+
+def test_r4_repo_mode_honours_sarif(tmp_path):
+    """`--repo -o sarif` printed the human screen.
+
+    It also printed progress chatter onto stdout ahead of the document, because
+    the chatter was gated on --json alone; the first fixed attempt still failed
+    to parse for that reason.
+    """
+    repo = tmp_path / "repo3"
+    repo.mkdir()
+    (repo / "SKILL.md").write_text(INJECTION)
+    subprocess.run(["git", "init", "-q", "."], cwd=repo, check=True)
+    subprocess.run(["git", "add", "SKILL.md"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "fixture"], cwd=repo, check=True)
+
+    proc = _run([sys.executable, "-m", "sunglasses"], "--repo", str(repo),
+                "-o", "sarif", timeout=300)
+    _assert_sarif_shaped(proc)
+
+
+def test_r4_deep_media_honours_sarif(tmp_path):
+    """`--file <media> --deep -o sarif` exited 3 but printed the human screen."""
+    media = tmp_path / "clip.mp3"
+    media.write_bytes(b"ID3\x03\x00\x00\x00" + b"\x00" * 128)
+    proc = _run([sys.executable, "-m", "sunglasses"], "--file", str(media),
+                "--deep", "-o", "sarif", timeout=300)
+    doc = _assert_sarif_shaped(proc)
+    # Incompleteness must ride along, or a SARIF consumer sees an empty results
+    # array and concludes nothing was there.
+    props = doc["runs"][0].get("properties", {})
+    if proc.returncode == EXIT_INCOMPLETE:
+        assert props.get("inspectionComplete") is False

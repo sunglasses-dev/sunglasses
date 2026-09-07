@@ -120,14 +120,27 @@ class SunglassesScanner:
 
         extraction = extract_file_sources(file_path)
         result = self.engine.scan(extraction.text, channel="file")
+
+        # The library aggregate carries the SAME three axes as the CLI. Before this,
+        # `is_clean` was copied straight off the engine result and sat next to
+        # `extraction_complete: false` in the same document -- so a ZIP nobody could
+        # read came back through the MCP wire as a clean scan. Finding nothing in
+        # the part we managed to read is not the same claim as reading all of it.
+        inspection_complete = bool(extraction.complete) and not getattr(
+            result, "truncated", False
+        )
+        threat_found = bool(getattr(result, "threat_found", not result.is_clean))
         return {
             "file": file_path,
             "sources_found": len(extraction.sources),
             "sources": extraction.labels,
-            "is_clean": result.is_clean,
+            "threat_found": threat_found,
+            "inspection_complete": inspection_complete,
+            "is_clean": (not threat_found) and inspection_complete,
             "decision": result.decision,
             "threats": result.findings,
             "extraction_complete": extraction.complete,
+            "truncated": bool(getattr(result, "truncated", False)),
             "warnings": list(extraction.warnings),
         }
 
@@ -249,11 +262,22 @@ class SunglassesScanner:
                 return self.scan_deep(input_path)
             else:
                 ext = os.path.splitext(input_path)[1].lower()
+                # Nothing was transcribed, so nothing was inspected. This document
+                # must carry the same axes as every other one, or a caller that
+                # checks `is_clean` reads silence as a pass.
                 return {
                     "file": input_path,
                     "needs_deep_scan": True,
                     "reason": f"Audio/video file ({ext}) requires DEEP scan",
                     "action": "Call scanner.scan_deep() or set allow_deep=True",
+                    "threat_found": False,
+                    "inspection_complete": False,
+                    "is_clean": False,
+                    "extraction_complete": False,
+                    "warnings": [
+                        f"Audio/video content not transcribed — nothing in "
+                        f"{os.path.basename(input_path)} was inspected."
+                    ],
                 }
         else:
             return self.scan_fast(input_path)

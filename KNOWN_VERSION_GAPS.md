@@ -56,20 +56,16 @@ ordinary whitespace-separated text, and roughly **quadratic** for a single
 unbroken token — a base64 blob, a `data:` URI, a minified bundle line, a long
 hex string or JWT.
 
-Measured on one machine, warm engine, same byte counts:
-
-| input, 2,000 → 8,000 → 16,000 chars | cost |
-|---|---|
-| whitespace-separated (`"a " * n`) | 0.148s → 0.636s → 1.261s (linear) |
-| one unbroken token (`"a" * n`) | 1.118s → 18.369s → 73.735s (quadratic) |
-| base64-shaped blob | 1.113s → 18.276s → 73.247s (quadratic) |
+The growth is measurable and reproducible; the exact byte counts and timings are
+held in our internal release evidence rather than published here, so this file
+states the boundary without also handing over a tuned recipe. The fix lands in
+v0.6 and the measurements go public with it.
 
 **Why it matters, beyond speed.** The PreToolUse firewall hook has a 10-second
 timeout, and Claude Code does not treat a timed-out hook as a block: *"A
 timed-out command hook doesn't block the tool call. The call continues through
-the normal permission flow."* So a single unbroken token in the low tens of KB
-can push the hook past its timeout, and the tool call then proceeds
-**unscanned**. That is reachable from attacker-controlled input, which makes it
+the normal permission flow."* So an input of this shape can push the hook past
+its timeout, and the tool call then proceeds **unscanned**. That is reachable from attacker-controlled input, which makes it
 a bypass of the enforcement surface rather than a performance complaint. The
 same curve stalls a repo scan in CI.
 

@@ -208,6 +208,55 @@ def _walk_repo_files_with_skips(repo_dir):
     return files, skips
 
 
+def _deep_dict_to_sarif(result_dict, source):
+    """Serialise the deep-scan dict as SARIF.
+
+    The deep path returns a plain dict, not a ScanResult, so `to_sarif` cannot take
+    it directly. Rather than invent a second result type, the findings are wrapped in
+    the minimum shape `to_sarif` consumes; incompleteness rides along as a note so a
+    SARIF consumer is told the file was not fully read instead of seeing an empty
+    results array and concluding nothing was there.
+    """
+    from .sarif import to_sarif
+
+    class _Shim:
+        def __init__(self, d):
+            self.findings = list(d.get("threats") or [])
+            self.threat_found = bool(d.get("threat_found"))
+            self.inspection_complete = bool(d.get("inspection_complete"))
+            self.is_clean = bool(d.get("is_clean"))
+            self.truncated = False
+            self.decision = d.get("decision", "allow")
+            self.severity = d.get("severity", "none")
+            self.extraction_warnings = list(d.get("warnings") or [])
+            self.extraction_complete = self.inspection_complete
+            self.source = source
+
+        def reported_findings(self):
+            return self.findings
+
+    doc = to_sarif([_Shim(result_dict)], source=source)
+    if not result_dict.get("inspection_complete", True):
+        runs = doc.get("runs") or []
+        if runs:
+            props = runs[0].setdefault("properties", {})
+            props["inspectionComplete"] = False
+            props["notInspected"] = result_dict.get("warnings") or [
+                "This file was not fully inspected."
+            ]
+    return doc
+
+
+def _wants_machine_output(args) -> bool:
+    """True when stdout must carry ONE document and nothing else.
+
+    Progress chatter was gated on `args.json` alone, so `-o sarif` printed the human
+    screen onto stdout ahead of the document and the result did not parse. Anything
+    that writes to stdout in a scan path checks this, not the flag.
+    """
+    return bool(getattr(args, "json", False)) or getattr(args, "output", "human") in ("json", "sarif")
+
+
 def _scan_repo(args, engine):
     """Clone a GitHub repo and scan all files."""
     repo_url = args.repo
@@ -215,7 +264,7 @@ def _scan_repo(args, engine):
     tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
 
     # Clone
-    if not args.json:
+    if not _wants_machine_output(args):
         print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — repo scan")
         print(f"  {DIM}{'─' * 50}{RESET}")
         print(f"  {DIM}Cloning {repo_url}...{RESET}")
@@ -238,7 +287,7 @@ def _scan_repo(args, engine):
     except subprocess.TimeoutExpired:
         _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
 
-    if not args.json:
+    if not _wants_machine_output(args):
         print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
     # Walk and scan
@@ -251,6 +300,9 @@ def _scan_repo(args, engine):
     category_counts = {}
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     file_results = []
+    # The ScanResult objects themselves, kept so `-o sarif` can serialise repo mode
+    # through the same path as `--file` instead of falling through to the human screen.
+    repo_results = []
 
     walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
     for filepath, _reason in walked:
@@ -266,17 +318,26 @@ def _scan_repo(args, engine):
             walker_skips.append((rel_path, f"{label} — not inspected"))
             continue
 
+        # Repo files go through the SAME extraction path as `--file`. Reading them
+        # as raw text here meant a real compressed PDF named `.txt` was scanned as
+        # its own binary bytes, found nothing, and was counted as inspected -- the
+        # file mode of the identical file correctly reported "not inspected". One
+        # scanner cannot hold two opinions about one file depending on how it was
+        # invoked; that divergence is audit finding C1 all over again, one level up.
         try:
-            with open(filepath, 'r', errors='ignore') as f:
-                content = f.read()
-        except (OSError, PermissionError) as exc:
+            scan_result = engine.scan_file(filepath)
+        except UnreadableFile as exc:
             # Was a silent `continue`. An unreadable file is not an absent one.
+            walker_skips.append((rel_path, f"{exc} — not inspected"))
+            continue
+        except OSError as exc:
             walker_skips.append(
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
 
-        scan_result = engine.scan(content, channel="file")
         files_scanned += 1
+        scan_result.source = rel_path
+        repo_results.append(scan_result)
 
         if not scan_result.inspection_complete:
             # A file we could only partly read. NOT a threat — counting it as one
@@ -287,9 +348,15 @@ def _scan_repo(args, engine):
 
         if scan_result.threat_found:
             files_with_threats += 1
-            total_threats += len(scan_result.findings)
+            # `reported_findings()` is what `--file` prints as `findings_count`;
+            # `findings` is the raw pattern-fire list (`patterns_fired`). Counting the
+            # raw list here made one file report 7 threats in repo mode and 6 in file
+            # mode. Two surfaces, one file, two numbers -- the same divergence this
+            # release exists to remove, in the counters rather than the verdict.
+            reported = scan_result.reported_findings()
+            total_threats += len(reported)
 
-            for finding in scan_result.findings:
+            for finding in reported:
                 cat = finding.get("category", "unknown")
                 category_counts[cat] = category_counts.get(cat, 0) + 1
                 sev = finding.get("severity", "low")
@@ -365,7 +432,13 @@ def _scan_repo(args, engine):
     summary["is_clean"] = not total_threats and not incomplete
     summary["exit_code"] = repo_exit
 
-    if args.json:
+    if args.output == "sarif":
+        # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
+        # through the selected serializer or the flag is a lie.
+        print(json.dumps(to_sarif(repo_results, source=repo_url), indent=2))
+        sys.exit(repo_exit)
+
+    if args.json or args.output == "json":
         print(json.dumps(summary, indent=2))
         sys.exit(repo_exit)
 
@@ -595,6 +668,18 @@ def cmd_scan(args):
             _usage_error(args, f"Not a regular file: {filepath}",
                          "Nothing was scanned. Sockets, FIFOs and device files are "
                          "refused — reading one can block forever.")
+        # Readability belongs with the other pre-scan checks, not inside the
+        # extractor. The media shortcut below decides on the FILENAME and returns a
+        # scan-shaped answer without ever opening the file, so an unreadable .mp3
+        # reported "incomplete" (3) instead of "operational error" (2). Any future
+        # shortcut added above the extractor inherits this check for free.
+        try:
+            with open(filepath, "rb") as _probe:
+                _probe.read(1)
+        except OSError as exc:
+            _usage_error(args,
+                         f"could not read {filepath}: {exc.strerror or exc} — NOT inspected",
+                         "Nothing was scanned. Check the file's permissions.")
 
         # Check if this is audio/video
         if _is_media_file(filepath):
@@ -681,7 +766,15 @@ def cmd_scan(args):
                     result_dict["is_clean"] = (not threat_found) and inspection_complete
                     result_dict["exit_code"] = exit_code
 
-                    if args.json:
+                    if args.output == "sarif":
+                        # Deep scan printed the human screen under `-o sarif`. The deep
+                        # path builds a dict rather than a ScanResult, so it is
+                        # serialised here directly -- one document, the axes already
+                        # folded in above, rather than a second parallel result type.
+                        print(json.dumps(_deep_dict_to_sarif(result_dict, filepath), indent=2))
+                        sys.exit(exit_code)
+
+                    if args.json or args.output == "json":
                         print(json.dumps(result_dict))
                         sys.exit(exit_code)
 
@@ -762,8 +855,11 @@ def cmd_scan(args):
         result = engine.scan(text, channel=args.channel)
         source = "text"
     else:
-        print("Error: provide text, --file, or --stdin")
-        sys.exit(1)
+        # Was `print(...)` + exit 1 -- a usage mistake occupying the scanner's THREAT
+        # code, and no document at all under --json/-o. A CI job could not tell
+        # "you invoked me wrong" from "this file attacks your agent".
+        _usage_error(args, "No input provided.",
+                     "Nothing was scanned. Pass text, --file <path>, or --stdin.")
 
     _emit_scan_result(args, result, source)
 

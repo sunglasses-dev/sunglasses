@@ -90,7 +90,16 @@ def _extract_image(path: str):
 
     try:
         from .image import ImageExtractor
-        sources.extend(ImageExtractor().extract(path))
+        extractor = ImageExtractor()
+        sources.extend(extractor.extract(path))
+        for failure in getattr(extractor, "failures", []):
+            # OCR (or another sub-extractor) did not run. Name it, and mark the scan
+            # incomplete: an image whose text was never read is not a clean image.
+            complete = False
+            warnings.append(
+                f"OCR text not read from {os.path.basename(path)} — {failure}. "
+                f"Visible text in this image was NOT inspected."
+            )
     except ImportError:
         complete = False
         warnings.append(
@@ -206,6 +215,23 @@ def _sniff(path: str) -> bytes:
         return b""
 
 
+def _probe_readable(path: str) -> None:
+    """Raise UnreadableFile unless we can actually open and read the file.
+
+    This runs BEFORE identify(), deliberately. identify() falls back to the file
+    suffix when the magic sniff comes back empty, and `_sniff` swallows OSError --
+    so an unreadable `.png` was routed to the image branch, which never attempts a
+    read, and the scan came back "incomplete" (3) instead of "operational error" (2).
+    Guarding the branches that read is not enough when a branch that does not read
+    can be selected by filename alone. Checking first covers every branch at once.
+    """
+    try:
+        with open(path, "rb") as fh:
+            fh.read(1)
+    except OSError as exc:
+        raise UnreadableFile(path, exc) from exc
+
+
 def _matches(head: bytes, magic: bytes, offset: int) -> bool:
     return head[offset:offset + len(magic)] == magic
 
@@ -266,6 +292,7 @@ def extract_file_sources(path: str) -> ExtractionResult:
 
 
 def _extract_file_sources(path: str) -> ExtractionResult:
+    _probe_readable(path)
     kind, label = identify(path)
 
     if _extractors_disabled():

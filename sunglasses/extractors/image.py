@@ -46,6 +46,15 @@ def _check_deps():
         )
 
 
+class OCRUnavailable(RuntimeError):
+    """OCR could not be performed. Not a result -- an absence of one.
+
+    Carried as an exception rather than a string so no caller can mistake it for
+    extracted text. The dispatcher turns it into a named warning plus
+    complete=False, which is what makes the scan report INCOMPLETE instead of clean.
+    """
+
+
 class ImageExtractor:
     """Extract text from images for SUNGLASSES scanning."""
 
@@ -63,9 +72,20 @@ class ImageExtractor:
             raise FileNotFoundError(f"Image not found: {image_path}")
 
         results = []
+        # Populated when a sub-extractor could not run. The caller MUST treat a
+        # non-empty list as incomplete coverage; losing OCR does not mean the image
+        # is clean, it means we did not read the part of it OCR would have read.
+        self.failures = []
 
         # 1. OCR — visible text in the image
-        ocr_text = self._extract_ocr(image_path)
+        try:
+            ocr_text = self._extract_ocr(image_path)
+        except OCRUnavailable as exc:
+            # Partial extraction, honestly labelled: EXIF and hidden-text detection
+            # below still run and can still catch something, but the image is no
+            # longer fully inspected and the dispatcher has to say so.
+            self.failures.append(str(exc))
+            ocr_text = ""
         if ocr_text.strip():
             results.append(("ocr", ocr_text))
 
@@ -104,18 +124,24 @@ class ImageExtractor:
         return results
 
     def _extract_ocr(self, image_path: str) -> str:
-        """Run OCR on the image to extract visible text."""
+        """Run OCR on the image to extract visible text.
+
+        Raises OCRUnavailable if OCR could not run. It must NEVER return the error
+        as text: the returned string is scanned as document content, so an error
+        string was counted as successfully extracted content and an image whose OCR
+        never ran came back inspected and clean. That is the same false-success class
+        the audio transcription path was repaired for.
+        """
         from PIL import Image
-        import pytesseract
 
         try:
             img = Image.open(image_path)
-            return self._ocr_from_pil(img)
         except Exception as e:
-            return f"[OCR error: {e}]"
+            raise OCRUnavailable(f"image could not be opened for OCR: {e}") from e
+        return self._ocr_from_pil(img)
 
     def _ocr_from_pil(self, img) -> str:
-        """Run OCR on a PIL Image object."""
+        """Run OCR on a PIL Image object. Raises OCRUnavailable on any failure."""
         import pytesseract
 
         try:
@@ -123,9 +149,11 @@ class ImageExtractor:
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
             text = pytesseract.image_to_string(img)
-            return text.strip()
         except Exception as e:
-            return f"[OCR error: {e}]"
+            # Includes pytesseract.TesseractNotFoundError -- the executable missing
+            # from PATH is exactly the case that used to return exit 0 / is_clean.
+            raise OCRUnavailable(f"OCR did not run: {e}") from e
+        return text.strip()
 
     def _extract_exif(self, image_path: str) -> List[Tuple[str, str]]:
         """Extract text-containing EXIF metadata fields."""
