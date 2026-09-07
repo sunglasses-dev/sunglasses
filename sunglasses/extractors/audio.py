@@ -193,12 +193,28 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
     # answer to a question that was never asked -- and a FIFO blocked on open.
     _probe_readable(audio_path)
 
-    extractor = AudioExtractor(whisper_model=whisper_model)
-    texts = extractor.extract(audio_path)
+    # A decoder that gives up costs COVERAGE, never the scan, and never a
+    # traceback -- the same contract `dispatch` has applied to these formats since
+    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # to the caller, so "no traceback on any supported path" had an exemption for
+    # the public API a user is most likely to call first.
+    try:
+        extractor = AudioExtractor(whisper_model=whisper_model)
+        texts = extractor.extract(audio_path)
+        _failed = None
+    except ImportError as exc:
+        extractor, texts, _failed = None, [], (
+            f"audio scanning requires: pip install sunglasses[audio] — nothing in "
+            f"{os.path.basename(audio_path)} was inspected. ({exc})")
+    except Exception as exc:
+        extractor, texts, _failed = None, [], (
+            f"audio extraction failed ({exc.__class__.__name__}) — nothing in "
+            f"{os.path.basename(audio_path)} was inspected.")
 
     return aggregate(
         ((source, text, engine.scan(text, channel="file")) for source, text in texts),
         source=audio_path,
-        warnings=list(getattr(extractor, "warnings", [])),
+        warnings=list(getattr(extractor, "warnings", None) or [])
+                 + ([_failed] if _failed else []),
         extra={"file": audio_path},
     )

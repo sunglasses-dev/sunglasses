@@ -528,6 +528,21 @@ class SunglassesEngine:
         self._pattern_count = len(carriers)
         self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
+        # v0.5.6 round 4. ASTRA read `info()["keywords"] == 6642` beside the
+        # README's 6,944 as a stale number. It is not stale -- it is a DIFFERENT
+        # measurement: this index is the pre-screen automaton, which deliberately
+        # omits the generic keywords excluded above (they matched normal manifests
+        # and JSON-LD). The inventory of keywords the patterns actually declare is
+        # larger. Publishing only one of the two made the pair look like a
+        # contradiction, so `info()` now reports both and names which is which.
+        declared = set()
+        declared_entries = 0
+        for _p in carriers:
+            for _kw in (_p.get("keywords") or []):
+                declared.add(_kw.lower())
+                declared_entries += 1
+        self._keywords_declared = len(declared)
+        self._keyword_entries = declared_entries
 
     @staticmethod
     def _is_anchored(raw: str) -> bool:
@@ -988,7 +1003,11 @@ class SunglassesEngine:
             "version": __import__('sunglasses').__version__,
             "patterns": self._pattern_count,
             "mechanisms": self._mechanism_count,
+            # the pre-screen index (excludes the generic keywords listed above)
             "keywords": self._keyword_count,
+            # what the patterns declare, which is the number the README quotes
+            "keywords_declared": self._keywords_declared,
+            "keyword_entries": self._keyword_entries,
             "regex_patterns": len(self._regex_patterns),
             "channels": ["message", "file", "api_response", "web_content", "log_memory"],
         }

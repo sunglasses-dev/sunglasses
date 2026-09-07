@@ -307,14 +307,31 @@ def scan_image(image_path: str, engine=None) -> dict:
     # answer to a question that was never asked -- and a FIFO blocked on open.
     _probe_readable(image_path)
 
-    extractor = ImageExtractor()
-    texts = extractor.extract(image_path)
+    # A decoder that gives up costs COVERAGE, never the scan, and never a
+    # traceback -- the same contract `dispatch` has applied to these formats since
+    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # to the caller, so "no traceback on any supported path" had an exemption for
+    # the public API a user is most likely to call first.
+    try:
+        extractor = ImageExtractor()
+        texts = extractor.extract(image_path)
+        _failed = None
+    except ImportError as exc:
+        extractor, texts, _failed = None, [], (
+            f"image scanning requires: pip install sunglasses[image] — nothing in "
+            f"{os.path.basename(image_path)} was inspected. ({exc})")
+    except Exception as exc:
+        extractor, texts, _failed = None, [], (
+            f"image extraction failed ({exc.__class__.__name__}) — nothing in "
+            f"{os.path.basename(image_path)} was inspected.")
 
     warnings = [
         f"OCR/metadata text not read from {os.path.basename(image_path)} — {failure}. "
         f"That content was NOT inspected."
-        for failure in getattr(extractor, "failures", [])
+        for failure in getattr(extractor, "failures", None) or []
     ]
+    if _failed:
+        warnings.append(_failed)
     return aggregate(
         [(source, text, engine.scan(text, channel="file")) for source, text in texts],
         source=image_path,

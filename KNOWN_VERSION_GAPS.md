@@ -90,6 +90,27 @@ of failing open.
 unbroken tokens. The static scanner still does not execute scanned content;
 this is about what gets inspected, not about what runs.
 
+**Shape sensitivity at a FIXED length, measured 2026-09-07 on the release head.** The
+README's "~50 µs/byte" is a floor, not a rate that holds across inputs. Six payloads, each
+just over the 1 MiB cap so each scans exactly the capped 1,048,576 bytes, warm engine,
+same machine:
+
+| payload shape | wall clock |
+|---|---|
+| `" " * n` (a run of spaces) | 51.8 s |
+| `"." * n` | 52.9 s |
+| `"benign filler. " * n` (ordinary prose) | 66.6 s |
+| `"filler line\n" * n` | 73.8 s |
+| `"a " * n` | 111.0 s |
+| `"\n" * n` (a run of newlines) | 139.8 s |
+
+Same byte count, **2.7× spread**. This is the ordinary-shape band and it does not include
+the unbroken-token case above, which is the quadratic one. It is recorded because the
+README previously stated the linear rate without qualification, and because a reader
+sizing a CI budget from "50 µs/byte" would be wrong by a factor of three before ever
+meeting an adversarial input. No tuned recipe is published here for the same reason as
+above.
+
 ## v0.5.6 — a boundary-assertion defect leaves some pattern branches unreachable
 
 A `\b` written immediately before a literal that is not a word character (`-`,
@@ -195,3 +216,66 @@ measure separately is a language we cannot honestly advertise.
 this release it is **6,944 unique keywords** (7,683 entries summed across patterns). The old
 figure predates the +80 patterns that landed in v0.5.4. Pattern count (1,540) and category count
 (118) were both verified correct and are unchanged.
+
+## v0.5.6 — what "every document carries the three axes" is scoped to
+
+The release notes and README say a SUNGLASSES scan document carries `threat_found`,
+`inspection_complete` and `is_clean`. That sentence is true of every surface enumerated
+in `V056_ACCEPTANCE_MATRIX.md` — 28 surfaces × 12 input states, each asserted by a test
+in `tests/test_v056_matrix.py` — and it is scoped to those rows deliberately.
+
+ASTRA's third review refused the unqualified version of the claim, and was right to: at
+that point the five public extractor `scan_*` convenience functions and the three retained
+`SunglassesScanner` helpers had no rows, and two of them were returning documents with no
+axes at all. They have rows now, and the defects are fixed. But the honest form of the
+claim names its scope, because the argument that made it false once is available again the
+moment somebody adds a surface without adding a row.
+
+**Outside the matrix, and therefore outside the claim:**
+
+- Anything a caller builds themselves from `engine.ScanResult` attributes. The object
+  carries the axes as properties; a dict a caller assembles by hand does not, unless it
+  goes through `sunglasses.result.normalize()`.
+- `sunglasses.firewall`'s hook verdicts. That surface answers allow/deny/defer for a tool
+  call, not a coverage question, and it has its own gap entry above.
+- `engine.info()`, `check`, `version` and the other non-scan commands.
+
+**How to check the claim rather than take it:** `python3 -m pytest tests/test_v056_matrix.py`
+runs one test per asserted cell. `python3 tools/gen_v056_matrix_table.py` regenerates the
+table from the same module the tests parametrize over, so the table cannot claim a cell the
+suite does not assert. Note what that does NOT prove: a generated table proves the table and
+the tests read one source, not that the tests assert anything. That is what the 18 mutation
+cases in the same file are for — each feeds a response with its coverage evidence stripped
+to the same assertion functions the real cells use and requires it to FAIL.
+
+## v0.5.6 — three input states that now answer differently
+
+Behaviour changes, not bug fixes, and each is a matrix state:
+
+**Non-regular inputs are refused (`nonregular`).** A FIFO, socket, device node or directory
+at the input path is an operational error — CLI exit 2, MCP `isError: true`, library
+`NonRegularFile` (a subclass of `UnreadableFile`, so existing handlers already catch it).
+Previously the readability probe proved a path readable by OPENING it, and opening a FIFO
+with no writer blocks in the kernel: an MCP `scan_file` on a named pipe never returned at
+all. The type check now happens on `os.stat` metadata, before any file object exists.
+Note the consequence: `scan --file /dev/null` is now exit 2, where an empty regular file is
+exit 0. A device is not a thing we can scan; an empty file is.
+
+**A byte stream that does not decode is incomplete, never clean (`undecodable`).** Every
+text read was `open(..., errors="ignore")`, which silently DROPS undecodable bytes: a
+256-byte file of non-UTF-8 pairs scanned 128 bytes and returned `inspection_complete: true,
+is_clean: true`. We still scan what decodes — throwing the file away would lose real
+coverage — but the answer is exit 3 and the warning names how many bytes went unread.
+Latin-1 text and mislabelled binaries land here. Valid UTF-8 is unaffected.
+On stdin the answer is different because the transport is: undecodable stdin is an
+operational error (exit 2, one document), not a partial scan. Decoding with replacement
+there would mean reporting on a substitution the caller never sent.
+
+**Empty input is complete and clean (`empty`).** `--text ""`, empty stdin, an empty file and
+MCP `scan_text` with an empty string all return exit 0, `inspection_complete: true`,
+`is_clean: true`, `bytes_scanned: 0`. Nothing went unread, so nothing was hidden — this is
+the one case where "we inspected all of it" costs nothing and is exactly true. Both human
+renderings say `0 bytes inspected — the input was empty` rather than `No threats detected`,
+so a reader can tell a clean scan of a document from a clean scan of nothing. MCP keeps one
+distinction the CLI cannot express: a MISSING `text` argument is still a usage error, because
+the tool's API contract was broken and nothing was submitted; an empty string is content.

@@ -129,7 +129,7 @@ sunglasses scan --file meeting.mp4 --deep      # scan video
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
-**Input size cap.** `engine.scan()` reads at most **1 MB** by default. Scan cost is linear in input length (~50 µs/byte), so an uncapped filter handed a 10 MB page stalls an agent for minutes — a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
+**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost is roughly linear in input length (~50 µs/byte) — but **not on every input shape**: the matcher is quadratic on a single unbroken token, so a long token can cost far more than its length suggests (measured curve and consequences in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md)). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes — a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
 
 **Exit codes.** `0` = read the whole input, found nothing. `1` = threat found. `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 
@@ -187,7 +187,7 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency — real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
 | Patterns | 1,540 |
-| Keywords | 6,944 unique (7,683 entries across all patterns) |
+| Keywords | 6,931 unique declared (7,683 entries across all patterns); the pre-screen index holds 6,642 — 289 generic keywords are deliberately excluded from it. `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
 | Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 118 |
 | Normalization techniques | 17 |
@@ -244,7 +244,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 ## What Works Today
 
-- ✅ Text scanning: 1,540 patterns, 6,944 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
+- ✅ Text scanning: 1,540 patterns, 6,931 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
@@ -267,7 +267,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 ## The Firewall — from detector to control (v0.4)
 
 Everything above this line *detects*. The firewall *stops*. It installs as a
-Claude Code `PreToolUse` hook and answers one question before every tool call:
+Claude Code `PreToolUse` hook and answers one question before every tool call (**best-effort**: the hook runs under a 10-second timeout, and Claude Code lets a timed-out hook's tool call proceed — so on the pathological input shapes described in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md) a call can go through unscanned):
 **does this action violate a fact we can prove?**
 
 ```bash
