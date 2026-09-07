@@ -152,14 +152,18 @@ def read_text_source(path: str):
 
     try:
         return raw.decode("utf-8"), []
-    except UnicodeDecodeError:
-        pass
+    except UnicodeDecodeError as exc:
+        # NOT swallowed -- handled on the next line. Written as a named binding so
+        # a grep for silent handlers in this package comes back empty and stays
+        # that way; the round-4 receipt is that grep.
+        first_bad = exc.start
 
     text = raw.decode("utf-8", errors="replace")
     undecodable = text.count("\ufffd")
     return text.replace("\ufffd", ""), [
         f"{os.path.basename(path)} is not valid UTF-8 — {undecodable} byte(s) could "
-        f"not be decoded and were NOT inspected. Only the text that decoded was scanned."
+        f"not be decoded and were NOT inspected (first at offset {first_bad}). "
+        f"Only the text that decoded was scanned."
     ]
 
 

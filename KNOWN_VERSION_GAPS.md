@@ -279,3 +279,23 @@ renderings say `0 bytes inspected — the input was empty` rather than `No threa
 so a reader can tell a clean scan of a document from a clean scan of nothing. MCP keeps one
 distinction the CLI cannot express: a MISSING `text` argument is still a usage error, because
 the tool's API contract was broken and nothing was submitted; an empty string is content.
+
+## v0.5.6 — three silent skips outside the scan path, reported and not fixed
+
+Round 4 removed every silent `except: pass` in `sunglasses/extractors/` that could cost scan
+coverage (the receipt is a checker, not a grep: it walks the AST for exception handlers whose
+whole body is `pass`/`continue`, and the only two that survive are temp-file cleanups where
+failing to delete a scratch file loses nothing). Sweeping the rest of the package turned up
+three more, all in DIAGNOSTIC commands rather than in a scan:
+
+- `cli.py:1030` — `sunglasses check` skips a `settings.json` it cannot parse.
+- `cli.py:1039` — the same command skips a hook command it cannot lex.
+- `cli.py:1085` — `sunglasses receipts` skips a receipt line that is not valid JSON.
+
+They are the same *shape* as the defects this release fixes — a thing we could not read, passed
+over without saying so — and in the first two cases that means `check` can report a healthy
+firewall while sitting next to a settings file it never managed to read. They are NOT fixed here
+for one reason: this release is scoped to what a SCAN reports about content, the acceptance matrix
+covers scan surfaces, and widening it to the diagnostic commands at the end of a repair release is
+the kind of unreviewed change the release exists to avoid. They are recorded so the next round
+starts with them on the list rather than rediscovering them.

@@ -146,6 +146,10 @@ class VideoExtractor:
                     try:
                         os.unlink(tmp_path)
                     except OSError:
+                        # Temp-file cleanup only. Failing to delete a scratch file
+                        # loses no scan coverage, which is why this one handler is
+                        # allowed to stay quiet; every handler that CAN lose
+                        # coverage names what it gave up on.
                         pass
 
         except Exception as exc:
@@ -203,7 +207,7 @@ class VideoExtractor:
                 try:
                     os.unlink(tmp_path)
                 except OSError:
-                    pass
+                    pass          # temp-file cleanup only; no coverage is lost here
 
         except Exception as e:
             # Same repair as audio.py: an error string is not a transcript. Returning
