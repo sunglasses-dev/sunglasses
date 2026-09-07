@@ -165,21 +165,28 @@ class ImageExtractor:
                 results.append(("ocr", text))
             return results
 
-        inspected = 0
         for index, frame in enumerate(ImageSequence.Iterator(img)):
             if index >= self.MAX_OCR_FRAMES:
                 break
             try:
                 text = self._ocr_from_pil(frame)
             except OCRUnavailable as exc:
-                # One frame's failure costs that frame, not the rest of them.
-                self.failures.append(f"frame {index} not read by OCR ({exc})")
-                continue
+                # OCR being UNAVAILABLE is a property of the machine, not of this
+                # frame: Tesseract missing from PATH fails identically on all of
+                # them. Retrying would launch it up to 64 times and stack 64
+                # copies of one sentence in the warnings a human has to read, so
+                # the loss is reported once, for the whole file, and names the
+                # scope. (T9's review catch.)
+                remaining = min(total, self.MAX_OCR_FRAMES) - index
+                self.failures.append(
+                    f"{remaining} of {total} frames not read by OCR ({exc})")
+                break
             except Exception as exc:
+                # A per-FRAME failure, by contrast, really is per frame: one
+                # corrupt frame in a GIF costs that frame and nothing else.
                 self.failures.append(
                     f"frame {index} not read ({exc.__class__.__name__}: {exc})")
                 continue
-            inspected += 1
             if text.strip():
                 results.append((f"ocr:frame:{index}", text))
 
@@ -305,10 +312,22 @@ class ImageExtractor:
     # a few bytes that are not UTF-8, which made the file read as INCOMPLETE for a
     # reason that was not true. The XPComment inside it is read properly by the
     # EXIF path above; the container it arrived in is not a text field.
+    # Every entry here must be a container that is BINARY BY FORMAT. The test is
+    # not "PIL gave me bytes" -- almost everything in `info` is bytes -- it is
+    # "there is no text encoding defined for this block".
+    #
+    # `xmp` was in this list for about twenty minutes and that was a real bug I
+    # introduced while fixing G2: XMP is an XML TEXT packet that merely arrives as
+    # bytes, and a `dc:description` inside it is exactly the kind of place an
+    # instruction hides. It made `xmp-description.jpg` -- 8 findings when the
+    # packet is scanned -- come back exit 0, complete, clean. Excluding a text
+    # format as "binary" is the same false-coverage move as never reading it, so
+    # the bar for adding a key here is a format with no text encoding at all.
     _BINARY_INFO_KEYS = {
-        "exif", "icc_profile", "photoshop", "adobe", "adobe_transform",
-        "xmp", "mpinfo", "palette", "transparency", "background",
-        "extension", "chromaticity", "gamma", "srgb", "interlace",
+        "exif",              # raw EXIF segment; its text fields are read above
+        "icc_profile", "photoshop", "adobe", "adobe_transform", "mpinfo",
+        "palette", "transparency", "background", "extension",
+        "chromaticity", "gamma", "srgb", "interlace",
         "dpi", "aspect", "loop", "duration", "version",
     }
 
