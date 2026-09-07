@@ -234,6 +234,9 @@ def _build_image_fixtures(root, f):
         "xmp-description.jpg": 8,          # JPEG XMP packet
         "exif-xpcomment.jpg": 6,           # JPEG XPComment, UTF-16LE
         "exif-description.jpg": 6,         # JPEG ImageDescription, plain str
+        "png-exif-description.png": 6,     # PNG eXIf chunk, tag 270
+        "png-text-description.png": 6,     # PNG tEXt
+        "tiff-xpcomment.tiff": 6,          # TIFF IFD0, UTF-16LE bytes
     }
     f["containers"] = {os.path.join(here, k): v for k, v in f["containers"].items()}
 

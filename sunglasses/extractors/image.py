@@ -487,6 +487,16 @@ class ImageExtractor:
         """
         Basic hidden text detection.
 
+        FRAME 0 ONLY, and that is a decision rather than the frame bug again
+        (v0.5.6 round 5, reviewed by T9 and left as-is deliberately). This pass is
+        a HEURISTIC over OCR geometry -- tiny glyphs, edge placement -- not a
+        content source: it reports that text looks hidden, it does not supply text
+        to scan. A later frame's actual TEXT is already read by `_ocr_frames_of`,
+        which walks every frame, so no content is lost by not re-running the
+        geometry check per frame. If this ever becomes a content source, it needs
+        the frame walk like everything else -- anything that reads "the image" has
+        to ask which frame.
+
         Checks for signs that text might be hidden in the image:
         - Very small text regions (font-size effectively 0)
         - Text matching background color
