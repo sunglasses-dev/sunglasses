@@ -141,7 +141,9 @@ STATES = [
     # --- round 4 ---
     ("nonregular",        "not a regular file", "FIFO/socket/device/directory at the input path"),
     ("undecodable",       "bytes do not decode", "a byte stream that is not valid UTF-8"),
-    ("empty",             "empty", "input that legitimately carries no content"),
+    ("empty",             "empty", "a VALID input of this format that legitimately "
+                                   "carries no content (0-byte text file, blank image, "
+                                   "silent audio) -- read in full, nothing there"),
 ]
 
 # --- surfaces -------------------------------------------------------------
@@ -468,13 +470,8 @@ _row("lib_helper_image", {
     "corrupt_parser_fail": "incomplete",       # PNG header, not a PNG
     "nonregular": "operational",
     "undecodable": _HELPER_WRONG_TYPE,
-    "empty": "incomplete",                     # a 0-byte .png is not a decodable image
+    "empty": "clean",                          # a valid blank image: decoded, no text
 })
-NOTES[("lib_helper_image", "empty")] = (
-    "DIVERGENCE from the text surfaces, and the right one: an empty TEXT input is "
-    "content that was fully read, but an empty IMAGE file is a file whose image we "
-    "could not decode. 0 bytes of text is complete; 0 bytes of PNG is incomplete."
-)
 
 _row("lib_helper_pdf", {
     "clean": "clean", "finding": "threat",
@@ -486,7 +483,7 @@ _row("lib_helper_pdf", {
     "corrupt_parser_fail": "incomplete",
     "nonregular": "operational",
     "undecodable": _HELPER_WRONG_TYPE,
-    "empty": "incomplete",                     # a 0-byte .pdf has no PDF structure
+    "empty": "clean",                          # a valid PDF with a blank page
 })
 
 _row("lib_helper_text", _file_surface({
@@ -527,7 +524,10 @@ def _conv_row(name, extra=None):
         "corrupt_parser_fail": "incomplete",
         "nonregular": "operational",
         "undecodable": _CONV_NO_ROUTER,
-        "empty": "incomplete",
+        # A valid input of this format with nothing in it: the decoder RAN and
+        # produced nothing, which is a complete inspection of an empty document.
+        # Contrast `corrupt_parser_fail`, where the decoder could not run at all.
+        "empty": "clean",
     }
     base.update(extra or {})
     _row(name, base)

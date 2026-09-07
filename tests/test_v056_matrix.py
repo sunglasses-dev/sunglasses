@@ -175,8 +175,10 @@ def _build_image_fixtures(root, f):
     # extraction and does NOT depend on OCR -- which is what makes the OCR-off
     # cells assertable as "finding present AND coverage lost".
     f["img_finding"] = png("img-finding.png", INJECTION)
-    f["img_empty"] = root / "img-empty.png"
-    f["img_empty"].write_bytes(b"")
+    # `empty` is a VALID image carrying no content -- decoded in full, nothing in
+    # it. (A 0-byte file is not this: it is bytes the parser cannot make sense of,
+    # which is `corrupt_parser_fail` and has its own cell.)
+    f["img_empty"] = png("img-blank.png")
     # a PNG header on bytes that are not a PNG: the decoder gives up
     f["img_corrupt"] = root / "img-corrupt.png"
     f["img_corrupt"].write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 128)
@@ -197,7 +199,7 @@ def _build_image_fixtures(root, f):
 def _build_pdf_fixtures(root, f):
     """Real PDFs, including ASTRA's F4 shape: a valid document whose annotation
     array holds one malformed element BEFORE an instruction-bearing one."""
-    def pdf(name, annots=None, page_text_obj=True):
+    def pdf(name, annots=None, page_text=None):
         objs = []
         objs.append(b"<< /Type /Catalog /Pages 2 0 R >>")
         objs.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
@@ -207,12 +209,13 @@ def _build_pdf_fixtures(root, f):
             page += b" /Annots " + annots
         page += b" >>"
         objs.append(page)
-        stream = b"BT /F1 12 Tf 20 100 Td (ordinary page text) Tj ET"
+        stream = (b"BT /F1 12 Tf 20 100 Td (ordinary page text) Tj ET"
+                  if page_text is None else page_text)
         objs.append(b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream))
         return objs
 
-    def write(name, extra_objs=b"", annots=None):
-        objs = pdf(name, annots)
+    def write(name, extra_objs=b"", annots=None, page_text=None):
+        objs = pdf(name, annots, page_text)
         out = bytearray(b"%PDF-1.4\n")
         offsets = []
         for i, body in enumerate(objs, start=1):
@@ -246,13 +249,14 @@ def _build_pdf_fixtures(root, f):
             % INJECTION.encode(),
         ],
         "pdf-clean.pdf": [],
+        "pdf-blank.pdf": [],
     }
     f["pdf_clean"] = write("pdf-clean.pdf")
     f["pdf_finding"] = write("pdf-annot-valid.pdf", annots=b"[5 0 R]")
     f["pdf_partial_annots"] = write("pdf-annot-partial.pdf",
                                     annots=b"[(a malformed string) 5 0 R]")
-    f["pdf_empty"] = root / "pdf-empty.pdf"
-    f["pdf_empty"].write_bytes(b"")
+    # A valid PDF with a blank page and no metadata or annotations.
+    f["pdf_empty"] = write("pdf-blank.pdf", page_text=b"")
 
     # Over the engine cap through a REAL extractor: the annotation carries the
     # instruction first and then more than 1 MiB of filler, so PyPDF2 hands the
@@ -779,7 +783,9 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "unreadable": space["unreadable_file"], "missing": space["missing_file"],
             "missing_dependency": space["qr_clean"],
             "corrupt_parser_fail": space["img_corrupt"],
-            "nonregular": space["fifo"], "empty": space["img_empty"],
+            "nonregular": space["fifo"],
+            # a valid image that simply carries no symbol
+            "empty": space["img_empty"],
         }[state]
         if state == "missing_dependency":
             from sunglasses.extractors import qr as qr_mod
@@ -827,6 +833,8 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
                 "missing": space["missing_media"]}.get(state, space["media_file"])
     if surface == "lib_scan_deep" and state not in (
             "unreadable", "missing", "nonregular"):
+        # `scan_deep` routes on the suffix, so every seam-driven state arrives as
+        # a real, readable .mp3 and only the transcriber behind it is replaced.
         path = space["media_file"]
     if surface == "lib_helper_text":
         path = _file_for(state, space)
@@ -842,6 +850,14 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
     if surface == "lib_scan_email":
         return scanner.scan_email(ORDINARY, [path])
     if surface == "lib_scan_deep":
+        if state in _MediaSeam.STATES:
+            # The library twin of the `cli_deep` subprocess seam, and for the same
+            # reason: a real silent MP3 carries no speech, so most of these states
+            # cannot be driven through a real decoder. Declaring them N/A was the
+            # round-3 move ASTRA rejected -- a state we cannot currently produce is
+            # not a state that cannot exist. Only the transcriber is replaced.
+            return _with_media_seam("lib_conv_audio", state, monkeypatch,
+                                    lambda: scanner.scan_deep(path))
         return scanner.scan_deep(path)
     if surface == "lib_helper_text":
         return scanner._scan_text_file(path)
