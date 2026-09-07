@@ -243,6 +243,19 @@ def _build_image_fixtures(root, f):
                + list(f["containers"])):
         assert os.path.exists(_p), f"missing committed fixture: {_p}"
 
+    # A multi-page TIFF whose ImageDescription lives ONLY on page 2. T9 reasoned
+    # this one out of the source and could not build a fixture for it; per-page
+    # tags do work, via `encoderinfo` on each appended image rather than the
+    # shared `tiffinfo=`. It was a live false clean: exit 0, complete, clean.
+    from PIL import Image as _Im0, TiffImagePlugin as _Tiff
+    _p0, _p1 = _Im0.new("RGB", (60, 30), "white"), _Im0.new("RGB", (60, 30), "white")
+    _i0 = _Tiff.ImageFileDirectory_v2(); _i0[270] = "an ordinary first page"
+    _i1 = _Tiff.ImageFileDirectory_v2(); _i1[270] = INJECTION
+    _p0.encoderinfo = {"tiffinfo": _i0}
+    _p1.encoderinfo = {"tiffinfo": _i1}
+    f["tiff_page2_metadata"] = str(root / "tiff-page2-metadata.tiff")
+    _p0.save(f["tiff_page2_metadata"], save_all=True, append_images=[_p1], tiffinfo=_i0)
+
     # A multi-PAGE TIFF, generated: same mechanism as the GIF, different container.
     from PIL import Image as _Im
     _pages = [_Im.new("RGB", (240, 60), "white"), _text_image(INJECTION)]
@@ -1376,6 +1389,15 @@ def test_every_metadata_container_is_read(space):
         assert len(doc["findings"]) >= expected_findings, (
             f"{name}: {len(doc['findings'])} findings, expected at least "
             f"{expected_findings}")
+
+    # Metadata is per-FRAME, not per-file: a multi-page TIFF carries one IFD per
+    # page and a GIF can carry a comment block per frame, so reading page 0 and
+    # stopping is the frame bug on the metadata side.
+    page2 = scanner.scan_fast(space["tiff_page2_metadata"])
+    assert page2["threat_found"] is True, (
+        "a TIFF whose ImageDescription lives only on page 2 came back with no "
+        "finding — page 0's IFD is not the file's metadata")
+    assert page2["inspection_complete"] is True
 
 
 def test_normalize_refuses_input_it_does_not_understand():

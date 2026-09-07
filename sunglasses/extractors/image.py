@@ -84,9 +84,15 @@ class ImageExtractor:
         # 1. OCR — visible text in EVERY frame, not just the one PIL opens on.
         results.extend(self._ocr_all_frames(image_path))
 
-        # 2. EXIF metadata — hidden text in photo properties
-        exif_texts = self._extract_exif(image_path)
-        for field, text in exif_texts:
+        # 2. Metadata — hidden text in photo properties, IN EVERY FRAME.
+        #    A multi-page TIFF carries a separate IFD per page, and a GIF can
+        #    carry a comment block per frame, so reading page 0's metadata and
+        #    stopping is the frame bug (G1) again on the metadata side: a
+        #    two-page TIFF whose ImageDescription lives only on page 2 returned
+        #    exit 0, complete, clean. Found by T9 reasoning from the source; the
+        #    fixture turned out to be buildable after all, so it is asserted
+        #    rather than filed as an unknown.
+        for field, text in self._metadata_all_frames(image_path):
             if text.strip():
                 results.append((f"exif:{field}", text))
 
@@ -194,6 +200,44 @@ class ImageExtractor:
             self.failures.append(
                 f"{total - self.MAX_OCR_FRAMES} of {total} frames not inspected — "
                 f"{source} exceeds the {self.MAX_OCR_FRAMES}-frame OCR cap")
+        return results
+
+    def _metadata_all_frames(self, image_path: str) -> List[Tuple[str, str]]:
+        """EXIF and embedded text from every frame, not just the one PIL opens on."""
+        from PIL import Image, ImageSequence
+
+        try:
+            img = Image.open(image_path)
+        except Exception as exc:
+            self.failures.append(
+                f"image metadata not read ({exc.__class__.__name__}: {exc})")
+            return []
+
+        total = getattr(img, "n_frames", 1) or 1
+        if total == 1:
+            return self._exif_from_pil(img)
+
+        results: List[Tuple[str, str]] = []
+        seen = set()
+        for index, frame in enumerate(ImageSequence.Iterator(img)):
+            if index >= self.MAX_OCR_FRAMES:
+                break
+            for field, text in self._exif_from_pil(frame):
+                # Frame 0 keeps the bare label so nothing downstream sees a new
+                # source name for the ordinary single-page case; later frames are
+                # labelled, and identical values repeated across frames (a tag
+                # inherited by every page) are reported once.
+                label = field if index == 0 else f"frame:{index}:{field}"
+                key = (field, text)
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append((label, text))
+        if total > self.MAX_OCR_FRAMES:
+            self.failures.append(
+                f"metadata for {total - self.MAX_OCR_FRAMES} of {total} frames not "
+                f"read — {os.path.basename(image_path)} exceeds the "
+                f"{self.MAX_OCR_FRAMES}-frame cap")
         return results
 
     def _extract_ocr(self, image_path: str) -> str:
