@@ -383,6 +383,20 @@ def _matches(head: bytes, magic: bytes, offset: int) -> bool:
     return head[offset:offset + len(magic)] == magic
 
 
+def _is_webp(head: bytes) -> bool:
+    """RIFF + 'WEBP' at offset 8. A WebP is an IMAGE wearing a RIFF container.
+
+    v0.5.6 round 5 (T9). `_MAGIC_MEDIA` matches bare `RIFF` and labels it
+    "RIFF container (WAV/AVI)", so every `.webp` was routed to the deep-scan
+    branch and reported exit 3 with "not transcribed — Nothing in <file> was
+    inspected". Not a false clean, but a false REASON: the file was never sent to
+    the image extractor that would have read its XMP and EXIF, and the warning
+    told the user to re-run with --deep, which would not have helped either.
+    RIFF alone does not identify a format; the four bytes at offset 8 do.
+    """
+    return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+
+
 def identify(path: str):
     """Return (kind, label) where kind is pdf | image | media | opaque | text.
 
@@ -392,6 +406,9 @@ def identify(path: str):
     head = _sniff(path)
     if _matches(head, *_MAGIC_PDF):
         return "pdf", "PDF document"
+    # Checked before the media table, which matches bare RIFF.
+    if _is_webp(head):
+        return "image", "WebP image"
     for magic, offset in _MAGIC_IMAGE:
         if _matches(head, magic, offset):
             return "image", "image"

@@ -310,7 +310,10 @@ def _scan_repo(args, engine):
         from .extractors.dispatch import identify
         kind, label = identify(filepath)
         if kind in ("opaque", "media"):
-            walker_skips.append((rel_path, f"{label} — not inspected"))
+            walker_skips.append((
+                rel_path,
+                f"{label} — not inspected. Scan it directly to look inside: "
+                f"sunglasses scan --file {rel_path}"))
             continue
 
         # Repo files go through the SAME extraction path as `--file`. Reading them

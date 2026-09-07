@@ -149,7 +149,9 @@ def space(tmp_path_factory):
     _build_pdf_fixtures(root, f)
     _build_media_fixtures(root, f)
 
-    yield {k: str(v) for k, v in f.items()} | {"root": str(root)}
+    containers = f.pop("containers")
+    yield ({k: str(v) for k, v in f.items()}
+           | {"root": str(root), "containers": containers})
 
     for key in ("unreadable_file", "unreadable_media"):
         try:
@@ -217,9 +219,28 @@ def _build_image_fixtures(root, f):
     f["byte_meta_control"] = os.path.join(here, "exif-description.jpg")  # plain str EXIF
     f["embedded_undecodable"] = os.path.join(here, "invalid-comment.gif")   # all comment bytes bad
     f["embedded_partial"] = os.path.join(here, "partial-comment.gif")   # finding + 3 bad bytes
-    for _p in (f["qr_clean"], f["qr_finding"], f["frames_finding"],
-               f["byte_meta_finding"], f["byte_meta_xmp"], f["byte_meta_control"],
-               f["embedded_undecodable"], f["embedded_partial"]):
+    # Every metadata CONTAINER we route, one fixture each, all carrying the same
+    # instruction. Round 5's second pass: TIFF and WebP were both broken and both
+    # invisible, because the suite only ever exercised JPEG and GIF. A container
+    # with no fixture is a container nobody checked.
+    f["containers"] = {
+        "tiff-description.tiff": 6,        # TIFF ImageDescription (no _getexif)
+        "webp-xmp.webp": 8,                # WebP, XMP packet
+        "webp-exif-xpcomment.webp": 6,     # WebP, byte-valued XPComment
+        "jpeg-com.jpg": 6,                 # JPEG COM segment
+        "jpeg-usercomment-unicode.jpg": 6, # UserComment, UNICODE charset header
+        "png-itxt-xmp.png": 8,             # PNG iTXt carrying XMP
+        "png-ztxt-comment.png": 6,         # PNG zTXt (compressed)
+        "xmp-description.jpg": 8,          # JPEG XMP packet
+        "exif-xpcomment.jpg": 6,           # JPEG XPComment, UTF-16LE
+        "exif-description.jpg": 6,         # JPEG ImageDescription, plain str
+    }
+    f["containers"] = {os.path.join(here, k): v for k, v in f["containers"].items()}
+
+    for _p in ([f["qr_clean"], f["qr_finding"], f["frames_finding"],
+                f["byte_meta_finding"], f["byte_meta_xmp"], f["byte_meta_control"],
+                f["embedded_undecodable"], f["embedded_partial"]]
+               + list(f["containers"])):
         assert os.path.exists(_p), f"missing committed fixture: {_p}"
 
     # A multi-PAGE TIFF, generated: same mechanism as the GIF, different container.
@@ -1325,6 +1346,36 @@ def test_lib_cell(surface, state, outcome, space, scanner, engine, monkeypatch):
                 f"{where}: {axis}={doc.get(axis)!r} but {twin} says "
                 f"{other.get(axis)!r} on the same input — a wrapper that disagrees "
                 f"with what it wraps is a second implementation")
+
+
+def test_every_metadata_container_is_read(space):
+    """One fixture per metadata CONTAINER we route, all carrying an instruction.
+
+    Round 5's second pass found TIFF and WebP both broken and both invisible:
+    `_exif_from_pil` gated on `_getexif`, which TIFF does not have, so EXIF was
+    skipped entirely for a supported format (`tiff-description.tiff` -> exit 0,
+    complete, clean); and `_sniff` matched bare RIFF, so every `.webp` was routed
+    to the deep branch and told the user to re-run with --deep, which would not
+    have helped. Neither was reachable from the JPEG and GIF fixtures the suite
+    already had.
+
+    So the rule is one fixture per container, not per bug. A container with no
+    fixture is a container nobody checked, and that is how both of these lasted.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    scanner = SunglassesScanner()
+    for path, expected_findings in space["containers"].items():
+        doc = scanner.scan_fast(path)
+        name = os.path.basename(path)
+        assert doc["threat_found"] is True, (
+            f"{name}: the instruction in this container was not read at all "
+            f"(threat_found={doc['threat_found']}, findings={doc['findings']})")
+        assert doc["inspection_complete"] is True, (
+            f"{name}: read but reported incomplete — {doc['warnings']}")
+        assert len(doc["findings"]) >= expected_findings, (
+            f"{name}: {len(doc['findings'])} findings, expected at least "
+            f"{expected_findings}")
 
 
 def test_normalize_refuses_input_it_does_not_understand():

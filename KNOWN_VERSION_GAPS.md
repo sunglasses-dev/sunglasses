@@ -299,3 +299,39 @@ for one reason: this release is scoped to what a SCAN reports about content, the
 covers scan surfaces, and widening it to the diagnostic commands at the end of a repair release is
 the kind of unreviewed change the release exists to avoid. They are recorded so the next round
 starts with them on the list rather than rediscovering them.
+
+## v0.5.6 — `--repo` skips most of the formats `--file` extracts, and not consistently
+
+MEASURED, not described. The repository walker declines members by extension
+(`cli.py::_BINARY_EXTENSIONS`); the file path routes by CONTENT
+(`extractors/dispatch.py::identify`). Crossing the two lists:
+
+| formats the extractor routes | in repo mode |
+|---|---|
+| `.bmp` `.gif` `.jpeg` `.jpg` `.pdf` `.png` `.webp` | **skipped and named** — never reach the extractor |
+| `.tif` `.tiff` | **scanned** — they are absent from the walker's skip list |
+
+So an instruction hidden in a committed **PNG's** EXIF, a **GIF's** later frame, or a
+**PDF's** annotations is reported by `scan --repo` as uninspected scope (exit 3, the member
+named), and by `scan --file <member>` as a finding (exit 1). The same instruction in a
+committed **TIFF** is found by both — the walker's list simply never included `.tif`.
+
+That inconsistency is not a second bug on top of the first; it is the evidence that the two
+lists were written independently and never reconciled, which is the same shape as audit
+finding C1 (two file-scanning surfaces, two extension tables, opposite answers) one level
+up. C1 was fixed by giving both surfaces one owner; the walker was not part of that fix.
+
+**Why it is a gap and not a false clean:** every skipped member is named, in every output
+format (`skipped`, `notInspected`, and the human `INCOMPLETE SCAN` list), and the scan exits
+3, not 0. Nothing claims to have read them. As of round 5 the skip line also says what to do
+about it — `Scan it directly to look inside: sunglasses scan --file <path>` — because
+"binary file type (.gif) — not inspected" told a reader what happened and not what closes it.
+
+**Why it is deferred:** reconciling the lists means the walker runs OCR over every committed
+image, which changes what a repo scan costs (seconds per image, per frame) and what it
+promises. That is a scope decision with a performance budget attached, taken deliberately in
+v0.6, not a coverage repair made at the end of a repair release.
+
+**Reproduce:** commit a GIF whose second frame carries an instruction and a TIFF whose
+ImageDescription carries the same one; `scan --repo` finds the TIFF and names the GIF as
+skipped, `scan --file` finds both.

@@ -351,6 +351,43 @@ class ImageExtractor:
                       f"NOT inspected (first at offset {first_bad}); the rest of the "
                       f"field was scanned")
 
+    def _exif_tags(self, img) -> dict:
+        """Every EXIF tag PIL can give us, for every format that carries EXIF.
+
+        v0.5.6 round 5, second pass (T9). This used to be
+        `img._getexif() if hasattr(img, "_getexif") else None`. `_getexif` is a
+        JPEG-era private method: **TIFF does not have it**, so `hasattr` came back
+        False and EXIF was skipped ENTIRELY for a format this extractor routes and
+        supports. `tiff-description.tiff` -- an ImageDescription tag holding an
+        instruction, a field named in `_EXIF_TEXT_FIELDS` -- returned exit 0,
+        complete, clean. The capability check was real; it was checking for the
+        wrong capability, and the honest-absence branch swallowed the difference.
+
+        The public `getexif()` works on both. `get_ifd(0x8769)` is needed as well
+        because the Exif sub-IFD is where `UserComment` actually lives, and the
+        old private call merged it silently -- so switching to the public API
+        without this would have traded a TIFF miss for a UserComment miss.
+        """
+        tags = {}
+        getexif = getattr(img, "getexif", None)
+        if getexif is not None:
+            try:
+                base = getexif()
+            except Exception:
+                base = None
+            if base:
+                tags.update(dict(base))
+                try:
+                    tags.update(dict(base.get_ifd(0x8769)))   # Exif sub-IFD
+                except Exception:
+                    pass          # no sub-IFD on this file; the base tags stand
+        if not tags and hasattr(img, "_getexif"):
+            try:
+                tags = dict(img._getexif() or {})
+            except Exception:
+                tags = {}
+        return tags
+
     def _exif_from_pil(self, img) -> List[Tuple[str, str]]:
         """Extract text from EXIF data of a PIL Image."""
         from PIL.ExifTags import TAGS
@@ -362,7 +399,7 @@ class ImageExtractor:
         # by capability rather than by catching the AttributeError it used to
         # raise into a bare `pass`. Only a real read error is a coverage loss.
         try:
-            exif_data = img._getexif() if hasattr(img, "_getexif") else None
+            exif_data = self._exif_tags(img)
             if exif_data:
                 for tag_id, value in exif_data.items():
                     tag_name = TAGS.get(tag_id, str(tag_id))
