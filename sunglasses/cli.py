@@ -1630,8 +1630,52 @@ def cmd_demo(args):
     print(f"  {DIM}That's {total_ms/1000:.4f} seconds for {len(demos)} scans.{RESET}\n")
 
 
+class _MachineAwareParser(argparse.ArgumentParser):
+    """An argparse parser that respects the caller's requested output format.
+
+    argparse's own `error()` writes a usage paragraph to stderr and exits 2 with
+    EMPTY stdout. That made the contract's "exactly one document on every path"
+    false for the one class of failure that happens before `args` exists:
+    `--channel not-a-channel --json` refused correctly and told a JSON consumer
+    nothing at all.
+
+    The format cannot be read off parsed arguments here -- parsing is what just
+    failed -- so it is read off argv, which is the only evidence available at
+    this point. Exit code and stderr behaviour for human callers are unchanged.
+    """
+
+    _MACHINE_FLAGS = ("--json", "--output=json", "--output=sarif", "-o=json", "-o=sarif")
+
+    @staticmethod
+    def _argv_wants_machine_output(argv) -> bool:
+        for i, tok in enumerate(argv):
+            if tok in ("--json",) or tok.startswith(("--output=", "-o=")):
+                if tok == "--json" or tok.split("=", 1)[1] in ("json", "sarif"):
+                    return True
+            if tok in ("--output", "-o") and i + 1 < len(argv):
+                if argv[i + 1] in ("json", "sarif"):
+                    return True
+        return False
+
+    def error(self, message):
+        if self._argv_wants_machine_output(sys.argv[1:]):
+            print(json.dumps({
+                "error": f"Invalid arguments: {message}",
+                "hint": "Nothing was scanned.",
+                "scanned": False,
+                "decision": None,
+                "is_clean": False,
+                "threat_found": False,
+                "inspection_complete": False,
+                "exit_code": EXIT_USAGE,
+            }))
+            sys.exit(EXIT_USAGE)
+        super().error(message)
+
+
+
 def main():
-    parser = argparse.ArgumentParser(
+    parser = _MachineAwareParser(
         prog="sunglasses",
         description="SUNGLASSES — The input firewall for AI agents.",
     )
@@ -1640,7 +1684,9 @@ def main():
         action="version",
         version=f"sunglasses {__version__}",
     )
-    subparsers = parser.add_subparsers(dest="command")
+    # parser_class propagates the machine-aware error handler to every
+    # subcommand; the invalid-choice failure happens on the SUBparser.
+    subparsers = parser.add_subparsers(dest="command", parser_class=_MachineAwareParser)
 
     # scan
     scan_parser = subparsers.add_parser("scan", help="Scan text or file")
