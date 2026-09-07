@@ -181,8 +181,9 @@ def _tool_scan_text(arguments):
         if result.inspection_complete:
             summary = f"PASS — No threats detected ({result.latency_ms}ms)"
         else:
-            summary = (f"INCOMPLETE — no findings in the inspected scope "
-                       f"({result.latency_ms}ms); part of the input was not read")
+            summary = (f"INCOMPLETE SCAN — no findings in the inspected scope "
+                       f"({result.latency_ms}ms); part of the input was not read. "
+                       f"This is NOT a clean result.")
     else:
         summary = (
             f"{result.decision.upper()} — {len(result.findings)} threat(s) found, "
@@ -192,6 +193,17 @@ def _tool_scan_text(arguments):
             summary += f"\n  {i}. [{f['severity'].upper()}] {f['name']}"
             if f.get("matched_text"):
                 summary += f' — matched: "{f["matched_text"]}"'
+        if not result.inspection_complete:
+            # A finding does not cancel a coverage failure, and the agent reads
+            # the FIRST LINE. This surface announced only "BLOCK — 5 threats" on
+            # a truncated input, so the part that was never read vanished behind
+            # the part that was. Same defect the CLI human threat screen had.
+            summary = ("INCOMPLETE SCAN — part of the input was not read, AND "
+                       "threats were found in the part that was.\n" + summary)
+
+    # Both branches now open with the same "INCOMPLETE SCAN" prefix that
+    # `scan_file` uses. An agent keying on the first line should not have to
+    # learn two vocabularies for one fact.
 
     output = f"{summary}\n\n{json.dumps(result_dict, indent=2)}"
 

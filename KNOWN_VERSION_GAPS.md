@@ -130,3 +130,30 @@ consent tests, and anyone embedding the library should know where the gate is
 before assuming they inherited it. Moving the gate into the library is a v0.6
 item; it changes a public API signature, which a scoped repair release is the
 wrong place for.
+
+## v0.5.6 — `--repo` skips an oversized file where `--file` scans the first MiB
+
+Both surfaces report their coverage honestly, and neither reports a false clean.
+They just do not read the same bytes:
+
+* `sunglasses scan --file big.txt` scans the first 1 MiB and reports
+  `truncated: true`, `inspection_complete: false` — so a finding in the first KB
+  of a 1.1 MB file is **found**, alongside an explicit statement that the rest was
+  not read (exit 1).
+* `sunglasses scan --repo <repo>` skips any member over the 1 MB walker limit
+  entirely, names it in `skipped` with the reason, and reports the run as
+  incomplete (exit 3) — so the same injection in the same file is **not found**.
+
+The consequence worth stating plainly: an attacker who pads a poisoned file past
+1 MB is invisible to a repository scan while remaining visible to a direct file
+scan of that same file. The repo scan does say the file was not inspected, so a
+consumer that reads `skipped` is not misled — but a consumer that reads only the
+exit code learns "incomplete", not "there is an injection in here".
+
+Not changed in v0.5.6 on purpose: unifying them changes what the walker reads on
+every large file in every repository, which is a behaviour and performance change
+rather than a trust repair, and this release is scoped to the latter. The
+divergence is asserted as the current behaviour in the acceptance matrix
+(`cli_repo` / `truncated + finding`, carried as a note rather than hidden in an
+N/A) so a later change has to update a test that says what it used to do.
+Unification is a v0.6 item.

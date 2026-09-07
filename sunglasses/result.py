@@ -184,14 +184,14 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
             extraction_complete = False
     extraction_complete = bool(extraction_complete)
 
-    # Invariant 4, twice over.
+    # Invariant 4. `needs_deep_scan` is a bool on the scan_auto notice and a LIST
+    # of deferred attachments on the email aggregate; both mean the same thing --
+    # bytes we have not read yet -- so both defeat completeness. Truthiness covers
+    # both shapes; iterating did not, and a bool is not iterable.
     if warnings:
         extraction_complete = False
     if obj.get("needs_deep_scan"):
         extraction_complete = False
-    for pending in obj.get("needs_deep_scan") or []:
-        if isinstance(pending, dict):
-            extraction_complete = False
 
     inspection_complete = extraction_complete and not truncated
 
