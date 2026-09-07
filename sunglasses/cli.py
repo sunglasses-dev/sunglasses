@@ -209,42 +209,25 @@ def _walk_repo_files_with_skips(repo_dir):
 
 
 def _deep_dict_to_sarif(result_dict, source):
-    """Serialise the deep-scan dict as SARIF.
+    """Serialise a deep-scan result as SARIF.
 
-    The deep path returns a plain dict, not a ScanResult, so `to_sarif` cannot take
-    it directly. Rather than invent a second result type, the findings are wrapped in
-    the minimum shape `to_sarif` consumes; incompleteness rides along as a note so a
-    SARIF consumer is told the file was not fully read instead of seeing an empty
-    results array and concluding nothing was there.
+    v0.5.6 round-3 repair: this used to build a local `_Shim` object to satisfy
+    `to_sarif`'s attribute access. The shim set `findings`, `decision`, `severity`
+    and the axes -- but not `channel`, `event_id` or `latency_ms`, which
+    `to_sarif` reads ONLY when serializing an actual finding. So every test
+    passed (they all had empty results) and the first real deep finding crashed
+    the process with AttributeError, exit 1, empty stdout.
+
+    There is no shim any more. The dict goes through the one normalizer and comes
+    back as a `NormalizedResult`, which is guaranteed to carry every field the
+    serializer touches. Coverage properties are the serializer's job now, so they
+    are not re-applied here.
     """
+    from .result import normalize, NormalizedResult
     from .sarif import to_sarif
 
-    class _Shim:
-        def __init__(self, d):
-            self.findings = list(d.get("threats") or [])
-            self.threat_found = bool(d.get("threat_found"))
-            self.inspection_complete = bool(d.get("inspection_complete"))
-            self.is_clean = bool(d.get("is_clean"))
-            self.truncated = False
-            self.decision = d.get("decision", "allow")
-            self.severity = d.get("severity", "none")
-            self.extraction_warnings = list(d.get("warnings") or [])
-            self.extraction_complete = self.inspection_complete
-            self.source = source
-
-        def reported_findings(self):
-            return self.findings
-
-    doc = to_sarif([_Shim(result_dict)], source=source)
-    if not result_dict.get("inspection_complete", True):
-        runs = doc.get("runs") or []
-        if runs:
-            props = runs[0].setdefault("properties", {})
-            props["inspectionComplete"] = False
-            props["notInspected"] = result_dict.get("warnings") or [
-                "This file was not fully inspected."
-            ]
-    return doc
+    normalized = normalize(result_dict, source=source)
+    return to_sarif([NormalizedResult(normalized)], source=source)
 
 
 def _wants_machine_output(args) -> bool:
@@ -751,16 +734,19 @@ def cmd_scan(args):
                         _usage_error(args, f"Deep scan failed: {result_dict['error']}",
                                      "Nothing was scanned.")
 
-                    threats = result_dict.get("threats", [])
+                    # One normalizer decides the axes; this path no longer computes
+                    # them. The line that used to live here read
+                    #   inspection_complete = bool(sources_found) and (aggregate_clean or threat_found)
+                    # in which finding a threat MANUFACTURED the coverage claim --
+                    # a real audio aggregate could return extraction_complete:false
+                    # with a finding and be published as inspection_complete:true.
+                    # Coverage and detection are independent facts.
+                    from .result import normalize as _normalize
+                    result_dict = _normalize(result_dict, source=filepath)
+                    threats = result_dict.get("findings") or result_dict.get("threats") or []
                     sources_found = result_dict.get("sources_found", 0)
-                    # Derived, not re-declared: the aggregate `is_clean` already ORs
-                    # incompleteness up from every sub-scan (v0.5.6 semantics), so
-                    # "not clean AND no findings" is precisely the incomplete case.
-                    # `sources_found == 0` is the other one — a transcript that never
-                    # existed inspected nothing, and used to report PASS for it.
-                    threat_found = bool(threats)
-                    aggregate_clean = result_dict.get("is_clean", not threat_found)
-                    inspection_complete = bool(sources_found) and (aggregate_clean or threat_found)
+                    threat_found = bool(result_dict["threat_found"])
+                    inspection_complete = bool(result_dict["inspection_complete"])
 
                     if threat_found:
                         exit_code = EXIT_THREAT
@@ -775,16 +761,14 @@ def cmd_scan(args):
                             "was inspected." if not sources_found else
                             "Part of the transcribed content was not fully inspected."
                         )
-                    result_dict["threat_found"] = threat_found
-                    result_dict["inspection_complete"] = inspection_complete
-                    result_dict["is_clean"] = (not threat_found) and inspection_complete
+                    # axes already set by normalize(); only the exit code is ours
                     result_dict["exit_code"] = exit_code
 
                     if args.output == "sarif":
                         # Deep scan printed the human screen under `-o sarif`. The deep
                         # path builds a dict rather than a ScanResult, so it is
-                        # serialised here directly -- one document, the axes already
-                        # folded in above, rather than a second parallel result type.
+                        # serialised here through the one normalizer, rather than a
+                        # second parallel result type.
                         print(json.dumps(_deep_dict_to_sarif(result_dict, filepath), indent=2))
                         sys.exit(exit_code)
 
@@ -806,6 +790,13 @@ def cmd_scan(args):
                         print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
                         for t in threats:
                             print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {t.get('matched_text', '')}")
+                        # A finding does not cancel a coverage failure. The human
+                        # threat screen used to drop the warnings entirely, so a
+                        # partially transcribed file with one finding read as a
+                        # complete scan that happened to find something.
+                        if not inspection_complete:
+                            for w in result_dict.get("warnings", []):
+                                print(f"  {YELLOW}!{RESET} {w}")
                         print()
 
                     # Show transcript preview

@@ -71,36 +71,85 @@ class SunglassesScanner:
         """
         FAST: Scan email body + small attachments.
 
-        Returns dict with body result + per-attachment results.
-        Large audio/video attachments are flagged for DEEP scan.
+        Returns the canonical result dict (see ``sunglasses.result``) plus
+        ``body``, ``attachments`` and ``needs_deep_scan``.
+
+        v0.5.6 repair: the aggregate's coverage spans EVERY attachment, including
+        the ones deferred to DEEP. Before this, an ordinary body plus one
+        untranscribed audio attachment returned ``is_clean: true`` with the
+        attachment sitting in ``needs_deep_scan`` -- the aggregate reported on the
+        part it read and stayed silent about the part it did not, which is the
+        misleading-success class this release exists to close. Deferring work is
+        not the same as finding nothing, and the axes now say so.
         """
-        results = {
-            "body": self.engine.scan(email_body, channel="message").to_dict(),
-            "attachments": [],
-            "needs_deep_scan": [],
-            "is_clean": True,
-        }
+        from .result import normalize
 
         body_result = self.engine.scan(email_body, channel="message")
-        results["body"] = body_result.to_dict()
-        if not body_result.is_clean:
-            results["is_clean"] = False
+        body_norm = normalize(body_result, source="<email body>")
 
-        if attachments:
-            for path in attachments:
-                if self.needs_deep_scan(path):
-                    results["needs_deep_scan"].append({
-                        "file": path,
-                        "reason": "Large media file — requires DEEP scan",
-                        "command": f'scanner.scan_deep("{path}")',
-                    })
-                else:
-                    att_result = self.scan_fast(path)
-                    results["attachments"].append(att_result)
-                    if not att_result.get("is_clean", True):
-                        results["is_clean"] = False
+        attachments_out = []
+        pending = []
+        warnings = list(body_norm["warnings"])
+        threat_found = bool(body_norm["threat_found"])
+        extraction_complete = bool(body_norm["extraction_complete"])
+        truncated = bool(body_norm["truncated"])
+        findings = list(body_norm["findings"])
 
-        return results
+        for path in attachments or []:
+            if self.needs_deep_scan(path):
+                pending.append({
+                    "file": path,
+                    "reason": "Large media file — requires DEEP scan",
+                    "command": f'scanner.scan_deep("{path}")',
+                })
+                # Deferred is NOT inspected. This is the line ASTRA's R1 rerun
+                # was about: nothing in this attachment has been read yet.
+                extraction_complete = False
+                warnings.append(
+                    f"Attachment not inspected — {os.path.basename(path)} requires a "
+                    f"DEEP scan and has not been transcribed."
+                )
+                continue
+
+            try:
+                att = self.scan_fast(path)
+            except Exception as exc:  # operational failure on one attachment
+                # One unreadable attachment must not be reported as a clean email,
+                # and must not take down the scan of the others.
+                attachments_out.append({
+                    "file": path,
+                    "error": str(exc),
+                    "threat_found": False,
+                    "inspection_complete": False,
+                    "is_clean": False,
+                })
+                extraction_complete = False
+                warnings.append(f"Attachment not inspected — {os.path.basename(path)}: {exc}")
+                continue
+
+            attachments_out.append(att)
+            if att.get("threat_found"):
+                threat_found = True
+            if not att.get("inspection_complete", False):
+                extraction_complete = False
+            if att.get("truncated"):
+                truncated = True
+            warnings.extend(att.get("warnings") or [])
+            findings.extend(att.get("findings") or att.get("threats") or [])
+
+        aggregate = {
+            "threat_found": threat_found,
+            "extraction_complete": extraction_complete,
+            "truncated": truncated,
+            "warnings": warnings,
+            "findings": findings,
+            "channel": "message",
+        }
+        return normalize(aggregate, source="<email>", extra={
+            "body": body_result.to_dict(),
+            "attachments": attachments_out,
+            "needs_deep_scan": pending,
+        })
 
     def scan_fast(self, file_path: str) -> dict:
         """
@@ -118,31 +167,37 @@ class SunglassesScanner:
         """
         from .extractors.dispatch import extract_file_sources
 
+        from .result import normalize
+
         extraction = extract_file_sources(file_path)
         result = self.engine.scan(extraction.text, channel="file")
 
-        # The library aggregate carries the SAME three axes as the CLI. Before this,
-        # `is_clean` was copied straight off the engine result and sat next to
-        # `extraction_complete: false` in the same document -- so a ZIP nobody could
-        # read came back through the MCP wire as a clean scan. Finding nothing in
-        # the part we managed to read is not the same claim as reading all of it.
-        inspection_complete = bool(extraction.complete) and not getattr(
-            result, "truncated", False
+        # The axes are no longer computed here. `normalize()` owns that decision for
+        # every surface in the package (see sunglasses/result.py) -- this function's
+        # job is to say what was extracted and hand the evidence over. Before the
+        # round-3 repair each consumer did this arithmetic itself, and they did not
+        # all agree.
+        return normalize(
+            {
+                "extraction_complete": bool(extraction.complete),
+                "truncated": bool(getattr(result, "truncated", False)),
+                "warnings": list(extraction.warnings),
+                "findings": list(result.findings),
+                "threat_found": bool(getattr(result, "threat_found", not result.is_clean)),
+                "decision": result.decision,
+                "channel": "file",
+                "event_id": getattr(result, "event_id", ""),
+                "latency_ms": getattr(result, "latency_ms", 0.0),
+            },
+            source=file_path,
+            extra={
+                "file": file_path,
+                "sources_found": len(extraction.sources),
+                "sources": extraction.labels,
+                # kept for callers that predate the canonical name
+                "threats": list(result.findings),
+            },
         )
-        threat_found = bool(getattr(result, "threat_found", not result.is_clean))
-        return {
-            "file": file_path,
-            "sources_found": len(extraction.sources),
-            "sources": extraction.labels,
-            "threat_found": threat_found,
-            "inspection_complete": inspection_complete,
-            "is_clean": (not threat_found) and inspection_complete,
-            "decision": result.decision,
-            "threats": result.findings,
-            "extraction_complete": extraction.complete,
-            "truncated": bool(getattr(result, "truncated", False)),
-            "warnings": list(extraction.warnings),
-        }
 
     def _scan_image_fast(self, path: str) -> dict:
         """FAST: Image scan (OCR + EXIF + QR codes)."""
@@ -208,6 +263,17 @@ class SunglassesScanner:
 
         Returns full scan results after processing.
         """
+        from .extractors.dispatch import _probe_readable
+        from .result import normalize
+
+        # Invariant B (round-3 repair): the readability probe runs at EVERY public
+        # entry, not once per branch. The deep path selects its extractor from the
+        # file suffix and the missing-decoder branch returns before anything opens
+        # the file -- so a chmod-000 mp3 was answered from its name alone and came
+        # back through MCP as a successful call. Probing here covers both branches
+        # and both `allow_deep` values at once. Raises UnreadableFile (operational).
+        _probe_readable(file_path)
+
         ext = os.path.splitext(file_path)[1].lower()
         start = time.time()
 
@@ -218,8 +284,19 @@ class SunglassesScanner:
         else:
             result = {"file": file_path, "error": f"Unsupported deep scan type: {ext}"}
 
-        result["scan_time_seconds"] = round(time.time() - start, 2)
-        return result
+        elapsed = round(time.time() - start, 2)
+        if result.get("error"):
+            # An operational error is not a verdict; it stays an error document and
+            # the caller maps it to exit 2 / isError. Normalizing it would dress a
+            # failure up as a scan.
+            result["scan_time_seconds"] = elapsed
+            return result
+
+        # The dependency-warning dict from `_scan_audio`/`_scan_video` has no axes
+        # at all. It gets them here, and they say "not inspected" -- which is the
+        # truth when there is no decoder installed.
+        return normalize(result, source=file_path,
+                         extra={"file": file_path, "scan_time_seconds": elapsed})
 
     def _scan_audio(self, path: str) -> dict:
         """DEEP: Audio scan via Whisper."""
@@ -254,30 +331,38 @@ class SunglassesScanner:
         "needs_deep_scan" notice instead of processing. Safe for
         always-on inline use — never blocks unexpectedly.
         """
+        from .extractors.dispatch import _probe_readable
+        from .result import normalize
+
         if not os.path.exists(input_path):
             return {"error": f"File not found: {input_path}"}
+
+        # Invariant B: probe at the entry, once, before any routing decision. The
+        # media shortcut below picks its branch from the extension and (with
+        # allow_deep=False) never opens the file, so without this an unreadable
+        # media file was classified from its filename.
+        _probe_readable(input_path)
 
         if self.needs_deep_scan(input_path):
             if allow_deep:
                 return self.scan_deep(input_path)
-            else:
-                ext = os.path.splitext(input_path)[1].lower()
-                # Nothing was transcribed, so nothing was inspected. This document
-                # must carry the same axes as every other one, or a caller that
-                # checks `is_clean` reads silence as a pass.
-                return {
-                    "file": input_path,
-                    "needs_deep_scan": True,
-                    "reason": f"Audio/video file ({ext}) requires DEEP scan",
-                    "action": "Call scanner.scan_deep() or set allow_deep=True",
-                    "threat_found": False,
-                    "inspection_complete": False,
-                    "is_clean": False,
+            ext = os.path.splitext(input_path)[1].lower()
+            # Nothing was transcribed, so nothing was inspected. The axes come from
+            # the one normalizer, like every other document this package emits.
+            return normalize(
+                {
                     "extraction_complete": False,
                     "warnings": [
                         f"Audio/video content not transcribed — nothing in "
                         f"{os.path.basename(input_path)} was inspected."
                     ],
-                }
-        else:
-            return self.scan_fast(input_path)
+                },
+                source=input_path,
+                extra={
+                    "file": input_path,
+                    "needs_deep_scan": True,
+                    "reason": f"Audio/video file ({ext}) requires DEEP scan",
+                    "action": "Call scanner.scan_deep() or set allow_deep=True",
+                },
+            )
+        return self.scan_fast(input_path)

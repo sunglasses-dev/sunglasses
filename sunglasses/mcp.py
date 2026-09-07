@@ -237,6 +237,16 @@ def _tool_scan_file(arguments):
             "isError": True,
         }
 
+    # Everything past this point is a scan document, so it goes through the one
+    # normalizer before an agent ever sees it. The deep branch used to hand back
+    # `scan_audio`'s dependency-warning dict verbatim -- `file`, `warning`,
+    # `scan_time_seconds` and NOT ONE of the three axes -- which this server then
+    # published as a successful call with no incompleteness notice, because the
+    # notice below keys off `inspection_complete is False` and the key was absent.
+    # An absent axis is now false, not clean.
+    from .result import normalize
+    result = normalize(result, source=file_path)
+
     # A completed invocation over content we could not fully read is a SUCCESSFUL
     # tool call whose document says "incomplete, not clean". It is not isError --
     # nothing went wrong operationally -- but it must never read as a clean scan.
