@@ -510,9 +510,15 @@ def _scan_repo(args, engine):
                 if remaining > 0:
                     print(f"    {DIM}... and {remaining} more findings{RESET}")
                 break
+        if incomplete:
+            # A finding never cancels a coverage failure -- the invariant this
+            # release exists for, stated on the surface a human actually reads.
+            _print_coverage_banner("part of this repo was not read")
+            print(f"  {DIM}Findings below are from the inspected scope only.{RESET}")
         print()
     elif incomplete:
-        print(f"\n  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
+        _print_coverage_banner("part of this repo was not read")
+        print(f"  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
         if nothing_inspected:
             print(f"  {DIM}No files were inspected at all, so this is not a "
                   f"result about the repo's contents.{RESET}\n")
@@ -625,6 +631,23 @@ def _read_stdin_text(args) -> str:
         )
 
 
+def _print_coverage_banner(detail, stream=None):
+    """The ONE sentence that says a result is not a clean bill of health.
+
+    v0.5.6 round 4. Three human renderers -- single file, repo summary, deep scan
+    -- each announced lost coverage in their own words: `INCOMPLETE SCAN`,
+    `Files NOT inspected`, and a bare list of `!` lines under an `INCOMPLETE`
+    header. All three were truthful, and that is not the same as consistent: a
+    reader who has learned what `INCOMPLETE SCAN` means on one surface does not
+    see it on the next, and a grep for it across a CI log finds two thirds of the
+    cases. The reports below stay different -- a repo summary is not a file
+    verdict -- but the sentence that carries "this is not clean" is the same
+    string everywhere, because it is the same fact everywhere.
+    """
+    out = stream or sys.stdout
+    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— {detail}{RESET}", file=out)
+
+
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
     warnings = list(getattr(result, "extraction_warnings", None) or [])
@@ -645,7 +668,7 @@ def _print_extraction_warnings(result, stream=None):
     if not warnings:
         return
     out = stream or sys.stdout
-    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— part of this file was not read{RESET}", file=out)
+    _print_coverage_banner("part of this file was not read", stream=out)
     for w in warnings:
         print(f"  {YELLOW}!{RESET} {w}", file=out)
     if result.is_clean:
@@ -842,7 +865,8 @@ def cmd_scan(args):
                     elif exit_code == EXIT_INCOMPLETE:
                         print(f"\n  {YELLOW}{BOLD}INCOMPLETE{RESET} {DIM}({elapsed:.1f}s){RESET}")
                         print(f"  {DIM}No findings in the inspected scope — but this file was "
-                              f"not fully read, so this is not a clean bill of health.{RESET}\n")
+                              f"not fully read, so this is not a clean bill of health.{RESET}")
+                        _print_coverage_banner("part of this file was not read")
                         for w in result_dict.get("warnings", []):
                             print(f"  {YELLOW}!{RESET} {w}")
                         print()
@@ -855,6 +879,7 @@ def cmd_scan(args):
                         # partially transcribed file with one finding read as a
                         # complete scan that happened to find something.
                         if not inspection_complete:
+                            _print_coverage_banner("part of this file was not read")
                             for w in result_dict.get("warnings", []):
                                 print(f"  {YELLOW}!{RESET} {w}")
                         print()

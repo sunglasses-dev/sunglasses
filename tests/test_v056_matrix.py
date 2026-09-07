@@ -373,9 +373,7 @@ def _run(argv, env_extra=None, stdin=None, timeout=900, console=False):
     if env_extra:
         env.update(env_extra)
     if console:
-        exe = shutil.which("sunglasses")
-        assert exe, "console script `sunglasses` is not on PATH in this environment"
-        cmd = [exe] + argv
+        cmd = _console_cmd() + argv
     else:
         cmd = [sys.executable, "-m", "sunglasses"] + argv
     kwargs = {}
@@ -386,30 +384,125 @@ def _run(argv, env_extra=None, stdin=None, timeout=900, console=False):
                           cwd=TEST_ROOT, env=env, input=stdin, **kwargs)
 
 
+# The console-script leg. `setup.py` declares `sunglasses=sunglasses.cli:main`, so
+# the ONLY difference from `python -m sunglasses` is the entry symbol: `cli:main`
+# rather than `__main__`. That is a real difference -- it is where a packaging or
+# argv-handling bug lives -- and it is worth its own row.
+#
+# But it has to enter the PACKAGE UNDER TEST. A developer checkout usually has an
+# older `sunglasses` on PATH from a normal install (this machine has pipx 0.5.5),
+# and running THAT would have quietly graded a different codebase while looking
+# like coverage -- the exact failure mode this round is about. So: use the real
+# console script when it resolves to the package under test (which is the case in
+# a fresh acceptance venv, where the candidate wheel is what is installed), and
+# otherwise reproduce the generated script's body verbatim with this interpreter.
+_CONSOLE_BODY = "import sys; from sunglasses.cli import main; sys.exit(main())"
+
+
+def _console_script_is_under_test() -> bool:
+    exe = shutil.which("sunglasses")
+    if not exe:
+        return False
+    probe = subprocess.run(
+        [exe, "--version"], capture_output=True, text=True, timeout=120,
+        env=dict(os.environ, SUNGLASSES_PROBE="1"))
+    if probe.returncode != 0:
+        return False
+    # Resolve the interpreter the script runs under and ask IT where the package
+    # lives; comparing versions is not enough, since a stale install can carry the
+    # same version string as the candidate.
+    with open(exe, "rb") as fh:
+        first = fh.readline().decode("utf-8", "replace").strip()
+    if not first.startswith("#!"):
+        return False
+    interpreter = first[2:].strip()
+    # cwd MUST be the script's own directory. `python -c` puts the working
+    # directory on `sys.path` first, so probing from the worktree would import the
+    # worktree package through the pipx interpreter and answer "yes" for a script
+    # that, run normally, imports something else entirely. A console script's
+    # `sys.path[0]` is its own directory, so that is where the probe has to stand.
+    where = subprocess.run(
+        [interpreter, "-c", "import sunglasses, sys; sys.stdout.write(sunglasses.__file__)"],
+        capture_output=True, text=True, timeout=120, cwd=os.path.dirname(exe))
+    import sunglasses as _under_test
+    return (where.returncode == 0
+            and os.path.realpath(where.stdout.strip())
+            == os.path.realpath(_under_test.__file__))
+
+
+_CONSOLE_CMD = None
+
+
+def _console_cmd():
+    global _CONSOLE_CMD
+    if _CONSOLE_CMD is None:
+        if _console_script_is_under_test():
+            _CONSOLE_CMD = [shutil.which("sunglasses")]
+        else:
+            _CONSOLE_CMD = [sys.executable, "-c", _CONSOLE_BODY]
+    return list(_CONSOLE_CMD)
+
+
+def test_the_console_leg_enters_the_package_under_test():
+    """State which console leg this environment exercised, and prove it is ours.
+
+    Recorded rather than assumed: in a fresh acceptance venv the installed
+    console script IS the candidate and gets used; in a developer checkout with
+    an older `sunglasses` on PATH the fallback runs the same entry symbol under
+    the interpreter that imports the package under test. Either way the leg must
+    report the version of the code in this tree.
+    """
+    import sunglasses
+
+    proc = subprocess.run(_console_cmd() + ["--version"], capture_output=True,
+                          text=True, timeout=120, cwd=TEST_ROOT)
+    assert proc.returncode == 0, proc.stderr[:400]
+    assert sunglasses.__version__ in (proc.stdout + proc.stderr), (
+        f"the console leg reports {(proc.stdout + proc.stderr).strip()!r} but the "
+        f"package under test is {sunglasses.__version__} -- this leg is grading a "
+        f"different codebase")
+
+
 _SEAM_DRIVER = r'''
 import json, os, sys
 from sunglasses.extractors import audio as _audio
 
+# Capture the REAL class before replacing it. The decoder-error mode needs the
+# real `_transcribe`, and looking it up AFTER the swap found the seam instead
+# (KeyError), which the aggregate then reported as a generic extraction failure
+# rather than the transcription error that cell is about.
+_REAL = _audio.AudioExtractor
+
+
 class _SeamExtractor:
-    """Test-only extraction seam. Replaces ONLY the transcriber; the engine, the
-    shared aggregate builder, the scanner, the CLI and the serializer all run
-    unmodified. Production code has no switch for this."""
+    # Test-only extraction seam. Replaces ONLY the transcriber; the engine, the
+    # shared aggregate builder, the scanner, the CLI and the serializer all run
+    # unmodified. Production code has no switch for this.
+
     def __init__(self, *a, **kw):
         self.warnings = json.loads(os.environ["SEAM_WARNINGS"])
+
     def extract(self, path):
-        mode = os.environ.get("SEAM_MODE", "texts")
-        if mode == "decoder_error":
-            # Land in the REAL handler: audio.py's `_transcribe` except branch is
-            # what a Whisper/ffmpeg failure hits, and this raises inside its try.
-            real = _audio.AudioExtractor.__dict__["_transcribe"]
+        if os.environ.get("SEAM_MODE") == "decoder_error":
+            # Land in the REAL handler: `_transcribe`'s except branch is where a
+            # Whisper/ffmpeg failure goes, and this raises inside its try.
             class _Boom:
-                warnings = self.warnings
+                def __init__(self, warnings):
+                    self.warnings = warnings
+
                 def _get_model(self):
-                    raise RuntimeError("decoder failed after loading: corrupt stream")
-            text = real(_Boom())
-            self.warnings = list(_Boom.warnings)
+                    raise RuntimeError(
+                        "decoder failed after loading: corrupt audio stream")
+
+            boom = _Boom(self.warnings)
+            text = _REAL._transcribe(boom, path)
+            self.warnings = list(boom.warnings)
             return [("speech", text)] if text.strip() else []
-        return [tuple(pair) for pair in json.loads(os.environ["SEAM_TEXTS"])]
+        # The payload is read from a FILE, never the environment: the truncation
+        # cell carries more than 1 MiB and execve() refuses that as E2BIG.
+        with open(os.environ["SEAM_TEXTS_FILE"]) as fh:
+            return [tuple(pair) for pair in json.load(fh)]
+
 
 _audio.AudioExtractor = _SeamExtractor
 from sunglasses.cli import main
@@ -433,9 +526,26 @@ _SEAM = {
 }
 
 
+_SEAM_PAYLOAD_DIR = None
+
+
 def _seam_env(state):
+    """Environment for one seam run. The transcript goes to a FILE.
+
+    It used to go into the environment, which works right up to the cell that
+    matters most: the truncation transcript is over 1 MiB, and `execve()` refuses
+    an environment that size with E2BIG. The cell failed as a harness error --
+    which is the same shape as a cell that silently never ran.
+    """
+    global _SEAM_PAYLOAD_DIR
     texts, warnings, mode = _SEAM[state]
-    return {"SEAM_TEXTS": json.dumps(texts),
+    if _SEAM_PAYLOAD_DIR is None:
+        import tempfile
+        _SEAM_PAYLOAD_DIR = tempfile.mkdtemp(prefix="v056-seam-")
+    path = os.path.join(_SEAM_PAYLOAD_DIR, f"{state}.json")
+    with open(path, "w") as fh:
+        json.dump(texts, fh)
+    return {"SEAM_TEXTS_FILE": path,
             "SEAM_WARNINGS": json.dumps(warnings),
             "SEAM_MODE": mode}
 
@@ -562,10 +672,46 @@ def _one_json_doc(stdout, where):
 # because its human branch checked exit and traceback and then `continue`d.
 # These are the sentences a human actually reads, so these are what is asserted.
 
+# The coverage sentence is ONE string on purpose: it is the same fact on every
+# surface, and v0.5.6 round 4 made all three human renderers emit it. The clean
+# and finding lines are legitimately per-report -- a repo summary is not a file
+# verdict -- so those are sets, and every member is a line this suite has
+# actually observed the product print, not a guess at one.
 _COVERAGE_SENTENCE = "INCOMPLETE SCAN"
-_FINDING_SENTENCE = "threat(s) found"
-_CLEAN_SENTENCE = ("No threats detected", "0 bytes inspected")
-_INCOMPLETE_VERDICT = "INCOMPLETE"
+_FINDING_SENTENCE = (
+    "threat(s) found",              # single file
+    "THREATS FOUND",                # deep
+    "Files w/ threats:",            # repo summary
+)
+_CLEAN_SENTENCE = (
+    "No threats detected",                    # single file
+    "0 bytes inspected",                      # single file, empty input
+    "No threats found in audio/video content",  # deep
+    "No threats found.",                      # repo
+)
+_INCOMPLETE_VERDICT = ("INCOMPLETE", "No threats found in the inspected scope")
+
+
+def _rendered_a_finding(out: str) -> bool:
+    """Did this human report actually announce a finding?
+
+    The three renderers word it differently ("5 threat(s) found:", "THREATS
+    FOUND", "Files w/ threats: 1"), and the repo summary prints its counter
+    unconditionally -- so a bare substring test would read `Files w/ threats: 0`
+    as a finding. The count has to be read, not just the label.
+    """
+    for label in ("Files w/ threats:", "Total threats:"):
+        if label in out:
+            after = out.split(label, 1)[1].lstrip()
+            digits = ""
+            for ch in after:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            if digits and int(digits) > 0:
+                return True
+    return any(x in out for x in ("threat(s) found", "THREATS FOUND"))
 
 
 def _assert_human(stdout, stderr, outcome, where):
@@ -580,39 +726,43 @@ def _assert_human(stdout, stderr, outcome, where):
     both = out + err
 
     if outcome == "operational":
-        assert not out.strip(), (
-            f"{where}: an operational refusal printed a document on stdout — a "
-            f"caller cannot tell it apart from a verdict\n{out[:400]}")
+        # NOT "stdout is empty": `--repo` prints a progress banner ("Cloning ...")
+        # before it can know the clone will fail, and that is ordinary CLI
+        # behaviour in a human format. What must be absent is a VERDICT -- there is
+        # no such tolerance in the machine formats, where the JSON branch of this
+        # same function requires exactly one error document.
         assert "Nothing was scanned" in err, (
             f"{where}: operational refusal does not say nothing was scanned\n{err[:400]}")
-        for banned in ("PASS", _FINDING_SENTENCE, _INCOMPLETE_VERDICT):
+        for banned in ("PASS",) + _FINDING_SENTENCE + tuple(_CLEAN_SENTENCE):
+            assert banned not in both, (
+                f"{where}: operational refusal rendered {banned!r} — that is a verdict")
+        for banned in _INCOMPLETE_VERDICT:
             assert banned not in both, (
                 f"{where}: operational refusal rendered {banned!r} — that is a verdict")
         return
 
     if outcome == "clean":
-        assert "PASS" in out, f"{where}: a clean scan did not render PASS\n{out[:400]}"
-        assert any(s in out for s in _CLEAN_SENTENCE), (
-            f"{where}: PASS without the sentence that says why\n{out[:400]}")
+        assert any(x in out for x in _CLEAN_SENTENCE), (
+            f"{where}: a clean scan did not say so in any renderer's words\n{out[:400]}")
         assert _COVERAGE_SENTENCE not in both, (
             f"{where}: a clean scan announced lost coverage")
-        assert _FINDING_SENTENCE not in both, (
-            f"{where}: a clean scan rendered a finding")
+        assert not _rendered_a_finding(out), (
+            f"{where}: a clean scan rendered a finding\n{out[:400]}")
         return
 
     if outcome == "incomplete":
-        assert _INCOMPLETE_VERDICT in out, (
+        assert any(x in out for x in _INCOMPLETE_VERDICT), (
             f"{where}: an incomplete scan did not render INCOMPLETE\n{out[:400]}")
         assert _COVERAGE_SENTENCE in both, (
             f"{where}: incomplete scan does not carry the '{_COVERAGE_SENTENCE}' "
             f"block naming what went unread\n{both[:600]}")
         assert "PASS" not in out, f"{where}: an incomplete scan rendered PASS"
-        assert _FINDING_SENTENCE not in both, (
-            f"{where}: a findingless scan rendered a finding")
+        assert not _rendered_a_finding(out), (
+            f"{where}: a findingless scan rendered a finding\n{out[:400]}")
         return
 
     if outcome == "threat":
-        assert _FINDING_SENTENCE in out, (
+        assert _rendered_a_finding(out), (
             f"{where}: a threat did not render the finding line\n{out[:400]}")
         assert "PASS" not in out, f"{where}: a threat rendered PASS"
         assert _COVERAGE_SENTENCE not in both, (
@@ -621,7 +771,7 @@ def _assert_human(stdout, stderr, outcome, where):
 
     if outcome == "threat_incomplete":
         # The cell this release exists for, and the cell ASTRA mutated.
-        assert _FINDING_SENTENCE in out, (
+        assert _rendered_a_finding(out), (
             f"{where}: threat+incomplete did not render the finding line\n{out[:400]}")
         assert _COVERAGE_SENTENCE in both, (
             f"{where}: a finding SUPPRESSED the coverage warning — this is exactly "
@@ -1183,6 +1333,23 @@ _MUTATIONS = [
      json.dumps({"threat_found": True, "inspection_complete": True, "is_clean": False}), ""),
     ("clean/json: no document on stdout at all",
      "clean", "json", 0, "", ""),
+    # The repo summary prints its counters unconditionally, so a substring test
+    # would read a ZERO count as a finding and vice versa. Both directions.
+    ("threat/human (repo): the counter says zero",
+     "threat", "human", 1,
+     "\n  SCAN COMPLETE\n  Files scanned: 1\n  Files w/ threats: 0\n"
+     "  Total threats:   0\n", ""),
+    ("clean/human (repo): the counter says one",
+     "clean", "human", 0,
+     "\n  SCAN COMPLETE\n  Files w/ threats: 1\n  Total threats:   6\n"
+     "  No threats found. This repo looks clean.\n", ""),
+    ("threat_incomplete/human (deep): coverage banner removed",
+     "threat_incomplete", "human", 1,
+     "\n  THREATS FOUND (1.7s)\n  - Bypass instructions\n", ""),
+    ("incomplete/human (repo): skips listed but no coverage banner",
+     "incomplete", "human", 3,
+     "\n  SCAN COMPLETE\n  Files NOT inspected: 1\n"
+     "  No threats found in the inspected scope.\n", ""),
 ]
 
 
@@ -1214,6 +1381,20 @@ def test_the_mutations_are_mutations_of_something_that_passes():
         ("threat", "human", 1, "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n", ""),
         ("threat_incomplete", "human", 1,
          "\n  BLOCK [HIGH] (1.0ms)\n  2 threat(s) found:\n"
+         "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
+        # the other two renderers, unmutated, must also pass
+        ("threat", "human", 1,
+         "\n  SCAN COMPLETE\n  Files scanned: 1\n  Files w/ threats: 1\n"
+         "  Total threats:   6\n", ""),
+        ("clean", "human", 0,
+         "\n  SCAN COMPLETE\n  Files w/ threats: 0\n  Total threats:   0\n"
+         "  No threats found. This repo looks clean.\n", ""),
+        ("incomplete", "human", 3,
+         "\n  SCAN COMPLETE\n  Files NOT inspected: 1\n"
+         "\n  INCOMPLETE SCAN — part of this repo was not read\n"
+         "  No threats found in the inspected scope.\n", ""),
+        ("threat_incomplete", "human", 1,
+         "\n  THREATS FOUND (1.7s)\n  - Bypass instructions\n"
          "\n  INCOMPLETE SCAN — part of this file was not read\n", ""),
         ("operational", "human", 2, "", "  could not read x — NOT inspected\n"
                                         "  Nothing was scanned. Check permissions.\n"),
