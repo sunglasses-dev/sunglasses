@@ -116,24 +116,24 @@ class ImageExtractor:
         # OCR every frame, same contract as `extract()`.
         results.extend(self._ocr_frames_of(img, source=filename))
 
-        # v0.5.6 round 6 (ASTRA H5). `_ocr_frames_of` walks the sequence and LEAVES
-        # PIL parked on the last frame it seeked to. The metadata read below then
-        # ran against whatever frame the OCR walk happened to stop on, so on
-        # `metadata-first-page.tiff` the path API returned seven findings and this
-        # in-memory API returned none -- and recorded no failure, because nothing
-        # here knew a different frame had been read. Two APIs over the same bytes
-        # must answer the same question; seek back to frame 0 so they do.
+        # v0.5.6 round 7 (ASTRA I2). Round 6 put a `seek(0)` here and then read
+        # metadata ONCE. That fixed the first page by breaking the last: 0 -> 7
+        # findings for page-0-only metadata, and 7 -> 0 for page-1-only, with an
+        # empty `failures` list both times. A seek to frame 0 is not evidence that
+        # every metadata frame was read -- it just moves which page gets lost.
+        #
+        # The path and bytes APIs now run the SAME bounded walk, which is the only
+        # version of "they agree" that survives a fixture on the other page.
+        # `_metadata_frames_of` handles its own seeking, so the parked position the
+        # OCR walk left behind no longer decides what metadata is seen.
         try:
             if getattr(img, "n_frames", 1) > 1:
                 img.seek(0)
-        except Exception as exc:
-            self.failures.append(
-                f"could not return to frame 0 for metadata "
-                f"({exc.__class__.__name__}: {exc}) — metadata may be incomplete")
+        except Exception:
+            # Not fatal and not silent: the walk below reports what it cannot reach.
+            pass
 
-        # EXIF from PIL object
-        exif_texts = self._exif_from_pil(img)
-        for field, text in exif_texts:
+        for field, text in self._metadata_frames_of(img, source=filename):
             if text.strip():
                 results.append((f"exif:{field}", text))
 
@@ -168,8 +168,36 @@ class ImageExtractor:
         """OCR each frame. Complete only if EVERY frame reached OCR."""
         from PIL import ImageSequence
 
-        total = getattr(img, "n_frames", 1) or 1
+        # Round 7 (ASTRA I1, same mechanism as QR): `n_frames` is a property that
+        # PARSES, so a damaged later descriptor makes it RAISE -- and the `getattr`
+        # default never fires, because it only covers a missing attribute, not a
+        # getter that throws. Unguarded, that exception escaped to `dispatch`, which
+        # reported "Image extraction failed" and lost OCR and metadata for the whole
+        # file including the frames that read perfectly.
+        try:
+            total = getattr(img, "n_frames", 1) or 1
+            total_known = True
+        except Exception as exc:
+            total, total_known = None, False
+            self.failures.append(
+                f"frame count unreadable for OCR ({exc.__class__.__name__}) — "
+                f"frames after the first were NOT read by OCR")
         results: List[Tuple[str, str]] = []
+
+        if not total_known:
+            # Read the frame PIL already holds rather than abandoning the file.
+            try:
+                text = self._ocr_from_pil(img)
+            except OCRUnavailable as exc:
+                self.failures.append(str(exc))
+                return results
+            except Exception as exc:
+                self.failures.append(
+                    f"first frame not read by OCR ({exc.__class__.__name__})")
+                return results
+            if text.strip():
+                results.append(("ocr", text))
+            return results
 
         if total == 1:
             # The ordinary case, and the label stays `ocr` so nothing downstream
@@ -186,7 +214,15 @@ class ImageExtractor:
                 results.append(("ocr", text))
             return results
 
-        for index, frame in enumerate(ImageSequence.Iterator(img)):
+        try:
+            frames = list(ImageSequence.Iterator(img))
+        except Exception as exc:
+            self.failures.append(
+                f"frame sequence unreadable for OCR ({exc.__class__.__name__}) — "
+                f"only the first frame was read by OCR")
+            frames = [img]
+
+        for index, frame in enumerate(frames):
             if index >= self.MAX_OCR_FRAMES:
                 break
             try:
@@ -211,7 +247,7 @@ class ImageExtractor:
             if text.strip():
                 results.append((f"ocr:frame:{index}", text))
 
-        if total > self.MAX_OCR_FRAMES:
+        if total_known and total > self.MAX_OCR_FRAMES:
             self.failures.append(
                 f"{total - self.MAX_OCR_FRAMES} of {total} frames not inspected — "
                 f"{source} exceeds the {self.MAX_OCR_FRAMES}-frame OCR cap")
@@ -228,15 +264,43 @@ class ImageExtractor:
                 f"image metadata not read ({exc.__class__.__name__}: {exc})")
             return []
 
-        total = getattr(img, "n_frames", 1) or 1
-        if total == 1:
+        return self._metadata_frames_of(img, source=os.path.basename(image_path))
+
+    def _metadata_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
+        """EXIF and embedded text from every frame of an ALREADY-OPEN image.
+
+        v0.5.6 round 7 (ASTRA I2). Split out of `_metadata_all_frames` so the
+        in-memory API can run the SAME bounded walk instead of its own single read.
+        Round 6 gave `extract_from_bytes` a `seek(0)` and one `_exif_from_pil()`
+        call, which fixed the first page by BREAKING the last: on ASTRA's controls
+        the bytes API went 0 -> 7 findings for page-0-only metadata and 7 -> 0 for
+        page-1-only, with an empty `failures` list either way. Trading one page's
+        findings for another's is not a repair, and a silent trade is the same
+        false-completeness defect wearing different clothes.
+
+        The frame-count query is also hardened here for the I1 reason: `n_frames`
+        is a property that PARSES, so a damaged later descriptor makes it raise, and
+        `getattr(..., 1)` does not catch a getter that throws. Frames we can read
+        are read; what we cannot reach is named.
+        """
+        from PIL import ImageSequence
+
+        try:
+            total = getattr(img, "n_frames", 1) or 1
+            total_known = True
+        except Exception as exc:
+            total, total_known = None, False
+            self.failures.append(
+                f"frame count unreadable for metadata ({exc.__class__.__name__}) — "
+                f"frames after the first were NOT inspected for metadata")
+
+        if total_known and total == 1:
             return self._exif_from_pil(img)
 
         results: List[Tuple[str, str]] = []
         seen = set()
-        for index, frame in enumerate(ImageSequence.Iterator(img)):
-            if index >= self.MAX_OCR_FRAMES:
-                break
+
+        def _collect(frame, index):
             for field, text in self._exif_from_pil(frame):
                 # Frame 0 keeps the bare label so nothing downstream sees a new
                 # source name for the ordinary single-page case; later frames are
@@ -248,10 +312,50 @@ class ImageExtractor:
                     continue
                 seen.add(key)
                 results.append((label, text))
-        if total > self.MAX_OCR_FRAMES:
+
+        iterator = None
+        try:
+            iterator = iter(ImageSequence.Iterator(img))
+        except Exception as exc:
+            self.failures.append(
+                f"frame sequence unreadable for metadata ({exc.__class__.__name__}) "
+                f"— only the first frame's metadata was inspected")
+
+        if iterator is None:
+            # The I1 shape on the metadata side: the sequence is unreadable, the
+            # frame PIL already holds is not, and that is where a known finding can
+            # live. Read it rather than returning nothing.
+            try:
+                _collect(img, 0)
+            except Exception as exc:
+                self.failures.append(
+                    f"first frame metadata not read ({exc.__class__.__name__}: {exc})")
+            return results
+
+        index = 0
+        while index < self.MAX_OCR_FRAMES:
+            try:
+                frame = next(iterator)
+            except StopIteration:
+                break
+            except Exception as exc:
+                self.failures.append(
+                    f"frame {index} could not be reached for metadata "
+                    f"({exc.__class__.__name__}) — that frame and any after it were "
+                    f"NOT inspected for metadata")
+                break
+            try:
+                _collect(frame, index)
+            except Exception as exc:
+                self.failures.append(
+                    f"frame {index} metadata not read "
+                    f"({exc.__class__.__name__}: {exc})")
+            index += 1
+
+        if total_known and total > self.MAX_OCR_FRAMES:
             self.failures.append(
                 f"metadata for {total - self.MAX_OCR_FRAMES} of {total} frames not "
-                f"read — {os.path.basename(image_path)} exceeds the "
+                f"read — {source} exceeds the "
                 f"{self.MAX_OCR_FRAMES}-frame cap")
         return results
 
@@ -343,6 +447,35 @@ class ImageExtractor:
         b"\x00" * 8: "utf-8",          # "undefined" -- try UTF-8 and say if it fails
     }
 
+    @staticmethod
+    def _decode_spans(raw: bytes, encoding: str):
+        """Decode with `encoding`, keeping everything that decodes and counting the
+        decoder's ACTUAL error spans.
+
+        Returns ``(text, undecodable_bytes, first_bad_offset)``. This is
+        `dispatch.decode_lossy`'s method generalised to a named codec: each
+        `UnicodeDecodeError` reports the exact ``[start, end)`` it could not read,
+        so the count is a fact about the INPUT. A legitimate U+FFFD in the source
+        is preserved and NOT counted, which is the whole point (ASTRA I5a).
+        """
+        parts = []
+        undecodable = 0
+        first_bad = None
+        index = 0
+        while index < len(raw):
+            try:
+                parts.append(raw[index:].decode(encoding))
+                break
+            except UnicodeDecodeError as exc:
+                head = raw[index:index + exc.start]
+                if head:
+                    parts.append(head.decode(encoding, errors="ignore"))
+                if first_bad is None:
+                    first_bad = index + exc.start
+                undecodable += exc.end - exc.start
+                index += exc.end
+        return "".join(parts), undecodable, first_bad
+
     def _decode_partial(self, raw: bytes, encoding: str):
         """Decode `raw`, KEEPING every unit that decodes, and name what did not.
 
@@ -368,11 +501,22 @@ class ImageExtractor:
             try:
                 return raw.decode(encoding).rstrip("\x00"), None
             except UnicodeDecodeError:
-                text = raw.decode(encoding, errors="replace")
-                replaced = text.count("\ufffd")
-                return text.rstrip("\x00"), (
-                    f"{replaced} UTF-16 unit(s) could not be decoded and were "
-                    f"replaced; the text that decoded WAS scanned")
+                pass
+            # v0.5.6 round 7 (ASTRA I5a). Round 6 decoded with `errors="replace"`
+            # and counted U+FFFD in the RESULT. Renaming that count from "bytes" to
+            # "units" did not fix it: a LEGITIMATE U+FFFD in the source inflates the
+            # number, so a field holding one valid replacement character plus one
+            # incomplete trailing unit was reported as TWO undecodable units. One of
+            # them was valid input. That is the G5 invariant again -- a number about
+            # the decoder's output published as a fact about the input -- and I
+            # walked into it in the very function whose comment describes it.
+            #
+            # Count the decoder's OWN error spans instead, exactly as `decode_lossy`
+            # does for the byte-oriented encodings, and keep every valid character.
+            text, undecodable, first_bad = self._decode_spans(raw, encoding)
+            return text.rstrip("\x00"), (
+                f"{undecodable} byte(s) could not be decoded and were NOT inspected "
+                f"(first at offset {first_bad}); the text that decoded WAS scanned")
 
         if encoding in (None, "ascii", "utf-8"):
             from .dispatch import decode_lossy
@@ -387,11 +531,11 @@ class ImageExtractor:
         try:
             return raw.decode(encoding).rstrip("\x00"), None
         except UnicodeDecodeError:
-            text = raw.decode(encoding, errors="replace")
-            replaced = text.count("\ufffd")
-            return text.rstrip("\x00"), (
-                f"{replaced} {encoding} unit(s) could not be decoded and were "
-                f"replaced; the text that decoded WAS scanned")
+            pass
+        text, undecodable, first_bad = self._decode_spans(raw, encoding)
+        return text.rstrip("\x00"), (
+            f"{undecodable} byte(s) could not be decoded and were NOT inspected "
+            f"(first at offset {first_bad}); the text that decoded WAS scanned")
 
     def _decode_exif_text(self, tag_name: str, value: bytes):
         """Decode one byte-valued EXIF text field per its field encoding.
@@ -486,6 +630,61 @@ class ImageExtractor:
                       f"NOT inspected (first at offset {first_bad}); the rest of the "
                       f"field was scanned")
 
+    @staticmethod
+    def _classify_exif_container(raw: bytes):
+        """Decide from the CONTAINER whether zero tags means empty or broken.
+
+        Returns ``(state, detail)`` with state in {"empty", "populated", "unreadable"}.
+
+        v0.5.6 round 7 (ASTRA I3). Round 6 asked Pillow's warnings whether the
+        parse had failed, and that turned out to be unreliable in both directions:
+        the "Corrupt EXIF data" warning escapes a `catch_warnings(record=True)`
+        block entirely on the `_getexif()` path (measured -- it prints to stderr
+        while `caught` stays empty), so a genuinely broken block could look silent.
+        Chattiness is not evidence.
+
+        The container answers the question itself. An EXIF block is a TIFF header
+        (byte order, magic 42, IFD0 offset) followed by a 2-byte entry count. A
+        count of ZERO is a valid, successful, empty parse -- Pillow writes exactly
+        that, and calling it a loss is a false claim about a clean file. A count
+        that is nonzero while the block is too short to hold those entries, or a
+        header/offset that does not resolve, is a real failure.
+
+        This reads four fixed fields; it is deliberately NOT a parser and decodes no
+        tag. ASTRA's bound for this round was to distinguish the states without
+        starting a parser project, and reading the one field that states the entry
+        count is the smallest thing that can.
+        """
+        import struct
+
+        blob = raw[6:] if raw[:6] == b"Exif\x00\x00" else raw
+        if len(blob) < 8:
+            return "unreadable", f"{len(blob)} bytes, shorter than a TIFF header"
+        order = blob[:2]
+        if order == b"II":
+            endian = "<"
+        elif order == b"MM":
+            endian = ">"
+        else:
+            return "unreadable", "no TIFF byte-order mark"
+        try:
+            magic, offset = struct.unpack(endian + "HI", blob[2:8])
+        except Exception as exc:
+            return "unreadable", f"header not readable ({exc.__class__.__name__})"
+        if magic != 42:
+            return "unreadable", f"bad TIFF magic {magic}"
+        if offset + 2 > len(blob):
+            return "unreadable", (f"IFD0 offset {offset} beyond the "
+                                  f"{len(blob)}-byte block")
+        (count,) = struct.unpack(endian + "H", blob[offset:offset + 2])
+        if count == 0:
+            return "empty", "0 entries declared"
+        needed = offset + 2 + count * 12
+        if needed > len(blob):
+            return "unreadable", (f"{count} entries declared, needs {needed} bytes, "
+                                  f"block is {len(blob)}")
+        return "populated", f"{count} entries"
+
     def _exif_tags(self, img) -> dict:
         """Every EXIF tag PIL can give us, for every format that carries EXIF.
 
@@ -562,11 +761,32 @@ class ImageExtractor:
         except Exception:
             raw_exif = b""
 
+        # v0.5.6 round 7 (ASTRA I3). Round 6 treated "container present + zero tags"
+        # as failure, and that was too broad: **zero tags is also the correct result
+        # of a successful parse of an EMPTY block.** Pillow writes exactly that --
+        # `empty-exif.jpg` is a valid 20-byte zero-entry EXIF that decodes cleanly,
+        # emits no warning and loads its raster -- and round 6 turned it from
+        # 0/complete into 3/incomplete, claiming text fields went uninspected when
+        # there were none to inspect. A false loss claim is the mirror image of a
+        # false clean, and it costs the warnings their meaning.
+        #
+        # Three states, not two: ABSENT (no container -> clean), SUCCESSFULLY EMPTY
+        # (container, zero tags, parser silent -> clean), and FAILED (container,
+        # zero tags, parser warned or raised -> named loss). The evidence that
+        # separates the last two is the parser's own complaint, which is why the
+        # warning capture above exists -- short-ifd/far-ifd warn, empty-exif does not.
         if raw_exif and not tags:
-            detail = "; ".join(metadata_warnings or parser_errors) or "no tags decoded"
-            self.failures.append(
-                f"EXIF present but not parsed ({len(raw_exif)} bytes, {detail}) — "
-                f"its text fields were NOT inspected")
+            state, detail = self._classify_exif_container(raw_exif)
+            if state != "empty":
+                # Broken, or declaring entries none of which decoded. Either way
+                # bytes that were meant to be read were not, and that costs coverage.
+                extra = "; ".join(metadata_warnings or parser_errors)
+                self.failures.append(
+                    f"EXIF present but not parsed ({len(raw_exif)} bytes, {detail}"
+                    + (f"; {extra}" if extra else "") +
+                    f") — its text fields were NOT inspected")
+            # state == "empty" falls through: a successful parse of a block that
+            # genuinely holds nothing is CLEAN and COMPLETE, exactly like absence.
         elif metadata_warnings:
             # Tags came back, but the parser still complained: part of the block was
             # readable and part was not, so coverage is partial, not complete.

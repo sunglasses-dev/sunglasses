@@ -75,8 +75,29 @@ class QRExtractor:
         from pyzbar.pyzbar import decode
         from PIL import ImageSequence
 
-        total = getattr(img, "n_frames", 1) or 1
+        # v0.5.6 round 7 (ASTRA I1). `n_frames` is a PROPERTY THAT PARSES, so on a
+        # file whose later frame header is damaged it RAISES -- and `getattr(img,
+        # "n_frames", 1)` does not catch that, because the default only applies to
+        # a missing attribute, never to one whose getter throws.
+        #
+        # Round 6 therefore let a broken LATER header destroy a perfectly readable
+        # FIRST frame: `qr-first-short-later.gif` went from 6 findings / exit 1 on
+        # a21414b to 0 findings / exit 3. I lost a known finding while fixing lost
+        # findings, which is the defect this release exists to remove.
+        #
+        # The rule that replaces it: **a census of the whole sequence is never a
+        # prerequisite for scanning the frames that do read.** Discover what we
+        # can, decode what we can, and NAME the remainder -- even when the size of
+        # that remainder is itself unknown.
         results: List[Tuple[str, str]] = []
+        try:
+            total = getattr(img, "n_frames", 1) or 1
+            total_known = True
+        except Exception as exc:
+            total, total_known = None, False
+            self.failures.append(
+                f"frame count unreadable for QR ({exc.__class__.__name__}) — frames "
+                f"after the first were NOT inspected for QR codes")
 
         def _codes_of(frame, label_prefix: str):
             found = []
@@ -90,13 +111,48 @@ class QRExtractor:
                     found.append((f"{code_type.lower()}:{label_prefix}{i}", text))
             return found
 
-        if total == 1:
+        if total_known and total == 1:
             # Ordinary single-frame image: the label stays exactly as it was, so
             # nothing downstream of a still image sees a renamed source.
             return _codes_of(img, "")
 
-        for index, frame in enumerate(ImageSequence.Iterator(img)):
-            if index >= self.MAX_QR_FRAMES:
+        # ADVANCING can fail too, not just counting -- the iterator hits the same
+        # damaged descriptor part-way through. Everything decoded before that point
+        # is kept; the stop is named. `while` rather than `for` because building the
+        # iterator and stepping it are separately fallible.
+        index = 0
+        iterator = None
+        try:
+            iterator = iter(ImageSequence.Iterator(img))
+        except Exception as exc:
+            self.failures.append(
+                f"frame sequence unreadable for QR ({exc.__class__.__name__}) — "
+                f"only the first frame was inspected for QR codes")
+
+        if iterator is None:
+            # Fall back to the frame PIL already has open. This is the I1 case: the
+            # sequence is unreadable, frame 0 is not, and frame 0 is where the
+            # known finding lives.
+            try:
+                return _codes_of(img.convert("RGB"), "")
+            except Exception as exc:
+                self.failures.append(
+                    f"first frame not decoded for QR ({exc.__class__.__name__}) — "
+                    f"its codes were NOT read")
+                return results
+
+        while index < self.MAX_QR_FRAMES:
+            try:
+                frame = next(iterator)
+            except StopIteration:
+                break
+            except Exception as exc:
+                # A damaged descriptor mid-sequence. Keep what we have and say
+                # where we stopped; the count beyond it is genuinely unknown.
+                self.failures.append(
+                    f"frame {index} could not be reached for QR "
+                    f"({exc.__class__.__name__}) — that frame and any after it "
+                    f"were NOT inspected for QR codes")
                 break
             try:
                 # pyzbar wants a concrete image; an animated frame can be P-mode
@@ -106,6 +162,7 @@ class QRExtractor:
                 self.failures.append(
                     f"frame {index} not converted for QR decoding "
                     f"({exc.__class__.__name__}: {exc}) — its codes were NOT read")
+                index += 1
                 continue
             try:
                 # Frame 0 keeps the bare label for backwards compatibility; later
@@ -117,9 +174,9 @@ class QRExtractor:
                 self.failures.append(
                     f"frame {index} not decoded for QR "
                     f"({exc.__class__.__name__}: {exc}) — its codes were NOT read")
-                continue
+            index += 1
 
-        if total > self.MAX_QR_FRAMES:
+        if total_known and total > self.MAX_QR_FRAMES:
             self.failures.append(
                 f"{total - self.MAX_QR_FRAMES} of {total} frames not inspected for "
                 f"QR codes — {source} exceeds the {self.MAX_QR_FRAMES}-frame cap")
@@ -136,6 +193,12 @@ class QRExtractor:
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
+        # v0.5.6 round 7 (ASTRA I5b): reset per EXTRACTION, not per instance. The
+        # list was initialised in `__init__` only, so a reused extractor carried the
+        # previous file's loss into the next scan -- a clean file inheriting a
+        # stranger's incomplete flag. The canonical wrappers build a fresh instance
+        # each time, which is exactly why this hid.
+        self.failures = []
         img = Image.open(image_path)
         return self._decode_frames(img, source=os.path.basename(image_path))
 
@@ -150,6 +213,7 @@ class QRExtractor:
         from PIL import Image
         import io
 
+        self.failures = []          # round 7 (I5b): same reset on the bytes entry point
         img = Image.open(io.BytesIO(image_bytes))
         return self._decode_frames(img, source="image bytes")
 

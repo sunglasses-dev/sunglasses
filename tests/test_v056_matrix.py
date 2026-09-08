@@ -1649,25 +1649,59 @@ _CARRIERS = {
 
 
 def _write_carrier(path, carrier, bad_byte=False, later_frame=False):
-    """Build one container variant with Pillow's REAL writers."""
-    from PIL import Image
+    """Build one container variant with Pillow's REAL writers.
+
+    v0.5.6 round 7 (ASTRA I4.1). The round-6 version built an `ordinary` first-page
+    EXIF object AND NEVER USED IT: it passed the finding-bearing `exif=` to
+    `save_all`, which applies one EXIF block to BOTH pages. So all three
+    "later-frame" fixtures carried the instruction on page 0 as well, and the tests
+    that claimed to prove a later-frame read **passed against a frame-0-only
+    reader**. They asserted nothing. A fixture that cannot fail is not evidence.
+
+    Per-page tags need `encoderinfo` on each appended image, not a shared
+    `tiffinfo=` -- the mechanism the `tiff_page2_metadata` fixture already used and
+    that I failed to reuse here. `test_container_dimension_later_frame` now measures
+    the per-page premise before it trusts it, and a frame-0-only mutation must fail.
+    """
+    from PIL import Image, TiffImagePlugin
     tag, encoding, header, container = _CARRIERS[carrier]
-    payload = header + INJECTION.encode(encoding) + (b"\xff" if bad_byte else b"")
+
+    def _value(text):
+        if carrier == "exif:ImageDescription" and not header:
+            return text                      # a str tag; Pillow encodes it
+        return header + text.encode(encoding)
+
+    if later_frame:
+        first = TiffImagePlugin.ImageFileDirectory_v2()
+        second = TiffImagePlugin.ImageFileDirectory_v2()
+        first[tag] = _value("ordinary first page")
+        second[tag] = _value(INJECTION)
+        page0 = Image.new("RGB", (60, 30), "white")
+        page1 = Image.new("RGB", (60, 30), "white")
+        page0.encoderinfo = {"tiffinfo": first}
+        page1.encoderinfo = {"tiffinfo": second}
+        page0.save(path, save_all=True, append_images=[page1], tiffinfo=first)
+        return path
 
     exif = Image.Exif()
-    exif[tag] = payload
-    base = Image.new("RGB", (60, 30), "white")
-    if later_frame:
-        # The instruction is on frame 1; frame 0 is ordinary. A reader that stops
-        # at frame 0 sees a clean file, which is exactly G1/H1.
-        first = Image.new("RGB", (60, 30), "white")
-        ordinary = Image.Exif()
-        ordinary[tag] = header + b"ordinary first frame" if encoding == "ascii" \
-            else header + "ordinary first frame".encode(encoding)
-        first.save(path, save_all=True, append_images=[base], exif=exif)
-    else:
-        base.save(path, exif=exif)
+    exif[tag] = header + INJECTION.encode(encoding) + (b"\xff" if bad_byte else b"")
+    Image.new("RGB", (60, 30), "white").save(path, exif=exif)
     return path
+
+
+def _native_per_page_finding(path, carrier):
+    """Which pages NATIVELY carry the instruction. The premise, measured."""
+    from PIL import Image
+    tag, encoding, header, _ = _CARRIERS[carrier]
+    img = Image.open(path)
+    present = []
+    for index in range(getattr(img, "n_frames", 1)):
+        img.seek(index)
+        value = dict(img.getexif()).get(tag)
+        if isinstance(value, (bytes, bytearray)):
+            value = bytes(value)[len(header):].decode(encoding, "replace")
+        present.append(INJECTION[:20] in str(value or ""))
+    return present
 
 
 @pytest.mark.parametrize("carrier", sorted(_CARRIERS))
@@ -1702,19 +1736,56 @@ def test_container_dimension_valid_text_plus_one_bad_byte(carrier, tmp_path):
 
 @pytest.mark.parametrize("carrier", sorted(_CARRIERS))
 def test_container_dimension_later_frame(carrier, tmp_path):
-    """(iii) The instruction on a LATER FRAME of the same container.
+    """(iii) The instruction on a LATER PAGE of the same container.
 
-    Only multi-frame containers can host this; TIFF is used for every carrier
-    because it accepts all three EXIF fields AND multiple pages, so the variable
-    under test is the frame, not the format.
+    Round 7 (ASTRA I4.1): the PREMISE is measured first. Round 6's version of this
+    test passed against a frame-0-only reader because its fixture carried the
+    finding on both pages, so it proved nothing about later frames at all.
     """
     from sunglasses.scanner import SunglassesScanner
 
     path = _write_carrier(str(tmp_path / "later.tiff"), carrier, later_frame=True)
+
+    # The premise, native and asserted: page 0 must NOT carry it, page 1 must.
+    per_page = _native_per_page_finding(path, carrier)
+    assert per_page == [False, True], (
+        f"{carrier}: fixture does not isolate the finding on the later page "
+        f"({per_page}) — this cell cannot prove a later-frame read")
+
     doc = SunglassesScanner().scan_fast(path)
     assert doc["threat_found"] is True, (
-        f"{carrier}: a later frame's metadata was never read — "
+        f"{carrier}: a later page's metadata was never read — "
         f"complete={doc['inspection_complete']}, warnings={doc['warnings']}")
+    assert doc["inspection_complete"] is True, (
+        f"{carrier}: every page was readable, so the scan must be complete: "
+        f"{doc['warnings']}")
+
+
+@pytest.mark.parametrize("carrier", sorted(_CARRIERS))
+def test_container_dimension_later_frame_fails_for_a_frame_zero_only_reader(
+        carrier, tmp_path, monkeypatch):
+    """The mutation that proves the test above can fail.
+
+    ASTRA I4.1: an assertion that survives a deliberately broken reader is not
+    evidence. Replace the metadata walk with a frame-0-only reader and the
+    later-page finding MUST disappear. If this test ever goes green, the fixture
+    has stopped isolating the finding and the cell above is worthless again.
+    """
+    from sunglasses.extractors.image import ImageExtractor
+    from sunglasses.scanner import SunglassesScanner
+
+    path = _write_carrier(str(tmp_path / "later.tiff"), carrier, later_frame=True)
+    assert _native_per_page_finding(path, carrier) == [False, True]
+
+    def _frame_zero_only(self, img, source="image"):
+        return self._exif_from_pil(img)
+
+    monkeypatch.setattr(ImageExtractor, "_metadata_frames_of", _frame_zero_only)
+    doc = SunglassesScanner().scan_fast(path)
+    assert doc["threat_found"] is False, (
+        f"{carrier}: a frame-0-only metadata reader STILL found the later-page "
+        f"instruction — the fixture is not isolating it, so the positive test "
+        f"proves nothing")
 
 
 def test_container_dimension_corrupt_substructure_uses_real_fixtures():

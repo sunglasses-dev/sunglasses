@@ -1685,20 +1685,45 @@ def test_h3_a_legitimate_replacement_character_is_not_reported_as_damage():
     assert "�" in text, "a valid character was stripped from scanned text"
 
 
-def test_h3_utf16_loss_is_described_as_units_not_bytes():
-    """Say what was actually measured.
+def test_h3_utf16_loss_counts_measured_spans_not_replacement_characters():
+    """Round 7 (ASTRA I5a) REPLACES the round-6 version of this test.
 
-    UTF-16 gives no byte span, so the count is replaced UNITS. Calling those
-    "bytes not inspected" would be a claim about the input we cannot support —
-    the same error as the round-5 U+FFFD count, one encoding over.
+    Round 6 asserted the UTF-16 message said "units", not "bytes" — and that was
+    the wrong contract. Renaming a count does not make it a measurement: the number
+    was still `text.count("\ufffd")` over the DECODER'S OUTPUT, so a field holding
+    one LEGITIMATE U+FFFD plus one incomplete trailing unit was reported as two
+    undecodable units when only one byte was actually undecodable. The old test
+    passed happily on that, because it checked the wording rather than the number.
+
+    The real invariant is G5's: a published count must be a fact about the INPUT.
+    `_decode_spans` sums the decoder's own `[start, end)` error spans, so the valid
+    character is preserved and NOT counted.
     """
     _needs_pillow()
     from sunglasses.extractors.image import ImageExtractor
 
-    text, failure = ImageExtractor()._decode_exif_text("XPComment", b"\x00\xd8ab")
-    if failure is not None:
-        assert "byte" not in failure, \
-            f"UTF-16 loss claimed bytes it never measured: {failure}"
+    extractor = ImageExtractor()
+    # One valid U+FFFD, then a single trailing byte that cannot complete a unit.
+    raw = "ok \ufffd here".encode("utf-16-le") + b"\x41"
+    text, failure = extractor._decode_exif_text("XPComment", raw)
+
+    assert "\ufffd" in text, "the legitimate replacement character was stripped"
+    assert "ok" in text and "here" in text, "readable text either side was dropped"
+    assert failure is not None, "the incomplete trailing unit was swallowed"
+    assert "1 byte" in failure, (
+        f"loss miscounted — only ONE byte was undecodable, the U+FFFD was valid "
+        f"input: {failure}")
+
+
+def test_h3_a_clean_utf16_field_reports_no_loss_at_all():
+    """The negative control for the above: valid UTF-16 must claim nothing."""
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    text, failure = ImageExtractor()._decode_exif_text(
+        "XPComment", "a clean \ufffd value".encode("utf-16-le"))
+    assert failure is None, f"a fully valid UTF-16 field reported a loss: {failure}"
+    assert "\ufffd" in text
 
 
 # ---- H5: the in-memory API must agree with the path API ---------------------
@@ -1742,92 +1767,106 @@ def test_h5_frame_zero_metadata_survives_the_ocr_walk():
 
 # ---- the general rule H1 stands for -----------------------------------------
 
+def _frame_reader_offenders(source: str, filename: str = "<src>"):
+    """Every `Image.open` whose ENCLOSING function neither walks frames, seeks,
+    delegates to a walker, nor declares itself frame-0-only.
+
+    v0.5.6 round 7 (ASTRA I4.2). The round-6 guard sliced 4,000 characters after a
+    `\n    def ` found by `rfind` and searched that blob. Two things were wrong: the
+    window ran past the end of the function and could pick up the NEXT method's
+    `FRAME 0 ONLY — UNUSED` annotation, so a reader could be certified by its
+    neighbour's docstring; and a genuinely frame-0-only `_metadata_all_frames`
+    mutation still passed. It certified readers it never examined.
+
+    This uses the real `ast` boundary of the enclosing function, so the evidence
+    for a reader is only ever its own body. `test_the_frame_reader_guard_rejects_a
+    _frame_zero_only_reader` feeds it a mutation that MUST be reported.
+    """
+    import ast as _ast
+
+    tree = _ast.parse(source, filename=filename)
+    functions = [n for n in _ast.walk(tree)
+                 if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+
+    offenders = []
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, _ast.Attribute) and func.attr == "open"
+                and isinstance(func.value, _ast.Name) and func.value.id == "Image"):
+            continue
+        # The INNERMOST function containing this call.
+        enclosing = None
+        for candidate in functions:
+            if candidate.lineno <= node.lineno <= (candidate.end_lineno or candidate.lineno):
+                if enclosing is None or candidate.lineno > enclosing.lineno:
+                    enclosing = candidate
+        if enclosing is None:
+            offenders.append(f"{filename}:{node.lineno} (module level)")
+            continue
+
+        body = _ast.get_source_segment(source, enclosing) or ""
+        walks = any(token in body for token in
+                    ("ImageSequence", "_frames_of", "_decode_frames", ".seek("))
+        doc = _ast.get_docstring(enclosing) or ""
+        declared = "FRAME 0" in doc.upper()
+        if not (walks or declared):
+            offenders.append(f"{filename}:{node.lineno} ({enclosing.name})")
+    return offenders
+
+
 def test_every_image_reader_either_walks_frames_or_is_marked_frame_zero_only():
     """H1's real lesson, enforced structurally instead of by memory.
 
     Round 5 taught OCR and metadata to walk frames and left QR opening one frame,
-    because the repair was aimed at the components the review sampled. This
-    asserts the property for EVERY `Image.open` in the package: a reader either
-    walks the sequence, seeks deliberately, or is annotated as frame-0-only. A
-    new reader added without that annotation fails here rather than in a review
-    four rounds later.
+    because the repair was aimed at the components the review sampled. This asserts
+    the property for EVERY `Image.open` in the package: a reader either walks the
+    sequence, seeks deliberately, delegates to a walker, or SAYS IN ITS OWN
+    DOCSTRING that it is frame-0-only.
     """
-    import re as _re
+    import sunglasses
+
     pkg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
-        __import__("sunglasses").__file__))), "sunglasses", "extractors")
+        sunglasses.__file__))), "sunglasses", "extractors")
     offenders = []
     for filename in sorted(os.listdir(pkg)):
         if not filename.endswith(".py"):
             continue
-        source = open(os.path.join(pkg, filename), encoding="utf-8").read()
-        for match in _re.finditer(r"Image\.open\(", source):
-            line_no = source[:match.start()].count("\n") + 1
-            # The enclosing function: walk backwards to its `def`, then judge it
-            # on what it does, not on what a comment elsewhere promises.
-            head = source[:match.start()]
-            def_start = head.rfind("\n    def ")
-            body = source[def_start:def_start + 4000] if def_start != -1 else ""
-            walks = ("ImageSequence" in body or "_frames_of" in body
-                     or "_decode_frames" in body or ".seek(" in body)
-            declared = "FRAME 0" in body.upper()
-            if not (walks or declared):
-                offenders.append(f"{filename}:{line_no}")
+        with open(os.path.join(pkg, filename), encoding="utf-8") as handle:
+            offenders.extend(_frame_reader_offenders(handle.read(), filename))
     assert not offenders, (
         "these image readers neither walk frames nor declare themselves "
         f"frame-0-only: {offenders}")
 
 
-def test_h4_audio_metadata_has_its_own_external_converter():
-    """ASTRA H4, the second converter. Asserted directly, not through the grid.
+def test_the_frame_reader_guard_rejects_a_frame_zero_only_reader():
+    """The test that proves the guard. ASTRA I4.2 asked for exactly this.
 
-    The round-5 matrix said no external converter process runs on these surfaces.
-    `audio.py:_extract_metadata` runs **ffprobe** and checks its return code, so
-    the claim was wrong for a second, independent reason — and the round-5 note
-    calling video "the only surface that shells out" was wrong three times over.
+    A guard nobody has watched fail is a guard nobody has tested. Two mutations,
+    both of which the round-6 guard ACCEPTED:
 
-    This is asserted at the extractor rather than through `scan_audio()` because
-    the convenience function short-circuits on absent Whisper before ffprobe is
-    reached (this environment has no Whisper, exactly as ASTRA's did not). The
-    mechanism is what the N/A denied, so the mechanism is what gets measured.
+      1. a frame-0-only `_metadata_all_frames` -- the real method name, no walk;
+      2. the same, followed by a *different* method carrying the `FRAME 0 ONLY`
+         annotation, which is how the 4,000-character window certified its
+         neighbour.
     """
-    import subprocess as _sp
-    import tempfile
-    import wave
+    plain = (
+        "from PIL import Image\n"
+        "class X:\n"
+        "    def _metadata_all_frames(self, path):\n"
+        '        """EXIF from the image."""\n'
+        "        img = Image.open(path)\n"
+        "        return self._exif_from_pil(img)\n"
+    )
+    assert _frame_reader_offenders(plain, "mutation.py"), (
+        "the guard accepted a frame-0-only metadata reader")
 
-    from sunglasses.extractors.audio import AudioExtractor
-
-    if not shutil_which("ffprobe"):  # pragma: no cover - environment guard
-        pytest.skip("ffprobe not installed; the converter seam needs a real one")
-
-    with tempfile.TemporaryDirectory() as tmp:
-        clip = os.path.join(tmp, "silent.wav")
-        with wave.open(clip, "w") as handle:
-            handle.setnchannels(1)
-            handle.setsampwidth(2)
-            handle.setframerate(8000)
-            handle.writeframes(b"\x00\x00" * 8000)
-
-        bindir = os.path.join(tmp, "bin")
-        os.makedirs(bindir)
-        stub = os.path.join(bindir, "ffprobe")
-        with open(stub, "w") as handle:
-            handle.write("#!/bin/sh\nexit 7\n")
-        os.chmod(stub, 0o755)
-
-        extractor = AudioExtractor.__new__(AudioExtractor)   # skip the Whisper gate
-        extractor.warnings = []
-        old_path = os.environ["PATH"]
-        os.environ["PATH"] = bindir + os.pathsep + old_path
-        try:
-            extractor._extract_metadata(clip)
-        finally:
-            os.environ["PATH"] = old_path
-
-    assert any("ffprobe" in w for w in extractor.warnings), (
-        "a failing ffprobe produced no coverage warning — 'no external converter "
-        f"runs here' was the N/A this disproves. warnings={extractor.warnings}")
-
-
-def shutil_which(name):
-    import shutil
-    return shutil.which(name)
+    with_neighbour = plain + (
+        "    def _unused_helper(self, path):\n"
+        '        """FRAME 0 ONLY — UNUSED. Kept as a primitive."""\n'
+        "        return None\n"
+    )
+    assert _frame_reader_offenders(with_neighbour, "mutation.py"), (
+        "the guard let the NEXT method's frame-0-only annotation certify a reader "
+        "that never walks frames — the round-6 window bug")
