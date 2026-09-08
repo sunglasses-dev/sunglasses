@@ -214,19 +214,71 @@ class ImageExtractor:
                 results.append(("ocr", text))
             return results
 
+        # Round 8 (ASTRA J1). `ImageSequence.Iterator` yields THE SAME mutable
+        # image object, re-seeked -- it does not yield independent frames. So
+        # `list(...)` does not collect the sequence: it collects N references to
+        # one object, and by the time the list is built every one of them is
+        # parked on the LAST frame. The loop then OCR'd the final frame N times
+        # while labelling the reads 0, 1, 2 -- so a file whose text sits anywhere
+        # but the end came back with ZERO findings, `threat_found` False and
+        # `inspection_complete` True. A false clean, from an eager list.
+        #
+        # The rule: READ EACH FRAME BEFORE ADVANCING, and snapshot it while the
+        # object is still parked there. `while` + `next()` rather than `for`,
+        # because building the iterator and stepping it are separately fallible
+        # and everything read before a mid-sequence failure has to survive it.
+        index = 0
+        iterator = None
         try:
-            frames = list(ImageSequence.Iterator(img))
+            iterator = iter(ImageSequence.Iterator(img))
         except Exception as exc:
             self.failures.append(
                 f"frame sequence unreadable for OCR ({exc.__class__.__name__}) — "
                 f"only the first frame was read by OCR")
-            frames = [img]
 
-        for index, frame in enumerate(frames):
-            if index >= self.MAX_OCR_FRAMES:
+        if iterator is None:
+            # The sequence is unreadable but the open frame is not; read it
+            # rather than abandoning a file whose first frame is intact.
+            try:
+                text = self._ocr_from_pil(img)
+            except OCRUnavailable as exc:
+                self.failures.append(str(exc))
+                return results
+            except Exception as exc:
+                self.failures.append(
+                    f"first frame not read by OCR ({exc.__class__.__name__})")
+                return results
+            if text.strip():
+                results.append(("ocr", text))
+            return results
+
+        while index < self.MAX_OCR_FRAMES:
+            try:
+                frame = next(iterator)
+            except StopIteration:
+                break
+            except Exception as exc:
+                # A damaged descriptor part-way through. Keep every frame already
+                # read and name where the walk stopped; how much lies beyond it
+                # is genuinely unknown, so the message does not pretend to know.
+                self.failures.append(
+                    f"frame {index} could not be reached for OCR "
+                    f"({exc.__class__.__name__}) — that frame and any after it "
+                    f"were NOT read by OCR")
                 break
             try:
-                text = self._ocr_from_pil(frame)
+                # Snapshot AT this position. The iterator hands back the shared
+                # object, so anything that defers the actual read until after the
+                # next `seek` would read the wrong frame -- which is J1 exactly.
+                target = frame.convert("RGB")
+            except Exception as exc:
+                self.failures.append(
+                    f"frame {index} not converted for OCR "
+                    f"({exc.__class__.__name__}: {exc}) — its text was NOT read")
+                index += 1
+                continue
+            try:
+                text = self._ocr_from_pil(target)
             except OCRUnavailable as exc:
                 # OCR being UNAVAILABLE is a property of the machine, not of this
                 # frame: Tesseract missing from PATH fails identically on all of
@@ -243,9 +295,11 @@ class ImageExtractor:
                 # corrupt frame in a GIF costs that frame and nothing else.
                 self.failures.append(
                     f"frame {index} not read ({exc.__class__.__name__}: {exc})")
+                index += 1
                 continue
             if text.strip():
                 results.append((f"ocr:frame:{index}", text))
+            index += 1
 
         if total_known and total > self.MAX_OCR_FRAMES:
             self.failures.append(
@@ -458,6 +512,31 @@ class ImageExtractor:
         so the count is a fact about the INPUT. A legitimate U+FFFD in the source
         is preserved and NOT counted, which is the whole point (ASTRA I5a).
         """
+        # Round 8 (ASTRA J2). A BOM selects byte order ONCE, for the whole field,
+        # and it sits only at offset 0. The loop below restarts decoding at the
+        # byte after each error span -- past the BOM -- so with the generic
+        # "utf-16" codec every recovery read fell back to Python's default LITTLE
+        # endian. A big-endian field's readable remainder was then decoded in the
+        # wrong order and the known finding was lost, while the byte count stayed
+        # right: an honest number attached to unreadable text.
+        #
+        # So resolve the order once, here, and strip the BOM before the loop; the
+        # spans are still measured on the input, and `first_bad` is shifted back
+        # to an offset into the ORIGINAL bytes so the number stays a fact about
+        # what the caller handed us.
+        bom_offset = 0
+        if encoding == "utf-16":
+            if raw[:2] == b"\xff\xfe":
+                encoding, bom_offset = "utf-16-le", 2
+            elif raw[:2] == b"\xfe\xff":
+                encoding, bom_offset = "utf-16-be", 2
+            else:
+                # No BOM: Python's "utf-16" reads little endian. Name that, so
+                # recovery uses the same order as the first read instead of
+                # silently re-deciding it.
+                encoding = "utf-16-le"
+            raw = raw[bom_offset:]
+
         parts = []
         undecodable = 0
         first_bad = None
@@ -474,6 +553,8 @@ class ImageExtractor:
                     first_bad = index + exc.start
                 undecodable += exc.end - exc.start
                 index += exc.end
+        if first_bad is not None:
+            first_bad += bom_offset
         return "".join(parts), undecodable, first_bad
 
     def _decode_partial(self, raw: bytes, encoding: str):
