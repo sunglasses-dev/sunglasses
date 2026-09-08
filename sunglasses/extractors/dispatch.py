@@ -229,7 +229,18 @@ def _extract_image(path: str):
 
     try:
         from .qr import QRExtractor
-        sources.extend(("qr:" + label, text) for label, text in QRExtractor().extract(path))
+        qr_extractor = QRExtractor()
+        sources.extend(("qr:" + label, text) for label, text in qr_extractor.extract(path))
+        for failure in getattr(qr_extractor, "failures", []):
+            # v0.5.6 round 6 (ASTRA H1). This loop did not exist: the QR extractor
+            # had no `failures` list and this block only handled the case where the
+            # whole decoder blew up. A frame it skipped was therefore invisible --
+            # the image came back complete because nothing asked the decoder what
+            # it had not looked at.
+            complete = False
+            warnings.append(
+                f"{os.path.basename(path)} not fully read — {failure}."
+            )
     except ImportError:
         # QR is a narrower claim than OCR; say so separately rather than lumping them.
         complete = False

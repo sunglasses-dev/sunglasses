@@ -116,6 +116,21 @@ class ImageExtractor:
         # OCR every frame, same contract as `extract()`.
         results.extend(self._ocr_frames_of(img, source=filename))
 
+        # v0.5.6 round 6 (ASTRA H5). `_ocr_frames_of` walks the sequence and LEAVES
+        # PIL parked on the last frame it seeked to. The metadata read below then
+        # ran against whatever frame the OCR walk happened to stop on, so on
+        # `metadata-first-page.tiff` the path API returned seven findings and this
+        # in-memory API returned none -- and recorded no failure, because nothing
+        # here knew a different frame had been read. Two APIs over the same bytes
+        # must answer the same question; seek back to frame 0 so they do.
+        try:
+            if getattr(img, "n_frames", 1) > 1:
+                img.seek(0)
+        except Exception as exc:
+            self.failures.append(
+                f"could not return to frame 0 for metadata "
+                f"({exc.__class__.__name__}: {exc}) — metadata may be incomplete")
+
         # EXIF from PIL object
         exif_texts = self._exif_from_pil(img)
         for field, text in exif_texts:
@@ -241,7 +256,14 @@ class ImageExtractor:
         return results
 
     def _extract_ocr(self, image_path: str) -> str:
-        """Run OCR on the image to extract visible text.
+        """Run OCR on the image to extract visible text. **FRAME 0 ONLY — UNUSED.**
+
+        v0.5.6 round 6 frame sweep: this has NO callers. `extract()` routes through
+        `_ocr_all_frames()`, which walks the sequence. It is kept because it is the
+        single-image primitive the frame walker is built on, but it reads frame 0
+        and nothing else, so wiring it back into an extraction path would silently
+        reintroduce the H1/G1 class. Use `_ocr_all_frames()`; if you need one frame,
+        say so at the call site.
 
         Raises OCRUnavailable if OCR could not run. It must NEVER return the error
         as text: the returned string is scanned as document content, so an error
@@ -273,7 +295,11 @@ class ImageExtractor:
         return text.strip()
 
     def _extract_exif(self, image_path: str) -> List[Tuple[str, str]]:
-        """Extract text-containing EXIF metadata fields.
+        """Extract text-containing EXIF metadata fields. **FRAME 0 ONLY — UNUSED.**
+
+        v0.5.6 round 6 frame sweep: no callers; `extract()` uses
+        `_metadata_all_frames()`. Same warning as `_extract_ocr` -- it reads the
+        frame PIL opens on, so it must not be re-wired into an extraction path.
 
         v0.5.6 round 4: `except Exception: return []` made "this image has no
         metadata" and "we could not read this image's metadata" the same answer.
@@ -317,37 +343,102 @@ class ImageExtractor:
         b"\x00" * 8: "utf-8",          # "undefined" -- try UTF-8 and say if it fails
     }
 
+    def _decode_partial(self, raw: bytes, encoding: str):
+        """Decode `raw`, KEEPING every unit that decodes, and name what did not.
+
+        Returns ``(text, loss)`` where `loss` is None or a human phrase describing
+        the damage. Both may be set: that is a PARTIAL read -- readable text plus
+        a named loss -- and it is the whole point of this helper.
+
+        v0.5.6 round 6 (ASTRA H3). Two measurement rules, both learned the hard way:
+
+          * for a byte-oriented encoding the loss is measured on the INPUT, via
+            `decode_lossy`, which sums the exact `[start, end)` spans the decoder
+            could not read. That is the G5 rule -- never publish a number about
+            the decoder's output as if it were a fact about the input.
+          * for UTF-16 there is no such span, so we say what we actually measured:
+            REPLACED UNITS, not bytes. A legitimate U+FFFD in the source inflates
+            that count, so calling it "bytes not inspected" would be a claim we
+            cannot support. The wording is the honest one.
+        """
+        if not raw:
+            return "", None
+
+        if encoding in ("utf-16", "utf-16-le", "utf-16-be"):
+            try:
+                return raw.decode(encoding).rstrip("\x00"), None
+            except UnicodeDecodeError:
+                text = raw.decode(encoding, errors="replace")
+                replaced = text.count("\ufffd")
+                return text.rstrip("\x00"), (
+                    f"{replaced} UTF-16 unit(s) could not be decoded and were "
+                    f"replaced; the text that decoded WAS scanned")
+
+        if encoding in (None, "ascii", "utf-8"):
+            from .dispatch import decode_lossy
+            text, undecodable, first_bad = decode_lossy(raw)
+            if not undecodable:
+                return text.rstrip("\x00"), None
+            return text.rstrip("\x00"), (
+                f"{undecodable} byte(s) could not be decoded and were NOT "
+                f"inspected (first at offset {first_bad}); the text that "
+                f"decoded WAS scanned")
+
+        try:
+            return raw.decode(encoding).rstrip("\x00"), None
+        except UnicodeDecodeError:
+            text = raw.decode(encoding, errors="replace")
+            replaced = text.count("\ufffd")
+            return text.rstrip("\x00"), (
+                f"{replaced} {encoding} unit(s) could not be decoded and were "
+                f"replaced; the text that decoded WAS scanned")
+
     def _decode_exif_text(self, tag_name: str, value: bytes):
         """Decode one byte-valued EXIF text field per its field encoding.
 
-        Returns (text, failure). Exactly one of them is None. A field we cannot
-        decode is NOT dropped silently -- it comes back as a failure, which costs
-        coverage, because bytes we did not read are bytes we did not inspect.
+        Returns ``(text, failure)``. **Either, neither, or BOTH may be set** --
+        that signature changed in v0.5.6 round 6 and the caller changed with it.
+
+        It used to be "exactly one of them is None": one undecodable byte rejected
+        the WHOLE field and returned text=None. ASTRA H3 showed what that costs. A
+        proper nested UserComment with an ASCII header yields six findings, exit 1.
+        Add ONE bad byte at either end and this candidate returned zero findings and
+        exit 3 -- while the PREVIOUS wheel still found all six. The incomplete flag
+        was honest and the finding was still gone, and an honest flag does not
+        repair a lost finding: a scanner that drops a whole injection because its
+        last byte is malformed is a scanner an attacker appends one byte to.
+
+        So this now behaves like `_decode_embedded_text` already did for GIF/PNG
+        chunks: keep what decodes, scan it, and report the loss so coverage is
+        still marked incomplete. Retention and honesty are not a trade.
         """
         if tag_name in self._EXIF_UTF16_FIELDS:
-            try:
-                return value.decode("utf-16-le").rstrip("\x00"), None
-            except UnicodeDecodeError:
-                return None, (f"EXIF {tag_name} not decoded ({len(value)} bytes, "
-                              f"not valid UTF-16LE) — its text was NOT inspected")
+            text, loss = self._decode_partial(bytes(value), "utf-16-le")
+            if loss is None:
+                return text, None
+            return text, f"EXIF {tag_name} partially decoded — {loss}"
 
         if tag_name == "UserComment" and len(value) >= 8:
             encoding = self._USER_COMMENT_CHARSETS.get(bytes(value[:8]))
-            payload = value[8:]
+            payload = bytes(value[8:])
             if encoding:
-                try:
-                    return payload.decode(encoding).rstrip("\x00"), None
-                except UnicodeDecodeError:
-                    return None, (f"EXIF UserComment not decoded ({len(payload)} bytes, "
-                                  f"declared {encoding}) — its text was NOT inspected")
-            return None, (f"EXIF UserComment not decoded ({len(payload)} bytes, "
-                          f"unrecognised character-code header) — text NOT inspected")
+                text, loss = self._decode_partial(payload, encoding)
+                if loss is None:
+                    return text, None
+                return text, (f"EXIF UserComment partially decoded "
+                              f"(declared {encoding}) — {loss}")
+            # An unrecognised character-code header is not a reason to throw the
+            # payload away either; we read it as bytes and say the header was not
+            # understood. Same rule, one step further out.
+            text, loss = self._decode_partial(payload, None)
+            return text, (f"EXIF UserComment character-code header not recognised "
+                          f"({len(payload)} bytes read as UTF-8)"
+                          + (f" — {loss}" if loss else ""))
 
-        try:
-            return value.decode("utf-8").rstrip("\x00"), None
-        except UnicodeDecodeError:
-            return None, (f"EXIF {tag_name} not decoded ({len(value)} bytes, not "
-                          f"valid UTF-8) — its text was NOT inspected")
+        text, loss = self._decode_partial(bytes(value), "utf-8")
+        if loss is None:
+            return text, None
+        return text, f"EXIF {tag_name} partially decoded — {loss}"
 
     # PIL puts BINARY blocks in `img.info` beside the text chunks: the raw EXIF
     # segment, ICC profiles, Photoshop resources, palettes. Those are not text and
@@ -412,30 +503,76 @@ class ImageExtractor:
         old private call merged it silently -- so switching to the public API
         without this would have traded a TIFF miss for a UserComment miss.
         """
+        import warnings as _warnings
+
         tags = {}
-        getexif = getattr(img, "getexif", None)
-        if getexif is not None:
-            try:
-                base = getexif()
-            except Exception:
-                base = None
-            if base:
-                tags.update(dict(base))
+        parser_errors = []
+        # v0.5.6 round 6 (ASTRA H2). Pillow does NOT raise on a damaged EXIF block:
+        # it emits `UserWarning: Corrupt EXIF data` and hands back an empty tag set.
+        # Catching exceptions therefore proved nothing about the parsers that warn,
+        # and a count of caught exception patterns cannot stand in for handling them.
+        # Record warnings around the whole parse and read them as evidence.
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            getexif = getattr(img, "getexif", None)
+            if getexif is not None:
                 try:
-                    tags.update(dict(base.get_ifd(0x8769)))   # Exif sub-IFD
+                    base = getexif()
                 except Exception as exc:
-                    # An ABSENT sub-IFD returns {} and never lands here, so
-                    # reaching this branch means one exists and would not parse --
-                    # and `UserComment` lives in it. Swallowing that is the exact
-                    # defect this release is about, so it costs coverage.
-                    self.failures.append(
-                        f"EXIF sub-IFD not read ({exc.__class__.__name__}: {exc}) — "
-                        f"UserComment and other sub-IFD text were NOT inspected")
-        if not tags and hasattr(img, "_getexif"):
-            try:
-                tags = dict(img._getexif() or {})
-            except Exception:
-                tags = {}
+                    base = None
+                    parser_errors.append(f"{exc.__class__.__name__}: {exc}")
+                if base:
+                    tags.update(dict(base))
+                    try:
+                        tags.update(dict(base.get_ifd(0x8769)))   # Exif sub-IFD
+                    except Exception as exc:
+                        # An ABSENT sub-IFD returns {} and never lands here, so
+                        # reaching this branch means one exists and would not parse --
+                        # and `UserComment` lives in it. Swallowing that is the exact
+                        # defect this release is about, so it costs coverage.
+                        self.failures.append(
+                            f"EXIF sub-IFD not read ({exc.__class__.__name__}: {exc}) — "
+                            f"UserComment and other sub-IFD text were NOT inspected")
+            if not tags and hasattr(img, "_getexif"):
+                try:
+                    tags = dict(img._getexif() or {})
+                except Exception as exc:
+                    tags = {}
+                    parser_errors.append(f"{exc.__class__.__name__}: {exc}")
+
+            # Only warnings ABOUT metadata parsing count. ASTRA was explicit that an
+            # unrelated resource warning (Pillow's "unclosed file", say) must not be
+            # rebranded as corrupt metadata -- a scanner that cries corruption at
+            # every stray warning is one nobody reads the warnings of.
+            metadata_warnings = [
+                str(w.message) for w in caught
+                if "exif" in str(w.message).lower() or "ifd" in str(w.message).lower()
+            ]
+
+        # An absent EXIF block is an HONEST ABSENCE and stays clean: PNGs and most
+        # GIFs simply have none, and calling that a failure would make every clean
+        # file incomplete. A PRESENT raw container that yielded no tags is the
+        # opposite -- bytes that exist, were meant to be read, and were not. The raw
+        # container is excluded from the text path (`_BINARY_INFO_KEYS`), and that
+        # exclusion is only honest while its failure to parse is reported here.
+        raw_exif = b""
+        try:
+            info = getattr(img, "info", None) or {}
+            raw_exif = info.get("exif") or b""
+        except Exception:
+            raw_exif = b""
+
+        if raw_exif and not tags:
+            detail = "; ".join(metadata_warnings or parser_errors) or "no tags decoded"
+            self.failures.append(
+                f"EXIF present but not parsed ({len(raw_exif)} bytes, {detail}) — "
+                f"its text fields were NOT inspected")
+        elif metadata_warnings:
+            # Tags came back, but the parser still complained: part of the block was
+            # readable and part was not, so coverage is partial, not complete.
+            self.failures.append(
+                f"EXIF partially parsed ({'; '.join(metadata_warnings)}) — some "
+                f"metadata text may NOT have been inspected")
         return tags
 
     def _exif_from_pil(self, img) -> List[Tuple[str, str]]:
@@ -461,9 +598,14 @@ class ImageExtractor:
                         continue
                     if isinstance(value, (bytes, bytearray)):
                         text, failure = self._decode_exif_text(tag_name, bytes(value))
+                        # `elif` here until v0.5.6 round 6. That single keyword WAS
+                        # ASTRA H3: a partial decode reported the loss and then threw
+                        # the readable half away, so the finding vanished and only the
+                        # warning survived. Both branches now run -- name the loss AND
+                        # scan what we read.
                         if failure:
                             self.failures.append(failure)
-                        elif text and len(text) > 5:
+                        if text and len(text) > 5:
                             results.append((tag_name, text))
         except Exception as exc:
             self.failures.append(
@@ -493,11 +635,13 @@ class ImageExtractor:
         """
         Basic hidden text detection.
 
-        FRAME 0 ONLY, and that is a decision rather than the frame bug again
-        (v0.5.6 round 5, reviewed by T9 and left as-is deliberately). This pass is
-        a HEURISTIC over OCR geometry -- tiny glyphs, edge placement -- not a
-        content source: it reports that text looks hidden, it does not supply text
-        to scan. A later frame's actual TEXT is already read by `_ocr_frames_of`,
+        FRAME 0 GEOMETRY ONLY, and that is a decision rather than the frame bug
+        again (round 5, reviewed by T9; wording corrected in round 6 to ASTRA's
+        precision). The claim "not a content source" was too absolute: the string
+        this returns DOES include OCR text excerpts, and that string is scanned. So
+        state it exactly -- what is limited to frame 0 is the GEOMETRY heuristic
+        (tiny glyphs, edge placement), not the reading of later frames. A later
+        frame's actual TEXT is already read by `_ocr_frames_of`,
         which walks every frame, so no content is lost by not re-running the
         geometry check per frame. If this ever becomes a content source, it needs
         the frame walk like everything else -- anything that reads "the image" has

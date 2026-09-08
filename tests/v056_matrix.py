@@ -327,10 +327,19 @@ def _file_surface(extra=None):
         # are live on any surface that takes a path.
         "later_component": "threat",               # frame 2 fires; every frame inspected
         "byte_metadata": "threat",                 # XPComment decodes and fires
-        "converter_failed": NotApplicable(
-        "no external converter process runs on this path; text is produced by an "
-        "in-process parser, so there is no helper exit status to ignore",
-        claim="interface"),
+        # ROUND 6 -- ASTRA H4 REJECTED this N/A, and he was right. The claim was
+        # "no external converter process runs on this path". Image routing shells
+        # out to TESSERACT, on every surface that takes a path. An exit-7 stub
+        # first on PATH reaches the CLI, real MCP and seven library surfaces, and
+        # the product answers correctly: the OCR component is lost and NAMED while
+        # the EXIF component still fires. So the cell is asserted, not excused.
+        #
+        # The lesson is about the N/A itself, not this cell. A wrong "impossible"
+        # publishes a reason to stop looking, and it survived a whole review round
+        # because a grid full of confident N/As reads like coverage. An N/A has to
+        # name the mechanism it denies; this one denied a subprocess the code
+        # plainly spawns.
+        "converter_failed": "threat_incomplete",
     }
     base.update(extra or {})
     return base
@@ -404,10 +413,13 @@ _row("cli_repo", {
     # so on this surface both image mechanisms are named skips, not findings.
     "later_component": "incomplete",
     "byte_metadata": "incomplete",
-    "converter_failed": NotApplicable(
-        "no external converter process runs on this path; text is produced by an "
-        "in-process parser, so there is no helper exit status to ignore",
-        claim="interface"),
+    # ROUND 6 (ASTRA H4). Reachable here too, and the CONTAINER is the reason:
+    # `_BINARY_EXTENSIONS` declines .jpg/.gif outright, which is why both image
+    # mechanisms above are named skips on this surface -- but `.tiff` is NOT in
+    # that set, so a committed TIFF IS routed to the image extractor and the
+    # failing Tesseract is reached. "The walker inspects no images" was true of
+    # the extensions I happened to test with, and false of the walker.
+    "converter_failed": "threat_incomplete",
 })
 
 NOTES[("cli_repo", "truncated_finding")] = (
@@ -469,10 +481,12 @@ _row("cli_deep", {
     # The deep path is the one that shells out, so this is where a converter's
     # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
     "converter_failed": "incomplete",
-    "later_component": NotApplicable(
-        "this surface handles a single-component input only; there is no second "
-        "frame, page or track for it to omit",
-        claim="interface"),
+    # ROUND 6 -- ASTRA H4 REJECTED this "single-component" premise. A container
+    # here can carry SEVERAL SUBTITLE TRACKS, and `_extract_subtitles` iterates
+    # them and labels each `subtitle:<lang>`. A real two-track mkv puts the
+    # finding on the SECOND track. The reason described the one-track fixture I
+    # had, and then generalised it into a property of the surface.
+    "later_component": "threat",
     "byte_metadata": NotApplicable(
         "this surface parses no image or document metadata block, so no field "
         "arrives as bytes needing its own encoding",
@@ -550,10 +564,12 @@ _row("lib_scan_deep", {
     # The deep path is the one that shells out, so this is where a converter's
     # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
     "converter_failed": "incomplete",
-    "later_component": NotApplicable(
-        "this surface handles a single-component input only; there is no second "
-        "frame, page or track for it to omit",
-        claim="interface"),
+    # ROUND 6 -- ASTRA H4 REJECTED this "single-component" premise. A container
+    # here can carry SEVERAL SUBTITLE TRACKS, and `_extract_subtitles` iterates
+    # them and labels each `subtitle:<lang>`. A real two-track mkv puts the
+    # finding on the SECOND track. The reason described the one-track fixture I
+    # had, and then generalised it into a property of the surface.
+    "later_component": "threat",
     "byte_metadata": NotApplicable(
         "this surface parses no image or document metadata block, so no field "
         "arrives as bytes needing its own encoding",
@@ -591,10 +607,11 @@ _row("lib_helper_image", {
     "empty": "clean",                          # a valid blank image: decoded, no text
     "later_component": "threat",               # ASTRA G1: frame 2 carries it
     "byte_metadata": "threat",                 # ASTRA G2: XPComment decodes
-    "converter_failed": NotApplicable(
-        "no external converter process runs on this path; text is produced by an "
-        "in-process parser, so there is no helper exit status to ignore",
-        claim="interface"),
+    # ROUND 6 (ASTRA H4): Tesseract PRESENT but FAILING, which is a different
+    # state from Tesseract ABSENT (`missing_dependency` above). The process runs
+    # and returns nonzero, and a nonzero exit must not be read as "this image has
+    # no text" -- the same false-success shape the audio path was repaired for.
+    "converter_failed": "threat_incomplete",
 })
 
 _row("lib_helper_pdf", {
@@ -609,10 +626,12 @@ _row("lib_helper_pdf", {
     "undecodable": _HELPER_WRONG_TYPE,
     "empty": "clean",                          # a valid PDF with a blank page
     "later_component": "threat",               # the finding on page 2
-    "byte_metadata": NotApplicable(
-        "this surface parses no image or document metadata block, so no field "
-        "arrives as bytes needing its own encoding",
-        claim="interface"),
+    # ROUND 6 (ASTRA H4): rejected, and correctly. PyPDF2 returns a document
+    # `/Title` as a byte string carrying its own encoding, so a UTF-16BE title
+    # IS a byte-valued metadata field on this surface. Measured: it decodes,
+    # fires and the scan stays complete. The old reason described the PDFs I had
+    # fixtures for, not the parser.
+    "byte_metadata": "threat",
     "converter_failed": NotApplicable(
         "no external converter process runs on this path; text is produced by an "
         "in-process parser, so there is no helper exit status to ignore",
@@ -699,14 +718,35 @@ _conv_row("lib_conv_image", {
     "later_component": "threat",
     "byte_metadata": "threat",
     "undecodable": "threat_incomplete",
+    # ROUND 6 (ASTRA H4): the convenience function reaches the same failing
+    # Tesseract the helper does.
+    "converter_failed": "threat_incomplete",
 })
 _conv_row("lib_conv_pdf", {
     "later_component": "threat",               # the finding on page 2
+    # ROUND 6 (ASTRA H4): the two PDF byte-metadata N/As were rejected. PyPDF2
+    # hands back a document `/Title` as a byte string that needs its own
+    # decoding, and a UTF-16 one decodes, fires and stays complete -- so the
+    # state exists on this surface and the claim "no field arrives as bytes" was
+    # about the fixtures, not about the parser.
+    "byte_metadata": "threat",
 })
-_conv_row("lib_conv_audio", {})
-_conv_row("lib_conv_video", {
-    # The only surface that shells out to a converter for a text component.
+# ROUND 6 (ASTRA H4): audio has its OWN converter. `_extract_metadata` runs
+# ffprobe and CHECKS its return code, so "no external converter process runs"
+# was wrong here for a second, independent reason -- and the round-5 note below
+# claiming video was "the only surface" that shells out was wrong three times
+# over. The cell runs on the same transcription seam the other audio states use
+# (this environment has no Whisper, exactly as ASTRA's did); the real ffprobe
+# mechanism is asserted directly in `test_h4_audio_metadata_has_its_own_...`.
+_conv_row("lib_conv_audio", {
     "converter_failed": "incomplete",
+})
+_conv_row("lib_conv_video", {
+    "converter_failed": "incomplete",
+    # ROUND 6 (ASTRA H4): the third rejected single-component premise. Real mkv,
+    # real ffprobe, real per-track conversion; only Whisper is seamed, and the
+    # finding comes from the SECOND subtitle track, not from speech.
+    "later_component": "threat",
 })
 
 # QR is the one convenience function with exactly ONE content source, and that
@@ -725,9 +765,10 @@ _conv_row("lib_conv_qr", {
     "incomplete_finding": "threat_incomplete",
     # The 2,953-byte figure is right about ONE SYMBOL and was wrong as a statement
     # about the surface: a caller-configured cap truncates decoded QR text at any
-    # size, and several symbols concatenate. Kept as a scoped remark rather than
-    # an N/A -- at the DEFAULT 1 MiB cap it still holds, and that is what it is
-    # allowed to say.
+    # size. Kept as a scoped remark rather than an N/A -- at the DEFAULT 1 MiB cap
+    # it still holds for THIS function, and that is what it is allowed to say.
+    # (Round 6: the "symbols concatenate" half belonged to `scan_fast`, not here.
+    # See the note below.)
     "truncated_finding": "threat_incomplete",
 })
 
@@ -735,8 +776,15 @@ NOTES[("lib_conv_qr", "truncated_finding")] = (
     "SCOPED REMARK, not an impossibility. A single QR symbol caps at 2,953 bytes "
     "(version 40, level L, binary), so at the DEFAULT 1 MiB engine cap one symbol "
     "cannot truncate. This cell is asserted with a caller-configured cap, which is "
-    "a supported constructor argument -- and several symbols in one image "
-    "concatenate, so even the default is not the bound my round-4 reason claimed."
+    "a supported constructor argument. "
+    "ROUND 6 correction (ASTRA H4): the old wording said several symbols "
+    "'concatenate before the cap', and that describes the WRONG FUNCTION. "
+    "`scan_qr()` scans each decoded source SEPARATELY and folds the children "
+    "afterwards, so each symbol meets the cap on its own; it is `scan_fast()` "
+    "that JOINS extracted text before scanning, and that is the path where "
+    "several symbols add up against one cap. Same package, two different "
+    "aggregation shapes -- naming the wrong one made a true sentence into a "
+    "false reason."
 )
 
 # =========================================================================

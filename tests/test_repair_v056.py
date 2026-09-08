@@ -1388,3 +1388,446 @@ def test_r4_deep_media_honours_sarif(tmp_path):
     props = doc["runs"][0].get("properties", {})
     if proc.returncode == EXIT_INCOMPLETE:
         assert props.get("inspectionComplete") is False
+
+
+# ==========================================================================
+# ROUND 6 — ASTRA's fifth review (H1, H2, H3, H5).
+#
+# One shared theme, and it is worth stating once because all four are the same
+# mistake wearing different clothes: a component of the file was not read, and
+# the document did not say so. H1 is a frame nobody walked, H2 is a metadata
+# block that warned instead of raising, H3 is a field thrown away because one
+# byte of it was bad, H5 is two APIs disagreeing about the same bytes.
+#
+# The rule these encode: **content we did not read cannot be counted as content
+# we cleared**, and its round-6 corollary, **an honest incomplete flag does not
+# repair a lost finding.** H3 is the case that proves the corollary — the
+# candidate reported the loss correctly and still shipped a scanner that misses
+# an injection if you append one malformed byte to it.
+# ==========================================================================
+
+V056_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "fixtures", "v056")
+
+
+def _fixture(name):
+    path = os.path.join(V056_FIXTURES, name)
+    assert os.path.exists(path), f"missing committed fixture: {path}"
+    return path
+
+
+def _needs_pyzbar():
+    try:
+        import pyzbar.pyzbar  # noqa: F401
+        from PIL import Image  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment guard
+        pytest.skip(f"QR decoding unavailable: {exc}")
+
+
+def _needs_pillow():
+    try:
+        from PIL import Image  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment guard
+        pytest.skip(f"Pillow unavailable: {exc}")
+
+
+# ---- H1: QR must walk frames -------------------------------------------------
+
+def test_h1_the_fixture_really_does_hide_its_code_on_a_later_frame():
+    """Trip evidence for H1, asserted BEFORE the product is asked anything.
+
+    If a later refactor makes this fixture single-frame, or puts the symbol on
+    frame 0, every H1 case below would pass for a reason that has nothing to do
+    with the repair. So the premise is measured, not assumed.
+    """
+    _needs_pyzbar()
+    from PIL import Image, ImageSequence
+    from pyzbar.pyzbar import decode
+
+    img = Image.open(_fixture("qr-later.gif"))
+    assert getattr(img, "n_frames", 1) == 2, "fixture is no longer two frames"
+    per_frame = [len(decode(f.convert("RGB")))
+                 for f in ImageSequence.Iterator(img)]
+    assert per_frame[0] == 0, "frame 0 must carry NO code, or H1 proves nothing"
+    assert per_frame[1] == 1, "frame 1 must carry the code"
+
+
+@pytest.mark.parametrize("entrypoint", ENTRYPOINTS)
+def test_h1_later_frame_qr_is_a_threat_not_a_clean_complete_scan(entrypoint):
+    """The H1 blocker itself: exit 0 / complete / clean over a live injection.
+
+    This is the worst shape the release can produce — not a missed read that
+    admits it, but a missed read that certifies the file. Frame 1 of this GIF
+    carries `Ignore all previous instructions…`; the same pixels scanned alone
+    produced six findings while the file scanned exit 0, `is_clean: true`.
+    """
+    _needs_pyzbar()
+    proc = _run(entrypoint, "--file", _fixture("qr-later.gif"), "-o", "json",
+                timeout=300)
+    doc = _one_json_doc(proc)
+    assert proc.returncode == EXIT_THREAT, (
+        f"later-frame QR did not raise a threat (exit {proc.returncode}); "
+        f"warnings={doc.get('extraction_warnings')}")
+    assert doc["threat_found"] is True
+    assert doc["is_clean"] is False
+    assert doc["findings_count"] > 0
+
+
+def test_h1_qr_reports_the_frame_a_finding_came_from():
+    """A finding that cannot be located is a finding somebody will dispute.
+
+    Frame 0 keeps its bare label so nothing downstream of a still image sees a
+    renamed source; later frames must name the frame.
+    """
+    _needs_pyzbar()
+    from sunglasses.extractors.qr import QRExtractor
+
+    still = QRExtractor().extract(_fixture("qr-injection.png"))
+    assert [label for label, _ in still] == ["qrcode:0"], \
+        "single-frame label changed; downstream consumers key on it"
+
+    animated = QRExtractor().extract(_fixture("qr-later.gif"))
+    labels = [label for label, _ in animated]
+    assert labels, "no QR code found on any frame"
+    assert any("frame:1" in label for label in labels), \
+        f"later-frame finding does not name its frame: {labels}"
+
+
+def test_h1_the_public_scan_qr_helper_agrees_with_the_cli():
+    """`scan_qr()` is a public entry point and returned the same false clean.
+
+    Fixing only the dispatcher would have left the convenience function — the
+    one a user calls first — still certifying the file.
+    """
+    _needs_pyzbar()
+    from sunglasses.extractors.qr import scan_qr
+
+    doc = scan_qr(_fixture("qr-later.gif"))
+    assert doc["threat_found"] is True, "scan_qr() still misses the later frame"
+    assert doc["is_clean"] is False
+
+
+def test_h1_qr_uses_the_same_frame_cap_as_ocr_and_metadata():
+    """One frame budget for every reader of the same file.
+
+    A per-component cap is a frame some component silently skipped, and the
+    file would still read complete because only the other components said so.
+    """
+    from sunglasses.extractors.image import ImageExtractor
+    from sunglasses.extractors.qr import QRExtractor
+    assert QRExtractor.MAX_QR_FRAMES == ImageExtractor.MAX_OCR_FRAMES
+
+
+def test_h1_frames_past_the_cap_are_named_by_the_qr_reader_too():
+    """Past the cap is a coverage loss, and every component must own its share."""
+    _needs_pyzbar()
+    from PIL import Image
+    from sunglasses.extractors.qr import QRExtractor
+
+    total = QRExtractor.MAX_QR_FRAMES + 1
+    frames = [Image.new("RGB", (40, 40), "white") for _ in range(total)]
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "over-cap.tiff")
+        frames[0].save(path, save_all=True, append_images=frames[1:])
+        extractor = QRExtractor()
+        extractor.extract(path)
+        assert any("not inspected for QR" in f for f in extractor.failures), \
+            f"QR reader stayed silent about frames past the cap: {extractor.failures}"
+
+
+# ---- H2: corrupt EXIF is not absent EXIF ------------------------------------
+
+@pytest.mark.parametrize("name", ["short-ifd.jpg", "far-ifd.jpg"])
+def test_h2_the_fixture_really_does_have_a_present_but_unparsable_exif(name):
+    """Trip evidence for H2: present container, zero tags, parser complains.
+
+    Pillow does NOT raise here — it emits `UserWarning: Corrupt EXIF data` and
+    returns an empty tag set. That is exactly why catching exceptions proved
+    nothing, and why this premise is measured rather than asserted in prose.
+    """
+    _needs_pillow()
+    import warnings as _w
+    from PIL import Image
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        img = Image.open(_fixture(name))
+        tags = dict(img.getexif())
+        raw = img.info.get("exif") or b""
+        img.load()          # the raster is fine; only the metadata is damaged
+    assert raw, "fixture has no raw EXIF container at all"
+    assert not tags, "fixture's EXIF parsed cleanly; it cannot demonstrate H2"
+    assert any("exif" in str(w.message).lower() for w in caught), \
+        "no parser warning; this fixture no longer exercises the warning path"
+
+
+@pytest.mark.parametrize("name", ["short-ifd.jpg", "far-ifd.jpg"])
+@pytest.mark.parametrize("entrypoint", ENTRYPOINTS)
+def test_h2_corrupt_exif_is_incomplete_not_clean_and_complete(entrypoint, name):
+    """The blocker: exit 0, complete, clean, over metadata we never read."""
+    _needs_pillow()
+    proc = _run(entrypoint, "--file", _fixture(name), "-o", "json", timeout=300)
+    doc = _one_json_doc(proc)
+    assert proc.returncode == EXIT_INCOMPLETE, (
+        f"corrupt EXIF still reports exit {proc.returncode}; "
+        f"warnings={doc.get('extraction_warnings')}")
+    assert doc["inspection_complete"] is False
+    assert doc["threat_found"] is False, "the raster is genuinely clean"
+    assert any("EXIF" in w for w in doc.get("extraction_warnings", [])), \
+        "coverage was lost without naming the component that was not read"
+
+
+def test_h2_absent_exif_stays_clean_and_complete():
+    """The other half, and the one that would make this repair a regression.
+
+    A PNG with no EXIF block is an HONEST ABSENCE. If "no tags" alone marked a
+    file incomplete, every clean image in the corpus would go incomplete — the
+    exact over-correction the acceptance contract rejects a blanket rule for.
+    """
+    _needs_pillow()
+    proc = _run([sys.executable, "-m", "sunglasses"], "--file",
+                _fixture("qr-ordinary.png"), "-o", "json", timeout=300)
+    doc = _one_json_doc(proc)
+    assert doc["inspection_complete"] is True, \
+        f"absent metadata was treated as damaged: {doc.get('extraction_warnings')}"
+    assert doc["is_clean"] is True
+
+
+def test_h2_an_unrelated_pillow_warning_is_not_reported_as_corrupt_metadata():
+    """ASTRA asked for this boundary explicitly.
+
+    Pillow emits unrelated warnings (`unclosed file`, resource notes). A scanner
+    that rebrands every stray warning as corrupt metadata is one whose warnings
+    nobody reads — and it would make clean files incomplete for a false reason.
+    """
+    _needs_pillow()
+    import warnings as _w
+    from PIL import Image
+    from sunglasses.extractors.image import ImageExtractor
+
+    extractor = ImageExtractor()
+    img = Image.open(_fixture("exif-description.jpg"))
+    with _w.catch_warnings():
+        _w.simplefilter("always")
+        _w.warn("unclosed file <_io.BufferedReader name='x'>", ResourceWarning)
+        extractor._exif_tags(img)
+    assert not any("not parsed" in f or "partially parsed" in f
+                   for f in extractor.failures), \
+        f"an unrelated warning was counted as metadata damage: {extractor.failures}"
+
+
+# ---- H3: a bad byte must not discard the readable text ----------------------
+
+def test_h3_the_control_fixture_is_a_real_finding_at_full_strength():
+    """Trip evidence for H3: the control must find things, or the loss is unmeasurable."""
+    _needs_pillow()
+    proc = _run([sys.executable, "-m", "sunglasses"], "--file",
+                _fixture("ascii_control.jpg"), "-o", "json", timeout=300)
+    doc = _one_json_doc(proc)
+    assert proc.returncode == EXIT_THREAT
+    assert doc["inspection_complete"] is True
+    assert doc["findings_count"] >= 6, \
+        f"control lost strength ({doc['findings_count']} findings)"
+
+
+@pytest.mark.parametrize("name", ["ascii_bad_tail.jpg", "ascii_bad_prefix.jpg"])
+@pytest.mark.parametrize("entrypoint", ENTRYPOINTS)
+def test_h3_one_bad_byte_keeps_the_findings_and_reports_the_loss(entrypoint, name):
+    """The amendment case, and the sharpest lesson of this round.
+
+    The candidate handled this "correctly" by its own contract: it reported an
+    honest, precisely-worded incomplete. It also returned ZERO findings and exit
+    3 on a file the PREVIOUS wheel caught six findings in — so an attacker
+    appends one malformed byte and the injection stops being reported. An honest
+    flag does not repair a lost finding; retention and honesty are not a trade,
+    and this asserts BOTH halves at once.
+    """
+    _needs_pillow()
+    proc = _run(entrypoint, "--file", _fixture(name), "-o", "json", timeout=300)
+    doc = _one_json_doc(proc)
+    assert proc.returncode == EXIT_THREAT, (
+        f"readable text was discarded with the bad byte (exit {proc.returncode})")
+    assert doc["findings_count"] >= 6, \
+        f"partial decode lost findings: {doc['findings_count']}"
+    assert doc["inspection_complete"] is False, \
+        "the undecodable byte was swallowed; loss must still cost coverage"
+    assert any("UserComment" in w for w in doc.get("extraction_warnings", [])), \
+        "the loss was not named"
+
+
+def test_h3_the_loss_is_counted_on_the_input_not_on_the_decoders_output():
+    """The G5 rule, applied to the new partial path.
+
+    Round 5 was corrected for publishing a count of U+FFFD characters as a fact
+    about bytes. The byte-oriented path measures the decoder's actual
+    `[start, end)` spans, so one bad byte reports as ONE byte.
+    """
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    extractor = ImageExtractor()
+    text, failure = extractor._decode_exif_text(
+        "ImageDescription", b"readable text here" + b"\xff" + b" and more")
+    assert "readable text here" in text and "and more" in text, \
+        "the decodable text either side of the bad byte was dropped"
+    assert "1 byte" in failure, f"loss miscounted: {failure}"
+
+
+def test_h3_a_legitimate_replacement_character_is_not_reported_as_damage():
+    """U+FFFD is a valid character. Counting it as damage is the G5 defect."""
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    text, failure = ImageExtractor()._decode_exif_text(
+        "ImageDescription", "a real � character".encode("utf-8"))
+    assert failure is None, f"a valid U+FFFD was reported as a loss: {failure}"
+    assert "�" in text, "a valid character was stripped from scanned text"
+
+
+def test_h3_utf16_loss_is_described_as_units_not_bytes():
+    """Say what was actually measured.
+
+    UTF-16 gives no byte span, so the count is replaced UNITS. Calling those
+    "bytes not inspected" would be a claim about the input we cannot support —
+    the same error as the round-5 U+FFFD count, one encoding over.
+    """
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    text, failure = ImageExtractor()._decode_exif_text("XPComment", b"\x00\xd8ab")
+    if failure is not None:
+        assert "byte" not in failure, \
+            f"UTF-16 loss claimed bytes it never measured: {failure}"
+
+
+# ---- H5: the in-memory API must agree with the path API ---------------------
+
+def test_h5_path_and_bytes_extraction_agree_on_the_same_file():
+    """`_ocr_frames_of` left PIL parked on the last frame it seeked to.
+
+    The metadata read that followed then ran against whatever frame the OCR walk
+    happened to stop on, so the path API found the first-page metadata and the
+    in-memory API found none — and recorded NO failure, because nothing here
+    knew a different frame had been read. Two APIs over the same bytes must
+    answer the same question.
+    """
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    path = _fixture("metadata-first-page.tiff")
+    from_path = ImageExtractor().extract(path)
+    with open(path, "rb") as fh:
+        from_bytes = ImageExtractor().extract_from_bytes(
+            fh.read(), "metadata-first-page.tiff")
+
+    meta_path = sorted(label for label, _ in from_path if label.startswith("exif"))
+    meta_bytes = sorted(label for label, _ in from_bytes if label.startswith("exif"))
+    assert meta_path, "the path API stopped finding the first-page metadata"
+    assert meta_path == meta_bytes, \
+        f"path/bytes disagree: {meta_path} vs {meta_bytes}"
+
+
+def test_h5_frame_zero_metadata_survives_the_ocr_walk():
+    """The mechanism, isolated: after walking frames, metadata still reads frame 0."""
+    _needs_pillow()
+    from sunglasses.extractors.image import ImageExtractor
+
+    path = _fixture("metadata-first-page.tiff")
+    with open(path, "rb") as fh:
+        results = ImageExtractor().extract_from_bytes(fh.read(), "x.tiff")
+    assert any(label.startswith("exif") for label, _ in results), \
+        "in-memory extraction still reads metadata from the wrong frame"
+
+
+# ---- the general rule H1 stands for -----------------------------------------
+
+def test_every_image_reader_either_walks_frames_or_is_marked_frame_zero_only():
+    """H1's real lesson, enforced structurally instead of by memory.
+
+    Round 5 taught OCR and metadata to walk frames and left QR opening one frame,
+    because the repair was aimed at the components the review sampled. This
+    asserts the property for EVERY `Image.open` in the package: a reader either
+    walks the sequence, seeks deliberately, or is annotated as frame-0-only. A
+    new reader added without that annotation fails here rather than in a review
+    four rounds later.
+    """
+    import re as _re
+    pkg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
+        __import__("sunglasses").__file__))), "sunglasses", "extractors")
+    offenders = []
+    for filename in sorted(os.listdir(pkg)):
+        if not filename.endswith(".py"):
+            continue
+        source = open(os.path.join(pkg, filename), encoding="utf-8").read()
+        for match in _re.finditer(r"Image\.open\(", source):
+            line_no = source[:match.start()].count("\n") + 1
+            # The enclosing function: walk backwards to its `def`, then judge it
+            # on what it does, not on what a comment elsewhere promises.
+            head = source[:match.start()]
+            def_start = head.rfind("\n    def ")
+            body = source[def_start:def_start + 4000] if def_start != -1 else ""
+            walks = ("ImageSequence" in body or "_frames_of" in body
+                     or "_decode_frames" in body or ".seek(" in body)
+            declared = "FRAME 0" in body.upper()
+            if not (walks or declared):
+                offenders.append(f"{filename}:{line_no}")
+    assert not offenders, (
+        "these image readers neither walk frames nor declare themselves "
+        f"frame-0-only: {offenders}")
+
+
+def test_h4_audio_metadata_has_its_own_external_converter():
+    """ASTRA H4, the second converter. Asserted directly, not through the grid.
+
+    The round-5 matrix said no external converter process runs on these surfaces.
+    `audio.py:_extract_metadata` runs **ffprobe** and checks its return code, so
+    the claim was wrong for a second, independent reason — and the round-5 note
+    calling video "the only surface that shells out" was wrong three times over.
+
+    This is asserted at the extractor rather than through `scan_audio()` because
+    the convenience function short-circuits on absent Whisper before ffprobe is
+    reached (this environment has no Whisper, exactly as ASTRA's did not). The
+    mechanism is what the N/A denied, so the mechanism is what gets measured.
+    """
+    import subprocess as _sp
+    import tempfile
+    import wave
+
+    from sunglasses.extractors.audio import AudioExtractor
+
+    if not shutil_which("ffprobe"):  # pragma: no cover - environment guard
+        pytest.skip("ffprobe not installed; the converter seam needs a real one")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = os.path.join(tmp, "silent.wav")
+        with wave.open(clip, "w") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(8000)
+            handle.writeframes(b"\x00\x00" * 8000)
+
+        bindir = os.path.join(tmp, "bin")
+        os.makedirs(bindir)
+        stub = os.path.join(bindir, "ffprobe")
+        with open(stub, "w") as handle:
+            handle.write("#!/bin/sh\nexit 7\n")
+        os.chmod(stub, 0o755)
+
+        extractor = AudioExtractor.__new__(AudioExtractor)   # skip the Whisper gate
+        extractor.warnings = []
+        old_path = os.environ["PATH"]
+        os.environ["PATH"] = bindir + os.pathsep + old_path
+        try:
+            extractor._extract_metadata(clip)
+        finally:
+            os.environ["PATH"] = old_path
+
+    assert any("ffprobe" in w for w in extractor.warnings), (
+        "a failing ffprobe produced no coverage warning — 'no external converter "
+        f"runs here' was the N/A this disproves. warnings={extractor.warnings}")
+
+
+def shutil_which(name):
+    import shutil
+    return shutil.which(name)

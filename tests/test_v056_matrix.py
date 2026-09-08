@@ -273,6 +273,32 @@ def _build_image_fixtures(root, f):
     f["over_cap_clean"].write_text("benign filler. " * 90000)
     assert f["over_cap_clean"].stat().st_size > CAP
 
+    # ROUND 6 (ASTRA H4). A REAL failing external converter, not a seam.
+    #
+    # Round 5 declared `converter_failed` impossible on every path surface --
+    # "no external converter process runs on this path" -- and that claim was
+    # simply false: image routing shells out to Tesseract. ASTRA reached it with
+    # an exit-7 stub on PATH through the CLI, real MCP and seven library
+    # surfaces. A false impossibility is worse than a missing test, because the
+    # grid publishes it as a reason nobody needs to look again.
+    #
+    # `ffprobe` gets the same treatment: `audio.py:_extract_metadata` runs it and
+    # checks its return code, so audio metadata is a second real converter seam.
+    import stat as _stat
+    bindir = root / "failed-converter-bin"
+    bindir.mkdir(exist_ok=True)
+    for tool in ("tesseract", "ffprobe"):
+        stub = bindir / tool
+        stub.write_text("#!/bin/sh\nexit 7\n")
+        stub.chmod(stub.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
+    f["failed_converter_bin"] = str(bindir)
+
+    # The input for that state: a file whose OCR component dies while a metadata
+    # component still carries the instruction. That is what makes it a COMPONENT
+    # failure -- the product must keep the finding AND report the lost coverage,
+    # which is exactly the behaviour ASTRA observed and the grid never asserted.
+    f["converter_failed_image"] = f["byte_meta_control"]
+
     # Two QR symbols in ONE image: one ordinary, one carrying the instruction.
     # This is the fixture that disproves the round-4 "exactly one content source"
     # reason -- a later symbol IS a later component, and one can fire while
@@ -368,6 +394,33 @@ def _build_pdf_fixtures(root, f):
     f["pdf_truncated_finding"] = write("pdf-big.pdf", annots=b"[5 0 R]")
     assert f["pdf_truncated_finding"].stat().st_size > CAP
 
+    # ROUND 6 (ASTRA H4). The two PDF `byte_metadata` N/As said this surface
+    # "parses no document metadata block, so no field arrives as bytes". PyPDF2
+    # returns `/Title` as a byte string carrying its OWN encoding, and a UTF-16BE
+    # title is exactly the byte-valued metadata state. Hand-built rather than
+    # written through a library so the BOM and the byte string are the fixture,
+    # not a side effect of somebody's writer.
+    title = b"\xfe\xff" + INJECTION.encode("utf-16-be")
+    esc = title.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+    body = [b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>"]
+    stream = b"BT /F1 12 Tf 10 100 Td (ordinary page text) Tj ET"
+    body.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    body.append(b"<< /Title (" + esc + b") >>")
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for index, obj in enumerate(body, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % index + obj + b"\nendobj\n"
+    startxref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(body) + 1)
+    for off in offsets:
+        out += b"%010d 00000 n \n" % off
+    out += (b"trailer\n<< /Size %d /Root 1 0 R /Info 5 0 R >>\nstartxref\n%d\n%%%%EOF\n"
+            % (len(body) + 1, startxref))
+    f["pdf_byte_metadata"] = root / "pdf-utf16-title.pdf"
+    f["pdf_byte_metadata"].write_bytes(bytes(out))
+
 
 def _build_media_fixtures(root, f):
     """A real, valid, silent WAV. It is a carrier: the deep cells replace the
@@ -379,6 +432,33 @@ def _build_media_fixtures(root, f):
         w.setframerate(16000)
         w.writeframes(b"\x00\x00" * 16000)
     f["wav"] = p
+
+    # ROUND 6 (ASTRA H4). Three N/As claimed deep/video inputs have "a single
+    # component ... no second frame, page or TRACK". The code iterates subtitle
+    # streams and labels each `subtitle:<lang>`, so a second track is exactly the
+    # later component those cells denied. Built with REAL ffmpeg: the premise
+    # under review is whether a real container can carry one, so a hand-rolled
+    # stand-in would assert my belief about mkv rather than mkv.
+    srt_one = root / "track-one.srt"
+    srt_two = root / "track-two.srt"
+    srt_one.write_text("1\n00:00:00,000 --> 00:00:02,000\nordinary first track\n\n")
+    srt_two.write_text(f"1\n00:00:00,000 --> 00:00:02,000\n{INJECTION}\n\n")
+    f["video_two_tracks"] = root / "two-subtitle-tracks.mkv"
+    built = subprocess.run(
+        ["ffmpeg", "-loglevel", "error",
+         "-f", "lavfi", "-t", "2", "-i", "color=c=black:s=64x64",
+         "-f", "lavfi", "-t", "2", "-i", "anullsrc=r=8000:cl=mono",
+         "-i", str(srt_one), "-i", str(srt_two),
+         "-map", "0:v", "-map", "1:a", "-map", "2", "-map", "3",
+         "-c:v", "libx264", "-c:a", "aac", "-c:s", "srt",
+         "-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=fra",
+         "-y", str(f["video_two_tracks"])],
+        capture_output=True, text=True, timeout=300)
+    # A fixture that failed to build is a cell that quietly does not run, which is
+    # the failure mode this suite exists to prevent -- so say so loudly.
+    assert built.returncode == 0 and f["video_two_tracks"].exists(), (
+        "could not build the two-subtitle-track fixture with ffmpeg; this cell "
+        f"cannot be asserted without it.\n{built.stderr[-500:]}")
 
 
 @pytest.fixture(scope="module")
@@ -423,7 +503,9 @@ def repos(tmp_path_factory):
             here = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "fixtures", "v056")
             src = {"frames_finding": "two-frame.gif",
-                   "byte_meta_finding": "exif-xpcomment.jpg"}[key]
+                   "byte_meta_finding": "exif-xpcomment.jpg",
+                   "byte_meta_control": "exif-description.jpg",
+                   "tiff_description": "tiff-description.tiff"}[key]
             _sh.copy(os.path.join(here, src), os.path.join(root, name))
             return [name]
         return add
@@ -462,6 +544,17 @@ def repos(tmp_path_factory):
             "later.gif", "frames_finding")),
         "byte_metadata": make("bytemeta", {"ok.md": "notes\n"}, extra=_commit_fixture(
             "meta.jpg", "byte_meta_finding")),
+        # ROUND 6: the repository walker routes an image to the same extractor,
+        # so a failing Tesseract is reachable through `--repo` too. Round 5 called
+        # this cell impossible on the walker as well.
+        # A .TIFF, deliberately: `_BINARY_EXTENSIONS` declines .jpg/.gif outright,
+        # so those never reach an extractor through `--repo` (which is why the two
+        # image mechanisms above are named skips here). `.tiff` is NOT in that set,
+        # so it IS routed to the image extractor -- which is exactly the
+        # "repository TIFF routing follows the inspected route" ASTRA cited. The
+        # container choice is the whole reason this cell is reachable.
+        "converter_failed": make("convfail", {"ok.md": "notes\n"}, extra=_commit_fixture(
+            "meta.tiff", "tiff_description")),
         # ASTRA's counterexample to my `storage` claim: git cannot store a FIFO,
         # which is true -- but it stores a SYMLINK, and a symlink to a FIFO
         # survives a clone and puts a non-regular file in the walker's path. The
@@ -639,6 +732,45 @@ sys.argv = ["sunglasses"] + json.loads(os.environ["SEAM_ARGV"])
 main()
 '''
 
+# ROUND 6. The `cli_deep` twin of `_RealTrackSeam`: a real .mkv through the real
+# CLI, real ffprobe and real per-track conversion, with ONLY Whisper stood in for.
+_TRACK_SEAM_DRIVER = r'''
+import json, os, sys
+from sunglasses.extractors import video as _video
+
+_REAL = _video.VideoExtractor
+
+
+class _TrackSeam:
+    def __init__(self, *a, **kw):
+        # Bypass `_check_deps` (it demands Whisper) and nothing else.
+        self._real = _REAL.__new__(_REAL)
+        self._real.warnings = []
+        self.warnings = []
+
+    def extract(self, path):
+        results = list(self._real._extract_subtitles(path))
+        self.warnings = list(self._real.warnings)
+        results.append(("audio_transcript", os.environ["SEAM_TRANSCRIPT"]))
+        return results
+
+
+_video.VideoExtractor = _TrackSeam
+from sunglasses.cli import main
+sys.argv = ["sunglasses"] + json.loads(os.environ["SEAM_ARGV"])
+main()
+'''
+
+
+def _run_track_seam(argv, timeout=900):
+    env = dict(os.environ)
+    env["SEAM_ARGV"] = json.dumps(argv)
+    env["SEAM_TRANSCRIPT"] = ORDINARY
+    return subprocess.run([sys.executable, "-c", _TRACK_SEAM_DRIVER],
+                          capture_output=True, text=True, timeout=timeout,
+                          cwd=TEST_ROOT, env=env)
+
+
 _OVER_CAP = "benign filler. " * 90000
 
 _SEAM = {
@@ -701,8 +833,16 @@ def _run_seam(state, argv, timeout=900):
 # per-surface input construction
 # =========================================================================
 
-def _file_for(state, space):
-    """The path that puts a FILE surface into `state`."""
+def _file_for(state, space, surface=None):
+    """The path that puts a FILE surface into `state`.
+
+    `surface` only matters for `converter_failed`, which has two real mechanisms:
+    the deep/audio surfaces drive ffmpeg through the transcription seam, while
+    every path surface reaches a failing Tesseract on an ordinary image. Round 5
+    had one entry here because it believed the second mechanism did not exist.
+    """
+    if state == "converter_failed" and surface not in (None, "cli_deep"):
+        return space["converter_failed_image"]
     return {
         "clean": space["clean_file"],
         "finding": space["finding_file"],
@@ -726,6 +866,13 @@ def _file_for(state, space):
     }[state]
 
 
+def _failed_converter_env(space):
+    """PATH with the exit-7 stubs FIRST. No product switch, no monkeypatched
+    internals: the scanner runs the same `tesseract` lookup it always runs and
+    gets a process that fails, which is precisely how ASTRA reached it."""
+    return {"PATH": space["failed_converter_bin"] + os.pathsep + os.environ["PATH"]}
+
+
 _TEXT_INPUT = {
     "clean": ORDINARY,
     "finding": INJECTION,
@@ -740,14 +887,18 @@ def _cli_args(surface, state, space, repos, fmt):
     fmt_args = {"human": [], "json": ["--json"], "sarif": ["-o", "sarif"]}[fmt]
 
     if surface in ("cli_file", "cli_console"):
-        argv = ["scan", "--file", _file_for(state, space)] + fmt_args
+        argv = ["scan", "--file", _file_for(state, space, surface)] + fmt_args
         env = {"SUNGLASSES_DISABLE_EXTRACTORS": "1"} if state == "incomplete_finding" else None
+        if state == "converter_failed":
+            env = _failed_converter_env(space)
         return argv, None, env
 
     if surface == "cli_positional":
         # The auto-promotion leg: `scan <path>` with no --file.
-        argv = ["scan", _file_for(state, space)] + fmt_args
+        argv = ["scan", _file_for(state, space, surface)] + fmt_args
         env = {"SUNGLASSES_DISABLE_EXTRACTORS": "1"} if state == "incomplete_finding" else None
+        if state == "converter_failed":
+            env = _failed_converter_env(space)
         return argv, None, env
 
     if surface in ("cli_text", "cli_stdin"):
@@ -759,7 +910,8 @@ def _cli_args(surface, state, space, repos, fmt):
         return ["scan", "--stdin"] + fmt_args, _TEXT_INPUT[state], None
 
     if surface == "cli_repo":
-        return ["scan", "--repo", repos[state]] + fmt_args, None, None
+        env = _failed_converter_env(space) if state == "converter_failed" else None
+        return ["scan", "--repo", repos[state]] + fmt_args, None, env
 
     if surface == "cli_deep":
         path = {
@@ -767,6 +919,8 @@ def _cli_args(surface, state, space, repos, fmt):
             "missing": space["missing_media"],
             "nonregular": space["fifo"],
         }.get(state, space["wav"] if state in _SEAM else space["media_file"])
+        if state == "later_component":
+            path = str(space["video_two_tracks"])
         return ["scan", "--file", path, "--deep"] + fmt_args, None, None
 
     raise AssertionError(surface)
@@ -1023,7 +1177,9 @@ def test_cli_cell(surface, state, outcome, space, repos):
         where = f"{surface}/{state}/{fmt}"
         argv, stdin, env = _cli_args(surface, state, space, repos, fmt)
 
-        if surface == "cli_deep" and M.outcome_state(surface, state) in _SEAM:
+        if surface == "cli_deep" and state == "later_component":
+            proc = _run_track_seam(argv)
+        elif surface == "cli_deep" and M.outcome_state(surface, state) in _SEAM:
             proc = _run_seam(M.outcome_state(surface, state), argv)
         else:
             proc = _run(argv, env_extra=env, stdin=stdin,
@@ -1090,12 +1246,20 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             # round 5
             "later_component": space["frames_finding"],
             "byte_metadata": space["byte_meta_finding"],
+            # round 6: OCR dies, the metadata component still carries the finding
+            "converter_failed": space["converter_failed_image"],
             # the EMBEDDED-text undecodable state, split from outer-format
             # failure: the GIF itself parses, its comment bytes do not, and the
             # readable part still fires (ASTRA G2's `partial-comment.gif`).
             "undecodable": space["embedded_partial"],
         }[state]
-        if state in ("incomplete_clean", "incomplete_finding"):
+        if state == "converter_failed":
+            # Tesseract PRESENT but FAILING (exit 7), which is a different state
+            # from Tesseract absent below: the process runs, returns nonzero, and
+            # its output must not be mistaken for "this image has no text".
+            monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
+                               + os.environ["PATH"])
+        elif state in ("incomplete_clean", "incomplete_finding"):
             # The REAL mechanism ASTRA used for F2, with no seam at all: Tesseract
             # simply is not on PATH, so `pytesseract` raises TesseractNotFoundError
             # at run time while pyzbar (a linked library) keeps decoding. The
@@ -1153,6 +1317,8 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "corrupt_parser_fail": space["corrupt_pdf"],
             "nonregular": space["fifo"], "empty": space["pdf_empty"],
             "later_component": space["pdf_page2_finding"],
+            # round 6: a UTF-16BE `/Title`, which PyPDF2 returns as bytes
+            "byte_metadata": space["pdf_byte_metadata"],
         }[state]
         if state == "missing_dependency":
             from sunglasses.extractors import pdf as pdf_mod
@@ -1162,6 +1328,14 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
         return scan_pdf(path, engine=engine)
 
     if surface in ("lib_conv_audio", "lib_conv_video"):
+        if surface == "lib_conv_video" and state == "later_component":
+            # ROUND 6 (ASTRA H4): a REAL second subtitle track, through the real
+            # container and the real per-track conversion.
+            from sunglasses.extractors import video as video_mod
+            real_cls = video_mod.VideoExtractor
+            monkeypatch.setattr(video_mod, "VideoExtractor",
+                                lambda *a, **kw: _RealTrackSeam(real_cls))
+            return scan_video(str(space["video_two_tracks"]), engine=engine)
         path = {
             "unreadable": space["unreadable_media"], "missing": space["missing_media"],
             "nonregular": space["fifo"],
@@ -1205,7 +1379,14 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
         return aggregate(children, source="<aggregate>", warnings=warnings)
 
     # --- generic file surfaces
-    path = _file_for(state, space)
+    path = _file_for(state, space, surface)
+    if state == "converter_failed" and surface not in ("lib_conv_audio", "lib_scan_deep"):
+        # ROUND 6 (ASTRA H4). The round-5 grid said no external converter runs on
+        # these surfaces. Every one of them routes an image to the extractor that
+        # shells out to Tesseract, so the state is reached the same way ASTRA
+        # reached it -- a failing process on PATH, no product switch.
+        monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
+                           + os.environ["PATH"])
     if surface in ("lib_scan_auto_true", "lib_scan_deep") and state in (
             "missing_dependency", "unreadable", "missing"):
         path = {"unreadable": space["unreadable_media"],
@@ -1229,6 +1410,14 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
     if surface == "lib_scan_email":
         return scanner.scan_email(ORDINARY, [path])
     if surface == "lib_scan_deep":
+        if state == "later_component":
+            # ROUND 6: `scan_deep` routes on the suffix, so a real .mkv reaches
+            # the video extractor and the second track is a real later component.
+            from sunglasses.extractors import video as video_mod
+            real_cls = video_mod.VideoExtractor
+            monkeypatch.setattr(video_mod, "VideoExtractor",
+                                lambda *a, **kw: _RealTrackSeam(real_cls))
+            return scanner.scan_deep(str(space["video_two_tracks"]))
         if state in _MediaSeam.STATES:
             # The library twin of the `cli_deep` subprocess seam, and for the same
             # reason: a real silent MP3 carries no speech, so most of these states
@@ -1292,6 +1481,38 @@ class _MediaSeam:
 
     def extract(self, path):
         return list(self._sources)
+
+
+class _RealTrackSeam:
+    """Real ffmpeg subtitle extraction; ONLY the transcriber is replaced.
+
+    ROUND 6. `_MediaSeam` replaces the whole extractor, which is right for the
+    states a real silent WAV cannot reach -- but it would prove nothing about
+    multi-track routing, because the tracks would be my list rather than
+    ffmpeg's. Here the container, ffprobe, the per-track conversion and the
+    labels are all REAL; the speech seam stands in for Whisper exactly as it does
+    for G3, and no live ASR result is claimed. That is ASTRA's own method.
+    """
+
+    def __init__(self, real_cls):
+        # `real_cls` is captured BEFORE the monkeypatch. Looking it up afterwards
+        # finds the seam and `_extract_subtitles` vanishes -- the identical trap
+        # the audio driver documents, and it fails as a swallowed AttributeError
+        # that reads as "extraction failed", not as a harness bug.
+        # Bypass `_check_deps` only: it demands Whisper, and the seam is what
+        # stands in for Whisper. Every other method is the real one.
+        self._real = real_cls.__new__(real_cls)
+        self._real.warnings = []
+        self.warnings = []
+
+    def extract(self, path):
+        results = list(self._real._extract_subtitles(path))
+        self.warnings = list(self._real.warnings)
+        # The declared speech seam, benign: the finding under test comes from the
+        # SECOND SUBTITLE TRACK, so a transcript that carried one would prove
+        # nothing about track routing.
+        results.append(("audio_transcript", ORDINARY))
+        return results
 
 
 def _with_media_seam(surface, state, monkeypatch, call):
@@ -1403,6 +1624,125 @@ def test_every_metadata_container_is_read(space):
     assert page2["inspection_complete"] is True
 
 
+# ROUND 6 (ASTRA H4). The container table grows its THIRD DIMENSION.
+#
+# The round-5 table had one VALID example per container, and ASTRA's objection is
+# the sharpest sentence of this review: "one valid encoding example per container
+# does not cover valid text plus a bad byte, corrupt substructures, or QR on a
+# later frame. Those missing distinctions explain H1-H3." All three blockers lived
+# in the gap between "this container is read" and "this container is read when
+# something about it is WRONG".
+#
+# So each carrier is crossed with the states that broke it:
+#   (i)   valid text + one bad byte   -> H3's shape
+#   (ii)  corrupt substructure        -> H2's shape
+#   (iii) a later frame               -> H1/G1's shape
+#
+# Applicability is declared per carrier with a MECHANISM, not left implicit --
+# the same standard the twenty corrected N/As are now held to.
+_CARRIERS = {
+    # label:            (tag, encoding, charset-header, frame-capable container)
+    "exif:UserComment": (0x9286, "ascii", b"ASCII\x00\x00\x00", "jpeg"),
+    "exif:XPComment":   (0x9C9C, "utf-16-le", b"", "jpeg"),
+    "exif:ImageDescription": (270, "ascii", b"", "tiff"),
+}
+
+
+def _write_carrier(path, carrier, bad_byte=False, later_frame=False):
+    """Build one container variant with Pillow's REAL writers."""
+    from PIL import Image
+    tag, encoding, header, container = _CARRIERS[carrier]
+    payload = header + INJECTION.encode(encoding) + (b"\xff" if bad_byte else b"")
+
+    exif = Image.Exif()
+    exif[tag] = payload
+    base = Image.new("RGB", (60, 30), "white")
+    if later_frame:
+        # The instruction is on frame 1; frame 0 is ordinary. A reader that stops
+        # at frame 0 sees a clean file, which is exactly G1/H1.
+        first = Image.new("RGB", (60, 30), "white")
+        ordinary = Image.Exif()
+        ordinary[tag] = header + b"ordinary first frame" if encoding == "ascii" \
+            else header + "ordinary first frame".encode(encoding)
+        first.save(path, save_all=True, append_images=[base], exif=exif)
+    else:
+        base.save(path, exif=exif)
+    return path
+
+
+@pytest.mark.parametrize("carrier", sorted(_CARRIERS))
+def test_container_dimension_valid_text_plus_one_bad_byte(carrier, tmp_path):
+    """(i) A bad byte must cost COVERAGE, never the finding.
+
+    This is H3 generalised off the single fixture it was found on. The failure it
+    guards against is specific: the field decodes 99% and the scanner returns
+    exit 3 with zero findings, so appending one malformed byte to an injection
+    hides it. Retention and honesty are not a trade.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    scanner = SunglassesScanner()
+    suffix = ".jpg" if _CARRIERS[carrier][3] == "jpeg" else ".tiff"
+    clean = _write_carrier(str(tmp_path / f"ok{suffix}"), carrier)
+    damaged = _write_carrier(str(tmp_path / f"bad{suffix}"), carrier, bad_byte=True)
+
+    control = scanner.scan_fast(clean)
+    assert control["threat_found"] is True, (
+        f"{carrier}: the control variant does not fire, so this cell measures nothing")
+
+    doc = scanner.scan_fast(damaged)
+    assert doc["threat_found"] is True, (
+        f"{carrier}: one bad byte discarded the readable text and the finding with "
+        f"it — warnings={doc['warnings']}")
+    # And the loss, if the decoder really lost something, must be NAMED. An
+    # inspection that silently drops bytes is the other half of the same defect.
+    if doc["inspection_complete"] is False:
+        assert doc["warnings"], f"{carrier}: incomplete with nothing named"
+
+
+@pytest.mark.parametrize("carrier", sorted(_CARRIERS))
+def test_container_dimension_later_frame(carrier, tmp_path):
+    """(iii) The instruction on a LATER FRAME of the same container.
+
+    Only multi-frame containers can host this; TIFF is used for every carrier
+    because it accepts all three EXIF fields AND multiple pages, so the variable
+    under test is the frame, not the format.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    path = _write_carrier(str(tmp_path / "later.tiff"), carrier, later_frame=True)
+    doc = SunglassesScanner().scan_fast(path)
+    assert doc["threat_found"] is True, (
+        f"{carrier}: a later frame's metadata was never read — "
+        f"complete={doc['inspection_complete']}, warnings={doc['warnings']}")
+
+
+def test_container_dimension_corrupt_substructure_uses_real_fixtures():
+    """(ii) A present-but-unparsable metadata block.
+
+    DECLARED SCOPE, with the mechanism named rather than a silent gap: Pillow's
+    writers NORMALISE a damaged block away on save (a short IFD handed to
+    `Image.save(exif=...)` comes back as no EXIF container at all, measured), so
+    a synthetic corrupt substructure cannot be built through the public API --
+    it needs per-format byte surgery on the encoded file. ASTRA's `short-ifd.jpg`
+    and `far-ifd.jpg` ARE that surgery, done by the reviewer, so the EXIF/JPEG
+    family is asserted on his real files (see `test_h2_*` in
+    tests/test_repair_v056.py). The other containers' corrupt-substructure
+    variants are NOT claimed here.
+    """
+    from sunglasses.scanner import SunglassesScanner
+
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "fixtures", "v056")
+    scanner = SunglassesScanner()
+    for name in ("short-ifd.jpg", "far-ifd.jpg"):
+        doc = scanner.scan_fast(os.path.join(here, name))
+        assert doc["inspection_complete"] is False, (
+            f"{name}: a present, unparsable EXIF block still reads as a complete "
+            f"inspection")
+        assert doc["warnings"], f"{name}: incomplete with nothing named"
+
+
 def test_normalize_refuses_input_it_does_not_understand():
     """Round-4 hardening, from ASTRA's API observation.
 
@@ -1441,7 +1781,10 @@ def test_mcp_cell(surface, state, outcome, space, monkeypatch):
         res = mcp._tool_scan_text({"text": _TEXT_INPUT[call_state]})
     else:
         allow_deep = surface.endswith("_true")
-        path = _file_for(call_state, space)
+        path = _file_for(call_state, space, surface)
+        if call_state == "converter_failed":
+            monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
+                               + os.environ["PATH"])
         if allow_deep and call_state in ("unreadable",):
             path = space["unreadable_media"]
         res = mcp._tool_scan_file({"file_path": path, "allow_deep": allow_deep})
@@ -1510,7 +1853,7 @@ _STDIO_CELLS = [(s, st, M.outcome_for(s, st)) for s, g, _l, _f, st, o in M.cells
 @pytest.mark.parametrize("surface,state,outcome",
                          _STDIO_CELLS, ids=[f"stdio-{st}" for _s, st, _o in _STDIO_CELLS])
 def test_mcp_stdio_cell(surface, state, outcome, space):
-    path = _file_for(state, space)
+    path = _file_for(state, space, surface)
     msgs = [
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
         {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
@@ -1522,6 +1865,10 @@ def test_mcp_stdio_cell(surface, state, outcome, space):
         # same degraded-extraction switch the in-process cells use; without it
         # this cell scans a real PNG and finds nothing to report.
         env["SUNGLASSES_DISABLE_EXTRACTORS"] = "1"
+    if state == "converter_failed":
+        # ROUND 6: over the real wire too. ASTRA reached the failing converter
+        # through stdio MCP, which the round-5 grid also called impossible.
+        env["PATH"] = space["failed_converter_bin"] + os.pathsep + env["PATH"]
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.mcp"],
         input="".join(json.dumps(m) + "\n" for m in msgs),
