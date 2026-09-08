@@ -387,8 +387,8 @@ class ImageExtractor:
         """
         try:
             return value.decode("utf-8"), None
-        except UnicodeDecodeError:
-            pass
+        except UnicodeDecodeError as exc:
+            first_bad = exc.start      # NOT swallowed -- handled immediately below
         from .dispatch import decode_lossy
         text, undecodable, first_bad = decode_lossy(value)
         return text, (f"embedded text {key!r}: {undecodable} byte(s) undecodable and "
@@ -423,8 +423,14 @@ class ImageExtractor:
                 tags.update(dict(base))
                 try:
                     tags.update(dict(base.get_ifd(0x8769)))   # Exif sub-IFD
-                except Exception:
-                    pass          # no sub-IFD on this file; the base tags stand
+                except Exception as exc:
+                    # An ABSENT sub-IFD returns {} and never lands here, so
+                    # reaching this branch means one exists and would not parse --
+                    # and `UserComment` lives in it. Swallowing that is the exact
+                    # defect this release is about, so it costs coverage.
+                    self.failures.append(
+                        f"EXIF sub-IFD not read ({exc.__class__.__name__}: {exc}) — "
+                        f"UserComment and other sub-IFD text were NOT inspected")
         if not tags and hasattr(img, "_getexif"):
             try:
                 tags = dict(img._getexif() or {})
