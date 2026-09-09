@@ -5,6 +5,216 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-09-09
+
+> Trust repair. No new patterns (1540 / 118 categories unchanged) and no new parsers.
+> The result schema IS extended, additively: `threat_found`, `inspection_complete`,
+> `files_skipped`/`skipped` and per-file skip reasons are new, and **`is_clean` changes
+> meaning** — it now requires a complete inspection as well as no findings, so a result
+> that was `true` for an uninspected archive is now `false`. The changes below repair three
+> things: what the scanner DETECTS, what it truthfully reports as COVERED, and what it does
+> without asking your CONSENT.
+
+### Fixed
+
+- **A scan that could not read the file no longer reports it as clean.** Six paths returned
+  a success-shaped answer for content nobody looked at: a directory passed as a file, a
+  path-like argument that does not exist (the path *string* was scanned as prose and came
+  back `allow`), an archive whose compressed bytes were "scanned" as text, an input past the
+  1 MB cap, audio or video without `--deep`, and a deep scan
+  whose transcription **failed**, where the ffmpeg error message was scanned *as if it were
+  the transcript* and the file was reported PASS. Each now reports what actually happened.
+
+- **`is_clean` means what it says.** It used to be `decision == "allow"`, so "I found nothing
+  in the 5% of this file I could read" and "this file is clean" were the same value. A scan
+  result now answers three separate questions — `threat_found`, `inspection_complete`, and
+  `is_clean` (both) — in the API, and in every scan document emitted by the CLI, the library
+  and the MCP server. (Argument-parsing failures emit an error document, not a scan document.)
+  **API change:** if you branch on `is_clean` meaning "no findings", the equivalent condition
+  is now **`not result.threat_found`** — note the inversion, since `result.threat_found` alone
+  is the opposite test. `is_clean` additionally requires a complete inspection.
+
+- **Exit codes are applied on every scan path and documented.** `0` complete and nothing
+  found · `1` threat · `2` usage or operational error — nothing scanned on single-file paths,
+  and on aggregate paths (repo, batch) the affected scope is reported, since work may have
+  completed before the failure · `3` incomplete,
+  nothing found in what could be read. Precedence `1 > 3 > 2 > 0`. Previously only the file
+  and text paths used `3` at all; repo scan, deep scan and audio-without-`--deep` returned
+  only `0`/`1`, and the selector ignored truncation entirely. A missing file used to exit `1`,
+  indistinguishable from "threat found" to a CI job.
+
+- **File format is identified by content, not by the filename.** A ZIP named `notes.txt` had
+  its compressed bytes read as prose and was reported as a complete, clean scan. (Compressed
+  bytes are not reliably inert as input, either: scanning them as text has produced false
+  matches in our own repo-mode testing. The defect is that they were treated as document text
+  at all, in both directions.) Identification is now content-first with a suffix fallback
+  (`dispatch.identify()`): a real PDF named `.txt` still reaches the PDF extractor, and an
+  archive is reported as uninspected whatever it is called. Repository traversal keeps its
+  documented extension exclusions, so this is not filename independence on every surface.
+  No archive parser was added; the tool stops claiming it read what it did not.
+
+- **`--json` and `-o json|sarif` emit exactly one document on stdout, on the CLI
+  machine-output invocations the acceptance matrix covers** — the covered CLI cases for clean,
+  finding, incomplete, incomplete-with-finding, unreadable, missing and missing-dependency
+  states, plus argument errors. The deep-scan branch printed three progress lines in front of its payload,
+  so `scan --deep --json | jq` never had a chance. Diagnostics now go to stderr. `-o json`
+  printed human text despite parsing the flag. Argument errors used to print a usage paragraph
+  to stderr and nothing to stdout; when a machine format is selected they now emit one JSON
+  error document. The claim is scoped to CLI machine-output invocations proven by that matrix and is
+  generated from it; library functions return result documents and MCP returns protocol
+  responses, which are separate interface contracts. Surfaces outside the matrix are listed in
+  KNOWN_VERSION_GAPS.md.
+
+- **`sunglasses pin` asks before starting your MCP servers.** It launches every configured
+  stdio server with your full environment to read its tool lists — necessary, but it did it
+  with no prompt, printing "reading descriptors from N server(s)" *while already doing it*,
+  including from `--quiet`, which is the mode wired into timers and `SessionStart` hooks. It
+  now prints the exact command lines and waits. With no terminal to ask it refuses rather
+  than launching, unless you pre-consent with `--yes` or `SUNGLASSES_PIN_CONSENT=1`. Consent
+  is read from the environment only, never from a scanned repository or project settings.
+
+- **A left-boundary defect that hid the ordinary forms of five detection rules.** A `\b`
+  written immediately before a literal that is not a word character asserts only where the
+  PRECEDING character is a word character. After a space — or at the start of the input — it
+  cannot hold, so the ordinary whitespace-separated forms these rules exist to catch were
+  missed, while a form glued to a preceding word could still match. `GLS-EX-007` (curl
+  credential upload) had *only* such alternatives, so its ordinary command-line forms went
+  undetected. Also repaired:
+  `GLS-SC-PKG-207` (`--extra-index-url`, `--trusted-host`, `.npmrc`, `.pypirc`),
+  `GLS-SESNR-001` (`/var/run/docker.sock`, `/proc/`, `--privileged`), `GLS-SBX-887`
+  (container/sandbox escape), and `GLS-DFP-041` (the `---` front-matter fence). Each now uses
+  `(?:\b|(?<!\S))` — a left-boundary repair that also holds after whitespace or at the start
+  of input. `GLS-EX-007` additionally changes its description and narrows its expression beyond
+  a boundary substitution: it is now scoped to uploads whose payload is a credential file, so
+  an ordinary `curl --data @report.csv` is not a finding.
+  **Five patterns changed in total; none added, none removed — 1540 patterns and 118
+  categories are unchanged from 0.5.5.**
+
+- **A non-empty list of extracted sources is no longer treated as proof that everything was
+  inspected.** Five public extractor `scan_*` convenience functions and two retained
+  `SunglassesScanner` helpers each folded their child scan results by hand, copying findings
+  and decision while dropping the child's `truncated` and `extraction_complete`. So a
+  transcript or PDF text layer that ran past the 1 MB engine cap arrived at the normalizer
+  with the truncation already discarded, and `scan_deep()` returned `truncated: false,
+  inspection_complete: true, is_clean: true, exit 0` for content it had read only part of.
+  The converted convenience functions and helpers no longer fold by hand: they now go through
+  `sunglasses.result.aggregate()`, which folds coverage pessimistically (any child truncated ⇒
+  truncated; every child complete ⇒ complete) while findings fold additively. `scan_email()`
+  keeps its explicitly retained fold before `normalize()`, a documented exception rather than
+  a missed conversion.
+
+- **A sub-parser that gives up no longer hides the content after it.** `PDFExtractor`
+  wrapped its whole annotation loop in one `except Exception: pass`, so a valid PDF whose
+  annotation array began with a malformed element abandoned the rest of the loop — and an
+  instruction sitting in the NEXT annotation was never extracted, with the scan reported as
+  complete and clean. The guard now sits inside the loop, so one bad element costs only
+  itself, and the failure is recorded as lost coverage rather than dropped. Every other
+  silent `except: pass` in the extractors (audio metadata, video subtitles, the video audio
+  track, image EXIF, hidden-text detection) now names what it could not read.
+
+- **OCR that could not run no longer returns a clean image.** `ImageExtractor` recorded the
+  loss in `failures` and returned normally, and `_scan_image_fast()` / `scan_image()` never
+  read that list — so with Tesseract absent from `PATH` they returned complete and clean,
+  with no warnings, for an image whose visible text was never read. `scan_fast()` on the
+  same file correctly said incomplete.
+
+- **Bytes that do not decode are no longer counted as inspected.** The repaired scan text
+  reads used `errors="ignore"`, which silently drops undecodable bytes: a 256-byte file of non-UTF-8
+  pairs scanned 128 bytes and returned complete and clean. We still scan what decodes, but
+  the result is incomplete and the warning names how many bytes went unread.
+
+- **A named pipe no longer hangs the MCP server.** The readability probe proved a path
+  readable by opening it, and opening a FIFO with no writer blocks in the kernel — so an
+  MCP `scan_file` on one never returned a result at all. The file type is now checked on
+  `os.stat` metadata before any file object exists, and FIFOs, sockets, device nodes and
+  directories are refused operationally (`NonRegularFile`, a subclass of `UnreadableFile`).
+
+- **Undecodable stdin is an operational error, not a crash.** `sys.stdin.read()` sat outside
+  every handler, so a byte stream that is not valid UTF-8 raised `UnicodeDecodeError` out of
+  `main()` — and Python exits 1 on an uncaught exception, which is this package's code for
+  THREAT FOUND. A CI job piping a binary file was told it had been attacked, and got a
+  traceback instead of a document. It now exits 2 with one document naming the offset.
+
+- **`-ojson` is honoured when the parse fails.** The pre-parse format detector missed
+  argparse's attached short-option form, so `scan -ojson --channel not-a-channel` exited 2
+  with completely empty stdout — the one path where "exactly one document, always" matters
+  most to a machine caller.
+
+- **Empty input is reported as what it is.** `--text ""`, empty stdin, an empty file and MCP
+  `scan_text` with an empty string return exit 0, `inspection_complete: true`, `is_clean:
+  true`, `bytes_scanned: 0`; nothing went unread, so nothing was hidden. Both human
+  renderings now say `0 bytes inspected — the input was empty` rather than `No threats
+  detected`, so a clean scan of a document is distinguishable from a clean scan of nothing.
+  MCP keeps one distinction the CLI cannot express: a MISSING `text` argument is still a
+  usage error, because the tool's API contract was broken and nothing was submitted.
+
+- **`normalize()` refuses input it does not understand.** `normalize(None)` and
+  `normalize(object())` used to come back complete and clean, because every axis defaulted
+  to the optimistic value when nothing contradicted it. They now raise `TypeError`.
+
+- **Image coverage is reported honestly, and what went unread is named.** Image metadata
+  extraction and bounded frame processing preserve the supported content they can read and
+  report the frames or components they could not, instead of returning a complete-looking
+  result. Frame processing is bounded at 64 frames and says so when a file exceeds it. This is
+  not a claim that every image component walks frames: hidden-text geometry remains a declared
+  frame-0 limitation, recorded in KNOWN_VERSION_GAPS.md.
+
+### Upgrading
+
+- **If you wired `sunglasses pin --quiet` into a timer or a `SessionStart` hook, add
+  `--yes`** (or set `SUNGLASSES_PIN_CONSENT=1` in that job's environment). An unattended
+  `pin` without consent now refuses with exit 2 and a one-line notice on stderr instead of
+  starting your MCP servers. Note that `sunglasses init` does not create those jobs — it
+  wires the firewall hook and nothing else — so if you have one, it is yours to update.
+- **A single positional argument that looks like a path and does not exist is now a usage
+  error (exit 2), not text.** `sunglasses scan ./missing.txt` previously scanned the
+  15-character *string* and reported a clean pass. Scripts that passed URLs or file-shaped
+  strings positionally will now see exit 2; pass them with `--text` to scan them as strings.
+- **`is_clean` in the Python API now also requires a complete inspection.** If you branch on
+  it meaning "no findings", the equivalent is **`not result.threat_found`** — the inversion
+  matters; branching on `result.threat_found` gives you the opposite behaviour.
+- **Exit codes are stricter.** A missing file used to exit 1 (indistinguishable from "threat
+  found"); it now exits 2. A repo whose clone failed used to exit 1; it now exits 2. CI jobs
+  keying on `!= 0` are unaffected; jobs keying on `== 1` as "attack found" get more accurate.
+- **A file that cannot be read is now exit 2, not exit 1.** A permissions error, I/O error or
+  broken symlink used to escape as an uncaught `OSError`, which terminates the process with
+  Python's default exit code 1 — the same code as "threat found" — so anything keying on 1
+  reported a permissions problem as an agent-targeted injection. It now refuses with exit 2.
+  When a machine format is selected it emits one JSON error document naming the errno; the
+  human rendering prints the line "could not read <path>: … — NOT inspected".
+- **Non-regular inputs are now refused (exit 2).** A FIFO, socket, device node or directory
+  passed as a file is an operational error. Note the consequence for scripts that used
+  `/dev/null` as a no-op input: that is a character device and now exits 2, where an empty
+  regular file exits 0.
+- **A file that is not valid UTF-8 now exits 3 when no finding is retained, not 0.** A
+  retained finding still takes precedence and exits 1. Previously the undecodable bytes were
+  dropped and the rest reported as a complete, clean scan. If you scan Latin-1 text or
+  mislabelled binaries in CI, those jobs move from 0 to 3 (incomplete) and the warning names
+  the byte count. Valid UTF-8 is unaffected.
+- **The five extractor `scan_*` convenience functions now return the canonical result
+  document** — the three axes plus coverage detail — instead of the ad-hoc
+  `{file, sources_found, is_clean, threats, results}` shape. `is_clean`, `threats` and
+  `results` are all still present, so the legacy keys remain available — but the documented
+  `is_clean` semantics (now: no finding AND a complete inspection) and the error behaviour
+  below do change. A caller that relied on the ABSENCE of the axes was relying on the bug. These functions also now raise
+  `UnreadableFile` for an unreadable, missing or non-regular path instead of returning a
+  partial scan document for a file they never opened.
+- **`--output json` now emits JSON.** On 0.5.5 the flag was silently ignored on `scan --file`
+  and printed the human screen; only `--json` produced a document. Both work now. If you built
+  a text scraper around the human output that `--output json` used to print, this release
+  breaks it — `--json` behaviour is unchanged.
+
+### Known gaps
+
+See `KNOWN_VERSION_GAPS.md`. In short: the pattern matcher's cost is quadratic on a single
+unbroken token, the firewall hook has a 10-second timeout, and Claude Code lets a timed-out
+hook's tool call proceed — so treat the firewall as best-effort on input containing very long
+unbroken tokens until v0.6 fixes the matcher. The same boundary defect above leaves 198
+alternatives across 89 patterns unreachable — a figure recorded by that earlier audit and not
+re-established by this release; five are repaired here and a full sweep is a v0.6 item. `attack-db/` lags `patterns.py`. And the pin consent gate lives at the `sunglasses pin`
+command, not inside the library — a Python caller invoking `firewall.probe_server()` directly
+still spawns servers unprompted.
+
 ## [0.5.5] — 2026-09-04
 
 > Hotfix release: firewall hook fixes only, no new patterns (1540 patterns / 118 categories unchanged).
