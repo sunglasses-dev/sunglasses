@@ -1266,16 +1266,58 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             # instruction in these fixtures lives in a PNG text chunk, so a finding
             # is still available with OCR gone -- which is what makes
             # `incomplete_finding` a real cell rather than a duplicate.
-            monkeypatch.setenv("PATH", "/usr/bin:/bin")
+            # v0.5.6 Gate C. This USED to be `setenv("PATH", "/usr/bin:/bin")`,
+            # which only removes Tesseract on a machine that keeps it elsewhere --
+            # true for Homebrew's /opt/homebrew/bin, false on Linux, where the
+            # system package installs /usr/bin/tesseract. The cell then asserted
+            # incompleteness in an environment where extraction had legitimately
+            # completed, so it failed on every CI lane while passing locally. A
+            # precondition that is stated but never established is not a
+            # precondition: point PATH at a directory known to hold nothing, and
+            # PROVE the binary is gone before asserting anything about its absence.
+            empty_bin = os.path.join(os.path.dirname(space["clean_file"]), "_no_bin")
+            os.makedirs(empty_bin, exist_ok=True)
+            monkeypatch.setenv("PATH", empty_bin)
+            assert shutil.which("tesseract") is None, (
+                "precondition NOT established: tesseract is still resolvable, so "
+                "this cell would assert incompleteness against a complete scan")
         elif state == "missing_dependency":
             # The other mechanism: the PACKAGE is absent, so `_check_deps` raises
             # before any decoding is attempted. Different failure, different
             # warning, same honest answer.
             from sunglasses.extractors import image as image_mod
             monkeypatch.setattr(image_mod, "_check_deps", _raise_missing_package)
-        if surface == "lib_helper_image":
-            return scanner._scan_image_fast(path)
-        return scan_image(path, engine=engine)
+        doc = (scanner._scan_image_fast(path) if surface == "lib_helper_image"
+               else scan_image(path, engine=engine))
+        if state in ("incomplete_clean", "incomplete_finding"):
+            # ASTRA, Gate C: an unrelated extraction failure must not be able to
+            # satisfy this cell. The loss has to be the missing-Tesseract one we
+            # induced, the EXIF component has to have been read anyway, and for
+            # `incomplete_finding` the finding that does NOT depend on OCR has to
+            # have SURVIVED -- a source entry alone is not retention.
+            warns = [str(w) for w in (doc.get("warnings") or [])]
+            # Only the MISSING-BINARY text counts. A generic "OCR did not run"
+            # can be produced by a Tesseract that ran and failed, which is a
+            # different state with its own cell -- accepting it here would let
+            # that state satisfy this one.
+            assert any("tesseract is not installed" in w.lower()
+                       or "tesseract is not in your path" in w.lower()
+                       for w in warns), (
+                f"{surface}/{state}: incompleteness is not the induced missing-"
+                f"Tesseract loss; warnings were {warns!r}")
+            assert "exif:png:Comment" in (doc.get("sources") or []), (
+                f"{surface}/{state}: the non-OCR component was not read; "
+                f"sources were {doc.get('sources')!r}")
+            if state == "incomplete_finding":
+                assert doc.get("threat_found") is True and (doc.get("findings") or []), (
+                    f"{surface}/{state}: the metadata-borne finding did not survive "
+                    f"the OCR loss; threat_found={doc.get('threat_found')!r} "
+                    f"findings={len(doc.get('findings') or [])}")
+            else:
+                assert not (doc.get("findings") or []), (
+                    f"{surface}/{state}: a clean fixture produced findings "
+                    f"{doc.get('findings')!r}")
+        return doc
 
     if surface == "lib_conv_qr":
         path = {

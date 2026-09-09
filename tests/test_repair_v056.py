@@ -762,46 +762,118 @@ def fake_mcp_config(tmp_path, monkeypatch):
     return config
 
 
-def _run_pin(*args, env=None, stdin=""):
+# v0.5.6 Gate C. The consent tests below used to run in the shared TEST_ROOT with
+# whatever MCP configuration the machine happened to have. A developer laptop has
+# real servers in ~/.claude.json, so `pin` reached the consent path and refused; a
+# clean container or CI runner has none, so `pin` short-circuited with "No MCP
+# servers configured. Nothing to pin." and exit 0 -- and the tests failed on every
+# lane while passing locally. They were reading the environment, not the product.
+#
+# Each test now gets a throwaway cwd and HOME holding one synthetic server, so the
+# consent path is what is under test.
+#
+# The synthetic command WRITES A MARKER FILE (ASTRA: `/bin/false` proves nothing --
+# a command that fails and a command that never ran are indistinguishable from the
+# outside). Refusal is proven by the marker's ABSENCE: if `pin` ever regressed into
+# spawning what it claimed to decline, the marker would exist.
+_MARKER_NAME = "SPAWNED_MARKER"
+
+
+def _isolated_pin_home(tmp_path):
+    """A cwd+HOME pair whose ONLY MCP server is a synthetic marker-writer."""
+    root = tmp_path / "pinroot"
+    home = tmp_path / "pinhome"
+    root.mkdir(parents=True, exist_ok=True)
+    home.mkdir(parents=True, exist_ok=True)
+    marker = root / _MARKER_NAME
+    # ASTRA: the marker command must be one that DEMONSTRABLY works, or its
+    # absence proves nothing -- a command that failed to resolve and a command
+    # that never ran are the same empty directory. No shell, no PATH lookup, no
+    # quoting: the interpreter running these tests, with the path as its own argv
+    # entry. `--never-executed` rides along so the disclosure assertion has
+    # something unmistakable to look for.
+    argv = ["-c", "import pathlib, sys; pathlib.Path(sys.argv[1]).touch()",
+            str(marker), "--never-executed"]
+    # CALIBRATION: prove this exact command creates the marker, then clear it.
+    # Without this the refusal assertion below is satisfied by a broken command.
+    subprocess.run([sys.executable, *argv], check=True, timeout=60)
+    assert marker.exists(), (
+        "calibration FAILED: the synthetic marker command did not create its "
+        "marker, so its later absence could not prove non-execution")
+    marker.unlink()
+    config = {"mcpServers": {"probe-server": {
+        "command": sys.executable, "args": argv}}}
+    (root / ".mcp.json").write_text(json.dumps(config))
+    return root, home, marker
+
+
+def _run_pin(*args, env=None, stdin="", cwd=None, home=None):
     full_env = dict(os.environ)
     full_env.pop("SUNGLASSES_PIN_CONSENT", None)
     if env:
         full_env.update(env)
+    if home is not None:
+        # Applied AFTER the caller's overrides on purpose: nothing may replace the
+        # isolated HOME, or the test silently reads the developer's real config.
+        full_env["HOME"] = str(home)
+        full_env.pop("XDG_CONFIG_HOME", None)
     return subprocess.run(
         [sys.executable, "-m", "sunglasses", "pin", *args],
-        cwd=TEST_ROOT, capture_output=True, text=True,
+        cwd=str(cwd) if cwd is not None else TEST_ROOT,
+        capture_output=True, text=True,
         input=stdin, timeout=120, env=full_env,
     )
 
 
-def test_unattended_pin_without_consent_refuses_and_does_not_hang():
+def _assert_consent_path_was_exercised(proc, marker, where):
+    """The run must have SEEN our server and must NOT have started it."""
+    combined = proc.stdout + proc.stderr
+    assert "No MCP servers configured" not in combined, (
+        f"{where}: the synthetic MCP config was not discovered, so this cell "
+        f"proves nothing about consent. Output was: {combined[:300]!r}")
+    assert "probe-server" in combined, (
+        f"{where}: the synthetic server was never named: {combined[:300]!r}")
+    assert not marker.exists(), (
+        f"{where}: REFUSAL DID NOT HOLD -- the declined server actually ran and "
+        f"wrote {marker}")
+
+
+def test_unattended_pin_without_consent_refuses_and_does_not_hang(tmp_path):
     """The launchd / SessionStart case. Must fail fast and visibly.
 
     A prompt here would be a hang: there is no terminal to answer it, so the
     job would block forever and the session would never start.
     """
-    proc = _run_pin("--quiet")
+    root, home, marker = _isolated_pin_home(tmp_path)
+    proc = _run_pin("--quiet", cwd=root, home=home)
     combined = proc.stdout + proc.stderr
+    _assert_consent_path_was_exercised(proc, marker, "unattended_pin_without_consent")
     assert proc.returncode == EXIT_USAGE
     assert "without consent" in combined.lower()
     assert "SUNGLASSES_PIN_CONSENT" in combined
 
 
-def test_refusal_is_not_reported_as_descriptor_drift():
+def test_refusal_is_not_reported_as_descriptor_drift(tmp_path):
     """`--quiet` mapped every non-zero code to "drift detected", so refusing to
     start servers announced that the user's tools had been tampered with.
     """
-    proc = _run_pin("--quiet")
+    root, home, marker = _isolated_pin_home(tmp_path)
+    proc = _run_pin("--quiet", cwd=root, home=home)
+    _assert_consent_path_was_exercised(proc, marker, "refusal_is_not_descriptor_drift")
     assert proc.returncode == EXIT_USAGE
     assert "drift detected" not in (proc.stdout + proc.stderr).lower()
 
 
-def test_refusal_lists_the_exact_commands_it_would_have_run():
+def test_refusal_lists_the_exact_commands_it_would_have_run(tmp_path):
     """Consent is meaningless without saying what is being consented to."""
-    proc = _run_pin()
+    root, home, marker = _isolated_pin_home(tmp_path)
+    proc = _run_pin(cwd=root, home=home)
     combined = proc.stdout + proc.stderr
+    _assert_consent_path_was_exercised(proc, marker, "refusal_lists_exact_commands")
     assert proc.returncode == EXIT_USAGE
     assert "about to" in combined.lower()
+    assert "--never-executed" in combined, (
+        "the argv of the server we declined to start was not shown to the user")
     # every spawnable server is named with its argv, not just counted
     assert "MCP server" in combined
 
