@@ -169,6 +169,36 @@ def _build_result(finding: dict, artifact_uri: str, artifact_index: int) -> dict
     }
 
 
+def _coverage_properties(results) -> dict:
+    """Run-level coverage, on every SARIF document this package emits.
+
+    A consumer that keeps only the SARIF must be able to see that part of the
+    input went unread. Repo and deep runs already carried these; ordinary
+    single-file runs did not, so a 1.26 MB truncated file with a finding produced
+    a valid document that looked like a complete inspection -- the warning existed
+    only on stderr, which no consumer retains. Same fields, same names, every path.
+    """
+    complete = True
+    truncated = False
+    not_inspected: list = []
+    for r in results:
+        if not getattr(r, "inspection_complete", True):
+            complete = False
+        if getattr(r, "truncated", False):
+            truncated = True
+            complete = False
+        for w in (getattr(r, "extraction_warnings", None) or []):
+            if w not in not_inspected:
+                not_inspected.append(w)
+
+    props = {"inspectionComplete": complete, "truncated": truncated}
+    if not complete:
+        props["notInspected"] = not_inspected or [
+            "Part of this input was not inspected."
+        ]
+    return props
+
+
 def to_sarif(
     results: Iterable,
     source: str = "inline",
@@ -210,10 +240,16 @@ def to_sarif(
     for r in results:
         for f in r.findings:
             res = _build_result(f, artifact_uri=artifact_uri, artifact_index=0)
-            res["properties"]["decision"] = r.decision
-            res["properties"]["channel"] = r.channel
-            res["properties"]["event_id"] = r.event_id
-            res["properties"]["latency_ms"] = r.latency_ms
+            # Read through getattr with defaults, not bare attribute access.
+            # `to_sarif` touches these three ONLY inside this loop, which is why
+            # every empty-results test passed while a deep scan with one finding
+            # raised AttributeError on the first serialized finding. The real fix
+            # is upstream -- callers now pass a NormalizedResult that always
+            # carries them -- but the serializer no longer assumes it.
+            res["properties"]["decision"] = getattr(r, "decision", "allow")
+            res["properties"]["channel"] = getattr(r, "channel", None) or "file"
+            res["properties"]["event_id"] = getattr(r, "event_id", None) or ""
+            res["properties"]["latency_ms"] = getattr(r, "latency_ms", None) or 0.0
             sarif_results.append(res)
 
     # Artifact entry (the thing we scanned).
@@ -244,6 +280,7 @@ def to_sarif(
                 "artifacts": [artifact],
                 "results": sarif_results,
                 "columnKind": "utf16CodeUnits",
+                "properties": _coverage_properties(results),
             }
         ],
     }

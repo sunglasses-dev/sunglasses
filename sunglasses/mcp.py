@@ -24,6 +24,7 @@ if _pkg_dir not in sys.path:
 from sunglasses import __version__
 from sunglasses.engine import SunglassesEngine
 from sunglasses.scanner import SunglassesScanner
+from sunglasses.extractors.dispatch import UnreadableFile
 
 # Protocol constants
 JSONRPC = "2.0"
@@ -153,12 +154,24 @@ def handle_tools_call(params):
 
 def _tool_scan_text(arguments):
     """Execute scan_text tool."""
-    text = arguments.get("text", "")
     channel = arguments.get("channel", "message")
 
-    if not text:
+    # v0.5.6 round 4: `if not text` collapsed two different situations into one
+    # error. A MISSING `text` argument is a usage error -- the caller broke the
+    # tool's API contract and nothing was submitted. An EMPTY STRING is content:
+    # the caller submitted a document that happens to have no bytes in it, and the
+    # honest answer is a clean, complete scan of 0 bytes -- which is also what the
+    # CLI now says for `--text ""` and empty stdin, so the two surfaces agree.
+    if "text" not in arguments:
         return {
             "content": [{"type": "text", "text": "Error: 'text' parameter is required."}],
+            "isError": True,
+        }
+    text = arguments.get("text")
+    if not isinstance(text, str):
+        return {
+            "content": [{"type": "text",
+                         "text": "Error: 'text' parameter must be a string."}],
             "isError": True,
         }
 
@@ -174,8 +187,20 @@ def _tool_scan_text(arguments):
     result_dict = result.to_dict()
 
     # Build a human-readable summary + JSON
-    if result.is_clean:
-        summary = f"PASS — No threats detected ({result.latency_ms}ms)"
+    # threat_found, not is_clean: a truncated-but-findingless scan must not render
+    # as "ALLOW — 0 threat(s) found", and must not render as PASS either.
+    if not result.threat_found:
+        if result.inspection_complete:
+            if not result.bytes_scanned:
+                summary = (f"PASS — 0 bytes inspected: the input was empty, so "
+                           f"nothing was found because there was nothing to read "
+                           f"({result.latency_ms}ms)")
+            else:
+                summary = f"PASS — No threats detected ({result.latency_ms}ms)"
+        else:
+            summary = (f"INCOMPLETE SCAN — no findings in the inspected scope "
+                       f"({result.latency_ms}ms); part of the input was not read. "
+                       f"This is NOT a clean result.")
     else:
         summary = (
             f"{result.decision.upper()} — {len(result.findings)} threat(s) found, "
@@ -185,6 +210,17 @@ def _tool_scan_text(arguments):
             summary += f"\n  {i}. [{f['severity'].upper()}] {f['name']}"
             if f.get("matched_text"):
                 summary += f' — matched: "{f["matched_text"]}"'
+        if not result.inspection_complete:
+            # A finding does not cancel a coverage failure, and the agent reads
+            # the FIRST LINE. This surface announced only "BLOCK — 5 threats" on
+            # a truncated input, so the part that was never read vanished behind
+            # the part that was. Same defect the CLI human threat screen had.
+            summary = ("INCOMPLETE SCAN — part of the input was not read, AND "
+                       "threats were found in the part that was.\n" + summary)
+
+    # Both branches now open with the same "INCOMPLETE SCAN" prefix that
+    # `scan_file` uses. An agent keying on the first line should not have to
+    # learn two vocabularies for one fact.
 
     output = f"{summary}\n\n{json.dumps(result_dict, indent=2)}"
 
@@ -212,9 +248,48 @@ def _tool_scan_file(arguments):
         }
 
     scanner = SunglassesScanner()
-    result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+    try:
+        result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+    except UnreadableFile as exc:
+        # An operational failure must surface as an error, not as a scan result.
+        # Returning a "0 threats" document here would be the same lie the
+        # exit-code repair removes from the CLI.
+        return {
+            "content": [{"type": "text", "text": f"Error: {exc} — NOT inspected. Nothing was scanned."}],
+            "isError": True,
+        }
 
-    output = json.dumps(result, indent=2, default=str)
+    # An explicit error document from the library is an operational failure.
+    if isinstance(result, dict) and result.get("error"):
+        return {
+            "content": [{"type": "text", "text": f"Error: {result['error']} — nothing was scanned."}],
+            "isError": True,
+        }
+
+    # Everything past this point is a scan document, so it goes through the one
+    # normalizer before an agent ever sees it. The deep branch used to hand back
+    # `scan_audio`'s dependency-warning dict verbatim -- `file`, `warning`,
+    # `scan_time_seconds` and NOT ONE of the three axes -- which this server then
+    # published as a successful call with no incompleteness notice, because the
+    # notice below keys off `inspection_complete is False` and the key was absent.
+    # An absent axis is now false, not clean.
+    from .result import normalize
+    result = normalize(result, source=file_path)
+
+    # A completed invocation over content we could not fully read is a SUCCESSFUL
+    # tool call whose document says "incomplete, not clean". It is not isError --
+    # nothing went wrong operationally -- but it must never read as a clean scan.
+    # Prepending the notice matters: an agent reading the first line of this text
+    # is the caller we are actually protecting.
+    if isinstance(result, dict) and result.get("inspection_complete") is False:
+        warnings = result.get("warnings") or []
+        reason = warnings[0] if warnings else "content was not fully inspected"
+        notice = (f"INCOMPLETE SCAN — {reason} This is NOT a clean result; "
+                  f"do not treat {file_path} as inspected.\n\n")
+    else:
+        notice = ""
+
+    output = notice + json.dumps(result, indent=2, default=str)
     return {
         "content": [{"type": "text", "text": output}],
         "isError": False,

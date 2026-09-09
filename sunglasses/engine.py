@@ -60,8 +60,36 @@ class ScanResult:
         self.extraction_sources = []
 
     @property
+    def threat_found(self) -> bool:
+        """A pattern fired. Independent of how much of the input we managed to read.
+
+        Use this — never ``is_clean`` — to answer "did the scanner find something?".
+        The two questions are different and v0.5.6 stopped conflating them.
+        """
+        return self.decision != "allow"
+
+    @property
+    def inspection_complete(self) -> bool:
+        """We read all of it: nothing truncated, no extractor gave up."""
+        return self.extraction_complete and not self.truncated
+
+    @property
     def is_clean(self) -> bool:
-        return self.decision == "allow"
+        """Read the whole thing AND found nothing.
+
+        v0.5.6 API CHANGE (repair, deliberate). This used to be
+        ``decision == "allow"``, which made "I found no threats in the 5% of this
+        file I could read" indistinguishable from "this file is clean" — the exact
+        misleading-success class this release exists to close. Uninspected content
+        can never contribute to CLEAN.
+
+        MIGRATION for callers: if you meant "no findings", use ``threat_found``
+        (inverted) or compare ``decision`` yourself; ``is_clean`` now also requires
+        ``inspection_complete``. A caller that branches to "block/deny" on
+        ``not is_clean`` MUST migrate — an unread byte is not an attack, and
+        ``findings`` can be empty here.
+        """
+        return not self.threat_found and self.inspection_complete
 
     @property
     def severity(self) -> str:
@@ -125,6 +153,12 @@ class ScanResult:
             "truncated": self.truncated,
             "bytes_scanned": self.bytes_scanned,
             "extraction_complete": self.extraction_complete,
+            # v0.5.6: the three questions, answered separately and explicitly, so a
+            # machine consumer never has to re-derive them from `decision` + flags
+            # (and never has to guess which one `is_clean` meant this release).
+            "threat_found": self.threat_found,
+            "inspection_complete": self.inspection_complete,
+            "is_clean": self.is_clean,
             "extraction_warnings": list(self.extraction_warnings),
             "findings_count": len(self.reported_findings()),
             "patterns_fired": len(self.findings),
@@ -146,6 +180,11 @@ class ScanResult:
     def summary(self) -> str:
         if self.is_clean:
             return f"[SUNGLASSES] PASS ({self.latency_ms}ms) — clean"
+        if not self.threat_found:
+            # No findings, but we did not read all of it. Saying PASS here is the
+            # bug; saying THREAT here would be a lie in the other direction.
+            return (f"[SUNGLASSES] INCOMPLETE ({self.latency_ms}ms) — "
+                    f"no findings in the inspected scope; part of the input was not read")
         return (
             f"[SUNGLASSES] {self.decision.upper()} ({self.latency_ms}ms) — "
             f"{len(self.findings)} finding(s), severity: {self.severity}"
@@ -489,6 +528,21 @@ class SunglassesEngine:
         self._pattern_count = len(carriers)
         self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
+        # v0.5.6 round 4. ASTRA read `info()["keywords"] == 6642` beside the
+        # README's 6,944 as a stale number. It is not stale -- it is a DIFFERENT
+        # measurement: this index is the pre-screen automaton, which deliberately
+        # omits the generic keywords excluded above (they matched normal manifests
+        # and JSON-LD). The inventory of keywords the patterns actually declare is
+        # larger. Publishing only one of the two made the pair look like a
+        # contradiction, so `info()` now reports both and names which is which.
+        declared = set()
+        declared_entries = 0
+        for _p in carriers:
+            for _kw in (_p.get("keywords") or []):
+                declared.add(_kw.lower())
+                declared_entries += 1
+        self._keywords_declared = len(declared)
+        self._keyword_entries = declared_entries
 
     @staticmethod
     def _is_anchored(raw: str) -> bool:
@@ -949,7 +1003,11 @@ class SunglassesEngine:
             "version": __import__('sunglasses').__version__,
             "patterns": self._pattern_count,
             "mechanisms": self._mechanism_count,
+            # the pre-screen index (excludes the generic keywords listed above)
             "keywords": self._keyword_count,
+            # what the patterns declare, which is the number the README quotes
+            "keywords_declared": self._keywords_declared,
+            "keyword_entries": self._keyword_entries,
             "regex_patterns": len(self._regex_patterns),
             "channels": ["message", "file", "api_response", "web_content", "log_memory"],
         }

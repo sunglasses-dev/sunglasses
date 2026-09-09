@@ -293,10 +293,17 @@ def _cli(args, home, cwd=None):
     # ~/.claude.json and SPAWNS every server it finds there. A test that
     # inherited the developer's real HOME would launch their actual MCP servers.
     home.mkdir(parents=True, exist_ok=True)
+    # SUNGLASSES_PIN_CONSENT: as of v0.5.6 `pin` refuses to start MCP servers
+    # without consent, and a subprocess is never a TTY, so every case in this
+    # file would otherwise exit 2 having read nothing. These tests are about
+    # drift detection, not about the consent gate — the gate has its own cases
+    # in tests/test_repair_v056.py, including one asserting that an unattended
+    # run WITHOUT this variable refuses.
     return subprocess.run(
         [sys.executable, "-m", "sunglasses"] + args,
         capture_output=True, text=True, cwd=cwd,
         env={**os.environ, "SUNGLASSES_HOME": str(home), "HOME": str(home),
+             "SUNGLASSES_PIN_CONSENT": "1",
              "PYTHONPATH": str(__import__("pathlib").Path(__file__).parent.parent)},
     )
 

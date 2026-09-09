@@ -23,6 +23,7 @@ import time
 
 from . import __version__
 from .engine import SunglassesEngine
+from .extractors.dispatch import UnreadableFile
 from .reporter import ProtectedEngine, generate_report
 from .mailer import set_email, get_email, send_report
 from .sarif import to_sarif
@@ -42,7 +43,27 @@ def print_result(result, verbose=False):
     """Pretty-print a scan result."""
     if result.is_clean:
         print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({result.latency_ms}ms){RESET}")
-        print(f"  {DIM}No threats detected.{RESET}\n")
+        if not getattr(result, "bytes_scanned", None):
+            # Empty input is the one case where "we inspected all of it" costs
+            # nothing and is exactly true: 0 of 0 bytes read, nothing unread. It
+            # would be a lie in the other direction to call that an operational
+            # failure -- an empty README in a repo walk, or a CI step piping an
+            # empty diff, is a legitimate input. But a reader who sees only "PASS,
+            # no threats detected" cannot tell a clean scan of a document from a
+            # clean scan of nothing, so the count is stated rather than implied.
+            print(f"  {DIM}0 bytes inspected — the input was empty. "
+                  f"Nothing was found because there was nothing to read.{RESET}\n")
+        else:
+            print(f"  {DIM}No threats detected.{RESET}\n")
+    elif not result.threat_found:
+        # Incomplete, not clean and not a threat. Before v0.5.6 `is_clean` was a
+        # synonym for "no findings", so this case could not arise; once it could,
+        # the else-branch below rendered it as `ALLOW [NONE] 0 threat(s) found` in
+        # THREAT red — alarming and wrong in the opposite direction. The reasons
+        # print immediately after this, from _print_extraction_warnings.
+        print(f"\n  {YELLOW}{BOLD}INCOMPLETE{RESET} {DIM}({result.latency_ms}ms){RESET}")
+        print(f"  {DIM}No findings in the inspected scope. Part of this input was "
+              f"not read, so this is not a clean result.{RESET}")
     else:
         severity_colors = {
             "critical": RED, "high": RED,
@@ -83,6 +104,43 @@ def print_result(result, verbose=False):
         print()
 
 
+# Extensions we would actually route somewhere if the file existed. Deliberately a
+# closed list: it is the difference between refusing a typo'd path and refusing the
+# perfectly reasonable act of scanning the string "example.com".
+_PATHLIKE_EXTENSIONS = {
+    '.txt', '.md', '.markdown', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg',
+    '.conf', '.env', '.xml', '.html', '.htm', '.csv', '.tsv', '.log', '.rst',
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.sh', '.bash', '.zsh', '.rb', '.go',
+    '.rs', '.java', '.c', '.h', '.cpp', '.php', '.pl', '.sql', '.ipynb',
+    '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp',
+    '.mp3', '.wav', '.m4a', '.ogg', '.flac', '.mp4', '.mov', '.avi', '.mkv', '.webm',
+    '.zip', '.tar', '.gz', '.tgz', '.7z',
+}
+
+
+def _looks_like_path(text):
+    """Is this single argument meant to be a file, rather than prose to scan?
+
+    The bounded rule (v0.5.6, documented in --help): a single positional argument
+    counts as path-like when it contains a path separator, begins with `/`, `./`,
+    `../` or `~`, or ends in a known scannable extension — and contains no spaces.
+
+    Why bounded: before this, `sunglasses scan ./malicious.txt` on a path that did
+    not exist scanned the 18-character *string* and reported PASS. Promoting only
+    existing files (the old `isfile` check) fixed the hit and left the miss, which
+    is the worse half — a typo in a CI script produced a clean bill of health for a
+    file nobody ever opened. Refusing everything path-shaped would be the opposite
+    error, so ordinary text scanning is preserved by keeping this list closed.
+    """
+    if not text or any(ch.isspace() for ch in text):
+        return False
+    if os.sep in text or '/' in text:
+        return True
+    if text.startswith(('~', './', '../', '/')):
+        return True
+    return os.path.splitext(text)[1].lower() in _PATHLIKE_EXTENSIONS
+
+
 def _is_media_file(filepath):
     """Check if a file is audio/video that needs deep scan."""
     audio_exts = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.wma'}
@@ -112,22 +170,85 @@ _BINARY_EXTENSIONS = {
 
 
 def _walk_repo_files(repo_dir):
-    """Walk repo directory, yielding text file paths. Skip binaries and junk."""
-    for root, dirs, files in os.walk(repo_dir):
+    """Walk repo directory, yielding text file paths. Skip binaries and junk.
+
+    Kept for callers that only want the paths; `_walk_repo_files_with_skips` is
+    what the scan uses, because the skips are half the truth.
+    """
+    for filepath, _reason in _walk_repo_files_with_skips(repo_dir)[0]:
+        yield filepath
+
+
+def _walk_repo_files_with_skips(repo_dir):
+    """Return (files, skips). `skips` is [(relpath, reason)], and it is the point.
+
+    v0.5.6: this walker silently `continue`d past three whole classes of file —
+    anything over 1 MB, anything with a binary extension, and anything that
+    raised OSError — and none of it reached a counter. A repo containing one
+    readable note and one 1.2 MB document reported "files_scanned: 1 ... This
+    repo looks clean". The unread document did not appear anywhere in the
+    output, which is the contract's merge stop condition in one sentence:
+    skipped content must not vanish.
+
+    This is NOT the walker rewrite (fstat, symlink policy, caps) — that stays
+    v0.6. It counts what it already decided to skip, and says so.
+    """
+    files, skips = [], []
+    for root, dirs, filenames in os.walk(repo_dir):
         # Prune skip dirs in-place
         dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.endswith('.egg-info')]
-        for f in files:
+        for f in filenames:
+            filepath = os.path.join(root, f)
+            rel = os.path.relpath(filepath, repo_dir)
             ext = os.path.splitext(f)[1].lower()
             if ext in _BINARY_EXTENSIONS:
+                skips.append((rel, f"binary file type ({ext}) — not inspected"))
                 continue
-            filepath = os.path.join(root, f)
-            # Skip files larger than 1MB
             try:
-                if os.path.getsize(filepath) > 1_000_000:
-                    continue
-            except OSError:
+                size = os.path.getsize(filepath)
+            except OSError as exc:
+                skips.append((rel, f"could not be read ({exc.__class__.__name__}) — not inspected"))
                 continue
-            yield filepath
+            if size > 1_000_000:
+                skips.append((rel, f"larger than the 1 MB repo-scan limit ({size:,} bytes) — not inspected"))
+                continue
+            if not os.path.isfile(filepath):
+                skips.append((rel, "not a regular file — not inspected"))
+                continue
+            files.append((filepath, None))
+    return files, skips
+
+
+def _deep_dict_to_sarif(result_dict, source):
+    """Serialise a deep-scan result as SARIF.
+
+    v0.5.6 round-3 repair: this used to build a local `_Shim` object to satisfy
+    `to_sarif`'s attribute access. The shim set `findings`, `decision`, `severity`
+    and the axes -- but not `channel`, `event_id` or `latency_ms`, which
+    `to_sarif` reads ONLY when serializing an actual finding. So every test
+    passed (they all had empty results) and the first real deep finding crashed
+    the process with AttributeError, exit 1, empty stdout.
+
+    There is no shim any more. The dict goes through the one normalizer and comes
+    back as a `NormalizedResult`, which is guaranteed to carry every field the
+    serializer touches. Coverage properties are the serializer's job now, so they
+    are not re-applied here.
+    """
+    from .result import normalize, NormalizedResult
+    from .sarif import to_sarif
+
+    normalized = normalize(result_dict, source=source)
+    return to_sarif([NormalizedResult(normalized)], source=source)
+
+
+def _wants_machine_output(args) -> bool:
+    """True when stdout must carry ONE document and nothing else.
+
+    Progress chatter was gated on `args.json` alone, so `-o sarif` printed the human
+    screen onto stdout ahead of the document and the result did not parse. Anything
+    that writes to stdout in a scan path checks this, not the flag.
+    """
+    return bool(getattr(args, "json", False)) or getattr(args, "output", "human") in ("json", "sarif")
 
 
 def _scan_repo(args, engine):
@@ -137,7 +258,7 @@ def _scan_repo(args, engine):
     tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
 
     # Clone
-    if not args.json:
+    if not _wants_machine_output(args):
         print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — repo scan")
         print(f"  {DIM}{'─' * 50}{RESET}")
         print(f"  {DIM}Cloning {repo_url}...{RESET}")
@@ -152,47 +273,98 @@ def _scan_repo(args, engine):
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:
-            if args.json:
-                print(json.dumps({"error": f"git clone failed: {result.stderr.strip()}"}))
-            else:
-                print(f"\n  {RED}Clone failed:{RESET} {result.stderr.strip()}\n")
-            sys.exit(1)
+            # Exit 2, not 1. The clone failed, so nothing was scanned — and
+            # exit 1 means "threat found". A CI job cannot tell a typo'd URL
+            # from a repo full of attacks if both answer 1.
+            _usage_error(args, f"Clone failed: {result.stderr.strip()}",
+                         "Nothing was scanned.")
     except subprocess.TimeoutExpired:
-        if args.json:
-            print(json.dumps({"error": "git clone timed out (120s)"}))
-        else:
-            print(f"\n  {RED}Clone timed out (120s).{RESET}\n")
-        sys.exit(1)
+        _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
 
-    if not args.json:
+    if not _wants_machine_output(args):
         print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
     # Walk and scan
     start = time.perf_counter()
     files_scanned = 0
     files_with_threats = 0
+    files_incomplete = 0
+    partially_read = []          # (path, reason) for members read only in part
     total_threats = 0
     all_findings = []
     category_counts = {}
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     file_results = []
+    # The ScanResult objects themselves, kept so `-o sarif` can serialise repo mode
+    # through the same path as `--file` instead of falling through to the human screen.
+    repo_results = []
 
-    for filepath in _walk_repo_files(tmp_dir):
-        try:
-            with open(filepath, 'r', errors='ignore') as f:
-                content = f.read()
-        except (OSError, PermissionError):
-            continue
-
-        scan_result = engine.scan(content, channel="file")
-        files_scanned += 1
+    walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
+    for filepath, _reason in walked:
         rel_path = os.path.relpath(filepath, tmp_dir)
 
-        if not scan_result.is_clean:
-            files_with_threats += 1
-            total_threats += len(scan_result.findings)
+        # Content routing, same rule as `--file` (1a-3): the walker's extension
+        # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
+        # at all — used to be read as text here and counted as inspected, which
+        # is the original bug one level up.
+        from .extractors.dispatch import identify
+        kind, label = identify(filepath)
+        if kind in ("opaque", "media"):
+            walker_skips.append((
+                rel_path,
+                f"{label} — not inspected. Scan it directly to look inside: "
+                f"sunglasses scan --file {rel_path}"))
+            continue
 
-            for finding in scan_result.findings:
+        # Repo files go through the SAME extraction path as `--file`. Reading them
+        # as raw text here meant a real compressed PDF named `.txt` was scanned as
+        # its own binary bytes, found nothing, and was counted as inspected -- the
+        # file mode of the identical file correctly reported "not inspected". One
+        # scanner cannot hold two opinions about one file depending on how it was
+        # invoked; that divergence is audit finding C1 all over again, one level up.
+        try:
+            scan_result = engine.scan_file(filepath)
+        except UnreadableFile as exc:
+            # Was a silent `continue`. An unreadable file is not an absent one.
+            walker_skips.append((rel_path, f"{exc} — not inspected"))
+            continue
+        except OSError as exc:
+            walker_skips.append(
+                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
+            continue
+
+        files_scanned += 1
+        scan_result.source = rel_path
+        repo_results.append(scan_result)
+
+        if not scan_result.inspection_complete:
+            # A file we could only partly read. NOT a threat — counting it as one
+            # (which `not is_clean` now would) inflates "files with threats" with
+            # zero findings behind it — but it must not leave the scan looking
+            # complete either.
+            files_incomplete += 1
+            # v0.5.6 round 5: this used to be a COUNT and nothing else, so the
+            # report said "Files not fully read: 1" and never which file or why —
+            # while the walker's own skips were listed by name right beside it.
+            # A count is not a name: a reader cannot act on "one of these is
+            # partly unread". The reasons already exist on the result; nothing
+            # was collecting them.
+            reason = "; ".join(scan_result.extraction_warnings) or (
+                "truncated at the scan cap" if scan_result.truncated
+                else "part of this file was not read")
+            partially_read.append((rel_path, reason))
+
+        if scan_result.threat_found:
+            files_with_threats += 1
+            # `reported_findings()` is what `--file` prints as `findings_count`;
+            # `findings` is the raw pattern-fire list (`patterns_fired`). Counting the
+            # raw list here made one file report 7 threats in repo mode and 6 in file
+            # mode. Two surfaces, one file, two numbers -- the same divergence this
+            # release exists to remove, in the counters rather than the verdict.
+            reported = scan_result.reported_findings()
+            total_threats += len(reported)
+
+            for finding in reported:
                 cat = finding.get("category", "unknown")
                 category_counts[cat] = category_counts.get(cat, 0) + 1
                 sev = finding.get("severity", "low")
@@ -226,7 +398,9 @@ def _scan_repo(args, engine):
             })
 
         if not args.json and args.verbose:
-            status = f"{GREEN}PASS{RESET}" if scan_result.is_clean else f"{RED}THREAT{RESET}"
+            status = (f"{GREEN}PASS{RESET}" if scan_result.is_clean
+                      else f"{RED}THREAT{RESET}" if scan_result.threat_found
+                      else f"{YELLOW}INCOMPLETE{RESET}")
             print(f"  {status}  {rel_path}")
 
     elapsed_ms = (time.perf_counter() - start) * 1000
@@ -241,6 +415,7 @@ def _scan_repo(args, engine):
         "repo_name": repo_name,
         "files_scanned": files_scanned,
         "files_with_threats": files_with_threats,
+        "files_incomplete": files_incomplete,
         "total_threats": total_threats,
         "severity_breakdown": severity_counts,
         "category_breakdown": category_counts,
@@ -248,9 +423,65 @@ def _scan_repo(args, engine):
         "file_results": file_results,
     }
 
-    if args.json:
+    # Same contract as every other scan path (1b): a repo we could only partly
+    # read is not a repo that came back clean.
+    # `files_skipped` is the half that used to vanish: every file the walker
+    # declined, with the reason it declined it.
+    summary["files_skipped"] = len(walker_skips)
+    summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
+    # Same fact, same names, in the machine document: a consumer keeping only the
+    # JSON could previously see the COUNT of partly-read members and never learn
+    # which they were.
+    summary["partially_read"] = [{"file": f, "reason": r} for f, r in partially_read]
+    # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
+    # is not a repo we cleared.
+    nothing_inspected = files_scanned == 0
+    incomplete = bool(files_incomplete or walker_skips or nothing_inspected)
+    repo_exit = (EXIT_THREAT if total_threats else
+                 EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
+    # Through the one normalizer, like every other document. This block used to
+    # compute the three axes itself. It computed them CORRECTLY -- but "correct
+    # duplicate of the invariant" is the exact shape the other four consumers had
+    # right up until one of them drifted, so the duplicate goes too. Only the exit
+    # code is this function's own.
+    from .result import normalize as _normalize
+    summary.update(_normalize(
+        {
+            "threat_found": bool(total_threats),
+            "extraction_complete": not incomplete,
+            "warnings": ([f"{path}: {reason}" for path, reason in walker_skips]
+                         + [f"{path}: {reason}" for path, reason in partially_read]),
+            "findings": summary.get("findings") or [],
+            "channel": "file",
+        },
+        source=repo_url,
+    ))
+    summary["exit_code"] = repo_exit
+
+    if args.output == "sarif":
+        # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
+        # through the selected serializer or the flag is a lie.
+        sarif_doc = to_sarif(repo_results, source=repo_url)
+        not_inspected = ([f"{path}: {reason}" for path, reason in walker_skips]
+                         + [f"{path}: {reason}" for path, reason in partially_read])
+        not_inspected += [
+            f"{r.source}: not fully inspected"
+            for r in repo_results if not getattr(r, "inspection_complete", True)
+        ]
+        if not_inspected and sarif_doc.get("runs"):
+            # Without this a repo where nothing could be read emits results:[] --
+            # which a SARIF consumer reads as "scanned, nothing there". The empty
+            # results array is exactly the lie the release exists to remove, and it
+            # is the same one the deep path already guards against.
+            props = sarif_doc["runs"][0].setdefault("properties", {})
+            props["inspectionComplete"] = False
+            props["notInspected"] = not_inspected
+        print(json.dumps(sarif_doc, indent=2))
+        sys.exit(repo_exit)
+
+    if args.json or args.output == "json":
         print(json.dumps(summary, indent=2))
-        sys.exit(0 if total_threats == 0 else 1)
+        sys.exit(repo_exit)
 
     # Human-readable output
     print(f"\n  {BOLD}SCAN COMPLETE{RESET}")
@@ -258,6 +489,25 @@ def _scan_repo(args, engine):
     print(f"  Repo:            {CYAN}{repo_name}{RESET} ({repo_url})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
+    if files_incomplete or walker_skips:
+        # The banner introduces the list. Round 5: it was printed in the verdict
+        # block BELOW, so a reader met the named skips first and the header last,
+        # and a header that promises a list of what went unread has to arrive
+        # before the list. Caught by the round-5 `banner_without_named_scope`
+        # assertion on this surface.
+        _print_coverage_banner("part of this repo was not read")
+    if files_incomplete:
+        print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
+        for name, reason in partially_read[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+        if len(partially_read) > 10:
+            print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
+    if walker_skips:
+        print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
+        for name, reason in walker_skips[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+        if len(walker_skips) > 10:
+            print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
     print(f"  Scan time:       {DIM}{elapsed_ms:.0f}ms{RESET}")
 
@@ -291,39 +541,165 @@ def _scan_repo(args, engine):
                 if remaining > 0:
                     print(f"    {DIM}... and {remaining} more findings{RESET}")
                 break
+        if incomplete:
+            # A finding never cancels a coverage failure -- the invariant this
+            # release exists for, stated on the surface a human actually reads.
+            # The banner itself is printed above, next to the list it heads.
+            print(f"  {DIM}Findings above are from the inspected scope only; see "
+                  f"the INCOMPLETE SCAN list.{RESET}")
         print()
+    elif incomplete:
+        print(f"\n  {YELLOW}{BOLD}No threats found in the inspected scope.{RESET}")
+        if nothing_inspected:
+            print(f"  {DIM}No files were inspected at all, so this is not a "
+                  f"result about the repo's contents.{RESET}\n")
+        else:
+            print(f"  {DIM}{files_incomplete + len(walker_skips)} file(s) were not "
+                  f"read in full, so this is not a clean bill of health for the "
+                  f"repo.{RESET}\n")
     else:
         print(f"\n  {GREEN}{BOLD}No threats found.{RESET} This repo looks clean.\n")
 
-    sys.exit(0 if total_threats == 0 else 1)
+    sys.exit(repo_exit)
 
 
-# Exit-code contract for a scan (audit finding C1).
+# Exit-code contract for a scan (audit finding C1; extended by the v0.5.6 repair).
 #   0 = scanned completely, nothing found
 #   1 = threat found
-#   3 = we could not read part of the file, and found nothing in what we could read
+#   2 = usage or operational error — we did not scan anything
+#   3 = we could not read part of it, and found nothing in what we could read
 # 3 exists because 0 is a claim. "I read the whole file and it is clean" and "I could
 # not open the text layer and saw nothing" must not be the same signal to a CI job.
+# 2 exists for the same reason one level up: "you pointed me at a directory" and
+# "your file is clean" were both exit 0 before v0.5.6, which made a typo look like
+# a pass. Precedence is 1 > 3 > 2 > 0: a threat we DID find outranks the part we
+# could not read, and both outrank a usage complaint.
 EXIT_CLEAN = 0
 EXIT_THREAT = 1
+EXIT_USAGE = 2
 EXIT_INCOMPLETE = 3
 
 
 def _scan_exit_code(result):
-    if not result.is_clean:
+    """Map a ScanResult onto the exit contract.
+
+    v0.5.6: this used to branch on `not result.is_clean` FIRST. That was safe only
+    while `is_clean` meant "no findings". Now that `is_clean` also requires a
+    complete inspection, the old first line would return EXIT_THREAT for a merely
+    truncated file — turning a repair into a false accusation. The two changes are
+    one change; do not split them.
+    """
+    if getattr(result, "threat_found", not getattr(result, "is_clean", True)):
+        # A finding outranks incompleteness, but never hides it: the JSON carries
+        # `truncated`/`extraction_complete` and the human output prints the warning
+        # block either way.
         return EXIT_THREAT
-    if not getattr(result, "extraction_complete", True):
+    if not getattr(result, "inspection_complete", getattr(result, "extraction_complete", True)):
         return EXIT_INCOMPLETE
     return EXIT_CLEAN
 
 
+def _usage_error(args, message, hint=None):
+    """Refuse to scan, in whatever format the caller asked for. Never exit 0.
+
+    Every `--json`/`--sarif` outcome must still be exactly ONE valid JSON document
+    on stdout (contract 1c) — a CI job that pipes us into `jq` should get a parseable
+    refusal, not a human paragraph that explodes the pipeline.
+    """
+    wants_json = getattr(args, "json", False) or getattr(args, "output", "human") in ("json", "sarif")
+    if wants_json:
+        print(json.dumps({
+            "error": message,
+            "hint": hint,
+            "scanned": False,
+            "decision": None,
+            "is_clean": False,
+            "threat_found": False,
+            "inspection_complete": False,
+            "exit_code": EXIT_USAGE,
+        }))
+    else:
+        print(f"\n  {RED}{message}{RESET}", file=sys.stderr)
+        if hint:
+            print(f"  {DIM}{hint}{RESET}", file=sys.stderr)
+        print(file=sys.stderr)
+    sys.exit(EXIT_USAGE)
+
+
+def _read_stdin_text(args) -> str:
+    """Read stdin as text, or refuse operationally. Never a traceback, never exit 1.
+
+    v0.5.6 round 4 (ASTRA F5). `sys.stdin.read()` sat outside every error handler,
+    so a byte stream that is not valid UTF-8 -- `PYTHONIOENCODING=utf-8:strict` and
+    one 0xff -- raised `UnicodeDecodeError` out of `main()`. Python exits 1 on an
+    uncaught exception, and 1 is this package's code for THREAT FOUND. A CI job
+    piping a binary file into the scanner was told it had been attacked, and got a
+    traceback instead of a document. That is the same class as the `UnreadableFile`
+    repair: an operational failure wearing a verdict's exit code.
+
+    POLICY, stated because there were two defensible answers (T9's brief, item C2):
+    an undecodable stream is an OPERATIONAL error (exit 2), not a partial scan.
+    Decoding with `errors="replace"` was the alternative, and it is worse here: it
+    would silently substitute U+FFFD for the attacker-controlled bytes and then
+    report on the substitution, which is a scan of something the caller never sent.
+    Refusing names exactly what happened and scans nothing.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:
+        # A caller (or a test) replaced stdin with a text-mode object. Nothing to
+        # decode: it is already str.
+        return sys.stdin.read()
+    raw = buffer.read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        _usage_error(
+            args,
+            f"Input is not valid UTF-8: {len(raw)} bytes read, "
+            f"first undecodable byte 0x{raw[exc.start]:02x} at offset {exc.start}.",
+            "Nothing was scanned. SUNGLASSES scans text; pipe a decoded stream, "
+            "or use --file to scan a binary as a file.",
+        )
+
+
+def _print_coverage_banner(detail, stream=None):
+    """The ONE sentence that says a result is not a clean bill of health.
+
+    v0.5.6 round 4. Three human renderers -- single file, repo summary, deep scan
+    -- each announced lost coverage in their own words: `INCOMPLETE SCAN`,
+    `Files NOT inspected`, and a bare list of `!` lines under an `INCOMPLETE`
+    header. All three were truthful, and that is not the same as consistent: a
+    reader who has learned what `INCOMPLETE SCAN` means on one surface does not
+    see it on the next, and a grep for it across a CI log finds two thirds of the
+    cases. The reports below stay different -- a repo summary is not a file
+    verdict -- but the sentence that carries "this is not clean" is the same
+    string everywhere, because it is the same fact everywhere.
+    """
+    out = stream or sys.stdout
+    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— {detail}{RESET}", file=out)
+
+
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
-    warnings = getattr(result, "extraction_warnings", None)
+    warnings = list(getattr(result, "extraction_warnings", None) or [])
+    # Truncation is incompleteness too, and it lives on its own attribute rather
+    # than in extraction_warnings — so before v0.5.6 an oversized file printed
+    # nothing at all about the part that was never scanned. Worse, when the first
+    # megabyte DID contain a finding, the output showed the threat and stayed
+    # silent about the rest of the file, which is precisely the invariant this
+    # release exists to hold: findings survive incompleteness, and incompleteness
+    # survives findings. Both get shown.
+    if getattr(result, "truncated", False):
+        scanned = getattr(result, "bytes_scanned", None)
+        warnings.append(
+            f"Input larger than the {scanned:,}-byte scan cap — only the first "
+            f"{scanned:,} bytes were scanned. Anything after that was not read."
+            if scanned else
+            "Input exceeded the scan cap — the remainder was not read.")
     if not warnings:
         return
     out = stream or sys.stdout
-    print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— part of this file was not read{RESET}", file=out)
+    _print_coverage_banner("part of this file was not read", stream=out)
     for w in warnings:
         print(f"  {YELLOW}!{RESET} {w}", file=out)
     if result.is_clean:
@@ -331,110 +707,18 @@ def _print_extraction_warnings(result, stream=None):
               f"same as clean.{RESET}", file=out)
 
 
-def cmd_scan(args):
-    """Run a scan."""
-    engine = SunglassesEngine()
+def _emit_scan_result(args, result, source):
+    """The ONE place a scan outcome leaves the process. Never returns.
 
-    if args.repo:
-        _scan_repo(args, engine)
-        return
-
-    if args.file:
-        filepath = args.file
-        if not os.path.exists(filepath):
-            print(f"\n  {RED}File not found:{RESET} {filepath}\n")
-            sys.exit(1)
-
-        # Check if this is audio/video
-        if _is_media_file(filepath):
-            if not args.deep:
-                ext = os.path.splitext(filepath)[1].lower()
-                print(f"\n  {YELLOW}{BOLD}DEEP SCAN NEEDED{RESET}")
-                print(f"  {DIM}{'─' * 50}{RESET}")
-                print(f"  {filepath} is an audio/video file ({ext}).")
-                print(f"  Deep scan transcribes audio to text, then scans for attacks.")
-                print(f"\n  To scan this file, add --deep:")
-                print(f"  {CYAN}sunglasses scan --file {filepath} --deep{RESET}")
-                print(f"\n  {DIM}Deep scan requires Whisper + FFmpeg.")
-                print(f"  Run 'sunglasses check' to see what's installed.{RESET}\n")
-                sys.exit(0)
-            else:
-                # Run deep scan
-                print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — deep scanning {filepath}")
-                print(f"  {DIM}{'─' * 50}{RESET}")
-                print(f"  {DIM}Transcribing audio with Whisper... (this may take a while){RESET}")
-                try:
-                    from .scanner import SunglassesScanner
-                    scanner = SunglassesScanner()
-                    start = time.time()
-                    result_dict = scanner.scan_deep(filepath)
-                    elapsed = time.time() - start
-
-                    if result_dict.get("error"):
-                        print(f"\n  {RED}Error:{RESET} {result_dict['error']}\n")
-                        sys.exit(1)
-
-                    threats = result_dict.get("threats", [])
-                    is_clean = result_dict.get("is_clean", len(threats) == 0)
-
-                    if args.json:
-                        print(json.dumps(result_dict))
-                        sys.exit(0 if is_clean else 1)
-
-                    if is_clean:
-                        print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({elapsed:.1f}s){RESET}")
-                        print(f"  {DIM}No threats found in audio/video content.{RESET}\n")
-                    else:
-                        print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
-                        for t in threats:
-                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {t.get('matched_text', '')}")
-                        print()
-
-                    # Show transcript preview
-                    for r in result_dict.get("results", []):
-                        preview = r.get("text_preview", "")[:200]
-                        if preview:
-                            print(f"  {DIM}Transcript preview: {preview}...{RESET}\n")
-
-                    sys.exit(0 if is_clean else 1)
-                except ImportError as e:
-                    print(f"\n  {RED}Missing dependencies:{RESET} {e}")
-                    print(f"  Run: {CYAN}pip install sunglasses[all]{RESET}")
-                    print(f"  And: {CYAN}brew install ffmpeg{RESET} (Mac) or {CYAN}apt install ffmpeg{RESET} (Linux)\n")
-                    sys.exit(1)
-        else:
-            result = engine.scan_file(filepath)
-            source = filepath
-    elif args.stdin:
-        text = sys.stdin.read()
-        result = engine.scan(text, channel=args.channel)
-        source = "stdin"
-    elif args.text:
-        text = ' '.join(args.text)
-        # Auto-detect: single argument that looks like an existing file path.
-        # Without this guard, `sunglasses scan ./malicious.txt` silently scans the
-        # path string itself (not the file contents) and returns PASS — the worst
-        # possible failure mode for a security tool. Promote to a file scan and
-        # tell the user what just happened.
-        if len(args.text) == 1 and os.path.isfile(text):
-            # stderr, not stdout: `--json` and `--sarif` make stdout a machine
-            # contract, and this courtesy note used to land in front of the
-            # document — so `scan file.txt --json | jq` died on a CI runner
-            # while the same command without the auto-promotion worked fine.
-            # The human still sees it; a pipe no longer eats it.
-            print(f"\n  {YELLOW}Note:{RESET} interpreting '{text}' as a file path. "
-                  f"Use {CYAN}--file{RESET} to be explicit.", file=sys.stderr)
-            args.file = text
-            return cmd_scan(args)
-        result = engine.scan(text, channel=args.channel)
-        source = "text"
-    else:
-        print("Error: provide text, --file, or --stdin")
-        sys.exit(1)
-
+    Contract 1c: every `--json`/`--sarif` outcome is exactly one valid JSON document
+    on stdout, with all diagnostics on stderr. Before v0.5.6 the sarif branch, the
+    json branch, the deep-scan branch and the media-without-deep branch each decided
+    this for themselves, and two of them got it wrong in different ways. Funnelling
+    them here is the fix that keeps them from drifting apart again — and it is why
+    human, JSON and SARIF cannot disagree about the same scan (Fugu gate 3).
+    """
     if args.output == "sarif":
-        sarif_log = to_sarif([result], source=source)
-        print(json.dumps(sarif_log, indent=2))
+        print(json.dumps(to_sarif([result], source=source), indent=2))
         # stdout is a machine contract here; the warning goes to stderr.
         _print_extraction_warnings(result, stream=sys.stderr)
         sys.exit(_scan_exit_code(result))
@@ -454,6 +738,251 @@ def cmd_scan(args):
     print_result(result, verbose=args.verbose)
     _print_extraction_warnings(result)
     sys.exit(_scan_exit_code(result))
+
+
+def cmd_scan(args):
+    """Run a scan."""
+    engine = SunglassesEngine()
+
+    # `-o json` is documented as an output format and was silently printing human
+    # text (audit case `output_json_alias`): the flag parsed, the format did not
+    # apply. One assignment here fixes it for every branch below — file, text,
+    # stdin, repo and deep — instead of four separate checks that can drift.
+    if getattr(args, "output", "human") == "json":
+        args.json = True
+
+    if args.repo:
+        _scan_repo(args, engine)
+        return
+
+    # Explicit beats inferred: --text is the documented escape hatch from the
+    # path-shape rule below, so it is checked before any filesystem guess.
+    if getattr(args, "explicit_text", None) is not None:
+        result = engine.scan(args.explicit_text, channel=args.channel)
+        _emit_scan_result(args, result, source="text")
+
+    if args.file:
+        filepath = args.file
+        # Refuse before scanning, never after. Each of these used to end in a
+        # verdict: a directory crashed or came back PASS, a missing file exited 1
+        # (indistinguishable from "threat found" to a CI job), and a FIFO would
+        # have blocked forever on read. Nothing was inspected in any of these
+        # cases, so none of them may return a scan-shaped answer.
+        if not os.path.exists(filepath):
+            _usage_error(args, f"File not found: {filepath}",
+                         "Nothing was scanned. Check the path.")
+        if os.path.isdir(filepath):
+            _usage_error(args, f"Not a file: {filepath} is a directory.",
+                         "Nothing was scanned. To scan a tree, scan the files in it "
+                         "(a directory scan is not the same claim as a file scan).")
+        if not os.path.isfile(filepath):
+            _usage_error(args, f"Not a regular file: {filepath}",
+                         "Nothing was scanned. Sockets, FIFOs and device files are "
+                         "refused — reading one can block forever.")
+        # Readability belongs with the other pre-scan checks, not inside the
+        # extractor. The media shortcut below decides on the FILENAME and returns a
+        # scan-shaped answer without ever opening the file, so an unreadable .mp3
+        # reported "incomplete" (3) instead of "operational error" (2). Any future
+        # shortcut added above the extractor inherits this check for free.
+        try:
+            with open(filepath, "rb") as _probe:
+                _probe.read(1)
+        except OSError as exc:
+            _usage_error(args,
+                         f"could not read {filepath}: {exc.strerror or exc} — NOT inspected",
+                         "Nothing was scanned. Check the file's permissions.")
+
+        # Check if this is audio/video
+        if _is_media_file(filepath):
+            if not args.deep:
+                ext = os.path.splitext(filepath)[1].lower()
+                # We transcribed nothing, so we inspected nothing. Exit 0 here was
+                # the purest form of the bug: a CI job scanning a media file got the
+                # same signal as a file we read end to end and cleared.
+                warning = (f"Audio/video content not transcribed — deep scan not requested. "
+                           f"Nothing in {os.path.basename(filepath)} was inspected. Re-run with --deep.")
+                result = engine.scan("", channel="file")
+                result.extraction_complete = False
+                result.extraction_warnings = [warning]
+                result.extraction_sources = []
+
+                if args.output == "sarif":
+                    print(json.dumps(to_sarif([result], source=filepath), indent=2))
+                    _print_extraction_warnings(result, stream=sys.stderr)
+                    sys.exit(_scan_exit_code(result))
+                if args.json:
+                    output = result.to_dict()
+                    output["source"] = filepath
+                    print(json.dumps(output))
+                    _print_extraction_warnings(result, stream=sys.stderr)
+                    sys.exit(_scan_exit_code(result))
+
+                print(f"\n  {YELLOW}{BOLD}DEEP SCAN NEEDED{RESET}")
+                print(f"  {DIM}{'─' * 50}{RESET}")
+                print(f"  {filepath} is an audio/video file ({ext}).")
+                print(f"  Deep scan transcribes audio to text, then scans for attacks.")
+                print(f"\n  To scan this file, add --deep:")
+                print(f"  {CYAN}sunglasses scan --file {filepath} --deep{RESET}")
+                print(f"\n  {DIM}Deep scan requires Whisper + FFmpeg.")
+                print(f"  Run 'sunglasses check' to see what's installed.{RESET}\n")
+                _print_extraction_warnings(result)
+                sys.exit(_scan_exit_code(result))
+            else:
+                # Run deep scan. Progress chatter goes to stderr whenever stdout is
+                # a machine contract — it used to print three lines in front of the
+                # JSON document, so `scan --deep --json | jq` never had a chance.
+                chatter = sys.stderr if (args.json or args.output == "sarif") else sys.stdout
+                print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — deep scanning {filepath}", file=chatter)
+                print(f"  {DIM}{'─' * 50}{RESET}", file=chatter)
+                print(f"  {DIM}Transcribing audio with Whisper... (this may take a while){RESET}", file=chatter)
+                try:
+                    from .scanner import SunglassesScanner
+                    scanner = SunglassesScanner()
+                    start = time.time()
+                    result_dict = scanner.scan_deep(filepath)
+                    elapsed = time.time() - start
+
+                    if result_dict.get("error"):
+                        # Operational failure. Nothing was transcribed, so nothing was
+                        # inspected — this may not leave as a scan verdict of any kind.
+                        _usage_error(args, f"Deep scan failed: {result_dict['error']}",
+                                     "Nothing was scanned.")
+
+                    # One normalizer decides the axes; this path no longer computes
+                    # them. The line that used to live here read
+                    #   inspection_complete = bool(sources_found) and (aggregate_clean or threat_found)
+                    # in which finding a threat MANUFACTURED the coverage claim --
+                    # a real audio aggregate could return extraction_complete:false
+                    # with a finding and be published as inspection_complete:true.
+                    # Coverage and detection are independent facts.
+                    from .result import normalize as _normalize
+                    result_dict = _normalize(result_dict, source=filepath)
+                    threats = result_dict.get("findings") or result_dict.get("threats") or []
+                    sources_found = result_dict.get("sources_found", 0)
+                    threat_found = bool(result_dict["threat_found"])
+                    inspection_complete = bool(result_dict["inspection_complete"])
+
+                    if threat_found:
+                        exit_code = EXIT_THREAT
+                    elif not inspection_complete:
+                        exit_code = EXIT_INCOMPLETE
+                    else:
+                        exit_code = EXIT_CLEAN
+
+                    if not inspection_complete:
+                        result_dict.setdefault("warnings", []).append(
+                            "No audio/video content was transcribed — nothing in this file "
+                            "was inspected." if not sources_found else
+                            "Part of the transcribed content was not fully inspected."
+                        )
+                    # axes already set by normalize(); only the exit code is ours
+                    result_dict["exit_code"] = exit_code
+
+                    if args.output == "sarif":
+                        # Deep scan printed the human screen under `-o sarif`. The deep
+                        # path builds a dict rather than a ScanResult, so it is
+                        # serialised here through the one normalizer, rather than a
+                        # second parallel result type.
+                        print(json.dumps(_deep_dict_to_sarif(result_dict, filepath), indent=2))
+                        sys.exit(exit_code)
+
+                    if args.json or args.output == "json":
+                        print(json.dumps(result_dict))
+                        sys.exit(exit_code)
+
+                    if exit_code == EXIT_CLEAN:
+                        print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({elapsed:.1f}s){RESET}")
+                        print(f"  {DIM}No threats found in audio/video content.{RESET}\n")
+                    elif exit_code == EXIT_INCOMPLETE:
+                        print(f"\n  {YELLOW}{BOLD}INCOMPLETE{RESET} {DIM}({elapsed:.1f}s){RESET}")
+                        print(f"  {DIM}No findings in the inspected scope — but this file was "
+                              f"not fully read, so this is not a clean bill of health.{RESET}")
+                        _print_coverage_banner("part of this file was not read")
+                        for w in result_dict.get("warnings", []):
+                            print(f"  {YELLOW}!{RESET} {w}")
+                        print()
+                    else:
+                        print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
+                        for t in threats:
+                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {t.get('matched_text', '')}")
+                        # A finding does not cancel a coverage failure. The human
+                        # threat screen used to drop the warnings entirely, so a
+                        # partially transcribed file with one finding read as a
+                        # complete scan that happened to find something.
+                        if not inspection_complete:
+                            _print_coverage_banner("part of this file was not read")
+                            for w in result_dict.get("warnings", []):
+                                print(f"  {YELLOW}!{RESET} {w}")
+                        print()
+
+                    # Show transcript preview
+                    for r in result_dict.get("results", []):
+                        preview = r.get("text_preview", "")[:200]
+                        if preview:
+                            print(f"  {DIM}Transcript preview: {preview}...{RESET}\n")
+
+                    sys.exit(exit_code)
+                except ImportError as e:
+                    _usage_error(
+                        args, f"Deep scan unavailable — missing dependencies: {e}",
+                        "Nothing was scanned. Run: pip install sunglasses[all], and "
+                        "brew install ffmpeg (Mac) or apt install ffmpeg (Linux).",
+                    )
+        else:
+            try:
+                result = engine.scan_file(filepath)
+            except UnreadableFile as exc:
+                # The file exists but we could not read it. That is an operational
+                # failure (exit 2), never a finding: letting the OSError escape
+                # exited 1, which callers read as "threat found".
+                _usage_error(args, f"{exc} — NOT inspected",
+                             "Nothing was scanned. Check the file's permissions.")
+            source = filepath
+    elif args.stdin:
+        text = _read_stdin_text(args)
+        result = engine.scan(text, channel=args.channel)
+        source = "stdin"
+    elif args.text:
+        text = ' '.join(args.text)
+        # Auto-detect: single argument that looks like an existing file path.
+        # Without this guard, `sunglasses scan ./malicious.txt` silently scans the
+        # path string itself (not the file contents) and returns PASS — the worst
+        # possible failure mode for a security tool. Promote to a file scan and
+        # tell the user what just happened.
+        if len(args.text) == 1 and os.path.isfile(text):
+            # stderr, not stdout: `--json` and `--sarif` make stdout a machine
+            # contract, and this courtesy note used to land in front of the
+            # document — so `scan file.txt --json | jq` died on a CI runner
+            # while the same command without the auto-promotion worked fine.
+            # The human still sees it; a pipe no longer eats it.
+            print(f"\n  {YELLOW}Note:{RESET} interpreting '{text}' as a file path. "
+                  f"Use {CYAN}--file{RESET} to be explicit.", file=sys.stderr)
+            args.file = text
+            return cmd_scan(args)
+        if len(args.text) == 1 and _looks_like_path(text):
+            # It is shaped like a path and it is not a readable file. Scanning the
+            # string would answer a question nobody asked, in a format that looks
+            # exactly like the answer they wanted.
+            if os.path.isdir(text):
+                _usage_error(args, f"Not a file: {text} is a directory.",
+                             "Nothing was scanned. Use --text to scan this as a string, "
+                             "or scan the files inside it.")
+            if os.path.exists(text):
+                _usage_error(args, f"Not a regular file: {text}",
+                             "Nothing was scanned. Use --text to scan this as a string.")
+            _usage_error(args, f"File not found: {text}",
+                         "Nothing was scanned. This argument looks like a path; if you "
+                         "meant to scan it as literal text, use --text; to scan a file, use --file.")
+        result = engine.scan(text, channel=args.channel)
+        source = "text"
+    else:
+        # Was `print(...)` + exit 1 -- a usage mistake occupying the scanner's THREAT
+        # code, and no document at all under --json/-o. A CI job could not tell
+        # "you invoked me wrong" from "this file attacks your agent".
+        _usage_error(args, "No input provided.",
+                     "Nothing was scanned. Pass text, --file <path>, or --stdin.")
+
+    _emit_scan_result(args, result, source)
 
 
 def cmd_check(args):
@@ -741,6 +1270,86 @@ def cmd_init(args):
     return 0
 
 
+# The ONE environment variable that grants consent. It is read from the process
+# environment and NOWHERE else: never from a scanned repository, a `.env` file, a
+# `.mcp.json`, or project settings. A target must never be able to authorise the
+# thing it is the target of.
+_PIN_CONSENT_ENV = "SUNGLASSES_PIN_CONSENT"
+
+
+def _describe_launch(servers):
+    """The exact command lines that are about to run, one per line."""
+    lines = []
+    for name in sorted(servers):
+        config = servers[name] or {}
+        command = config.get("command")
+        if not command:
+            # http/sse servers are not spawned; say so rather than listing them
+            # as if they were about to be executed.
+            lines.append((name, None))
+            continue
+        argv = " ".join([str(command), *(str(a) for a in config.get("args") or [])])
+        lines.append((name, argv))
+    return lines
+
+
+def _pin_consent(args, servers):
+    """Ask before launching the user's MCP servers. Returns True to proceed.
+
+    Non-interactive callers must say yes IN ADVANCE (`--yes` or the env var).
+    They may not be asked, because there is nobody there to answer: a prompt
+    written to a launchd job's stdout is a hang, and a hang in a SessionStart
+    hook is a broken session. So unattended-without-consent FAILS, visibly and
+    immediately, rather than either launching or waiting.
+    """
+    if getattr(args, "yes", False) or os.environ.get(_PIN_CONSENT_ENV) == "1":
+        return True
+
+    launches = _describe_launch(servers)
+    spawning = [(n, c) for n, c in launches if c]
+
+    if not spawning:
+        # Nothing will be executed; there is nothing to consent to.
+        return True
+
+    interactive = sys.stdin.isatty() and sys.stderr.isatty()
+    stream = sys.stderr if getattr(args, "quiet", False) else sys.stdout
+
+    print(f"\n  {BOLD}sunglasses pin{RESET} is about to {BOLD}start "
+          f"{len(spawning)} MCP server(s){RESET} to read their tool lists.", file=stream)
+    print(f"  {DIM}They run with your environment, exactly as your agent would "
+          f"start them.{RESET}\n", file=stream)
+    for name, argv in spawning:
+        print(f"    {CYAN}{name}{RESET}: {argv}", file=stream)
+    skipped = [n for n, c in launches if not c]
+    if skipped:
+        print(f"\n  {DIM}Not started (not a local command): "
+              f"{', '.join(skipped)}{RESET}", file=stream)
+
+    if not interactive:
+        print(f"\n  {RED}Refusing to start them without consent.{RESET}", file=stream)
+        # NOT "the installer writes this in" — it does not. `sunglasses init`
+        # wires the PreToolUse firewall hook and nothing else; the launchd timer
+        # and SessionStart hook that run `pin --quiet` are configured by the user.
+        # Telling them otherwise would be this release's own sin: claiming a thing
+        # does something it does not.
+        print(f"  {DIM}No terminal to ask. Re-run with {RESET}{BOLD}--yes{RESET}"
+              f"{DIM}, or set {RESET}{BOLD}{_PIN_CONSENT_ENV}=1{RESET}"
+              f"{DIM} in that job's environment for unattended runs.{RESET}\n",
+              file=stream)
+        return False
+
+    try:
+        answer = input(f"\n  Start them now? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n  {DIM}Cancelled. Nothing was started.{RESET}\n", file=stream)
+        return False
+    if answer not in ("y", "yes"):
+        print(f"\n  {DIM}Cancelled. Nothing was started.{RESET}\n", file=stream)
+        return False
+    return True
+
+
 def cmd_pin(args):
     """Record (or verify) SHA-256 pins for every configured MCP tool descriptor.
 
@@ -760,7 +1369,12 @@ def cmd_pin(args):
         buffer = _io.StringIO()
         with _contextlib.redirect_stdout(buffer):
             code = _pin_run(args)
-        if code != 0:
+        # Only code 1 means drift. v0.5.6 added code 2 (refused to start servers
+        # without consent), and `!= 0` reported that as "descriptor drift
+        # detected" — a false alarm telling the user their tools were tampered
+        # with when in fact nothing had been read at all. The consent gate prints
+        # its own reason to stderr.
+        if code == EXIT_THREAT:
             print("SUNGLASSES: MCP tool descriptor drift detected — "
                   "`sunglasses pin --check` for detail. Affected tools are blocked "
                   "until you re-run `sunglasses pin`.")
@@ -782,6 +1396,17 @@ def _pin_run(args):
     if not servers:
         print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
         return 0
+
+    # ── CONSENT GATE (v0.5.6, contract 1e) ──────────────────────────────────
+    # Everything below this line LAUNCHES PROCESSES. `build_pins` starts every
+    # configured stdio MCP server with the user's full environment to read its
+    # tool list. Before this release it did that with no prompt and no warning —
+    # including from `--quiet`, which is wired into a launchd timer and a
+    # SessionStart hook, so servers were being started silently every time a
+    # session opened. "Reading descriptors from N server(s)" is not consent; it
+    # is a status line printed while it is already happening.
+    if not _pin_consent(args, servers):
+        return EXIT_USAGE
 
     print(f"\n  {BOLD}SUNGLASSES{RESET} — reading descriptors from "
           f"{len(servers)} MCP server(s)...")
@@ -1121,8 +1746,77 @@ def cmd_demo(args):
     print(f"  {DIM}That's {total_ms/1000:.4f} seconds for {len(demos)} scans.{RESET}\n")
 
 
+class _MachineAwareParser(argparse.ArgumentParser):
+    """An argparse parser that respects the caller's requested output format.
+
+    argparse's own `error()` writes a usage paragraph to stderr and exits 2 with
+    EMPTY stdout. That made the contract's "exactly one document on every path"
+    false for the one class of failure that happens before `args` exists:
+    `--channel not-a-channel --json` refused correctly and told a JSON consumer
+    nothing at all.
+
+    The format cannot be read off parsed arguments here -- parsing is what just
+    failed -- so it is read off argv, which is the only evidence available at
+    this point. Exit code and stderr behaviour for human callers are unchanged.
+    """
+
+    _MACHINE_VALUES = ("json", "sarif")
+
+    @staticmethod
+    def _argv_wants_machine_output(argv) -> bool:
+        """Every spelling of "give me a machine document" that argparse accepts.
+
+        v0.5.6 round 4 (ASTRA F5): this listed `--output=json`, `-o=json` and
+        `-o json`, and missed the ATTACHED short form `-ojson` -- which argparse
+        accepts and which people write. So `sunglasses scan -ojson --channel nope`
+        exited 2 with an EMPTY stdout: the caller asked for JSON, the parser failed
+        before `args` existed, this said "human", and the error paragraph went to
+        stderr. A JSON consumer got nothing at all on the one path where the
+        contract's "exactly one document, always" matters most.
+
+        The rule is now the same one argparse uses: a short option may carry its
+        value attached, a long option may carry it after `=`, and either may take
+        the next token. Anything not in that grammar is not our concern here.
+        """
+        for i, tok in enumerate(argv):
+            if tok == "--json":
+                return True
+            # long form: --output=json
+            if tok.startswith("--output="):
+                if tok.split("=", 1)[1] in _MachineAwareParser._MACHINE_VALUES:
+                    return True
+                continue
+            # short form: -o=json (tolerated), -ojson (argparse's attached value)
+            if tok.startswith("-o") and not tok.startswith("--") and len(tok) > 2:
+                value = tok[3:] if tok[2] == "=" else tok[2:]
+                if value in _MachineAwareParser._MACHINE_VALUES:
+                    return True
+                continue
+            # separated form: --output json / -o json
+            if tok in ("--output", "-o") and i + 1 < len(argv):
+                if argv[i + 1] in _MachineAwareParser._MACHINE_VALUES:
+                    return True
+        return False
+
+    def error(self, message):
+        if self._argv_wants_machine_output(sys.argv[1:]):
+            print(json.dumps({
+                "error": f"Invalid arguments: {message}",
+                "hint": "Nothing was scanned.",
+                "scanned": False,
+                "decision": None,
+                "is_clean": False,
+                "threat_found": False,
+                "inspection_complete": False,
+                "exit_code": EXIT_USAGE,
+            }))
+            sys.exit(EXIT_USAGE)
+        super().error(message)
+
+
+
 def main():
-    parser = argparse.ArgumentParser(
+    parser = _MachineAwareParser(
         prog="sunglasses",
         description="SUNGLASSES — The input firewall for AI agents.",
     )
@@ -1131,11 +1825,19 @@ def main():
         action="version",
         version=f"sunglasses {__version__}",
     )
-    subparsers = parser.add_subparsers(dest="command")
+    # parser_class propagates the machine-aware error handler to every
+    # subcommand; the invalid-choice failure happens on the SUBparser.
+    subparsers = parser.add_subparsers(dest="command", parser_class=_MachineAwareParser)
 
     # scan
     scan_parser = subparsers.add_parser("scan", help="Scan text or file")
     scan_parser.add_argument("text", nargs="*", help="Text to scan")
+    scan_parser.add_argument(
+        "--text", "-t", dest="explicit_text", metavar="STRING",
+        help="Scan this string as literal text, never as a path. Use it when the "
+             "string looks like a filename (v0.5.6: a path-shaped positional "
+             "argument that does not exist is now a usage error, not a scan)",
+    )
     scan_parser.add_argument("--file", "-f", help="File to scan")
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
@@ -1185,7 +1887,13 @@ def main():
     pin_parser.add_argument(
         "--quiet", action="store_true",
         help="Print nothing unless drift is found. For launchd timers and "
-             "SessionStart hooks; the exit code still carries the verdict.")
+             "SessionStart hooks; the exit code still carries the verdict. "
+             "Requires --yes or SUNGLASSES_PIN_CONSENT=1, because it starts "
+             "your MCP servers and there is nobody there to ask.")
+    pin_parser.add_argument(
+        "--yes", "-y", action="store_true",
+        help="Consent, in advance, to starting the configured MCP servers so "
+             "their tool lists can be read. Required for unattended runs.")
     pin_parser.set_defaults(func=cmd_pin)
 
     # init
