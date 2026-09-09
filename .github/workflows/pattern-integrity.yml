@@ -29,7 +29,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        # 3.14 added 2026-09-08 (Fugu Gate-C addendum): the independent A1 review of
+        # the v0.5.6 repair ran on CPython 3.14 with Pillow 12.3.0, and J1 is
+        # specifically about Pillow frame-iterator behaviour. Five green lanes that
+        # EXCLUDE the graded interpreter prove compatibility, not reproduction.
+        # 3.14 is fully blocking here — never informational, never continue-on-error.
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -38,10 +43,72 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package + dev deps
+      # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
+      # and a decoder that is missing turns a real finding into silence.
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      - name: Install package + dev + media deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]" || pip install -e . && pip install pytest
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest Pillow pytesseract PyPDF2 pyzbar; }
+          # Pin the reviewer's resolved stack rather than trusting free resolution.
+          # Pillow 12.3.0 requires >=3.10, so 3.9 necessarily takes 11.3.0 — that lane
+          # therefore differs from the graded stack on the exact library J1 concerns.
+          # It stays FULLY BLOCKING anyway: no exception is pre-authorised, and any
+          # difference there gets investigated before it is classified.
+          if [ "${{ matrix.python-version }}" = "3.9" ]; then
+            pip install "Pillow==11.3.0"
+          else
+            pip install "Pillow==12.3.0"
+          fi
+          pip install "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9"
+
+      # A version receipt, printed per job. Interpreter-dependent resolution can change
+      # frame-reading behaviour, which is the J1 surface — so the versions that actually
+      # ran are recorded, not assumed.
+      - name: Resolved environment receipt
+        run: |
+          echo "python : $(python -V 2>&1)"
+          echo "pip    : $(pip -V)"
+          echo "pytest : $(pytest --version 2>&1 | head -1)"
+          python - <<'PYEOF'
+          import importlib.metadata as md
+          for pkg in ("Pillow", "pytesseract", "PyPDF2", "pyzbar"):
+              try:
+                  print(f"{pkg:12s}: {md.version(pkg)}")
+              except Exception as exc:
+                  raise SystemExit(f"MISSING media dependency {pkg}: {exc}")
+          PYEOF
+          echo "tesseract: $(tesseract --version 2>&1 | head -1)"
+          echo "ffmpeg   : $(ffmpeg -version 2>&1 | head -1)"
+          echo "ffprobe  : $(ffprobe -version 2>&1 | head -1)"
+
+      # Importability is not operation. A decoder that imports but never decodes
+      # reports a real finding as noise, so the modules are imported AND the two
+      # committed QR fixtures are actually decoded, each required non-empty.
+      - name: Media dependency preflight (import + PATH + real QR decode)
+        run: |
+          python - <<'PYEOF'
+          import shutil, sys
+          import PIL, pytesseract, PyPDF2          # noqa: F401
+          import pyzbar.pyzbar as zb
+          from PIL import Image
+          for tool in ("tesseract", "ffmpeg", "ffprobe"):
+              if shutil.which(tool) is None:
+                  raise SystemExit(f"NATIVE TOOL MISSING on PATH: {tool}")
+          for fixture in ("tests/fixtures/v056/qr-ordinary.png",
+                          "tests/fixtures/v056/qr-injection.png"):
+              with Image.open(fixture) as img:
+                  codes = zb.decode(img.convert("RGB"))
+              if not codes or not codes[0].data:
+                  raise SystemExit(f"QR CONTROL FAILED: {fixture} decoded to nothing "
+                                   f"-- zbar is present but not operational")
+              print(f"QR OK {fixture}: {len(codes)} code(s), {len(codes[0].data)} bytes")
+          print("media preflight OK")
+          PYEOF
 
       - name: Pattern integrity tests (no dupes / id / category / shape)
         run: pytest tests/test_pattern_integrity.py -v
@@ -54,6 +121,22 @@ jobs:
 
       - name: Customer-zero real-world suite (attacks block, normal usage passes)
         run: python test_customer_zero.py
+
+      # v0.5.6 round-8 acceptance, as a DEDICATED BLOCKING step ahead of the full
+      # suite. These are the cells that discriminate the J1/J2 repair: 10 of them
+      # fail on the previous candidate. Exactly 19 must pass and NOTHING may skip --
+      # a skip here would let this workflow report success while omitting the very
+      # evidence the independent GO rests on.
+      - name: v0.5.6 round-8 acceptance (J1/J2) — 19 passed, zero skips
+        run: |
+          pytest tests/test_v056_round8.py -q -p no:cacheprovider \
+            | tee /tmp/round8.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^19 passed" /tmp/round8.log || {
+            echo "ROUND-8 GATE INVALID: expected exactly '19 passed'"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed)" /tmp/round8.log; then
+            echo "ROUND-8 GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
 
       # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above
       # only cover ~4 test families; major families ran local-only until now.
