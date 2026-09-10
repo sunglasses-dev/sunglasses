@@ -11,6 +11,8 @@ Usage:
 """
 
 import re
+
+from . import _prefilter
 import time
 import uuid
 from typing import Optional
@@ -513,6 +515,14 @@ class SunglassesEngine:
         # Patterns with NO regex keep keyword-verdict behavior (their keywords
         # are their whole definition, e.g. multi-word attack phrases).
         self._regex_bearing_ids = {p["id"] for p, _ in self._regex_patterns}
+        # Step-3 prefilter: the literals each regex cannot match without. Built
+        # once at load (sub-second for 1,578 regexes), consulted per scan.
+        self._regex_requirement = {
+            id(rx): _prefilter.requirement(rx.pattern)
+            for _p, rxs in self._regex_patterns for _m, rx, _g in rxs
+        }
+        self._literal_index = _prefilter.LiteralIndex(
+            self._regex_requirement.values())
         self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
 
         # Build Aho-Corasick automaton if available (10x faster)
@@ -850,12 +860,26 @@ class SunglassesEngine:
                         findings.append(finding)
 
         # Step 3: Regex patterns (for things like API keys)
+        #
+        # Every one of these regexes used to be evaluated against the whole
+        # document on every scan -- 1,578 of them, 781 carrying guarded
+        # lookahead predicates that re-match per co-occurrence window. That is
+        # where a 1 MB scan spent most of its 52 seconds. Almost all of them
+        # cannot match the document in front of them, and each regex says so
+        # itself: `_prefilter` derives the literals it cannot match without,
+        # from its own parse tree. A document missing one is skipped unread.
+        # The derivation errs toward extracting nothing, and extracting nothing
+        # just means "evaluate", so this can cost time but never a finding.
+        prefilter_present = self._literal_index.present(_prefilter.fold(text))
         for pattern, regexes in self._regex_patterns:
             if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
             if pattern["id"] in seen_ids:
                 continue
             for mode, rx, guards in regexes:
+                if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
+                                       prefilter_present):
+                    continue
                 # Predicates (lookahead- or caret-led) are evaluated per WINDOW,
                 # not once globally: their (?=.*A)(?=.*B) signals must CO-OCCUR
                 # locally to count. Attack payloads are compact; spreading the
