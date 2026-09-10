@@ -1,0 +1,63 @@
+name: Bypass or false positive
+description: Content that should have matched and did not, or benign content that fired
+title: "[bypass] "
+labels: ["detection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most valuable issue you can open. Two shapes belong here:
+
+        - **Bypass** — content that should have been flagged and was not.
+        - **False positive** — ordinary, benign content that was flagged.
+
+        ⚠️ **If the bypass is a working exploit against a real system, do not post it here.**
+        Report it privately via [SECURITY.md](https://github.com/sunglasses-dev/sunglasses/blob/main/SECURITY.md)
+        and we will credit you in the release notes.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which is it?
+      options:
+        - Bypass — should have matched, did not
+        - False positive — benign content, fired anyway
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: The exact input
+      description: The file or string, as close to verbatim as you can share. Redact real secrets.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: The exact command you ran
+      placeholder: sunglasses scan --file notes.pdf
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Exit code you expected
+      description: "0 clean · 1 threat found · 2 usage/operational error · 3 incomplete inspection"
+      placeholder: "1"
+    validations:
+      required: true
+  - type: input
+    id: actual
+    attributes:
+      label: Exit code you got
+      placeholder: "0"
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and environment
+      description: "Output of `sunglasses --version` and `sunglasses check`."
+      render: text
+    validations:
+      required: true

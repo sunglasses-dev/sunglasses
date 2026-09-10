@@ -1,0 +1,37 @@
+name: Bug report
+description: Something crashed, hung, or behaved differently from the documentation
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For content that should or should not have matched, use **Bypass or false positive** instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that shows it. A one-line command is ideal.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: exit
+    attributes:
+      label: Exit code, if the CLI was involved
+      placeholder: "2"
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and environment
+      description: "Output of `sunglasses --version` and `sunglasses check`, plus your OS and Python version."
+      render: text
+    validations:
+      required: true
