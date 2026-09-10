@@ -942,11 +942,113 @@ def _expand(path: str) -> str:
     return os.path.normpath(os.path.expanduser(path))
 
 
+# -- Action surface ---------------------------------------------------------
+# A policy `blocked_paths` rule answers "does this call TOUCH that path?". That
+# is not the same question as "does this text MENTION that path?", and until
+# 2026-09-10 this lane could not tell them apart: it scanned every value of the
+# tool input, so writing documentation that NAMES a protected path was denied
+# exactly like writing TO it. Three agents hit it inside ten minutes on 09-10;
+# the class was first recorded on 08-28 and went unfixed for thirteen days.
+#
+# Telling the two apart is the same distinction the scanner lane already makes
+# -- a blog post that discusses a dangerous install command is not a finding --
+# so the firewall lane now makes it too, per FIELD rather than per tool:
+#
+#   Write / Edit / MultiEdit / NotebookEdit / Read  -> the path fields only.
+#       `content`, `new_string` and friends are DATA: the thing being written,
+#       not a thing being touched.
+#   Bash  -> the command, minus the bodies of QUOTED heredocs (literal data,
+#       the shell expands nothing inside them), plus any command substitutions
+#       found inside UNQUOTED heredoc bodies, which do execute. Distinguished,
+#       not stripped: a substitution inside a body is action, not prose.
+#   anything else -> every value, unchanged. A tool we do not know is a tool we
+#       cannot narrow safely, so it keeps the old behaviour and fails closed.
+#
+# This never widens what is scanned; it only stops prose being read as action.
+# `egress_surface_text` is deliberately NOT reused: for the secrets lane the
+# content going out IS the leak, so scanning every value is right there and
+# wrong here. One helper for both would re-merge the two questions.
+
+_PATH_FIELDS = {
+    "Write": ("file_path",),
+    "Edit": ("file_path",),
+    "MultiEdit": ("file_path",),
+    "NotebookEdit": ("notebook_path", "file_path"),
+    "Read": ("file_path",),
+}
+
+# `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`. The quote around the delimiter is the
+# whole signal: quoted means the shell performs no expansion inside the body.
+_HEREDOC_START_RE = re.compile(r"""<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1""")
+# What still executes inside an unquoted body.
+_SUBSTITUTION_RE = re.compile(r"\$\([^)]*\)|`[^`]*`")
+
+
+def bash_action_surface(command: str) -> str:
+    """The part of a Bash command that can act on a path.
+
+    Literal heredoc bodies are removed; the executable substitutions inside
+    unquoted bodies are kept. The command is returned UNCHANGED whenever the
+    structure cannot be parsed with confidence -- an unterminated heredoc, or
+    any surprise at all -- because an uncertain parse must never be reported as
+    proved safe.
+    """
+    if not command or "<<" not in command:
+        return command or ""
+    try:
+        lines = command.split("\n")
+        kept = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            match = _HEREDOC_START_RE.search(line)
+            if not match:
+                kept.append(line)
+                i += 1
+                continue
+            # The opening line is real command text: it carries the redirect
+            # target, which is exactly the path this lane cares about.
+            kept.append(line)
+            literal = bool(match.group(1))
+            delimiter = match.group(2)
+            i += 1
+            body = []
+            closed = False
+            while i < len(lines):
+                if lines[i].strip() == delimiter:
+                    closed = True
+                    i += 1
+                    break
+                body.append(lines[i])
+                i += 1
+            if not closed:
+                # We do not know where the body ends, so we do not get to
+                # narrow anything about this command.
+                return command
+            if not literal:
+                for body_line in body:
+                    kept.extend(_SUBSTITUTION_RE.findall(body_line))
+        return "\n".join(kept)
+    except Exception:
+        return command
+
+
+def _action_surface(tool_name: str, tool_input: dict) -> list:
+    """The values of a tool call that can act on a path. Values only."""
+    if not tool_input:
+        return []
+    fields = _PATH_FIELDS.get(tool_name)
+    if fields:
+        return [str(tool_input[f]) for f in fields if tool_input.get(f)]
+    if tool_name == "Bash":
+        return [bash_action_surface(str(tool_input.get("command", "")))]
+    return [str(v) for v in tool_input.values()]
+
+
 def _referenced_paths(tool_name: str, tool_input: dict) -> list:
-    """Path-shaped tokens in a tool call. Values only, never our own keys."""
-    values = [str(v) for v in (tool_input or {}).values()]
-    tokens: list = []
-    for value in values:
+    """Path-shaped tokens a tool call can ACT on. Values only, never our keys."""
+    tokens = []
+    for value in _action_surface(tool_name, tool_input):
         tokens.extend(_PATH_TOKEN_RE.findall(value))
     return tokens
 
