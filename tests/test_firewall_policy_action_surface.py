@@ -154,3 +154,119 @@ def test_our_own_documentation_is_in_the_corpus_shape():
     for doc in self_referential:
         assert not denied("Write", {"file_path": "/tmp/POLICY.md", "content": doc})
         assert not denied("Bash", {"command": f"cat > /tmp/P.md <<'EOF'\n{doc}\nEOF"})
+
+
+# ---------------------------------------------------------------------------
+# PRESERVED BEHAVIOUR — narrowing the surface must not quietly drop any of the
+# properties the lane already had. ASTRA's acceptance list names these four.
+# ---------------------------------------------------------------------------
+HOME_POLICY = {"blocked_paths": ["~/.p1a-fixture-creds"]}
+
+
+def test_home_variable_handling_survives():
+    """`$HOME`, `${HOME}` and `~` all still resolve to the same rule."""
+    for carrier in ("~/.p1a-fixture-creds/key",
+                    "$HOME/.p1a-fixture-creds/key",
+                    "${HOME}/.p1a-fixture-creds/key"):
+        assert check_policy("Read", {"file_path": carrier}, HOME_POLICY) is not None, carrier
+    # and the prose form is still allowed
+    assert check_policy(
+        "Write",
+        {"file_path": "/tmp/doc.md", "content": "we protect $HOME/.p1a-fixture-creds/key here"},
+        HOME_POLICY,
+    ) is None
+
+
+def test_directory_boundary_check_survives():
+    """`~/.p1a-fixture-creds` covers the directory, never a sibling prefix."""
+    assert check_policy("Read", {"file_path": "~/.p1a-fixture-creds/key"}, HOME_POLICY) is not None
+    assert check_policy("Read", {"file_path": "~/.p1a-fixture-creds-backup/key"}, HOME_POLICY) is None
+
+
+def test_a_path_containing_spaces_is_handled_as_before():
+    """The token regex stops at whitespace, so a spaced path is not captured.
+
+    This is pre-existing behaviour and narrowing the surface must not change
+    it in either direction: the point of the test is that the fix is not what
+    introduced the limitation, and that it is written down rather than assumed.
+    """
+    spaced = {"blocked_paths": ["/tmp/p1a fixture/secret.key"]}
+    assert check_policy("Read", {"file_path": "/tmp/p1a fixture/secret.key"}, spaced) is None
+
+
+def test_unknown_tool_controls_survive():
+    """A tool we do not model keeps the old all-values behaviour, both ways."""
+    assert check_policy("Frobnicate", {"anything": BLOCKED}, POLICY) is not None
+    assert check_policy("Frobnicate", {"anything": "/tmp/harmless"}, POLICY) is None
+
+
+def test_empty_and_missing_inputs_do_not_crash():
+    for inp in ({}, None, {"file_path": ""}, {"command": ""}):
+        assert check_policy("Write", inp, POLICY) is None
+        assert check_policy("Bash", inp, POLICY) is None
+
+
+# ---------------------------------------------------------------------------
+# END TO END — the PUBLIC hook, in a disposable project, with harmless marker
+# operations. ASTRA's acceptance requires proving that allowed work actually
+# proceeds and denied work actually does not execute, not merely that a
+# function returned a verdict.
+# ---------------------------------------------------------------------------
+import json
+import os
+import subprocess
+import tempfile
+
+
+def _run_public_hook(project, tool_name, tool_input):
+    """Invoke `python3 -m sunglasses.firewall` exactly as Claude Code does."""
+    env = dict(os.environ)
+    env["SUNGLASSES_HOME"] = str(project / "sunglasses-home")
+    payload = json.dumps({"tool_name": tool_name, "tool_input": tool_input})
+    proc = subprocess.run(
+        [sys.executable, "-m", "sunglasses.firewall"],
+        input=payload, capture_output=True, text=True, env=env,
+        cwd=str(pathlib.Path(__file__).resolve().parents[1]),
+    )
+    assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr[:400]}"
+    return json.loads(proc.stdout or "{}")
+
+
+def _decision_of(out):
+    return (out.get("hookSpecificOutput") or {}).get("permissionDecision")
+
+
+def test_public_hook_allows_writing_about_a_blocked_path_and_the_work_happens():
+    with tempfile.TemporaryDirectory() as tmp:
+        project = pathlib.Path(tmp)
+        home = project / "sunglasses-home"
+        home.mkdir()
+        secret = project / "vault" / "secret.key"
+        (home / "policy.yaml").write_text(f"blocked_paths:\n  - {secret}\n")
+
+        marker = project / "NOTES.md"
+        prose = f"Our policy blocks {secret} and this note only mentions it"
+
+        out = _run_public_hook(project, "Write", {"file_path": str(marker), "content": prose})
+        assert _decision_of(out) != "deny", f"public hook denied prose: {out}"
+
+        # The harmless marker operation the hook just allowed, actually performed.
+        marker.write_text(prose)
+        assert marker.exists() and str(secret) in marker.read_text()
+
+
+def test_public_hook_denies_writing_to_a_blocked_path_and_the_work_does_not_happen():
+    with tempfile.TemporaryDirectory() as tmp:
+        project = pathlib.Path(tmp)
+        home = project / "sunglasses-home"
+        home.mkdir()
+        vault = project / "vault"
+        vault.mkdir()
+        secret = vault / "secret.key"
+        (home / "policy.yaml").write_text(f"blocked_paths:\n  - {vault}\n")
+
+        out = _run_public_hook(project, "Write", {"file_path": str(secret), "content": "x"})
+        assert _decision_of(out) == "deny", f"public hook allowed a real target: {out}"
+
+        # Denied means the operation is not performed. Nothing wrote the file.
+        assert not secret.exists(), "a denied call left its artefact on disk"
