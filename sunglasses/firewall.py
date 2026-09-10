@@ -949,6 +949,8 @@ def _expand(path: str) -> str:
 # tool input, so writing documentation that NAMES a protected path was denied
 # exactly like writing TO it. Three agents hit it inside ten minutes on 09-10;
 # the class was first recorded on 08-28 and went unfixed for thirteen days.
+# This change fixes the FILE-TOOL half of that class. The Bash half stays open,
+# deliberately, for the reason recorded above `_action_surface`.
 #
 # Telling the two apart is the same distinction the scanner lane already makes
 # -- a blog post that discusses a dangerous install command is not a finding --
@@ -957,12 +959,10 @@ def _expand(path: str) -> str:
 #   Write / Edit / MultiEdit / NotebookEdit / Read  -> the path fields only.
 #       `content`, `new_string` and friends are DATA: the thing being written,
 #       not a thing being touched.
-#   Bash  -> the command, minus the bodies of QUOTED heredocs (literal data,
-#       the shell expands nothing inside them), plus any command substitutions
-#       found inside UNQUOTED heredoc bodies, which do execute. Distinguished,
-#       not stripped: a substitution inside a body is action, not prose.
-#   anything else -> every value, unchanged. A tool we do not know is a tool we
-#       cannot narrow safely, so it keeps the old behaviour and fails closed.
+#   Bash and anything else -> every value, unchanged. A tool whose grammar we
+#       cannot parse is a tool we cannot narrow safely, so it keeps the old
+#       behaviour and fails closed. See the note above `_action_surface` for
+#       why Bash is on this side of the line and what that still costs.
 #
 # This never widens what is scanned; it only stops prose being read as action.
 # `egress_surface_text` is deliberately NOT reused: for the secrets lane the
@@ -977,106 +977,31 @@ _PATH_FIELDS = {
     "Read": ("file_path",),
 }
 
-# Recognising a heredoc is the whole risk in this lane. The first cut used a
-# bare regex and it NARROWED on three shapes it had not actually established
-# (T9 review, 2026-09-10): `<<<` is a here-string and its inner `<<` was read
-# as a heredoc, swallowing the next real command; `<<EOF` inside a quoted
-# string is not a heredoc at all; and a substitution spanning lines inside an
-# unquoted body was invisible to a per-line scan. Each one turned an
-# unestablished parse into a proved-safe one, which is the failure this lane
-# exists to avoid.
+# Bash is deliberately NOT narrowed here, and that is a decision rather than an
+# omission. Two cuts of this lane tried to subtract quoted heredoc bodies from a
+# command before asking which paths it touches. Both were unsafe, and the second
+# was unsafe in a way the first was not: an independent review (ASTRA,
+# 2026-09-10) EXECUTED nine shapes where the parser removed text the shell
+# really runs. A quoted heredoc fed to `bash`, directly or through a pipeline,
+# is not data, it is a program. An apparent opener inside a comment, inside
+# ordinary quoted text, or inside an arithmetic shift `$((1 << n))` is not a
+# redirection at all, and a delimiter word longer than the captured token
+# (`<<true-tail`) is not the delimiter it was read as. Each of those then finds
+# its guessed terminator further down and swallows the live commands in
+# between. Substitution extraction undercaptures nested and quote-bearing
+# parentheses, dropping the very operation that matters.
 #
-# So the rule is inverted: narrowing is a privilege that has to be earned. We
-# only remove a body when the opening was found OUTSIDE any quoting, is a real
-# `<<` rather than part of `<<<`, and its delimiter line is actually reached.
-# Anything else -- an unbalanced quote, a `<<` we cannot place, an unterminated
-# body -- returns the command whole and it is judged on all of it.
-_HEREDOC_START_RE = re.compile(r"""\A<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1""")
-# What still executes inside an unquoted body. DOTALL so a substitution that
-# spans lines is one match rather than none.
-_SUBSTITUTION_RE = re.compile(r"\$\(.*?\)|`.*?`", re.DOTALL)
-
-
-def _heredoc_opening(line):
-    """(is_literal, delimiter) if this line opens a heredoc, else None.
-
-    Scans the line tracking quote state, because a `<<` inside quotes is text.
-    A `<<<` here-string is explicitly not a heredoc. Returns None the moment
-    anything is ambiguous, and the caller then declines to narrow at all.
-    """
-    quote = None
-    i = 0
-    while i < len(line):
-        ch = line[i]
-        if quote:
-            if ch == quote:
-                quote = None
-            i += 1
-            continue
-        if ch in ("'", '"'):
-            quote = ch
-            i += 1
-            continue
-        if ch == "<" and line.startswith("<<", i):
-            if line.startswith("<<<", i):      # here-string, not a heredoc
-                return None
-            match = _HEREDOC_START_RE.match(line[i:])
-            if not match:
-                return None                    # a `<<` we cannot place
-            return bool(match.group(1)), match.group(2)
-        i += 1
-    if quote:
-        return None                            # unbalanced quote on this line
-    return None
-
-
-def bash_action_surface(command: str) -> str:
-    """The part of a Bash command that can act on a path.
-
-    Literal heredoc bodies are removed and the executable substitutions inside
-    unquoted bodies are kept. The command is returned UNCHANGED whenever the
-    structure cannot be established -- an unterminated body, a `<<` inside
-    quotes, a here-string, an unbalanced quote, any surprise at all -- because
-    an uncertain parse must never be reported as proved safe.
-    """
-    if not command or "<<" not in command:
-        return command or ""
-    try:
-        lines = command.split("\n")
-        kept = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            if "<<" not in line:
-                kept.append(line)
-                i += 1
-                continue
-            opening = _heredoc_opening(line)
-            if opening is None:
-                # We cannot establish what this `<<` is. Do not narrow anything.
-                return command
-            literal, delimiter = opening
-            # The opening line is real command text: it carries the redirect
-            # target, which is exactly the path this lane cares about.
-            kept.append(line)
-            i += 1
-            body = []
-            closed = False
-            while i < len(lines):
-                if lines[i].strip() == delimiter:
-                    closed = True
-                    i += 1
-                    break
-                body.append(lines[i])
-                i += 1
-            if not closed:
-                return command
-            if not literal:
-                kept.extend(_SUBSTITUTION_RE.findall("\n".join(body)))
-        return "\n".join(kept)
-    except Exception:
-        return command
-
+# The lesson underneath: a fallback for a parser that FAILS does nothing for a
+# parser that confidently recognises the WRONG construct. Recognising bash well
+# enough to subtract from it needs a real grammar -- consumers, pipelines,
+# delimiter quoting forms, several documents on one line, line continuations --
+# not another alternation bolted on per counter-example. Until that exists a
+# Bash command is judged on all of its text, exactly as it was before this lane
+# was touched.
+#
+# The cost is stated rather than hidden: a Bash command whose TEXT names a
+# blocked path without touching it is still denied. That false positive is real,
+# it is what prompted this work, and for Bash it remains OPEN.
 
 def _action_surface(tool_name: str, tool_input: dict) -> list:
     """The values of a tool call that can act on a path. Values only."""
@@ -1085,8 +1010,6 @@ def _action_surface(tool_name: str, tool_input: dict) -> list:
     fields = _PATH_FIELDS.get(tool_name)
     if fields:
         return [str(tool_input[f]) for f in fields if tool_input.get(f)]
-    if tool_name == "Bash":
-        return [bash_action_surface(str(tool_input.get("command", "")))]
     return [str(v) for v in tool_input.values()]
 
 

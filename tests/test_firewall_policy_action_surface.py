@@ -36,7 +36,7 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from sunglasses.firewall import bash_action_surface, check_policy  # noqa: E402
+from sunglasses.firewall import check_policy  # noqa: E402
 
 # A synthetic protected path. Never a real one from anybody's policy: a test
 # that depends on the operator's own secrets layout is a test that breaks on a
@@ -61,10 +61,6 @@ MENTIONS = [
     ("edit-newstring-names-path",
      "Edit", {"file_path": "/tmp/README.md", "old_string": "x",
               "new_string": f"The policy protects {BLOCKED} from every tool"}),
-    ("bash-quoted-heredoc-names-path",
-     "Bash", {"command": f"cat > /tmp/notes.md <<'EOF'\nsee {BLOCKED}\nEOF"}),
-    ("bash-quoted-heredoc-multiline-doc",
-     "Bash", {"command": f"cat > /tmp/d.md <<'EOF'\n# Policy\n- {BLOCKED} is blocked\n- rotate quarterly\nEOF"}),
     ("notebook-source-names-path",
      "NotebookEdit", {"notebook_path": "/tmp/n.ipynb",
                       "new_source": f"# do not read {BLOCKED}"}),
@@ -109,11 +105,21 @@ def test_touching_a_blocked_path_is_still_denied(name, tool, inp):
     )
 
 
-def test_an_uncertain_parse_is_never_reported_as_safe():
-    """An unterminated heredoc means we do not know where the body ends."""
-    command = f"cat > /tmp/n.md <<'EOF'\nharmless prose about {BLOCKED}\n"
-    assert bash_action_surface(command) == command
-    assert denied("Bash", {"command": command})
+def test_the_bash_false_positive_is_still_open_and_that_is_recorded():
+    """The half of the 09-10 regression this change does NOT fix.
+
+    A Bash command whose text only NAMES a blocked path is still denied. Two
+    attempts to subtract quoted heredoc bodies before asking the path question
+    both let real operations through (ASTRA executed nine of them on 09-10), so
+    Bash is judged on all of its text until a real grammar exists. This test
+    exists so the gap is a recorded contract rather than a silent one: when the
+    Bash lane is repaired, this test is what fails and gets rewritten.
+    """
+    prose = f"cat > /tmp/notes.md <<'EOF'\nsee {BLOCKED}\nEOF"
+    assert denied("Bash", {"command": prose}), (
+        "the Bash prose false positive appears to be fixed -- if that is real, "
+        "this test and the note above `_action_surface` both need rewriting"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +139,14 @@ def test_clean_corpus_through_a_write_body_is_never_a_policy_denial():
     assert not hits, f"policy lane denied clean corpus docs by INDEX {hits[:5]}"
 
 
-def test_clean_corpus_through_a_quoted_heredoc_is_never_a_policy_denial():
+def test_clean_corpus_through_a_bash_command_is_never_a_policy_denial():
+    """Background control only.
+
+    ASTRA's receipt correction, 09-10: no clean corpus document contains a
+    policy-relevant path, so this cannot demonstrate the mention/touch
+    distinction. It shows the lane does not fire on ordinary documents. The
+    self-referential fixtures below are what actually carry the evidence.
+    """
     hits = [i for i, doc in enumerate(_clean_corpus())
             if denied("Bash", {"command": f"cat > /tmp/doc.md <<'EOF'\n{doc}\nEOF"})]
     assert not hits, f"policy lane denied heredoc-carried corpus docs by INDEX {hits[:5]}"
@@ -153,7 +166,6 @@ def test_our_own_documentation_is_in_the_corpus_shape():
     ]
     for doc in self_referential:
         assert not denied("Write", {"file_path": "/tmp/POLICY.md", "content": doc})
-        assert not denied("Bash", {"command": f"cat > /tmp/P.md <<'EOF'\n{doc}\nEOF"})
 
 
 # ---------------------------------------------------------------------------
@@ -335,13 +347,59 @@ def test_self_attack_shapes_still_deny(name, command):
     assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None, name
 
 
-def test_a_quoted_heredoc_body_carried_through_a_pipeline_is_still_prose():
-    """The allow side of the same machinery, so hardening cannot creep.
+# ---------------------------------------------------------------------------
+# ASTRA REVIEW 2026-09-10 — nine shapes he EXECUTED against the second cut of
+# the parser. Each one really ran under bash 3.2 and really created a marker
+# inside the blocked directory while the candidate hook deferred. They are the
+# reason Bash is no longer narrowed at all, and they are kept here so that any
+# future attempt to narrow it has to face them before it merges.
+#
+# Verdict + receipts: Desktop/SUNGLASSES_ASTRA_REVIEW_2026-09-04/
+#   P1A_REVIEW_e7fb3a2_2026-09-10/{VERDICT.md,RESULTS.json,probe.py}
+# ---------------------------------------------------------------------------
+V = "~/.p1a-fixture-vault/marker"
 
-    `grep x <<'EOF' | tee /tmp/out` with a literal body that merely NAMES the
-    protected path acts on /tmp/out, not on the vault.
+ASTRA_BYPASSES = [
+    # R1. Quoting a delimiter says the CURRENT shell will not expand the body.
+    # It says nothing about what the receiving program does with it. Both of
+    # these hand a "literal" body to an interpreter, which runs it.
+    ("R1-quoted-heredoc-into-a-shell", f"/bin/bash <<'DOC'\n: > {V}\nDOC\n"),
+    ("R1-quoted-heredoc-through-a-pipeline", f"/bin/cat <<'DOC' | /bin/bash\n: > {V}\nDOC\n"),
+    # R2. Substitution extraction undercaptures, and it undercaptures in the
+    # UNSAFE direction: the operation survives, the evidence of it does not.
+    ("R2-nested-substitution", f"/bin/cat > /dev/null <<DOC\n$(printf x; $(printf true); : > {V})\nDOC\n"),
+    ("R2-parenthesis-inside-quotes", f"/bin/cat > /dev/null <<DOC\n$(printf ')'; : > {V})\nDOC\n"),
+    ("R2-substitution-spanning-lines", f"/bin/cat > /dev/null <<DOC\n$(\n: > {V}\n)\nDOC\n"),
+    # R3. The parser recognised a heredoc that was never there, then found its
+    # guessed terminator further down and swallowed the live commands between.
+    # A fallback for a parser that FAILS does nothing for one that is confidently
+    # wrong.
+    ("R3-opener-inside-a-comment", f"# <<'true'\n: > {V}\ntrue\n"),
+    ("R3-opener-inside-quoted-text", f"printf '%s\\n' \"<<'true'\" > /dev/null\n: > {V}\ntrue\n"),
+    ("R3-delimiter-word-longer-than-the-token", f"/bin/cat > /dev/null <<true-tail\nordinary caption\ntrue-tail\n: > {V}\ntrue\n"),
+    ("R3-arithmetic-shift-read-as-a-redirect", f"true=2\n: $((1 << true))\n: > {V}\ntrue\n"),
+]
+
+
+@pytest.mark.parametrize("name,command", ASTRA_BYPASSES,
+                         ids=[b[0] for b in ASTRA_BYPASSES])
+def test_astra_executed_bypasses_deny(name, command):
+    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None, (
+        f"{name}: ASTRA ran this command and it wrote inside the blocked "
+        "directory. Whatever narrowing allowed it has to be reverted."
+    )
+
+
+def test_a_quoted_heredoc_body_carried_through_a_pipeline_is_not_proved_prose():
+    """The case that looked like the allow side and was not.
+
+    Until ASTRA executed R1, this asserted that a quoted body carried through a
+    pipeline is prose. `<<'EOF' | tee` is; `<<'DOC' | bash` is a program, and
+    the two are not distinguishable by the quoting. Judging the whole command
+    denies both, which costs a false positive on the first and refuses to guess
+    on the second.
     """
     command = ("grep x <<'EOF' | tee /tmp/out\n"
                "the policy protects ~/.p1a-fixture-vault/keys from every tool\n"
                "EOF")
-    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is None
+    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None
