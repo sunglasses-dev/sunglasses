@@ -969,12 +969,27 @@ def _expand(path: str) -> str:
 # content going out IS the leak, so scanning every value is right there and
 # wrong here. One helper for both would re-merge the two questions.
 
+# Per tool: the fields that name a TARGET, and the full documented input
+# schema. Both halves are load-bearing. The first says what to look at; the
+# second says when we are entitled to look at only that. A call carrying a key
+# this schema does not list is not the call we documented, so it is judged on
+# all of its values instead -- the same rule Bash lives under. That direction
+# is deliberate: a schema that grows upstream re-opens a false positive, which
+# is recoverable, rather than opening a hole, which is not.
 _PATH_FIELDS = {
     "Write": ("file_path",),
     "Edit": ("file_path",),
     "MultiEdit": ("file_path",),
     "NotebookEdit": ("notebook_path", "file_path"),
     "Read": ("file_path",),
+}
+_TOOL_SCHEMA = {
+    "Write": {"file_path", "content"},
+    "Edit": {"file_path", "old_string", "new_string", "replace_all"},
+    "MultiEdit": {"file_path", "edits"},
+    "NotebookEdit": {"notebook_path", "file_path", "cell_id", "new_source",
+                     "cell_type", "edit_mode"},
+    "Read": {"file_path", "offset", "limit"},
 }
 
 # Bash is deliberately NOT narrowed here, and that is a decision rather than an
@@ -1008,8 +1023,16 @@ def _action_surface(tool_name: str, tool_input: dict) -> list:
     if not tool_input:
         return []
     fields = _PATH_FIELDS.get(tool_name)
-    if fields:
-        return [str(tool_input[f]) for f in fields if tool_input.get(f)]
+    if fields and set(tool_input) <= _TOOL_SCHEMA[tool_name]:
+        target = [str(tool_input[f]) for f in fields if tool_input.get(f)]
+        if target:
+            return target
+        # The tool NAME is one we know, but its documented target field is
+        # missing or empty, so this is not the call we know how to narrow.
+        # Self-review 2026-09-10 found eight shapes here -- `Write` with no
+        # `file_path`, an empty one, `None`, `0` -- where returning the empty
+        # surface ALLOWED a call the baseline denied. Same rule as Bash: an
+        # unrecognised shape is judged on all of its values.
     return [str(v) for v in tool_input.values()]
 
 

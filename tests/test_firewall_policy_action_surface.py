@@ -403,3 +403,51 @@ def test_a_quoted_heredoc_body_carried_through_a_pipeline_is_not_proved_prose():
                "the policy protects ~/.p1a-fixture-vault/keys from every tool\n"
                "EOF")
     assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None
+
+
+# ---------------------------------------------------------------------------
+# SELF REVIEW 2026-09-10 — narrowing the file tools has to be earned too.
+#
+# The first scope-split commit looked at the documented path field and, when it
+# was missing or empty, returned an EMPTY surface. An empty surface is not "no
+# paths found", it is "nothing to check", so eight shapes that the baseline
+# DENIED were allowed: `Write` with no `file_path`, with `""`, with `None`,
+# with `0`; `Edit`, `MultiEdit` and `NotebookEdit` with their target absent;
+# and a `Read` carrying an extra key that named the target.
+#
+# Same rule as Bash: a tool NAME we know is not the same as a call we know. We
+# narrow only when the input matches the documented schema AND actually carries
+# a target. Anything else is judged on all of its values.
+# ---------------------------------------------------------------------------
+UNRECOGNISED_SHAPES = [
+    ("write-without-a-target", "Write", {"content": BLOCKED}),
+    ("write-with-an-empty-target", "Write", {"file_path": "", "content": BLOCKED}),
+    ("write-with-a-null-target", "Write", {"file_path": None, "content": BLOCKED}),
+    ("write-with-a-falsy-zero-target", "Write", {"file_path": 0, "content": BLOCKED}),
+    ("edit-without-a-target", "Edit", {"old_string": "a", "new_string": BLOCKED}),
+    ("multiedit-without-a-target", "MultiEdit", {"edits": [{"new_string": BLOCKED}]}),
+    ("notebookedit-without-a-target", "NotebookEdit", {"new_source": BLOCKED}),
+    ("read-carrying-a-key-the-schema-does-not-list",
+     "Read", {"file_path": "/tmp/a", "notebook_path": BLOCKED}),
+]
+
+
+@pytest.mark.parametrize("name,tool,inp", UNRECOGNISED_SHAPES,
+                         ids=[s[0] for s in UNRECOGNISED_SHAPES])
+def test_a_known_tool_name_is_not_a_known_call(name, tool, inp):
+    assert denied(tool, inp), (
+        f"{name}: the target field was missing, empty or joined by a key the "
+        "documented schema does not list, and the call was narrowed anyway. "
+        "An unrecognised shape must be judged on all of its values."
+    )
+
+
+def test_the_recognised_shapes_are_still_narrowed():
+    """The fail-closed rule above must not swallow the fix it guards."""
+    assert not denied("Write", {"file_path": "/tmp/R.md",
+                                "content": f"never touch {BLOCKED}"})
+    assert not denied("Edit", {"file_path": "/tmp/R.md", "old_string": "x",
+                               "new_string": BLOCKED, "replace_all": False})
+    assert not denied("Read", {"file_path": "/tmp/R.md", "offset": 1, "limit": 2})
+    assert denied("Write", {"file_path": BLOCKED, "content": "x"})
+    assert denied("Read", {"file_path": BLOCKED, "offset": 1})
