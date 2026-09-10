@@ -1,0 +1,29 @@
+name: Feature request
+description: A capability, format, or language you need
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation, not the solution. What content is reaching your agent unchecked?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: Optional. If you already have a shape in mind, describe it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New file format or carrier
+        - New language coverage
+        - CLI or output format
+        - Integration (CI, hook, MCP)
+        - Something else
+    validations:
+      required: true
