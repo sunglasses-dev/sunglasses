@@ -5,6 +5,9 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+- CI: the `pattern-integrity` workflow now runs four jobs on every pull request: `classify` (a fail-closed, stdlib classifier in `scripts/ci_classify.py` reads the complete change list and requires the full matrix unless every changed path is documentation), `fast` (one Python, the same five blocking gates, the suite minus the two v0.5.6 acceptance modules), `integrity` (the unchanged six-Python matrix, run whenever `classify` requires it, and always on pushes to `main`, release tags, nightly and on demand), and `coverage` (the single check merge automation reads; it fails unless the required work succeeded). Documentation-only pull requests no longer wait ~3 h for the matrix; code changes still get it before merge. `tests/test_ci_gate.py` guards the workflow structure and the classifier.
+
 ## [0.5.6] — 2026-09-09
 
 > Trust repair. No new patterns (1540 / 118 categories unchanged) and no new parsers.

@@ -14,14 +14,202 @@ name: pattern-integrity
 #
 # This workflow is the GitHub-side enforcement layer (no --no-verify bypass).
 
+# 2026-09-10 split (T9 Fable + T8 Opus review, ASTRA NO-GO round 1 applied):
+# the full six-Python matrix below took 2 h 50 m PER PULL REQUEST (the "Full
+# test suite" step alone: 167 min per job). A contributor fixing a README typo
+# waited three hours for a check. Now, on every pull request, four jobs run:
+#
+#   classify  — unfiltered, every PR. scripts/ci_classify.py — taken from
+#               origin/main, NEVER the PR's own copy — reads the COMPLETE change
+#               list from git (renames contribute both names) and says
+#               full=true unless EVERY path is documentation. Any error → full.
+#               GitHub's own path filters are NOT used: they inspect a bounded
+#               window of changed files and would fail open on large PRs.
+#   fast      — always. Python 3.12, the same native tools, pinned media deps,
+#               receipt, media preflight and the SAME five blocking gates as
+#               the matrix (byte-identical run: lines), then the suite minus the
+#               two v0.5.6 acceptance modules. Minutes, not hours.
+#   integrity — the full matrix, unchanged, ONLY when classify says full=true
+#               (and always on push to main, tags, nightly, manual dispatch).
+#   coverage  — always runs last and is the ONE check merge automation reads:
+#               it fails unless classify and fast succeeded AND, when full was
+#               required, all six matrix jobs succeeded. A skipped matrix only
+#               passes when classify affirmatively said docs-only, so requiring
+#               `coverage` never deadlocks a docs PR and never lets code skip
+#               the matrix.
+#
+# The release ship stays bound to the main-branch run of this workflow:
+# SHIP_MANUAL "WATCH CI TO GREEN" waits on it after the scanner merge.
+# tests/test_ci_gate.py loads this file as YAML and asserts the structure above
+# (no path filters, no disabling `if` on classify/fast/coverage, the exact
+# fast-suite ignore list, the gate commands, the coverage rule) and unit-tests
+# the classifier, including ASTRA's four negative controls from round 1.
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "17 9 * * *"   # 09:17 UTC = 02:17 PT daily, before the 03:30 PT local gauntlet
+  workflow_dispatch:
 
 jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      full: ${{ steps.decide.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide whether the full matrix is required (fail-closed)
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "full=true  # event=$EVENT: not a pull request, the matrix always runs"
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Judge with the classifier from the protected branch, never with the
+          # copy inside the PR under judgement (T8 review, 2026-09-10): a PR
+          # that edits scripts/ci_classify.py must not be able to classify
+          # itself as documentation. actions/checkout with fetch-depth: 0 makes
+          # origin/main available. If main has no classifier yet, fail to FULL.
+          if ! git show origin/main:scripts/ci_classify.py > "$RUNNER_TEMP/ci_classify.py" 2>/dev/null; then
+            echo "full=true  # origin/main has no scripts/ci_classify.py; defaulting to FULL"
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python "$RUNNER_TEMP/ci_classify.py" --base "$BASE" --head "$HEAD"
+
+  fast:
+    runs-on: ubuntu-latest
+    # A hang must fail, not wait. Set from the first hosted measurement, not
+    # from local arithmetic (ASTRA round 1); tighten once measured.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
+      # and a decoder that is missing turns a real finding into silence.
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      - name: Install package + dev + media deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest Pillow pytesseract PyPDF2 pyzbar; }
+          # Pin the reviewer's resolved stack rather than trusting free resolution.
+          # Pillow 12.3.0 requires >=3.10, so 3.9 necessarily takes 11.3.0 — that lane
+          # therefore differs from the graded stack on the exact library J1 concerns.
+          # It stays FULLY BLOCKING anyway: no exception is pre-authorised, and any
+          # difference there gets investigated before it is classified.
+          pip install "Pillow==12.3.0"
+          pip install "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9"
+
+      # A version receipt, printed per job. Interpreter-dependent resolution can change
+      # frame-reading behaviour, which is the J1 surface — so the versions that actually
+      # ran are recorded, not assumed.
+      - name: Resolved environment receipt
+        run: |
+          echo "python : $(python -V 2>&1)"
+          echo "pip    : $(pip -V)"
+          echo "pytest : $(pytest --version 2>&1 | head -1)"
+          python - <<'PYEOF'
+          import importlib.metadata as md
+          for pkg in ("Pillow", "pytesseract", "PyPDF2", "pyzbar"):
+              try:
+                  print(f"{pkg:12s}: {md.version(pkg)}")
+              except Exception as exc:
+                  raise SystemExit(f"MISSING media dependency {pkg}: {exc}")
+          PYEOF
+          echo "tesseract: $(tesseract --version 2>&1 | head -1)"
+          echo "ffmpeg   : $(ffmpeg -version 2>&1 | head -1)"
+          echo "ffprobe  : $(ffprobe -version 2>&1 | head -1)"
+
+      # Importability is not operation. A decoder that imports but never decodes
+      # reports a real finding as noise, so the modules are imported AND the two
+      # committed QR fixtures are actually decoded, each required non-empty.
+      - name: Media dependency preflight (import + PATH + real QR decode)
+        run: |
+          python - <<'PYEOF'
+          import shutil, sys
+          import PIL, pytesseract, PyPDF2          # noqa: F401
+          import pyzbar.pyzbar as zb
+          from PIL import Image
+          for tool in ("tesseract", "ffmpeg", "ffprobe"):
+              if shutil.which(tool) is None:
+                  raise SystemExit(f"NATIVE TOOL MISSING on PATH: {tool}")
+          for fixture in ("tests/fixtures/v056/qr-ordinary.png",
+                          "tests/fixtures/v056/qr-injection.png"):
+              with Image.open(fixture) as img:
+                  codes = zb.decode(img.convert("RGB"))
+              if not codes or not codes[0].data:
+                  raise SystemExit(f"QR CONTROL FAILED: {fixture} decoded to nothing "
+                                   f"-- zbar is present but not operational")
+              print(f"QR OK {fixture}: {len(codes)} code(s), {len(codes[0].data)} bytes")
+          print("media preflight OK")
+          PYEOF
+
+      - name: Pattern integrity tests (no dupes / id / category / shape)
+        run: pytest tests/test_pattern_integrity.py -v
+
+      - name: Dogfood regression tests (May 27 incident)
+        run: pytest tests/test_dogfood_bugs.py -v
+
+      - name: False-positive regression gate (Jun 6 incident — clean text must not block)
+        run: pytest tests/test_false_positives.py -v
+
+      - name: Customer-zero real-world suite (attacks block, normal usage passes)
+        run: python test_customer_zero.py
+
+      # v0.5.6 round-8 acceptance, as a DEDICATED BLOCKING step ahead of the full
+      # suite. These are the cells that discriminate the J1/J2 repair: 10 of them
+      # fail on the previous candidate. Exactly 19 must pass and NOTHING may skip --
+      # a skip here would let this workflow report success while omitting the very
+      # evidence the independent GO rests on.
+      - name: v0.5.6 round-8 acceptance (J1/J2) — 19 passed, zero skips
+        run: |
+          pytest tests/test_v056_round8.py -q -p no:cacheprovider \
+            | tee /tmp/round8.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^19 passed" /tmp/round8.log || {
+            echo "ROUND-8 GATE INVALID: expected exactly '19 passed'"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed)" /tmp/round8.log; then
+            echo "ROUND-8 GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
+
+      # The fast suite: everything except the two v0.5.6 acceptance modules
+      # (tests/test_v056_matrix.py — the media matrix, 398 cases — and
+      # tests/test_repair_v056.py — 114 cases spanning media, consent, CLI output
+      # and result semantics). Those two run in the `integrity` matrix whenever
+      # `classify` says the change is not documentation-only, and on every push
+      # to main, on tags, nightly and on demand. --ignore keeps pytest.ini's
+      # testpaths in force (no path argument), so the root-scope customer-zero
+      # collection is unchanged. tests/test_ci_gate.py asserts this exact list.
+      - name: Fast suite (all tests except the two v0.5.6 acceptance modules)
+        run: |
+          pytest -q -p no:cacheprovider \
+            --ignore=tests/test_v056_matrix.py \
+            --ignore=tests/test_repair_v056.py \
+            --durations=15
+
   integrity:
+    needs: classify
+    if: needs.classify.outputs.full == 'true'
     runs-on: ubuntu-latest
     # One version was tested while setup.py claimed five. A support claim backed by
     # no run is the same class of defect as a published number with no generator:
@@ -142,3 +330,29 @@ jobs:
       # only cover ~4 test families; major families ran local-only until now.
       - name: Full test suite
         run: pytest -q
+
+  coverage:
+    # The single check merge automation may rely on. always() so a skipped or
+    # failed upstream job still produces a verdict here instead of silence.
+    needs: [classify, fast, integrity]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLASSIFY: ${{ needs.classify.result }}
+      FULL: ${{ needs.classify.outputs.full }}
+      FAST: ${{ needs.fast.result }}
+      INTEGRITY: ${{ needs.integrity.result }}
+    steps:
+      - name: Require the work the change needed
+        run: |
+          echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"
+          [ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }
+          [ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }
+          if [ "$FULL" = "true" ]; then
+            [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }
+            echo "COVERAGE OK: full matrix required and green"
+          else
+            [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }
+            echo "COVERAGE OK: documentation-only change, fast lane green"
+          fi

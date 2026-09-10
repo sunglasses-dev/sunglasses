@@ -23,7 +23,7 @@ setup(
     python_requires=">=3.9",
     install_requires=[],
     extras_require={
-        "dev": ["pytest"],
+        "dev": ["pytest", "PyYAML"],
         "image": ["Pillow", "pytesseract"],
         "pdf": ["PyPDF2"],
         "qr": ["pyzbar", "Pillow"],
