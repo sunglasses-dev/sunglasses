@@ -6,9 +6,80 @@
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**The input firewall for AI agents.**
+**Check outside content for prompt-injection patterns before your AI agent acts on it.**
 
-**🕶 Try it in your browser — no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images. Image OCR runs locally in your browser; the image never leaves your device.
+Sunglasses is a local, open-source scanner for text and supported files. It reports what
+it matched **and what it could not read**, so you can decide what to pass onward. It
+produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
+on that result.
+
+Four outcomes, deliberately different signals:
+
+| exit | meaning |
+|---|---|
+| `0` | inspection completed, no findings |
+| `1` | threat found |
+| `3` | **incomplete** — no findings in the part that could be read; something was not inspected |
+| `2` | usage or operational error |
+
+**`0` and `3` never collapse into each other.** "I read it and found nothing" and "I could
+not open it, so I saw nothing" are different facts, and the second one is where agents get
+hurt. In JSON the same split is explicit: `is_clean` is `not threat_found and
+inspection_complete`.
+
+## Sixty seconds
+
+```bash
+pip install sunglasses
+curl -O https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.sh
+bash sixty-seconds.sh
+```
+
+The script writes its own fixtures into a temp directory and scans them. Scanned content is
+never executed — the script runs shell, Python and scanner commands only, and the ZIP is
+not extracted.
+
+```
+$ sunglasses scan --file notes.md            # ordinary sprint notes
+  PASS (7.73ms) — No threats detected.
+scanner exit code: 0
+
+$ sunglasses scan --file vendor-brief.md     # a vendor brief with an instruction buried in it
+  BLOCK [HIGH] (16.73ms) — 6 threat(s) found:
+  1. [HIGH] Ignore previous instructions            GLS-PI-001
+  6. [HIGH] Data exfiltration to sink (mechanism)   GLS-MECH-003
+scanner exit code: 1
+
+$ sunglasses scan --file attachments.zip     # an archive we do not extract
+  INCOMPLETE (1.02ms)
+  No findings in the inspected scope. Part of this input was not read, so this is
+  not a clean result.
+scanner exit code: 3
+
+$ sunglasses scan --file missing.md
+  File not found: missing.md — Nothing was scanned. Check the path.
+scanner exit code: 2
+```
+
+And the same archive as JSON, which is what your code consumes:
+
+```json
+{ "decision": "allow", "threat_found": false, "inspection_complete": false,
+  "is_clean": false,
+  "extraction_warnings": ["ZIP archive not inspected — SUNGLASSES does not extract this
+   format, so no content from attachments.zip was scanned. This is not a clean result."] }
+```
+
+`decision: allow` with **`is_clean: false`**. Nothing was found because nothing was read,
+and the result says so instead of letting a CI job read it as safe.
+
+*Every output above was produced by `demo/sixty-seconds.sh` against the published 0.5.6
+wheel. If yours differs, that is a bug worth an issue.*
+
+⭐ If that ZIP result is the behaviour you wanted from a scanner, a star helps other people
+find it.
+
+**🕶 Or try it in your browser — no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images. Image OCR runs locally in your browser; the image never leaves your device.
 
 ---
 
@@ -96,7 +167,7 @@ scan, and errors. `0` is a claim, so it is reserved for scans that earned it.
 
 | code | meaning |
 |---|---|
-| `0` | Read all of it, found nothing. |
+| `0` | Inspection completed in the supported scope, and nothing matched. Not a statement that the file is safe — only that everything we could read was read, and no pattern fired. |
 | `1` | Threat found. Incompleteness, if any, is still reported alongside it. |
 | `2` | Usage or operational error — **nothing was scanned in the scope this invocation was asked for**. A path that does not exist, a directory, a socket, an unreadable file, an invalid argument, a failed deep scan. For an aggregate (a repository, an email with attachments) a *part* that could not be read is reported as incomplete (`3`) with that part named — `2` is for the case where the whole request failed. |
 | `3` | **Incomplete**: found nothing in the part that could be read. An archive we do not extract, a PDF whose text layer needs `sunglasses[media]`, audio without `--deep`, or input past the size cap. |
