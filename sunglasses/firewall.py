@@ -942,11 +942,104 @@ def _expand(path: str) -> str:
     return os.path.normpath(os.path.expanduser(path))
 
 
+# -- Action surface ---------------------------------------------------------
+# A policy `blocked_paths` rule answers "does this call TOUCH that path?". That
+# is not the same question as "does this text MENTION that path?", and until
+# 2026-09-10 this lane could not tell them apart: it scanned every value of the
+# tool input, so writing documentation that NAMES a protected path was denied
+# exactly like writing TO it. Three agents hit it inside ten minutes on 09-10;
+# the class was first recorded on 08-28 and went unfixed for thirteen days.
+# This change fixes the FILE-TOOL half of that class. The Bash half stays open,
+# deliberately, for the reason recorded above `_action_surface`.
+#
+# Telling the two apart is the same distinction the scanner lane already makes
+# -- a blog post that discusses a dangerous install command is not a finding --
+# so the firewall lane now makes it too, per FIELD rather than per tool:
+#
+#   Write / Edit / MultiEdit / NotebookEdit / Read  -> the path fields only.
+#       `content`, `new_string` and friends are DATA: the thing being written,
+#       not a thing being touched.
+#   Bash and anything else -> every value, unchanged. A tool whose grammar we
+#       cannot parse is a tool we cannot narrow safely, so it keeps the old
+#       behaviour and fails closed. See the note above `_action_surface` for
+#       why Bash is on this side of the line and what that still costs.
+#
+# This never widens what is scanned; it only stops prose being read as action.
+# `egress_surface_text` is deliberately NOT reused: for the secrets lane the
+# content going out IS the leak, so scanning every value is right there and
+# wrong here. One helper for both would re-merge the two questions.
+
+# Per tool: the fields that name a TARGET, and the full documented input
+# schema. Both halves are load-bearing. The first says what to look at; the
+# second says when we are entitled to look at only that. A call carrying a key
+# this schema does not list is not the call we documented, so it is judged on
+# all of its values instead -- the same rule Bash lives under. That direction
+# is deliberate: a schema that grows upstream re-opens a false positive, which
+# is recoverable, rather than opening a hole, which is not.
+_PATH_FIELDS = {
+    "Write": ("file_path",),
+    "Edit": ("file_path",),
+    "MultiEdit": ("file_path",),
+    "NotebookEdit": ("notebook_path", "file_path"),
+    "Read": ("file_path",),
+}
+_TOOL_SCHEMA = {
+    "Write": {"file_path", "content"},
+    "Edit": {"file_path", "old_string", "new_string", "replace_all"},
+    "MultiEdit": {"file_path", "edits"},
+    "NotebookEdit": {"notebook_path", "file_path", "cell_id", "new_source",
+                     "cell_type", "edit_mode"},
+    "Read": {"file_path", "offset", "limit"},
+}
+
+# Bash is deliberately NOT narrowed here, and that is a decision rather than an
+# omission. Two cuts of this lane tried to subtract quoted heredoc bodies from a
+# command before asking which paths it touches. Both were unsafe, and the second
+# was unsafe in a way the first was not: an independent review (ASTRA,
+# 2026-09-10) EXECUTED nine shapes where the parser removed text the shell
+# really runs. A quoted heredoc fed to `bash`, directly or through a pipeline,
+# is not data, it is a program. An apparent opener inside a comment, inside
+# ordinary quoted text, or inside an arithmetic shift `$((1 << n))` is not a
+# redirection at all, and a delimiter word longer than the captured token
+# (`<<true-tail`) is not the delimiter it was read as. Each of those then finds
+# its guessed terminator further down and swallows the live commands in
+# between. Substitution extraction undercaptures nested and quote-bearing
+# parentheses, dropping the very operation that matters.
+#
+# The lesson underneath: a fallback for a parser that FAILS does nothing for a
+# parser that confidently recognises the WRONG construct. Recognising bash well
+# enough to subtract from it needs a real grammar -- consumers, pipelines,
+# delimiter quoting forms, several documents on one line, line continuations --
+# not another alternation bolted on per counter-example. Until that exists a
+# Bash command is judged on all of its text, exactly as it was before this lane
+# was touched.
+#
+# The cost is stated rather than hidden: a Bash command whose TEXT names a
+# blocked path without touching it is still denied. That false positive is real,
+# it is what prompted this work, and for Bash it remains OPEN.
+
+def _action_surface(tool_name: str, tool_input: dict) -> list:
+    """The values of a tool call that can act on a path. Values only."""
+    if not tool_input:
+        return []
+    fields = _PATH_FIELDS.get(tool_name)
+    if fields and set(tool_input) <= _TOOL_SCHEMA[tool_name]:
+        target = [str(tool_input[f]) for f in fields if tool_input.get(f)]
+        if target:
+            return target
+        # The tool NAME is one we know, but its documented target field is
+        # missing or empty, so this is not the call we know how to narrow.
+        # Self-review 2026-09-10 found eight shapes here -- `Write` with no
+        # `file_path`, an empty one, `None`, `0` -- where returning the empty
+        # surface ALLOWED a call the baseline denied. Same rule as Bash: an
+        # unrecognised shape is judged on all of its values.
+    return [str(v) for v in tool_input.values()]
+
+
 def _referenced_paths(tool_name: str, tool_input: dict) -> list:
-    """Path-shaped tokens in a tool call. Values only, never our own keys."""
-    values = [str(v) for v in (tool_input or {}).values()]
-    tokens: list = []
-    for value in values:
+    """Path-shaped tokens a tool call can ACT on. Values only, never our keys."""
+    tokens = []
+    for value in _action_surface(tool_name, tool_input):
         tokens.extend(_PATH_TOKEN_RE.findall(value))
     return tokens
 
