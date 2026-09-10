@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**Check outside content for prompt-injection patterns before your AI agent acts on it.**
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,540 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run.
 
 Sunglasses is a local, open-source scanner for text and supported files. It reports what
 it matched **and what it could not read**, so you can decide what to pass onward. It
