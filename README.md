@@ -1,5 +1,11 @@
 # SUNGLASSES
 
+[![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
+[![PyPI](https://img.shields.io/pypi/v/sunglasses)](https://pypi.org/project/sunglasses/)
+[![python: 3.9 – 3.14](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/sunglasses-dev/sunglasses/blob/main/.github/workflows/pattern-integrity.yml)
+[![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
+[![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
+
 **The input firewall for AI agents.**
 
 **🕶 Try it in your browser — no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images. Image OCR runs locally in your browser; the image never leaves your device.

@@ -44,14 +44,24 @@ setup(
         ],
     },
     classifiers=[
-        # 30+ releases, a full CI suite on five Python versions, a reproducible
+        # 30+ releases, a full CI suite on six Python versions, a reproducible
         # benchmark and a firewall in production use. "Alpha" understated it to
         # every package index reader; Beta is the honest rung, and Production/Stable
         # would overstate it while the API can still move in a minor.
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
+        # One classifier per version the CI matrix actually runs
+        # (.github/workflows/pattern-integrity.yml). Without these, package indexes
+        # and the shields.io pyversions badge can only report "3", which tells a
+        # reader nothing about what is tested.
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Security",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
