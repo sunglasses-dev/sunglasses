@@ -270,3 +270,78 @@ def test_public_hook_denies_writing_to_a_blocked_path_and_the_work_does_not_happ
 
         # Denied means the operation is not performed. Nothing wrote the file.
         assert not secret.exists(), "a denied call left its artefact on disk"
+
+
+# ---------------------------------------------------------------------------
+# T9 REVIEW 2026-09-10 — three commands that ACT on a protected path while the
+# first cut of the heredoc parser returned zero paths for them. Every one is a
+# case of the parser NARROWING when it had not actually established anything:
+# the exact failure ASTRA's third NO GO condition names. Written to fail first.
+# ---------------------------------------------------------------------------
+VAULT_POLICY = {"blocked_paths": ["~/.p1a-fixture-vault"]}
+
+REVIEW_BYPASSES = [
+    # `<<<` is a here-string, not a heredoc. Matching the inner `<<` swallowed
+    # the following real command as if it were an inert body.
+    ("here-string",
+     "echo <<<EOF\nrm -rf ~/.p1a-fixture-vault/keys\nEOF"),
+    # A substitution spanning lines inside an UNQUOTED body executes. Scanning
+    # the body line by line never sees it.
+    ("multiline-substitution",
+     "cat <<EOF\n$(\nrm -rf ~/.p1a-fixture-vault/keys\n)\nEOF"),
+    # `<<EOF` inside a quoted string is not a heredoc at all. Treating it as one
+    # turned the real commands after it into a body.
+    ("heredoc-token-inside-a-quoted-string",
+     'echo "x <<EOF"\nrm -rf ~/.p1a-fixture-vault/keys\nEOF'),
+]
+
+
+@pytest.mark.parametrize("name,command", REVIEW_BYPASSES,
+                         ids=[b[0] for b in REVIEW_BYPASSES])
+def test_review_bypasses_still_deny(name, command):
+    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None, (
+        f"{name}: the command acts on the protected path and the parser "
+        "narrowed it away — an unestablished parse became a proved safe one"
+    )
+
+
+# ---------------------------------------------------------------------------
+# SELF ATTACK — shapes tried against the hardened parser after the T9 review,
+# looking for a fourth bypass. None of these narrowed anything away. Kept as
+# regressions so a future simplification of the parser has to face them.
+# ---------------------------------------------------------------------------
+SELF_ATTACK = [
+    ("comment-containing-heredoc-token",
+     "# see <<EOF docs\nrm -rf ~/.p1a-fixture-vault/keys"),
+    ("single-quoted-heredoc-token",
+     "echo '<<EOF' ; rm -rf ~/.p1a-fixture-vault/keys"),
+    ("escaped-quote-then-real-heredoc",
+     'echo "a\\"b" ; cat <<EOF\nx\nEOF\nrm -rf ~/.p1a-fixture-vault/keys'),
+    ("two-heredocs-opened-on-one-line",
+     "cat <<A <<B\nx\nA\ny\nB\nrm -rf ~/.p1a-fixture-vault/keys"),
+    ("dash-heredoc-with-tab-indented-terminator",
+     "cat <<-EOF\n\tx\n\tEOF\nrm -rf ~/.p1a-fixture-vault/keys"),
+    ("terminator-with-trailing-space",
+     "cat <<EOF\nx\nEOF \nrm -rf ~/.p1a-fixture-vault/keys"),
+    ("nested-substitution-in-unquoted-body",
+     "cat <<EOF\n$(echo $(rm -rf ~/.p1a-fixture-vault/keys))\nEOF"),
+    ("backtick-substitution-spanning-lines",
+     "cat <<EOF\n`\nrm -rf ~/.p1a-fixture-vault/keys\n`\nEOF"),
+]
+
+
+@pytest.mark.parametrize("name,command", SELF_ATTACK, ids=[c[0] for c in SELF_ATTACK])
+def test_self_attack_shapes_still_deny(name, command):
+    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is not None, name
+
+
+def test_a_quoted_heredoc_body_carried_through_a_pipeline_is_still_prose():
+    """The allow side of the same machinery, so hardening cannot creep.
+
+    `grep x <<'EOF' | tee /tmp/out` with a literal body that merely NAMES the
+    protected path acts on /tmp/out, not on the vault.
+    """
+    command = ("grep x <<'EOF' | tee /tmp/out\n"
+               "the policy protects ~/.p1a-fixture-vault/keys from every tool\n"
+               "EOF")
+    assert check_policy("Bash", {"command": command}, VAULT_POLICY) is None

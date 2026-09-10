@@ -977,21 +977,67 @@ _PATH_FIELDS = {
     "Read": ("file_path",),
 }
 
-# `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`. The quote around the delimiter is the
-# whole signal: quoted means the shell performs no expansion inside the body.
-_HEREDOC_START_RE = re.compile(r"""<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1""")
-# What still executes inside an unquoted body.
-_SUBSTITUTION_RE = re.compile(r"\$\([^)]*\)|`[^`]*`")
+# Recognising a heredoc is the whole risk in this lane. The first cut used a
+# bare regex and it NARROWED on three shapes it had not actually established
+# (T9 review, 2026-09-10): `<<<` is a here-string and its inner `<<` was read
+# as a heredoc, swallowing the next real command; `<<EOF` inside a quoted
+# string is not a heredoc at all; and a substitution spanning lines inside an
+# unquoted body was invisible to a per-line scan. Each one turned an
+# unestablished parse into a proved-safe one, which is the failure this lane
+# exists to avoid.
+#
+# So the rule is inverted: narrowing is a privilege that has to be earned. We
+# only remove a body when the opening was found OUTSIDE any quoting, is a real
+# `<<` rather than part of `<<<`, and its delimiter line is actually reached.
+# Anything else -- an unbalanced quote, a `<<` we cannot place, an unterminated
+# body -- returns the command whole and it is judged on all of it.
+_HEREDOC_START_RE = re.compile(r"""\A<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1""")
+# What still executes inside an unquoted body. DOTALL so a substitution that
+# spans lines is one match rather than none.
+_SUBSTITUTION_RE = re.compile(r"\$\(.*?\)|`.*?`", re.DOTALL)
+
+
+def _heredoc_opening(line):
+    """(is_literal, delimiter) if this line opens a heredoc, else None.
+
+    Scans the line tracking quote state, because a `<<` inside quotes is text.
+    A `<<<` here-string is explicitly not a heredoc. Returns None the moment
+    anything is ambiguous, and the caller then declines to narrow at all.
+    """
+    quote = None
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if quote:
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            i += 1
+            continue
+        if ch == "<" and line.startswith("<<", i):
+            if line.startswith("<<<", i):      # here-string, not a heredoc
+                return None
+            match = _HEREDOC_START_RE.match(line[i:])
+            if not match:
+                return None                    # a `<<` we cannot place
+            return bool(match.group(1)), match.group(2)
+        i += 1
+    if quote:
+        return None                            # unbalanced quote on this line
+    return None
 
 
 def bash_action_surface(command: str) -> str:
     """The part of a Bash command that can act on a path.
 
-    Literal heredoc bodies are removed; the executable substitutions inside
+    Literal heredoc bodies are removed and the executable substitutions inside
     unquoted bodies are kept. The command is returned UNCHANGED whenever the
-    structure cannot be parsed with confidence -- an unterminated heredoc, or
-    any surprise at all -- because an uncertain parse must never be reported as
-    proved safe.
+    structure cannot be established -- an unterminated body, a `<<` inside
+    quotes, a here-string, an unbalanced quote, any surprise at all -- because
+    an uncertain parse must never be reported as proved safe.
     """
     if not command or "<<" not in command:
         return command or ""
@@ -1001,16 +1047,18 @@ def bash_action_surface(command: str) -> str:
         i = 0
         while i < len(lines):
             line = lines[i]
-            match = _HEREDOC_START_RE.search(line)
-            if not match:
+            if "<<" not in line:
                 kept.append(line)
                 i += 1
                 continue
+            opening = _heredoc_opening(line)
+            if opening is None:
+                # We cannot establish what this `<<` is. Do not narrow anything.
+                return command
+            literal, delimiter = opening
             # The opening line is real command text: it carries the redirect
             # target, which is exactly the path this lane cares about.
             kept.append(line)
-            literal = bool(match.group(1))
-            delimiter = match.group(2)
             i += 1
             body = []
             closed = False
@@ -1022,12 +1070,9 @@ def bash_action_surface(command: str) -> str:
                 body.append(lines[i])
                 i += 1
             if not closed:
-                # We do not know where the body ends, so we do not get to
-                # narrow anything about this command.
                 return command
             if not literal:
-                for body_line in body:
-                    kept.extend(_SUBSTITUTION_RE.findall(body_line))
+                kept.extend(_SUBSTITUTION_RE.findall("\n".join(body)))
         return "\n".join(kept)
     except Exception:
         return command
