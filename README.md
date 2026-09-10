@@ -1,6 +1,6 @@
 # SUNGLASSES
 
-[![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
+[![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg?branch=main&event=push)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
 [![PyPI](https://img.shields.io/pypi/v/sunglasses)](https://pypi.org/project/sunglasses/)
 [![python: 3.9 – 3.14](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/sunglasses-dev/sunglasses/blob/main/.github/workflows/pattern-integrity.yml)
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
