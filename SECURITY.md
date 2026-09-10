@@ -78,16 +78,20 @@ not patched — `pip install -U sunglasses`.
 
 ## Advisory history
 
-**No security advisories have been published for this project to date.**
+| Advisory | Severity | Weakness | Affected | Patched | Published (UTC) |
+|---|---|---|---|---|---|
+| [GHSA-j49m-wpxr-62h8](https://github.com/sunglasses-dev/sunglasses/security/advisories/GHSA-j49m-wpxr-62h8) — scan results reported clean for content that was never inspected (missing path, ZIP, oversized input, audio without `--deep`, among others) | High | CWE-636 (not failing securely) | `>= 0.1.0, < 0.5.6` | 0.5.6 | 2026-09-10 |
 
-The closest thing is [v0.5.6](https://github.com/sunglasses-dev/sunglasses/releases/tag/v0.5.6),
-which repaired a false-clean class: six paths returned a success-shaped answer for
-content nobody had read — a directory passed as a file, a non-existent path scanned
-as prose, an archive's compressed bytes scanned as text, input past the size cap,
-audio without `--deep`, and a deep scan whose transcription failed where the ffmpeg
-error message was scanned *as if it were the transcript*. `is_clean` also changed
-meaning: it now requires a complete inspection as well as no findings.
+That advisory covers the false-clean class repaired in
+[v0.5.6](https://github.com/sunglasses-dev/sunglasses/releases/tag/v0.5.6): six paths
+returned a success-shaped answer for content nobody had read — a directory passed as a
+file, a non-existent path scanned as prose, an archive's compressed bytes scanned as
+text, input past the size cap, audio without `--deep`, and a deep scan whose
+transcription failed where the ffmpeg error message was scanned *as if it were the
+transcript*. `is_clean` also changed meaning: it now requires a complete inspection as
+well as no findings.
 
-**If you are on 0.5.5 or earlier, upgrade.** That release was found in our own
-review rather than reported by an outside researcher, which is why there is no
-advisory attached to it — not because it did not matter.
+**If you are on 0.5.5 or earlier, upgrade.** The issue was found in our own review
+rather than reported by an outside researcher. We published the advisory ourselves,
+with the affected range established by testing every published wheel back to 0.1.0,
+so that the record is public and dependency tooling has something to point at.
