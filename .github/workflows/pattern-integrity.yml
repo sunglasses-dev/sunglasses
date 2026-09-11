@@ -356,3 +356,63 @@ jobs:
             [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }
             echo "COVERAGE OK: documentation-only change, fast lane green"
           fi
+
+  certify:
+    # THE gate. `coverage` answers "did this change get the work it needed",
+    # which is the right question for a MERGE and the wrong one for a RELEASE:
+    # a documentation-only change legitimately skips the matrix, and a tree
+    # verified only by the docs lane must never be publishable.
+    #
+    # So certify answers both, separately. It is the single required status
+    # context for merging, and it records in its own log whether the FULL
+    # matrix actually ran, which is what the publisher checks before uploading.
+    #
+    # Built 2026-09-10 after a system audit found the release path had no
+    # mechanical gate at all: PyPI could be uploaded from a tree whose CI had
+    # skipped, been cancelled, or never run. A missing leg is not a pass.
+    needs: [classify, fast, integrity, coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLASSIFY: ${{ needs.classify.result }}
+      FULL: ${{ needs.classify.outputs.full }}
+      FAST: ${{ needs.fast.result }}
+      INTEGRITY: ${{ needs.integrity.result }}
+      COVERAGE: ${{ needs.coverage.result }}
+    steps:
+      - name: Every required leg ran and succeeded
+        run: |
+          echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY coverage=$COVERAGE"
+
+          # An absent result is the failure mode this job exists for. A leg that
+          # was skipped, cancelled, or never reported reads as anything but
+          # "success", and none of those are evidence that the work was done.
+          fail() { echo "CERTIFY FAIL: $1"; exit 1; }
+
+          [ -n "$CLASSIFY" ] || fail "classify produced no result at all"
+          [ -n "$FAST" ]     || fail "fast produced no result at all"
+          [ -n "$COVERAGE" ] || fail "coverage produced no result at all"
+
+          [ "$CLASSIFY" = "success" ] || fail "classify=$CLASSIFY"
+          [ "$FAST" = "success" ]     || fail "fast=$FAST"
+          [ "$COVERAGE" = "success" ] || fail "coverage=$COVERAGE"
+
+          case "$FULL" in
+            true)
+              [ "$INTEGRITY" = "success" ] || fail "full matrix required, integrity=$INTEGRITY"
+              echo "CERTIFY LEVEL: full"
+              echo "CERTIFY OK: every leg ran and succeeded on $GITHUB_SHA"
+              ;;
+            false)
+              # The docs lane. Merging is fine; publishing from this tree is not,
+              # and the publisher refuses on the absence of "CERTIFY LEVEL: full".
+              [ "$INTEGRITY" = "skipped" ] || fail "docs lane but integrity=$INTEGRITY (expected skipped)"
+              echo "CERTIFY LEVEL: docs"
+              echo "CERTIFY OK for merge: documentation-only change, fast lane green on $GITHUB_SHA"
+              echo "NOT RELEASE CERTIFIED: the full matrix did not run on this tree"
+              ;;
+            *)
+              fail "classify output is neither true nor false ($FULL) — refusing to guess"
+              ;;
+          esac
