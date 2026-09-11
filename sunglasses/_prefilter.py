@@ -62,14 +62,42 @@ def _pick(clauses):
     return max(clauses, key=lambda c: min(len(l) for l in c))
 
 
+def _ascii_literal(av):
+    """The lowercase ASCII character this LITERAL contributes, or None.
+
+    A non-ASCII literal contributes NOTHING and breaks the run. Two reasons,
+    both found by execution (ASTRA, 2026-09-10):
+
+      `chr(0x130).lower()` is two codepoints, so lowercasing here injected a
+      COMBINING DOT ABOVE into the requirement that the matching document never
+      had to contain -- the fold order was fixed in `fold()` and this earlier
+      conversion still had it.
+
+      More fundamentally, lowercase-plus-four-exceptions is not a general
+      Unicode equivalence rule. It is exhaustive for characters equivalent to
+      ASCII LETTERS, which is a different claim. Greek final sigma and the micro
+      sign match their regexes and defeat that mapping, and sigma's lowercasing
+      is context sensitive besides, which a per-character extractor cannot see.
+
+    Restricting derivation to ASCII removes the whole class rather than adding
+    another table. Anything non-ASCII is simply evaluated, as before.
+    """
+    ch = chr(av)
+    if ch.isascii():
+        return ch.lower()
+    return None
+
+
 def _leading_run(seq):
-    """The literal characters one parsed sequence must start with."""
+    """The ASCII literal characters one parsed sequence must start with."""
     run = []
     for op, av in seq:
-        if str(op) == "LITERAL":
-            run.append(chr(av).lower())
-        else:
+        if str(op) != "LITERAL":
             break
+        ch = _ascii_literal(av)
+        if ch is None:
+            break
+        run.append(ch)
     return "".join(run)
 
 
@@ -89,7 +117,14 @@ def _clauses(seq):
     for op, av in seq:
         name = str(op)
         if name == "LITERAL":
-            cur.append(chr(av).lower())
+            ch = _ascii_literal(av)
+            if ch is not None:
+                cur.append(ch)
+                continue
+            # A non-ASCII literal is not derivable, so it ends the run exactly
+            # like a wildcard would. The ASCII prefix before it is still a
+            # necessary substring and is kept.
+            flush()
             continue
         flush()
         if name == "SUBPATTERN":
@@ -148,7 +183,8 @@ def requirement(pattern_source: str):
     folded, seen = [], set()
     for c in clauses:
         f = frozenset(fold(l) for l in c)
-        if f and f not in seen and all(len(l) >= MIN_LITERAL for l in f):
+        if f and f not in seen and all(
+                len(l) >= MIN_LITERAL and l.isascii() for l in f):
             seen.add(f)
             folded.append(f)
     return tuple(folded)

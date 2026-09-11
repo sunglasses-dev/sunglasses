@@ -8,6 +8,7 @@ The danger is obvious and these tests are pointed at it: a wrong requirement
 does not slow the scanner down, it makes the scanner blind. Every test here
 asks "can a skip hide a real match?", not "is it faster?".
 """
+import json
 import re
 import sys
 import pathlib
@@ -192,3 +193,56 @@ def test_every_regex_survives_requirement_extraction(engine):
     for pattern, regexes in engine._regex_patterns:
         for _mode, rx, _guards in regexes:
             _prefilter.requirement(rx.pattern)   # must not raise
+
+
+# ---------------------------------------------------------------------------
+# ASTRA REVIEW 2026-09-10 — NO GO on 6012832. Seven of these lost a finding
+# through the public engine: baseline blocked, candidate came back clean.
+#
+# Two defects, and the second is the one worth remembering. U1 was a repeat of
+# the fold-order bug in a place I had not fixed: `_clauses` and `_leading_run`
+# lowercased each literal BEFORE folding, so a U+0130 in a pattern injected a
+# combining mark into the requirement that the document never had to contain.
+#
+# U2 was a scope error in my reasoning rather than a typo. I enumerated every
+# codepoint equivalent to an ASCII LETTER, found exactly four, and treated that
+# as a Unicode equivalence map. It is not one. Greek final sigma and the micro
+# sign match their regexes and defeat it, and sigma's lowercasing is context
+# sensitive, which a per-character extractor cannot see at all.
+#
+# The repair is not a fifth table entry. Literal derivation is restricted to
+# ASCII, where the four-codepoint fold IS exhaustive (independently confirmed
+# over all 1,114,112 codepoints), and anything else is simply evaluated.
+# ---------------------------------------------------------------------------
+_UNICODE_CASES = json.loads(
+    (pathlib.Path(__file__).resolve().parents[1]
+     / "tests" / "fixtures" / "prefilter_unicode_cases.json").read_text())
+
+
+@pytest.mark.parametrize("name,pattern,text",
+                         _UNICODE_CASES, ids=[c[0] for c in _UNICODE_CASES])
+def test_astra_constructed_cases_never_lose_a_finding(name, pattern, text):
+    """If the regex matches, the prefilter must not skip it. No exceptions."""
+    try:
+        matches = bool(re.search(pattern, text, re.IGNORECASE))
+    except re.error:
+        pytest.skip(f"{name}: not compilable on this Python")
+    req = _prefilter.requirement(pattern)
+    if not matches:
+        return                      # nothing to lose
+    assert not _prefilter.can_skip(req, _prefilter.fold(text)), (
+        f"{name}: /{pattern}/i matches this text but the prefilter skipped it. "
+        f"derived requirement was {req!r}"
+    )
+
+
+def test_no_requirement_is_ever_derived_from_a_non_ascii_literal():
+    """The rule that removes the whole Unicode-equivalence class."""
+    for source in ["İabcd", "(?:İabcd|other)", "σabcd",
+                   "μabcd", "ΣΣΣΣ"]:
+        for clause in _prefilter.requirement(source):
+            for literal in clause:
+                assert literal.isascii(), (
+                    f"/{source}/ produced the non-ASCII requirement {literal!r}; "
+                    "lowercase-plus-exceptions is not a Unicode equivalence rule"
+                )
