@@ -246,3 +246,116 @@ def test_no_requirement_is_ever_derived_from_a_non_ascii_literal():
                     f"/{source}/ produced the non-ASCII requirement {literal!r}; "
                     "lowercase-plus-exceptions is not a Unicode equivalence rule"
                 )
+
+
+# ---------------------------------------------------------------------------
+# MUTATION RESISTANCE — ASTRA, second review of this branch.
+#
+# He did not argue with the tests above, he MUTATED the code: forced step 3 to
+# skip every regex, and all 41 of them still passed while 25 real public-engine
+# detections vanished. The canonical case lost GLS-CF-252 and stayed green
+# because a different finding was quietly covering for it.
+#
+# A test that survives "the scanner detects nothing" is not protecting the
+# scanner. These assert EXACT finding ids through the public `scan`, so the
+# skip-everything mutation has to fail them.
+# ---------------------------------------------------------------------------
+CANONICAL_RULE = "GLS-CF-252"
+
+
+def test_the_canonical_attack_keeps_its_specific_rule(engine):
+    """Not "some finding" -- this finding.
+
+    The weak version of this test asserted a non-empty list and stayed green
+    through a mutation that lost this exact id.
+    """
+    result = engine.scan(PLAIN_ATTACK)
+    findings = result.findings if hasattr(result, "findings") else result
+    ids = {f["id"] for f in findings}
+    assert CANONICAL_RULE in ids, (
+        f"{CANONICAL_RULE} is gone from the plainest attack in the corpus. "
+        f"Found instead: {sorted(ids)}"
+    )
+
+
+def _probe_engine(extra):
+    """A public engine carrying one custom pattern, reachable on any channel."""
+    return SunglassesEngine(extra_patterns=[extra])
+
+
+def _custom(rule_id, pattern):
+    return {
+        "id": rule_id, "name": rule_id, "category": "test",
+        "severity": "high", "keywords": [], "regex": [pattern],
+        "description": "prefilter acceptance probe",
+        "channel": ["message", "file", "api_response",
+                    "web_content", "log_memory", "tool_output"],
+    }
+
+
+@pytest.mark.parametrize("name,pattern,text",
+                         _UNICODE_CASES, ids=[c[0] for c in _UNICODE_CASES])
+@pytest.mark.parametrize("path", ["automaton", "substring"])
+def test_constructed_cases_keep_their_exact_id_through_public_scan(
+        name, pattern, text, path):
+    """Exact id, public API, both lookup paths.
+
+    The prefilter has two implementations of the same decision -- an
+    Aho-Corasick index and a per-literal substring fallback for when the
+    optional library is missing. A bug in either one is a blind scanner, so
+    both are exercised rather than whichever happens to be installed.
+    """
+    try:
+        expected = bool(re.search(pattern, text, re.IGNORECASE))
+    except re.error:
+        pytest.skip(f"{name}: not compilable on this Python")
+    if not expected:
+        return
+
+    rule_id = f"PREFILTER-{name}"
+    eng = _probe_engine(_custom(rule_id, pattern))
+    if path == "substring":
+        eng._literal_index._automaton = None     # force the fallback path
+
+    result = eng.scan(text)
+    findings = result.findings if hasattr(result, "findings") else result
+    ids = {f["id"] for f in findings}
+    assert rule_id in ids, (
+        f"{name} ({path} path): /{pattern}/i matches this text, but the public "
+        f"engine did not report {rule_id}. Found: {sorted(ids)}. "
+        f"Derived requirement: {_prefilter.requirement(pattern)!r}"
+    )
+
+
+def test_the_suite_rejects_a_skip_everything_mutation(engine):
+    """The guard on the guard.
+
+    If `can_skip` were mutated to always skip, the tests above must go red.
+    Rather than trust that, this reproduces the mutation in-process and asserts
+    the detections really do disappear -- so if some future refactor makes the
+    prefilter unable to lose a finding, this test says so out loud instead of
+    silently passing for the wrong reason.
+    """
+    rule_id = "PREFILTER-mutation-probe"
+    pattern, text = r"marker.{0,20}anchor", "marker and then anchor"
+    eng = _probe_engine(_custom(rule_id, pattern))
+
+    result = eng.scan(text)
+    findings = result.findings if hasattr(result, "findings") else result
+    assert rule_id in {f["id"] for f in findings}, "probe pattern does not fire"
+
+    original = _prefilter.can_skip
+    try:
+        _prefilter.can_skip = lambda req, present: True      # skip everything
+        muted = eng.scan(text)
+        muted_findings = muted.findings if hasattr(muted, "findings") else muted
+        assert rule_id not in {f["id"] for f in muted_findings}, (
+            "the skip-everything mutation did NOT lose this finding, so these "
+            "tests cannot prove the prefilter is what keeps detection alive"
+        )
+    finally:
+        _prefilter.can_skip = original
+
+    again = eng.scan(text)
+    again_findings = again.findings if hasattr(again, "findings") else again
+    assert rule_id in {f["id"] for f in again_findings}, "mutation leaked"
