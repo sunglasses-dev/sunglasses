@@ -1,0 +1,37 @@
+{
+ "GLS-PI-013": [
+  "file",
+  "tool_output",
+  "web_content"
+ ],
+ "GLS-PI-016": [
+  "file",
+  "message",
+  "tool_output",
+  "web_content"
+ ],
+ "GLS-PI-017": [
+  "file",
+  "message",
+  "tool_output",
+  "web_content"
+ ],
+ "GLS-PI-021": [
+  "file",
+  "message",
+  "tool_output",
+  "web_content"
+ ],
+ "GLS-PI-INFO": [
+  "file",
+  "message",
+  "tool_output",
+  "web_content"
+ ],
+ "GLS-PIEMN-001": [
+  "file",
+  "message",
+  "tool_output",
+  "web_content"
+ ]
+}

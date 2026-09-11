@@ -106,21 +106,39 @@ def test_the_already_detected_case_is_undisturbed(engine):
     )
 
 
-def test_every_touched_rule_still_covers_the_channels_it_had(engine):
-    """Adding a channel must never remove one."""
-    had = {"message", "file", "web_content", "tool_output"}
+def test_every_touched_rule_still_covers_the_channels_it_had():
+    """Adding a channel must never remove one. Compared against frozen evidence.
+
+    The first version of this test ended in `or True`, which made it vacuous:
+    an external reviewer disabled a rule's bindings and all 14 tests stayed
+    green. Its follow-up loop also walked file, web_content and tool_output and
+    silently omitted `message`, so removing five `message` bindings changed
+    nothing visible either.
+
+    The repair is to stop restating the change and start comparing it to
+    evidence. `channels_before.json` is the channel set of each rule read
+    straight from origin/main before this branch touched it, so the expected
+    value is exactly baseline plus `api_response` and nothing else moves.
+    """
+    import json
+    before = json.loads((FIXTURES / "channels_before.json").read_text())
+    engine = SunglassesEngine()
     by_id = {p["id"]: p for p in engine._patterns}
+
+    assert sorted(before) == sorted(RULES), (
+        "the frozen baseline no longer covers exactly the rules this branch "
+        "touches -- refreeze it deliberately rather than editing this list"
+    )
+
     for rule in RULES:
         assert rule in by_id, f"{rule} not found in the pattern set"
-        channels = set(by_id[rule].get("channel", ()))
-        assert "api_response" in channels, f"{rule} is missing api_response"
-        # GLS-PI-013 never carried `message`; assert only what each rule had.
-        assert had.intersection(channels) == had.intersection(
-            set(by_id[rule].get("channel", ())) | {"api_response"}) - {"api_response"} or True
-        for prior in ("file", "web_content", "tool_output"):
-            assert prior in channels, (
-                f"{rule} lost the {prior} channel while gaining api_response"
-            )
+        now = set(by_id[rule].get("channel", ()))
+        expected = set(before[rule]) | {"api_response"}
+        assert now == expected, (
+            f"{rule}: channels are {sorted(now)}, expected {sorted(expected)}. "
+            f"Baseline was {sorted(before[rule])}; this branch may add "
+            "api_response and change nothing else."
+        )
 
 
 def test_the_change_is_channel_reach_and_not_new_patterns(engine):
