@@ -44,6 +44,14 @@ name: pattern-integrity
 # (no path filters, no disabling `if` on classify/fast/coverage, the exact
 # fast-suite ignore list, the gate commands, the coverage rule) and unit-tests
 # the classifier, including ASTRA's four negative controls from round 1.
+# Superseded PR runs are cancelled; runs on main and on tags are NOT. The release
+# ship waits on the main-branch run and `certify` must exist for the exact release
+# sha, so cancelling those would turn a gate into an absence — the one failure mode
+# this workflow was rebuilt to remove.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
@@ -211,6 +219,11 @@ jobs:
     needs: classify
     if: needs.classify.outputs.full == 'true'
     runs-on: ubuntu-latest
+    # Measured on run 34583112120 (PR #140, full matrix): legs ran 40.8 to 90.4 min,
+    # the slowest being 3.9. 120 leaves ~33% headroom over the worst observed leg and
+    # still turns a hang into a failure instead of a six-hour wait. Lower it when the
+    # regex prefilter work lands and the real numbers drop.
+    timeout-minutes: 120
     # One version was tested while setup.py claimed five. A support claim backed by
     # no run is the same class of defect as a published number with no generator:
     # believable, unverified, and only discovered by the user it breaks.
