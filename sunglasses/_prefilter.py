@@ -42,8 +42,13 @@ MIN_LITERAL = 4       # below this a literal is not selective enough to pay for
 
 
 def fold(text: str) -> str:
-    """The haystack view every prefilter test runs against."""
-    return text.lower().translate(_CASEFOLD)
+    """The haystack view every prefilter test runs against.
+
+    Translate BEFORE lowering. `"\u0130".lower()` is TWO codepoints, an ASCII
+    `i` followed by COMBINING DOT ABOVE, so lowering first splits the character
+    the table is meant to collapse and the fold silently fails on it.
+    """
+    return text.translate(_CASEFOLD).lower()
 
 
 def _pick(clauses):
@@ -57,13 +62,27 @@ def _pick(clauses):
     return max(clauses, key=lambda c: min(len(l) for l in c))
 
 
+def _leading_run(seq):
+    """The literal characters one parsed sequence must start with."""
+    run = []
+    for op, av in seq:
+        if str(op) == "LITERAL":
+            run.append(chr(av).lower())
+        else:
+            break
+    return "".join(run)
+
+
 def _clauses(seq):
     """CNF clauses required by one parsed sequence."""
     out, cur = [], []
+    prefix = ""
 
     def flush():
+        nonlocal prefix
         run = "".join(cur)
         cur.clear()
+        prefix = run
         if len(run) >= MIN_LITERAL:
             out.append(frozenset({run}))
 
@@ -86,12 +105,25 @@ def _clauses(seq):
                 out.extend(_clauses(item))
         elif name == "BRANCH":
             _, branches = av
-            picks = [_pick(_clauses(b)) for b in branches]
+            # `prefix` is the literal run that ran up to this alternation and
+            # was just flushed. It is required whichever branch is taken, and
+            # sre_parse FACTORS it out of the branches: `(previous|prior)`
+            # arrives as p, r, BRANCH(evious|ior), where every piece alone is
+            # under MIN_LITERAL. Recombining recovers {previous, prior}.
+            alts = []
+            for b in branches:
+                lead = _leading_run(b)
+                whole = prefix + lead
+                if len(whole) >= MIN_LITERAL:
+                    alts.append(frozenset({whole}))
+                else:
+                    alts.append(_pick(_clauses(b)))
             # One unconstrained branch and the alternation constrains nothing.
-            if picks and all(p is not None for p in picks):
-                merged = frozenset().union(*picks)
+            if alts and all(a is not None for a in alts):
+                merged = frozenset().union(*alts)
                 if all(len(l) >= MIN_LITERAL for l in merged):
                     out.append(merged)
+            prefix = ""
         elif name == "ASSERT":
             direction, item = av
             # Positive lookahead AND lookbehind both require their contents to
