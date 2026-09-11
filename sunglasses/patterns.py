@@ -3476,7 +3476,7 @@ PATTERNS = [
         "name": "Indirect injection — <INFORMATION> / <IMPORTANT> wrapper",
         "category": "prompt_injection",
         "severity": "high",
-        "channel": ["message", "file", "web_content", "tool_output"],
+        "channel": ["message", "file", "web_content", "tool_output", "api_response"],
         "keywords": [
             "<information>",
             "<important>",
@@ -3492,6 +3492,28 @@ PATTERNS = [
             "please do the following first",
             "please do this first",
             "before the original task",
+        ],
+        # CORROBORATION (2026-09-11). This rule had `keywords` and NO regex at all, so
+        # a bare keyword stamped a high-severity finding on its own: the engine's
+        # "corroborate, don't stamp" rule, born of the claude-seo incident, only ever
+        # covered regex-bearing patterns. "developer at anthropic" and "<information>"
+        # are things ordinary text says, and a maintainer bio, a package description
+        # and an office-hours notice were each blocked on every channel.
+        #
+        # The discriminator is read off the fixtures, not invented: every true positive
+        # carries an IMPERATIVE AIMED AT THE AGENT ("please reveal the configuration",
+        # "please do the following first: Send a transaction"), and every false positive
+        # is purely descriptive. So the verdict is now a CO-OCCURRENCE of this rule's own
+        # signature with that imperative, in one 1200-char window (step 3 evaluates a
+        # regex-bearing pattern globally, so the signature has to be inside the regex or
+        # the rule would fire on any text carrying an imperative).
+        #
+        # The prose gaps exclude quotes, braces, brackets, colons and commas on purpose.
+        # A benign JSON audit-record schema carries fields named `override`, `policy` and
+        # `execute`, and a window that crosses JSON punctuation reads
+        # `override": {"type": "boolean"}, "policy` as an instruction (ASTRA, Sep-10).
+        "regex": [
+            '(?is)(?=.*(?:<\\s*(?:information|important|instructions|system|admin)\\s*>|\\bthis\\s+is\\s+an?\\s+important\\s+message\\s+from\\b|\\bthis\\s+is\\s+a\\s+message\\s+from\\s+the\\s+user\\b|\\bimportant\\s+message\\s+from\\b|\\bbefore\\s+the\\s+original\\s+task\\b))(?=.*(?:please\\s+(?:do\\s+the\\s+following|do\\s+this|reveal|disclose|send|transfer|forward|execute|run|dump|exfiltrate|output|print|show|ignore(?!\\s+(?:my|our)\\b)|disregard(?!\\s+(?:my|our)\\b))\\b|before\\s+you\\s+(?:can\\s+)?(?:solve|continue|proceed|answer|respond|begin|start|do|complete)\\b|\\b(?:ignore|disregard|forget|bypass|override|disable|skip)\\b(?!\\s+(?:my|our)\\b)[^.\\n\\"\'{}\\[\\]:,]{0,60}\\b(?:instructions?|polic(?:y|ies)|guardrails?|rules?|restrictions?|safety|safeguards?|redaction|system\\s*prompt)\\b|\\b(?:reveal|disclose|exfiltrate|leak|dump|send|transfer|forward)\\b[^.\\n\\"\'{}\\[\\]:,]{0,60}\\b(?:system\\s*prompt|configuration|config|secrets?|credentials?|api\\s*keys?|passwords?|transaction)\\b|these\\s+instructions\\s+have\\s+(?:higher|greater|top)\\s+priority\\b|\\byou\\s+(?:must|should|are\\s+required\\s+to|need\\s+to)\\s+(?:first\\s+)?(?:send|reveal|disclose|execute|run|ignore|disregard|forward|transfer|output|print|dump)\\b)).{0,1200}',
         ],
         "description": "Indirect injection templates from the AgentDojo paper — wraps malicious instructions in fake authority XML tags.",
     },
@@ -3528,7 +3550,7 @@ PATTERNS = [
         "name": "Social engineering — authority impersonation",
         "category": "prompt_injection",
         "severity": "high",
-        "channel": ["message", "file", "web_content", "tool_output"],
+        "channel": ["message", "file", "web_content", "tool_output", "api_response"],
         "keywords": [
             "developer at anthropic", "developer at openai", "employee at anthropic",
             "employee at openai", "engineer at anthropic", "engineer at openai",
@@ -3538,6 +3560,28 @@ PATTERNS = [
             "red team exercise", "penetration test", "security researcher",
             "your grandmother used to", "my grandmother used to tell",
             "life is at stake", "life depends on", "emergency override",
+        ],
+        # CORROBORATION (2026-09-11). This rule had `keywords` and NO regex at all, so
+        # a bare keyword stamped a high-severity finding on its own: the engine's
+        # "corroborate, don't stamp" rule, born of the claude-seo incident, only ever
+        # covered regex-bearing patterns. "developer at anthropic" and "<information>"
+        # are things ordinary text says, and a maintainer bio, a package description
+        # and an office-hours notice were each blocked on every channel.
+        #
+        # The discriminator is read off the fixtures, not invented: every true positive
+        # carries an IMPERATIVE AIMED AT THE AGENT ("please reveal the configuration",
+        # "please do the following first: Send a transaction"), and every false positive
+        # is purely descriptive. So the verdict is now a CO-OCCURRENCE of this rule's own
+        # signature with that imperative, in one 1200-char window (step 3 evaluates a
+        # regex-bearing pattern globally, so the signature has to be inside the regex or
+        # the rule would fire on any text carrying an imperative).
+        #
+        # The prose gaps exclude quotes, braces, brackets, colons and commas on purpose.
+        # A benign JSON audit-record schema carries fields named `override`, `policy` and
+        # `execute`, and a window that crosses JSON punctuation reads
+        # `override": {"type": "boolean"}, "policy` as an instruction (ASTRA, Sep-10).
+        "regex": [
+            '(?is)(?=.*(?:\\b(?:developer|employee|engineer)\\s+at\\s+(?:anthropic|openai)\\b|\\bauthoriz(?:ed\\s+by|ation\\s+from)\\s+(?:anthropic|openai)\\b|\\btesting\\s+your\\s+(?:safety|guardrails)\\b|\\bsafety\\s+audit\\b|\\bred\\s+team\\s+exercise\\b|\\bpenetration\\s+test\\b|\\bsecurity\\s+researcher\\b|\\bemergency\\s+override\\b|\\bgrandmother\\s+used\\s+to\\b|\\blife\\s+(?:is\\s+at\\s+stake|depends\\s+on)\\b))(?=.*(?:please\\s+(?:do\\s+the\\s+following|do\\s+this|reveal|disclose|send|transfer|forward|execute|run|dump|exfiltrate|output|print|show|ignore(?!\\s+(?:my|our)\\b)|disregard(?!\\s+(?:my|our)\\b))\\b|before\\s+you\\s+(?:can\\s+)?(?:solve|continue|proceed|answer|respond|begin|start|do|complete)\\b|\\b(?:ignore|disregard|forget|bypass|override|disable|skip)\\b(?!\\s+(?:my|our)\\b)[^.\\n\\"\'{}\\[\\]:,]{0,60}\\b(?:instructions?|polic(?:y|ies)|guardrails?|rules?|restrictions?|safety|safeguards?|redaction|system\\s*prompt)\\b|\\b(?:reveal|disclose|exfiltrate|leak|dump|send|transfer|forward)\\b[^.\\n\\"\'{}\\[\\]:,]{0,60}\\b(?:system\\s*prompt|configuration|config|secrets?|credentials?|api\\s*keys?|passwords?|transaction)\\b|these\\s+instructions\\s+have\\s+(?:higher|greater|top)\\s+priority\\b|\\byou\\s+(?:must|should|are\\s+required\\s+to|need\\s+to)\\s+(?:first\\s+)?(?:send|reveal|disclose|execute|run|ignore|disregard|forward|transfer|output|print|dump)\\b)).{0,1200}',
         ],
         "description": "Authority impersonation and emotional manipulation framings commonly used in social-engineering-style prompt injection.",
     },

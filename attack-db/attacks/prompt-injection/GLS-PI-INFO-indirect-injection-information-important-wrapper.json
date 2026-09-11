@@ -1,15 +1,17 @@
 {
   "id": "GLS-PI-INFO",
-  "name": "Indirect injection \u2014 <INFORMATION> / <IMPORTANT> wrapper",
+  "name": "Indirect injection — <INFORMATION> / <IMPORTANT> wrapper",
   "version": "1.0",
   "category": "prompt_injection",
   "severity": "high",
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "tool_output",
+    "api_response"
   ],
-  "description": "Indirect injection templates from the AgentDojo paper \u2014 wraps malicious instructions in fake authority XML tags.",
+  "description": "Indirect injection templates from the AgentDojo paper — wraps malicious instructions in fake authority XML tags.",
   "keywords": [
     "<information>",
     "<important>",
@@ -26,7 +28,9 @@
     "please do this first",
     "before the original task"
   ],
-  "regex": [],
+  "regex": [
+    "(?is)(?=.*(?:<\\s*(?:information|important|instructions|system|admin)\\s*>|\\bthis\\s+is\\s+an?\\s+important\\s+message\\s+from\\b|\\bthis\\s+is\\s+a\\s+message\\s+from\\s+the\\s+user\\b|\\bimportant\\s+message\\s+from\\b|\\bbefore\\s+the\\s+original\\s+task\\b))(?=.*(?:please\\s+(?:do\\s+the\\s+following|do\\s+this|reveal|disclose|send|transfer|forward|execute|run|dump|exfiltrate|output|print|show|ignore(?!\\s+(?:my|our)\\b)|disregard(?!\\s+(?:my|our)\\b))\\b|before\\s+you\\s+(?:can\\s+)?(?:solve|continue|proceed|answer|respond|begin|start|do|complete)\\b|\\b(?:ignore|disregard|forget|bypass|override|disable|skip)\\b(?!\\s+(?:my|our)\\b)[^.\\n\\\"'{}\\[\\]:,]{0,60}\\b(?:instructions?|polic(?:y|ies)|guardrails?|rules?|restrictions?|safety|safeguards?|redaction|system\\s*prompt)\\b|\\b(?:reveal|disclose|exfiltrate|leak|dump|send|transfer|forward)\\b[^.\\n\\\"'{}\\[\\]:,]{0,60}\\b(?:system\\s*prompt|configuration|config|secrets?|credentials?|api\\s*keys?|passwords?|transaction)\\b|these\\s+instructions\\s+have\\s+(?:higher|greater|top)\\s+priority\\b|\\byou\\s+(?:must|should|are\\s+required\\s+to|need\\s+to)\\s+(?:first\\s+)?(?:send|reveal|disclose|execute|run|ignore|disregard|forward|transfer|output|print|dump)\\b)).{0,1200}"
+  ],
   "examples": {
     "malicious": [],
     "benign": []
