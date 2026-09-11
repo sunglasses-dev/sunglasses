@@ -473,6 +473,21 @@ private key files are named individually and matching is boundary-aware, so
   `aws configure set` and ordinary credential setup, and a guard that shoots
   healthy work gets uninstalled. Resolving it properly needs the resident
   process in v0.5. **Do not read the two fixes in 0.4.2 as closing this.**
+- **A Bash command that only NAMES a protected path is still denied.** If your
+  policy lists a path under `blocked_paths`, writing documentation about that
+  path through a shell heredoc is refused exactly like writing to it. The file
+  tools were repaired in 0.5.7 and read their documented path fields, so `Write`
+  and `Edit` treat their content as data. Bash was not, and that is deliberate.
+  Two attempts to subtract quoted heredoc bodies before asking the path question
+  both let real operations through. An independent review executed nine shapes
+  where the parser removed text the shell actually runs, including a quoted
+  heredoc piped into `bash`, an apparent opener inside a comment or inside an
+  arithmetic shift and a delimiter word longer than the token matched. Judging
+  the whole command costs a false positive on prose. Guessing at the structure
+  cost real deletions, so a Bash command is judged on all of its text until a
+  real grammar exists. A test asserts this limit is still here and it is what
+  fails when the lane is repaired.
+
 - **The WARN lane is off by default**, and the reasons are measurements, not
   taste: 1 of 39 ordinary tool calls escalates (a plain `curl -s pypi.org` reads
   as a dangerous shell command), and it costs ~902ms per call because the

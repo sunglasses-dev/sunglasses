@@ -335,3 +335,23 @@ v0.6, not a coverage repair made at the end of a repair release.
 **Reproduce:** commit a GIF whose second frame carries an instruction and a TIFF whose
 ImageDescription carries the same one; `scan --repo` finds the TIFF and names the GIF as
 skipped, `scan --file` finds both.
+
+
+## Open limit as of 0.5.7 (2026-09-10)
+
+`blocked_paths` in the firewall policy asks what a call touches. For `Write`,
+`Edit`, `MultiEdit`, `NotebookEdit` and `Read` that question is now answered
+from the documented path fields, so prose that names a protected path is no
+longer treated as touching it.
+
+For `Bash` the same false positive is still open, on purpose. Subtracting the
+quoted heredoc bodies from a command before asking the path question was tried
+twice and was unsafe both times. An independent review executed nine commands
+where the parser removed text the shell really runs and seven of them survived
+the hardened second attempt. The failure underneath is that a fallback for a
+parser which fails does nothing for a parser which is confidently wrong.
+
+So a Bash command is judged on all of its text. Writing about a blocked path in
+a shell heredoc is refused. The repair needs a real shell grammar rather than
+another special case, and `tests/test_firewall_policy_action_surface.py` carries
+a named test asserting the limit is still present.
