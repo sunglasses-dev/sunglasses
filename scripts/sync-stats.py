@@ -91,8 +91,12 @@ def sync_readme(stats):
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
         # What Works Today line
-        (r'Text scanning: \d+ patterns, \d+ keywords, 13 languages, \d+ attack categories',
-         f'Text scanning: {stats["patterns"]} patterns, {stats["keywords"]} keywords, 13 languages, {stats["categories"]} attack categories'),
+        # The language count was a LITERAL here on both sides, so this line would have
+        # re-emitted 13 no matter what the patterns said. It reads the typed field now,
+        # which tools/gen_language_stats.py measures from patterns.py.
+        (r'Text scanning: \d+ patterns, \d+ keywords, \d+ languages, \d+ attack categories',
+         f'Text scanning: {stats["patterns"]} patterns, {stats["keywords"]} keywords, '
+         f'{stats["dedicated_pattern_languages"]} languages, {stats["categories"]} attack categories'),
     ]
     return update_file(readme, replacements, "README.md")
 
