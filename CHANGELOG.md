@@ -8,6 +8,17 @@ All notable changes to Sunglasses are documented here.
 ### Changed
 - CI: the `pattern-integrity` workflow now runs four jobs on every pull request: `classify` (a fail-closed, stdlib classifier in `scripts/ci_classify.py` reads the complete change list and requires the full matrix unless every changed path is documentation), `fast` (one Python, the same five blocking gates, the suite minus the two v0.5.6 acceptance modules), `integrity` (the unchanged six-Python matrix, run whenever `classify` requires it, and always on pushes to `main`, release tags, nightly and on demand), and `coverage` (the single check merge automation reads; it fails unless the required work succeeded). Documentation-only pull requests no longer wait ~3 h for the matrix; code changes still get it before merge. `tests/test_ci_gate.py` guards the workflow structure and the classifier.
 
+## [0.5.7] — 2026-09-10
+
+### Fixed
+- **A `blocked_paths` policy now asks what a call TOUCHES, not what its text mentions.** For `Write`, `Edit`, `MultiEdit`, `NotebookEdit` and `Read` the firewall reads the documented path fields, so `content` and `new_string` are data rather than targets. Writing documentation that NAMES a protected path is no longer denied like writing TO it. Narrowing applies only when the tool input matches the documented schema and carries a target; a missing target, a falsy one, or a key the schema does not list is judged on every value, as before.
+
+### Known limitation
+- **The same false positive is still present for `Bash` and is deliberately unfixed.** Two attempts to subtract quoted heredoc bodies before asking the path question both let real operations through: an independent review executed nine shapes where the parser removed text the shell runs, including a quoted heredoc piped into `bash`, an apparent opener inside a comment or inside `$((1 << n))`, and a delimiter word longer than the token matched. Subtracting from shell syntax safely needs a real grammar, so a `Bash` command is judged on all of its text and one whose text only NAMES a blocked path is still denied. A test asserts this, and it is what fails when the lane is repaired.
+
+### Unchanged
+- 1,540 patterns, 118 categories, 6,642 keywords. This release adds no patterns and no blog.
+
 ## [0.5.6] — 2026-09-09
 
 > Trust repair. No new patterns (1540 / 118 categories unchanged) and no new parsers.
