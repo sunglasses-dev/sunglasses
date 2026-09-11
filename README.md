@@ -1,12 +1,12 @@
 # SUNGLASSES
 
-[![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
+[![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg?branch=main&event=push)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
 [![PyPI](https://img.shields.io/pypi/v/sunglasses)](https://pypi.org/project/sunglasses/)
 [![python: 3.9 – 3.14](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/sunglasses-dev/sunglasses/blob/main/.github/workflows/pattern-integrity.yml)
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**Check outside content for prompt-injection patterns before your AI agent acts on it.**
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,540 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run.
 
 Sunglasses is a local, open-source scanner for text and supported files. It reports what
 it matched **and what it could not read**, so you can decide what to pass onward. It
@@ -338,7 +338,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 ## What Works Today
 
-- ✅ Text scanning: 1,1540 patterns, 6,931 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
+- ✅ Text scanning: 1,540 patterns, 6,931 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
