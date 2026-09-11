@@ -2189,8 +2189,13 @@ def test_the_matrix_has_no_undeclared_or_silently_dropped_cells():
             assert isinstance(value.why, str) and len(value.why) > 20, (
                 f"{sid}/{state}: N/A without a checkable reason")
         elif M.is_alias(value):
-            assert value.state in dict((s[0], s) for s in
-                                       [(st[0],) for st in M.STATES]) or True
+            # Was `... or True`, which made it vacuous: an alias could point
+            # at a state that does not exist and this still passed. Found by
+            # tests/test_assertions_can_fail.py, 2026-09-11.
+            declared = {st[0] for st in M.STATES}
+            assert value.state in declared, (
+                f"{sid}/{state}: alias points at {value.state!r}, which is not "
+                f"a declared state ({sorted(declared)})")
             assert isinstance(value.why, str) and len(value.why) > 20, (
                 f"{sid}/{state}: alias without a stated equivalence")
             assert M.MATRIX[(sid, value.state)] in M.OUTCOMES, (
