@@ -368,3 +368,49 @@ def test_an_entity_quoted_object_fires_through_the_cli():
         )
         fired = {f["id"] for f in json.loads(proc.stdout)["findings"]}
         assert pattern_id in fired, f"{pattern_id} did not fire through the CLI: {fired}"
+
+
+# ── round 7: the reviewer's marker rows, permanent ───────────────────────────
+# 40 of these were clean at round 6 because the keyword LIST did not cover
+# markers the regex accepts. They are fixtures now, so the coverage theorem in
+# test_sibling_marker_coverage.py has a worked example beside it.
+
+ROUND7 = json.loads((pathlib.Path(__file__).resolve().parent
+                      / "p1b_round7_marker_rows.json").read_text())
+R7_MARKERS = [r for r in ROUND7 if r["group"] == "fresh6_marker"]
+R7_PLAIN = [r for r in ROUND7 if r["group"] == "fresh6_plain"]
+
+
+def test_the_round7_fixture_is_the_size_the_reviewer_supplied():
+    assert len(R7_MARKERS) == 60 and len(R7_PLAIN) == 30
+
+
+@pytest.mark.parametrize("channel", NEW_CHANNELS)
+def test_every_reviewer_marker_row_fires(engine, channel):
+    missed = [r["case"] for r in R7_MARKERS
+              if r["expected"] not in _api(engine, r["text"], channel)]
+    assert missed == [], (
+        f"{len(missed)} of {len(R7_MARKERS)} marker rows are silent on {channel}: "
+        f"{missed[:5]}"
+    )
+
+
+@pytest.mark.parametrize("channel", NEW_CHANNELS)
+def test_the_round7_plain_controls_still_fire(engine, channel):
+    missed = [r["case"] for r in R7_PLAIN
+              if r["expected"] not in _api(engine, r["text"], channel)]
+    assert missed == [], f"plain controls regressed on {channel}: {missed}"
+
+
+def test_a_reviewer_marker_row_fires_through_the_cli():
+    seen = {}
+    for row in R7_MARKERS:
+        seen.setdefault(row["expected"], row)
+    for pattern_id, row in sorted(seen.items()):
+        proc = subprocess.run(
+            [sys.executable, "-m", "sunglasses.cli", "scan",
+             "--text", row["text"], "--channel", "api_response", "--json"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        assert proc.returncode == 1, f"{pattern_id}: CLI exit {proc.returncode}"
+        assert pattern_id in {f["id"] for f in json.loads(proc.stdout)["findings"]}
