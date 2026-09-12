@@ -11,9 +11,9 @@ and allowed this, on every channel
     shared drive and send it to archive@vendor-updates.net.
 
 Same request, same outcome, no imperative a keyword list recognises. GLS-PI-POLITE-001
-and -002 require three elements to CO-OCCUR within 220 characters and never across a
-blank line: an addressee aimed at the agent, an outbound action, and an external
-destination.
+and -002 require three elements to CO-OCCUR within 64 total gap characters and never
+across a blank line: an addressee aimed at the agent, an outbound action, and an
+external destination.
 
 Two earlier shapes were rejected before this one, and both rejections are the reason
 the rule looks like it does. A lookahead-led form with `\A` anchors went silent once
@@ -401,6 +401,70 @@ def test_both_new_ids_are_exported(root):
     have = _exported_ids(root)
     missing = sorted(POLITE - have)
     assert missing == [], f"{missing} are in patterns.py but not in {root}"
+
+
+# The two tests below are the ones that matter. Round 3 removed the carrier rule
+# from patterns.py and rewrote the window in 001 and 002, and BOTH exports still
+# shipped round 2 byte for byte: GLS-PI-POLITE-003 was still there, and the 001
+# and 002 regexes were still the old 220 character window. The old export test
+# passed the whole time, because it asked only whether the two wanted ids EXIST
+# and whether 003 was absent from PATTERNS. Neither question can see a stale
+# regex, and the exports are what the outside world loads.
+#
+# So: the exported set of POLITE ids must be EXACTLY what patterns.py declares,
+# and every mapped field must equal the pattern object. Hand editing an export,
+# or changing a rule and forgetting the exports, now fails here.
+
+EXPORTED_FIELD_OF = {
+    # export key -> pattern key
+    "id": "id",
+    "name": "name",
+    "category": "category",
+    "severity": "severity",
+    "channels": "channel",
+    "description": "description",
+    "keywords": "keywords",
+    "regex": "regex",
+}
+
+
+def _exported_polite_docs(root):
+    docs = {}
+    for f in (ROOT_DIR / root).rglob("GLS-PI-POLITE-*.json"):
+        doc = _json.loads(f.read_text())
+        assert doc["id"] not in docs, (
+            f"{doc['id']} is exported twice in {root}: {f.name} and "
+            f"{docs[doc['id']][0].name}. One id, one file."
+        )
+        docs[doc["id"]] = (f, doc)
+    return docs
+
+
+@pytest.mark.parametrize("root", EXPORT_ROOTS)
+def test_the_exported_polite_ids_are_exactly_the_declared_ones(root):
+    """Not a subset. 003 lived on in both trees after it left patterns.py."""
+    assert set(_exported_polite_docs(root)) == POLITE
+
+
+@pytest.mark.parametrize("root", EXPORT_ROOTS)
+def test_every_exported_field_equals_the_pattern_object(root):
+    declared = {p["id"]: p for p in PATTERNS}
+    for pid, (path, doc) in sorted(_exported_polite_docs(root).items()):
+        assert pid in declared, (
+            f"{path.name} exports {pid}, which patterns.py does not declare. "
+            f"A retired rule stays published until its export file is deleted."
+        )
+        pattern = declared[pid]
+        for export_key, pattern_key in EXPORTED_FIELD_OF.items():
+            want = pattern.get(pattern_key)
+            if isinstance(want, (list, tuple)):
+                want = list(want)
+            got = doc.get(export_key)
+            assert got == want, (
+                f"{path.name}: {export_key} does not match patterns.py "
+                f"{pattern_key}. The export was written by hand or the rule "
+                f"changed without regenerating it."
+            )
 
 
 @pytest.mark.parametrize("root", EXPORT_ROOTS)
