@@ -521,14 +521,23 @@ private key files are named individually and matching is boundary-aware, so
   audit-trail failure never weakens a DENY — the block is enforced whether or
   not it can be written down.
 
+  One failure cannot write that receipt at all: if the
+  harness kills the hook on its timeout, nothing runs to write anything.
+  So an `in_flight` record is appended *before* the check begins, and the
+  decision record references it. A killed evaluation leaves an orphan, and
+  `sunglasses receipts --verify` names it and exits non-zero. That does not
+  make the hook fail closed, which is the harness's contract rather than
+  ours. It makes the failure visible instead of silent.
+
 ### Cost
 
 ~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
 is 19ms of that). Zero network calls — nothing about your work leaves the
 machine. An invocation appends to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`
-when the write succeeds, recording a SHA-256 of the tool input and never the
-input itself. A hook killed during the policy read never reaches the write, so
-"every invocation appends" is not a promise this makes.
+when the write succeeds, two lines rather than one (the check starting and
+the decision), recording a SHA-256 of the tool input and never the input
+itself. A hook killed during the policy read never reaches the write, so
+"every invocation appends two lines" is not a promise this makes.
 
 ## Roadmap
 

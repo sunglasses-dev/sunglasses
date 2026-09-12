@@ -1082,6 +1082,63 @@ def _warn_if_hook_interpreter_missing():
                     return
 
 
+
+def _verify_lifecycle(rows, directory):
+    """Pair each in_flight record with its terminal record and name the orphans.
+
+    An orphan is a call the firewall began evaluating and never finished: the
+    harness killed the hook on its timeout, or the process died. Both FAIL OPEN,
+    and before these records existed both were invisible — no receipt at all,
+    which reads exactly like a hook that was never installed.
+
+    Receipts written before this existed carry no `kind`. They are terminal
+    records by definition and are counted as such rather than reported as
+    orphans, because a legacy line is not evidence of a missed call.
+    """
+    in_flight, terminal, legacy = {}, set(), 0
+    for r in rows:
+        kind = r.get("kind")
+        if kind == "in_flight":
+            in_flight[r.get("eval_id")] = r
+        elif kind == "decision":
+            terminal.add(r.get("eval_id"))
+        else:
+            legacy += 1
+
+    orphans = [(eid, rec) for eid, rec in in_flight.items() if eid not in terminal]
+    # A terminal record with no opening line means the pair was split across a
+    # day boundary or the opening write failed. Worth naming, not worth failing.
+    dangling = sorted(terminal - set(in_flight))
+
+    print(f"\n  {BOLD}SUNGLASSES receipt lifecycle{RESET} {DIM}({directory}){RESET}")
+    print(f"  {DIM}{'─' * 52}{RESET}")
+    print(f"  evaluations started   {CYAN}{len(in_flight)}{RESET}")
+    print(f"  decisions recorded    {CYAN}{len(terminal)}{RESET}")
+    if legacy:
+        print(f"  legacy lines          {DIM}{legacy}  (written before lifecycle records){RESET}")
+    if dangling:
+        print(f"  decisions with no opening line  {YELLOW}{len(dangling)}{RESET} "
+              f"{DIM}(day boundary, or the opening write failed){RESET}")
+
+    if not orphans:
+        print(f"\n  {GREEN}{BOLD}No orphans.{RESET} "
+              f"{DIM}Every evaluation that started also finished.{RESET}\n")
+        return 0
+
+    from .firewall import sanitize_receipt_field as _clean
+    print(f"\n  {RED}{BOLD}{len(orphans)} evaluation(s) started and never finished.{RESET}")
+    print(f"  {DIM}A killed or crashed hook FAILS OPEN: the tool call proceeded "
+          f"unchecked.{RESET}\n")
+    for eid, rec in orphans[:20]:
+        print(f"    {RED}orphan{RESET} {DIM}{_clean(rec.get('ts'))}{RESET} "
+              f"{BOLD}{_clean(rec.get('tool_name')) or '(unknown tool)'}{RESET} "
+              f"{DIM}eval {eid}{RESET}")
+    if len(orphans) > 20:
+        print(f"    {DIM}... and {len(orphans) - 20} more{RESET}")
+    print()
+    return 1
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
@@ -1115,6 +1172,9 @@ def cmd_receipts(args):
                     rows.append(_json.loads(line))
                 except ValueError:
                     continue
+
+    if getattr(args, "verify", False):
+        return _verify_lifecycle(rows, directory)
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
@@ -1918,6 +1978,10 @@ def main():
     receipts_parser.add_argument("--today", action="store_true", help="Today only")
     receipts_parser.add_argument("--limit", type=int, default=40,
                                  help="Rows to show (default 40)")
+    receipts_parser.add_argument(
+        "--verify", action="store_true",
+        help="Pair every started evaluation with its decision and name the orphans. "
+             "An orphan is a call the hook began and never finished, which fails open.")
     receipts_parser.set_defaults(func=cmd_receipts)
 
     # demo
