@@ -140,7 +140,7 @@ PATTERNS = [
 
     {
         "id": "GLS-PI-021-API",
-        "name": 'Social engineering — authority impersonation (api_response reach)',
+        "name": 'Authority impersonation to disclosure (api_response)',
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
@@ -152,7 +152,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PI-INFO-API",
-        "name": 'Indirect injection — INFORMATION wrapper (api_response reach)',
+        "name": 'INFORMATION wrapper injection (api_response)',
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
@@ -164,7 +164,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PI-013-API",
-        "name": 'Malicious README agent targeting (api_response reach)',
+        "name": 'Malicious README agent targeting (api_response)',
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
@@ -176,7 +176,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PIEMN-001-API",
-        "name": 'Hidden comment agent instruction (api_response reach)',
+        "name": 'Hidden comment agent instruction (api_response)',
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
@@ -188,7 +188,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PI-016-API",
-        "name": 'Policy override chained to prompt exfiltration (api_response reach)',
+        "name": 'Policy override to prompt exfiltration (api_response)',
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
@@ -200,7 +200,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PI-017-API",
-        "name": 'Redaction override with secret disclosure (api_response reach)',
+        "name": 'Redaction override to secret disclosure (api_response)',
         "category": "prompt_injection",
         "severity": "critical",
         "channel": ["api_response", "log_memory", "agent_input"],
