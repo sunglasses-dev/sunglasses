@@ -190,6 +190,65 @@ def requirement(pattern_source: str):
     return tuple(folded)
 
 
+# Opcodes that consume exactly one character.
+_ONE_CHAR = {"LITERAL", "NOT_LITERAL", "ANY", "IN", "RANGE", "CATEGORY"}
+# Opcodes that consume nothing: anchors and lookarounds.
+_ZERO_WIDTH = {"AT", "ASSERT", "ASSERT_NOT", "NEGATE"}
+
+
+def _max_len(seq):
+    """Longest string this parse tree can consume, or None when unbounded.
+
+    Deliberately conservative: an opcode this does not recognise returns None,
+    because the only caller uses the number to bound a search window and a bound
+    that is too small silently loses matches.
+    """
+    total = 0
+    for op, av in seq:
+        name = getattr(op, "name", str(op))
+        if name in _ZERO_WIDTH:
+            continue
+        if name in _ONE_CHAR:
+            total += 1
+        elif name == "SUBPATTERN":
+            inner = _max_len(av[3])
+            if inner is None:
+                return None
+            total += inner
+        elif name == "ATOMIC_GROUP":
+            inner = _max_len(av)
+            if inner is None:
+                return None
+            total += inner
+        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            _, hi, sub = av
+            if hi >= _sre_parse.MAXREPEAT:
+                return None
+            inner = _max_len(sub)
+            if inner is None:
+                return None
+            total += hi * inner
+        elif name == "BRANCH":
+            widest = 0
+            for branch in av[1]:
+                inner = _max_len(branch)
+                if inner is None:
+                    return None
+                widest = max(widest, inner)
+            total += widest
+        else:
+            return None                      # GROUPREF, GROUPREF_EXISTS, ...
+    return total
+
+
+def max_match_length(pattern_source: str):
+    """Longest match this regex can produce, or None when it is unbounded."""
+    try:
+        return _max_len(_sre_parse.parse(pattern_source, re.IGNORECASE))
+    except Exception:
+        return None
+
+
 def can_skip(req, present) -> bool:
     """True when the regex provably cannot match.
 
