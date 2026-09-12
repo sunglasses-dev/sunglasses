@@ -3,7 +3,6 @@
   "patterns": 1540,
   "keywords": 6642,
   "categories": 118,
-  "languages": 23,
   "normalization_techniques": 17,
   "scan_speed_display": "~0.7ms short input, ~4ms typical attack string",
   "license": "MIT",
@@ -38,5 +37,22 @@
     "python": "3.14.6"
   },
   "scan_speed_generated_by": "tools/gen_perf_stats.py",
-  "scan_speed_generated_at": "2026-08-30T19:59:48-07:00"
+  "scan_speed_generated_at": "2026-08-30T19:59:48-07:00",
+  "dedicated_pattern_languages": 13,
+  "dedicated_patterns_per_language": {
+    "Arabic": 2,
+    "Chinese": 2,
+    "French": 2,
+    "German": 2,
+    "Hindi": 2,
+    "Indonesian": 2,
+    "Japanese": 2,
+    "Korean": 2,
+    "Portuguese": 2,
+    "Russian": 2,
+    "Spanish": 2,
+    "Turkish": 2,
+    "Vietnamese": 2
+  },
+  "language_stats_generated_by": "tools/gen_language_stats.py"
 }

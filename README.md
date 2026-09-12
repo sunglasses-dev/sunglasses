@@ -121,7 +121,7 @@ It flags; it does not silently strip. Content it cannot inspect — an archive, 
 - QR Codes: decode QR codes and barcodes, scan content
 
 **What it catches:**
-- Prompt injection (English-first; dedicated non-English patterns in 23 languages — see [Language coverage](#language-coverage-measured))
+- Prompt injection (English-first; dedicated non-English patterns in 13 languages, two patterns each — see [Language coverage](#language-coverage-measured))
 - Credential exfiltration
 - Command injection
 - Memory poisoning
@@ -282,7 +282,7 @@ result = scanner.scan_auto("any_file.ext")
 | Sustained throughput | ~26 KB/sec, single-threaded |
 | Patterns | 1,540 |
 | Keywords | 6,931 unique declared (7,683 entries across all patterns); the pre-screen index holds 6,642 — 289 generic keywords are deliberately excluded from it. `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
-| Languages | English-first: full ruleset in English · 2 dedicated patterns each in 23 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
+| Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 118 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
@@ -562,7 +562,7 @@ SUNGLASSES is risk reduction, not magic.
 
 - **Pattern-based**: catches known attack patterns and variants. Novel zero-day attacks may pass until patterns are added.
 - **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist — report them.
-- **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 23 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
+- **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 13 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
 - **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
