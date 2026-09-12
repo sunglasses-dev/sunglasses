@@ -219,11 +219,23 @@ jobs:
     needs: classify
     if: needs.classify.outputs.full == 'true'
     runs-on: ubuntu-latest
-    # Measured on run 34583112120 (PR #140, full matrix): legs ran 40.8 to 90.4 min,
-    # the slowest being 3.9. 120 leaves ~33% headroom over the worst observed leg and
-    # still turns a hang into a failure instead of a six-hour wait. Lower it when the
-    # regex prefilter work lands and the real numbers drop.
-    timeout-minutes: 120
+    # 180, and the reason is that 120 was measured on a quiet runner.
+    #
+    # Run 34583112120 (PR #140, full matrix) had legs of 40.8 to 90.4 min on an
+    # uncontended queue, and 120 looked like 33% headroom. Under contention it is
+    # not headroom at all. Run 34632419075 attempt 3 is the receipt: its six
+    # integrity legs sat QUEUED for 13 hours, started at 07:40Z, and five of them
+    # ended at 09:40:26Z — exactly 120 minutes, to the second, which is this
+    # timeout killing them. GitHub renders a timeout kill as CANCELLED, so it does
+    # not even read as a failure. Only 3.9 finished, at 93 min. On the same night
+    # main's own legs took 57 to 90 min with three workflows sharing the runners.
+    #
+    # So the old value failed its own matrix precisely when the queue was busy,
+    # which is exactly when it matters. A timeout is there to turn a hang into a
+    # failure, not to turn a slow queue into one.
+    #
+    # Lower it when the regex prefilter work lands and the real numbers drop.
+    timeout-minutes: 180
     # One version was tested while setup.py claimed five. A support claim backed by
     # no run is the same class of defect as a published number with no generator:
     # believable, unverified, and only discovered by the user it breaks.
