@@ -497,6 +497,13 @@ private key files are named individually and matching is boundary-aware, so
   permission flow rather than wedging your agent. A *dead control* is different:
   if the policy file is missing, empty, unreadable or unparseable, or if the audit
   trail cannot be written, the firewall now ASKS and names which control is down,
+  and unreadable includes the shapes that are not a file you can read at all: a
+  FIFO, socket, device node or directory in that path is answered from metadata
+  before anything opens it, because a FIFO with no writer blocks in the kernel
+  and a blocked hook is timed out by the harness and fails open. A NUL byte
+  anywhere in the policy counts as unparseable, comments included: YAML will
+  happily keep one inside a value, and a path with a NUL in it silently matches
+  nothing, which is the one answer indistinguishable from a clean scan.
   because an empty answer on the wire is indistinguishable from "checked, nothing
   found". A missing policy only counts as dead where one was installed; a machine
   that never configured one is not nagged.
