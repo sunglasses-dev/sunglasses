@@ -78,13 +78,32 @@ exists to prove exactly this, and builds its payload as `"a " * n` — the
 whitespace-separated shape, which is the fast one. The gate has been green
 throughout while the quadratic shape was unbounded underneath it.
 
-**Status.** Not fixed in v0.5.6. v0.5.6 is a scoped trust repair, and the fix
-belongs in the matcher; landing it unreviewed at the end of a repair release is
-the kind of change this release exists to avoid. A ratio-based regression test
-(`test_engine_cost_is_linear_only_for_whitespace_separated_input`) documents the
-curve without asserting a wall-clock ceiling. Being fixed in v0.6, along with a
-bounded mitigation so that an unscannable input shape fails **visibly** instead
-of failing open.
+**Status.** Not fixed in v0.5.6, and PARTLY reduced since. v0.5.6 is a scoped
+trust repair and the fix belongs in the matcher; landing it unreviewed at the end
+of a repair release is the kind of change this release exists to avoid.
+
+Updated 2026-09-12. The curve no longer reproduces on documents the prefilter can
+SKIP. A rule whose alternation contained a bare character class used to derive no
+required literal at all, which made the whole rule unskippable and meant an
+expensive branch ran on documents that could not possibly match it: a 27 KB
+document of one long word cost **255 seconds** for that reason. The deriver now
+takes a required-character clause from such a branch, the document is skipped
+unread, and the same scan is **0.03 s**. No pattern changed and detection is
+identical across 2,746 documents on 7 channels.
+
+That reduces the reachable surface; it does not remove the curve. The blowup
+still reproduces whenever the prefilter CANNOT skip, which is any document that
+genuinely contains the rule's literals. The surviving measured case is a 27 KB
+document holding the literal `decode` and a long run that never completes the
+match: **207 s**, unchanged before and after the skip work. That case, and the
+two other rules with an unbounded wide class beside an underivable branch, are
+the bounding work order.
+
+`test_engine_cost_is_linear_only_for_whitespace_separated_input` now asserts the
+skip keeps working rather than asserting the blowup reproduces, and names the
+207 s case as the evidence that the gap is still real. Bounded mitigation, so
+that an unscannable input shape fails **visibly** instead of failing open,
+remains a v0.6 item.
 
 **Until then:** treat the firewall as best-effort on inputs containing very long
 unbroken tokens. The static scanner still does not execute scanned content;
