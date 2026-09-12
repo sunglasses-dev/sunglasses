@@ -572,3 +572,93 @@ def test_ledger_of_benign_shapes_other_rules_still_block(engine, name, rules):
     for ch in CHANNELS:
         found |= {f.get("id") for f in (engine.scan(text, channel=ch).findings or [])}
     assert not found, f"{name} blocked by {sorted(found)}"
+
+
+# ── ROUND 3: the attack SPACE, generated rather than sampled ─────────────────
+#
+# Rounds 1 and 2 were each rejected for the same class of defect. Every escape a
+# reviewer demonstrated was one point in a product (verb x filler x object x
+# wrapper), and every fix was a point repair, so the next probe found the next
+# point. This enumerates the product instead.
+
+from tests.p1b_attack_space import cases as _attack_space   # noqa: E402
+import json as _json                                        # noqa: E402
+import pathlib as _pathlib                                  # noqa: E402
+
+ATTACK_SPACE = list(_attack_space())
+REVIEW_MATRIX = _json.loads(
+    (_pathlib.Path(__file__).resolve().parent / "p1b_review_matrix.json").read_text())
+REVIEW_ATTACKS = [r for r in REVIEW_MATRIX
+                  if r.get("expected_id") in REPAIRED and r["group"] == "boundary_attack"]
+REVIEW_BENIGN = [r for r in REVIEW_MATRIX if r["group"] == "boundary_benign"]
+
+
+def test_the_generated_attack_space_is_big_enough_to_mean_something():
+    assert len(ATTACK_SPACE) >= 500, (
+        f"the sweep produced {len(ATTACK_SPACE)} cases; a handful of samples is what "
+        "rounds 1 and 2 were rejected for"
+    )
+
+
+def test_every_generated_variant_fires_its_rule(engine):
+    """All of them, not a sample of them. One loop so a failure lists the shapes."""
+    missed = [(rule, text) for rule, text in ATTACK_SPACE
+              if rule not in _hits(engine, text, "api_response")]
+    assert missed == [], (
+        f"{len(missed)} of {len(ATTACK_SPACE)} generated variants escaped, e.g. "
+        f"{[t for _, t in missed[:3]]}"
+    )
+
+
+@pytest.mark.parametrize("row", REVIEW_ATTACKS, ids=[r["case"] for r in REVIEW_ATTACKS])
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_review_matrix_attacks_fire(engine, row, channel):
+    assert row["expected_id"] in _hits(engine, row["text"], channel), (
+        f"{row['case']} on {channel}: {row['text'][:70]}"
+    )
+
+
+@pytest.mark.parametrize("row", REVIEW_BENIGN, ids=[r["case"] for r in REVIEW_BENIGN])
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_review_matrix_benign_controls_stay_clean(engine, row, channel):
+    """The ordinary-request boundary.
+
+    "Please send the public safety newsletter to reception" has the verb and the
+    word `safety` in it. It is clean because `safety` is not the HEAD of its
+    phrase, which is the rule that lets the filler grammar be permissive.
+    """
+    hits = _hits(engine, row["text"], channel)
+    assert not hits, f"{row['case']} on {channel}: {sorted(hits)} blocked an ordinary request"
+
+
+def test_control_dropping_the_head_rule_blocks_ordinary_requests(engine):
+    """Without the head requirement the rule fires on a nearby sensitive WORD.
+
+    That is exactly the round-2 rejection: "safety newsletter" is not a safety
+    policy, and a rule that cannot tell them apart is matching vocabulary rather
+    than an operation.
+    """
+    HEAD_ASSERTION = (
+        "(?=[\\s\\\"'`\u201d\u2019\u00bb)\\]]*"
+        "(?:[.,;:!?<\\n]|$|\\b(?:to|from|in|into|via|before|after|and|then|now|first"
+        "|immediately)\\b))")
+    weakened = []
+    for p in PATTERNS:
+        if p["id"] in REPAIRED:
+            p = copy.deepcopy(p)
+            stripped = [r.replace(HEAD_ASSERTION, "") for r in p["regex"]]
+            assert stripped != p["regex"], (
+                "the head assertion was not found, so this control would silently "
+                "test the unmodified rule and prove nothing"
+            )
+            p["regex"] = stripped
+        weakened.append(p)
+    eng = SunglassesEngine(weakened)
+    newsletter = [r for r in REVIEW_BENIGN if "newsletter" in r["text"]]
+    assert newsletter, "the review matrix should carry the newsletter control"
+    fired = [r["case"] for r in newsletter
+             if {f.get("id") for f in (eng.scan(r["text"], channel="api_response").findings or [])} & REPAIRED]
+    assert fired, (
+        "removing the head rule must bring the ordinary-request false positives back; "
+        "if it does not, the head rule is not what stops them and this proves nothing"
+    )
