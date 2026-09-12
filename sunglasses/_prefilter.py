@@ -101,6 +101,60 @@ def _leading_run(seq):
     return "".join(run)
 
 
+def _class_requirement(seq):
+    """A ClassClause when this branch cannot match without one of its characters.
+
+    Only for the unambiguous shape: a bare character class repeated at least
+    once, with nothing else in the branch that could carry the match. Anything
+    less certain returns None, because a wrong clause here would SKIP a regex
+    that could have matched, and a missed skip only costs time.
+    """
+    # A capturing group around the class is the common shape: `([\u2800-\u28FF]{8,})`
+    core = [(op, av) for op, av in seq if str(op) != "AT"]
+    if len(core) == 1 and str(core[0][0]) == "SUBPATTERN":
+        return _class_requirement(core[0][1][-1])
+
+    ranges, seen_repeat = [], False
+    for op, av in seq:
+        name = str(op)
+        if name in ("MAX_REPEAT", "MIN_REPEAT"):
+            lo, _hi, item = av
+            if lo < 1 or len(item) != 1 or str(item[0][0]) != "IN":
+                return None
+            got = _class_ranges(item[0][1])
+            if not got:
+                return None
+            ranges, seen_repeat = got, True
+        elif name == "IN":
+            got = _class_ranges(av)
+            if not got:
+                return None
+            ranges, seen_repeat = got, True
+        elif name == "AT":
+            continue
+        else:
+            return None          # something else could carry the match
+    if not seen_repeat or not ranges:
+        return None
+    return ClassClause(ranges)
+
+
+def _class_ranges(items):
+    """Ranges of a positive character class, or None if it is negated/complex."""
+    out = []
+    for op, av in items:
+        name = str(op)
+        if name == "NEGATE":
+            return None          # a negated class matches almost everything
+        if name == "RANGE":
+            out.append((av[0], av[1]))
+        elif name == "LITERAL":
+            out.append((av, av))
+        else:
+            return None          # CATEGORY (\w, \s ...) is far too broad
+    return out or None
+
+
 def _clauses(seq):
     """CNF clauses required by one parsed sequence."""
     out, cur = [], []
@@ -152,12 +206,22 @@ def _clauses(seq):
                 if len(whole) >= MIN_LITERAL:
                     alts.append(frozenset({whole}))
                 else:
-                    alts.append(_pick(_clauses(b)))
+                    picked = _pick(_clauses(b))
+                    if picked is None:
+                        # No literal anywhere in this branch. It may still
+                        # require a CHARACTER CLASS, which is a real clause.
+                        picked = _class_requirement(b)
+                    alts.append(picked)
             # One unconstrained branch and the alternation constrains nothing.
             if alts and all(a is not None for a in alts):
-                merged = frozenset().union(*alts)
-                if all(len(l) >= MIN_LITERAL for l in merged):
-                    out.append(merged)
+                lits, klasses = set(), []
+                for a in alts:
+                    if isinstance(a, ClassClause):
+                        klasses.append(a)
+                    else:
+                        lits |= set(a)
+                if all(len(l) >= MIN_LITERAL for l in lits):
+                    out.append(Clause(lits, klasses) if klasses else frozenset(lits))
             prefix = ""
         elif name == "ASSERT":
             direction, item = av
@@ -173,6 +237,101 @@ def _clauses(seq):
     return out
 
 
+PAGE_SHIFT = 8          # a codepoint "page" is 256 characters wide
+
+
+class ClassClause:
+    """A branch that requires at least one character from a set of ranges.
+
+    A bare character class under `+` or `{n,}` carries no literal, so the CNF
+    deriver used to return NOTHING for the whole regex it sits in — one such
+    branch made every other branch in that regex unskippable, and the rule then
+    ran on every document. `GLS-ENC-ALT-210` is the worked example: a braille
+    class beside a base64 branch cost 255 seconds on a 27 KB document that could
+    not possibly match either.
+
+    The branch does require something, just not a literal: at least one
+    character inside its ranges. That is a clause, and it is cheap to answer.
+    """
+
+    __slots__ = ("ranges", "pages")
+
+    def __init__(self, ranges):
+        self.ranges = tuple(sorted(ranges))
+        # Every 256-character page the ranges touch. Answering "is any character
+        # of this class present" then costs a set intersection rather than a
+        # scan, and the page set for a document is computed once.
+        pages = set()
+        for lo, hi in self.ranges:
+            for page in range(lo >> PAGE_SHIFT, (hi >> PAGE_SHIFT) + 1):
+                pages.add(page)
+        self.pages = frozenset(pages)
+
+    def satisfied_by(self, pages_present) -> bool:
+        """Conservative: pages OVERLAP means a character MIGHT be present."""
+        return bool(self.pages & pages_present)
+
+    def __repr__(self):
+        return f"ClassClause({[(hex(a), hex(b)) for a, b in self.ranges]})"
+
+
+class Clause:
+    """One CNF clause: the document must contain a literal OR a class character.
+
+    A plain literal clause is still just a frozenset elsewhere in this module;
+    this type appears only when an alternation mixes literals with a branch whose
+    requirement is a character class.
+    """
+
+    __slots__ = ("literals", "classes")
+
+    def __init__(self, literals=(), classes=()):
+        self.literals = frozenset(literals)
+        self.classes = tuple(classes)
+
+    def satisfied_by(self, presence) -> bool:
+        for lit in self.literals:
+            if presence.has_literal(lit):
+                return True
+        return any(c.satisfied_by(presence.pages) for c in self.classes)
+
+    # A clause used to be a plain frozenset of literals and several callers
+    # still treat it as one. Iterating yields the LITERAL half, which is what
+    # every one of them wants; the class half is reached through `.classes`.
+    def __iter__(self):
+        return iter(self.literals)
+
+    def __len__(self):
+        return len(self.literals)
+
+    def __contains__(self, item):
+        return item in self.literals
+
+    def __repr__(self):
+        return f"Clause(literals={sorted(self.literals)[:3]}, classes={list(self.classes)})"
+
+
+def pages_of(text: str) -> frozenset:
+    """The 256-character pages this document touches. One pass."""
+    return frozenset(ord(ch) >> PAGE_SHIFT for ch in set(text))
+
+
+class Presence:
+    """What a document contains, as the skip test needs it."""
+
+    __slots__ = ("literals", "text", "pages")
+
+    def __init__(self, literals, text, pages):
+        self.literals = literals      # set, or None when there is no index
+        self.text = text              # folded text, kept for the fallback path
+        self.pages = pages
+
+    def has_literal(self, lit) -> bool:
+        if self.literals is not None:
+            return lit in self.literals
+        return lit in self.text
+
+
 def requirement(pattern_source: str):
     """CNF requirement for one regex source, or () when nothing is derivable."""
     try:
@@ -182,6 +341,16 @@ def requirement(pattern_source: str):
         return ()
     folded, seen = [], set()
     for c in clauses:
+        if isinstance(c, Clause):
+            lits = frozenset(fold(l) for l in c.literals)
+            if lits and not all(len(l) >= MIN_LITERAL and l.isascii() for l in lits):
+                continue
+            key = (lits, c.classes)
+            if key in seen:
+                continue
+            seen.add(key)
+            folded.append(Clause(lits, c.classes))
+            continue
         f = frozenset(fold(l) for l in c)
         if f and f not in seen and all(
                 len(l) >= MIN_LITERAL and l.isascii() for l in f):
@@ -193,16 +362,40 @@ def requirement(pattern_source: str):
 def can_skip(req, present) -> bool:
     """True when the regex provably cannot match.
 
-    `present` is the set of required literals actually found in the document
-    (see LiteralIndex), or the folded text itself when no index is in use.
+    `present` is a Presence, the set of literals found in the document, or the
+    folded text itself when no index is in use. A clause may require a literal,
+    a character class, or either.
     """
+    if isinstance(present, Presence):
+        for clause in req:
+            if isinstance(clause, Clause):
+                if not clause.satisfied_by(present):
+                    return True
+            elif not any(present.has_literal(l) for l in clause):
+                return True
+        return False
+    # Legacy callers: a bare set of literals, or the folded text. A class clause
+    # cannot be answered without the document, so it is treated as satisfiable,
+    # which costs a scan and never a finding.
     if isinstance(present, str):
         for clause in req:
-            if not any(l in present for l in clause):
+            lits = clause.literals if isinstance(clause, Clause) else clause
+            if isinstance(clause, Clause) and clause.classes:
+                if any(l in present for l in lits):
+                    continue
+                if any(c.satisfied_by(pages_of(present)) for c in clause.classes):
+                    continue
+                return True
+            if not any(l in present for l in lits):
                 return True
         return False
     for clause in req:
-        if present.isdisjoint(clause):
+        if isinstance(clause, Clause):
+            if clause.classes:
+                continue          # unanswerable here, do not skip
+            if present.isdisjoint(clause.literals):
+                return True
+        elif present.isdisjoint(clause):
             return True
     return False
 
@@ -222,7 +415,8 @@ class LiteralIndex:
         self._literals = set()
         for req in requirements:
             for clause in req:
-                self._literals |= set(clause)
+                self._literals |= set(
+                    clause.literals if isinstance(clause, Clause) else clause)
         self._automaton = None
         if not self._literals:
             return
@@ -240,7 +434,12 @@ class LiteralIndex:
         self._automaton = a
 
     def present(self, folded_text: str):
-        """Literals actually in the document, or the text itself if no index."""
-        if self._automaton is None:
-            return folded_text
-        return {found for _end, found in self._automaton.iter(folded_text)}
+        """What the document contains: literals found, plus its codepoint pages.
+
+        The pages are what answers a ClassClause, and they cost one pass over
+        the set of distinct characters rather than a scan per class.
+        """
+        literals = None
+        if self._automaton is not None:
+            literals = {found for _end, found in self._automaton.iter(folded_text)}
+        return Presence(literals, folded_text, pages_of(folded_text))
