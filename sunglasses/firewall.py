@@ -1341,6 +1341,44 @@ def run_hook(stdin_text: str, home=None) -> dict:
     started = _time.perf_counter()
     payload, decision, error, extras = {}, None, None, {}
 
+    # RED 5 — LIFECYCLE RECORDS.
+    #
+    # A PreToolUse hook that is killed on the harness's timeout FAILS OPEN, and
+    # it does so in complete silence: nothing runs to write a receipt, so the
+    # audit trail shows no evidence that the call was ever seen. "Every call
+    # writes a receipt" was therefore false for exactly the failure that matters
+    # most, and the absence was indistinguishable from the hook not being
+    # installed at all.
+    #
+    # So the evidence is written BEFORE the work, not after. An `in_flight`
+    # record is appended the moment a call arrives, carrying an evaluation id;
+    # the terminal record references that id. A killed or crashed evaluation
+    # leaves an in_flight with no terminal partner, and `sunglasses receipts
+    # --verify` names it. Silence becomes an orphan, which is a fact you can act on.
+    #
+    # This does NOT make the hook fail closed — that is the harness's contract,
+    # not ours. It makes the failure legible.
+    try:
+        payload = _json.loads(stdin_text) if stdin_text.strip() else {}
+        if not isinstance(payload, dict):
+            payload = {}
+    except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
+        payload = {}
+    eval_id = _new_eval_id()
+    try:
+        write_receipt({
+            "ts": _now_iso(),
+            "kind": "in_flight",
+            "eval_id": eval_id,
+            "tool_name": payload.get("tool_name"),
+            "session_id": payload.get("session_id"),
+            "input_sha256": _input_digest(payload.get("tool_input")),
+        }, home=home)
+    except Exception:  # noqa: BLE001
+        # Losing the opening line must not change what the firewall does, for
+        # the same reason losing the closing one does not.
+        pass
+
     try:
         payload = _json.loads(stdin_text) if stdin_text.strip() else {}
         if not isinstance(payload, dict):
@@ -1363,6 +1401,8 @@ def run_hook(stdin_text: str, home=None) -> dict:
     try:
         write_receipt({
             "ts": _now_iso(),
+            "kind": "decision",
+            "eval_id": eval_id,
             "tool_name": payload.get("tool_name"),
             "session_id": payload.get("session_id"),
             "decision": decision.action,
@@ -1379,6 +1419,16 @@ def run_hook(stdin_text: str, home=None) -> dict:
         pass
 
     return decision.to_hook_output()
+
+
+def _new_eval_id() -> str:
+    """Identifier tying one call's in_flight record to its terminal record.
+
+    Random rather than sequential: a counter would need shared state across
+    concurrent hook processes, and the only job here is to pair two lines.
+    """
+    import os
+    return os.urandom(8).hex()
 
 
 def _now_iso() -> str:

@@ -495,14 +495,20 @@ private key files are named individually and matching is boundary-aware, so
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
 - **It fails open.** A crash, a bad config, an unparseable policy — all fall
   through to Claude Code's own permission flow rather than wedging your agent.
-  Every one of those writes a receipt saying the call was *not* checked, because
-  a firewall that is quietly off is worse than no firewall.
+  Those write a receipt saying the call was *not* checked, because a firewall
+  that is quietly off is worse than no firewall. One failure cannot write that
+  receipt: if the harness kills the hook on its timeout, nothing runs to write
+  anything. So an `in_flight` record is appended *before* the check begins, and
+  the decision record references it. A killed evaluation leaves an orphan, and
+  `sunglasses receipts --verify` names it and exits non-zero. That does not make
+  the hook fail closed, which is the harness's contract rather than ours. It
+  makes the failure visible instead of silent.
 
 ### Cost
 
 ~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
 is 19ms of that). Zero network calls — nothing about your work leaves the
-machine. Every invocation appends one line to
+machine. Every invocation appends two lines (one when the check starts, one when it decides) to
 `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`, recording a SHA-256 of the tool input
 and never the input itself.
 
