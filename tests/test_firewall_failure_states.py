@@ -209,3 +209,114 @@ def test_control_the_old_receipt_handling_swallows_an_unwritable_trail(home):
         "with the failure swallowed the call goes silent again, which is the "
         "behaviour F6 replaces"
     )
+
+
+# ── round 2 R1: bytes that do not decode are F3, not an escaped exception ────
+# `read_text` raises UnicodeDecodeError, which is a ValueError and NOT an
+# OSError, so undecodable policy bytes went straight past the unreadable clause
+# and out of the named-failure lane altogether. The hook returned `{}` with no
+# stated state, and the same exception took the later pin TOFU decision with it.
+# Two junk bytes at the end of the file were enough.
+
+UNDECODABLE = b"blocked_paths:\n\xff\xfe"
+
+
+def _write_bytes(home, data):
+    (home / "policy.yaml").write_bytes(data)
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    return home
+
+
+def test_undecodable_policy_bytes_are_classified_as_unreadable(home):
+    _write_bytes(home, UNDECODABLE)
+    with pytest.raises(PolicyDown) as caught:
+        firewall.load_policy(home / "policy.yaml")
+    assert caught.value.state == "unreadable", (
+        f"undecodable bytes were classified as {caught.value.state!r}"
+    )
+
+
+def test_undecodable_policy_bytes_ask_and_name_the_control(home):
+    _write_bytes(home, UNDECODABLE)
+    decision, reason = _decision(home)
+    assert decision == "ask", f"got {decision!r}, so the dead control was silent"
+    assert "cannot be read" in reason, reason
+    assert "did NOT run" in reason, reason
+
+
+def test_undecodable_policy_bytes_do_not_take_the_rest_of_the_hook_down(home):
+    """The whole point of a named state: later lanes still get to decide."""
+    _write_bytes(home, UNDECODABLE)
+    out = run_hook(CLEAN, home=home)
+    assert out.get("hookSpecificOutput"), "the hook produced no decision at all"
+    # and the failure is recorded rather than swallowed
+    assert "cannot be read" in out["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_swallowing_the_classification_brings_the_silence_back(home, monkeypatch):
+    """Mutation control. Remove UnicodeError from the clause and this must fail.
+
+    Without it the exception escapes `load_policy` entirely, which is exactly
+    the state round 1 shipped in.
+    """
+    _write_bytes(home, UNDECODABLE)
+    real = firewall.load_policy
+
+    def only_oserror(path):
+        p = pathlib.Path(path)
+        try:
+            p.read_text()
+        except OSError as exc:                     # the pre-fix clause
+            raise PolicyDown("unreadable", str(exc)) from exc
+        return real(path)
+
+    monkeypatch.setattr(firewall, "load_policy", only_oserror)
+    with pytest.raises(UnicodeDecodeError):
+        firewall.load_policy(home / "policy.yaml")
+
+
+# ── round 2 R3: an install that predates the marker must still enrol ─────────
+# The marker is what turns a LATER missing policy into a dead control rather
+# than a machine that never configured one. It was only written on the branch
+# that CREATES policy.yaml, so every install that already had a policy took an
+# early return and never got it. Those are precisely the older installs.
+
+LEGACY_SHAPES = [
+    ("a policy the user wrote", "blocked_paths: []\n"),
+    ("our own untouched disabled starter", None),   # filled in at call time
+]
+
+
+@pytest.mark.parametrize("label,body", LEGACY_SHAPES, ids=[s[0] for s in LEGACY_SHAPES])
+def test_an_existing_install_is_enrolled_by_init_policy(home, label, body):
+    text = starter_policy_text(enabled=False) if body is None else body
+    (home / "policy.yaml").write_text(text, encoding="utf-8")
+    assert not (home / firewall.INSTALL_MARKER).exists()
+
+    firewall.write_starter_policy(home=home, enabled=True)
+
+    assert (home / firewall.INSTALL_MARKER).exists(), (
+        f"{label}: init --policy left this install unenrolled, so losing the "
+        "policy later still falls through silently"
+    )
+
+
+@pytest.mark.parametrize("label,body", LEGACY_SHAPES, ids=[s[0] for s in LEGACY_SHAPES])
+def test_and_then_losing_the_policy_asks_instead_of_falling_through(home, label, body):
+    """The reason the marker matters, executed end to end."""
+    text = starter_policy_text(enabled=False) if body is None else body
+    (home / "policy.yaml").write_text(text, encoding="utf-8")
+    firewall.write_starter_policy(home=home, enabled=True)
+    (home / "policy.yaml").unlink()
+
+    decision, reason = _decision(home)
+    assert decision == "ask", f"{label}: policy loss produced {decision!r}"
+    assert "gone" in reason or "missing" in reason, reason
+
+
+def test_a_users_own_policy_is_still_never_rewritten(home):
+    """Enrolling must not become a licence to touch their file."""
+    mine = "blocked_paths:\n  - ~/.ssh\n"
+    (home / "policy.yaml").write_text(mine, encoding="utf-8")
+    assert firewall.write_starter_policy(home=home, enabled=True) is None
+    assert (home / "policy.yaml").read_text() == mine
