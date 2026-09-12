@@ -37,6 +37,13 @@ LIVE_CHANNELS = {
 SANCTIONED_SUBSETS = [
     {"message", "file", "api_response", "web_content", "log_memory"},
     {"message", "file", "api_response", "tool_output"},
+    # WO-P1B round 4 splits the channels deliberately: six parent rules keep the
+    # existing channels with parent behaviour, and six siblings carry the new
+    # reach alone. Each half MUST be tested without the other, because the point
+    # of the split is that neither touches the other's territory. A test that
+    # iterated all seven here would be unable to express that.
+    {"api_response", "log_memory", "agent_input"},          # the siblings' own
+    {"message", "file", "web_content", "tool_output"},      # the parents' own
 ]
 
 

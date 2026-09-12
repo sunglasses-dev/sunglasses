@@ -871,14 +871,36 @@ class SunglassesEngine:
         # The derivation errs toward extracting nothing, and extracting nothing
         # just means "evaluate", so this can cost time but never a finding.
         prefilter_present = self._literal_index.present(_prefilter.fold(text))
+        # A rule may declare `match_on: "normalized"`. Step 3.5 already gives the
+        # normalized view to keyword CANDIDATES, but a rule reaches that pass only
+        # if one of its keywords is in the index, and the index drops anything on
+        # KEYWORD_DENYLIST. A marker whose only distinguishing word is denylisted
+        # ("<!-- ... agent", "<admin>") can therefore never become a candidate, no
+        # matter what its keyword list says, so folded evasions of that marker were
+        # unreachable by design rather than by oversight. Those rules ask for the
+        # normalized view directly here instead.
+        normalized_present = None
         for pattern, regexes in self._regex_patterns:
             if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
             if pattern["id"] in seen_ids:
                 continue
-            for mode, rx, guards in regexes:
+            # `match_on: "normalized"` means ALSO the normalized view, never
+            # instead of the raw one. Replacing raw with normalized lost four
+            # detections whose filler was U+2028 / U+2029: the raw text matched
+            # and the folded text did not, so a flag meant to ADD reach removed
+            # some. Raw stays first and decides; normalized is a second look.
+            subjects = [(text, prefilter_present)]
+            if pattern.get("match_on") == "normalized":
+                if normalized_present is None:
+                    normalized_present = self._literal_index.present(
+                        _prefilter.fold(normalized))
+                subjects.append((normalized, normalized_present))
+            for subject, present in subjects:
+              matched_here = False
+              for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
-                                       prefilter_present):
+                                       present):
                     continue
                 # Predicates (lookahead- or caret-led) are evaluated per WINDOW,
                 # not once globally: their (?=.*A)(?=.*B) signals must CO-OCCUR
@@ -887,14 +909,14 @@ class SunglassesEngine:
                 # READMEs came to BLOCK (Jul 10 2026 red-team). Caret-led
                 # predicates additionally keep their negation guards at
                 # document scope — see _eval_regex and _split_caret_predicate.
-                match = self._eval_regex(mode, rx, guards, text)
+                match = self._eval_regex(mode, rx, guards, subject)
                 if match:
                     seen_ids.add(pattern["id"])
                     finding = {
                         **pattern,
                         "matched_text": match.group(0)[:50],
                     }
-                    if not pattern.get("negation_immune") and self._check_negation(text, match.start()):
+                    if not pattern.get("negation_immune") and self._check_negation(subject, match.start()):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
@@ -906,7 +928,10 @@ class SunglassesEngine:
                         finding["defensive_context"] = True
                         finding["original_severity"] = pattern["severity"]
                     findings.append(finding)
+                    matched_here = True
                     break
+              if matched_here:
+                  break   # raw decided; do not look at the normalized view
 
         # Step 3.5: Corroboration pass for keyword candidates (see
         # _regex_bearing_ids). Step 3 already ran these patterns' regexes on
