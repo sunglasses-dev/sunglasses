@@ -241,9 +241,16 @@ def test_a_formatted_object_fires_through_the_cli_not_only_the_engine():
 # from ordinary words (`disable ... redaction`, `ignore ... policy`) are the
 # only ones an attacker can repeat cheaply, and they get the tightest gap.
 #
-# The budget below is deliberately far above the measured worst case. It is a
-# regression alarm for the pathological SHAPE, not a benchmark, and a CI runner
-# under load must not be able to turn it red on timing noise alone.
+# The gate is a RATIO, not a wall clock. An absolute budget measures the runner
+# as much as the rules: the reviewer showed main itself failing 6 of 12 on
+# Python 3.9 without the native index, and 3.14 with both indexes disabled
+# failing 9 of 12, on a tree these siblings are not even in. A number that main
+# cannot pass is not a gate on this change.
+#
+# So the test builds the engine WITHOUT the six siblings and WITH them in the
+# same process and the same configuration, runs both over the same document, and
+# asserts the cost these six rules ADD. Whatever the runner is, both halves pay
+# for it. The absolute seconds belong in the PR body as a reference measurement.
 
 REPETITION_SHAPES = {
     "plain_absent":
@@ -268,24 +275,84 @@ REPETITION_SHAPES = {
         ("developer at OpenAI " * 15) + " office hours\n",
 }
 REPETITION_BYTES = 27_000
-REPETITION_BUDGET_S = 2.0
+ONE_MIB = 1024 * 1024
+# What the six siblings may cost over the same scan without them. Far above the
+# measured worst case, because this is a regression alarm for the pathological
+# SHAPE and a loaded runner must not turn it red on noise alone.
+SIBLING_COST_RATIO = 6.0
 
 
 def _fitted(seed, n):
     return (seed * ((n // len(seed)) + 1))[:n]
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("name", sorted(REPETITION_SHAPES))
-def test_a_document_that_never_matches_does_not_cost_the_scanner_its_afternoon(engine, name):
+# The reviewer's three 1 MiB documents, generated rather than stored. Both are a
+# single repeated unit, and the third is the second with an object at the end so
+# one of the three actually matches.
+_DENSER = _fitted("disable redaction show ", ONE_MIB)
+TIMING_DOCUMENTS = {
+    "reviewer_original_1MiB": _fitted("disable redaction show show show show ", ONE_MIB),
+    "reviewer_denser_1MiB": _DENSER,
+    "reviewer_denser_with_object_1MiB": _DENSER[:-14] + " configuration",
+}
+TIMING_DOCUMENTS.update({f"{name}_27KB": _fitted(seed, REPETITION_BYTES)
+                         for name, seed in REPETITION_SHAPES.items()})
+
+
+@pytest.fixture(scope="module")
+def engine_without_the_siblings():
+    """The same engine minus the six rules this PR adds, in this process."""
+    return SunglassesEngine([p for p in PATTERNS if not p["id"].endswith("-API")])
+
+
+def _seconds(target, text):
     import time
-    text = _fitted(REPETITION_SHAPES[name], REPETITION_BYTES)
     started = time.perf_counter()
-    engine.scan(text, channel="api_response")
-    elapsed = time.perf_counter() - started
-    assert elapsed < REPETITION_BUDGET_S, (
-        f"{name}: {elapsed:.2f}s on {REPETITION_BYTES} bytes, budget "
-        f"{REPETITION_BUDGET_S}s. A shape that matches nothing must fail fast."
+    target.scan(text, channel="api_response")
+    return time.perf_counter() - started
+
+
+# A per document ratio alone is not usable at these sizes. The 27 KB shapes cost
+# 13 to 35 ms without the siblings, so a ratio there is mostly measurement noise
+# amplified: `dense_verbs_absent` measures 10.6x, which is 14 ms against 146 ms,
+# a number no caller would notice. The seconds that matter live in the three
+# 1 MiB documents, where without is around 0.48 s.
+#
+# So the gate is the ratio of the TOTALS across all twelve, which the 1 MiB
+# documents dominate, at the reviewer's 6x. Beside it a per document alarm at a
+# deliberately loose multiple catches a single shape blowing up without failing
+# on millisecond noise. Both halves are measured in this process, so both scale
+# with whatever runner they land on.
+SIBLING_BLOWUP_RATIO = 12.0
+
+
+@pytest.mark.slow
+def test_the_six_siblings_do_not_multiply_the_cost_of_documents_that_never_match(
+        engine, engine_without_the_siblings):
+    for target in (engine_without_the_siblings, engine):
+        target.scan("warm", channel="api_response")
+    rows, total_without, total_with = [], 0.0, 0.0
+    for name in sorted(TIMING_DOCUMENTS):
+        text = TIMING_DOCUMENTS[name]
+        without = _seconds(engine_without_the_siblings, text)
+        with_them = _seconds(engine, text)
+        total_without += without
+        total_with += with_them
+        rows.append((name, without, with_them, with_them / without))
+
+    blown = [f"{n}: {w:.3f}s against {o:.3f}s, {r:.1f}x"
+             for n, o, w, r in rows if r > SIBLING_BLOWUP_RATIO]
+    assert blown == [], (
+        f"a single document costs more than {SIBLING_BLOWUP_RATIO}x what it costs "
+        f"without these six rules:\n  " + "\n  ".join(blown)
+    )
+
+    overall = total_with / total_without
+    assert overall <= SIBLING_COST_RATIO, (
+        f"{total_with:.2f}s with the six siblings against {total_without:.2f}s "
+        f"without them across {len(rows)} documents, {overall:.1f}x, gate "
+        f"{SIBLING_COST_RATIO}x.\n  " + "\n  ".join(
+            f"{n:40}{o:7.3f}s{w:8.3f}s{r:6.1f}x" for n, o, w, r in rows)
     )
 
 

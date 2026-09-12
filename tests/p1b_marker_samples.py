@@ -5,6 +5,7 @@ of markers the regex accepts. Walk the SAME parse tree `_prefilter` walks, emit
 a sample per branch, and let the suite prove every one of them routes.
 """
 import re as _re
+import string as _string
 try:
     import re._parser as sre_parse
 except ImportError:                                   # pragma: no cover
@@ -56,7 +57,49 @@ _SPACE = [' ']          # swapped to a newline for the third variant
 MAX_NESTED_ALTS = 24   # widest nested alternation in the sibling markers
 
 
+_GAP_PREFERENCE = (" ", "x", "a", "0", "-", "_")
+
+
+def _excluded_by(items):
+    """Every character the members of a class name, expanded."""
+    out = set()
+    for op, av in items:
+        n = str(op)
+        if n == "LITERAL":
+            out.add(chr(av))
+        elif n == "RANGE":
+            out.update(chr(c) for c in range(av[0], av[1] + 1))
+        elif n == "CATEGORY":
+            c = str(av)
+            if "SPACE" in c:
+                out.update(" \t\r\n\f\v")
+            elif "DIGIT" in c:
+                out.update("0123456789")
+            elif "WORD" in c:
+                out.update(_string.ascii_letters + _string.digits + "_")
+    return out
+
+
 def _from_class(items):
+    """One character the class accepts.
+
+    A NEGATED class needs a character it does NOT name. The first version read
+    past the NEGATE marker and returned the first LITERAL it found, so `[^.\n]`
+    emitted `.`, the one character it forbids. Every sample for the two marker
+    SEQUENCES came out as `ignore.policy`, the marker rejected all of them, the
+    valid-sample filter dropped the whole family, and the coverage theorem was
+    then quantifying over nothing for two of the six rules.
+
+    A space is preferred wherever the class allows one, because these gaps sit
+    between words the marker bounds with `\b`, and any non-space filler welds
+    the words together and fails the boundary just as surely.
+    """
+    if any(str(op) == "NEGATE" for op, _ in items):
+        excluded = _excluded_by([(op, av) for op, av in items if str(op) != "NEGATE"])
+        for ch in _GAP_PREFERENCE:
+            if ch not in excluded:
+                return ch
+        return "x"
     for op, av in items:
         n = str(op)
         if n == "LITERAL":
@@ -70,8 +113,6 @@ def _from_class(items):
             if "DIGIT" in c:
                 return "0"
             return "a"
-        if n == "NEGATE":
-            continue
     return "x"
 
 

@@ -264,13 +264,23 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The marker's own object vocabulary, one entry per word the
+        # alternation `polic(?:y|ies)|safeguards?|guardrails?|instructions?|
+        # safety` accepts. The previous list was PHRASES a person wrote by
+        # reading the rule ('safety policy', 'policy checks'), and the marker
+        # requires no such phrase, so `Ignore policy.` reached nothing.
+        # Singular and plural are both here because the index is word bounded
+        # and 'policies' does not contain a bounded 'policy'.
         "keywords": [
-            'safety policy',
-            'safety policies',
-            'safety rules',
-            'policy checks',
-            'guardrails',
+            'policy',
+            'policies',
+            'safeguard',
             'safeguards',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'safety',
         ],
         "regex": [
             '(?is)(?:\\b(?:ignore|bypass|disable|override|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:polic(?:y|ies)|safeguards?|guardrails?|instructions?|safety)\\b)[\\s\\S]{0,24}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
@@ -284,10 +294,14 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "critical",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # One entry per word in `redaction|redact|masking|mask|sanitization|
+        # sanitisation`. 'mask' was the one that was simply absent, so
+        # `Disable mask.` with a folded object reached nothing.
         "keywords": [
             'redaction',
             'redact',
             'masking',
+            'mask',
             'sanitization',
             'sanitisation',
         ],
