@@ -195,9 +195,28 @@ def check_workflow(doc) -> list[str]:
             p.append(f"fast suite ignore set is {sorted(ignores)}, must be exactly {sorted(FAST_IGNORES)}")
         if toks[:2] != ["pytest", "-q"] or any(t.startswith(("-k", "-m", "--deselect")) for t in toks):
             p.append("fast suite narrows collection beyond the two --ignore flags")
-    for name, job in (("classify", classify), ("fast", fast), ("coverage", coverage)):
+    # EVERY job, enumerated from the document. This was a hardcoded three
+    # (classify, fast, coverage) and so it silently exempted `integrity` — the six-way
+    # matrix, the only job that has ever run for hours (legs 40.8 to 90.4 min on run
+    # 34583112120). A timeout rule that skips the job that can hang is not a rule.
+    for name, job in sorted(jobs.items()):
         if "timeout-minutes" not in job:
             p.append(f"job {name} has no timeout-minutes (a hang must fail, not wait)")
+
+    # Concurrency: superseding a PR run saves a runner; superseding a main or tag run
+    # destroys the evidence the release gate requires for that exact sha.
+    conc = doc.get("concurrency")
+    if not isinstance(conc, dict):
+        p.append("no concurrency block (superseded PR runs pile up on the runners)")
+    else:
+        if "${{ github.ref }}" not in str(conc.get("group", "")):
+            p.append("concurrency.group is not per-ref, so unrelated branches cancel each other")
+        cip = str(conc.get("cancel-in-progress", ""))
+        if cip in ("True", "true"):
+            p.append("cancel-in-progress is unconditional: it would cancel main and tag runs "
+                     "the release gate needs, turning a required check into an absence")
+        elif "github.event_name == 'pull_request'" not in cip:
+            p.append(f"cancel-in-progress must be pull-request-only, got {cip!r}")
 
     # --- ASTRA round 2: data bindings, required execution, exact suite scope ---
     # Bindings: the classifier's decision must flow through unbroken references.
@@ -286,6 +305,34 @@ def test_fast_lane_receipt_and_preflight_match_the_matrix():
 
 def _mutate(fn):
     doc = _load(); fn(doc); return doc
+
+
+def test_control_timeout_removed_from_the_matrix_job():
+    # the exact hole this change closes: the old hardcoded loop passed on this doc
+    def m(d): d["jobs"]["integrity"].pop("timeout-minutes", None)
+    assert check_workflow(_mutate(m))
+
+
+def test_control_timeout_removed_from_every_other_job():
+    for name in ("classify", "fast", "coverage", "certify"):
+        def m(d, n=name): d["jobs"][n].pop("timeout-minutes", None)
+        assert check_workflow(_mutate(m)), f"removing {name} timeout was not caught"
+
+
+def test_control_concurrency_block_removed():
+    def m(d): d.pop("concurrency", None)
+    assert check_workflow(_mutate(m))
+
+
+def test_control_cancel_in_progress_made_unconditional():
+    # would cancel the main-branch run a release is waiting on
+    def m(d): d["concurrency"]["cancel-in-progress"] = True
+    assert check_workflow(_mutate(m))
+
+
+def test_control_concurrency_group_not_per_ref():
+    def m(d): d["concurrency"]["group"] = "${{ github.workflow }}"
+    assert check_workflow(_mutate(m))
 
 
 def test_control_path_filter_reintroduced():
