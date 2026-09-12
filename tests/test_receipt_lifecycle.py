@@ -260,3 +260,79 @@ def test_a_denied_call_whose_terminal_write_failed_is_not_reported_as_unchecked(
         "a DENY that was enforced but could not record itself must be offered "
         "as one of the causes, or the report defames a working block"
     )
+
+
+# ── round 3: a write cut inside a character must not take the file down ──────
+# Round 2 counted lines it could not PARSE. It still read the file with
+# `read_text()`, which decodes the whole thing at once, so a single truncated
+# multibyte character anywhere in it raised and the command analysed NOTHING —
+# a traceback instead of a report. The reviewer's artifact is exactly that: a
+# DENY whose terminal record was cut mid-character when the process died.
+#
+# Receipts are now read as BYTES and decoded one line at a time. An undecodable
+# line is counted and located; it is never decoded with errors="replace" and
+# then accepted, because a line rebuilt out of substitution characters is not
+# the line that was written.
+
+BYTE_FIXTURES = pathlib.Path(__file__).resolve().parent / "receipt_byte_fixtures"
+REVIEWER_ARTIFACT = BYTE_FIXTURES / "reviewer_partial_utf8.jsonl"
+GOOD = b'{"kind": "in_flight", "eval_id": "ok1", "ts": "t", "tool_name": "Bash"}'
+DONE = b'{"kind": "decision", "eval_id": "ok1", "decision": "allow"}'
+CUT = b'{"ts": "2026-09-12", "kind": "decision", "session_id": "review-\xe2\x82'
+
+
+def _write_bytes_file(home, name, data):
+    d = home / "receipts"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / name).write_bytes(data)
+    return d / name
+
+
+def test_the_reviewer_artifact_really_is_undecodable_as_a_whole():
+    """Guard the fixture itself: if it ever decodes, it stopped being the case."""
+    raw = REVIEWER_ARTIFACT.read_bytes()
+    with pytest.raises(UnicodeDecodeError):
+        raw.decode("utf-8")
+
+
+def test_the_reviewer_artifact_reports_instead_of_crashing(home):
+    _write_bytes_file(home, "2026-09-12.jsonl", REVIEWER_ARTIFACT.read_bytes())
+    code, out = _verify(home)
+    assert "Traceback" not in out, f"the command crashed instead of reporting:\n{out}"
+    assert code != 0
+    assert "2026-09-12.jsonl:4" in out, f"the cut line was not located: {out}"
+    assert "INCOMPLETE" in out.upper()
+
+
+def test_a_cut_in_the_middle_still_leaves_the_lines_around_it_analysed(home):
+    _write_bytes_file(home, "mid.jsonl", GOOD + b"\n" + CUT + b"\n" + DONE + b"\n")
+    code, out = _verify(home)
+    assert code != 0
+    assert "mid.jsonl:2" in out, out
+    # the valid rows either side are still counted
+    assert "evaluations started   1" in out, out
+    assert "decisions recorded    1" in out, out
+
+
+def test_one_broken_file_does_not_silence_a_clean_one(home):
+    _write_bytes_file(home, "a-clean.jsonl", GOOD + b"\n" + DONE + b"\n")
+    _write_bytes_file(home, "b-broken.jsonl", CUT + b"\n")
+    code, out = _verify(home)
+    assert code != 0
+    assert "b-broken.jsonl:1" in out, out
+    assert "evaluations started   1" in out, "the clean file stopped being read"
+
+
+def test_an_undecodable_line_is_never_rebuilt_with_replacement_characters(home):
+    _write_bytes_file(home, "r.jsonl", CUT + b"\n")
+    code, out = _verify(home)
+    assert "�" not in out, (
+        "the report contains U+FFFD, so a line was decoded with replacement and "
+        "shown as if it were what was written"
+    )
+
+
+def test_control_reading_the_whole_file_at_once_brings_the_crash_back():
+    """The mutation: `read_text()` is what could not survive this file."""
+    with pytest.raises(UnicodeDecodeError):
+        REVIEWER_ARTIFACT.read_text()
