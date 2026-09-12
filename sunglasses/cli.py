@@ -1137,9 +1137,14 @@ def _verify_lifecycle(rows, directory, unparseable=()):
         print(f"  {DIM}This result is INCOMPLETE. A truncated write leaves a "
               f"fragment exactly like this.{RESET}\n")
         for path, lineno, raw in unparseable[:20]:
-            preview = raw.strip()[:60]
-            print(f"    {RED}unreadable{RESET} {DIM}{path}:{lineno}{RESET} "
-                  f"{DIM}{preview!r}{RESET}")
+            # `raw` already carries its own quoting: a JSON line as text, or a
+            # byte preview plus the decode reason. Re-quoting it here hid the
+            # reason behind the truncation.
+            preview = raw.strip()
+            if len(preview) > 96:
+                preview = preview[:96] + "…"
+            print(f"    {RED}unreadable{RESET} {DIM}{path.name}:{lineno}{RESET} "
+                  f"{DIM}{preview}{RESET}")
         if len(unparseable) > 20:
             print(f"    {DIM}... and {len(unparseable) - 20} more{RESET}")
         print()
@@ -1201,11 +1206,32 @@ def cmd_receipts(args):
     # certified the file, so a receipts file whose only line was a truncated
     # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
     # read a line must say so, not average it away.
+    # Read BYTES and decode one line at a time. `read_text()` decodes the whole
+    # file at once, so a single truncated multibyte character anywhere in it
+    # raises and the command analyses NOTHING: a write cut mid-character (the
+    # process was killed between the two appends) took down the whole audit
+    # trail with a traceback rather than reporting an incomplete run.
+    #
+    # An undecodable line is counted and LOCATED. It is never decoded with
+    # errors="replace" and then accepted, because a line rebuilt from
+    # substitution characters is not the line that was written, and reporting on
+    # it would be reporting on something nobody sent.
     rows = []
     unparseable = []
     for path in files:
-        for lineno, line in enumerate(path.read_text().splitlines(), 1):
-            if not line.strip():
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            unparseable.append((path, 0, f"<unreadable file: {exc}>"))
+            continue
+        for lineno, chunk in enumerate(raw.split(b"\n"), 1):
+            if not chunk.strip():
+                continue
+            try:
+                line = chunk.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                # A safe preview: the bytes as written, never a lossy decode.
+                unparseable.append((path, lineno, f"{chunk[:48]!r}  ({exc.reason})"))
                 continue
             try:
                 rows.append(_json.loads(line))

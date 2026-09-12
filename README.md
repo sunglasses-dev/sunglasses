@@ -512,6 +512,9 @@ private key files are named individually and matching is boundary-aware, so
   or a kill between the two appends leaves a file that is missing lines or ends
   mid-line, so `--verify` counts every line it cannot read, prints it with its
   file and line number, and reports the run as incomplete rather than clean.
+  Receipts are read as bytes and decoded a line at a time, so unreadable lines
+  are located at the line boundary, including a write cut inside a multibyte
+  character, and one damaged line never costs you the rest of the file.
 
 ### Cost
 
