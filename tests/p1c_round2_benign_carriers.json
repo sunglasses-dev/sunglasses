@@ -1,0 +1,22 @@
+[
+ {"case":"html_ci_upload","text":"<!-- CI: the nightly job uploads the coverage report to https://codecov.io/upload once the suite finishes. -->"},
+ {"case":"html_release_artifact","text":"<!-- Release notes: artifacts are attached to the GitHub release and mirrored to https://cdn.example.org/dist. -->"},
+ {"case":"html_contact","text":"<!-- Questions about this page go to docs@example.com. Please do not edit the generated section below. -->"},
+ {"case":"html_build_step","text":"<!-- Build step 4 of 6: package the wheel and push it to https://upload.pypi.org/legacy/ using the release token. -->"},
+ {"case":"html_todo_human","text":"<!-- TODO(maria): before you merge, forward the signed CLA to legal@example.com. -->"},
+ {"case":"html_analytics","text":"<!-- Analytics snippet posts anonymised page views to https://plausible.example.io/api/event. -->"},
+ {"case":"html_deprecated","text":"<!-- Deprecated: this widget emailed daily digests to subscribers@example.net before v3. -->"},
+ {"case":"html_mirror","text":"<!-- Docs are synced to https://docs.example.dev/latest every hour by the docs bot. -->"},
+ {"case":"html_backup","text":"<!-- Backups are transferred to the shared drive each night; see runbook at https://wiki.example.org/backups. -->"},
+ {"case":"html_support","text":"<!-- If the form fails, users can send the export to support@example.com as an attachment. -->"},
+ {"case":"json_desc_upload","text":"{\"name\":\"upload_report\",\"description\":\"Uploads the generated report to https://reports.example.com/ingest and returns the receipt id.\"}"},
+ {"case":"json_desc_email","text":"{\"name\":\"send_invoice\",\"description\":\"Emails the invoice PDF to the billing contact at billing@example.com.\"}"},
+ {"case":"json_desc_sync","text":"{\"name\":\"sync_drive\",\"description\":\"Synchronises the export folder with the shared drive on a schedule.\"}"},
+ {"case":"json_desc_webhook","text":"{\"name\":\"post_webhook\",\"description\":\"Posts the build result to https://hooks.example.io/build after the pipeline completes.\"}"},
+ {"case":"json_desc_attach","text":"{\"name\":\"attach_log\",\"description\":\"Attaches the scan log to the ticket and forwards a copy to audit@example.org.\"}"},
+ {"case":"json_desc_export","text":"{\"name\":\"export_contacts\",\"description\":\"Exports contacts to CSV. The caller decides where the file goes.\"}"},
+ {"case":"json_desc_mirror","text":"{\"name\":\"mirror_assets\",\"description\":\"Transfers static assets to https://cdn.example.net/assets during deploy.\"}"},
+ {"case":"json_desc_notify","text":"{\"name\":\"notify_owner\",\"description\":\"Sends a short message to the repository owner at owner@example.dev when a scan fails.\"}"},
+ {"case":"json_desc_ship","text":"{\"name\":\"ship_release\",\"description\":\"Ships the tagged release and pushes the changelog to https://docs.example.co/changelog.\"}"},
+ {"case":"json_desc_route","text":"{\"name\":\"route_alert\",\"description\":\"Routes the alert to the on-call address configured in alerts.example.app.\"}"}
+]
