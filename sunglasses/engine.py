@@ -453,6 +453,7 @@ class SunglassesEngine:
             ch for p in self._patterns for ch in p.get("channel", []))
 
         # Build pattern index
+        self._anchor_spec = {}          # id(compiled rx) -> (anchor terms, span)
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
 
@@ -497,6 +498,27 @@ class SunglassesEngine:
                             compiled.append(("guarded", core_rx, guard_rx))
                     elif self._is_anchored(r):
                         compiled.append(("windowed", rx, None))
+                    elif pattern.get("anchor_terms"):
+                        # Opt-in fourth mode. A rule states the rare token its
+                        # match cannot happen without; the engine then reads only
+                        # the text around it. Rules that declare nothing are
+                        # untouched.
+                        terms = tuple(sorted(
+                            {_prefilter.fold(a) for a in pattern["anchor_terms"] if a},
+                            key=len, reverse=True))
+                        # The span must be at least the longest match the regex
+                        # can make, or a real match straddling the window edge
+                        # is lost. Where that length is derivable it WINS over
+                        # the declared number, in both directions: it is proof,
+                        # and the declared number is a claim. Where it is not
+                        # (any unbounded `+`/`*`, which is most real rules), the
+                        # claim is what holds, and the timing fixtures hold the
+                        # claim.
+                        proven = _prefilter.max_match_length(r)
+                        span = (proven if proven is not None
+                                else int(pattern.get("anchor_span", self.ANCHOR_SPAN)))
+                        self._anchor_spec[id(rx)] = (terms, max(span, 1))
+                        compiled.append(("anchored", rx, None))
                     else:
                         compiled.append(("plain", rx, None))
                 if compiled:
@@ -628,6 +650,10 @@ class SunglassesEngine:
     # Locality rule for whole-document co-occurrence predicates (see scan step 3).
     # COOCCUR_WINDOW chars per view, half-overlapping so a payload straddling a
     # boundary is still seen whole (any payload <= WINDOW/2 is fully inside some view).
+    # Default half-width of an anchor window. Must be >= the longest match the
+    # rule can make (marker + both gaps + object), or a real match straddling the
+    # edge is lost; a rule may override with `anchor_span`.
+    ANCHOR_SPAN = 600
     COOCCUR_WINDOW = 1200
     COOCCUR_STRIDE = 600
 
@@ -649,7 +675,79 @@ class SunglassesEngine:
             return self._match_windowed(rx, text)
         if mode == "windowed":
             return self._match_windowed(rx, text)
+        if mode == "anchored":
+            return self._match_anchored(rx, text)
         return rx.search(text)
+
+    def _match_anchored(self, rx, text: str):
+        """Search only the text AROUND the rule's rare token.
+
+        A rule like the api_response siblings begins with a marker that is cheap
+        to find and common in adversarial text, then spends two bounded gaps
+        looking for an object that never comes. Cost is (number of marker
+        starts) x (gap work), which is why 1 MiB of `<admin>show ` took 18
+        seconds where main took 0.53.
+
+        The OBJECT is the rare token. A rule that declares `anchor_terms` is
+        searched only from start positions near those tokens, so a document with
+        no object is not searched at all, and a document made of nothing but
+        objects collapses into one window rather than one window per occurrence.
+
+        The search runs on the DOCUMENT with `pos`/`endpos` bounds rather than on
+        a sliced copy. That is not an optimisation. A slice invents context at
+        both edges: `\b` at the cut sees the start of a string where the document
+        has a word character, `^` matches a beginning that is not one, and `$`
+        matches an end that is not one. Every offset it reports is then relative
+        to the slice, which is the wrong number for `_check_negation` and for the
+        excerpt. Bounding the search keeps the real neighbours and the real
+        offsets. A candidate is still re-run unbounded with `.match()` before it
+        counts, because `endpos` is itself an invented end.
+        """
+        anchors, span = self._anchor_spec[id(rx)]
+        folded = _prefilter.fold(text)
+        # `fold` translates before lowering precisely so it stays one char to one
+        # char, but a future table entry could break that, and a position found
+        # in a differently-sized string points somewhere else in the document.
+        # If the lengths ever disagree, search everything: slower, correct.
+        if len(folded) != len(text):
+            return rx.search(text)
+
+        spots = []
+        for term in anchors:
+            at = folded.find(term)
+            while at != -1:
+                spots.append(at)
+                at = folded.find(term, at + 1)
+        if not spots:
+            return None                      # the rule cannot match this document
+
+        # A match that contains the anchor at `p` must START in [p - span, p].
+        # Windows are ranges of START positions, merged where they touch.
+        spots.sort()
+        windows, lo, hi = [], max(0, spots[0] - span), spots[0]
+        for at in spots[1:]:
+            if at - span <= hi:              # overlapping: merge rather than repeat
+                hi = at
+            else:
+                windows.append((lo, hi))
+                lo, hi = max(0, at - span), at
+        windows.append((lo, hi))
+
+        length = len(text)
+        for lo, hi in windows:
+            pos, stop = lo, min(length, hi + span)
+            while pos <= hi:
+                m = rx.search(text, pos, stop)
+                if m is None or m.start() > hi:
+                    break
+                # `stop` is an invented end of string. Re-run the match from the
+                # same position against the whole document, so what is returned
+                # is a match the document really contains.
+                confirmed = rx.match(text, m.start())
+                if confirmed is not None:
+                    return confirmed
+                pos = m.start() + 1
+        return None
 
     def _match_windowed(self, rx, text: str):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
