@@ -320,3 +320,114 @@ def test_a_users_own_policy_is_still_never_rewritten(home):
     (home / "policy.yaml").write_text(mine, encoding="utf-8")
     assert firewall.write_starter_policy(home=home, enabled=True) is None
     assert (home / "policy.yaml").read_text() == mine
+
+
+# ── round 3: three fault shapes that ended as a healthy answer ───────────────
+
+NUL_IN_VALUE = b"blocked_paths:\n  - ~/.ssh/id_rsa\x00\n"
+NUL_IN_COMMENT = b"# note\x00 about this policy\nblocked_paths:\n  - ~/.ssh\n"
+NUL_ALONE = b"blocked_paths:\n\x00\n"
+
+
+def _bytes_policy(home, data):
+    (home / "policy.yaml").write_bytes(data)
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    return home
+
+
+# R1. A NUL inside a VALUE is valid UTF-8 and YAML keeps it, so
+# `- ~/.ssh/id_rsa\x00` parsed cleanly, never matched the path it names, and the
+# call came back CLEAN in 30 ms with no policy_state and no confession. A
+# silent no-match is the worst answer a control can give: it is indistinguishable
+# from "checked, nothing found". The bytes are checked before YAML sees them,
+# because by then the NUL is already inside a value.
+
+@pytest.mark.parametrize("label,data", [
+    ("in a value", NUL_IN_VALUE),
+    ("on its own line", NUL_ALONE),
+    ("in a comment", NUL_IN_COMMENT),
+], ids=["value", "line", "comment"])
+def test_a_nul_byte_anywhere_is_a_dead_control(home, label, data):
+    """Including in a comment: a policy file with a NUL was not hand-written."""
+    _bytes_policy(home, data)
+    decision, reason = _decision(home)
+    assert decision == "ask", f"NUL {label} produced {decision!r}, a silent answer"
+    assert "does not parse" in reason, reason
+
+
+def test_a_nul_in_a_value_no_longer_reports_a_clean_scan(home):
+    """The exact round-2 escape: parsed, unmatched, reported healthy."""
+    _bytes_policy(home, NUL_IN_VALUE)
+    out = firewall.run_hook(CLEAN, home=home).get("hookSpecificOutput", {})
+    assert out.get("permissionDecision") == "ask"
+    assert "GLS-FW-CLEAN" not in out.get("permissionDecisionReason", "")
+
+
+def test_control_removing_the_nul_check_brings_the_silent_answer_back(home, monkeypatch):
+    """Mutation: without the byte check the NUL rides inside a parsed value."""
+    _bytes_policy(home, NUL_IN_VALUE)
+    real = firewall.load_policy
+
+    def no_nul_check(path):
+        p = pathlib.Path(path)
+        raw = p.read_bytes().replace(b"\x00", b"")   # what the parser used to see
+        return firewall.parse_policy(raw.decode("utf-8"))
+
+    monkeypatch.setattr(firewall, "load_policy", no_nul_check)
+    assert firewall.load_policy(home / "policy.yaml") is not None, (
+        "without the byte check the file parses, which is exactly the state "
+        "that produced a clean verdict on a corrupt policy"
+    )
+
+
+# R2. A FIFO with no writer blocks in the kernel. The installed hook sat past
+# the harness's 10 second timeout with no stdout and no receipt, and a timed-out
+# hook FAILS OPEN. The type is now answered from `os.stat` metadata before any
+# file object exists, so nothing can block.
+
+@pytest.mark.parametrize("kind", ["fifo", "directory"])
+def test_a_non_regular_policy_asks_immediately_instead_of_blocking(home, kind, tmp_path):
+    import os
+    import time
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    target = home / "policy.yaml"
+    if kind == "fifo":
+        os.mkfifo(target)
+    else:
+        target.mkdir()
+
+    started = time.perf_counter()
+    decision, reason = _decision(home)
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 1.0, (
+        f"{kind} took {elapsed:.1f}s; the hook is still blocking on the read and "
+        "the harness will time it out and fail open"
+    )
+    assert decision == "ask", f"{kind} produced {decision!r}"
+    assert "cannot be read" in reason, reason
+
+
+def test_the_node_type_is_named_in_the_failure(home):
+    import os
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    os.mkfifo(home / "policy.yaml")
+    with pytest.raises(PolicyDown) as caught:
+        firewall.load_policy(home / "policy.yaml")
+    assert "FIFO" in str(caught.value), str(caught.value)
+
+
+# R3. The regression the round-2 PR body claimed and the suite did not contain.
+
+def test_undecodable_bytes_do_not_stop_a_later_pin_decision(home):
+    """The named state must not short-circuit the rest of the call.
+
+    The whole reason UnicodeError was classified rather than left to escape is
+    that the escaping exception took the later lane down with it. This asserts
+    the call still produces a decision and still carries the confession.
+    """
+    _bytes_policy(home, b"blocked_paths:\n\xff\xfe")
+    out = firewall.run_hook(CLEAN, home=home).get("hookSpecificOutput", {})
+    assert out, "the hook produced no decision at all"
+    assert out["permissionDecision"] == "ask"
+    assert "cannot be read" in out["permissionDecisionReason"]

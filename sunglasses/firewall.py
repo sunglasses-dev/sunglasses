@@ -41,6 +41,8 @@ Design constraints (all load-bearing):
 
 from __future__ import annotations
 
+import os as _os
+import stat as _stat
 import hashlib
 import re
 
@@ -951,6 +953,19 @@ class PolicyDown(Exception):
         super().__init__(f"{POLICY_STATES.get(state, state)}{': ' + detail if detail else ''}")
 
 
+def _describe_node(mode) -> str:
+    """What kind of thing is at that path, for the message the user reads."""
+    if _stat.S_ISFIFO(mode):
+        return "a FIFO"
+    if _stat.S_ISSOCK(mode):
+        return "a socket"
+    if _stat.S_ISDIR(mode):
+        return "a directory"
+    if _stat.S_ISCHR(mode) or _stat.S_ISBLK(mode):
+        return "a device"
+    return "not a regular file"
+
+
 def load_policy(path) -> dict:
     """Read policy.yaml, or raise PolicyDown naming the state it is in.
 
@@ -963,15 +978,43 @@ def load_policy(path) -> dict:
         if (p.parent / INSTALL_MARKER).exists():
             raise PolicyDown("missing", str(p))
         return {}
+    # STAT BEFORE READ. A FIFO with no writer blocks in the kernel, so the hook
+    # sat past the harness's 10 second timeout with no stdout and no receipt,
+    # and a timed-out hook FAILS OPEN. A socket, a device node or a directory in
+    # that path is the same class: not a thing we can read, and answering that
+    # from metadata costs nothing and cannot block.
     try:
-        raw = p.read_text()
+        st = _os.stat(p)
+    except OSError as exc:
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+    if not _stat.S_ISREG(st.st_mode):
+        raise PolicyDown(
+            "unreadable", f"not a regular file ({_describe_node(st.st_mode)}) ({p})")
+
+    try:
+        data = p.read_bytes()
+    except OSError as exc:
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+
+    # A NUL anywhere in the file means it was not written by a person editing a
+    # policy. YAML accepts one inside a value and keeps it, so
+    # `- ~/.ssh/id_rsa\x00` parsed cleanly, never matched the path it names, and
+    # the call came back CLEAN in 30 ms with no policy_state and no confession.
+    # A silent no-match is the worst possible answer from a control: it looks
+    # exactly like "checked, nothing found". Checked on the BYTES, before YAML
+    # sees them, because by then the NUL is already inside a value.
+    if b"\x00" in data:
+        raise PolicyDown("corrupt", f"NUL byte in the policy file ({p})")
+
+    try:
+        raw = data.decode("utf-8")
     # A policy whose BYTES do not decode is unreadable in exactly the sense F3
-    # means, but `read_text` raises UnicodeDecodeError, which is a ValueError
-    # and NOT an OSError. It escaped this clause and left the named-failure lane
-    # entirely: the caller returned `{}` with no stated failure state, and the
-    # same exception took the later pin TOFU decision down with it. Two junk
-    # bytes at the end of the file were enough to do that.
-    except (OSError, UnicodeError) as exc:
+    # means, but decoding raises UnicodeDecodeError, which is a ValueError and
+    # NOT an OSError. It used to escape the clause below and leave the
+    # named-failure lane entirely: the caller returned `{}` with no stated
+    # failure state, and the same exception took the later pin TOFU decision
+    # down with it. Two junk bytes at the end of the file were enough.
+    except UnicodeError as exc:
         raise PolicyDown("unreadable", f"{exc} ({p})") from exc
     if not raw.strip():
         raise PolicyDown("empty", str(p))
