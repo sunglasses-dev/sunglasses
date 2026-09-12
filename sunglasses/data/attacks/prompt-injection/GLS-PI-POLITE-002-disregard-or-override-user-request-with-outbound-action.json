@@ -1,0 +1,34 @@
+{
+  "id": "GLS-PI-POLITE-002",
+  "name": "Disregard or override user request with outbound action",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output",
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Authority inversion with an outbound action. The text tells the agent to disregard or override the user's own request and then move data to an external destination, the three elements within 220 characters of each other and never across a blank line. Separated from GLS-PI-POLITE-001 because the addressee here is the instruction to overrule the user rather than a greeting, and it should be reportable on its own.",
+  "keywords": [
+    "disregard user request outbound",
+    "override request outbound"
+  ],
+  "regex": [
+    "(?is)\\b(?:disregard|override|ignore)[ \\t]+(?:the[ \\t]+)?user(?:'s|s)?[ \\t]+(?:request|instructions?)\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?(?:\\b(?:send|sends|sent|sending|email|emails|emailed|e-mail|mail|mails|mailed|forward|forwards|forwarded|attach|attaches|attached|upload|uploads|uploaded|post|posts|posted|transfer|transfers|transferred|share|shares|shared|export|exports|exported|sync|syncs|synced|push|pushes|pushed|deliver|delivers|delivered|submit|submits|submitted|route|routes|routed|ship|ships|shipped|cc|bcc|goes?[ \\t]+to|should[ \\t]+go[ \\t]+to|(?:should|must|needs?[ \\t]+to|will|is[ \\t]+to|are[ \\t]+to)[ \\t]+be[ \\t]+(?:sent|emailed|forwarded|uploaded|shared|posted|exported|transferred))\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?(?:[A-Za-z0-9._%+\\-]{1,64}@[A-Za-z0-9.\\-]{1,253}\\.[A-Za-z]{2,24}|https?://[^\\s<>\\\"']{1,2048}|\\b(?:[a-z0-9\\-]{1,63}\\.){1,8}(?:com|net|org|io|dev|co|ai|gov|edu|biz|app)\\b|shared[ \\t]+drive|this[ \\t]+address|following[ \\t]+endpoint|the[ \\t]+following[ \\t]+(?:url|link|address))|(?:[A-Za-z0-9._%+\\-]{1,64}@[A-Za-z0-9.\\-]{1,253}\\.[A-Za-z]{2,24}|https?://[^\\s<>\\\"']{1,2048}|\\b(?:[a-z0-9\\-]{1,63}\\.){1,8}(?:com|net|org|io|dev|co|ai|gov|edu|biz|app)\\b|shared[ \\t]+drive|this[ \\t]+address|following[ \\t]+endpoint|the[ \\t]+following[ \\t]+(?:url|link|address))[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?\\b(?:send|sends|sent|sending|email|emails|emailed|e-mail|mail|mails|mailed|forward|forwards|forwarded|attach|attaches|attached|upload|uploads|uploaded|post|posts|posted|transfer|transfers|transferred|share|shares|shared|export|exports|exported|sync|syncs|synced|push|pushes|pushed|deliver|delivers|delivered|submit|submits|submitted|route|routes|routed|ship|ships|shipped|cc|bcc|goes?[ \\t]+to|should[ \\t]+go[ \\t]+to|(?:should|must|needs?[ \\t]+to|will|is[ \\t]+to|are[ \\t]+to)[ \\t]+be[ \\t]+(?:sent|emailed|forwarded|uploaded|shared|posted|exported|transferred))\\b)",
+    "(?is)\\b(?:send|sends|sent|sending|email|emails|emailed|e-mail|mail|mails|mailed|forward|forwards|forwarded|attach|attaches|attached|upload|uploads|uploaded|post|posts|posted|transfer|transfers|transferred|share|shares|shared|export|exports|exported|sync|syncs|synced|push|pushes|pushed|deliver|delivers|delivered|submit|submits|submitted|route|routes|routed|ship|ships|shipped|cc|bcc|goes?[ \\t]+to|should[ \\t]+go[ \\t]+to|(?:should|must|needs?[ \\t]+to|will|is[ \\t]+to|are[ \\t]+to)[ \\t]+be[ \\t]+(?:sent|emailed|forwarded|uploaded|shared|posted|exported|transferred))\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?(?:\\b(?:disregard|override|ignore)[ \\t]+(?:the[ \\t]+)?user(?:'s|s)?[ \\t]+(?:request|instructions?)\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?(?:[A-Za-z0-9._%+\\-]{1,64}@[A-Za-z0-9.\\-]{1,253}\\.[A-Za-z]{2,24}|https?://[^\\s<>\\\"']{1,2048}|\\b(?:[a-z0-9\\-]{1,63}\\.){1,8}(?:com|net|org|io|dev|co|ai|gov|edu|biz|app)\\b|shared[ \\t]+drive|this[ \\t]+address|following[ \\t]+endpoint|the[ \\t]+following[ \\t]+(?:url|link|address))|(?:[A-Za-z0-9._%+\\-]{1,64}@[A-Za-z0-9.\\-]{1,253}\\.[A-Za-z]{2,24}|https?://[^\\s<>\\\"']{1,2048}|\\b(?:[a-z0-9\\-]{1,63}\\.){1,8}(?:com|net|org|io|dev|co|ai|gov|edu|biz|app)\\b|shared[ \\t]+drive|this[ \\t]+address|following[ \\t]+endpoint|the[ \\t]+following[ \\t]+(?:url|link|address))[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?\\b(?:disregard|override|ignore)[ \\t]+(?:the[ \\t]+)?user(?:'s|s)?[ \\t]+(?:request|instructions?)\\b)",
+    "(?is)(?:[A-Za-z0-9._%+\\-]{1,64}@[A-Za-z0-9.\\-]{1,253}\\.[A-Za-z]{2,24}|https?://[^\\s<>\\\"']{1,2048}|\\b(?:[a-z0-9\\-]{1,63}\\.){1,8}(?:com|net|org|io|dev|co|ai|gov|edu|biz|app)\\b|shared[ \\t]+drive|this[ \\t]+address|following[ \\t]+endpoint|the[ \\t]+following[ \\t]+(?:url|link|address))[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?(?:\\b(?:disregard|override|ignore)[ \\t]+(?:the[ \\t]+)?user(?:'s|s)?[ \\t]+(?:request|instructions?)\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?\\b(?:send|sends|sent|sending|email|emails|emailed|e-mail|mail|mails|mailed|forward|forwards|forwarded|attach|attaches|attached|upload|uploads|uploaded|post|posts|posted|transfer|transfers|transferred|share|shares|shared|export|exports|exported|sync|syncs|synced|push|pushes|pushed|deliver|delivers|delivered|submit|submits|submitted|route|routes|routed|ship|ships|shipped|cc|bcc|goes?[ \\t]+to|should[ \\t]+go[ \\t]+to|(?:should|must|needs?[ \\t]+to|will|is[ \\t]+to|are[ \\t]+to)[ \\t]+be[ \\t]+(?:sent|emailed|forwarded|uploaded|shared|posted|exported|transferred))\\b|\\b(?:send|sends|sent|sending|email|emails|emailed|e-mail|mail|mails|mailed|forward|forwards|forwarded|attach|attaches|attached|upload|uploads|uploaded|post|posts|posted|transfer|transfers|transferred|share|shares|shared|export|exports|exported|sync|syncs|synced|push|pushes|pushed|deliver|delivers|delivered|submit|submits|submitted|route|routes|routed|ship|ships|shipped|cc|bcc|goes?[ \\t]+to|should[ \\t]+go[ \\t]+to|(?:should|must|needs?[ \\t]+to|will|is[ \\t]+to|are[ \\t]+to)[ \\t]+be[ \\t]+(?:sent|emailed|forwarded|uploaded|shared|posted|exported|transferred))\\b[^\\r\\n]{0,64}?(?:\\r?\\n[ \\t]{0,8}[^\\r\\n \\t][^\\r\\n]{0,64}?){0,2}(?:\\r?\\n)?\\b(?:disregard|override|ignore)[ \\t]+(?:the[ \\t]+)?user(?:'s|s)?[ \\t]+(?:request|instructions?)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-12",
+  "source": "patterns.py:GLS-PI-POLITE-002"
+}
