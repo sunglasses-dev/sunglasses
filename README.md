@@ -495,16 +495,37 @@ private key files are named individually and matching is boundary-aware, so
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
 - **It fails open.** A crash, a bad config, an unparseable policy — all fall
   through to Claude Code's own permission flow rather than wedging your agent.
-  Every one of those writes a receipt saying the call was *not* checked, because
-  a firewall that is quietly off is worse than no firewall.
+  Those write a receipt saying the call was *not* checked, because a firewall
+  that is quietly off is worse than no firewall. One failure cannot write that
+  receipt: if the harness kills the hook on its timeout, nothing runs to write
+  anything. So an `in_flight` record is appended *before* the check begins, and
+  the decision record references it. An opening record with no terminal partner
+  is named by `sunglasses receipts --verify`, which exits non-zero. What that
+  proves is that the pair is incomplete, and no more: the evaluation may still
+  be running, the hook may have been killed, or the decision may have been made
+  and enforced with only the terminal write failing. The record cannot tell
+  those apart and does not pretend to. It does not make the hook fail closed,
+  which is the harness's contract rather than ours, and it does not establish
+  that the tool call ran. It makes the gap visible instead of silent.
+
+  Both records depend on the write succeeding. A full disk, a read-only volume
+  or a kill between the two appends leaves a file that is missing lines or ends
+  mid-line, so `--verify` counts every line it cannot read, prints it with its
+  file and line number, and reports the run as incomplete rather than clean.
+  Receipts are read as bytes and decoded a line at a time, so unreadable lines
+  are located at the line boundary, including a write cut inside a multibyte
+  character, and one damaged line never costs you the rest of the file.
 
 ### Cost
 
 ~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
 is 19ms of that). Zero network calls — nothing about your work leaves the
-machine. Every invocation appends one line to
-`~/.sunglasses/receipts/YYYY-MM-DD.jsonl`, recording a SHA-256 of the tool input
-and never the input itself.
+machine. An invocation appends two lines when both writes succeed, one when the check
+starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
+recording a SHA-256 of the tool input and never the input itself. A hook killed
+between the two leaves only the first, which is the case these records exist to
+make visible, so "every invocation appends two lines" is not a promise this
+makes.
 
 ## Roadmap
 

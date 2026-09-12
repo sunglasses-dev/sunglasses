@@ -44,8 +44,27 @@ from sunglasses.firewall import (
 # a real subprocess means the transport code is actually exercised; a mocked
 # `tools/list` would prove only that our test doubles agree with each other.
 
+def _decision_line(tmp_path):
+    """The terminal record for the call.
+
+    Each call writes a PAIR: an `in_flight` opening line before evaluation and the
+    decision after it. Reading line [0] used to mean "the receipt" and now means
+    "the opening line", so these assertions select by kind.
+    """
+    import json as _json
+    path = next((tmp_path / "receipts").glob("*.jsonl"))
+    rows = [_json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    decisions = [r for r in rows if r.get("kind") == "decision"]
+    assert len(decisions) == 1, f"expected one decision record, got {len(decisions)}"
+    return decisions[0]
+
+
 _FAKE_SERVER = '''#!/usr/bin/env python3
 import json, sys
+
+
+
+
 
 TOOLS = %s
 
@@ -273,7 +292,7 @@ def test_receipt_records_pin_source(tmp_path, monkeypatch):
     firewall.run_hook(json.dumps({
         "session_id": "s", "tool_name": "mcp__github__create_issue", "tool_input": {}}))
 
-    line = json.loads((tmp_path / "receipts").glob("*.jsonl").__next__().read_text().splitlines()[0])
+    line = _decision_line(tmp_path)
     assert line["pin_source"] == "pin_file"
     assert line["decision"] == "ask"
 
@@ -282,7 +301,7 @@ def test_non_mcp_receipt_has_no_pin_source(tmp_path, monkeypatch):
     from sunglasses import firewall
     monkeypatch.setenv("SUNGLASSES_HOME", str(tmp_path))
     firewall.run_hook(json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}}))
-    line = json.loads((tmp_path / "receipts").glob("*.jsonl").__next__().read_text().splitlines()[0])
+    line = _decision_line(tmp_path)
     assert "pin_source" not in line
 
 
@@ -504,7 +523,7 @@ def test_hook_denies_a_drifted_tool_and_records_the_source(tmp_path, monkeypatch
     firewall.run_hook(json.dumps({
         "session_id": "s", "tool_name": "mcp__github__create_issue", "tool_input": {}}))
 
-    line = json.loads(next((tmp_path / "receipts").glob("*.jsonl")).read_text().splitlines()[0])
+    line = _decision_line(tmp_path)
     assert line["decision"] == "deny"
     assert line["rule_id"] == "GLS-FW-PIN-DRIFT"
     assert line["pin_source"] == "pin_state"
@@ -522,7 +541,7 @@ def test_hook_marks_a_stale_state_in_the_receipt(tmp_path, monkeypatch):
     firewall.run_hook(json.dumps({
         "session_id": "s", "tool_name": "mcp__github__create_issue", "tool_input": {}}))
 
-    line = json.loads(next((tmp_path / "receipts").glob("*.jsonl")).read_text().splitlines()[0])
+    line = _decision_line(tmp_path)
     assert line["pin_state_stale"] is True
     assert line["decision"] != "deny", "stale is doubt, not evidence"
 

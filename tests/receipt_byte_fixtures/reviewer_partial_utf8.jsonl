@@ -1,0 +1,4 @@
+{"ts": "2026-09-12T12:20:54-07:00", "kind": "in_flight", "eval_id": "e56057f229f0a694", "tool_name": "Bash", "session_id": "review-clean", "input_sha256": "bb27f2d3e59c216fee8177478bdcc09ebd391620a30be8d11098f3ff4e3556f9"}
+{"ts": "2026-09-12T12:20:54-07:00", "kind": "decision", "eval_id": "e56057f229f0a694", "tool_name": "Bash", "session_id": "review-clean", "decision": "defer", "lane": "deterministic", "rule_id": "GLS-FW-CLEAN", "input_sha256": "bb27f2d3e59c216fee8177478bdcc09ebd391620a30be8d11098f3ff4e3556f9", "elapsed_ms": 1.88}
+{"ts": "2026-09-12T12:20:54-07:00", "kind": "in_flight", "eval_id": "c6e1c7cb71eb389d", "tool_name": "Bash", "session_id": "review-â‚¬-byte-fragment", "input_sha256": "c72443f9520540c226c4d2f4f4d4db56e392471327e19d537c1d3487759e559d"}
+{"ts": "2026-09-12T12:20:54-07:00", "kind": "decision", "eval_id": "c6e1c7cb71eb389d", "tool_name": "Bash", "session_id": "review-â‚

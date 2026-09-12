@@ -1082,6 +1082,100 @@ def _warn_if_hook_interpreter_missing():
                     return
 
 
+
+def _verify_lifecycle(rows, directory, unparseable=()):
+    """Pair each in_flight record with its terminal record and name the orphans.
+
+    An orphan is a call the firewall began evaluating and never finished: the
+    harness killed the hook on its timeout, or the process died. Both FAIL OPEN,
+    and before these records existed both were invisible — no receipt at all,
+    which reads exactly like a hook that was never installed.
+
+    Receipts written before this existed carry no `kind`. They are terminal
+    records by definition and are counted as such rather than reported as
+    orphans, because a legacy line is not evidence of a missed call.
+    """
+    in_flight, terminal, legacy = {}, set(), 0
+    for r in rows:
+        kind = r.get("kind")
+        if kind == "in_flight":
+            in_flight[r.get("eval_id")] = r
+        elif kind == "decision":
+            terminal.add(r.get("eval_id"))
+        else:
+            legacy += 1
+
+    orphans = [(eid, rec) for eid, rec in in_flight.items() if eid not in terminal]
+    # A terminal record with no opening line means the pair was split across a
+    # day boundary or the opening write failed. Worth naming, not worth failing.
+    dangling = sorted(terminal - set(in_flight))
+
+    print(f"\n  {BOLD}SUNGLASSES receipt lifecycle{RESET} {DIM}({directory}){RESET}")
+    print(f"  {DIM}{'─' * 52}{RESET}")
+    print(f"  evaluations started   {CYAN}{len(in_flight)}{RESET}")
+    print(f"  decisions recorded    {CYAN}{len(terminal)}{RESET}")
+    if legacy:
+        print(f"  legacy lines          {DIM}{legacy}  (written before lifecycle records){RESET}")
+    if dangling:
+        print(f"  decisions with no opening line  {YELLOW}{len(dangling)}{RESET} "
+              f"{DIM}(day boundary, or the opening write failed){RESET}")
+
+    if unparseable:
+        print(f"  unreadable lines      {RED}{len(unparseable)}{RESET} "
+              f"{DIM}(counted, not analysed){RESET}")
+
+    if not orphans and not unparseable:
+        print(f"\n  {GREEN}{BOLD}No orphans.{RESET} "
+              f"{DIM}Every opening record has a terminal partner.{RESET}\n")
+        return 0
+
+    from .firewall import sanitize_receipt_field as _clean
+
+    if unparseable:
+        # file:line, so the reader can go and look rather than take our word.
+        print(f"\n  {RED}{BOLD}{len(unparseable)} line(s) could not be read.{RESET}")
+        print(f"  {DIM}This result is INCOMPLETE. A truncated write leaves a "
+              f"fragment exactly like this.{RESET}\n")
+        for path, lineno, raw in unparseable[:20]:
+            # `raw` already carries its own quoting: a JSON line as text, or a
+            # byte preview plus the decode reason. Re-quoting it here hid the
+            # reason behind the truncation.
+            preview = raw.strip()
+            if len(preview) > 96:
+                preview = preview[:96] + "…"
+            print(f"    {RED}unreadable{RESET} {DIM}{path.name}:{lineno}{RESET} "
+                  f"{DIM}{preview}{RESET}")
+        if len(unparseable) > 20:
+            print(f"    {DIM}... and {len(unparseable) - 20} more{RESET}")
+        print()
+
+    if not orphans:
+        print(f"  {DIM}Valid rows analysed: every opening record has a terminal "
+              f"partner.{RESET}\n")
+        return 1
+
+    # What the record proves is that a pair is missing. It does NOT prove the
+    # tool call ran: a hook still blocked on a slow read looks exactly like this
+    # and then completes normally, and so does a DENY whose terminal append hit
+    # ENOSPC after the decision was already enforced.
+    print(f"\n  {RED}{BOLD}{len(orphans)} opening record(s) with no terminal "
+          f"partner.{RESET}")
+    print(f"  {DIM}Three things produce this, and this file cannot tell them "
+          f"apart:{RESET}")
+    print(f"    {DIM}1. the evaluation is still running{RESET}")
+    print(f"    {DIM}2. the hook was killed or crashed, which fails open{RESET}")
+    print(f"    {DIM}3. the decision was made and enforced, and the terminal "
+          f"append failed{RESET}\n")
+    for eid, rec in orphans[:20]:
+        print(f"    {RED}orphan{RESET} {DIM}{_clean(rec.get('ts'))}{RESET} "
+              f"{BOLD}{_clean(rec.get('tool_name')) or '(unknown tool)'}{RESET} "
+              f"{DIM}eval {eid}{RESET}")
+    if len(orphans) > 20:
+        print(f"    {DIM}... and {len(orphans) - 20} more{RESET}")
+    print()
+    return 1
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
@@ -1107,14 +1201,45 @@ def cmd_receipts(args):
     # user goes to read the audit trail is where it has to be said.
     _warn_if_hook_interpreter_missing()
 
+    # The pretty printer skips a line it cannot parse, which is right for a
+    # human scrolling their history. Verify mode inherited that skip and then
+    # certified the file, so a receipts file whose only line was a truncated
+    # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
+    # read a line must say so, not average it away.
+    # Read BYTES and decode one line at a time. `read_text()` decodes the whole
+    # file at once, so a single truncated multibyte character anywhere in it
+    # raises and the command analyses NOTHING: a write cut mid-character (the
+    # process was killed between the two appends) took down the whole audit
+    # trail with a traceback rather than reporting an incomplete run.
+    #
+    # An undecodable line is counted and LOCATED. It is never decoded with
+    # errors="replace" and then accepted, because a line rebuilt from
+    # substitution characters is not the line that was written, and reporting on
+    # it would be reporting on something nobody sent.
     rows = []
+    unparseable = []
     for path in files:
-        for line in path.read_text().splitlines():
-            if line.strip():
-                try:
-                    rows.append(_json.loads(line))
-                except ValueError:
-                    continue
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            unparseable.append((path, 0, f"<unreadable file: {exc}>"))
+            continue
+        for lineno, chunk in enumerate(raw.split(b"\n"), 1):
+            if not chunk.strip():
+                continue
+            try:
+                line = chunk.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                # A safe preview: the bytes as written, never a lossy decode.
+                unparseable.append((path, lineno, f"{chunk[:48]!r}  ({exc.reason})"))
+                continue
+            try:
+                rows.append(_json.loads(line))
+            except ValueError:
+                unparseable.append((path, lineno, line))
+
+    if getattr(args, "verify", False):
+        return _verify_lifecycle(rows, directory, unparseable)
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
@@ -1918,6 +2043,13 @@ def main():
     receipts_parser.add_argument("--today", action="store_true", help="Today only")
     receipts_parser.add_argument("--limit", type=int, default=40,
                                  help="Rows to show (default 40)")
+    receipts_parser.add_argument(
+        "--verify", action="store_true",
+        help="Pair every opening record with its terminal record and name the ones "
+             "with no partner. A missing partner does NOT mean the tool call ran: "
+             "the evaluation may still be running, the hook may have been killed, "
+             "or the decision may have been enforced and only the terminal write "
+             "failed. Exits non-zero if any line cannot be read.")
     receipts_parser.set_defaults(func=cmd_receipts)
 
     # demo

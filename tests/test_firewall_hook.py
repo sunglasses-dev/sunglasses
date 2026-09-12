@@ -165,10 +165,23 @@ def test_a_bad_policy_does_not_suppress_a_real_leak_block(home):
 
 # ── receipts ────────────────────────────────────────────────────────────────
 
-def test_every_invocation_writes_exactly_one_receipt(home):
+def test_every_invocation_writes_exactly_one_pair_of_receipts(home):
+    """One call, two lines: the opening record and the decision.
+
+    This used to assert one line per call. The second line is the RED 5 lifecycle
+    record, written before evaluation so that a hook killed on the harness's
+    timeout leaves an orphan instead of leaving nothing at all.
+    """
     for _ in range(3):
         firewall.run_hook(json.dumps(CLEAN))
-    assert len(_receipts(home)) == 3
+    rows = _receipts(home)
+    assert len(rows) == 6, f"expected three pairs, got {len(rows)} lines"
+    opening = [r for r in rows if r.get("kind") == "in_flight"]
+    decisions = [r for r in rows if r.get("kind") == "decision"]
+    assert len(opening) == len(decisions) == 3
+    assert {r["eval_id"] for r in opening} == {r["eval_id"] for r in decisions}, \
+        "each opening record must be closed by the decision that carries its id"
+    assert len({r["eval_id"] for r in opening}) == 3, "evaluation ids must be distinct"
 
 
 def test_receipt_has_the_spec_fields(home):
@@ -241,7 +254,8 @@ def test_receipts_loosened_by_an_older_version_are_repaired_in_place(home):
     assert stat.S_IMODE(stale.stat().st_mode) == 0o600
     # Repairing permissions must not cost the audit history it is protecting.
     assert "written by 0.4.1" in stale.read_text()
-    assert len(stale.read_text().strip().splitlines()) == 2
+    # one pre-existing line plus this call's pair (opening + decision)
+    assert len(stale.read_text().strip().splitlines()) == 3
 
 
 def test_a_filesystem_that_refuses_chmod_still_audits(home, monkeypatch):
