@@ -493,8 +493,13 @@ private key files are named individually and matching is boundary-aware, so
   as a dangerous shell command), and it costs ~902ms per call because the
   pattern database is rebuilt in every hook subprocess. Enable with
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
-- **It fails open.** A crash, a bad config, an unparseable policy — all fall
-  through to Claude Code's own permission flow rather than wedging your agent.
+- **It fails open, and says so.** A crash falls through to Claude Code's own
+  permission flow rather than wedging your agent. A *dead control* is different:
+  if the policy file is missing, empty, unreadable or unparseable, or if the audit
+  trail cannot be written, the firewall now ASKS and names which control is down,
+  because an empty answer on the wire is indistinguishable from "checked, nothing
+  found". A missing policy only counts as dead where one was installed; a machine
+  that never configured one is not nagged.
   Every one of those writes a receipt saying the call was *not* checked, because
   a firewall that is quietly off is worse than no firewall.
 
