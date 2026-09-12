@@ -41,6 +41,8 @@ Design constraints (all load-bearing):
 
 from __future__ import annotations
 
+import os as _os
+import stat as _stat
 import hashlib
 import re
 
@@ -908,16 +910,123 @@ def parse_policy(text: str) -> dict:
     return policy
 
 
+# RED 4 — THE CONTROL IS DOWN AND THE CALL STILL WENT THROUGH.
+#
+# Every one of these states used to end the same way: the policy lane produced no
+# opinion, the hook emitted `{}`, and the call fell through to the normal
+# permission flow with nothing on screen to say the control was dead. `{}` is
+# indistinguishable from "this call is fine", which is the whole problem: a
+# firewall that is quietly off looks exactly like a firewall that looked and
+# found nothing.
+#
+# A dead control now ASKS, and the question names which control died. Asking is
+# deliberately annoying. It is supposed to be: the fix is to repair the policy,
+# not to learn to click through.
+#
+# `missing` needs care, and the first draft of it was wrong. "The home directory
+# exists" is NOT evidence that a policy was ever installed: `write_receipt`
+# creates that directory itself on the first call, so a fresh machine that never
+# ran `sunglasses init` would have asked on every call, forever. That is the
+# cry-wolf failure this file warns about elsewhere, and it would have been
+# shipped as a security feature.
+#
+# So a missing policy is only a DEAD control when something positively says one
+# was installed: the marker `sunglasses init` writes next to it. No marker means
+# the firewall was never configured, which is the old silent behaviour and the
+# correct one. Installs that predate the marker gain it on their next `init`.
+INSTALL_MARKER = "installed"
+POLICY_STATES = {
+    "missing":     "the policy file is gone",
+    "unreadable":  "the policy file cannot be read",
+    "empty":       "the policy file is empty",
+    "corrupt":     "the policy file does not parse",
+    "wrong_type":  "the policy file is not a mapping",
+}
+
+
+class PolicyDown(Exception):
+    """A named policy failure state. `state` is one of POLICY_STATES."""
+
+    def __init__(self, state: str, detail: str = ""):
+        self.state = state
+        self.detail = detail
+        super().__init__(f"{POLICY_STATES.get(state, state)}{': ' + detail if detail else ''}")
+
+
+def _describe_node(mode) -> str:
+    """What kind of thing is at that path, for the message the user reads."""
+    if _stat.S_ISFIFO(mode):
+        return "a FIFO"
+    if _stat.S_ISSOCK(mode):
+        return "a socket"
+    if _stat.S_ISDIR(mode):
+        return "a directory"
+    if _stat.S_ISCHR(mode) or _stat.S_ISBLK(mode):
+        return "a device"
+    return "not a regular file"
+
+
 def load_policy(path) -> dict:
-    """Read policy.yaml. Absent = {} (blocks nothing). Malformed = PolicyError."""
+    """Read policy.yaml, or raise PolicyDown naming the state it is in.
+
+    Returns `{}` only for the one honest empty case: no home directory, meaning
+    nothing was ever installed.
+    """
     import pathlib
     p = pathlib.Path(path)
     if not p.exists():
+        if (p.parent / INSTALL_MARKER).exists():
+            raise PolicyDown("missing", str(p))
         return {}
+    # STAT BEFORE READ. A FIFO with no writer blocks in the kernel, so the hook
+    # sat past the harness's 10 second timeout with no stdout and no receipt,
+    # and a timed-out hook FAILS OPEN. A socket, a device node or a directory in
+    # that path is the same class: not a thing we can read, and answering that
+    # from metadata costs nothing and cannot block.
     try:
-        return parse_policy(p.read_text())
+        st = _os.stat(p)
     except OSError as exc:
-        raise PolicyError(f"policy file at {p} is unreadable: {exc}") from exc
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+    if not _stat.S_ISREG(st.st_mode):
+        raise PolicyDown(
+            "unreadable", f"not a regular file ({_describe_node(st.st_mode)}) ({p})")
+
+    try:
+        data = p.read_bytes()
+    except OSError as exc:
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+
+    # A NUL anywhere in the file means it was not written by a person editing a
+    # policy. YAML accepts one inside a value and keeps it, so
+    # `- ~/.ssh/id_rsa\x00` parsed cleanly, never matched the path it names, and
+    # the call came back CLEAN in 30 ms with no policy_state and no confession.
+    # A silent no-match is the worst possible answer from a control: it looks
+    # exactly like "checked, nothing found". Checked on the BYTES, before YAML
+    # sees them, because by then the NUL is already inside a value.
+    if b"\x00" in data:
+        raise PolicyDown("corrupt", f"NUL byte in the policy file ({p})")
+
+    try:
+        raw = data.decode("utf-8")
+    # A policy whose BYTES do not decode is unreadable in exactly the sense F3
+    # means, but decoding raises UnicodeDecodeError, which is a ValueError and
+    # NOT an OSError. It used to escape the clause below and leave the
+    # named-failure lane entirely: the caller returned `{}` with no stated
+    # failure state, and the same exception took the later pin TOFU decision
+    # down with it. Two junk bytes at the end of the file were enough.
+    except UnicodeError as exc:
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+    if not raw.strip():
+        raise PolicyDown("empty", str(p))
+    try:
+        parsed = parse_policy(raw)
+    except PolicyError as exc:
+        raise PolicyDown("corrupt", f"{exc} ({p})") from exc
+    except OSError as exc:
+        raise PolicyDown("unreadable", f"{exc} ({p})") from exc
+    if not isinstance(parsed, dict):
+        raise PolicyDown("wrong_type", f"parsed as {type(parsed).__name__} ({p})")
+    return parsed
 
 
 # `$HOME` and `${HOME}` name the same directory `~` does, so a path rule that
@@ -1259,12 +1368,28 @@ def evaluate(payload: dict, home=None) -> "tuple":
     # verdict — otherwise a corrupt policy.yaml plus a pin TOFU on the same call
     # yields a receipt that never mentions the dead policy control.
     errors = []
+    policy_down = None      # set when the policy control is down; used as the
+                            # fallback verdict instead of a silent fall-through
 
     def confession():
         return "; ".join(errors) if errors else None
 
     try:
         policy = load_policy(home / "policy.yaml")
+    except PolicyDown as down:
+        # Recorded, not returned. A dead control must reach the receipt even when
+        # a LATER check produces the verdict — that rule predates this change and
+        # still holds, so this does not short-circuit the remaining lanes. What
+        # changes is the FALLBACK: where nothing else decided, the answer is no
+        # longer `{}` but an ask that names which control is down.
+        errors.append(str(down))
+        extras["policy_state"] = down.state
+        policy_down = Decision(
+            "ask", "error", f"GLS-FW-POLICY-{down.state.upper().replace('_', '-')}",
+            f"SUNGLASSES firewall: {POLICY_STATES.get(down.state, down.state)}, so the "
+            f"path and egress rules did NOT run on this call. Repair the policy file "
+            f"under ~/.sunglasses or run `sunglasses init --policy`. Approve only if "
+            f"you would have approved this call unchecked.")
     except PolicyError as exc:
         errors.append(str(exc))
     else:
@@ -1322,7 +1447,9 @@ def evaluate(payload: dict, home=None) -> "tuple":
                 raise AssertionError("fuzzy lane produced a deny; that is forbidden")
             return decision, confession(), extras
 
-    return _CLEAN, confession(), extras
+    # Nothing found anything. If the policy control was down for this call, that
+    # is not a clean result and must not look like one.
+    return (policy_down or _CLEAN), confession(), extras
 
 
 def run_hook(stdin_text: str, home=None) -> dict:
@@ -1354,10 +1481,15 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "flow. This tool call was NOT checked. See ~/.sunglasses/receipts/.",
         )
 
-    if error and decision.lane != "error":
-        # A control was down while the rest of the lane worked. `lane` keeps
-        # saying which lane actually decided — overloading it with "error" threw
-        # that away — and `degraded` plus `error` carry the confession.
+    if error:
+        # A control was down on this call. `lane` keeps saying which lane actually
+        # decided — overloading it with "error" threw that away — and `degraded`
+        # plus `error` carry the confession.
+        #
+        # Marked whenever there is an error, including when the dead control is
+        # itself the verdict (RED 4). The condition used to exclude `lane ==
+        # "error"`, which meant the one receipt where a control definitely died
+        # was the one receipt not flagged as degraded.
         extras = {**extras, "degraded": True}
 
     try:
@@ -1373,10 +1505,22 @@ def run_hook(stdin_text: str, home=None) -> dict:
             **extras,
             **({"error": error} if error else {}),
         }, home=home)
-    except Exception:  # noqa: BLE001
-        # Losing an audit line must not change a security decision. The block
-        # (or the defer) stands either way.
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # F6 — THE AUDIT TRAIL IS DOWN.
+        #
+        # Losing an audit line must not WEAKEN a decision, so a deny stays a deny
+        # and is returned unchanged. But a `defer` or an `allow` that nobody can
+        # record is a call with no evidence it happened, which is the same silence
+        # the lifecycle records exist to remove. Those ASK, naming the dead control
+        # rather than echoing an exception at the user.
+        if decision.action != "deny":
+            decision = Decision(
+                "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
+                "SUNGLASSES firewall: the audit trail could not be written, so this "
+                "call would leave no record. Check the receipts directory under "
+                "~/.sunglasses for permissions and disk space. Approve only if you "
+                "would have approved it unrecorded.")
+            error = f"receipts unwritable: {type(exc).__name__}: {exc}"
 
     return decision.to_hook_output()
 
@@ -1613,15 +1757,39 @@ def write_starter_policy(home=None, enabled: bool = True):
     """
     home = home or sunglasses_home()
     path = home / "policy.yaml"
+
+    def _mark_enrolled():
+        """Record that a policy lives here, so its later ABSENCE is a dead control.
+
+        This has to run on EVERY path that leaves a policy in place, not only on
+        the one that creates the file. An install that predates the marker takes
+        the exists-guard or the upgrade branch below, both of which used to
+        return before this ran, so the machines most likely to be running an
+        older policy were exactly the ones that never got enrolled. On those,
+        losing the policy still fell through to `{}` instead of asking, which is
+        the failure this marker exists to make impossible.
+        """
+        marker = home / INSTALL_MARKER
+        if marker.exists():
+            return
+        home.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            "sunglasses wrote a policy here. If policy.yaml is missing, the control "
+            "is down and the firewall will ask rather than fall through silently.\n",
+            encoding="utf-8")
+
     if path.exists():
         is_our_untouched_disabled = (
             path.read_text(encoding="utf-8") == starter_policy_text(enabled=False))
         if enabled and is_our_untouched_disabled:
             path.write_text(starter_policy_text(enabled=True), encoding="utf-8")
+            _mark_enrolled()
             return path
+        _mark_enrolled()
         return None
     home.mkdir(parents=True, exist_ok=True)
     path.write_text(starter_policy_text(enabled), encoding="utf-8")
+    _mark_enrolled()
     return path
 
 

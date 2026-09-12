@@ -115,22 +115,32 @@ def test_internal_crash_defers_and_confesses(home, monkeypatch):
     assert "synthetic detector explosion" in last.get("error", "")
 
 
-def test_corrupt_policy_file_defers_and_confesses_rather_than_blocking(home):
+def test_corrupt_policy_file_asks_and_confesses_rather_than_blocking(home):
     """A policy we cannot parse is a control that is NOT running.
 
-    Blocking everything would be hostile; silently ignoring it would let the
-    user believe they are protected. So: defer, and say so in the receipt.
+    Blocking everything would be hostile and silently ignoring it would let the
+    user believe they are protected, so this used to defer and confess in the
+    receipt. The confession was real and nobody read it: `{}` on the wire is
+    indistinguishable from "checked, nothing found", and the receipt is only
+    consulted after something has already gone wrong.
+
+    RED 4: it still does not block, and it still confesses, but the user is now
+    asked and told which control is down at the moment it matters.
     """
     (home / "policy.yaml").write_text("max_spend_usd: 50\n")
     out = firewall.run_hook(json.dumps(CLEAN))
-    assert out == {}
+    assert out["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert "does not parse" in out["hookSpecificOutput"]["permissionDecisionReason"]
     last = _receipts(home)[-1]
     # `lane` keeps naming the lane that actually decided; the confession rides
     # on `degraded` + `error`. Overloading `lane` with "error" used to throw the
     # real lane away, which made a degraded receipt indistinguishable from a
     # crashed one.
     assert last["degraded"] is True
-    assert last["lane"] == "deterministic"
+    # The dead control is the verdict here, so `lane` names the error lane. Where
+    # a real lane decides instead, it keeps naming that lane — the test below.
+    assert last["lane"] == "error"
+    assert last["rule_id"] == "GLS-FW-POLICY-CORRUPT"
     assert "max_spend_usd" in last.get("error", "")
 
 
