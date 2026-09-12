@@ -24414,7 +24414,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-V3-001",
-        "name": "2026-06-30_ansi_sgr_conceal_encoding_smuggling_hardening",
+        "name": "ANSI Concealment Encoding Smuggling",
         "category": "terminal_output_encoding_smuggling",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24422,7 +24422,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-V3-030",
-        "name": "2026-06-30_unicode_homoglyph_approval_laundering_hardening",
+        "name": "Unicode Homoglyph Approval Laundering",
         "category": "unicode_evasion",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24601,7 +24601,7 @@ PATTERNS = [
     # === v0.3.15 batch (12 patterns) ===
     {
         "id": "GLS-V3-007",
-        "name": "2026-06-30_browser_history_continuity_hardening",
+        "name": "Browser History Continuity Laundering",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24609,7 +24609,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-V3-031",
-        "name": "2026-06-30_vector_reranker_trust_receipt_hardening",
+        "name": "Vector Reranker Trust Receipt Laundering",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24747,7 +24747,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-584",
-        "name": "2026-07-15_multimodal_tool_invocation_residual_safety_bypass.md",
+        "name": "Multimodal Invocation Residual Safety Bypass",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24912,7 +24912,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-605",
-        "name": "2026-07-17_salamilayered_delegation_C20260717T223247_azrollinaz.md",
+        "name": "Layered Delegation Cumulative Intent Smuggling",
         "category": "agent_workflow_security",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -24934,7 +24934,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-607",
-        "name": "Citation-presence validation laundering \u2014 C20260718T133021_azrollinaz",
+        "name": "Citation Presence Validation Laundering",
         "category": "agent_workflow_security",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -24945,7 +24945,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-609",
-        "name": "2026-07-18_executable_pov_sanitizer_oracle_laundering_C20260718T111515_qaqu.md",
+        "name": "Executable Proof Sanitizer Oracle Laundering",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -24956,7 +24956,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-610",
-        "name": "2026-07-18_expert_judge_surface_agreement_gap_C20260718T140212_azrollinaz.md",
+        "name": "Expert Judge Cross Field Agreement Gap",
         "category": "agent_workflow_security",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -24989,7 +24989,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-614",
-        "name": "2026-07-18_swarm_correlation_laundering_C20260718T133203_qaqu.md",
+        "name": "Swarm Correlation Independence Laundering",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25154,7 +25154,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-631",
-        "name": "2026-07-23_blockchain_intent_authorization_replay_C20260723T075543_azrollinaz.md",
+        "name": "Blockchain Intent Authorization Replay",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25165,7 +25165,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-632",
-        "name": "2026-07-23_certification_consensus_lineage_laundering_C20260723T120118_azrollina",
+        "name": "Certification Consensus Lineage Laundering",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25176,7 +25176,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-634",
-        "name": "2026-07-23_cumulative_validation_receipt_replay_C20260723T085059_azrollinaz.md",
+        "name": "Validation Receipt Epoch Replay",
         "category": "agent_workflow_security",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -25187,7 +25187,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-637",
-        "name": "2026-07-23_nested_mcp_oauth_state_context_pollution_C20260723T060830_azrollinaz.",
+        "name": "Nested OAuth State Context Pollution",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25254,7 +25254,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-644",
-        "name": "MCP stdio startup environment-variable injection \u2014 C20260725T180137_claw",
+        "name": "MCP Stdio Startup Environment Injection",
         "category": "agent_workflow_security",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25353,7 +25353,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AW-661",
-        "name": "C20260723T122349_azrollinaz_helpbench_confident_security_advice_omission.md",
+        "name": "Confident Security Advice Omission",
         "category": "agent_workflow_security",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -25397,7 +25397,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MCP-065",
-        "name": "2026-07-17_normalized_execution_policy_gap_C20260717T231433_claw.md",
+        "name": "Normalized Execution Policy Rebinding",
         "category": "mcp_threat",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25452,7 +25452,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MCP-071",
-        "name": "2026-07-23_session_alias_path_traversal_C20260723T125106_azrollinaz.md",
+        "name": "Session Alias Path Traversal",
         "category": "mcp_threat",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25463,7 +25463,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MCP-072",
-        "name": "2026-07-25_mcp_tool_index_unvalidated_regex_redos_C20260725T233247_azrollinaz.md",
+        "name": "Unbounded Tool Search Regex Denial",
         "category": "mcp_threat",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25485,7 +25485,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MCP-076",
-        "name": "MCP log-resource dirname traversal root escape \u2014 C20260726T060101_azrollinaz",
+        "name": "Log Resource Root Traversal",
         "category": "mcp_threat",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25507,7 +25507,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-568",
-        "name": "2026-07-15_rag_feedback_reingestion_latent_instruction_amplification.md",
+        "name": "RAG Feedback Latent Instruction Amplification",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25518,7 +25518,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-569",
-        "name": "2026-07-15_retrieval_context_displacement_policy_eviction_hardening.md",
+        "name": "Retrieval Context Safety Control Eviction",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25551,7 +25551,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-573",
-        "name": "2026-07-16_dual_path_rag_canary_integrity_hardening.md",
+        "name": "Dual Path RAG Canary Integrity Bypass",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25573,7 +25573,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-576",
-        "name": "2026-07-16_rag_inference_cost_amplification_hardening.md",
+        "name": "RAG Inference Cost Amplification",
         "category": "retrieval_poisoning",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -25584,7 +25584,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-577",
-        "name": "2026-07-16_relevance_conditioned_safe_source_activation_C20260716T085614_azrolli",
+        "name": "Relevance Conditioned Safety Activation",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25595,7 +25595,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-579",
-        "name": "2026-07-22_semantic_equivalence_memory_representation_laundering_C20260722T13431",
+        "name": "Semantic Memory Approval Laundering",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25628,7 +25628,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-582",
-        "name": "2026-07-26_semantic_neighbor_poisoning_C20260726T093134_qaqu.md",
+        "name": "Semantic Neighbor Evidence Poisoning",
         "category": "retrieval_poisoning",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -25639,7 +25639,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RP-585",
-        "name": "C20260716T060531_qaqu_toe_shared_origin_evidence_independence_laundering.md",
+        "name": "Shared Origin Evidence Independence Laundering",
         "category": "retrieval_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25805,7 +25805,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ABX-002",
-        "name": "2026-07-18_contextual_integrity_dimension_short_circuit_spillage_C20260718T12561",
+        "name": "Contextual Integrity Recipient Check Bypass",
         "category": "authorization_bypass",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25827,7 +25827,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ABX-007",
-        "name": "2026-07-23_langflow_public_flow_file_source_read_C20260723T165726_claw_DRAFT.md",
+        "name": "Public Flow File Source Disclosure",
         "category": "authorization_bypass",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -25838,7 +25838,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ABX-008",
-        "name": "2026-07-23_post_id_object_identity_authorization_binding_C20260723T122635_claw_C",
+        "name": "Object Identity Authorization Rebinding",
         "category": "authorization_bypass",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25860,7 +25860,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ABX-013",
-        "name": "C20260715T225122_symbolic_guardrail_session_scope_omission.md",
+        "name": "Symbolic Guardrail Session Scope Omission",
         "category": "authorization_bypass",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25893,7 +25893,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ABX-017",
-        "name": "C20260726T001817_qaqu_cve_2026_33010_cors_anonymous_HELD_FOR_BOSS_JUDGE.md",
+        "name": "Anonymous CORS Memory API Exposure",
         "category": "authorization_bypass",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25970,7 +25970,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SSRF-010",
-        "name": "2026-07-18_rag_url_fetch_ssrf_context_materialization_hardening.md",
+        "name": "RAG URL Fetch SSRF Materialization",
         "category": "ssrf",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -25981,7 +25981,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SSRF-012",
-        "name": "DNS-rebinding SSRF private-resolution response ingested into RAG memory \u2014 C20260726T070521_azrollinaz",
+        "name": "DNS Rebinding Private Response Ingestion",
         "category": "ssrf",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26025,7 +26025,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SSRF-019",
-        "name": "C20260726T032214_azrollinaz_litellm_mcp_connection_test_ssrf.md",
+        "name": "Credentialed MCP Connection Test SSRF",
         "category": "ssrf",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26036,7 +26036,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SSRF-021",
-        "name": "mcp-url-downloader URL destination validation SSRF carrier \u2014 C20260726T062105_azrollinaz",
+        "name": "Resolved URL Destination SSRF Bypass",
         "category": "ssrf",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26070,7 +26070,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PCF-669",
-        "name": "2026-07-15_typed_graph_alias_collision_verified_edge_rebinding.md",
+        "name": "Typed Graph Alias Edge Rebinding",
         "category": "provenance_chain_fracture",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26081,7 +26081,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-650",
-        "name": "2026-07-16_compute_pressure_exhaustion_tool_lifecycle_C20260716T151425_azrollina",
+        "name": "Tool Lifecycle Compute Budget Exhaustion",
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26125,7 +26125,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RPD-006",
-        "name": "2026-07-18_sqlbot_parser_differential_C20260718T063354_azrollinaz.md",
+        "name": "Text To SQL Parser Differential",
         "category": "representation_parser_differential",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -26136,7 +26136,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SE-006",
-        "name": "2026-07-22_runtime_sandbox_configuration_erosion_C20260722T163856_qaqu.md",
+        "name": "Runtime Sandbox Configuration Erosion",
         "category": "sandbox_escape",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26147,7 +26147,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SE-007",
-        "name": "2026-07-23_crawl4ai_generator_frame_attribute_escape_C20260723T163446_qaqu.md",
+        "name": "Generator Frame Attribute Sandbox Escape",
         "category": "sandbox_escape",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -26158,7 +26158,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-RPD-008",
-        "name": "Case-folding mismatch in Custom MCP environment denylist \u2014 C20260723T134055_qaqu",
+        "name": "Case Folding Environment Denylist Bypass",
         "category": "representation_parser_differential",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26169,7 +26169,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SE-009",
-        "name": "2026-07-25_dspy_pythoninterpreter_sandbox_capability_file_read_C20260725T195935_",
+        "name": "Python Interpreter File URI Disclosure",
         "category": "sandbox_escape",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26246,7 +26246,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PT-016",
-        "name": "2026-07-23_symlink_target_canonicalization_workspace_boundary_C20260723T132144_q",
+        "name": "Symlink Workspace Boundary Escape",
         "category": "path_traversal",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26257,7 +26257,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PT-017",
-        "name": "2026-07-25_mcp_attachment_arbitrary_filesystem_write_C20260725T215701_claw.md",
+        "name": "MCP Attachment Arbitrary File Write",
         "category": "path_traversal",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26467,7 +26467,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DBSL-003",
-        "name": "2026-07-16_mcp_result_lifecycle_state_laundering.md",
+        "name": "Tool Result Lifecycle Authority Laundering",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26500,7 +26500,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DBSL-004",
-        "name": "2026-07-23_delegated_citation_provenance_rebinding_C20260722T194520_claw.md",
+        "name": "Delegated Citation Provenance Rebinding",
         "category": "delegation_bridge_state_laundering",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26533,7 +26533,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DBSL-008",
-        "name": "2026-07-25_paired_operand_flag_invariant_bypass_C20260725T212032_azrollinaz.md",
+        "name": "Paired Operand Lifecycle Flag Mismatch",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26544,7 +26544,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-EX-029",
-        "name": "2026-07-26_targeted_runtime_skill_probe_C20260726T094856_qaqu.md",
+        "name": "Targeted Runtime Skill Scope Bypass",
         "category": "exfiltration",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26555,7 +26555,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DBSL-009",
-        "name": "C20260716T084422_azrollinaz_anonymous_interleaving_state_collision.md",
+        "name": "Anonymous Interleaving State Collision",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26577,7 +26577,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CI-008",
-        "name": "false-safe command-template reassembly bypass \u2014 C20260718T093307_qaqu",
+        "name": "False Safe Command Template Reassembly",
         "category": "command_injection",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26588,7 +26588,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AB-009",
-        "name": "unauthenticated browser MCP HTTP lifecycle capability exposure \u2014 C20260723T170652_qaqu",
+        "name": "Unauthenticated Browser MCP Exposure",
         "category": "auth_bypass",
         "severity": "critical",
         "channel": ["message", "file", "web_content"],
@@ -26599,7 +26599,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-CI-011",
-        "name": "2026-07-25_mcp_download_website_outputpath_shell_interpretation_C20260725T192535",
+        "name": "MCP Download Output Path Shell Injection",
         "category": "command_injection",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26632,7 +26632,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-AB-011",
-        "name": "C20260726T001805_claw_mcp_streamable_http_session_hijack.md",
+        "name": "Streamable HTTP Session Hijacking",
         "category": "auth_bypass",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26644,7 +26644,7 @@ PATTERNS = [
     # === v0.4.9 batch (29 patterns) ===
     {
         "id": "GLS-PCF-673",
-        "name": "2026-07-18_duplicate_citation_corroboration_laundering_C20260718T142525_claw.md",
+        "name": "Duplicate Citation Corroboration Laundering",
         "category": "provenance_chain",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26677,7 +26677,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SMP-021",
-        "name": "2026-07-23_multi_label_evidence_output_boundary_poisoning_C20260723T141336_azrol",
+        "name": "Evidence Label Boundary Poisoning",
         "category": "structured_metadata_poisoning",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26688,7 +26688,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PCF-681",
-        "name": "2026-07-23_tri_context_personalization_provenance_collapse_hardening.md",
+        "name": "Personalization Provenance Collapse",
         "category": "provenance_chain",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26699,7 +26699,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-SMP-023",
-        "name": "20260723_structured_threat_relation_rebinding_C20260723T112119_azrollinaz.md",
+        "name": "Structured Threat Relation Rebinding",
         "category": "structured_metadata_poisoning",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26721,7 +26721,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DOAS-001",
-        "name": "2026-07-22_adversarial_compute_amplification.md",
+        "name": "Adversarial Compute Amplification",
         "category": "denial_of_ai_service",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26732,7 +26732,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DOAS-002",
-        "name": "Aggregate request-budget exhaustion via normal concurrent queries \u2014 C20260722T185728_claw",
+        "name": "Aggregate Request Budget Exhaustion",
         "category": "denial_of_ai_service",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26743,7 +26743,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DOAS-003",
-        "name": "2026-07-22_ui_output_continuation_compute_amplification.md",
+        "name": "Output Continuation Compute Amplification",
         "category": "denial_of_ai_service",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26765,7 +26765,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MSR-004",
-        "name": "Cross-task multimodal retention disclosure \u2014 C20260723T173526_qaqu",
+        "name": "Cross Task Multimodal Retention Disclosure",
         "category": "memory_state_replay",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26809,7 +26809,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-MMP-004",
-        "name": "C20260723T144142_claw_historical_scan_poisoning_lookahead_mtd.md",
+        "name": "Historical Scan Forecast Poisoning",
         "category": "mlops_metadata_poisoning",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
@@ -26820,7 +26820,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-EE-003",
-        "name": "2026-07-17_hpaa_typographic_render_tokenization_mismatch_hardening.md",
+        "name": "Rendered Tokenization Instruction Smuggling",
         "category": "encoding_evasion",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26853,7 +26853,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-ALP-005",
-        "name": "2026-07-23_proof_context_scope_laundering_C20260723T114302_azrollinaz.md",
+        "name": "Proof Context Scope Laundering",
         "category": "attestation_lineage_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26864,7 +26864,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-IP-003",
-        "name": "2026-07-15_audio_transcript_confidence_bypass.md",
+        "name": "Audio Transcript Confidence Bypass",
         "category": "indirect_prompt_injection",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26919,7 +26919,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-PE-008",
-        "name": "C20260723T063337_claw_transitive_blast_radius_under_modeling_DRAFT.md",
+        "name": "Transitive Tool Blast Radius Under Modeling",
         "category": "privilege_escalation",
         "severity": "high",
         "channel": ["message", "file", "web_content"],
@@ -26930,7 +26930,7 @@ PATTERNS = [
     },
     {
         "id": "GLS-DKS-002",
-        "name": "2026-07-16_rubric_parser_duplicate_key_collision.md",
+        "name": "Duplicate Policy Key Collision",
         "category": "duplicate_key_shadowing",
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
