@@ -139,6 +139,34 @@ def _class_requirement(seq):
     return ClassClause(ranges)
 
 
+# A class wider than this is not selective enough to be worth proving, and the
+# proof below walks every codepoint in it.
+MAX_CLASS_CODEPOINTS = 4096
+
+
+def _case_inert(ch: str) -> bool:
+    """True when no case operation and no fold can move this character.
+
+    The clause is answered against pages of the FOLDED document while the pages
+    were recorded from the class as written, so any character the class can
+    match must fold to the same page or the clause is wrong in the unsafe
+    direction. `[K-Å]` on a document of KELVIN SIGN U+212A is the worked case:
+    `re.IGNORECASE` matches it against `K`, `fold` turns it into `k` on page 0,
+    the recorded page 0x21 is absent, and a rule that WOULD have matched is
+    skipped.
+
+    Rather than build a reverse case map, require every character in the class
+    to be inert. A character that is not the result of any case mapping is
+    itself uncased, and every character that case folds into another is a cased
+    letter whose own upper or lower differs from itself, so the test excludes
+    both directions. `test_the_recorded_pages_hold_for_every_codepoint` proves
+    that exhaustively over the classes that actually gain a clause, rather than
+    leaving it as an argument.
+    """
+    return (ch.lower() == ch and ch.upper() == ch
+            and ch.casefold() == ch and fold(ch) == ch)
+
+
 def _class_ranges(items):
     """Ranges of a positive character class, or None if it is negated/complex."""
     out = []
@@ -152,7 +180,15 @@ def _class_ranges(items):
             out.append((av, av))
         else:
             return None          # CATEGORY (\w, \s ...) is far too broad
-    return out or None
+    if not out:
+        return None
+    if sum(hi - lo + 1 for lo, hi in out) > MAX_CLASS_CODEPOINTS:
+        return None
+    for lo, hi in out:
+        for cp in range(lo, hi + 1):
+            if not _case_inert(chr(cp)):
+                return None      # case can move it off the recorded page
+    return out
 
 
 def _clauses(seq):
@@ -218,6 +254,15 @@ def _clauses(seq):
                 for a in alts:
                     if isinstance(a, ClassClause):
                         klasses.append(a)
+                    elif isinstance(a, Clause):
+                        # A NESTED alternation arrives here as an inner Clause.
+                        # Iterating it yields its literals only, so `set(a)`
+                        # kept the literals and silently DROPPED its classes,
+                        # turning `decode OR braille` into `decode` and making
+                        # a necessary condition STRONGER than the regex. Both
+                        # halves have to come out.
+                        lits |= set(a.literals)
+                        klasses.extend(a.classes)
                     else:
                         lits |= set(a)
                 if all(len(l) >= MIN_LITERAL for l in lits):
@@ -261,10 +306,15 @@ class ClassClause:
         # Every 256-character page the ranges touch. Answering "is any character
         # of this class present" then costs a set intersection rather than a
         # scan, and the page set for a document is computed once.
+        # Recorded from what `fold` PRODUCES for each character, because the
+        # document these pages are compared against is folded. `_class_ranges`
+        # only admits characters fold leaves alone, so the two agree, and
+        # computing it this way means a future fold change shows up here.
         pages = set()
         for lo, hi in self.ranges:
-            for page in range(lo >> PAGE_SHIFT, (hi >> PAGE_SHIFT) + 1):
-                pages.add(page)
+            for cp in range(lo, hi + 1):
+                for ch in fold(chr(cp)):
+                    pages.add(ord(ch) >> PAGE_SHIFT)
         self.pages = frozenset(pages)
 
     def satisfied_by(self, pages_present) -> bool:
