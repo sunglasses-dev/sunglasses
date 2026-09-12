@@ -965,7 +965,13 @@ def load_policy(path) -> dict:
         return {}
     try:
         raw = p.read_text()
-    except OSError as exc:
+    # A policy whose BYTES do not decode is unreadable in exactly the sense F3
+    # means, but `read_text` raises UnicodeDecodeError, which is a ValueError
+    # and NOT an OSError. It escaped this clause and left the named-failure lane
+    # entirely: the caller returned `{}` with no stated failure state, and the
+    # same exception took the later pin TOFU decision down with it. Two junk
+    # bytes at the end of the file were enough to do that.
+    except (OSError, UnicodeError) as exc:
         raise PolicyDown("unreadable", f"{exc} ({p})") from exc
     if not raw.strip():
         raise PolicyDown("empty", str(p))
@@ -1708,21 +1714,39 @@ def write_starter_policy(home=None, enabled: bool = True):
     """
     home = home or sunglasses_home()
     path = home / "policy.yaml"
+
+    def _mark_enrolled():
+        """Record that a policy lives here, so its later ABSENCE is a dead control.
+
+        This has to run on EVERY path that leaves a policy in place, not only on
+        the one that creates the file. An install that predates the marker takes
+        the exists-guard or the upgrade branch below, both of which used to
+        return before this ran, so the machines most likely to be running an
+        older policy were exactly the ones that never got enrolled. On those,
+        losing the policy still fell through to `{}` instead of asking, which is
+        the failure this marker exists to make impossible.
+        """
+        marker = home / INSTALL_MARKER
+        if marker.exists():
+            return
+        home.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            "sunglasses wrote a policy here. If policy.yaml is missing, the control "
+            "is down and the firewall will ask rather than fall through silently.\n",
+            encoding="utf-8")
+
     if path.exists():
         is_our_untouched_disabled = (
             path.read_text(encoding="utf-8") == starter_policy_text(enabled=False))
         if enabled and is_our_untouched_disabled:
             path.write_text(starter_policy_text(enabled=True), encoding="utf-8")
+            _mark_enrolled()
             return path
+        _mark_enrolled()
         return None
     home.mkdir(parents=True, exist_ok=True)
     path.write_text(starter_policy_text(enabled), encoding="utf-8")
-    # Records that a policy was installed here, so its later ABSENCE is a dead
-    # control rather than a machine that never configured one.
-    (home / INSTALL_MARKER).write_text(
-        "sunglasses wrote a policy here. If policy.yaml is missing, the control "
-        "is down and the firewall will ask rather than fall through silently.\n",
-        encoding="utf-8")
+    _mark_enrolled()
     return path
 
 
