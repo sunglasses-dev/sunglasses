@@ -161,3 +161,102 @@ def test_orphans_are_found_among_completed_calls(home):
     run_hook(PAYLOAD, home=home)
     recs += _records(home)[2:]
     assert _verify_lifecycle(recs, home / "receipts") == 1
+
+
+# ── round 2: what --verify is allowed to certify, and what it may claim ──────
+# Round 1 reused the pretty printer's "skip a line I cannot parse" and then
+# printed "No orphans. Every evaluation that started also finished." over a file
+# whose ONLY line was a 31-byte truncated fragment, exit 0. A checker that
+# cannot read a line has to say so.
+
+def _verify(home):
+    """Run the real CLI the way a user does, and return (exit code, plain text)."""
+    import re as _re
+    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
+                          cwd=TREE, capture_output=True, text=True, env=env)
+    return proc.returncode, _re.sub(r"\x1b\[[0-9;]*m", "", proc.stdout + proc.stderr)
+
+
+def _write(home, name, text):
+    d = home / "receipts"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / name).write_text(text)
+    return d / name
+
+
+def test_a_truncated_final_line_is_reported_and_the_run_is_not_clean(home):
+    """The ENOSPC shape: the write died mid-line, so the file ends in a fragment."""
+    _write(home, "receipts-2026-09-12.jsonl", '{"kind":"in_flight","eval_id":"a')
+    code, out = _verify(home)
+    assert code != 0, "a file that cannot be read must not exit 0"
+    assert "No orphans" not in out, "an unreadable file was certified clean"
+    assert "receipts-2026-09-12.jsonl:1" in out, f"the bad line was not located: {out}"
+    assert "INCOMPLETE" in out.upper()
+
+
+def test_valid_rows_are_still_analysed_alongside_an_unreadable_one(home):
+    """Counting the bad line must not throw away the good ones."""
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"ok","ts":"t","tool_name":"Bash"}\n'
+           '{"kind":"decision","eval_id":"ok"}\n'
+           '{"kind":"in_flight","eval_id":"tr')
+    code, out = _verify(home)
+    assert code != 0
+    assert "evaluations started   1" in out, out
+    assert "decisions recorded    1" in out, out
+    assert "unreadable lines" in out
+
+
+def test_a_clean_paired_file_is_still_clean(home):
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"x","ts":"t","tool_name":"Bash"}\n'
+           '{"kind":"decision","eval_id":"x"}\n')
+    code, out = _verify(home)
+    assert code == 0 and "No orphans" in out, out
+
+
+# R2. An unmatched opening record proves the PAIR is incomplete. It does not
+# prove the tool call ran. Two real cases produce it and neither ran unchecked:
+# a hook still blocked on a slow read that then completes normally, and a DENY
+# that was decided and enforced whose terminal append hit a full disk.
+
+def test_an_unmatched_opening_does_not_claim_the_tool_call_ran(home):
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"y","ts":"t","tool_name":"Bash"}\n')
+    code, out = _verify(home)
+    assert code != 0
+    assert "no terminal partner" in out, out
+    lowered = out.lower()
+    assert "proceeded unchecked" not in lowered, (
+        "the report asserts the host executed the call, which this file cannot show"
+    )
+    for cause in ("still running", "killed", "terminal append failed"):
+        assert cause in lowered, f"the report does not offer the cause {cause!r}: {out}"
+
+
+def test_a_live_evaluation_looks_the_same_as_a_killed_one_and_is_not_called_dead(home):
+    """The hook is still running: opening written, terminal not yet."""
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"live","ts":"t","tool_name":"Read"}\n')
+    code, out = _verify(home)
+    assert code != 0
+    assert "still running" in out.lower()
+    # ...and once it finishes, the same file is clean.
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"live","ts":"t","tool_name":"Read"}\n'
+           '{"kind":"decision","eval_id":"live","decision":"allow"}\n')
+    code, out = _verify(home)
+    assert code == 0, "a completed evaluation must stop being reported"
+
+
+def test_a_denied_call_whose_terminal_write_failed_is_not_reported_as_unchecked(home):
+    """The decision was made and ENFORCED; only the second append was lost."""
+    _write(home, "r.jsonl",
+           '{"kind":"in_flight","eval_id":"deny1","ts":"t","tool_name":"Bash"}\n')
+    code, out = _verify(home)
+    assert code != 0
+    assert "terminal append failed" in out.lower(), (
+        "a DENY that was enforced but could not record itself must be offered "
+        "as one of the causes, or the report defames a working block"
+    )

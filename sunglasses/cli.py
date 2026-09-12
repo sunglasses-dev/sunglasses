@@ -1083,7 +1083,7 @@ def _warn_if_hook_interpreter_missing():
 
 
 
-def _verify_lifecycle(rows, directory):
+def _verify_lifecycle(rows, directory, unparseable=()):
     """Pair each in_flight record with its terminal record and name the orphans.
 
     An orphan is a call the firewall began evaluating and never finished: the
@@ -1120,15 +1120,47 @@ def _verify_lifecycle(rows, directory):
         print(f"  decisions with no opening line  {YELLOW}{len(dangling)}{RESET} "
               f"{DIM}(day boundary, or the opening write failed){RESET}")
 
-    if not orphans:
+    if unparseable:
+        print(f"  unreadable lines      {RED}{len(unparseable)}{RESET} "
+              f"{DIM}(counted, not analysed){RESET}")
+
+    if not orphans and not unparseable:
         print(f"\n  {GREEN}{BOLD}No orphans.{RESET} "
-              f"{DIM}Every evaluation that started also finished.{RESET}\n")
+              f"{DIM}Every opening record has a terminal partner.{RESET}\n")
         return 0
 
     from .firewall import sanitize_receipt_field as _clean
-    print(f"\n  {RED}{BOLD}{len(orphans)} evaluation(s) started and never finished.{RESET}")
-    print(f"  {DIM}A killed or crashed hook FAILS OPEN: the tool call proceeded "
-          f"unchecked.{RESET}\n")
+
+    if unparseable:
+        # file:line, so the reader can go and look rather than take our word.
+        print(f"\n  {RED}{BOLD}{len(unparseable)} line(s) could not be read.{RESET}")
+        print(f"  {DIM}This result is INCOMPLETE. A truncated write leaves a "
+              f"fragment exactly like this.{RESET}\n")
+        for path, lineno, raw in unparseable[:20]:
+            preview = raw.strip()[:60]
+            print(f"    {RED}unreadable{RESET} {DIM}{path}:{lineno}{RESET} "
+                  f"{DIM}{preview!r}{RESET}")
+        if len(unparseable) > 20:
+            print(f"    {DIM}... and {len(unparseable) - 20} more{RESET}")
+        print()
+
+    if not orphans:
+        print(f"  {DIM}Valid rows analysed: every opening record has a terminal "
+              f"partner.{RESET}\n")
+        return 1
+
+    # What the record proves is that a pair is missing. It does NOT prove the
+    # tool call ran: a hook still blocked on a slow read looks exactly like this
+    # and then completes normally, and so does a DENY whose terminal append hit
+    # ENOSPC after the decision was already enforced.
+    print(f"\n  {RED}{BOLD}{len(orphans)} opening record(s) with no terminal "
+          f"partner.{RESET}")
+    print(f"  {DIM}Three things produce this, and this file cannot tell them "
+          f"apart:{RESET}")
+    print(f"    {DIM}1. the evaluation is still running{RESET}")
+    print(f"    {DIM}2. the hook was killed or crashed, which fails open{RESET}")
+    print(f"    {DIM}3. the decision was made and enforced, and the terminal "
+          f"append failed{RESET}\n")
     for eid, rec in orphans[:20]:
         print(f"    {RED}orphan{RESET} {DIM}{_clean(rec.get('ts'))}{RESET} "
               f"{BOLD}{_clean(rec.get('tool_name')) or '(unknown tool)'}{RESET} "
@@ -1164,17 +1196,24 @@ def cmd_receipts(args):
     # user goes to read the audit trail is where it has to be said.
     _warn_if_hook_interpreter_missing()
 
+    # The pretty printer skips a line it cannot parse, which is right for a
+    # human scrolling their history. Verify mode inherited that skip and then
+    # certified the file, so a receipts file whose only line was a truncated
+    # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
+    # read a line must say so, not average it away.
     rows = []
+    unparseable = []
     for path in files:
-        for line in path.read_text().splitlines():
-            if line.strip():
-                try:
-                    rows.append(_json.loads(line))
-                except ValueError:
-                    continue
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                rows.append(_json.loads(line))
+            except ValueError:
+                unparseable.append((path, lineno, line))
 
     if getattr(args, "verify", False):
-        return _verify_lifecycle(rows, directory)
+        return _verify_lifecycle(rows, directory, unparseable)
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
@@ -1980,8 +2019,11 @@ def main():
                                  help="Rows to show (default 40)")
     receipts_parser.add_argument(
         "--verify", action="store_true",
-        help="Pair every started evaluation with its decision and name the orphans. "
-             "An orphan is a call the hook began and never finished, which fails open.")
+        help="Pair every opening record with its terminal record and name the ones "
+             "with no partner. A missing partner does NOT mean the tool call ran: "
+             "the evaluation may still be running, the hook may have been killed, "
+             "or the decision may have been enforced and only the terminal write "
+             "failed. Exits non-zero if any line cannot be read.")
     receipts_parser.set_defaults(func=cmd_receipts)
 
     # demo
