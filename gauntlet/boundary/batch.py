@@ -32,7 +32,15 @@ from runner import Ledger, scenario_of                                   # noqa:
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 PY = "/opt/homebrew/opt/python@3.14/bin/python3.14"
 MODEL = "claude-haiku-4-5-20251001"
-CONTROL_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
+# THE HOOK COMPARISON SCOPE, and not the control scope. These four seeds are the
+# ones whose hook-mediated rows are compared; that is a statement about which
+# comparisons are in scope, and it was being used to decide which rows get a
+# no-mediation control at all. Those are different questions. Without a control
+# a strict row has nothing to be a difference FROM: "the payload was blocked"
+# and "the payload never arrived" produce the same empty destination, so 17 of
+# the 21 first-generation rows were being graded with no baseline.
+HOOK_COMPARISON_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
+CONTROL_SEEDS = HOOK_COMPARISON_SEEDS  # kept: read by the loader's docstring and tests
 
 
 def upstream_for(entry, variant, run_dir, default_argv):
@@ -278,6 +286,7 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                "verdict": {"model_view": {"state": "INVALID_STIMULUS"}}}
         sink.stop()
         (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+        _settle("INVALID_STIMULUS")
         return row
     tool = f"mcp__fs__{params.get('name', 'read_text_file')}"
     arguments = params.get("arguments") or {"path": str(run_dir / "payload.txt")}
@@ -292,8 +301,19 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
            "expected_tool": tool,
            "upstream_kind": upstream_kind,
            "destination_url": sink_url}
+    # THE CHARGE ID WAS THROWN AWAY. `charge` returns one so the spend can be
+    # tied to what it produced, and this line discarded it, so every completed
+    # row left its charge unsettled: a call whose result nobody can find, which
+    # is the state the exam found rows in. Held here and settled against
+    # row.json on every exit from this function, including the early one.
+    charge_id = None
     if not dry_run:
-        ledger.charge(entry["id"], f"{variant['name']}/{route}")
+        charge_id = ledger.charge(entry["id"], f"{variant['name']}/{route}")
+
+    def _settle(outcome):
+        """Tie the charge to its terminal artifact, once, whichever way we leave."""
+        if charge_id is not None:
+            ledger.settle(charge_id, str(run_dir / "row.json"), outcome)
     # The allow list is the tool THIS scenario calls. Hardcoding the two
     # filesystem tools meant the stub scenarios, which expose `gate2_fetch`, were
     # permission-denied: the model emitted the tool_use and Claude Code refused
@@ -346,6 +366,7 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
         row["verdict"]["model_view"]["state"] = "INVALID_STIMULUS"
         row["invalid_reason"] = stimulus.reason
     (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+    _settle(row.get("verdict", {}).get("model_view", {}).get("state") or "completed")
     return row
 
 
@@ -389,7 +410,9 @@ def main(argv=None) -> int:
         chosen = {v.strip() for v in args.variants.split(",") if v.strip()}
         variants = [v for v in scenario["variants"]
                     if not chosen or v["name"] in chosen]
-        routes = ["proxy_strict"] + (["control"] if entry["id"] in CONTROL_SEEDS else [])
+        # EVERY variant gets its control. See HOOK_COMPARISON_SEEDS above for why
+        # this is no longer restricted to four scenarios.
+        routes = ["proxy_strict", "control"]
         wanted = {r.strip() for r in args.routes.split(",") if r.strip()}
         for variant in variants:
           for route in [r for r in routes if not wanted or r in wanted]:
