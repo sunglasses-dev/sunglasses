@@ -407,3 +407,76 @@ def test_the_frame_after_an_over_long_one_is_still_read():
     source = _io.BytesIO(b"z" * (limit * 4) + b'\n{"good":true}\n')
     frames = list(passthrough.bounded_lines(source, limit))
     assert frames[-1] == b'{"good":true}', frames
+
+
+# ── item 6: receipts a stranger can grade ──────────────────────────────────
+
+_CHATTY = _worker(
+    "sys.stdin.buffer.read()\n"
+    "sys.stderr.write('E' * 300000)\n"          # far past a pipe's ~64 KiB
+    "sys.stderr.flush()\n" + _CLEAN)
+
+
+def test_a_scanner_that_writes_a_lot_to_stderr_is_not_reported_as_a_deadline():
+    """stderr was opened as a PIPE and never read.
+
+    A pipe nobody drains fills at roughly 64 KiB and the writer BLOCKS, so a
+    worker that logs enough hangs in `write` until the deadline kills it and the
+    receipt says SCAN_DEADLINE about a scan that had finished thinking and was
+    only trying to talk. The case where a scanner has the most to say is the
+    case where it is in trouble, which is the case this used to misreport.
+    """
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=8000)
+    outcome = proxy.submit("result", request_id="chatty", payload="x",
+                           scanner=_CHATTY).result(timeout=7.0)
+    assert outcome.reason_code == passthrough.CLEAN, (
+        f"a talkative scanner was graded {outcome.reason_code}; it blocked on a "
+        f"full stderr pipe rather than taking any real time")
+    assert outcome.worker_terminated is False
+
+
+def test_the_workers_own_account_of_a_failure_is_kept():
+    """A scanner's explanation of why it failed is the first thing a stranger
+    grading the run will want, and it was being discarded."""
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=8000)
+    proxy.submit("result", request_id="boom", payload="x",
+                 scanner=_explode).result(timeout=7.0)
+    output = [e for e in proxy.events if e["kind"] == "WORKER_OUTPUT"
+              and e["request_id"] == "boom"]
+    assert output, "no WORKER_OUTPUT event at all"
+    assert "RuntimeError" in output[0]["stderr"], output[0]["stderr"][:200]
+    assert output[0]["exit_code"] not in (0, None)
+    assert output[0]["accepted"] is True, "it failed, but its output was read"
+
+
+def test_a_discarded_worker_result_says_that_it_was_discarded():
+    """Omitting a late result cannot be told from a worker that said nothing."""
+    proxy = Passthrough(deadline_ms=300, watchdog_ms=6000)
+    outcome = proxy.submit("result", request_id="late", payload="x",
+                           scanner=_slow).result(timeout=5.0)
+    assert outcome.reason_code == passthrough.SCAN_DEADLINE
+    output = [e for e in proxy.events if e["kind"] == "WORKER_OUTPUT"
+              and e["request_id"] == "late"]
+    assert output and output[0]["accepted"] is False
+    assert output[0]["discarded_reason"] == passthrough.SCAN_DEADLINE
+
+
+def test_every_event_carries_a_monotonic_stamp_and_the_ids_json_type():
+    """`time.time()` can step backwards when the host's clock is corrected, and
+    a lifecycle read from it can show a scan settling before it started.
+
+    And 4 and "4" are different JSON-RPC correlation ids that render
+    identically in a receipt, while the replacement contract requires preserving
+    the type rather than normalising it.
+    """
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=8000)
+    proxy.submit("result", request_id=4, payload="x", scanner=_instant).result(timeout=5.0)
+    proxy.submit("result", request_id="4", payload="x", scanner=_instant).result(timeout=5.0)
+
+    assert all("mono" in e for e in proxy.events), "an event with no monotonic stamp"
+    stamps = [e["mono"] for e in proxy.events]
+    assert stamps == sorted(stamps), "the monotonic stamps are not ordered"
+
+    typed = {(e["request_id"], e["request_id_type"]) for e in proxy.events
+             if e["kind"] == "SETTLED"}
+    assert (4, "int") in typed and ("4", "str") in typed, typed
