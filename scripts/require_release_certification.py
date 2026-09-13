@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 
@@ -64,24 +65,31 @@ def main() -> int:
     ap.add_argument("--repo", default="sunglasses-dev/sunglasses")
     args = ap.parse_args()
 
-    if len(args.sha) < 7:
-        refuse(f"{args.sha!r} is not a commit sha")
+    # A full, resolved commit sha, nothing shorter. Until 2026-09-13 this
+    # accepted any prefix of seven or more characters and matched run heads on
+    # their first seven, so a second commit sharing a seven-character prefix
+    # (an independent review mined one in seven seconds) could borrow the
+    # certified commit's run. Certification is a statement about one exact
+    # tree; a prefix names a family of trees.
+    sha = args.sha.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        refuse(f"{args.sha!r} is not a full 40-character commit sha; "
+               "resolve it first (git rev-parse) and pass the whole thing")
 
     runs = gh_json(["run", "list", "--repo", args.repo,
                     "--workflow", f"{WORKFLOW}.yml", "--limit", "60",
                     "--json", "databaseId,headSha,status,conclusion,event"])
 
-    mine = [r for r in runs if r.get("headSha", "").startswith(args.sha)
-            or args.sha.startswith(r.get("headSha", "")[:7])]
+    mine = [r for r in runs if str(r.get("headSha", "")).lower() == sha]
     if not mine:
-        refuse(f"no {WORKFLOW} run exists for {args.sha[:12]} — "
+        refuse(f"no {WORKFLOW} run exists for {sha[:12]} — "
                "an unverified tree is not publishable")
 
     # Prefer a completed run; a later in-progress rerun must not mask an
     # earlier verdict, and an in-progress-only result is not certification.
     completed = [r for r in mine if r.get("status") == "completed"]
     if not completed:
-        refuse(f"the {WORKFLOW} run for {args.sha[:12]} has not finished "
+        refuse(f"the {WORKFLOW} run for {sha[:12]} has not finished "
                f"(status={mine[0].get('status')}) — running is not passing")
 
     run = completed[0]
@@ -90,7 +98,7 @@ def main() -> int:
 
     detail = gh_json(["run", "view", str(run["databaseId"]), "--repo",
                       args.repo, "--json", "jobs,headSha"])
-    if not detail.get("headSha", "").startswith(args.sha[:7]):
+    if str(detail.get("headSha", "")).lower() != sha:
         refuse("the run returned a different head sha than requested")
 
     jobs = detail.get("jobs") or []
@@ -124,7 +132,7 @@ def main() -> int:
     if problems:
         refuse("this tree is not release certified:\n  " + "\n  ".join(problems))
 
-    print(f"RELEASE CERTIFIED: {args.sha[:12]} — run {run['databaseId']}, "
+    print(f"RELEASE CERTIFIED: {sha[:12]} — run {run['databaseId']}, "
           f"{len(REQUIRED_EXACT)} jobs + {len(legs)} matrix legs all green")
     return 0
 
