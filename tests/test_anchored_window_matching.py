@@ -289,3 +289,161 @@ def test_a_document_whose_fold_changes_length_falls_back_to_a_full_search(anchor
     assert _fires(plain, doc)
     assert _fires(anchored, doc)
     assert _finding(anchored, doc)["matched_text"].lower().startswith("disable redaction")
+
+
+# ── round 2: three ways the opt in path was wrong ───────────────────────────
+# All three came from the reviewer, all three are the same mistake in different
+# clothing. A window is a CLAIM about where a match can be, and a claim that is
+# wrong in the direction of "not here" loses a detection in silence.
+
+SIGMA = "σ" * 3
+FINAL_SIGMA = "ς" * 3
+ALL_CHANNELS = ["message", "file", "web_content", "tool_output",
+                "api_response", "log_memory", "agent_input"]
+
+
+def _rule(rule_id, source, terms, span=600):
+    return {
+        "id": rule_id, "name": rule_id, "category": "prompt_injection",
+        "severity": "high", "channel": ALL_CHANNELS, "regex": [source],
+        "anchor_terms": terms, "anchor_span": span,
+    }
+
+
+def _modes(engine, rule_id):
+    return [mode for mode, _rx, _g in engine._compiled_by_id[rule_id]]
+
+
+# R1. READ EXTENT is not consumed width.
+
+LOOKAHEAD_RULE = r"\bdisable secrets\b(?=.{40}END)"
+LOOKAHEAD_DOC = "disable secrets " + "x" * 39 + "END"
+LOOKBEHIND_RULE = r"(?<=BEGIN )disable secrets"
+LOOKBEHIND_DOC = "BEGIN disable secrets"
+
+_ASSERTION_CASES = [
+    ("positive lookahead", LOOKAHEAD_RULE, LOOKAHEAD_DOC),
+    ("negative lookahead", r"\bdisable secrets\b(?!.{0,10}ALLOWED)", "disable secrets and go"),
+    ("positive lookbehind", LOOKBEHIND_RULE, LOOKBEHIND_DOC),
+]
+
+
+@pytest.mark.parametrize("name,source,doc", _ASSERTION_CASES, ids=[c[0] for c in _ASSERTION_CASES])
+def test_a_regex_with_an_assertion_falls_back_to_plain_and_still_fires(name, source, doc):
+    """The match CONSUMES 15 characters and has to READ 58.
+
+    `max_match_length` counts what a match consumes, so the window was sized
+    from 15 and the bounded search found nothing. The unbounded re-check that
+    would have caught it never runs, because there was no candidate to re-check.
+    Deriving every assertion's reach is possible; refusing the mode cannot be
+    subtly wrong, so the mode is refused and the rule runs plain.
+    """
+    import re as _re
+    assert _re.search(source, doc, _re.IGNORECASE | _re.DOTALL), (
+        f"{name}: the fixture does not match its own regex"
+    )
+    engine = SunglassesEngine(patterns=[_rule("ASSERT-" + name, source, ["secrets"])],
+                              mechanisms=False)
+    assert _modes(engine, "ASSERT-" + name) == ["plain"], (
+        f"{name}: still anchored, so the window can be shorter than the read"
+    )
+    assert "lookahead or lookbehind" in "".join(engine._anchor_refusals.values())
+    assert "ASSERT-" + name in {f["id"] for f in engine.scan(doc, channel="message").findings}
+
+
+@pytest.mark.parametrize("source", [r"\bdisable\s+secrets\b", r"^disable secrets$",
+                                    r"\bdisable secrets\b\Z"])
+def test_word_and_line_anchors_are_not_lookarounds(source):
+    """`\\b`, `^` and `$` are answered from the neighbouring characters, which a
+    bounded search still has, so they do not cost the mode."""
+    engine = SunglassesEngine(patterns=[_rule("AT-OK", source, ["secrets"])],
+                              mechanisms=False)
+    assert _modes(engine, "AT-OK") == ["anchored"], engine._anchor_refusals
+
+
+# R2. The fold does not unify every case equivalence.
+
+def test_a_non_ascii_anchor_term_is_refused_and_the_rule_still_fires():
+    """SIGMA and FINAL SIGMA match each other and fold apart.
+
+    A rule anchored on one would not find a document written with the other.
+    Refused, so it runs plain and finds it.
+    """
+    engine = SunglassesEngine(patterns=[_rule("SIGMA", SIGMA, [SIGMA])], mechanisms=False)
+    assert _modes(engine, "SIGMA") == ["plain"]
+    reason = "".join(engine._anchor_refusals.values())
+    assert "not ASCII" in reason and "sigma" in reason, reason
+    assert "SIGMA" in {f["id"] for f in engine.scan(FINAL_SIGMA, channel="message").findings}
+
+
+def test_the_reviewers_mu_case_does_not_reproduce_and_that_is_why_sigma_was_found():
+    """Checked rather than accepted.
+
+    The reviewer named MICRO SIGN against GREEK MU. The fold's translate table
+    already unifies that pair, as it does LONG S and KELVIN SIGN. Fixing the
+    case that was already handled would have left sigma standing, so the pair
+    that actually fails is asserted here beside the three that do not.
+    """
+    from sunglasses import _prefilter as _pf
+    for left, right in (("μ", "Μ"), ("s", "ſ"), ("k", "K")):
+        assert _pf.fold(left) == _pf.fold(right), (
+            f"{left!r} and {right!r} stopped folding together; the refusal rule "
+            f"may now be stricter than it needs to be"
+        )
+    assert _pf.fold("σ") != _pf.fold("ς"), (
+        "sigma and final sigma now fold together, so the ASCII rule could relax"
+    )
+
+
+def test_ascii_anchor_terms_are_safe_for_every_codepoint():
+    """The proof behind the ASCII rule, swept rather than argued.
+
+    Nothing outside ASCII may case match an ASCII character without folding onto
+    it, or an ASCII anchor could be missed the way sigma is.
+    """
+    import re as _re
+    from sunglasses import _prefilter as _pf
+    escaped = []
+    for cp in range(0x110000):
+        ch = chr(cp)
+        if ch.isascii():
+            continue
+        folded = _pf.fold(ch)
+        if len(folded) == 1 and folded.isascii():
+            continue                      # folds onto ASCII, which is the point
+        for a in "abcdefghijklmnopqrstuvwxyz0123456789.":
+            if _re.fullmatch(_re.escape(a), ch, _re.IGNORECASE) and folded != a:
+                escaped.append((hex(cp), a, folded))
+                break
+        if len(escaped) > 5:
+            break
+    assert not escaped, (
+        f"{escaped} case match an ASCII character and do not fold onto it, so an "
+        f"ASCII anchor term is no longer safe"
+    )
+
+
+# R3. `id(rx)` is not a key.
+
+def test_two_rules_with_the_same_source_keep_their_own_span():
+    """`re.compile` caches, so both rules shared one compiled object and the
+    second declaration overwrote the first's span. Order dependent, and which
+    rule lost depended on declaration order. The reviewer's probe, both ways."""
+    source = r"\bdisable\s+secrets\b"
+    wide = _rule("GLS-TEST-WIDE", source, ["secrets"], span=100)
+    narrow = _rule("GLS-TEST-NARROW", source, ["secrets"], span=8)
+    doc = "disable" + " " * 50 + "secrets"
+    seen = {}
+    for label, rules in (("wide then narrow", [wide, narrow]),
+                         ("narrow then wide", [narrow, wide])):
+        engine = SunglassesEngine(patterns=rules, mechanisms=False)
+        spans = {key[0]: span for key, (_terms, span) in engine._anchor_spec.items()}
+        assert spans == {"GLS-TEST-WIDE": 100, "GLS-TEST-NARROW": 8}, (
+            f"{label}: one rule's span overwrote the other's, {spans}"
+        )
+        seen[label] = sorted(f["id"] for f in engine.scan(doc, channel="message").findings)
+    assert seen["wide then narrow"] == seen["narrow then wide"], seen
+    assert seen["wide then narrow"] == ["GLS-TEST-WIDE"], (
+        f"the wide rule's window reaches the gap and the narrow one's does not, "
+        f"which is each rule's own declaration. Got {seen}"
+    )

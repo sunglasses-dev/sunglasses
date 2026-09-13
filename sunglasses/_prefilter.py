@@ -460,6 +460,39 @@ def _max_len(seq):
     return total
 
 
+def _has_lookaround(seq) -> bool:
+    """True when this tree contains a lookahead or lookbehind.
+
+    `\b`, `^` and `$` are AT nodes and are NOT lookarounds; they are answered
+    from the neighbouring characters, which a bounded search still has.
+    """
+    for op, av in seq:
+        name = getattr(op, "name", str(op))
+        if name in ("ASSERT", "ASSERT_NOT"):
+            return True
+        if name == "SUBPATTERN":
+            if _has_lookaround(av[3]):
+                return True
+        elif name == "ATOMIC_GROUP":
+            if _has_lookaround(av):
+                return True
+        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            if _has_lookaround(av[2]):
+                return True
+        elif name == "BRANCH":
+            if any(_has_lookaround(b) for b in av[1]):
+                return True
+    return False
+
+
+def has_lookaround(pattern_source: str) -> bool:
+    """True when the regex contains a lookahead or lookbehind, or cannot be read."""
+    try:
+        return _has_lookaround(_sre_parse.parse(pattern_source, re.IGNORECASE))
+    except Exception:
+        return True                              # unreadable, assume the worst
+
+
 def max_match_length(pattern_source: str):
     """Longest match this regex can produce, or None when it is unbounded."""
     try:

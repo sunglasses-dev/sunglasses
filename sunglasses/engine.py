@@ -453,7 +453,12 @@ class SunglassesEngine:
             ch for p in self._patterns for ch in p.get("channel", []))
 
         # Build pattern index
-        self._anchor_spec = {}          # id(compiled rx) -> (anchor terms, span)
+        # (rule id, regex entry index) -> (anchor terms, span). NOT id(rx):
+        # `re.compile` caches, so two rules sharing a source share the object.
+        self._anchor_spec = {}
+        # (rule id, regex entry index) -> why anchored mode was refused. Read by
+        # the tests, so a refusal is visible rather than a silent downgrade.
+        self._anchor_refusals = {}
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
 
@@ -468,7 +473,7 @@ class SunglassesEngine:
 
             if "regex" in pattern:
                 compiled = []
-                for r in pattern["regex"]:
+                for index, r in enumerate(pattern["regex"]):
                     try:
                         rx = re.compile(r, re.IGNORECASE)
                     except re.error:
@@ -503,6 +508,15 @@ class SunglassesEngine:
                         # match cannot happen without; the engine then reads only
                         # the text around it. Rules that declare nothing are
                         # untouched.
+                        #
+                        # Two ways a rule can ASK for this and not get it, both
+                        # refusals rather than best efforts, because a window
+                        # that is wrong in either direction loses a detection.
+                        refusal = self._anchor_refusal(pattern, r)
+                        if refusal is not None:
+                            self._anchor_refusals[(pattern["id"], index)] = refusal
+                            compiled.append(("plain", rx, None))
+                            continue
                         terms = tuple(sorted(
                             {_prefilter.fold(a) for a in pattern["anchor_terms"] if a},
                             key=len, reverse=True))
@@ -517,8 +531,14 @@ class SunglassesEngine:
                         proven = _prefilter.max_match_length(r)
                         span = (proven if proven is not None
                                 else int(pattern.get("anchor_span", self.ANCHOR_SPAN)))
-                        self._anchor_spec[id(rx)] = (terms, max(span, 1))
-                        compiled.append(("anchored", rx, None))
+                        # Keyed by (rule id, entry index). `id(rx)` looked like a
+                        # key and is not one: `re.compile` caches, so two rules
+                        # with the same source share one compiled object, and
+                        # the second rule's span silently overwrote the first's.
+                        # Order dependent, and the direction of the loss depends
+                        # on which rule was declared last.
+                        self._anchor_spec[(pattern["id"], index)] = (terms, max(span, 1))
+                        compiled.append(("anchored", rx, (pattern["id"], index)))
                     else:
                         compiled.append(("plain", rx, None))
                 if compiled:
@@ -676,10 +696,63 @@ class SunglassesEngine:
         if mode == "windowed":
             return self._match_windowed(rx, text)
         if mode == "anchored":
-            return self._match_anchored(rx, text)
+            return self._match_anchored(rx, guards, text)
         return rx.search(text)
 
-    def _match_anchored(self, rx, text: str):
+    def _anchor_refusal(self, pattern, source):
+        """Why this rule may not use anchored mode, or None.
+
+        BOTH of these are the same mistake in different clothing, and both were
+        found by the reviewer rather than by me. A window is a claim about where
+        a match can be, and a claim that is wrong in the direction of "not
+        here" loses a detection silently.
+
+        READ EXTENT. `max_match_length` counts what a match CONSUMES, and a
+        lookahead reads past that. `\bdisable secrets\b(?=.{40}END)` consumes 15
+        characters and needs to read 58, so the bounded search finds nothing and
+        the unbounded re-check that would have caught it never runs. Deriving
+        every assertion's reach is possible; refusing the mode is correct today
+        and cannot be subtly wrong, so that is what this does. `\b`, `^` and `$`
+        are not lookarounds and are still allowed, because they are answered
+        from the neighbouring characters a bounded search still has.
+
+        CASE. The anchors are found with `fold().find()`, and the fold does not
+        implement regex simple case equivalence everywhere. GREEK SIGMA and
+        FINAL SIGMA match each other under IGNORECASE and fold to different
+        characters, so a rule anchored on one would not find a document written
+        with the other. Same shape as the class clause finding in #153.
+
+        The reviewer also named MICRO SIGN against GREEK MU. That one does NOT
+        reproduce: the fold's translate table already unifies it, as it does
+        LONG S and KELVIN SIGN. Checked rather than assumed, because a fix aimed
+        at a case that is already handled would have left sigma standing.
+
+        The rule is that a term must be ASCII and unchanged by the fold. A sweep
+        of all 1,114,112 codepoints shows nothing outside ASCII case matches an
+        ASCII character without folding onto it, so ASCII is provably safe and
+        everything else is refused rather than reasoned about. That sweep is
+        `test_ascii_anchor_terms_are_safe_for_every_codepoint`.
+        """
+        if _prefilter.has_lookaround(source):
+            return ("the regex contains a lookahead or lookbehind, which reads "
+                    "past what the match consumes, so a bounded window can be "
+                    "shorter than the read the regex needs")
+        for term in pattern["anchor_terms"]:
+            if not term:
+                continue
+            if not term.isascii():
+                return (f"anchor term {term!r} is not ASCII, and outside ASCII "
+                        f"the fold does not unify every case equivalence "
+                        f"(sigma and final sigma fold apart while matching each "
+                        f"other), so a document the regex matches may not "
+                        f"contain the term in the folded view")
+            if _prefilter.fold(term) != term:
+                return (f"anchor term {term!r} is not what the fold produces "
+                        f"({_prefilter.fold(term)!r}), so it would be looked for "
+                        f"in a view it cannot appear in")
+        return None
+
+    def _match_anchored(self, rx, key, text: str):
         """Search only the text AROUND the rule's rare token.
 
         A rule like the api_response siblings begins with a marker that is cheap
@@ -703,7 +776,7 @@ class SunglassesEngine:
         offsets. A candidate is still re-run unbounded with `.match()` before it
         counts, because `endpos` is itself an invented end.
         """
-        anchors, span = self._anchor_spec[id(rx)]
+        anchors, span = self._anchor_spec[key]
         folded = _prefilter.fold(text)
         # `fold` translates before lowering precisely so it stays one char to one
         # char, but a future table entry could break that, and a position found
