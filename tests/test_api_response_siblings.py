@@ -481,3 +481,116 @@ def test_a_reviewer_marker_row_fires_through_the_cli():
         )
         assert proc.returncode == 1, f"{pattern_id}: CLI exit {proc.returncode}"
         assert pattern_id in {f["id"] for f in json.loads(proc.stdout)["findings"]}
+
+
+# ── #155 landed, so these declarations are LIVE ──────────────────────────────
+# The six siblings declared `anchor_terms` on this branch while the engine
+# ignored the key, and a test asserted that inertness. #155 is on main now, the
+# engine reads them, and inertness is the wrong claim. What has to hold instead
+# is that every entry actually GETS the mode it asked for, and that having it
+# changes no decision and no span.
+#
+# A rule can ask for anchored mode and not get it: #155 refuses a declaration
+# whose terms are not fold-invariant, or whose regex can read past what a
+# window bounds, and records the reason in `_anchor_refusals`. A silent
+# downgrade to plain would leave every test here green while the declaration
+# quietly bought nothing, which is the same shape as round 12's copied control.
+#
+# The full receipt is wider than a suite should be: 11,219 frozen round-9
+# inputs by seven channels, 78,533 paired public cells and 134,628 paired
+# `_eval_regex` calls, 0 diffs on decision, severity, finding ids, matched_text
+# and untruncated `match.span()`, plus ASTRA's 13 timing documents at 27 KB and
+# 1 MiB with every sha256 checked. It is saved beside this branch as
+# `warroom/R13_ANCHORED_RECEIPT_2026-09-13.txt`. What runs HERE is the same
+# comparison over this file's own committed rows, which is fast enough to keep.
+
+
+def _sibling_entries(eng):
+    out = {}
+    for pattern, compiled in eng._regex_patterns:
+        if not pattern["id"].endswith("-API"):
+            continue
+        for index, (mode, rx, key) in enumerate(compiled):
+            out[(pattern["id"], index)] = (mode, rx, key)
+    return out
+
+
+def _without_anchors():
+    return [{k: v for k, v in p.items() if not k.startswith("anchor_")}
+            if p["id"].endswith("-API") else p for p in PATTERNS]
+
+
+@pytest.fixture(scope="module")
+def plain_engine():
+    """The same patterns with the anchor declarations stripped. The control."""
+    eng = SunglassesEngine(patterns=_without_anchors())
+    eng.scan("warm", channel="api_response")
+    return eng
+
+
+def test_every_sibling_entry_actually_gets_the_anchored_mode(engine):
+    """Asked for is not got. A refusal is a downgrade with a reason."""
+    entries = _sibling_entries(engine)
+    assert len(entries) == 12, sorted(entries)
+    not_anchored = {k: mode for k, (mode, _rx, _key) in entries.items()
+                    if mode != "anchored"}
+    refusals = {k: why for k, why in engine._anchor_refusals.items()
+                if k[0].endswith("-API")}
+    assert not_anchored == {}, (not_anchored, refusals)
+    assert refusals == {}, refusals
+    for key in entries:
+        terms, span = engine._anchor_spec[key]
+        assert terms, key
+        assert span >= 1, (key, span)
+
+
+def test_the_control_engine_is_really_a_control(plain_engine):
+    """Strip the keys and no sibling entry may still be anchored, or the
+    comparison below is one engine against itself."""
+    modes = {k: mode for k, (mode, _rx, _key) in _sibling_entries(plain_engine).items()}
+    assert modes and all(m != "anchored" for m in modes.values()), modes
+
+
+_ANCHOR_ROWS = [row["text"] for row in MATRIX] + \
+               [row["text"] for row in FORMATTED] + \
+               [row["text"] for row in NORMALIZED]
+_ANCHOR_CHANNELS = ("api_response", "log_memory", "agent_input",
+                    "message", "file", "web_content", "tool_output")
+
+
+def test_anchoring_changes_no_public_decision_on_this_branch_s_own_rows(
+        engine, plain_engine):
+    diffs = []
+    for text in _ANCHOR_ROWS:
+        for channel in _ANCHOR_CHANNELS:
+            a, b = engine.scan(text, channel=channel), plain_engine.scan(text, channel=channel)
+            cell_a = (a.decision, tuple(sorted((f["id"], f.get("matched_text"))
+                                               for f in a.findings)))
+            cell_b = (b.decision, tuple(sorted((f["id"], f.get("matched_text"))
+                                               for f in b.findings)))
+            if cell_a != cell_b:
+                diffs.append((text[:60], channel))
+    assert diffs == [], f"{len(diffs)} anchored/plain differences, e.g. {diffs[:5]}"
+
+
+def test_anchoring_moves_no_match_span_on_this_branch_s_own_rows(
+        engine, plain_engine):
+    """A finding carries no offsets and its `matched_text` is truncated, so the
+    spans come from the engine's own matcher rather than from the finding."""
+    anchored_entries, plain_entries = _sibling_entries(engine), _sibling_entries(plain_engine)
+    assert set(anchored_entries) == set(plain_entries)
+    diffs, matched = [], 0
+    for text in _ANCHOR_ROWS:
+        for key in anchored_entries:
+            amode, arx, akey = anchored_entries[key]
+            pmode, prx, pkey = plain_entries[key]
+            am = engine._eval_regex(amode, arx, akey, text)
+            pm = plain_engine._eval_regex(pmode, prx, pkey, text)
+            a = (am.span(), am.group(0)) if am else None
+            b = (pm.span(), pm.group(0)) if pm else None
+            if a is not None:
+                matched += 1
+            if a != b:
+                diffs.append((key, text[:60]))
+    assert matched > 0, "no sibling entry matched any row; this check is vacuous"
+    assert diffs == [], f"{len(diffs)} span differences, e.g. {diffs[:5]}"
