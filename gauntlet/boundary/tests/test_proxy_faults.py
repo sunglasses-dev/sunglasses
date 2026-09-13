@@ -180,10 +180,93 @@ def _worker(script):
     return lambda _payload, _channel: [_PY, "-c", "import sys;" + script]
 
 
+# A clean scan PRINTS a result, the way `fault_worker.py scan` does. A worker
+# that exits 0 in silence is not a clean scan, it is an unreadable one, and the
+# proxy now fails closed on it: deciding from the exit code alone let a payload
+# the engine BLOCKED reach the model unchanged.
+_CLEAN = ('print(__import__("json").dumps({"result": {"decision": "allow", '
+          '"findings": [], "inspection_complete": True}}))')
+
 _hang = _worker("sys.stdin.buffer.read()\nimport time\n"
                 "while True: time.sleep(0.05)")
-_slow = _worker("sys.stdin.buffer.read()\nimport time\ntime.sleep(0.6)")
-_instant = _worker("sys.stdin.buffer.read()")
+_slow = _worker("sys.stdin.buffer.read()\nimport time\ntime.sleep(0.6)\n" + _CLEAN)
+_instant = _worker("sys.stdin.buffer.read()\n" + _CLEAN)
+_blocks = _worker(
+    'sys.stdin.buffer.read()\n'
+    'print(__import__("json").dumps({"result": {"decision": "block", '
+    '"findings": [{"id": "GLS-TEST-001"}], "inspection_complete": True}}))')
+_silent = _worker("sys.stdin.buffer.read()")   # exits 0, says nothing
 _explode = _worker(
     "sys.stdin.buffer.read()\n"
     "raise RuntimeError('worker failed with SYNTHETIC-CANARY-b4d0c0ffee inside')")
+
+
+# ── the policy the proxy exists to apply ───────────────────────────────────
+# The first live run forwarded a payload the pinned engine BLOCKS, because this
+# file decided from the worker's EXIT CODE and never read what the scan said.
+# `fault_worker.py scan` exits 0 whether it finds something or not, so a
+# detector finding and a clean scan were the same event.
+
+def test_a_detector_finding_withholds_the_message():
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000)
+    outcome = proxy.submit("result", request_id=7, payload="anything",
+                           scanner=_blocks).result(timeout=5.0)
+    assert outcome.forwarded is False
+    assert outcome.reason_code == "detector_finding"
+    assert outcome.replacement["error"]["message"] == "GATE2_WITHHELD"
+
+
+def test_a_clean_scan_forwards():
+    """The other half, or the check above could just withhold everything."""
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000)
+    outcome = proxy.submit("result", request_id=8, payload="anything",
+                           scanner=_instant).result(timeout=5.0)
+    assert outcome.forwarded is True and outcome.reason_code is None
+
+
+def test_a_worker_that_says_nothing_is_uninspected_and_fails_closed():
+    """Exit 0 in silence is not a clean scan. Unreadable means uninspected."""
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000)
+    outcome = proxy.submit("result", request_id=9, payload="anything",
+                           scanner=_silent).result(timeout=5.0)
+    assert outcome.forwarded is False
+    assert outcome.reason_code == "inspection_result_unreadable"
+
+
+# ── what gets inspected, measured on G2-01 before this existed ─────────────
+
+def test_a_result_is_inspected_as_its_content_not_as_the_frame():
+    """The envelope of a payload that BLOCKS scanned `allow` on the real engine.
+
+    The injection sits inside a JSON string field and the frame around it reads
+    as structure, so the mediator forwarded a message the detector would have
+    stopped. Content, not envelope.
+    """
+    from proxy.passthrough import inspection_input
+    frame = {"jsonrpc": "2.0", "id": 1, "result": {
+        "content": [{"type": "text", "text": "GATE2_REPORT hostile body"}]}}
+    leaves = inspection_input(frame, "result")
+    assert [p for p, _ in leaves] == ["result.content[].text"]
+    assert leaves[0][1] == "GATE2_REPORT hostile body"
+    assert "jsonrpc" not in "\n".join(v for _p, v in leaves)
+
+
+def test_a_request_is_inspected_as_its_argument_leaves_with_provenance():
+    from proxy.passthrough import inspection_input
+    frame = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+        "name": "read_text_file",
+        "arguments": {"path": "/tmp/a.txt", "opts": {"note": "second leaf"}}}}
+    leaves = dict((p, v) for p, v in inspection_input(frame, "request"))
+    assert leaves == {"params.arguments.path": "/tmp/a.txt",
+                      "params.arguments.opts.note": "second leaf"}
+    assert "tools/call" not in "\n".join(leaves.values()), (
+        "the method name is frame structure and must not be inspected as content; "
+        "scanning whole frames quarantined ordinary tools/call under GLS-MCP-002")
+
+
+def test_a_frame_with_nothing_inspectable_yields_no_leaves():
+    """A handshake has no payload to withhold; it must not be scanned as one."""
+    from proxy.passthrough import inspection_input
+    assert inspection_input({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+                             "params": {"protocolVersion": "x"}}, "request") == []
+    assert inspection_input({"jsonrpc": "2.0", "id": 0, "result": {}}, "result") == []
