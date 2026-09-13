@@ -164,6 +164,13 @@ class Passthrough:
         self._hold_entered: dict = {}
         self._cancel_accepted: dict = {}
         self._upstream_forwards = 0
+        # Ids the client asked for and we forwarded upstream, still awaiting a
+        # result. NOT the same set as `_pending`, which holds messages being
+        # scanned right now. When an upstream stream turns out to be
+        # untrustworthy these are the ids a client is still waiting on, and
+        # answering them is the difference between a refusal and a hang.
+        self._awaiting_upstream: dict = {}
+        self._tainted: str | None = None
         # WRITTEN DURING THE RUN, not at shutdown. Holding the events in memory
         # until `serve` returns means a run that is killed, hangs, or is being
         # watched from outside leaves NOTHING behind, and the state a reader
@@ -344,6 +351,63 @@ class Passthrough:
         self._emit("CANCEL_ACCEPTED", request_id)
         self._cancel_accepted[request_id].set()
 
+    def expect_upstream(self, request_id) -> None:
+        with self._lock:
+            self._awaiting_upstream[request_id] = time.time()
+
+    def upstream_answered(self, request_id) -> None:
+        with self._lock:
+            self._awaiting_upstream.pop(request_id, None)
+
+    def is_tainted(self) -> bool:
+        with self._lock:
+            return self._tainted is not None
+
+    def taint(self, direction, reason) -> list:
+        """This stream is not trustworthy from here on. Refuse, do not resume.
+
+        THE ONE REAL CANDIDATE DEFECT in the 28c39e0 run. `read_frame` was
+        right: it refused the bad frame and reported `resynchronised=False`. The
+        PUMP then went back for the next line, which is resynchronisation at the
+        stream level however carefully the frame level declines to guess.
+
+        G2-10's own upstream script shows why it matters. `invalid_json` is a
+        TRUNCATED frame followed by a complete, well formed frame carrying an
+        injection. Resuming means reading a message whose framing was decided by
+        where the previous one broke, and the detector finding on that second
+        frame would then look like the mediator working. The test for this uses
+        a CLEAN follower on purpose, so nothing can hide the resync.
+
+        Returns a replacement for every id the client is still waiting on, so
+        they are refused rather than left to hang, which is the other half of
+        not guessing.
+        """
+        with self._lock:
+            if self._tainted is not None:
+                return []
+            self._tainted = reason
+            waiting = list(self._awaiting_upstream)
+            pending = list(self._pending.items())
+            self._awaiting_upstream.clear()
+        self._emit("STREAM_TAINTED", None, direction=direction, reason=reason,
+                   awaiting=[str(i) for i in waiting],
+                   pending=[str(i) for i, _ in pending])
+        replacements = []
+        for request_id in waiting:
+            replacements.append(self._withheld(request_id, MALFORMED_UPSTREAM, 0.0, ""))
+        for request_id, handle in pending:
+            outcome = Outcome(
+                request_id=request_id, direction=direction, forwarded=False,
+                worker_terminated=False, delivered_late=False, elapsed_ms=0.0,
+                reason_code=MALFORMED_UPSTREAM, inspected_utf8_bytes=0,
+                inspection_complete=False, detector_status=STATUS_UNREADABLE,
+                finding=False, rule_ids=[],
+                replacement=self._withheld(request_id, MALFORMED_UPSTREAM, 0.0, ""))
+            with self._lock:
+                self._pending.pop(request_id, None)
+            handle._settle(outcome)
+        return replacements
+
     def await_hold_entered(self, request_id, timeout: float = 1.0) -> bool:
         event = self._hold_entered.get(request_id)
         return bool(event and event.wait(timeout))
@@ -488,6 +552,33 @@ def inspection_input(message: dict, direction: str):
     return leaves
 
 
+def invalid_result_shape(message):
+    """Why a well formed JSON-RPC frame can still be an invalid RESULT.
+
+    G2-10's `invalid_result_shape` seed sends `result.content` as a STRING where
+    MCP defines a list of content blocks. It parses, it is jsonrpc 2.0, and the
+    old path therefore scanned it as content and would have reported whatever
+    the detector said about it. That is a category error: the shape of the
+    envelope is a PROTOCOL fact, and answering a protocol fault with a content
+    verdict tells a reader the upstream was understood when it was not.
+
+    Returns a reason string, or None when the shape is acceptable.
+    """
+    if "result" not in message:
+        return None
+    result = message.get("result")
+    if result is None or not isinstance(result, dict):
+        return None if result is None else "result_not_an_object"
+    if "content" in result and not isinstance(result["content"], list):
+        return "result_content_not_a_list"
+    for block in result.get("content") or []:
+        if not isinstance(block, dict):
+            return "result_content_block_not_an_object"
+    if "tools" in result and not isinstance(result["tools"], list):
+        return "result_tools_not_a_list"
+    return None
+
+
 def _string_leaves(node, path, out):
     if isinstance(node, str):
         out.append((path, node))
@@ -552,11 +643,34 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             line = raw.decode("utf-8", "surrogatepass").rstrip("\n")
             if not line.strip():
                 continue
+            if proxy.is_tainted():
+                # Everything after the bad frame is discarded, not examined.
+                proxy._emit("FRAME_DISCARDED_AFTER_TAINT", None,
+                            direction=direction, bytes=len(raw))
+                continue
             verdict = proxy.read_frame(line)
-            if verdict.decision is Decision.REFUSE:
+            shape = (invalid_result_shape(verdict.message)
+                     if verdict.decision is not Decision.REFUSE
+                     and direction == "result" and verdict.message else None)
+            if verdict.decision is Decision.REFUSE or shape:
                 # A refused frame is never forwarded and never guessed past.
+                reason = shape or verdict.reason
                 proxy._emit("FRAME_DROPPED", None, direction=direction,
-                            reason=verdict.reason)
+                            reason=reason)
+                if direction == "result":
+                    # THE STREAM IS TAINTED, not just this frame. Refusing the
+                    # frame and reading the next one is resynchronisation at the
+                    # stream level however carefully the frame level declines to
+                    # guess, and it is what this run actually did.
+                    for replacement in proxy.taint("result", reason):
+                        with write_lock:
+                            _write(stdout, (json.dumps(replacement) + "\n").encode())
+                    try:
+                        upstream.stdin.close()
+                    except (BrokenPipeError, ValueError, OSError):
+                        pass
+                    _kill_group(upstream, TERMINATION_GRACE_MS / 1000)
+                    break
                 continue
             message = verdict.message
             request_id = message.get("id")
@@ -572,6 +686,10 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 with write_lock:
                     _write(sink, raw)
                 continue
+            if direction == "request" and message.get("method"):
+                proxy.expect_upstream(request_id)
+            elif direction == "result":
+                proxy.upstream_answered(request_id)
             leaves = inspection_input(message, direction)
             if not leaves:
                 # Nothing inspectable in this frame: a handshake, an empty result,
