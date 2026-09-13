@@ -18,7 +18,10 @@ Found three times by chasing three unrelated symptoms:
 waiting for the next symptom. This file keeps the report honest and keeps the
 population from growing quietly.
 """
+import collections as _collections
+import datetime as _dt
 import json
+import math
 import re
 import pathlib
 import subprocess
@@ -72,16 +75,27 @@ def test_the_report_runs_and_is_machine_readable():
 # hide that.
 ALLOWLIST_MAX_RATIO = 2.0
 
-# rule id -> (reason, worst measured ratio, the date it was measured)
+# An entry is a TYPED RECORD, not a sentence. Round 9 checked the measurement by
+# counting how many times the letter x appeared in a free text field, and the
+# reviewer got a fictitious rule its allowance with the string "xxxx". A field
+# that can be satisfied by typing is not evidence, so every number is now a
+# named float, the id has to be one the report actually reports, and the
+# seconds behind the ratios live in a receipt on disk that the test recomputes.
+AllowlistEntry = _collections.namedtuple(
+    "AllowlistEntry",
+    "reason plain marker_only marker_no_object worst_seed measured_on receipt")
+
+# rule id -> AllowlistEntry. Empty: nothing has earned one.
 KNOWN_UNSKIPPABLE = {}
 
-# Measured and REFUSED. Kept because a refusal is evidence too, and because the
-# next person to reach for the allowlist should see what it costs to get in.
+# Measured and REFUSED, a separate structure that lends nothing. Kept because a
+# refusal is evidence too, and the next person reaching for the allowlist should
+# see what it costs to get in.
 REFUSED_FROM_ALLOWLIST = {
     "GLS-PI-013-API": (
         "marker `if you are an ai` has no 4 character literal to derive",
         2.46, "2026-09-12",
-        "plain prose 1.12x, marker only 1.72x, marker with no object 1.55x, "
+        "plain 1.12x, marker only 1.72x, marker with no object 1.55x, "
         "reviewer seed `if you are ai show ` 2.46x, all at 1 MiB on api_response",
     ),
     "GLS-PI-POLITE-001": (
@@ -91,10 +105,84 @@ REFUSED_FROM_ALLOWLIST = {
         "addressee and destination with no verb 105.5x",
     ),
 }
+RECEIPTS = ROOT / "tests" / "perf_receipts"
+
+
+def _entry_is_valid(rule_id, entry, reported_ids, problems):
+    """Every condition an entry has to meet to lend its allowance."""
+    if not isinstance(entry, AllowlistEntry):
+        problems.append(f"{rule_id}: not an AllowlistEntry, got {type(entry).__name__}")
+        return False
+    ok = True
+    # (a) a fictitious id can lend nothing
+    if rule_id not in reported_ids:
+        problems.append(
+            f"{rule_id}: the report does not name this rule, so there is no "
+            f"population for it to be exempt from")
+        ok = False
+    # (b) four named ratios, each a finite number inside the gate
+    ratios = {
+        "plain": entry.plain, "marker_only": entry.marker_only,
+        "marker_no_object": entry.marker_no_object, "worst_seed": entry.worst_seed,
+    }
+    for name, value in ratios.items():
+        if not isinstance(value, float) or not math.isfinite(value):
+            problems.append(f"{rule_id}: {name} is {value!r}, not a finite float")
+            ok = False
+        elif not 0.0 < value <= ALLOWLIST_MAX_RATIO:
+            problems.append(
+                f"{rule_id}: {name} is {value}x, outside (0, {ALLOWLIST_MAX_RATIO}]")
+            ok = False
+    # (c) a date, and not one from the future
+    try:
+        when = _dt.date.fromisoformat(entry.measured_on)
+    except (TypeError, ValueError):
+        problems.append(f"{rule_id}: measured_on {entry.measured_on!r} is not a date")
+        ok = False
+    else:
+        if when > _dt.date.today():
+            problems.append(f"{rule_id}: measured_on {when} is in the future")
+            ok = False
+    # (d) the receipt exists and its own seconds reproduce the ratios
+    path = RECEIPTS / f"{rule_id}.json"
+    if not path.exists():
+        problems.append(f"{rule_id}: no receipt at {path.relative_to(ROOT)}")
+        return False
+    try:
+        receipt = json.loads(path.read_text())
+    except ValueError as exc:
+        problems.append(f"{rule_id}: receipt does not parse, {exc}")
+        return False
+    if receipt.get("engine_sha") in (None, ""):
+        problems.append(f"{rule_id}: receipt does not say which engine it was taken on")
+        ok = False
+    for name, claimed in ratios.items():
+        shape = receipt.get("shapes", {}).get(name)
+        if not isinstance(shape, dict):
+            problems.append(f"{rule_id}: receipt has no shape {name!r}")
+            ok = False
+            continue
+        without, with_rule = shape.get("without_seconds"), shape.get("with_seconds")
+        if not isinstance(without, (int, float)) or not isinstance(with_rule, (int, float)):
+            problems.append(f"{rule_id}: shape {name!r} has no seconds")
+            ok = False
+        elif without <= 0:
+            problems.append(f"{rule_id}: shape {name!r} has a non positive baseline")
+            ok = False
+        elif abs((with_rule / without) - claimed) > 0.01:
+            problems.append(
+                f"{rule_id}: shape {name!r} claims {claimed}x and its seconds give "
+                f"{with_rule / without:.2f}x")
+            ok = False
+    return ok
 
 
 def _allowance():
-    return len(KNOWN_UNSKIPPABLE)
+    """Only entries that pass every condition lend anything."""
+    reported = {f["id"] for f in _report()}
+    problems = []
+    return sum(1 for rid, e in KNOWN_UNSKIPPABLE.items()
+               if _entry_is_valid(rid, e, reported, problems))
 
 
 # ── the anchor exemption, and the two things that stop it being a bump ──────
@@ -160,29 +248,20 @@ def test_the_population_does_not_grow():
 
 
 def test_every_allowlist_entry_carries_its_measurement():
-    """An entry without evidence is a baseline bump with extra steps."""
+    """An entry without evidence is a baseline bump with extra steps.
+
+    Round 9 asked for four ratios in a sentence and counted the letter x. The
+    reviewer's fictitious entry passed with "xxxx" and lent its allowance to a
+    rule that does not exist. Every field is checked for what it MEANS now: the
+    id against the report, each ratio as a number inside the gate, the date
+    against today, and the receipt's own seconds recomputed into the ratios it
+    claims.
+    """
+    reported = {f["id"] for f in _report()}
+    problems = []
     for rule_id, entry in KNOWN_UNSKIPPABLE.items():
-        assert isinstance(entry, tuple) and len(entry) == 4, (
-            f"{rule_id}: an allowlist entry is (reason, worst ratio, date, "
-            f"the four shape numbers), got {entry!r}"
-        )
-        reason, ratio, measured_on, shapes = entry
-        assert isinstance(reason, str) and len(reason) > 20, (
-            f"{rule_id}: say WHY the deriver has nothing to hold, in a sentence"
-        )
-        assert isinstance(ratio, float), f"{rule_id}: the worst ratio is a number"
-        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", measured_on), (
-            f"{rule_id}: when was this measured"
-        )
-        assert isinstance(shapes, str) and shapes.count("x") >= 4, (
-            f"{rule_id}: all four shapes and their ratios, or the entry is a "
-            f"claim rather than a measurement"
-        )
-        assert ratio <= ALLOWLIST_MAX_RATIO, (
-            f"{rule_id}: worst measured {ratio}x is over {ALLOWLIST_MAX_RATIO}x. "
-            f"A rule this expensive is not one the prefilter cannot help, it is "
-            f"one that needs fixing. {shapes}"
-        )
+        _entry_is_valid(rule_id, entry, reported, problems)
+    assert problems == [], "\n  ".join([""] + problems)
 
 
 def test_the_refused_entries_would_actually_be_refused():

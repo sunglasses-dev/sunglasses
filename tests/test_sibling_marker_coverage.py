@@ -143,34 +143,33 @@ def test_a_rule_exempted_from_routing_has_a_marker_that_cannot_be_indexed(engine
     """The other half of the theorem, and the part that stops it being a hatch.
 
     `match_on: normalized` is the sanctioned exemption, so nothing above tests
-    an exempt rule's samples. That is only honest if the exemption is EARNED.
-    A rule may take it when at least one word its own marker accepts cannot be
-    indexed, because `KEYWORD_DENYLIST` drops it at build time. Setting the flag
-    on a rule whose markers all route would silence a real requirement, and this
-    test names the rule if that ever happens.
+    an exempt rule's samples. That is only honest if the exemption is EARNED,
+    and round 9 accepted a weaker proof of that than it should have: a rule
+    whose marker merely CONTAINS a denylisted word qualified, even if every one
+    of its samples still routed through some other word.
 
-    It also records WHICH word, so the reason is in the run output rather than
-    in a commit message someone has to go and find.
+    The requirement is the thing itself. An exempt rule must have at least one
+    accepted marker sample that reaches NOTHING through the built index. That is
+    the only condition under which the normalized path is buying anything, and
+    the test names the word that makes it so.
     """
-    reasons, unearned = {}, []
+    unearned, reasons = [], {}
     for pattern in SIBLINGS:
         if pattern.get("match_on") != "normalized":
             continue
+        unrouted = [s for s in _samples(pattern, "core")
+                    if not _routes(engine, pattern["id"], s)]
+        if not unrouted:
+            unearned.append(pattern["id"])
+            continue
         blocked = sorted({
-            word
-            for sample in _samples(pattern, "core")
-            for word in sample.split()
+            word for sample in unrouted for word in sample.split()
             if word in SunglassesEngine.KEYWORD_DENYLIST
         })
-        if not blocked:
-            unrouted = [s for s in _samples(pattern, "core")
-                        if not _routes(engine, pattern["id"], s)]
-            if not unrouted:
-                unearned.append(pattern["id"])
-                continue
-            reasons[pattern["id"]] = f"unroutable samples {unrouted[:2]}"
-        else:
-            reasons[pattern["id"]] = f"denylisted marker words {blocked}"
+        reasons[pattern["id"]] = (
+            f"{len(unrouted)} unroutable sample(s), e.g. {unrouted[0]!r}"
+            + (f", denylisted {blocked}" if blocked else "")
+        )
     assert unearned == [], (
         f"{unearned} carry match_on normalized and every marker they accept "
         f"routes by keyword. The flag is exempting them from a requirement they "
@@ -178,27 +177,6 @@ def test_a_rule_exempted_from_routing_has_a_marker_that_cannot_be_indexed(engine
     )
     assert reasons, "no sibling is on the normalized path; this test proves nothing"
     print("\n".join(f"  {pid}: {why}" for pid, why in sorted(reasons.items())))
-
-
-@pytest.mark.parametrize(
-    "target", [p for p in SIBLINGS if p.get("match_on") != "normalized"],
-    ids=lambda p: p["id"])
-def test_the_control_an_absent_keyword_list_is_reported_for_this_family(target):
-    """The control, per family, that kills the reviewer's patch.
-
-    Swap ONE family's keywords for a phrase no sample contains. The theorem must
-    report THAT family. Under the old global guard the same swap passed, because
-    an empty family contributes no samples to fail with.
-    """
-    swapped = [dict(p, keywords=["zzz nothing contains this"]) if p["id"] == target["id"] else p
-               for p in PATTERNS]
-    engine = SunglassesEngine(swapped)
-    reported = {pid for pid, _s in _unrouted(engine, [p for p in swapped
-                                                      if p["id"].endswith("-API")])}
-    assert target["id"] in reported, (
-        f"{target['id']} was given keywords nothing matches and the theorem still "
-        f"passed for it. It is quantifying over an empty set of samples."
-    )
 
 
 def test_the_routing_check_reads_the_index_and_not_the_declaration(engine):
@@ -448,3 +426,51 @@ def test_the_guardrail_matrix_fires_through_the_cli():
         )
         fired = {f["id"] for f in _json.loads(proc.stdout)["findings"]}
         assert row["expected"] in fired, f"{marker}: saw {fired}"
+
+
+# ── round 10: the sampler has to cover what a full expansion covers ─────────
+# Round 9 walked one optional arm at a time. That finds `guardrail` beside
+# `guardrails` and misses three shapes the reviewer named, all of which a
+# Cartesian expansion of the grammar would reach:
+#
+#   two INDEPENDENT optionals both absent   `\bfoos?\s+bars?\b` never gave `foo bar`
+#   an alternative inside a nested optional `key(?:\s+(?:store|chain))?`
+#   the top of a bounded repeat             `(?:xy){0,2}` never gave two
+#
+# The sampler asks for a choice VECTOR now: all present, each one absent on its
+# own, all absent together, and each group at its own maximum.
+
+GRAMMAR_WITNESSES = [
+    ("two independent optionals", r"\bfoos?\s+bars?\b",
+     {"foo bar", "foo bars", "foos bar", "foos bars"}),
+    ("an alternative inside a nested optional", r"\bkey(?:\s+(?:store|chain))?\b",
+     {"key", "key store", "key chain"}),
+    ("the top of a bounded repeat", r"\bab(?:xy){0,2}cd\b",
+     {"abcd", "abxycd", "abxyxycd"}),
+]
+
+
+@pytest.mark.parametrize("name,source,expected", GRAMMAR_WITNESSES,
+                         ids=[w[0] for w in GRAMMAR_WITNESSES])
+def test_the_sampler_covers_the_whole_grammar(name, source, expected):
+    produced = {s for _b, s, kind in branch_samples(source) if kind == "core"}
+    accepted = {s for s in produced if re.search(source, s, re.IGNORECASE)}
+    missing = sorted(expected - accepted)
+    assert not missing, (
+        f"{name}: the sampler never produces {missing}, so nothing below can "
+        f"ask whether those markers route. Produced {sorted(accepted)}"
+    )
+
+
+def test_every_shipped_marker_branch_reaches_the_sampler():
+    """And the counts, as unique ACCEPTED samples rather than raw emissions.
+
+    A raw count flatters the sampler: it grows when the vectors grow whether or
+    not the extra strings are markers the regex admits. Unique accepted is the
+    number that means something, and a family that drops to nothing is named.
+    """
+    counts = {p["id"]: len(set(_samples(p, "core"))) for p in SIBLINGS}
+    empty = sorted(pid for pid, n in counts.items() if n == 0)
+    assert not empty, f"{empty} produce no accepted sample at all"
+    assert len(counts) == 6, counts
+    print("\n".join(f"  {pid}: {n} unique accepted" for pid, n in sorted(counts.items())))

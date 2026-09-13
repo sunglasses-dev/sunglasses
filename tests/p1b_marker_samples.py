@@ -21,10 +21,10 @@ def _emit(node, spaced, pick=None, counter=None, optional=None):
     `<(?:information|important|instructions|system|admin)>` are each covered
     rather than only the first one.
 
-    `optional` is `[counter, dropped]`, where `dropped` is the set of optional
-    arm indices to leave OUT of this sample. `s?` and `(?:...)?` are branches of
-    the marker grammar and emitting only one side of them is how `guardrail`
-    stayed invisible while `guardrails` was covered.
+    `optional` is `[counter, choices]`, where `choices` maps an optional group's
+    index to how many repetitions it should take. `s?` and `(?:...)?` are
+    branches of the marker grammar, and emitting only one side of them is how
+    `guardrail` stayed invisible while `guardrails` was covered.
     """
     out = []
     for op, av in node:
@@ -39,15 +39,18 @@ def _emit(node, spaced, pick=None, counter=None, optional=None):
             out.append(_from_class(av))
         elif name in ("MAX_REPEAT", "MIN_REPEAT"):
             lo, hi, item = av
-            if lo == 0 and hi == 1 and optional is not None:
-                # An OPTIONAL arm is a branch of the marker grammar like any
-                # other, and it was only ever emitted one way. `guardrails?`
-                # produced the plural and never the singular, so the per family
-                # guard could not see that `guardrail` is denylisted and reaches
-                # nothing. Walk both arms.
+            if lo == 0 and 1 <= hi < sre_parse.MAXREPEAT and optional is not None:
+                # An OPTIONAL group is a branch of the marker grammar like any
+                # other. Round 9 walked one arm at a time, which covers
+                # `guardrails?` but not two independent optionals BOTH absent
+                # (`\bfoos?\s+bars?\b` never produced `foo bar`) and not the
+                # upper end of a `{0,2}`. The choice vector says how many
+                # repetitions THIS group takes, so a caller can ask for all
+                # present, one absent, all absent, or a group at its maximum.
                 here = optional[0]
                 optional[0] += 1
-                reps = 1 if (optional[1] is None or here not in optional[1]) else 0
+                chosen = (optional[1] or {}).get(here)
+                reps = 1 if chosen is None else min(chosen, hi)
             else:
                 reps = lo if lo else (1 if spaced else 0)
             out.append(_emit(item, spaced, pick, counter, optional) * max(reps, 0))
@@ -71,6 +74,7 @@ def _emit(node, spaced, pick=None, counter=None, optional=None):
 _SPACE = [' ']          # swapped to a newline for the third variant
 MAX_NESTED_ALTS = 24   # widest nested alternation in the sibling markers
 MAX_OPTIONAL_ARMS = 24  # most optional arms in any one marker branch
+MAX_OPTIONAL_REPS = 4   # the top of a bounded repeat, clamped per group
 
 
 _GAP_PREFERENCE = (" ", "x", "a", "0", "-", "_")
@@ -185,9 +189,18 @@ def branch_samples(marker_source):
               counted = [0, None]
               _emit(b, spaced, pk, [0], counted)
               n_opt = min(counted[0], MAX_OPTIONAL_ARMS)
-              drops = [frozenset()] + [frozenset({k}) for k in range(n_opt)]
-              for dropped in drops:
-                s = _emit(b, spaced, pk, [0], [0, dropped])
+              # All present, each one absent on its own, ALL absent together,
+              # and each group at its own maximum. The reviewer's three grammar
+              # witnesses are the last three of those: two independent optionals
+              # both absent, an alternative inside a nested optional, and the
+              # top of a `{0,2}`.
+              vectors = [{}]
+              vectors += [{k: 0} for k in range(n_opt)]
+              if n_opt > 1:
+                  vectors.append({k: 0 for k in range(n_opt)})
+              vectors += [{k: MAX_OPTIONAL_REPS} for k in range(n_opt)]
+              for choices in vectors:
+                s = _emit(b, spaced, pk, [0], [0, choices])
                 if not s.strip():
                     continue
                 out.append((i, s, "core"))
