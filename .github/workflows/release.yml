@@ -1,0 +1,206 @@
+name: release
+
+# The release path, moved off a laptop and into a place a stranger can audit.
+#
+# Until 2026-09-13 a release was an upload from a Mac with a long-lived token
+# in a dotfile. Nothing on PyPI could tell a reader which commit built the
+# wheel, which CI run verified it, or whether the laptop was the laptop. This
+# workflow uploads from GitHub Actions through PyPI Trusted Publishing (a
+# short-lived OIDC identity, no stored token) and leaves three receipts a
+# reader can check without trusting us:
+#
+#   1. PEP 740 attestations on PyPI, signed through Sigstore, naming this
+#      repository, this workflow and this commit
+#      (https://pypi.org/project/sunglasses/#files shows them per file)
+#   2. GitHub build provenance for the same files
+#      (`gh attestation verify sunglasses-<v>-py3-none-any.whl -R sunglasses-dev/sunglasses`)
+#   3. A CycloneDX SBOM of the installed package, attached to the Release
+#      next to a SHA256SUMS of the exact files that went to PyPI
+#
+# Trigger: the annotated tag `/ship` pushes after the squash merge. The tag
+# must equal `sunglasses.__version__` and the commit must be release certified
+# (the FULL matrix ran and succeeded on it, checked from the API by the same
+# script the laptop path uses), or nothing is built.
+#
+# Switch-over: the `pypi` job fails with PyPI's "invalid-publisher" message
+# until a trusted publisher for (sunglasses-dev, sunglasses, release.yml,
+# environment pypi) exists on pypi.org. Nothing is uploaded on that failure,
+# so the laptop path keeps working until the switch, and the SBOM and the
+# provenance jobs still run. Once the publisher exists, /ship stops uploading
+# and waits for this run instead (SHIP_MANUAL step 1.C).
+#
+# PipeLock's README shows every one of these receipts; ours showed none.
+# WS2a of the 2026-09-13 parity plan.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions: read-all
+
+jobs:
+  gate:
+    name: release certified on this exact commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: The tag names the version the tree declares
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          DECLARED="$(python3 -c 'import sunglasses; print(sunglasses.__version__)')"
+          echo "tag=$TAG declared=$DECLARED"
+          [ "$TAG" = "$DECLARED" ] || { echo "REFUSED: tag v$TAG but sunglasses.__version__ is $DECLARED"; exit 2; }
+      - name: The full matrix ran and succeeded on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/require_release_certification.py "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY"
+
+  build:
+    name: build sdist and wheel
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: |
+          python3 -m pip install --upgrade pip build==1.6.1
+          python3 -m build --sdist --wheel --outdir dist/
+          ls -la dist/
+      - name: The wheel's description is the repo README (the 0.5.0 lesson)
+        run: |
+          python3 - <<'PY'
+          import glob, pathlib, zipfile, sys
+          wheel = sorted(glob.glob('dist/*.whl'))[-1]
+          with zipfile.ZipFile(wheel) as z:
+              meta = [n for n in z.namelist() if n.endswith('METADATA')][0]
+              text = z.read(meta).decode('utf-8')
+          body = text.split('\n\n', 1)[1].strip()
+          readme = pathlib.Path('README.md').read_text(encoding='utf-8').strip()
+          if body != readme:
+              print('REFUSED: the wheel long_description is not README.md'); sys.exit(2)
+          print(f'wheel description matches README.md ({len(readme.splitlines())} lines)')
+          PY
+      - name: A fresh venv installs the built wheel and the CLI answers
+        run: |
+          python3 -m venv /tmp/v && /tmp/v/bin/pip install --quiet dist/*.whl
+          /tmp/v/bin/sunglasses --version
+          /tmp/v/bin/sunglasses info
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  sbom:
+    name: CycloneDX SBOM of the installed package
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install the wheel into a clean environment and describe exactly that
+        run: |
+          python3 -m venv /tmp/sbom && /tmp/sbom/bin/pip install --quiet dist/*.whl
+          python3 -m pip install --quiet cyclonedx-bom==7.3.1
+          VERSION="${GITHUB_REF_NAME#v}"
+          cyclonedx-py environment /tmp/sbom/bin/python --output-format JSON --output-file "sunglasses-${VERSION}.cdx.json" --mc-type application
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('bomFormat', d['bomFormat'], 'components', len(d.get('components', [])))" "sunglasses-${VERSION}.cdx.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: sunglasses-*.cdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+  provenance:
+    name: GitHub build provenance for the artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: 'dist/*'
+
+  pypi:
+    name: upload to PyPI through Trusted Publishing, with attestations
+    needs: [build, sbom, provenance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The `pypi` environment is what PyPI's trusted publisher is bound to
+    # (owner sunglasses-dev, repo sunglasses, workflow release.yml, env pypi).
+    environment:
+      name: pypi
+      url: https://pypi.org/project/sunglasses/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          attestations: true
+          print-hash: true
+
+  release-assets:
+    name: attach the SBOM and SHA256SUMS to the GitHub Release
+    needs: [pypi, sbom]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sbom
+          path: sbom/
+      - name: Upload to the Release the tag already has, or say it is missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum dist/* > SHA256SUMS
+          cat SHA256SUMS
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || { echo "NO RELEASE for $GITHUB_REF_NAME yet; /ship creates it after the tag. Re-run this job once it exists."; exit 2; }
+          gh release upload "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --clobber sbom/*.cdx.json SHA256SUMS
