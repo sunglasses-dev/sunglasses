@@ -79,12 +79,20 @@ def flatten(value, prefix=""):
     `arguments.metadata.content` are different leaves and a gate that conflated
     them would pass a call that wrote the right bytes into the wrong field.
     """
+    # AN EMPTY CONTAINER IS STILL A LEAF. Recursing into `{}` or `[]` produced
+    # no entries at all, so an empty object replaced by an empty list left both
+    # sides with nothing to compare and the call passed as exact. The container
+    # itself is the value there, and `{}` and `[]` are different values.
     if isinstance(value, dict):
+        if not value:
+            return {prefix: value}
         out = {}
         for key, sub in value.items():
             out.update(flatten(sub, f"{prefix}.{key}" if prefix else str(key)))
         return out
     if isinstance(value, list):
+        if not value:
+            return {prefix: value}
         out = {}
         for index, sub in enumerate(value):
             out.update(flatten(sub, f"{prefix}[{index}]"))
@@ -113,7 +121,13 @@ class Fidelity:
         return f"<Fidelity {self.reason} {len(self.differences)} difference(s)>"
 
 
-def compare(intended_request, actual_call):
+# The one server this harness mounts. `mcp_config` names it `fs`, so a call
+# arriving through anything else went somewhere else, whatever the tool was
+# called. Callers with a second route pass their own set.
+DEFAULT_ROUTES = frozenset({"fs"})
+
+
+def compare(intended_request, actual_call, *, allowed_routes=DEFAULT_ROUTES):
     """Compare the call that ARRIVED against the call `request.json` specifies.
 
     `intended_request` is the package's request object (`params.name`,
@@ -157,6 +171,17 @@ def compare(intended_request, actual_call):
         differences.append({"reason": OPERATION_MISMATCH, "leaf": "params.name",
                             "intended": intended_name, "actual": actual_name,
                             "routed_via": routed_via})
+    # THE ROUTE IS PART OF THE IDENTITY. `normalise_tool_name` already returned
+    # which server the call came through, and nothing compared it, so a call to
+    # the right tool with the right arguments through a DIFFERENT server passed
+    # as the same experiment. Stripping the prefix and then ignoring what was
+    # stripped is the same as never having it.
+    elif routed_via is not None and routed_via not in allowed_routes:
+        differences.append({"reason": OPERATION_MISMATCH, "leaf": "params.name",
+                            "intended": intended_name, "actual": actual_call.get("name"),
+                            "routed_via": routed_via,
+                            "detail": f"the tool matches but the call arrived through "
+                                      f"{routed_via!r}, not {sorted(allowed_routes)}"})
 
     for leaf in sorted(set(intended_digests) | set(actual_digests)):
         want, got = intended_digests.get(leaf), actual_digests.get(leaf)
