@@ -550,7 +550,10 @@ starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
 recording a SHA-256 of the tool input and never the input itself. A hook killed
 between the two leaves only the first, which is the case these records exist to
 make visible, so "every invocation appends two lines" is not a promise this
-makes.
+makes. `sunglasses receipts --verify` reads each day file into memory whole, so
+its cost is memory rather than time. A 50 MB day file peaks near 380 MB of
+resident memory, roughly seven times the file, measured on an M series Mac.
+Reading it a line at a time instead is a later change, not one this makes.
 
 ## Roadmap
 

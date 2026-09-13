@@ -1137,9 +1137,9 @@ def _verify_lifecycle(rows, directory, unparseable=()):
         print(f"  {DIM}This result is INCOMPLETE. A truncated write leaves a "
               f"fragment exactly like this.{RESET}\n")
         for path, lineno, raw in unparseable[:20]:
-            # `raw` already carries its own quoting: a JSON line as text, or a
-            # byte preview plus the decode reason. Re-quoting it here hid the
-            # reason behind the truncation.
+            # `raw` is already inert: every producer above goes through
+            # `_unreadable_preview`. Nothing is re-quoted here, because
+            # re-quoting hid the decode reason behind the truncation.
             preview = raw.strip()
             if len(preview) > 96:
                 preview = preview[:96] + "…"
@@ -1174,6 +1174,31 @@ def _verify_lifecycle(rows, directory, unparseable=()):
         print(f"    {DIM}... and {len(orphans) - 20} more{RESET}")
     print()
     return 1
+
+
+def _unreadable_preview(material, reason: str = "") -> str:
+    """The ONE quoting path for anything pulled out of a line that could not be read.
+
+    Round 3 had two of them: the decode branch built a byte preview (safe), the
+    JSON branch stored the decoded line as it stood (not safe), and a receipts
+    line carrying `ESC [2J ESC [H` repainted the audit display it was supposed to
+    be evidence for. Both branches come through here now, so they cannot drift
+    apart again.
+
+    Two steps, and the second is the one that is allowed to be boring:
+    `repr` makes a control VISIBLE instead of active and keeps the preview
+    faithful (an audit preview that silently dropped bytes would be its own small
+    lie), and `sanitize_receipt_field` is the gate — the same function every other
+    untrusted field on this render path goes through, and the single place this
+    module defines "control character" and "bidi". On repr's ASCII output it is a
+    no-op, which is exactly what a gate behind a correct step should be.
+    """
+    from .firewall import sanitize_receipt_field
+
+    preview = sanitize_receipt_field(repr(material[:96]), limit=120) or ""
+    if reason:
+        preview = f"{preview}  ({sanitize_receipt_field(reason, limit=48) or ''})"
+    return preview
 
 
 def cmd_receipts(args):
@@ -1222,7 +1247,8 @@ def cmd_receipts(args):
         try:
             raw = path.read_bytes()
         except OSError as exc:
-            unparseable.append((path, 0, f"<unreadable file: {exc}>"))
+            unparseable.append(
+                (path, 0, f"<unreadable file: {_unreadable_preview(str(exc))}>"))
             continue
         for lineno, chunk in enumerate(raw.split(b"\n"), 1):
             if not chunk.strip():
@@ -1230,13 +1256,16 @@ def cmd_receipts(args):
             try:
                 line = chunk.decode("utf-8")
             except UnicodeDecodeError as exc:
-                # A safe preview: the bytes as written, never a lossy decode.
-                unparseable.append((path, lineno, f"{chunk[:48]!r}  ({exc.reason})"))
+                # The bytes as written, never a lossy decode.
+                unparseable.append(
+                    (path, lineno, _unreadable_preview(chunk, exc.reason)))
                 continue
             try:
                 rows.append(_json.loads(line))
             except ValueError:
-                unparseable.append((path, lineno, line))
+                # Decoded, so it is text — and text out of a damaged receipt is
+                # exactly the thing that must not reach a terminal as it stands.
+                unparseable.append((path, lineno, _unreadable_preview(line)))
 
     if getattr(args, "verify", False):
         return _verify_lifecycle(rows, directory, unparseable)

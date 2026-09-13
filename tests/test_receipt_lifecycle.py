@@ -336,3 +336,145 @@ def test_control_reading_the_whole_file_at_once_brings_the_crash_back():
     """The mutation: `read_text()` is what could not survive this file."""
     with pytest.raises(UnicodeDecodeError):
         REVIEWER_ARTIFACT.read_text()
+
+
+# ── round 4: a preview may not repaint the display it is evidence for ────────
+# ASTRA R3-1. Round 3 removed the quoting on the malformed-JSON branch because
+# "raw already carries its own quoting" — true of the decode branch, which
+# builds a byte preview, and false of this one, which stored the decoded line as
+# it stood. So a receipts line that is valid UTF-8 and invalid JSON reached the
+# terminal verbatim, and `ESC [2J ESC [H ALL CLEAR - 0 threats` erased the
+# incomplete-run diagnostic printed immediately above it. The report still said
+# INCOMPLETE and still exited 1; the user just could not see it any more.
+#
+# These assertions are on the RAW stdout BYTES. `_verify` above strips SGR
+# before any test sees the output, which is precisely the kind of help that
+# would have hidden this: the bug WAS an escape sequence in the output.
+
+import re as _re
+import unicodedata as _unicodedata
+
+_SGR = _re.compile(rb"\x1b\[[0-9;]*m")
+
+# The exact controls ASTRA replayed through a persisted receipt.
+_RECEIPT_CONTROLS = (
+    ("NUL", b"\x00"),
+    ("screen erase ESC [2J", b"\x1b[2J"),
+    ("cursor home ESC [H", b"\x1b[H"),
+    ("carriage return", b"\r"),
+    ("C1 CSI U+009B", "".encode("utf-8")),
+    ("bidi override U+202E", "‮".encode("utf-8")),
+)
+
+# Valid UTF-8, invalid JSON, carrying every control in the list above.
+HOSTILE_TEXT = (
+    '{"kind": "decision", "eval_id": "x"\x00'
+    ' \x1b[2J\x1b[H ALL CLEAR - 0 threats\r‮'
+)
+# The same line cut mid-character, so it never decodes: the other branch.
+HOSTILE_BYTES = HOSTILE_TEXT.encode("utf-8") + b"\xe2\x82"
+
+
+def _verify_raw(home, mutate=None):
+    """Run the real CLI and return (exit code, the BYTES a terminal receives)."""
+    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    if mutate is None:
+        argv = [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"]
+    else:
+        argv = [sys.executable, "-c", mutate]
+    proc = subprocess.run(argv, cwd=TREE, capture_output=True, env=env)
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def _assert_inert(raw: bytes):
+    """Nothing the receipt supplied may act on the terminal."""
+    for name, sequence in _RECEIPT_CONTROLS:
+        assert sequence not in raw, f"the receipt's {name} reached stdout as bytes"
+    # And the general statement, so a control nobody thought to list is caught
+    # too: the only escapes this command emits are its own colour codes, so with
+    # those removed no control or format character may remain except newline.
+    rest = _SGR.sub(b"", raw)
+    leftover = sorted({
+        f"U+{ord(c):04X}" for c in rest.decode("utf-8", "replace")
+        if c != "\n" and _unicodedata.category(c) in ("Cc", "Cf")
+    })
+    assert not leftover, f"control/format characters reached stdout: {leftover}"
+
+
+def _plain(raw: bytes) -> str:
+    return _SGR.sub(b"", raw).decode("utf-8", "replace")
+
+
+def test_a_malformed_json_receipt_line_cannot_repaint_the_terminal(home):
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      GOOD + b"\n" + DONE + b"\n" + HOSTILE_TEXT.encode("utf-8") + b"\n")
+    code, raw = _verify_raw(home)
+    _assert_inert(raw)
+    out = _plain(raw)
+    assert code == 1, out
+    assert "2026-09-12.jsonl:3" in out, f"the bad line was not located: {out}"
+    assert "evaluations started   1" in out, out
+    assert "decisions recorded    1" in out, out
+    assert "INCOMPLETE" in out.upper(), out
+
+
+def test_an_undecodable_receipt_line_cannot_repaint_the_terminal(home):
+    """The other branch, same bytes: the two may not diverge again."""
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      GOOD + b"\n" + DONE + b"\n" + HOSTILE_BYTES + b"\n")
+    code, raw = _verify_raw(home)
+    _assert_inert(raw)
+    out = _plain(raw)
+    assert code == 1, out
+    assert "2026-09-12.jsonl:3" in out, f"the bad line was not located: {out}"
+    assert "evaluations started   1" in out, out
+    assert "decisions recorded    1" in out, out
+    assert "INCOMPLETE" in out.upper(), out
+
+
+# The mutation, kept in the suite rather than run once by hand: put round 3's
+# behaviour back — the decoded line stored as it stands — and the malformed-JSON
+# case must replay its controls again. If this ever stops failing, the quoting
+# path stopped being what protects the display.
+_ROUND3_BEHAVIOUR = (
+    "import sys, types;"
+    "from sunglasses import cli;"
+    "cli._unreadable_preview = ("
+    "  lambda material, reason='':"
+    "  material if isinstance(material, str) else repr(material));"
+    "sys.exit(cli.cmd_receipts("
+    "  types.SimpleNamespace(verify=True, today=False, limit=40)))"
+)
+
+
+def test_control_the_round_3_preview_replays_the_controls(home):
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      GOOD + b"\n" + DONE + b"\n" + HOSTILE_TEXT.encode("utf-8") + b"\n")
+    code, raw = _verify_raw(home, mutate=_ROUND3_BEHAVIOUR)
+    assert code == 1, _plain(raw)
+    replayed = [name for name, sequence in _RECEIPT_CONTROLS if sequence in raw]
+    assert "screen erase ESC [2J" in replayed, (
+        "the control did not reproduce the round 3 bug, so the passing tests "
+        f"above prove nothing; replayed: {replayed}\n{_plain(raw)}"
+    )
+
+
+def test_control_the_undecodable_branch_also_needs_the_quoting_path(home):
+    """Round 3's decode branch was safe by accident of repr, not by contract."""
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      GOOD + b"\n" + DONE + b"\n" + HOSTILE_BYTES + b"\n")
+    code, raw = _verify_raw(home, mutate=(
+        "import sys, types;"
+        "from sunglasses import cli;"
+        "cli._unreadable_preview = ("
+        "  lambda material, reason='':"
+        "  material.decode('utf-8', 'replace')"
+        "  if isinstance(material, bytes) else material);"
+        "sys.exit(cli.cmd_receipts("
+        "  types.SimpleNamespace(verify=True, today=False, limit=40)))"
+    ))
+    assert code == 1, _plain(raw)
+    replayed = [name for name, sequence in _RECEIPT_CONTROLS if sequence in raw]
+    assert "screen erase ESC [2J" in replayed, (
+        f"the decode branch did not replay its controls; replayed: {replayed}"
+    )
