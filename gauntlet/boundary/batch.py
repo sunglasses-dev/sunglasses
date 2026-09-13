@@ -351,6 +351,9 @@ def main(argv=None) -> int:
     parser.add_argument("--only")
     parser.add_argument("--skip", default="", help="comma-separated scenario ids already done")
     parser.add_argument("--routes", default="", help="limit to these routes, e.g. control")
+    parser.add_argument("--variants", default="",
+                        help="comma-separated variant names; default is EVERY "
+                             "variant the scenario declares")
     args = parser.parse_args(argv)
 
     import shlex
@@ -365,12 +368,24 @@ def main(argv=None) -> int:
         if entry["id"] in {x.strip() for x in args.skip.split(",") if x.strip()}:
             continue
         scenario = json.loads((PACKAGE / entry["directory"] / "scenario.json").read_text())
-        primary = scenario["variants"][0]
+        # EVERY VARIANT, not `variants[0]`. A scenario's variants are different
+        # experiments, not restatements of one: G2-06's three are a description
+        # mutation, a schema mutation and a benign drift, and G2-07's are three
+        # sizes straddling the byte budget. Driving only the first meant the
+        # harness reported on a scenario while having exercised a third of it,
+        # and a row that was never run is not a row that passed.
+        #
+        # The ledger is what stops this from multiplying spend: it refuses past
+        # the budget whatever the matrix asks for. `--variants` narrows it.
+        chosen = {v.strip() for v in args.variants.split(",") if v.strip()}
+        variants = [v for v in scenario["variants"]
+                    if not chosen or v["name"] in chosen]
         routes = ["proxy_strict"] + (["control"] if entry["id"] in CONTROL_SEEDS else [])
         wanted = {r.strip() for r in args.routes.split(",") if r.strip()}
-        for route in [r for r in routes if not wanted or r in wanted]:
+        for variant in variants:
+          for route in [r for r in routes if not wanted or r in wanted]:
             call_no += 1
-            rows.append(run_one(entry, primary, outdir=args.outdir, route=route,
+            rows.append(run_one(entry, variant, outdir=args.outdir, route=route,
                                 engine_root=args.engine_root,
                                 upstream_argv=upstream_argv, ledger=ledger,
                                 dry_run=args.dry_run, call_no=call_no))
