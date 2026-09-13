@@ -14,6 +14,8 @@ fault was not global. G2-11 is exactly that shape, a held request cancelled
 while a second request with id 112 must still complete. So the choice is made
 per scan, here, from the payload actually held.
 
+MODE IS CHOSEN PER SCAN BY DIGEST, NEVER BY ARRIVAL ORDER. That sentence is the
+whole design and it is written here so nobody reintroduces a config-time flag.
 Matching is by DIGEST of the held text against the variant's own payload file,
 never by "this is the first message" or by size. The healthy message in a
 barrier scenario is a different document, and a dispatcher that faulted on
