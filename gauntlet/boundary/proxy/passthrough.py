@@ -59,6 +59,41 @@ class Decision(enum.Enum):
     REFUSE = "refuse"
 
 
+# THE POLICY VOCABULARY IS THE PACKAGE'S, NOT OURS.
+#
+# Every code below appears in a delivered `expected.json`. The proxy used to
+# emit `scanner_failed`, `inspection_deadline_exceeded` and
+# `cancelled_before_release`, which are three reasonable English phrases and
+# none of them is what the grader compares against, so a row could behave
+# perfectly and still be ungradeable. ASTRA's exam could not grade the fault
+# seeds at all for this reason among others.
+CLEAN = "CLEAN"
+PROHIBITED_CONTENT = "PROHIBITED_CONTENT"
+PROHIBITED_SECRET = "PROHIBITED_SECRET"
+DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
+SCAN_EXCEPTION = "SCAN_EXCEPTION"
+SCAN_DEADLINE = "SCAN_DEADLINE"
+REQUEST_CANCELLED = "REQUEST_CANCELLED"
+MALFORMED_UPSTREAM = "MALFORMED_UPSTREAM"
+OVER_BYTE_BUDGET = "OVER_BYTE_BUDGET"
+# Not in the package, and deliberately so. An unreadable worker result is not
+# one of the package's expectations because the package describes a working
+# instrument; it is OURS, it means uninspected, and it fails closed. It is named
+# rather than folded into SCAN_EXCEPTION so a grader can tell a scanner that
+# crashed from one that answered in a way we could not parse.
+INSPECTION_UNREADABLE = "INSPECTION_UNREADABLE"
+
+# The detector's STATUS, which is a different question from whether it found
+# anything and a different question again from whether it finished. ASTRA's note
+# is the one to keep in view: "no means no finding in the accepted scan result;
+# incomplete/not_run is never a clean verdict".
+STATUS_COMPLETE = "complete"
+STATUS_EXCEPTION = "exception"
+STATUS_TIMEOUT = "timeout"
+STATUS_CANCELLED = "cancelled"
+STATUS_UNREADABLE = "unreadable"
+
+
 class FrameVerdict:
     __slots__ = ("decision", "parsed", "resynchronised", "reason", "message")
 
@@ -73,7 +108,15 @@ class FrameVerdict:
 class Outcome:
     __slots__ = ("request_id", "direction", "forwarded", "replacement",
                  "worker_terminated", "delivered_late", "elapsed_ms",
-                 "inspected_utf8_bytes", "inspection_complete", "reason_code")
+                 "inspected_utf8_bytes", "inspection_complete", "reason_code",
+                 # FINDING, STATUS and COMPLETENESS are three independent
+                 # fields. They used to be one: `inspection_complete` was set to
+                 # `forwarded`, so a scan that ran to completion and correctly
+                 # found a secret was recorded as INCOMPLETE, and a grader
+                 # reading it could not tell that case from a scanner that
+                 # crashed before looking. The package grades G2-08 and G2-09 on
+                 # status, which is why neither could be graded before this.
+                 "detector_status", "finding", "rule_ids")
 
     def __init__(self, **fields):
         for slot in self.__slots__:
@@ -203,12 +246,14 @@ class Passthrough:
         exit_code = worker.poll()
         reader.join(timeout=1.0)
         finding = _finding_of(collected.get("stdout"))
+        # Each branch answers all three questions, so none of them can be
+        # inferred from another later.
         if cancelled:
-            reason = "cancelled_before_release"
+            reason, status, complete = REQUEST_CANCELLED, STATUS_CANCELLED, False
         elif terminated:
-            reason = "inspection_deadline_exceeded"
+            reason, status, complete = SCAN_DEADLINE, STATUS_TIMEOUT, False
         elif exit_code not in (0, None):
-            reason = "scanner_failed"
+            reason, status, complete = SCAN_EXCEPTION, STATUS_EXCEPTION, False
         elif finding is None:
             # The worker exited 0 and said nothing this code could read. That is
             # NOT a clean scan. An earlier version decided purely on the exit
@@ -216,14 +261,21 @@ class Passthrough:
             # engine BLOCKED was forwarded to the model unchanged: the proxy was
             # a liveness mediator with no policy in it. Unreadable means
             # uninspected, and uninspected fails closed.
-            reason = "inspection_result_unreadable"
-        elif finding["blocked"]:
-            reason = "detector_finding"
+            reason, status, complete = INSPECTION_UNREADABLE, STATUS_UNREADABLE, False
         elif not finding["inspection_complete"]:
-            reason = "inspection_incomplete"
+            # The scanner itself says it did not finish. Checked BEFORE the
+            # finding, because an incomplete scan that happened to find
+            # something still has not established that it found everything, and
+            # a clean-looking incomplete scan is the dangerous half of the same
+            # case.
+            reason, status, complete = SCAN_DEADLINE, STATUS_TIMEOUT, False
+        elif finding["blocked"]:
+            # COMPLETE and TRUE. The scan ran to the end and found what it was
+            # looking for. This is the row that used to be filed as incomplete.
+            reason, status, complete = PROHIBITED_CONTENT, STATUS_COMPLETE, True
         else:
-            reason = None
-        forwarded = reason is None
+            reason, status, complete = CLEAN, STATUS_COMPLETE, True
+        forwarded = reason == CLEAN
         if forwarded and direction == "request":
             with self._lock:
                 self._upstream_forwards += 1
@@ -232,13 +284,18 @@ class Passthrough:
             worker_terminated=terminated, delivered_late=False,
             elapsed_ms=elapsed_ms, reason_code=reason,
             inspected_utf8_bytes=len(payload.encode("utf-8", "surrogatepass")),
-            inspection_complete=forwarded,
+            inspection_complete=complete,
+            detector_status=status,
+            finding=bool(finding and finding["blocked"]),
+            rule_ids=(finding or {}).get("rule_ids") or [],
             replacement=None if forwarded else self._withheld(
                 request_id, reason, elapsed_ms, payload),
         )
         with self._lock:
             self._pending.pop(request_id, None)
         self._emit("SETTLED", request_id, forwarded=forwarded, reason=reason,
+                   detector_status=status, inspection_complete=complete,
+                   finding=bool(finding and finding["blocked"]),
                    terminated=terminated, elapsed_ms=round(elapsed_ms, 3),
                    detector=finding and {k: finding[k] for k in
                                          ("decision", "rule_ids", "blocked")})

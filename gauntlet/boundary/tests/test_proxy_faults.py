@@ -16,6 +16,7 @@ import time
 import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from proxy import passthrough              # noqa: E402
 from proxy.passthrough import (            # noqa: E402
     GATE2_WITHHELD_CODE, Decision, Passthrough, WatchdogTripped,
 )
@@ -212,8 +213,16 @@ def test_a_detector_finding_withholds_the_message():
     outcome = proxy.submit("result", request_id=7, payload="anything",
                            scanner=_blocks).result(timeout=5.0)
     assert outcome.forwarded is False
-    assert outcome.reason_code == "detector_finding"
+    assert outcome.reason_code == passthrough.PROHIBITED_CONTENT
     assert outcome.replacement["error"]["message"] == "GATE2_WITHHELD"
+    # THE THREE FIELDS, SEPARATELY. This scan ran to the end and found what it
+    # was looking for, so it is COMPLETE. `inspection_complete` used to be set
+    # to `forwarded`, which filed this row as incomplete and made it
+    # indistinguishable from a scanner that crashed before it looked.
+    assert outcome.finding is True
+    assert outcome.detector_status == passthrough.STATUS_COMPLETE
+    assert outcome.inspection_complete is True
+    assert outcome.rule_ids == ["GLS-TEST-001"]
 
 
 def test_a_clean_scan_forwards():
@@ -221,7 +230,13 @@ def test_a_clean_scan_forwards():
     proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000)
     outcome = proxy.submit("result", request_id=8, payload="anything",
                            scanner=_instant).result(timeout=5.0)
-    assert outcome.forwarded is True and outcome.reason_code is None
+    assert outcome.forwarded is True
+    assert outcome.reason_code == passthrough.CLEAN
+    # Clean is a POSITIVE statement now, not the absence of one. A reason of
+    # None cannot be compared against the package, which grades on CLEAN.
+    assert outcome.finding is False
+    assert outcome.detector_status == passthrough.STATUS_COMPLETE
+    assert outcome.inspection_complete is True
 
 
 def test_a_worker_that_says_nothing_is_uninspected_and_fails_closed():
@@ -230,7 +245,12 @@ def test_a_worker_that_says_nothing_is_uninspected_and_fails_closed():
     outcome = proxy.submit("result", request_id=9, payload="anything",
                            scanner=_silent).result(timeout=5.0)
     assert outcome.forwarded is False
-    assert outcome.reason_code == "inspection_result_unreadable"
+    assert outcome.reason_code == passthrough.INSPECTION_UNREADABLE
+    # Not a finding, not complete, and not clean. All three have to be sayable
+    # at once or this row reads like one of the other two.
+    assert outcome.finding is False
+    assert outcome.detector_status == passthrough.STATUS_UNREADABLE
+    assert outcome.inspection_complete is False
 
 
 # ── what gets inspected, measured on G2-01 before this existed ─────────────
