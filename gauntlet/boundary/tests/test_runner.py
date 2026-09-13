@@ -284,3 +284,114 @@ def test_a_scenario_with_several_variants_is_actually_several_experiments():
     assert "G2-06" in several and len(several["G2-06"]) == 3, several.get("G2-06")
     for scenario_id, names in several.items():
         assert len(set(names)) == len(names), f"{scenario_id} repeats a variant name"
+
+
+# ── the package now holds two generations of seed ──────────────────────────
+# G2-01..G2-12 are the original Gate 2 delivery. G2-13..G2-28 arrived with
+# ASTRA's Gate 3 design review and describe themselves differently: `routes`
+# rather than `route`, a `schedule_file` of operations rather than an inline
+# `schedule`, a `payload_ref` into another seed's payload rather than a `payload`
+# of their own, and a `mutation_must_reject` naming the change that has to turn
+# the fixture red. Seven variant keys are common to both.
+#
+# These tests hold what is true of EVERY seed whatever its generation, so the
+# package can grow again without them failing for being correct, and they name
+# the second generation's own requirement separately.
+
+def _generation(scenario_id):
+    return "g3" if scenario_id >= "G2-13" else "g2"
+
+
+def test_every_scenario_in_the_manifest_is_actually_on_disk():
+    """A half copied delivery is the failure this catches.
+
+    The manifest is the index and the directories are the thing; a seed listed
+    but not copied, or copied but not listed, is how a package quietly runs 27
+    of its 28 seeds.
+    """
+    missing = []
+    for entry in runner.load_manifest()["scenarios"]:
+        folder = runner.PACKAGE / entry["directory"]
+        for required in ("scenario.json", "expected.json"):
+            if not (folder / required).is_file():
+                missing.append(f"{entry['id']}/{required}")
+    assert missing == [], missing
+
+
+def test_every_variant_names_itself_and_its_scenario_agrees():
+    unreadable = []
+    for entry in runner.load_manifest()["scenarios"]:
+        scenario = runner.scenario_of(entry)
+        assert scenario["id"] == entry["id"], (scenario["id"], entry["id"])
+        names = [variant.get("name") for variant in scenario["variants"]]
+        if not all(names):
+            unreadable.append(f"{entry['id']}: a variant with no name")
+        if len(set(names)) != len(names):
+            unreadable.append(f"{entry['id']}: a repeated variant name in {names}")
+    assert unreadable == [], unreadable
+
+
+def test_the_second_generation_declares_its_own_routes_and_the_first_does_not():
+    """Where the route comes from is a real difference between the two shapes.
+
+    The first version of this test asserted that EVERY variant names a route,
+    which is untrue of the original package and was untrue before the new seeds
+    arrived: G2-01 through G2-12 carry no route at all, and the harness derives
+    `proxy_strict` plus a control for the seeds in CONTROL_SEEDS. The new seeds
+    declare `routes` themselves, including `no_mediation`. Asserting the new
+    shape over the old one would have failed a package that was correct, so the
+    difference is written down here rather than smoothed over.
+    """
+    derived, declared = [], {}
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            tag = f"{entry['id']}.{variant['name']}"
+            if _generation(entry["id"]) == "g3":
+                routes = variant.get("routes")
+                assert routes, f"{tag} declares no routes"
+                assert isinstance(routes, list) and all(routes), tag
+                declared[tag] = routes
+            elif variant.get("routes"):
+                derived.append(tag)
+    assert derived == [], (
+        f"first generation variants are not supposed to declare routes: {derived}")
+    assert declared, "no second generation seed declared a route"
+
+
+def test_every_second_generation_seed_carries_its_rejecting_mutation():
+    """The requirement that makes these fixtures worth running.
+
+    A fixture with no mutation that turns it red cannot be distinguished from a
+    fixture that passes because nothing is checking. ASTRA shipped one per
+    variant and this is where it is held.
+    """
+    without = []
+    for entry in runner.load_manifest()["scenarios"]:
+        if _generation(entry["id"]) != "g3":
+            continue
+        for variant in runner.scenario_of(entry)["variants"]:
+            if not variant.get("mutation_must_reject"):
+                without.append(f"{entry['id']}.{variant['name']}")
+    assert without == [], without
+
+
+def test_a_payload_reference_points_at_a_file_that_is_there_with_those_bytes():
+    """The new seeds reuse the old seeds' payloads by hash rather than copying
+    them, so a drifted or missing source is a silent change of stimulus."""
+    import hashlib
+
+    broken = []
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            ref = variant.get("payload_ref")
+            if not ref:
+                continue
+            path = pathlib.Path(ref["path"])
+            if not path.is_file():
+                broken.append(f"{entry['id']}.{variant['name']}: {path} missing")
+                continue
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+            if actual != ref["sha256"]:
+                broken.append(f"{entry['id']}.{variant['name']}: {path} is "
+                              f"{actual[:12]}, the seed expects {ref['sha256'][:12]}")
+    assert broken == [], broken
