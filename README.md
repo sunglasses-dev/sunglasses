@@ -9,6 +9,15 @@
 
 **Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,540 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run.
 
+**What works today**
+- Scan text, files, PDFs, images and QR codes from the CLI or from Python
+- An MCP server your agent calls, and a GitHub Action that scans every pull request
+- A Claude Code hook that blocks credential paths and policy violations before a tool runs
+
+**What is next**
+- Checking what a tool returns, not only what goes into it, through a local proxy
+- Until that lands this reads input, so a clean result is a confidence floor and not a guarantee
+
 Sunglasses is a local, open-source scanner for text and supported files. It reports what
 it matched **and what it could not read**, so you can decide what to pass onward. It
 produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
@@ -558,14 +567,14 @@ Reading it a line at a time instead is a later change, not one this makes.
 
 ## Roadmap
 
-### Next — In Progress
+### Next, in progress
 - 🔨 **Drag-and-drop web UI** — `sunglasses ui` opens a local browser page to scan files visually
 - 🔨 **URL scanning** — `sunglasses scan --url https://example.com`
 - 🔨 **Email report delivery** — daily reports to your inbox (your own SMTP, we never touch it)
 - 🔨 **`sunglasses update`** — update pattern database without reinstalling
 - 🔨 **Easy bug report form** — non-technical users can report issues
 
-### Later — On the Horizon
+### Later, on the horizon
 - 🔭 Bridge filter — scan agent-to-agent and file-handoff messages before the receiving agent ingests them
 - 🔭 Output scanning — scan what the agent SAYS back, not just what comes in
 - 🔭 PII detection — auto-detect sensitive data in content
