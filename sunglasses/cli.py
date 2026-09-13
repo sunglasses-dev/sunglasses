@@ -1082,6 +1082,164 @@ def _warn_if_hook_interpreter_missing():
                     return
 
 
+
+def _verify_lifecycle(rows, directory, unparseable=()):
+    """Pair each in_flight record with its terminal record and name the orphans.
+
+    An orphan is a call the firewall began evaluating and never finished: the
+    harness killed the hook on its timeout, or the process died. Both FAIL OPEN,
+    and before these records existed both were invisible — no receipt at all,
+    which reads exactly like a hook that was never installed.
+
+    Receipts written before this existed carry no `kind`. They are terminal
+    records by definition and are counted as such rather than reported as
+    orphans, because a legacy line is not evidence of a missed call.
+    """
+    in_flight, terminal, legacy = {}, set(), 0
+    for r in rows:
+        kind = r.get("kind")
+        if kind == "in_flight":
+            in_flight[r.get("eval_id")] = r
+        elif kind == "decision":
+            terminal.add(r.get("eval_id"))
+        else:
+            legacy += 1
+
+    orphans = [(eid, rec) for eid, rec in in_flight.items() if eid not in terminal]
+    # A terminal record with no opening line means the pair was split across a
+    # day boundary or the opening write failed. Worth naming, not worth failing.
+    dangling = sorted(terminal - set(in_flight))
+
+    print(f"\n  {BOLD}SUNGLASSES receipt lifecycle{RESET} {DIM}({directory}){RESET}")
+    print(f"  {DIM}{'─' * 52}{RESET}")
+    print(f"  evaluations started   {CYAN}{len(in_flight)}{RESET}")
+    print(f"  decisions recorded    {CYAN}{len(terminal)}{RESET}")
+    if legacy:
+        print(f"  legacy lines          {DIM}{legacy}  (written before lifecycle records){RESET}")
+    if dangling:
+        print(f"  decisions with no opening line  {YELLOW}{len(dangling)}{RESET} "
+              f"{DIM}(day boundary, or the opening write failed){RESET}")
+
+    if unparseable:
+        print(f"  unreadable lines      {RED}{len(unparseable)}{RESET} "
+              f"{DIM}(counted, not analysed){RESET}")
+
+    if not orphans and not unparseable:
+        print(f"\n  {GREEN}{BOLD}No orphans.{RESET} "
+              f"{DIM}Every opening record has a terminal partner.{RESET}\n")
+        return 0
+
+    if unparseable:
+        # file:line, so the reader can go and look rather than take our word.
+        print(f"\n  {RED}{BOLD}{len(unparseable)} line(s) could not be read.{RESET}")
+        print(f"  {DIM}This result is INCOMPLETE. A truncated write leaves a "
+              f"fragment exactly like this.{RESET}\n")
+        for path, lineno, raw in unparseable[:20]:
+            # `raw` is already inert: every producer above goes through
+            # `_unreadable_preview`. Nothing is re-quoted here, because
+            # re-quoting hid the decode reason behind the truncation.
+            preview = raw.strip()
+            if len(preview) > 96:
+                preview = preview[:96] + "…"
+            print(f"    {RED}unreadable{RESET} {DIM}{path.name}:{lineno}{RESET} "
+                  f"{DIM}{preview}{RESET}")
+        if len(unparseable) > 20:
+            print(f"    {DIM}... and {len(unparseable) - 20} more{RESET}")
+        print()
+
+    if not orphans:
+        print(f"  {DIM}Valid rows analysed: every opening record has a terminal "
+              f"partner.{RESET}\n")
+        return 1
+
+    # What the record proves is that a pair is missing. It does NOT prove the
+    # tool call ran: a hook still blocked on a slow read looks exactly like this
+    # and then completes normally, and so does a DENY whose terminal append hit
+    # ENOSPC after the decision was already enforced.
+    print(f"\n  {RED}{BOLD}{len(orphans)} opening record(s) with no terminal "
+          f"partner.{RESET}")
+    print(f"  {DIM}Three things produce this, and this file cannot tell them "
+          f"apart:{RESET}")
+    print(f"    {DIM}1. the evaluation is still running{RESET}")
+    print(f"    {DIM}2. the hook was killed or crashed, which fails open{RESET}")
+    print(f"    {DIM}3. the decision was made and enforced, and the terminal "
+          f"append failed{RESET}\n")
+    for eid, rec in orphans[:20]:
+        print(f"    {RED}orphan{RESET} {DIM}{_display(rec.get('ts'), 32)}{RESET} "
+              f"{BOLD}{_display(rec.get('tool_name'), 48) or '(unknown tool)'}"
+              f"{RESET} {DIM}eval {_display(eid, 64)}{RESET}")
+    if len(orphans) > 20:
+        print(f"    {DIM}... and {len(orphans) - 20} more{RESET}")
+    print()
+    return 1
+
+
+def _display(value, limit: int = 96) -> str:
+    """The ONE way a receipt-supplied string reaches a terminal on this path.
+
+    Round 4 said `sanitize_receipt_field` was "the same function every other
+    untrusted field on this render path goes through". That was false by one
+    path and the reviewer found it: the orphan line interpolated `eval_id`
+    verbatim, so a VALID JSON row carrying `ESC [2J ESC [H` erased the warning
+    printed above it. Valid rows never touch `_unreadable_preview`, and naming a
+    gate does not put anything through it.
+
+    `repr` first, because repr is the guard that holds. It makes a control
+    visible instead of active, and it escapes a LONE SURROGATE, which the
+    sanitizer leaves untouched and which makes `print` raise UnicodeEncodeError
+    and dump a traceback instead of naming the orphan it was asked about. The
+    outer quotes are stripped so an ordinary value still renders as itself.
+    `sanitize_receipt_field` stays behind it as depth and as the single place
+    this module defines control and bidi. Its output is NOT ASCII: repr keeps
+    printable non-ASCII as itself, and an earlier version of this sentence said
+    otherwise. What repr does guarantee, swept over all 1,114,112 code points,
+    is that nothing in category Cc, Cf, Cs, Zl or Zp survives it and every
+    output code point is one of a bounded printable set, which is the property
+    the sanitizer behind it has nothing left to remove from.
+
+    This is display only. The raw id is what pairs the records, and it is never
+    passed through here.
+    """
+    from .firewall import sanitize_receipt_field
+
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    return sanitize_receipt_field(repr(text)[1:-1], limit=limit) or ""
+
+
+def _unreadable_preview(material, reason: str = "") -> str:
+    """The ONE quoting path for anything pulled out of a line that could not be read.
+
+    Round 3 had two of them: the decode branch built a byte preview (safe), the
+    JSON branch stored the decoded line as it stood (not safe), and a receipts
+    line carrying `ESC [2J ESC [H` repainted the audit display it was supposed to
+    be evidence for. Both branches come through here now, so they cannot drift
+    apart again.
+
+    Two steps, and the second is the one that is allowed to be boring:
+    `repr` makes a control VISIBLE instead of active and keeps the preview
+    faithful (an audit preview that silently dropped bytes would be its own small
+    lie), and `sanitize_receipt_field` behind it is depth and the single place
+    this module defines "control character" and "bidi". Repr's output is not
+    ASCII, it keeps printable non-ASCII as itself; what it leaves behind carries
+    nothing in Cc, Cf, Cs, Zl or Zp, so the sanitizer is a no-op on it, which is
+    what a gate behind a correct step should be.
+
+    An earlier version of this docstring called that sanitizer "the same function
+    every other untrusted field on this render path goes through". It was not.
+    Valid rows had their own renderer that interpolated `eval_id` raw. Everything
+    displayed on this path now goes through `_display` above, and that is a
+    property of the code rather than a sentence about it.
+    """
+    from .firewall import sanitize_receipt_field
+
+    preview = sanitize_receipt_field(repr(material[:96]), limit=120) or ""
+    if reason:
+        preview = f"{preview}  ({sanitize_receipt_field(reason, limit=48) or ''})"
+    return preview
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
@@ -1107,40 +1265,80 @@ def cmd_receipts(args):
     # user goes to read the audit trail is where it has to be said.
     _warn_if_hook_interpreter_missing()
 
+    # The pretty printer skips a line it cannot parse, which is right for a
+    # human scrolling their history. Verify mode inherited that skip and then
+    # certified the file, so a receipts file whose only line was a truncated
+    # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
+    # read a line must say so, not average it away.
+    # Read BYTES and decode one line at a time. `read_text()` decodes the whole
+    # file at once, so a single truncated multibyte character anywhere in it
+    # raises and the command analyses NOTHING: a write cut mid-character (the
+    # process was killed between the two appends) took down the whole audit
+    # trail with a traceback rather than reporting an incomplete run.
+    #
+    # An undecodable line is counted and LOCATED. It is never decoded with
+    # errors="replace" and then accepted, because a line rebuilt from
+    # substitution characters is not the line that was written, and reporting on
+    # it would be reporting on something nobody sent.
     rows = []
+    unparseable = []
     for path in files:
-        for line in path.read_text().splitlines():
-            if line.strip():
-                try:
-                    rows.append(_json.loads(line))
-                except ValueError:
-                    continue
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            unparseable.append(
+                (path, 0, f"<unreadable file: {_unreadable_preview(str(exc))}>"))
+            continue
+        for lineno, chunk in enumerate(raw.split(b"\n"), 1):
+            if not chunk.strip():
+                continue
+            try:
+                line = chunk.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                # The bytes as written, never a lossy decode.
+                unparseable.append(
+                    (path, lineno, _unreadable_preview(chunk, exc.reason)))
+                continue
+            try:
+                rows.append(_json.loads(line))
+            except ValueError:
+                # Decoded, so it is text — and text out of a damaged receipt is
+                # exactly the thing that must not reach a terminal as it stands.
+                unparseable.append((path, lineno, _unreadable_preview(line)))
+
+    if getattr(args, "verify", False):
+        return _verify_lifecycle(rows, directory, unparseable)
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
     # as untrusted before it reaches the terminal.
-    from .firewall import sanitize_receipt_field as _clean
-
     colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
     print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
           f"{len(files)} day(s)){RESET}")
     print(f"  {DIM}{'─' * 74}{RESET}")
+    # PRE-EXISTING, and fixed here because it is the same boundary in the same
+    # file: this table sanitized its fields, which strips a control but leaves a
+    # lone surrogate, so a valid row with `"tool_name": "mcp__tool\ud800tail"`
+    # crashed the renderer on main too. The summary below sanitized nothing at
+    # all and printed a receipt-supplied `decision` verbatim. Both go through
+    # `_display` now. Neither is a defect this PR introduced.
     for row in rows[-args.limit:]:
-        decision = _clean(row.get("decision", "?"), limit=10)
+        decision = _display(row.get("decision", "?"), limit=10)
         color = colors.get(decision, "")
-        stamp = _clean(str(row.get("ts", ""))[11:19], limit=8)
-        note = _clean(row.get("rule_id", ""), limit=44)
+        stamp = _display(str(row.get("ts", ""))[11:19], limit=8)
+        note = _display(row.get("rule_id", ""), limit=44)
         if row.get("lane") == "error":
-            note = _clean(row.get("error", "error"), limit=44)
-        tool = _clean(row.get("tool_name"), limit=24) or "-"
+            note = _display(row.get("error", "error"), limit=44)
+        tool = _display(row.get("tool_name"), limit=24) or "-"
         print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
-              f"{DIM}{_clean(row.get('lane', ''), limit=13):<13}{RESET} "
+              f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
               f"{tool:<24} {DIM}{note}{RESET}")
 
     counts = {}
     for row in rows:
         counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
-    summary = "  ".join(f"{colors.get(k, '')}{k}: {v}{RESET}" for k, v in sorted(counts.items()))
+    summary = "  ".join(f"{colors.get(k, '')}{_display(k, 10)}: {v}{RESET}"
+                        for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
     print(f"  {DIM}{'─' * 74}{RESET}")
     print(f"  {summary}")
     # An audit trail that only reports blocks cannot answer "was it even
@@ -1918,6 +2116,13 @@ def main():
     receipts_parser.add_argument("--today", action="store_true", help="Today only")
     receipts_parser.add_argument("--limit", type=int, default=40,
                                  help="Rows to show (default 40)")
+    receipts_parser.add_argument(
+        "--verify", action="store_true",
+        help="Pair every opening record with its terminal record and name the ones "
+             "with no partner. A missing partner does NOT mean the tool call ran: "
+             "the evaluation may still be running, the hook may have been killed, "
+             "or the decision may have been enforced and only the terminal write "
+             "failed. Exits non-zero if any line cannot be read.")
     receipts_parser.set_defaults(func=cmd_receipts)
 
     # demo
