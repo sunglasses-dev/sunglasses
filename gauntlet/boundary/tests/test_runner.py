@@ -395,3 +395,42 @@ def test_a_payload_reference_points_at_a_file_that_is_there_with_those_bytes():
                 broken.append(f"{entry['id']}.{variant['name']}: {path} is "
                               f"{actual[:12]}, the seed expects {ref['sha256'][:12]}")
     assert broken == [], broken
+
+
+def test_the_payload_resolver_checks_the_hash_and_not_just_the_path(tmp_path):
+    """A resolver that trusts the path turns the saving into the hazard.
+
+    The new seeds reuse earlier payloads by reference so one stimulus lives in
+    one place. That is only safe if every resolution verifies the digest, since
+    a drifted source would otherwise change the stimulus for every seed pointing
+    at it, silently and everywhere at once.
+    """
+    import hashlib
+
+    body = b"AKIAGATE2SYNTHETIC001"
+    source = tmp_path / "payload.txt"
+    source.write_bytes(body)
+    variant = {"name": "v", "payload_ref": {
+        "path": str(source), "sha256": hashlib.sha256(body).hexdigest()}}
+    assert runner.resolve_payload_ref(variant) == body
+
+    source.write_bytes(body + b"X")
+    with pytest.raises(ValueError) as drifted:
+        runner.resolve_payload_ref(variant)
+    assert "drifted" in str(drifted.value)
+
+    source.unlink()
+    with pytest.raises(FileNotFoundError):
+        runner.resolve_payload_ref(variant)
+    with pytest.raises(KeyError):
+        runner.resolve_payload_ref({"name": "no ref"})
+
+
+def test_every_referenced_payload_in_the_package_resolves_today():
+    resolved = 0
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            if variant.get("payload_ref"):
+                assert runner.resolve_payload_ref(variant)
+                resolved += 1
+    assert resolved, "no seed used a payload_ref, so the resolver is untested here"
