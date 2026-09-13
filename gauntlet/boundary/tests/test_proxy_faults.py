@@ -290,3 +290,120 @@ def test_a_frame_with_nothing_inspectable_yields_no_leaves():
     assert inspection_input({"jsonrpc": "2.0", "id": 0, "method": "initialize",
                              "params": {"protocolVersion": "x"}}, "request") == []
     assert inspection_input({"jsonrpc": "2.0", "id": 0, "result": {}}, "result") == []
+
+
+# ── G2-07: the budget that was accepted and never read ─────────────────────
+# ASTRA measured 32,768 bytes forwarded under a budget of 1. `byte_budget` was
+# stored by a constructor that nothing consulted, and the HOLD_ENTERED receipt
+# recorded the byte count beside it, so the receipt looked like a bound was
+# being applied. A bound that is configured, documented, recorded and not
+# enforced is worse than no bound.
+
+_SIZE_POLICY = _scenario("07_large_response")["setup"]["size_policy"]
+
+
+def test_the_byte_budget_is_read_not_merely_accepted():
+    """The exact measurement from the exam: a large payload, a budget of 1."""
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000, byte_budget=1)
+    outcome = proxy.submit("result", request_id="large-32768",
+                           payload="x" * 32768, scanner=_instant).result(timeout=5.0)
+    assert outcome.forwarded is False, (
+        "32,768 bytes were forwarded under a byte budget of 1, which is what "
+        "ASTRA measured on the live run")
+    assert outcome.reason_code == passthrough.OVER_BYTE_BUDGET
+    assert outcome.inspected_utf8_bytes == 32768
+    assert outcome.inspection_complete is False
+    assert outcome.finding is False
+
+
+@pytest.mark.parametrize("variant,size,forwarded", [
+    # The package's own three sizes against the package's own budget.
+    ("bytes_32768", 32768, True),
+    # INCLUSIVE at the budget, which the policy states and which is the
+    # difference between `>` and `>=` in the only place it matters.
+    ("bytes_262144", 262144, True),
+    ("bytes_2097152", 2097152, False),
+])
+def test_the_package_sizes_land_where_the_policy_says(variant, size, forwarded):
+    budget = _SIZE_POLICY["inspection_byte_budget"]
+    assert _SIZE_POLICY["at_budget"] == "inclusive", "the policy changed"
+    assert _variant("07_large_response", variant), variant
+    proxy = Passthrough(deadline_ms=8000, watchdog_ms=12000, byte_budget=budget)
+    outcome = proxy.submit("result", request_id=variant, payload="x" * size,
+                           scanner=_instant).result(timeout=10.0)
+    assert outcome.forwarded is forwarded, (
+        f"{size} bytes against a budget of {budget}: forwarded="
+        f"{outcome.forwarded}, reason {outcome.reason_code}")
+    if not forwarded:
+        assert outcome.reason_code == passthrough.OVER_BYTE_BUDGET
+
+
+def test_an_over_budget_payload_never_reaches_a_worker():
+    """The budget bounds the WORK, not just the answer.
+
+    Scanning a document you have already decided to refuse spends the exact
+    resource the budget exists to bound, so the refusal happens before the
+    worker starts and no SCAN_STARTED is emitted for it.
+    """
+    proxy = Passthrough(deadline_ms=4000, watchdog_ms=6000, byte_budget=16)
+    outcome = proxy.submit("result", request_id="nope", payload="y" * 4096,
+                           scanner=_hang).result(timeout=5.0)
+    assert outcome.reason_code == passthrough.OVER_BYTE_BUDGET
+    started = [e for e in proxy.events
+               if e["kind"] == "SCAN_STARTED" and e["request_id"] == "nope"]
+    assert started == [], (
+        "a worker was started for a payload already known to be over budget; "
+        "note the scanner here HANGS, so this also proves the refusal does not "
+        "wait for it")
+
+
+# ── the reader itself is bounded, not just the frame it produced ───────────
+
+def test_a_frame_with_no_newline_does_not_read_without_a_ceiling():
+    """`readline` reads until a newline however far away it is.
+
+    The wire limit was checked against the line it returned, which applies the
+    bound AFTER the unbounded thing has already happened. An upstream that never
+    sends a newline made the proxy allocate until it died, inside a component
+    whose whole job is to survive a hostile upstream.
+    """
+    import io as _io
+
+    limit = 4096
+    # Ten times the limit, no newline anywhere in it.
+    source = _io.BytesIO(b"x" * (limit * 10))
+    frames = list(passthrough.bounded_lines(source, limit))
+    assert frames, "the reader produced nothing at all"
+    assert all(len(frame) <= limit + 1 for frame in frames), (
+        f"a frame of {max(len(f) for f in frames)} bytes came back under a "
+        f"limit of {limit}, so the ceiling is not being applied while reading")
+    # And what it produced is refused through the ordinary path rather than
+    # raising, so the refusal is recorded like every other refusal.
+    proxy = Passthrough(wire_frame_limit=limit)
+    verdict = proxy.read_frame(frames[0])
+    assert verdict.decision is Decision.REFUSE
+    assert verdict.resynchronised is False
+
+
+def test_ordinary_framing_is_unchanged_by_the_ceiling():
+    """Whole frames, split frames and a trailing frame with no newline."""
+    import io as _io
+
+    source = _io.BytesIO(b'{"a":1}\n{"b":2}\n{"c":3}')
+    assert list(passthrough.bounded_lines(source, 1 << 20)) == [
+        b'{"a":1}', b'{"b":2}', b'{"c":3}']
+
+
+def test_the_frame_after_an_over_long_one_is_still_read():
+    """The tail of a refused frame is dropped, the NEXT frame is not.
+
+    Draining too little resumes inside the frame that was refused, which is the
+    resynchronisation this harness refuses to do. Draining too much swallows a
+    good message.
+    """
+    import io as _io
+
+    limit = 64
+    source = _io.BytesIO(b"z" * (limit * 4) + b'\n{"good":true}\n')
+    frames = list(passthrough.bounded_lines(source, limit))
+    assert frames[-1] == b'{"good":true}', frames
