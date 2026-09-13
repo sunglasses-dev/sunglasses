@@ -97,6 +97,54 @@ def _allowance():
     return len(KNOWN_UNSKIPPABLE)
 
 
+# ── the anchor exemption, and the two things that stop it being a bump ──────
+# A rule that declares `anchor_terms` leaves this population, because the
+# windowed matcher in #155 answers "do we run this regex at all" from the rare
+# token rather than from a derived literal. That is a real answer, not an
+# excuse, but only while the declaration is one the matcher will accept.
+
+def _anchored_rules():
+    sys.path.insert(0, str(ROOT))
+    from sunglasses.patterns import PATTERNS
+    return [p for p in PATTERNS if p.get("anchor_terms")]
+
+
+def test_an_anchor_exemption_declares_terms_the_matcher_will_accept():
+    """Non empty, and every term invariant under the fold.
+
+    #155 refuses an anchor term whose case can move it, because the anchors are
+    found in the folded document while the term is written in the rule. A rule
+    could otherwise leave this report on a declaration that #155 will later
+    throw away, and the exemption would be worth nothing.
+    """
+    from sunglasses import _prefilter as _pf
+    anchored = _anchored_rules()
+    assert anchored, "no rule declares anchor_terms; this exemption is unused"
+    for pattern in anchored:
+        terms = pattern["anchor_terms"]
+        assert terms, f"{pattern['id']}: anchor_terms is empty"
+        for term in terms:
+            assert term, f"{pattern['id']}: an empty anchor term"
+            assert _pf.fold(term) == term, (
+                f"{pattern['id']}: anchor term {term!r} is not what the fold "
+                f"produces ({_pf.fold(term)!r}). #155 refuses it, so the "
+                f"exemption this rule takes here would not survive the rebase."
+            )
+        assert pattern.get("anchor_span"), (
+            f"{pattern['id']}: declares anchor terms and no span"
+        )
+
+
+def test_the_anchor_exemption_is_what_removes_those_rules_from_the_report():
+    """The control. Without the declaration they are back in the population."""
+    findings = _report()
+    exempt = {p["id"] for p in _anchored_rules()}
+    assert exempt, "nothing is exempt"
+    assert not (exempt & {f["id"] for f in findings}), (
+        "a rule declares anchor terms and the report still counts it"
+    )
+
+
 def test_the_population_does_not_grow():
     findings = _report()
     allowed = BASELINE + _allowance()

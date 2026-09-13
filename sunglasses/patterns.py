@@ -144,6 +144,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         "keywords": [
             'at anthropic',
             'at openai',
@@ -182,6 +243,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         "match_on": "normalized",
         "keywords": [
             '<admin>',
@@ -215,6 +337,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         "keywords": [
             'follow this README',
             'higher priority',
@@ -237,6 +420,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         "match_on": "normalized",
         "keywords": [
             'hidden comment',
@@ -264,6 +508,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         # ADDITIVE, raw decides first. One word of this marker's own object
         # alternation, `guardrail`, is on KEYWORD_DENYLIST, so declaring it
         # changes nothing and no keyword can route `Ignore guardrail.` on the
@@ -302,6 +607,67 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "critical",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
         # One entry per word in `redaction|redact|masking|mask|sanitization|
         # sanitisation`. 'mask' was the one that was simply absent, so
         # `Disable mask.` with a folded object reached nothing.
