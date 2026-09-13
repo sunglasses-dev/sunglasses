@@ -453,6 +453,12 @@ class SunglassesEngine:
             ch for p in self._patterns for ch in p.get("channel", []))
 
         # Build pattern index
+        # (rule id, regex entry index) -> (anchor terms, span). NOT id(rx):
+        # `re.compile` caches, so two rules sharing a source share the object.
+        self._anchor_spec = {}
+        # (rule id, regex entry index) -> why anchored mode was refused. Read by
+        # the tests, so a refusal is visible rather than a silent downgrade.
+        self._anchor_refusals = {}
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
 
@@ -467,7 +473,7 @@ class SunglassesEngine:
 
             if "regex" in pattern:
                 compiled = []
-                for r in pattern["regex"]:
+                for index, r in enumerate(pattern["regex"]):
                     try:
                         rx = re.compile(r, re.IGNORECASE)
                     except re.error:
@@ -497,6 +503,42 @@ class SunglassesEngine:
                             compiled.append(("guarded", core_rx, guard_rx))
                     elif self._is_anchored(r):
                         compiled.append(("windowed", rx, None))
+                    elif pattern.get("anchor_terms"):
+                        # Opt-in fourth mode. A rule states the rare token its
+                        # match cannot happen without; the engine then reads only
+                        # the text around it. Rules that declare nothing are
+                        # untouched.
+                        #
+                        # Two ways a rule can ASK for this and not get it, both
+                        # refusals rather than best efforts, because a window
+                        # that is wrong in either direction loses a detection.
+                        refusal = self._anchor_refusal(pattern, r)
+                        if refusal is not None:
+                            self._anchor_refusals[(pattern["id"], index)] = refusal
+                            compiled.append(("plain", rx, None))
+                            continue
+                        terms = tuple(sorted(
+                            {_prefilter.fold(a) for a in pattern["anchor_terms"] if a},
+                            key=len, reverse=True))
+                        # The span must be at least the longest match the regex
+                        # can make, or a real match straddling the window edge
+                        # is lost. Where that length is derivable it WINS over
+                        # the declared number, in both directions: it is proof,
+                        # and the declared number is a claim. Where it is not
+                        # (any unbounded `+`/`*`, which is most real rules), the
+                        # claim is what holds, and the timing fixtures hold the
+                        # claim.
+                        proven = _prefilter.max_match_length(r)
+                        span = (proven if proven is not None
+                                else int(pattern.get("anchor_span", self.ANCHOR_SPAN)))
+                        # Keyed by (rule id, entry index). `id(rx)` looked like a
+                        # key and is not one: `re.compile` caches, so two rules
+                        # with the same source share one compiled object, and
+                        # the second rule's span silently overwrote the first's.
+                        # Order dependent, and the direction of the loss depends
+                        # on which rule was declared last.
+                        self._anchor_spec[(pattern["id"], index)] = (terms, max(span, 1))
+                        compiled.append(("anchored", rx, (pattern["id"], index)))
                     else:
                         compiled.append(("plain", rx, None))
                 if compiled:
@@ -628,6 +670,10 @@ class SunglassesEngine:
     # Locality rule for whole-document co-occurrence predicates (see scan step 3).
     # COOCCUR_WINDOW chars per view, half-overlapping so a payload straddling a
     # boundary is still seen whole (any payload <= WINDOW/2 is fully inside some view).
+    # Default half-width of an anchor window. Must be >= the longest match the
+    # rule can make (marker + both gaps + object), or a real match straddling the
+    # edge is lost; a rule may override with `anchor_span`.
+    ANCHOR_SPAN = 600
     COOCCUR_WINDOW = 1200
     COOCCUR_STRIDE = 600
 
@@ -649,7 +695,172 @@ class SunglassesEngine:
             return self._match_windowed(rx, text)
         if mode == "windowed":
             return self._match_windowed(rx, text)
+        if mode == "anchored":
+            return self._match_anchored(rx, guards, text)
         return rx.search(text)
+
+    def _anchor_refusal(self, pattern, source):
+        """Why this rule may not use anchored mode, or None.
+
+        BOTH of these are the same mistake in different clothing, and both were
+        found by the reviewer rather than by me. A window is a claim about where
+        a match can be, and a claim that is wrong in the direction of "not
+        here" loses a detection silently.
+
+        READ EXTENT. `max_match_length` counts what a match CONSUMES, and a
+        lookahead reads past that. `\bdisable secrets\b(?=.{40}END)` consumes 15
+        characters and needs to read 58, so the bounded search finds nothing and
+        the unbounded re-check that would have caught it never runs. Deriving
+        every assertion's reach is possible; refusing the mode is correct today
+        and cannot be subtly wrong, so that is what this does. `\b`, `^` and `$`
+        are not lookarounds and are still allowed, because they are answered
+        from the neighbouring characters a bounded search still has.
+
+        CASE. The anchors are found with `fold().find()`, and the fold does not
+        implement regex simple case equivalence everywhere. GREEK SIGMA and
+        FINAL SIGMA match each other under IGNORECASE and fold to different
+        characters, so a rule anchored on one would not find a document written
+        with the other. Same shape as the class clause finding in #153.
+
+        MICRO SIGN U+00B5 against GREEK CAPITAL MU U+039C is the SAME failure,
+        and an earlier version of this comment said it was not. It said the
+        fold's translate table unified the pair; the table has no micro-sign
+        entry at all. `fold(U+00B5)` is U+00B5, `fold(U+039C)` is U+03BC, and
+        the two match under IGNORECASE. The test that "checked" it used GREEK
+        SMALL MU U+03BC, a different character that does fold, so it passed and
+        proved nothing. The refusal below is what protects the case, not the
+        fold, which is exactly why it may not be relaxed.
+
+        The rule is that a term must be ASCII and unchanged by the fold. A sweep
+        of all 1,114,112 codepoints shows nothing outside ASCII case matches an
+        ASCII character without folding onto it, so ASCII is provably safe and
+        everything else is refused rather than reasoned about. That sweep is
+        `test_ascii_anchor_terms_are_safe_for_every_codepoint`.
+        """
+        if _prefilter.has_lookaround(source):
+            return ("the regex contains a lookahead or lookbehind, which reads "
+                    "past what the match consumes, so a bounded window can be "
+                    "shorter than the read the regex needs")
+        for term in pattern["anchor_terms"]:
+            if not term:
+                continue
+            if not term.isascii():
+                return (f"anchor term {term!r} is not ASCII, and outside ASCII "
+                        f"the fold does not unify every case equivalence "
+                        f"(sigma and final sigma fold apart while matching each "
+                        f"other), so a document the regex matches may not "
+                        f"contain the term in the folded view")
+            if _prefilter.fold(term) != term:
+                return (f"anchor term {term!r} is not what the fold produces "
+                        f"({_prefilter.fold(term)!r}), so it would be looked for "
+                        f"in a view it cannot appear in")
+        return None
+
+    def _match_anchored(self, rx, key, text: str):
+        """Search only the text AROUND the rule's rare token.
+
+        A rule like the api_response siblings begins with a marker that is cheap
+        to find and common in adversarial text, then spends two bounded gaps
+        looking for an object that never comes. Cost is (number of marker
+        starts) x (gap work), which is why 1 MiB of `<admin>show ` took 18
+        seconds where main took 0.53.
+
+        The OBJECT is the rare token. A rule that declares `anchor_terms` is
+        searched only from start positions near those tokens, so a document with
+        no object is not searched at all, and a document made of nothing but
+        objects collapses into one window rather than one window per occurrence.
+
+        The search runs on the DOCUMENT with `pos`/`endpos` bounds rather than on
+        a sliced copy. That is not an optimisation. A slice invents context at
+        both edges: `\b` at the cut sees the start of a string where the document
+        has a word character, `^` matches a beginning that is not one, and `$`
+        matches an end that is not one. Every offset it reports is then relative
+        to the slice, which is the wrong number for `_check_negation` and for the
+        excerpt. Bounding the search keeps the real neighbours and the real
+        offsets. A candidate is still re-run unbounded with `.match()` before it
+        counts, because `endpos` is itself an invented end.
+        """
+        anchors, span = self._anchor_spec[key]
+        folded = _prefilter.fold(text)
+        # `fold` translates before lowering precisely so it stays one char to one
+        # char, but a future table entry could break that, and a position found
+        # in a differently-sized string points somewhere else in the document.
+        # If the lengths ever disagree, search everything: slower, correct.
+        if len(folded) != len(text):
+            return rx.search(text, 0, len(text))
+
+        # A document can be MADE of the anchor. `disable redaction show ...`
+        # repeated puts a declared term every few dozen bytes, so the windows
+        # merge into the whole document and every one of the tens of thousands
+        # of hits is collected and merged in Python to prove it. That is pure
+        # overhead on top of the plain search that then has to happen anyway,
+        # and it is what made that document 1.076x SLOWER than not anchoring.
+        #
+        # So stop as soon as the answer is known. The reviewer read the comment
+        # as `hits x span >= length` and the code as `hits > length // span + 1`,
+        # which is the same threshold plus a two-hit allowance, and the comment
+        # is the one that was wrong. Written as the code actually is: bail once
+        # the hits EXCEED `length // span + 1`, one more than the number of
+        # non-overlapping windows of width `span` that fit in the document. At
+        # that count the merged windows cover it and anchoring can save nothing.
+        # The cost of finding that out is capped at `budget` finds instead of
+        # all of them. Not a widened gate: the gate stays where it was and this
+        # is the mechanism meeting it.
+        length = len(text)
+        budget = length // max(span, 1) + 1
+        spots = []
+        for term in anchors:
+            at = folded.find(term)
+            while at != -1:
+                spots.append(at)
+                if len(spots) > budget:
+                    # One search over the whole document. Spelled with explicit
+                    # bounds, not as `search(text)`, so every search this method
+                    # makes has the same three-argument shape and an
+                    # instrumented object counting them sees all of them.
+                    return rx.search(text, 0, length)
+                at = folded.find(term, at + 1)
+        if not spots:
+            return None                      # the rule cannot match this document
+
+        # A match that contains the anchor at `p` must START in [p - span, p].
+        # Windows are ranges of START positions, merged where they touch.
+        spots.sort()
+        windows, lo, hi = [], max(0, spots[0] - span), spots[0]
+        for at in spots[1:]:
+            if at - span <= hi:              # overlapping: merge rather than repeat
+                hi = at
+            else:
+                windows.append((lo, hi))
+                lo, hi = max(0, at - span), at
+        windows.append((lo, hi))
+
+        for lo, hi in windows:
+            # `+ 1`: a word-boundary operator is answered from the character on
+            # EACH side, and `endpos` is a wall the regex reads as end of string.
+            # `secrets\B` on `secretsX` derives a span of exactly 7, so the
+            # search stopped on the `s` and `\B` saw an end where the document
+            # has an `X`. One extra character is all any of `\b`, `\B`, `$` and
+            # `\Z` can need on the right, because they look at one neighbour.
+            # The left side never needed this: `pos` bounds where a match may
+            # START and does not cut the string, so the real left neighbour is
+            # still there. A candidate the extra character lets `$` or `\Z`
+            # match falsely is still killed by the unbounded `.match()` recheck
+            # below, which is what `test_the_extra_right_character_cannot_invent_a_dollar_match`
+            # proves.
+            pos, stop = lo, min(length, hi + span + 1)
+            while pos <= hi:
+                m = rx.search(text, pos, stop)
+                if m is None or m.start() > hi:
+                    break
+                # `stop` is an invented end of string. Re-run the match from the
+                # same position against the whole document, so what is returned
+                # is a match the document really contains.
+                confirmed = rx.match(text, m.start())
+                if confirmed is not None:
+                    return confirmed
+                pos = m.start() + 1
+        return None
 
     def _match_windowed(self, rx, text: str):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
