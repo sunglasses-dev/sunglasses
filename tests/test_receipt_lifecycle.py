@@ -478,3 +478,151 @@ def test_control_the_undecodable_branch_also_needs_the_quoting_path(home):
     assert "screen erase ESC [2J" in replayed, (
         f"the decode branch did not replay its controls; replayed: {replayed}"
     )
+
+
+# ── round 5: valid rows reach the terminal too ───────────────────────────────
+# Round 4 fixed the unreadable-line preview and then said the shared sanitizer
+# was "the same function every other untrusted field on this render path goes
+# through". It was not. A VALID JSON opening row whose `eval_id` is
+# `ESC [2J ESC [H ALL CLEAR - 0 threats U+202E` parses perfectly, never touches
+# `_unreadable_preview`, and the orphan line printed it verbatim. Naming a gate
+# is not putting something through it, which is the same lesson as round 4's,
+# one field over.
+#
+# The lone-surrogate case is the other half and it is why repr is the guard
+# rather than the sanitizer: `"tool_name": "mcp__tool\ud800tail"` is valid JSON,
+# the sanitizer leaves the surrogate untouched, and `print` then raises
+# UnicodeEncodeError and dumps a traceback INSTEAD of naming the orphan the
+# command was asked about.
+
+ESC_ERASE = b"\x1b[2J"
+CURSOR_HOME = b"\x1b[H"
+RAW_EVAL_ID = "\x1b[2J\x1b[HALL CLEAR - 0 threats‮"
+SURROGATE_TOOL = "mcp__tool\ud800tail"
+
+
+def _pair(eval_id="ok1", tool="Bash"):
+    return (
+        json.dumps({"ts": "2026-09-12T00:00:00", "kind": "in_flight",
+                    "eval_id": eval_id, "tool_name": tool}),
+        json.dumps({"ts": "2026-09-12T00:00:00", "kind": "decision",
+                    "eval_id": eval_id, "decision": "allow"}),
+    )
+
+
+def _orphan(eval_id, tool="Bash"):
+    return json.dumps({"ts": "2026-09-12T00:00:00", "kind": "in_flight",
+                       "eval_id": eval_id, "tool_name": tool})
+
+
+def test_a_valid_row_cannot_repaint_the_orphan_report(home):
+    """ASTRA's raw eval_id, as a valid JSON row beside a clean pair."""
+    started, decided = _pair()
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      (started + "\n" + decided + "\n"
+                       + _orphan(RAW_EVAL_ID) + "\n").encode("utf-8"))
+    code, raw = _verify_raw(home)
+    _assert_inert(raw)
+    out = _plain(raw)
+    assert code == 1, out
+    assert "orphan" in out, out
+    assert "evaluations started   2" in out, out
+    assert "decisions recorded    1" in out, out
+
+
+def test_a_lone_surrogate_tool_name_is_named_not_a_traceback(home):
+    """Valid JSON, unencodable text. The report must still identify the orphan."""
+    started, decided = _pair()
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      (started + "\n" + decided + "\n"
+                       + _orphan("orphan1", SURROGATE_TOOL) + "\n").encode("utf-8"))
+    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    proc = subprocess.run(
+        [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
+        cwd=TREE, capture_output=True, env=env)
+    assert b"Traceback" not in proc.stderr + proc.stdout, (
+        proc.stderr.decode("utf-8", "replace"))
+    assert proc.stderr == b"", proc.stderr
+    assert proc.returncode == 1
+    out = _plain(proc.stdout)
+    assert "orphan" in out and "orphan1" in out, out
+    assert "mcp__tool" in out, "the orphan was not identifiable"
+    _assert_inert(proc.stdout)
+
+
+def test_the_pretty_table_survives_the_same_two_rows(home):
+    """Not only `--verify`. The default render is the same boundary, and both of
+    these predate this PR: the table sanitized its fields, which strips a control
+    and leaves a surrogate, and the summary line sanitized nothing at all."""
+    rows = [
+        json.dumps({"ts": "2026-09-12T00:00:00", "kind": "decision",
+                    "eval_id": "a", "decision": "allow", "tool_name": SURROGATE_TOOL}),
+        json.dumps({"ts": "2026-09-12T00:00:00", "kind": "decision",
+                    "eval_id": "b", "decision": RAW_EVAL_ID, "tool_name": "Bash"}),
+    ]
+    _write_bytes_file(home, "2026-09-12.jsonl", ("\n".join(rows) + "\n").encode("utf-8"))
+    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts"],
+                          cwd=TREE, capture_output=True, env=env)
+    assert b"Traceback" not in proc.stdout + proc.stderr, (
+        proc.stderr.decode("utf-8", "replace"))
+    _assert_inert(proc.stdout + proc.stderr)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("eval_id", RAW_EVAL_ID),
+    ("tool_name", SURROGATE_TOOL),
+])
+def test_control_restoring_the_raw_interpolation_replays_it(home, field, value):
+    """The mutation, in the suite. Put the round-4 renderer back for one field
+    and the bytes reach stdout again, or the tests above prove nothing."""
+    started, decided = _pair()
+    row = {"ts": "2026-09-12T00:00:00", "kind": "in_flight", "eval_id": "orphan1",
+           "tool_name": "Bash"}
+    row[field] = value
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      (started + "\n" + decided + "\n"
+                       + json.dumps(row) + "\n").encode("utf-8"))
+    mutation = (
+        "import sys, types;"
+        "from sunglasses import cli;"
+        "cli._display = lambda value, limit=96: "
+        "  '' if value is None else (value if isinstance(value, str) else str(value));"
+        "sys.exit(cli.cmd_receipts("
+        "  types.SimpleNamespace(verify=True, today=False, limit=40)))"
+    )
+    code, raw = _verify_raw(home, mutate=mutation)
+    if field == "eval_id":
+        assert ESC_ERASE in raw and CURSOR_HOME in raw, (
+            "the raw eval_id did not replay its controls, so the assertion "
+            "above is not what is stopping them")
+    else:
+        assert b"Traceback" in raw, (
+            "the raw surrogate tool name did not crash the renderer, so repr "
+            "is not what is keeping the orphan identifiable")
+
+
+def test_every_receipt_field_printed_on_this_path_goes_through_one_function():
+    """The claim round 4 made in a docstring, as a check on the source.
+
+    Rather than asserting the sentence again, read the two renderers and require
+    that no parsed field is interpolated except through `_display` (or through
+    `_unreadable_preview`, which is the other half of the same boundary).
+    """
+    import inspect
+    import re as _re
+    from sunglasses import cli
+
+    for function in (cli._verify_lifecycle, cli.cmd_receipts):
+        source = inspect.getsource(function)
+        for line in source.splitlines():
+            if ".get(" not in line or "print" not in line and "= " not in line:
+                continue
+            if "_display(" in line or "_unreadable_preview(" in line:
+                continue
+            if "counts[" in line or "row.get(\"lane\") ==" in line:
+                continue        # a lookup key, never printed as itself
+            assert not _re.search(r"\{[^}]*\.get\(", line), (
+                f"{function.__name__} interpolates a parsed field directly:\n"
+                f"    {line.strip()}\n"
+                f"Route it through _display; that is what round 5 exists for.")

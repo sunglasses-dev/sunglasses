@@ -1129,8 +1129,6 @@ def _verify_lifecycle(rows, directory, unparseable=()):
               f"{DIM}Every opening record has a terminal partner.{RESET}\n")
         return 0
 
-    from .firewall import sanitize_receipt_field as _clean
-
     if unparseable:
         # file:line, so the reader can go and look rather than take our word.
         print(f"\n  {RED}{BOLD}{len(unparseable)} line(s) could not be read.{RESET}")
@@ -1167,13 +1165,42 @@ def _verify_lifecycle(rows, directory, unparseable=()):
     print(f"    {DIM}3. the decision was made and enforced, and the terminal "
           f"append failed{RESET}\n")
     for eid, rec in orphans[:20]:
-        print(f"    {RED}orphan{RESET} {DIM}{_clean(rec.get('ts'))}{RESET} "
-              f"{BOLD}{_clean(rec.get('tool_name')) or '(unknown tool)'}{RESET} "
-              f"{DIM}eval {eid}{RESET}")
+        print(f"    {RED}orphan{RESET} {DIM}{_display(rec.get('ts'), 32)}{RESET} "
+              f"{BOLD}{_display(rec.get('tool_name'), 48) or '(unknown tool)'}"
+              f"{RESET} {DIM}eval {_display(eid, 64)}{RESET}")
     if len(orphans) > 20:
         print(f"    {DIM}... and {len(orphans) - 20} more{RESET}")
     print()
     return 1
+
+
+def _display(value, limit: int = 96) -> str:
+    """The ONE way a receipt-supplied string reaches a terminal on this path.
+
+    Round 4 said `sanitize_receipt_field` was "the same function every other
+    untrusted field on this render path goes through". That was false by one
+    path and the reviewer found it: the orphan line interpolated `eval_id`
+    verbatim, so a VALID JSON row carrying `ESC [2J ESC [H` erased the warning
+    printed above it. Valid rows never touch `_unreadable_preview`, and naming a
+    gate does not put anything through it.
+
+    `repr` first, because repr is the guard that holds. It makes a control
+    visible instead of active, and it escapes a LONE SURROGATE, which the
+    sanitizer leaves untouched and which makes `print` raise UnicodeEncodeError
+    and dump a traceback instead of naming the orphan it was asked about. The
+    outer quotes are stripped so an ordinary value still renders as itself.
+    `sanitize_receipt_field` stays behind it as depth and as the single place
+    this module defines control and bidi; on repr's ASCII output it is a no-op.
+
+    This is display only. The raw id is what pairs the records, and it is never
+    passed through here.
+    """
+    from .firewall import sanitize_receipt_field
+
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    return sanitize_receipt_field(repr(text)[1:-1], limit=limit) or ""
 
 
 def _unreadable_preview(material, reason: str = "") -> str:
@@ -1188,10 +1215,15 @@ def _unreadable_preview(material, reason: str = "") -> str:
     Two steps, and the second is the one that is allowed to be boring:
     `repr` makes a control VISIBLE instead of active and keeps the preview
     faithful (an audit preview that silently dropped bytes would be its own small
-    lie), and `sanitize_receipt_field` is the gate — the same function every other
-    untrusted field on this render path goes through, and the single place this
-    module defines "control character" and "bidi". On repr's ASCII output it is a
-    no-op, which is exactly what a gate behind a correct step should be.
+    lie), and `sanitize_receipt_field` behind it is depth and the single place
+    this module defines "control character" and "bidi". On repr's ASCII output it
+    is a no-op, which is what a gate behind a correct step should be.
+
+    An earlier version of this docstring called that sanitizer "the same function
+    every other untrusted field on this render path goes through". It was not.
+    Valid rows had their own renderer that interpolated `eval_id` raw. Everything
+    displayed on this path now goes through `_display` above, and that is a
+    property of the code rather than a sentence about it.
     """
     from .firewall import sanitize_receipt_field
 
@@ -1273,28 +1305,33 @@ def cmd_receipts(args):
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
     # as untrusted before it reaches the terminal.
-    from .firewall import sanitize_receipt_field as _clean
-
     colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
     print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
           f"{len(files)} day(s)){RESET}")
     print(f"  {DIM}{'─' * 74}{RESET}")
+    # PRE-EXISTING, and fixed here because it is the same boundary in the same
+    # file: this table sanitized its fields, which strips a control but leaves a
+    # lone surrogate, so a valid row with `"tool_name": "mcp__tool\ud800tail"`
+    # crashed the renderer on main too. The summary below sanitized nothing at
+    # all and printed a receipt-supplied `decision` verbatim. Both go through
+    # `_display` now. Neither is a defect this PR introduced.
     for row in rows[-args.limit:]:
-        decision = _clean(row.get("decision", "?"), limit=10)
+        decision = _display(row.get("decision", "?"), limit=10)
         color = colors.get(decision, "")
-        stamp = _clean(str(row.get("ts", ""))[11:19], limit=8)
-        note = _clean(row.get("rule_id", ""), limit=44)
+        stamp = _display(str(row.get("ts", ""))[11:19], limit=8)
+        note = _display(row.get("rule_id", ""), limit=44)
         if row.get("lane") == "error":
-            note = _clean(row.get("error", "error"), limit=44)
-        tool = _clean(row.get("tool_name"), limit=24) or "-"
+            note = _display(row.get("error", "error"), limit=44)
+        tool = _display(row.get("tool_name"), limit=24) or "-"
         print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
-              f"{DIM}{_clean(row.get('lane', ''), limit=13):<13}{RESET} "
+              f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
               f"{tool:<24} {DIM}{note}{RESET}")
 
     counts = {}
     for row in rows:
         counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
-    summary = "  ".join(f"{colors.get(k, '')}{k}: {v}{RESET}" for k, v in sorted(counts.items()))
+    summary = "  ".join(f"{colors.get(k, '')}{_display(k, 10)}: {v}{RESET}"
+                        for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
     print(f"  {DIM}{'─' * 74}{RESET}")
     print(f"  {summary}")
     # An audit trail that only reports blocks cannot answer "was it even
