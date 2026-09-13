@@ -45,6 +45,14 @@ def _decision(home, payload=CLEAN):
     return out.get("permissionDecision"), out.get("permissionDecisionReason", "")
 
 
+# A tool this install has never seen, so the pin lane has to decide.
+NEW_MCP_CALL = json.dumps({
+    "session_id": "round4",
+    "tool_name": "mcp__github__create_issue",
+    "tool_input": {},
+})
+
+
 @pytest.fixture
 def home(tmp_path):
     h = tmp_path / "sunglasses-home"
@@ -427,7 +435,116 @@ def test_undecodable_bytes_do_not_stop_a_later_pin_decision(home):
     the call still produces a decision and still carries the confession.
     """
     _bytes_policy(home, b"blocked_paths:\n\xff\xfe")
-    out = firewall.run_hook(CLEAN, home=home).get("hookSpecificOutput", {})
+
+    # Round 4. This drove CLEAN, which needs no pin lane at all, so the name
+    # promised a pin decision the body never asked for. The reviewer's mutation
+    # returns early on an unreadable policy, and a CLEAN call cannot see the
+    # difference. A first sighting can.
+    out = firewall.run_hook(NEW_MCP_CALL, home=home).get("hookSpecificOutput", {})
     assert out, "the hook produced no decision at all"
     assert out["permissionDecision"] == "ask"
-    assert "cannot be read" in out["permissionDecisionReason"]
+    rows = [json.loads(line)
+            for f in sorted((home / "receipts").glob("*.jsonl"))
+            for line in f.read_text().splitlines() if line.strip()]
+    assert rows, "no receipt"
+    assert rows[-1].get("rule_id") == "GLS-FW-PIN-TOFU", (
+        f"the deciding rule was {rows[-1].get('rule_id')!r}; the unreadable "
+        f"policy took the pin decision with it"
+    )
+    assert rows[-1].get("error"), "the receipt does not confess the dead policy"
+
+
+# ── round 4: through the INSTALLED command, not the imported function ────────
+# Every test above calls `run_hook` in this process. That is the right unit for
+# the decision logic and the wrong one for two of these faults, because both
+# are about what happens at the PROCESS boundary. A FIFO blocks in the kernel
+# and the harness kills the hook; an in-process call cannot be killed and cannot
+# fail open. The reviewer found exactly this gap twice, so these two drive the
+# command a real install runs, `python -m sunglasses.firewall` reading stdin,
+# with an isolated `SUNGLASSES_HOME`.
+
+import os as _os
+import subprocess as _subprocess
+import sys as _sys
+
+_REPO = pathlib.Path(__file__).resolve().parent.parent
+HOOK_DEADLINE_S = 2.0
+
+
+def _installed_hook(payload, home, deadline=HOOK_DEADLINE_S):
+    """The hook as a real install runs it. Returns (elapsed, parsed stdout)."""
+    import time as _time
+    env = dict(_os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(_REPO))
+    started = _time.perf_counter()
+    proc = _subprocess.run(
+        [_sys.executable, "-m", "sunglasses.firewall"],
+        input=payload, capture_output=True, text=True,
+        cwd=str(_REPO), env=env, timeout=deadline,
+    )
+    elapsed = _time.perf_counter() - started
+    assert proc.returncode == 0, (
+        f"the hook exited {proc.returncode}; a non-zero exit is a fail-open. "
+        f"stderr {proc.stderr[:300]!r}"
+    )
+    return elapsed, (json.loads(proc.stdout) if proc.stdout.strip() else {})
+
+
+def _receipt_rows(home):
+    return [json.loads(line)
+            for f in sorted((home / "receipts").glob("*.jsonl"))
+            for line in f.read_text().splitlines() if line.strip()]
+
+
+def test_an_unreadable_policy_and_a_first_sighting_both_reach_the_same_receipt(home):
+    """The regression the round 2 PR body claimed and the suite did not contain.
+
+    An invalid-byte policy AND a tool this install has never seen, on one call,
+    through the installed command. The pin lane must still decide, and the
+    receipt it writes must confess that the policy control was down while it
+    did. The reviewer's surviving mutation returns early on
+    `state == "unreadable"`, which produces a policy answer where the TOFU
+    answer belongs, and every one of the 362 firewall tests stayed green.
+    """
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    (home / "policy.yaml").write_bytes(b"blocked_paths:\n\xff\xfe\n")
+
+    _elapsed, out = _installed_hook(NEW_MCP_CALL, home)
+    decision = out.get("hookSpecificOutput", {})
+    assert decision.get("permissionDecision") == "ask", decision
+
+    rows = _receipt_rows(home)
+    assert rows, "the installed hook wrote no receipt at all"
+    last = rows[-1]
+    assert last.get("rule_id") == "GLS-FW-PIN-TOFU", (
+        f"the deciding rule was {last.get('rule_id')!r}. The policy lane answered "
+        f"where the pin lane should have, which is the reviewer's mutation."
+    )
+    assert last.get("degraded") is True, last
+    assert last.get("policy_state") == "unreadable", last
+    assert last.get("error"), "the receipt does not say the policy control was down"
+
+
+def test_a_fifo_policy_answers_through_the_installed_command_within_a_second(home):
+    """R2, at the boundary where it actually bit.
+
+    A FIFO with no writer blocks in the kernel. In this process there is no
+    harness to time the hook out, so the in-process version of this test could
+    pass while the installed hook sat past its deadline and the host failed
+    open. The subprocess has a hard deadline, so a regression here is a
+    TimeoutExpired rather than a green run.
+    """
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    fifo = home / "policy.yaml"
+    _os.mkfifo(fifo)
+    try:
+        elapsed, out = _installed_hook(CLEAN, home)
+    finally:
+        try:
+            fifo.unlink()
+        except OSError:
+            pass
+
+    assert elapsed < 1.0, f"the installed hook took {elapsed:.2f}s on a FIFO"
+    decision = out.get("hookSpecificOutput", {})
+    assert decision.get("permissionDecision") == "ask", decision
+    assert "cannot be read" in decision.get("permissionDecisionReason", "")
