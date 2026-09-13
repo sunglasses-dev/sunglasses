@@ -75,6 +75,16 @@ def _build_live_root() -> pathlib.Path | None:
     source = LIVE / "source"
     if not source.is_symlink():
         source.symlink_to(REPO)
+
+    # FRESH EVERY SESSION, and this is a correctness matter rather than tidiness.
+    # The exam writes its evidence here and some of it is STATE, not a record:
+    # `test_r7_concurrent_overspend_refuses` starts eight contenders against a
+    # ledger in this tree and asserts exactly one of them wins. On a second run
+    # the ledger still holds the first run's charge, so all eight correctly
+    # refuse, nobody reports a win, and the test fails while the code is right.
+    # An hour could go into "fixing" that. The directory is ours, never ASTRA's,
+    # and a charge from a previous run is not evidence about this one.
+    shutil.rmtree(LIVE / "evidence", ignore_errors=True)
     (LIVE / "evidence").mkdir(exist_ok=True)
     return LIVE
 
