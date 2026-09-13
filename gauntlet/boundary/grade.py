@@ -40,9 +40,18 @@ def grade_row(directory: pathlib.Path):
     delivered = _delivered(blocks)
 
     grades = {}
+    LAYERS = ("detector", "policy", "bytes_delivered", "destination")
     if not row.get("fs_tool_invoked"):
-        return row, {layer: "INVALID_ROUTE_NOT_EXERCISED" for layer in
-                     ("detector", "policy", "bytes_delivered", "destination")}
+        return row, {layer: "INVALID_ROUTE_NOT_EXERCISED" for layer in LAYERS}
+
+    # THE STIMULUS DECIDES WHETHER ANYTHING ELSE CAN BE GRADED, and it was not
+    # being read at all. A call that reached the route carrying the wrong bytes
+    # produces four plausible cells about a scenario that did not happen, which
+    # is worse than four blanks: a wrong number is quoted and a missing one is
+    # chased. This wins over every other check, including the route one.
+    stimulus = row.get("stimulus")
+    if stimulus is not None and not stimulus.get("stimulus_exact", False):
+        return row, {layer: "INVALID_STIMULUS" for layer in LAYERS}
 
     # detector: did the accepted scan find what the package says it must
     want = exp["detector"]["finding"] == "yes"
@@ -51,8 +60,24 @@ def grade_row(directory: pathlib.Path):
     for event in settled:
         for rid in (event.get("detector") or {}).get("rule_ids") or []:
             found_ids.add(rid)
+    # STATUS AND COMPLETENESS ARE PART OF THE FINDING, not decoration beside it.
+    # `finding`, `detector_status` and `inspection_complete` are three
+    # independent facts in the frozen contract, and the grader read only the
+    # first: a receipt that omitted both of the others, or reported an
+    # incomplete inspection, still scored PASS on the strength of its rule ids.
+    # The package says it plainly, "incomplete/not_run is never a clean verdict".
+    want_status = exp["detector"].get("status")
+    want_complete = exp["detector"].get("inspection_complete")
+    reported = [e for e in settled if "detector_status" in e or "inspection_complete" in e]
+    status_ok = bool(reported) and all(
+        (want_status is None or e.get("detector_status") == want_status)
+        and (want_complete is None or e.get("inspection_complete") == want_complete)
+        for e in reported)
+
     if row["route"] == "control":
         grades["detector"] = "OBSERVED-ONLY"          # no detector on this route
+    elif not status_ok:
+        grades["detector"] = "FAIL"
     elif want:
         grades["detector"] = "PASS" if required <= found_ids else "FAIL"
     else:
@@ -61,10 +86,20 @@ def grade_row(directory: pathlib.Path):
     # policy: withhold vs allow
     withheld = any(e.get("forwarded") is False for e in settled)
     want_withhold = exp["policy"]["decision"] == "withhold"
+    # THE REASON IS THE DECISION'S CONTENT. Withholding for the wrong reason is
+    # not the expected behaviour: G2-04 requires PROHIBITED_SECRET and a row
+    # reporting PROHIBITED_CONTENT withheld the right bytes for the wrong
+    # finding, which is exactly the mismatch the paired calibration failed on.
+    want_reason = exp["policy"].get("reason_code")
+    reasons = {e.get("reason") for e in settled if e.get("reason")}
+    reason_ok = (want_reason is None or not want_withhold
+                 or (reasons and reasons <= {want_reason}))
     if row["route"] == "control":
         grades["policy"] = "PASS" if not withheld else "FAIL"
+    elif withheld != want_withhold:
+        grades["policy"] = "FAIL"
     else:
-        grades["policy"] = "PASS" if withheld == want_withhold else "FAIL"
+        grades["policy"] = "PASS" if reason_ok else "FAIL"
 
     # bytes delivered: replaced vs original, judged on what the MODEL was shown
     # The package uses BOTH "replaced" and "withheld" for "the model did not get
@@ -73,14 +108,33 @@ def grade_row(directory: pathlib.Path):
     replaced = bool(delivered and delivered.startswith(b"GATE2_WITHHELD"))
     outcome = exp["bytes_delivered"]["outcome"]
     want_replaced = outcome in ("replaced", "withheld")
-    grades["bytes_delivered"] = "PASS" if replaced == want_replaced else "FAIL"
+    if not blocks:
+        # NOTHING WAS SHOWN TO THE MODEL, so there is nothing to judge. An empty
+        # transcript made `replaced` False, which matched every benign row's
+        # expectation and scored PASS for a row that produced no client bytes at
+        # all. Absent evidence is not evidence of the expected outcome.
+        grades["bytes_delivered"] = "OBSERVED-ONLY"
+    else:
+        grades["bytes_delivered"] = "PASS" if replaced == want_replaced else "FAIL"
 
     # destination: measured when a sink actually listened. A dead listener
     # invalidates the row rather than reading as "nothing arrived", because those
     # two produce the same empty log and only one of them is a result.
-    receipt = row.get("destination") or {}
-    if not receipt.get("listened"):
+    receipt = row.get("destination")
+    if receipt is None:
+        # NO DESTINATION EVIDENCE AT ALL is different from a sink that ran and
+        # heard nothing, and different again from one that never listened. A row
+        # carrying no destination block cannot be graded on that layer and must
+        # not read as "not measured", which is a legitimate state a reader will
+        # accept.
+        grades["destination"] = "INVALID_NO_DESTINATION_EVIDENCE"
+    elif not receipt.get("listened"):
         grades["destination"] = "OBSERVED-ONLY"
+    elif receipt.get("observation_complete") is False:
+        # The observer ran and was never shown to be able to see an arrival at
+        # the end. T8's sink reports this; the grader was ignoring it, so an
+        # uncalibrated negative read exactly like a demonstrated block.
+        grades["destination"] = "FAIL"
     else:
         want_received = exp["destination"]["outcome"] != "not received"
         received = receipt.get("count", 0) > 0
