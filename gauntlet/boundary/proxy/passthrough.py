@@ -186,9 +186,21 @@ class Passthrough:
     # ── receipts ────────────────────────────────────────────────────────────
     def _emit(self, kind: str, request_id, **fields) -> None:
         with self._lock:
+            # WALL CLOCK AND MONOTONIC. `time.time()` can step backwards when
+            # the host's clock is corrected, and a lifecycle read from it can
+            # then show a scan settling before it started. `seq` already orders
+            # the events; `mono` is what makes a DURATION between two of them
+            # trustworthy.
+            #
+            # The id carries its JSON TYPE with it, because 4 and "4" are
+            # different correlation ids in JSON-RPC, they render identically in
+            # a receipt, and the replacement contract requires preserving the
+            # type rather than normalising it.
             event = {"run_id": self.run_id, "seq": len(self.events),
-                     "at": time.time(), "kind": kind,
-                     "request_id": request_id, **fields}
+                     "at": time.time(), "mono": time.monotonic(), "kind": kind,
+                     "request_id": request_id,
+                     "request_id_type": type(request_id).__name__,
+                     **fields}
             self.events.append(event)
             if self._receipts_path:
                 # Appended and flushed inside the lock, so the file's order is
@@ -288,6 +300,9 @@ class Passthrough:
         reader = threading.Thread(target=_collect, daemon=True,
                                   args=(worker, collected))
         reader.start()
+        errors = threading.Thread(target=_collect_stderr, daemon=True,
+                                  args=(worker, collected))
+        errors.start()
         terminated = False
         try:
             worker.wait(timeout=self.deadline_ms / 1000)
@@ -303,7 +318,24 @@ class Passthrough:
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
         exit_code = worker.poll()
         reader.join(timeout=1.0)
+        errors.join(timeout=1.0)
         finding = _finding_of(collected.get("stdout"))
+        # ACCEPTED or DISCARDED, said out loud. A worker that finishes after a
+        # cancellation or past the deadline has produced a result we are
+        # deliberately not using, and a receipt that simply omits it cannot be
+        # told from one where the worker said nothing at all.
+        accepted = not (cancelled or terminated)
+        self._emit("WORKER_OUTPUT", request_id,
+                   accepted=accepted,
+                   discarded_reason=(REQUEST_CANCELLED if cancelled
+                                     else SCAN_DEADLINE if terminated else None),
+                   exit_code=exit_code,
+                   stdout_bytes=len(collected.get("stdout") or b""),
+                   stderr_bytes=len(collected.get("stderr") or b""),
+                   stderr=_clip(collected.get("stderr")),
+                   stdout=_clip(collected.get("stdout")))
+        if not accepted:
+            finding = None
         # Each branch answers all three questions, so none of them can be
         # inferred from another later.
         if cancelled:
@@ -474,6 +506,26 @@ def _collect(worker, into: dict) -> None:
         into["stdout"] = b""
 
 
+def _collect_stderr(worker, into: dict) -> None:
+    """Drain stderr, on its own thread, and keep it.
+
+    It was opened as a PIPE and never read, which is worse than not capturing
+    it. A pipe nobody drains fills at roughly 64 KiB and the writer BLOCKS, so a
+    worker that logs enough hangs in `write` until the deadline kills it, and
+    the receipt then says SCAN_DEADLINE about a scan that had finished thinking
+    and was only trying to talk. The one case where a scanner has the most to
+    say is the case where it is in trouble.
+
+    Kept, because item 6 asks for the discarded results too: a scanner's own
+    account of why it failed is the first thing a stranger grading the run will
+    want, and it is the thing we were throwing away.
+    """
+    try:
+        into["stderr"] = worker.stderr.read()
+    except (ValueError, OSError):
+        into["stderr"] = b''
+
+
 def _finding_of(raw):
     """What the scanner actually said. None when nothing readable came back.
 
@@ -502,6 +554,20 @@ def _finding_of(raw):
             "inspection_complete": bool(result.get("inspection_complete", True)),
         }
     return None
+
+
+# Worker output is evidence, not a payload, and it is kept at a bounded size so
+# a chatty scanner cannot turn the receipt into the thing it was describing.
+_WORKER_OUTPUT_CLIP = 4096
+
+
+def _clip(raw):
+    if not raw:
+        return ""
+    text = raw.decode("utf-8", "replace")
+    if len(text) <= _WORKER_OUTPUT_CLIP:
+        return text
+    return text[:_WORKER_OUTPUT_CLIP] + f"...[{len(text) - _WORKER_OUTPUT_CLIP} more]"
 
 
 def _kill_group(worker, grace: float) -> None:
