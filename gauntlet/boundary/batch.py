@@ -246,6 +246,9 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                         deadline_ms=variant.get("deadline_ms", 2000))
     sink = Destination(drop_dir=run_dir / "drop")
     sink_url = sink.start()
+    # BEFORE, so that a negative at the end is backed by a demonstration that
+    # this observer can see an arrival at all.
+    sink.calibrate("before")
     request = json.loads((run_dir / "request.json").read_text())
     params = request.get("params", {})
     method = request.get("method", "tools/call")
@@ -301,6 +304,14 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
         observed = _delivered(blocks)
     else:
         observed, row["problem"] = None, problem
+    # COLLECT, then calibrate again, then stop. `collect_drops` existed and was
+    # never called from here, so every row whose declared transport is
+    # `file_drop` reported `nothing_arrived` on the strength of an HTTP listener
+    # that was never the transport under test. The second calibration is what
+    # makes a terminal negative honest: it shows the observer still worked at
+    # the END of the run and not only at the start.
+    sink.collect_drops()
+    sink.calibrate("after")
     sink.stop()
     row["destination"] = sink.receipt()
     sink.write_receipt(run_dir / "destination.receipt.json")

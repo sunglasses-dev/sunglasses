@@ -22,6 +22,7 @@ Three properties this file exists to guarantee, each with a test that fails with
 """
 from __future__ import annotations
 
+import hashlib
 import http.server
 import ipaddress
 import json
@@ -29,6 +30,10 @@ import pathlib
 import threading
 import time
 import uuid
+
+# Calibration canaries are named, not counted. A probe that proved the observer
+# works must never be able to appear in the evidence as something that arrived.
+_CALIBRATION_PREFIX = ".gate2-calibration-"
 
 
 LOOPBACK_ONLY = "the sink handles attack payloads; it may only bind loopback"
@@ -76,6 +81,8 @@ class Destination:
         self.run_id = run_id or uuid.uuid4().hex[:12]
         self.host = host
         self.drop_dir = pathlib.Path(drop_dir) if drop_dir else None
+        self.calibrations: list[dict] = []
+        self._collected_at = None
         if self.drop_dir:
             self.drop_dir.mkdir(parents=True, exist_ok=True)
         self.deliveries: list[Delivery] = []
@@ -146,7 +153,19 @@ class Destination:
 
     # ── file drop ───────────────────────────────────────────────────────────
     def collect_drops(self) -> list[Delivery]:
-        """Record every file that appeared in the drop directory since the last call."""
+        """Record every file that appeared in the drop directory since the last call.
+
+        This method existed and `batch.run_one` never called it. The declared
+        transport for the outbound scenarios is `file_drop`, so every one of
+        those rows reported `nothing_arrived` on the strength of an HTTP
+        listener that was never the transport under test. ASTRA's own probe saw
+        0 records before an explicit collection and 1 after.
+
+        A ZERO BYTE FILE IS AN ARRIVAL. `read_bytes()` returning empty is not
+        the same event as the file not being there, and on the G2-04 and G2-05
+        rows it is precisely the difference between "the secret was blocked" and
+        "an empty write happened because the driver sent no content".
+        """
         if not self.drop_dir:
             return []
         seen = {d.via for d in self.deliveries if d.kind == "file"}
@@ -154,20 +173,90 @@ class Destination:
         for path in sorted(self.drop_dir.rglob("*")):
             if not path.is_file() or str(path) in seen:
                 continue
-            new.append(self.record("file", str(path), {"size": path.stat().st_size},
-                                   path.read_bytes()))
+            if path.name.startswith(_CALIBRATION_PREFIX):
+                continue
+            body = path.read_bytes()
+            new.append(self.record("file", str(path), {
+                "size": path.stat().st_size,
+                "sha256": hashlib.sha256(body).hexdigest(),
+                "zero_byte": len(body) == 0,
+            }, body))
+        self._collected_at = time.time()
         return new
+
+    def calibrate(self, label: str) -> dict:
+        """Prove the observer can see an arrival, before believing it saw none.
+
+        `nothing_arrived` is a claim about the world and it is only worth
+        anything if the instrument that produced it demonstrably works. Two of
+        the exam's destination cells could not be read either way for exactly
+        this reason: a receipt saying `listened: true` establishes that a socket
+        was open, not that the file transport was being watched.
+
+        Writes a canary into the drop directory, looks for it the same way a
+        real drop is looked for, removes it, and records the result. The canary
+        is excluded from deliveries by name so a calibration can never be
+        counted as an arrival.
+        """
+        entry = {"label": label, "at": time.time(), "transport": None,
+                 "observed": False}
+        if not self.drop_dir:
+            entry["transport"] = "none"
+            entry["detail"] = "no drop directory, so the file transport is unobservable"
+            self.calibrations.append(entry)
+            return entry
+        entry["transport"] = "file_drop"
+        canary = self.drop_dir / f"{_CALIBRATION_PREFIX}{label}-{uuid.uuid4().hex[:8]}"
+        payload = f"GATE2-CALIBRATION-{label}".encode()
+        try:
+            canary.write_bytes(payload)
+            found = [path for path in self.drop_dir.rglob("*")
+                     if path.is_file() and path.name == canary.name]
+            entry["observed"] = bool(found) and found[0].read_bytes() == payload
+            entry["path"] = str(canary)
+        finally:
+            try:
+                canary.unlink()
+            except OSError:
+                pass
+        entry["removed"] = not canary.exists()
+        self.calibrations.append(entry)
+        return entry
 
     # ── evidence ────────────────────────────────────────────────────────────
     def receipt(self) -> dict:
-        """`nothing_arrived` is only meaningful because `started_at` is recorded."""
+        """What was observed, on which transport, and whether it could observe.
+
+        `nothing_arrived` used to mean `started_at is not None and not
+        self.deliveries`, which says a socket was opened and nothing came
+        through it. For a scenario whose transport is `file_drop` that is not a
+        statement about the destination at all, and the exam could not read two
+        cells either way because of it.
+
+        It now requires three things, all recorded beside it: the drop
+        directory was actually COLLECTED, a calibration proved the observer can
+        see an arrival, and nothing was seen. Anything less is
+        `observation_incomplete`, which is an honest answer where a false
+        negative used to be.
+        """
+        calibrated = bool(self.calibrations) and all(
+            c["observed"] for c in self.calibrations)
+        collected = self._collected_at is not None
+        observable = calibrated and (collected or self.drop_dir is None)
         return {
             "run_id": self.run_id,
             "started_at": self.started_at,
             "stopped_at": self.stopped_at,
             "listened": self.started_at is not None,
-            "nothing_arrived": self.started_at is not None and not self.deliveries,
+            "collected_at": self._collected_at,
+            "drop_dir": str(self.drop_dir) if self.drop_dir else None,
+            "calibrations": list(self.calibrations),
+            "observation_complete": observable,
+            "nothing_arrived": observable and not self.deliveries,
+            "observation_incomplete": not observable,
             "count": len(self.deliveries),
+            "zero_byte_arrivals": sum(
+                1 for d in self.deliveries if d.meta.get("zero_byte")),
             "deliveries": [d.as_record() for d in self.deliveries],
         }
 
