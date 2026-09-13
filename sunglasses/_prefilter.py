@@ -460,6 +460,38 @@ def _max_len(seq):
     return total
 
 
+# Every node kind that can carry a subpattern. A walker that does not enter one
+# of these cannot see what is inside it, and for `_has_lookaround` "cannot see"
+# reads as "there is none", which is the R1a defect: a lookahead inside a
+# conditional stayed invisible, the rule stayed anchored, and the finding was
+# lost. Enumerated rather than discovered one bug at a time, and
+# `test_every_container_node_kind_is_walked` fails if a future interpreter adds
+# a kind that is not in here.
+_CONTAINERS = frozenset({
+    "SUBPATTERN", "ATOMIC_GROUP", "MAX_REPEAT", "MIN_REPEAT",
+    "POSSESSIVE_REPEAT", "BRANCH", "GROUPREF_EXISTS", "ASSERT", "ASSERT_NOT",
+})
+
+
+def _subtrees(name, av):
+    """The subpatterns hanging off one node, whatever kind it is."""
+    if name == "SUBPATTERN":
+        return (av[3],)
+    if name == "ATOMIC_GROUP":
+        return (av,)
+    if name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+        return (av[2],)
+    if name == "BRANCH":
+        return tuple(av[1])
+    if name in ("ASSERT", "ASSERT_NOT"):
+        return (av[1],)
+    if name == "GROUPREF_EXISTS":
+        # `(?(1)yes|no)`. BOTH arms, and the no-arm may be absent. Walking only
+        # the yes-arm would have left half of this hole open.
+        return tuple(arm for arm in (av[1], av[2]) if arm)
+    return ()
+
+
 def _has_lookaround(seq) -> bool:
     """True when this tree contains a lookahead or lookbehind.
 
@@ -470,18 +502,8 @@ def _has_lookaround(seq) -> bool:
         name = getattr(op, "name", str(op))
         if name in ("ASSERT", "ASSERT_NOT"):
             return True
-        if name == "SUBPATTERN":
-            if _has_lookaround(av[3]):
-                return True
-        elif name == "ATOMIC_GROUP":
-            if _has_lookaround(av):
-                return True
-        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
-            if _has_lookaround(av[2]):
-                return True
-        elif name == "BRANCH":
-            if any(_has_lookaround(b) for b in av[1]):
-                return True
+        if any(_has_lookaround(sub) for sub in _subtrees(name, av)):
+            return True
     return False
 
 

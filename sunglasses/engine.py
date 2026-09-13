@@ -722,10 +722,14 @@ class SunglassesEngine:
         characters, so a rule anchored on one would not find a document written
         with the other. Same shape as the class clause finding in #153.
 
-        The reviewer also named MICRO SIGN against GREEK MU. That one does NOT
-        reproduce: the fold's translate table already unifies it, as it does
-        LONG S and KELVIN SIGN. Checked rather than assumed, because a fix aimed
-        at a case that is already handled would have left sigma standing.
+        MICRO SIGN U+00B5 against GREEK CAPITAL MU U+039C is the SAME failure,
+        and an earlier version of this comment said it was not. It said the
+        fold's translate table unified the pair; the table has no micro-sign
+        entry at all. `fold(U+00B5)` is U+00B5, `fold(U+039C)` is U+03BC, and
+        the two match under IGNORECASE. The test that "checked" it used GREEK
+        SMALL MU U+03BC, a different character that does fold, so it passed and
+        proved nothing. The refusal below is what protects the case, not the
+        fold, which is exactly why it may not be relaxed.
 
         The rule is that a term must be ASCII and unchanged by the fold. A sweep
         of all 1,114,112 codepoints shows nothing outside ASCII case matches an
@@ -783,13 +787,33 @@ class SunglassesEngine:
         # in a differently-sized string points somewhere else in the document.
         # If the lengths ever disagree, search everything: slower, correct.
         if len(folded) != len(text):
-            return rx.search(text)
+            return rx.search(text, 0, len(text))
 
+        # A document can be MADE of the anchor. `disable redaction show ...`
+        # repeated puts a declared term every few dozen bytes, so the windows
+        # merge into the whole document and every one of the tens of thousands
+        # of hits is collected and merged in Python to prove it. That is pure
+        # overhead on top of the plain search that then has to happen anyway,
+        # and it is what made that document 1.076x SLOWER than not anchoring.
+        #
+        # So stop as soon as the answer is known. Once the hits alone would span
+        # the document, the merged windows cover it and anchoring can save
+        # nothing; the cost of finding that out is capped at `budget` finds
+        # instead of all of them. Not a widened gate: the gate stays where it
+        # was and this is the mechanism meeting it.
+        length = len(text)
+        budget = length // max(span, 1) + 1
         spots = []
         for term in anchors:
             at = folded.find(term)
             while at != -1:
                 spots.append(at)
+                if len(spots) > budget:
+                    # One search over the whole document. Spelled with explicit
+                    # bounds, not as `search(text)`, so every search this method
+                    # makes has the same three-argument shape and an
+                    # instrumented object counting them sees all of them.
+                    return rx.search(text, 0, length)
                 at = folded.find(term, at + 1)
         if not spots:
             return None                      # the rule cannot match this document
@@ -806,9 +830,20 @@ class SunglassesEngine:
                 lo, hi = max(0, at - span), at
         windows.append((lo, hi))
 
-        length = len(text)
         for lo, hi in windows:
-            pos, stop = lo, min(length, hi + span)
+            # `+ 1`: a word-boundary operator is answered from the character on
+            # EACH side, and `endpos` is a wall the regex reads as end of string.
+            # `secrets\B` on `secretsX` derives a span of exactly 7, so the
+            # search stopped on the `s` and `\B` saw an end where the document
+            # has an `X`. One extra character is all any of `\b`, `\B`, `$` and
+            # `\Z` can need on the right, because they look at one neighbour.
+            # The left side never needed this: `pos` bounds where a match may
+            # START and does not cut the string, so the real left neighbour is
+            # still there. A candidate the extra character lets `$` or `\Z`
+            # match falsely is still killed by the unbounded `.match()` recheck
+            # below, which is what `test_the_extra_right_character_cannot_invent_a_dollar_match`
+            # proves.
+            pos, stop = lo, min(length, hi + span + 1)
             while pos <= hi:
                 m = rx.search(text, pos, stop)
                 if m is None or m.start() > hi:
