@@ -25,6 +25,7 @@ from __future__ import annotations
 import enum
 import json
 import os
+import pathlib
 import signal
 import subprocess
 import threading
@@ -182,6 +183,10 @@ class Passthrough:
         self._emit("SCAN_STARTED", request_id, pid=worker.pid, argv=argv[:2])
         feeder = threading.Thread(target=_feed, daemon=True, args=(worker, payload))
         feeder.start()
+        collected: dict = {}
+        reader = threading.Thread(target=_collect, daemon=True,
+                                  args=(worker, collected))
+        reader.start()
         terminated = False
         try:
             worker.wait(timeout=self.deadline_ms / 1000)
@@ -196,12 +201,26 @@ class Passthrough:
             # able to release anything.
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
         exit_code = worker.poll()
+        reader.join(timeout=1.0)
+        finding = _finding_of(collected.get("stdout"))
         if cancelled:
             reason = "cancelled_before_release"
         elif terminated:
             reason = "inspection_deadline_exceeded"
         elif exit_code not in (0, None):
             reason = "scanner_failed"
+        elif finding is None:
+            # The worker exited 0 and said nothing this code could read. That is
+            # NOT a clean scan. An earlier version decided purely on the exit
+            # code and never read the worker's output at all, so a payload the
+            # engine BLOCKED was forwarded to the model unchanged: the proxy was
+            # a liveness mediator with no policy in it. Unreadable means
+            # uninspected, and uninspected fails closed.
+            reason = "inspection_result_unreadable"
+        elif finding["blocked"]:
+            reason = "detector_finding"
+        elif not finding["inspection_complete"]:
+            reason = "inspection_incomplete"
         else:
             reason = None
         forwarded = reason is None
@@ -220,7 +239,9 @@ class Passthrough:
         with self._lock:
             self._pending.pop(request_id, None)
         self._emit("SETTLED", request_id, forwarded=forwarded, reason=reason,
-                   terminated=terminated, elapsed_ms=round(elapsed_ms, 3))
+                   terminated=terminated, elapsed_ms=round(elapsed_ms, 3),
+                   detector=finding and {k: finding[k] for k in
+                                         ("decision", "rule_ids", "blocked")})
         handle._settle(outcome)
 
     def _withheld(self, request_id, reason_code, elapsed_ms, payload) -> dict:
@@ -274,6 +295,43 @@ def _feed(worker, payload: str) -> None:
         pass          # a worker that died before reading is the caller's answer
 
 
+def _collect(worker, into: dict) -> None:
+    try:
+        into["stdout"] = worker.stdout.read()
+    except (ValueError, OSError):
+        into["stdout"] = b""
+
+
+def _finding_of(raw):
+    """What the scanner actually said. None when nothing readable came back.
+
+    The worker prints the engine result as JSON on stdout. Deciding from the
+    EXIT CODE instead, which an earlier version did, means a blocked payload
+    forwards cleanly because the worker exits 0 either way.
+    """
+    if not raw:
+        return None
+    for line in reversed(raw.splitlines()):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        result = row.get("result") if isinstance(row, dict) else None
+        if not isinstance(result, dict):
+            continue
+        decision = result.get("decision")
+        findings = result.get("findings") or []
+        return {
+            "decision": decision,
+            "rule_ids": sorted({f.get("id") for f in findings if isinstance(f, dict)}),
+            "blocked": decision is not None and decision != "allow",
+            "inspection_complete": bool(result.get("inspection_complete", True)),
+        }
+    return None
+
+
 def _kill_group(worker, grace: float) -> None:
     """TERM the whole process group, then KILL. A grace period may not release
     payloads: it exists so a dying worker can close its files, nothing else."""
@@ -288,3 +346,170 @@ def _kill_group(worker, grace: float) -> None:
             worker.wait(timeout=grace)
         except subprocess.TimeoutExpired:
             continue
+
+
+# ── the stdio route: client on our stdin/stdout, upstream as a child ────────
+# Everything above is the mechanism. This is the shape the client actually
+# launches: `python3 passthrough.py -- <upstream argv...>`. Two pumps, one per
+# direction, each frame read, inspected, then forwarded or replaced. Neither pump
+# may block the other, which is why the scan happens in a worker rather than
+# inline, and why a refusal is written immediately rather than after the scan.
+
+def inspection_input(message: dict, direction: str):
+    """WHAT gets scanned, per the scenario package, and never the frame.
+
+    Results are inspected as the payload's own UTF-8 content text. Requests are
+    inspected as every string leaf of the arguments object, each carrying the
+    path it came from as provenance.
+
+    Scanning the raw JSON-RPC frame instead is measurably wrong in both
+    directions. On the result side the envelope of a payload that BLOCKS on a
+    direct scan came back `allow`, because the injection sits inside a JSON
+    string field and the frame around it reads as structure. On the request side
+    ordinary `tools/call` frames trip GLS-MCP-002 and quarantine, so the client's
+    own calls die and the route never reaches the payload at all. Both were
+    observed on G2-01 before this function existed.
+    """
+    leaves = []
+    if direction == "result":
+        result = message.get("result")
+        for block in (result or {}).get("content") or []:
+            if isinstance(block, dict) and isinstance(block.get("text"), str):
+                leaves.append(("result.content[].text", block["text"]))
+        if not leaves and isinstance(result, dict):
+            for key in ("content", "text"):
+                if isinstance(result.get(key), str):
+                    leaves.append((f"result.{key}", result[key]))
+    else:
+        arguments = (message.get("params") or {}).get("arguments")
+        _string_leaves(arguments, "params.arguments", leaves)
+    return leaves
+
+
+def _string_leaves(node, path, out):
+    if isinstance(node, str):
+        out.append((path, node))
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            _string_leaves(value, f"{path}.{key}", out)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            _string_leaves(value, f"{path}[{index}]", out)
+
+
+def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
+          wire_frame_limit=DEFAULT_WIRE_FRAME_LIMIT, receipts=None,
+          stdin=None, stdout=None) -> int:
+    """Sit between a client on stdio and an upstream MCP server."""
+    import sys as _sys
+    stdin = stdin if stdin is not None else _sys.stdin.buffer
+    stdout = stdout if stdout is not None else _sys.stdout.buffer
+    proxy = Passthrough(deadline_ms=deadline_ms, watchdog_ms=watchdog_ms,
+                        wire_frame_limit=wire_frame_limit)
+    upstream = subprocess.Popen(upstream_argv, stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=True)
+    proxy._emit("UPSTREAM_STARTED", None, pid=upstream.pid, argv=upstream_argv[:3])
+
+    def scanner(payload, channel):
+        return list(scanner_argv) + ["--channel", channel]
+
+    def pump(source, sink, direction, label):
+        for raw in iter(source.readline, b""):
+            line = raw.decode("utf-8", "surrogatepass").rstrip("\n")
+            if not line.strip():
+                continue
+            verdict = proxy.read_frame(line)
+            if verdict.decision is Decision.REFUSE:
+                # A refused frame is never forwarded and never guessed past.
+                proxy._emit("FRAME_DROPPED", None, direction=direction,
+                            reason=verdict.reason)
+                continue
+            message = verdict.message
+            request_id = message.get("id")
+            if request_id is None:            # notifications pass through
+                _write(sink, raw)
+                continue
+            leaves = inspection_input(message, direction)
+            if not leaves:
+                # Nothing inspectable in this frame: a handshake, an empty result,
+                # an error. There is no payload to withhold, so it passes and the
+                # receipt says why rather than silently forwarding.
+                proxy._emit("NO_INSPECTABLE_CONTENT", request_id, direction=direction)
+                _write(sink, raw)
+                continue
+            text = "\n".join(value for _path, value in leaves)
+            proxy._emit("INSPECTING", request_id, direction=direction,
+                        leaves=[path for path, _v in leaves],
+                        utf8_bytes=len(text.encode("utf-8", "surrogatepass")))
+            outcome = proxy.submit(direction, request_id=request_id, payload=text,
+                                   scanner=scanner).result()
+            if outcome.forwarded:
+                _write(sink, raw)
+            else:
+                _write(stdout, (json.dumps(outcome.replacement) + "\n").encode())
+        proxy._emit("PUMP_CLOSED", None, direction=direction, label=label)
+        if direction == "request":
+            # The client hung up. Close the upstream's stdin so IT exits, which
+            # is what ends the other pump. Without this the result pump blocks on
+            # a `readline` that will never return and the whole proxy hangs after
+            # a perfectly successful session, which is indistinguishable from a
+            # deadlock to anyone watching.
+            try:
+                sink.close()
+            except (BrokenPipeError, ValueError, OSError):
+                pass
+
+    threads = [
+        threading.Thread(target=pump, daemon=True,
+                         args=(stdin, upstream.stdin, "request", "client->upstream")),
+        threading.Thread(target=pump, daemon=True,
+                         args=(upstream.stdout, stdout, "result", "upstream->client")),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        for thread in threads:
+            thread.join()
+    finally:
+        _kill_group(upstream, TERMINATION_GRACE_MS / 1000)
+        if receipts:
+            pathlib.Path(receipts).write_text(
+                "\n".join(json.dumps(e) for e in proxy.events) + "\n")
+    return 0
+
+
+def _write(sink, raw: bytes) -> None:
+    try:
+        sink.write(raw if raw.endswith(b"\n") else raw + b"\n")
+        sink.flush()
+    except (BrokenPipeError, ValueError, OSError):
+        pass
+
+
+def _main(argv=None) -> int:
+    import argparse
+    import sys as _sys
+    parser = argparse.ArgumentParser(description="Gate 2 stdio pass-through")
+    parser.add_argument("--deadline-ms", type=int, default=2000)
+    parser.add_argument("--watchdog-ms", type=int, default=3000)
+    parser.add_argument("--receipts")
+    # ONE shell-quoted string, split here. `nargs="+"` swallowed the worker's own
+    # flags and argparse then rejected them as unknown options, which is a parsing
+    # accident that would have read as a broken worker.
+    parser.add_argument("--scanner", required=True,
+                        help='the scanner worker argv as one quoted string, e.g. '
+                             '"python3 fault_worker.py scan --engine-root /path"')
+    parser.add_argument("upstream", nargs=argparse.REMAINDER,
+                        help="-- then the upstream server argv")
+    args = parser.parse_args(argv)
+    upstream = args.upstream[1:] if args.upstream[:1] == ["--"] else args.upstream
+    if not upstream:
+        parser.error("give the upstream argv after --")
+    import shlex
+    return serve(upstream, shlex.split(args.scanner), deadline_ms=args.deadline_ms,
+                 watchdog_ms=args.watchdog_ms, receipts=args.receipts)
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

@@ -142,6 +142,33 @@ class InstrumentedClient:
         return observation
 
 
+def extract_tool_results(raw: bytes) -> list[bytes]:
+    """EVERY `tool_result` in the transcript, in order.
+
+    A session can make more than one tool call: the prompt points the model at a
+    request file, so the first result is often that file and the payload arrives
+    in a later one. Returning the first and calling it "what the model was shown"
+    would have measured the wrong message, and returning the last silently would
+    have hidden that there were several. The caller gets all of them.
+    """
+    out = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        for block in _tool_result_blocks(event):
+            content = block.get("content")
+            if isinstance(content, str):
+                out.append(content.encode("utf-8", "surrogatepass"))
+            elif content is not None:
+                out.append(json.dumps(content, sort_keys=True,
+                                      separators=(",", ":")).encode())
+    return out
+
+
 def extract_tool_result(raw: bytes) -> bytes | None:
     """The `tool_result` content of the transcript, as BYTES.
 

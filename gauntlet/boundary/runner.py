@@ -45,7 +45,19 @@ class Ledger:
         self.path = pathlib.Path(path)
         self.budget = budget
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.spent = sum(1 for _ in self.path.open()) if self.path.exists() else 0
+        # Count CHARGES, not lines. The probe wrote a second line recording its
+        # outcome and the ledger read it as another call: 3 calls reported as 4.
+        # Over-counting is the safe direction and it is still wrong, and the same
+        # bug under-counting would have quietly raised the ceiling.
+        self.spent = 0
+        if self.path.exists():
+            for line in self.path.read_text().splitlines():
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if row.get("charge") is True:
+                    self.spent += 1
 
     def remaining(self) -> int:
         return self.budget - self.spent
@@ -57,7 +69,8 @@ class Ledger:
                 f"against a budget of {self.budget}. Stop and report the count; "
                 f"raising the ceiling is not this run's decision.")
         with self.path.open("a") as fh:
-            fh.write(json.dumps({"at": time.time(), "scenario_id": scenario_id,
+            fh.write(json.dumps({"charge": True, "at": time.time(),
+                                 "scenario_id": scenario_id,
                                  "variant": variant, "note": note}) + "\n")
         self.spent += 1
 
