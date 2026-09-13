@@ -796,11 +796,16 @@ class SunglassesEngine:
         # overhead on top of the plain search that then has to happen anyway,
         # and it is what made that document 1.076x SLOWER than not anchoring.
         #
-        # So stop as soon as the answer is known. Once the hits alone would span
-        # the document, the merged windows cover it and anchoring can save
-        # nothing; the cost of finding that out is capped at `budget` finds
-        # instead of all of them. Not a widened gate: the gate stays where it
-        # was and this is the mechanism meeting it.
+        # So stop as soon as the answer is known. The reviewer read the comment
+        # as `hits x span >= length` and the code as `hits > length // span + 1`,
+        # which is the same threshold plus a two-hit allowance, and the comment
+        # is the one that was wrong. Written as the code actually is: bail once
+        # the hits EXCEED `length // span + 1`, one more than the number of
+        # non-overlapping windows of width `span` that fit in the document. At
+        # that count the merged windows cover it and anchoring can save nothing.
+        # The cost of finding that out is capped at `budget` finds instead of
+        # all of them. Not a widened gate: the gate stays where it was and this
+        # is the mechanism meeting it.
         length = len(text)
         budget = length // max(span, 1) + 1
         spots = []

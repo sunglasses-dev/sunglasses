@@ -594,17 +594,29 @@ def _seconds(engine, text):
 @pytest.mark.slow
 def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines):
     """First assertion. Where it cannot help it must not hurt."""
-    worse = []
+    worse, rows = [], []
     for label, seed in {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}.items():
         base, unanchored, anchored = _measure(three_engines, seed)
         allowed = unanchored * PER_DOCUMENT_OVERHEAD + base * FLOOR_FRACTION_OF_BASELINE
+        # BOTH numbers, because they can disagree and a reader deserves to see
+        # which one the gate used. The reviewer measured the 27 KB prompt storm
+        # at a strict 1.0521 (1.0478 over fifteen trials) while this formula
+        # passed it on the additive floor. That is the floor doing its job on a
+        # document whose whole cost is one fold, and it is also exactly the
+        # shape where a strict reading and a generous one part company.
+        strict = anchored / unanchored
+        rows.append(f"{label!r}: strict {strict:.4f}x, "
+                    f"allowance {allowed / unanchored:.4f}x "
+                    f"({anchored:.3f}s vs {unanchored:.3f}s, baseline {base:.3f}s)")
         if anchored > allowed:
             worse.append(f"{label!r}: {anchored:.3f}s anchored against "
                          f"{unanchored:.3f}s unanchored and a {base:.3f}s baseline, "
-                         f"{anchored / unanchored:.2f}x, allowed {allowed:.3f}s")
+                         f"strict {strict:.4f}x, allowed {allowed:.3f}s")
+    print("strict ratio and the allowance the gate used:\n  " + "\n  ".join(rows))
     assert worse == [], (
         f"anchoring costs more than {PER_DOCUMENT_OVERHEAD}x plus "
         f"{FLOOR_FRACTION_OF_BASELINE} of the baseline on:\n  " + "\n  ".join(worse)
+        + "\nevery document, strict and allowed:\n  " + "\n  ".join(rows)
     )
 
 
@@ -747,6 +759,7 @@ def test_every_container_node_kind_is_walked():
     interpreter grows a container the walker does not know about, instead of
     waiting for a reviewer to find the finding it lost.
     """
+    import inspect
     import re as _re
     from sunglasses import _prefilter as _pf
 
@@ -770,6 +783,28 @@ def test_every_container_node_kind_is_walked():
             f"a lookahead inside {label} was not seen, so a rule containing one "
             f"would be anchored and would lose the match the lookahead reads for"
         )
+
+    # `_CONTAINERS` must be the set the walker actually enters, not a list
+    # beside it that says anything. The reviewer emptied the constant and this
+    # test stayed green, because `_subtrees` is the real dispatcher and the
+    # constant was decorative. Tie them together HERE rather than in the engine,
+    # because this round is tests only: for every kind named in the constant the
+    # dispatcher must hand back a subtree, and every kind the dispatcher knows
+    # must be named. Emptying the constant now fails the second half.
+    import re as _re2
+    dispatched = set(_re2.findall(r'name (?:==|in) \(?"([A-Z_]+)"',
+                                  inspect.getsource(_pf._subtrees)))
+    dispatched |= set(_re2.findall(r'"([A-Z_]+)"',
+                                   inspect.getsource(_pf._subtrees)))
+    assert dispatched, "could not read the dispatcher; this check has gone blind"
+    missing = sorted(dispatched - set(_pf._CONTAINERS))
+    assert missing == [], (
+        f"_subtrees enters {missing} and _CONTAINERS does not name them, so the "
+        f"constant is decorative and emptying it would change nothing")
+    unused = sorted(set(_pf._CONTAINERS) - dispatched)
+    assert unused == [], (
+        f"_CONTAINERS names {unused} and _subtrees never enters them, so the "
+        f"constant promises a walk that does not happen")
 
     # And the same node kinds without an assertion must NOT be refused, or the
     # walker has simply become "always true", which protects nothing.
@@ -893,3 +928,48 @@ def test_the_cost_of_deciding_to_bail_does_not_grow_with_the_document():
         assert finds < anchors // 5, (
             f"{finds} find calls against {anchors} anchors: the document is "
             f"being walked, which is the cost the bail exists to avoid")
+
+
+# ── round 4: the recheck is still load-bearing, on exactly one shape ─────────
+# R1b's extra right character had a consequence the reviewer found and I did
+# not: the old right-cut fixtures (`Q x secretsX`, span 11) now SEE the X, so
+# the bounded search returns nothing and the unbounded recheck is never reached.
+# Dropping `confirmed = rx.match(text, m.start())` survived all 57 tests. The
+# guard had stopped being guarded by anything.
+#
+# This is the shape that still reaches it, and as far as the reviewer and I can
+# tell it is the only one. Non-multiline `$` accepts the position before what
+# looks like a final newline; `endpos` makes the cut look final when the real
+# document continues. `\Z` cannot do it, because once the span is derived plus
+# one the artificial end is never exactly where `\Z` would need it.
+
+def test_a_dollar_at_an_invented_end_of_string_is_rejected_by_the_recheck():
+    """`q.{0,3}secrets$` on `q x secrets\\nMORE`, derived span 11, endpos 12.
+
+    The bounded search finds `q x secrets` because from inside the window the
+    `\\n` looks like the document's final newline. It is not: `MORE` follows. The
+    unbounded `.match()` re-run rejects it, and without that re-run this blocks
+    on all seven channels when main allows.
+    """
+    channels = ["message", "file", "web_content", "tool_output", "api_response",
+                "log_memory", "agent_input"]
+    rule = dict(id="GLS-R4-RECHECK", name="recheck regression",
+                category="prompt_injection", severity="high", channel=channels,
+                regex=[r"q.{0,3}secrets$"], anchor_terms=["q"], anchor_span=600)
+    engine = SunglassesEngine([rule], mechanisms=False)
+    mode, rx, key = engine._compiled_by_id[rule["id"]][0]
+
+    assert mode == "anchored", mode
+    assert engine._anchor_spec[key][1] == 11, engine._anchor_spec[key]
+
+    text = "q x secrets\nMORE"
+    assert rx.search(text) is None, "the real document must not match"
+    assert rx.search(text, 0, 12).span() == (0, 11), (
+        "the bounded search must find the candidate the recheck then rejects; "
+        "if this stops matching, this fixture has stopped exercising the recheck")
+
+    plain = SunglassesEngine([{k: v for k, v in rule.items()
+                               if not k.startswith("anchor_")}], mechanisms=False)
+    for channel in channels:
+        assert plain.scan(text, channel=channel).decision == "allow", channel
+        assert engine.scan(text, channel=channel).decision == "allow", channel
