@@ -86,6 +86,17 @@ def _build_live_root() -> pathlib.Path | None:
     # and a charge from a previous run is not evidence about this one.
     shutil.rmtree(LIVE / "evidence", ignore_errors=True)
     (LIVE / "evidence").mkdir(exist_ok=True)
+
+    # ASTRA'S OWN RECEIPTS ARE SEEDED BACK IN, the top-level files only. Some
+    # tests READ his record rather than writing one: test_r6_package_receipts_current
+    # reads package_checksum_validation.final.json and has nothing to say without
+    # it. The per-run subtrees (independent, followup, native_pair) are NOT
+    # seeded, because those are outputs and his r7_concurrent even carries a
+    # spent ledger that would re-create the staleness this wipe exists to stop.
+    # Copies, so a test that overwrites one touches ours and never his.
+    for item in (EXAM / "evidence").iterdir():
+        if item.is_file():
+            shutil.copy2(item, LIVE / "evidence" / item.name)
     return LIVE
 
 

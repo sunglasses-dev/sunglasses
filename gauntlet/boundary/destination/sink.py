@@ -239,8 +239,14 @@ class Destination:
         `observation_incomplete`, which is an honest answer where a false
         negative used to be.
         """
-        calibrated = bool(self.calibrations) and all(
-            c["observed"] for c in self.calibrations)
+        # BOTH ENDS, not merely one. The intent was always a demonstration that
+        # this observer could see an arrival at the START and still could at the
+        # END, because a negative backed only by the first is a negative from an
+        # instrument that may have died halfway. `bool(self.calibrations)` made a
+        # before-only run complete, which is the weaker claim wearing the
+        # stronger claim's name.
+        labels = {c["label"] for c in self.calibrations if c["observed"]}
+        calibrated = {"before", "after"} <= labels
         collected = self._collected_at is not None
         observable = calibrated and (collected or self.drop_dir is None)
         return {

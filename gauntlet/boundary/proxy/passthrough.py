@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import signal
 import subprocess
 import threading
@@ -735,6 +736,42 @@ def inspection_input(message: dict, direction: str):
     return leaves
 
 
+# The path segments a receipt may print verbatim. Everything else in a leaf path
+# came from the message, and a message is written by whoever is on the other end.
+STRUCTURAL_SEGMENTS = frozenset({
+    "params", "arguments", "result", "content", "tools", "text", "title",
+    "description", "inputSchema", "structuredContent", "properties", "items",
+    "type", "name", "resource", "uri", "mimeType", "isError",
+})
+
+
+def receipt_path(path: str) -> str:
+    """A leaf path safe to write into a receipt.
+
+    ARBITRARY KEYS WERE PRINTED VERBATIM. The inspected leaves are keyed by their
+    dotted provenance, and on the request side those keys come from the caller's
+    own arguments object, so a fixture whose ARGUMENT NAME is the attack text put
+    that text straight into the instrument's receipt. A receipt is evidence and
+    it is read by people and tools that did not choose its contents; it must not
+    become a second delivery surface for the thing it is reporting on.
+
+    Structural segments stay readable because they are ours. Anything else is
+    replaced by a stable digest, so two mentions of the same leaf still match and
+    nobody has to see it.
+    """
+    out = []
+    for segment in re.split(r"(?=[.\[])", path):
+        bare = segment.lstrip(".[").rstrip("]")
+        if not bare or bare in STRUCTURAL_SEGMENTS or bare.isdigit():
+            out.append(segment)
+            continue
+        digest = hashlib.sha256(bare.encode("utf-8", "surrogatepass")).hexdigest()[:12]
+        lead = segment[:len(segment) - len(segment.lstrip(".["))]
+        tail = "]" if segment.endswith("]") else ""
+        out.append(f"{lead}<key:{digest}>{tail}")
+    return "".join(out)
+
+
 def invalid_result_shape(message):
     """Why a well formed JSON-RPC frame can still be an invalid RESULT.
 
@@ -807,7 +844,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
     write_lock = threading.Lock()
     inflight: list = []
 
-    def deliver(sink, raw, outcome, direction):
+    def deliver(sink, raw, outcome, direction, bound=None):
         """One writer at a time, so two settling scans cannot interleave bytes.
 
         Order is NOT preserved and does not need to be: JSON-RPC correlates by
@@ -817,11 +854,24 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         with write_lock:
             if outcome.forwarded:
                 proxy.count_bytes(direction, "egress", len(raw))
+                proxy._emit("RPC_EGRESS", outcome.request_id, direction=direction,
+                            bytes=len(raw), raw=raw.decode("utf-8", "replace"))
                 _write(sink, raw)
             else:
                 replaced = (json.dumps(outcome.replacement) + "\n").encode()
                 proxy.count_bytes(direction, "replaced", len(replaced))
+                proxy._emit("RPC_EGRESS", outcome.request_id, direction=direction,
+                            bytes=len(replaced), replaced=True,
+                            raw=replaced.decode("utf-8", "replace"))
                 _write(stdout, replaced)
+            # AFTER THE DECISION, and describing what was delivered. An array
+            # recorded before inspection is a statement about the upstream's
+            # intent, not about what the model was bound to.
+            if bound is not None:
+                delivered_tools = bound if outcome.forwarded else []
+                proxy._emit("MODEL_BOUND_TOOLS", outcome.request_id,
+                            tools=delivered_tools, count=len(delivered_tools),
+                            withheld=not outcome.forwarded)
 
     def cancellation_target(message):
         """The id a `notifications/cancelled` is about, or None.
@@ -890,11 +940,13 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 proxy.expect_upstream(request_id)
             elif direction == "result":
                 proxy.upstream_answered(request_id)
-            if direction == "result":
-                bound = model_bound_tools(message)
-                if bound is not None:
-                    proxy._emit("MODEL_BOUND_TOOLS", request_id, tools=bound,
-                                count=len(bound))
+            # MODEL_BOUND_TOOLS USED TO BE EMITTED HERE, before the message had
+            # been inspected and before any policy decision, so its array was
+            # nonempty even on a frame the client only ever received a refusal
+            # for. A receipt that says which tools the model was bound to has to
+            # describe what the model actually got, and at this point in the
+            # pump nobody knows yet. It moved into `deliver`.
+            bound = model_bound_tools(message) if direction == "result" else None
             leaves = inspection_input(message, direction)
             if not leaves:
                 # Nothing inspectable in this frame: a handshake, an empty result,
@@ -905,7 +957,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 continue
             text = "\n".join(value for _path, value in leaves)
             proxy._emit("INSPECTING", request_id, direction=direction,
-                        leaves=[path for path, _v in leaves],
+                        leaves=[receipt_path(path) for path, _v in leaves],
                         utf8_bytes=len(text.encode("utf-8", "surrogatepass")))
             # THE PUMP DOES NOT WAIT. It used to call `.result()` here, which
             # blocked this thread until the scan settled, so the reader could
@@ -921,9 +973,10 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                                       len(value.encode("utf-8", "surrogatepass"))
                                       for _path, value in leaves))
 
-            def settle(handle=handle, raw=raw, sink=sink, request_id=request_id):
+            def settle(handle=handle, raw=raw, sink=sink, request_id=request_id,
+                       bound=bound):
                 try:
-                    deliver(sink, raw, handle.result(), direction)
+                    deliver(sink, raw, handle.result(), direction, bound)
                 except WatchdogTripped as tripped:
                     # A harness fault, not a scenario result. It is recorded and
                     # nothing is written, because writing either the payload or
