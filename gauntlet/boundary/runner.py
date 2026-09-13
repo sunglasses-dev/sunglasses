@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 import pathlib
@@ -206,6 +207,36 @@ def load_manifest(package: pathlib.Path = PACKAGE) -> dict:
     manifest = json.loads((package / "manifest.json").read_text())
     assert manifest["schema_version"] == 1, manifest["schema_version"]
     return manifest
+
+
+def resolve_payload_ref(variant: dict) -> bytes:
+    """The bytes a second generation variant points at, verified by hash.
+
+    G2-13 onwards reuse the earlier seeds' payloads by reference rather than
+    copying them, which keeps one stimulus in one place and makes a drifted
+    source a silent change of stimulus for every seed pointing at it. So the
+    reference is resolved HERE, once, with the digest checked, rather than in
+    each consumer: a resolver that trusts the path and not the hash turns the
+    saving into the hazard.
+
+    Raises rather than returning something plausible. A stimulus that is not the
+    one the seed names is the defect this whole harness spent today fixing.
+    """
+    ref = variant.get("payload_ref")
+    if not ref:
+        raise KeyError(f"variant {variant.get('name')!r} has no payload_ref")
+    path = pathlib.Path(ref["path"])
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"{variant.get('name')!r} points at {path}, which is not there")
+    body = path.read_bytes()
+    actual = hashlib.sha256(body).hexdigest()
+    if actual != ref["sha256"]:
+        raise ValueError(
+            f"{variant.get('name')!r} points at {path}, which hashes to "
+            f"{actual} and the seed names {ref['sha256']}. The stimulus has "
+            f"drifted from what the fixture describes.")
+    return body
 
 
 def scenario_of(entry: dict, package: pathlib.Path = PACKAGE) -> dict:
