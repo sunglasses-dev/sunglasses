@@ -23,6 +23,7 @@ Three properties, each with a test that was red before this module existed:
 from __future__ import annotations
 
 import enum
+import hashlib
 import json
 import os
 import pathlib
@@ -171,6 +172,7 @@ class Passthrough:
         # answering them is the difference between a refusal and a hang.
         self._awaiting_upstream: dict = {}
         self._tainted: str | None = None
+        self._byte_counts: dict = {}
         # WRITTEN DURING THE RUN, not at shutdown. Holding the events in memory
         # until `serve` returns means a run that is killed, hangs, or is being
         # watched from outside leaves NOTHING behind, and the state a reader
@@ -423,6 +425,22 @@ class Passthrough:
     def upstream_answered(self, request_id) -> None:
         with self._lock:
             self._awaiting_upstream.pop(request_id, None)
+
+    def count_bytes(self, direction, kind, count) -> None:
+        """Bytes in and bytes out, per direction, so forwarding is measurable.
+
+        `upstream_forwards` counted MESSAGES, which cannot answer "did anything
+        of the payload leave", and that is the question every outbound row turns
+        on. Bytes that arrived, bytes that were passed on, and bytes written
+        instead of passing something on are three different totals.
+        """
+        with self._lock:
+            self._byte_counts[f"{direction}.{kind}"] = (
+                self._byte_counts.get(f"{direction}.{kind}", 0) + count)
+
+    def byte_counts(self) -> dict:
+        with self._lock:
+            return dict(self._byte_counts)
 
     def is_tainted(self) -> bool:
         with self._lock:
@@ -703,6 +721,19 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 start_new_session=True)
     proxy._emit("UPSTREAM_STARTED", None, pid=upstream.pid, argv=upstream_argv[:3])
+    # WHAT WAS RUNNING, hashed, at the top of the receipt. A run graded by a
+    # stranger has to be attributable to a specific mediator and a specific
+    # scanner, and "the proxy" is not an attribution. The source hash is of this
+    # file as imported, so a receipt cannot be read as describing a version of
+    # the code that was never the one that produced it.
+    proxy._emit("RUN_CONFIGURATION", None,
+                proxy_source_sha256=_source_digest(),
+                upstream_argv=list(upstream_argv),
+                upstream_argv_sha256=_argv_digest(upstream_argv),
+                scanner_argv=list(scanner_argv),
+                scanner_argv_sha256=_argv_digest(scanner_argv),
+                deadline_ms=deadline_ms, watchdog_ms=watchdog_ms,
+                wire_frame_limit=wire_frame_limit, byte_budget=byte_budget)
 
     def scanner(payload, channel):
         return list(scanner_argv) + ["--channel", channel]
@@ -710,7 +741,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
     write_lock = threading.Lock()
     inflight: list = []
 
-    def deliver(sink, raw, outcome):
+    def deliver(sink, raw, outcome, direction):
         """One writer at a time, so two settling scans cannot interleave bytes.
 
         Order is NOT preserved and does not need to be: JSON-RPC correlates by
@@ -719,9 +750,12 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         """
         with write_lock:
             if outcome.forwarded:
+                proxy.count_bytes(direction, "egress", len(raw))
                 _write(sink, raw)
             else:
-                _write(stdout, (json.dumps(outcome.replacement) + "\n").encode())
+                replaced = (json.dumps(outcome.replacement) + "\n").encode()
+                proxy.count_bytes(direction, "replaced", len(replaced))
+                _write(stdout, replaced)
 
     def cancellation_target(message):
         """The id a `notifications/cancelled` is about, or None.
@@ -742,6 +776,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             line = raw.decode("utf-8", "surrogatepass").rstrip("\n")
             if not line.strip():
                 continue
+            proxy.count_bytes(direction, "ingress", len(raw))
             if proxy.is_tainted():
                 # Everything after the bad frame is discarded, not examined.
                 proxy._emit("FRAME_DISCARDED_AFTER_TAINT", None,
@@ -789,6 +824,11 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 proxy.expect_upstream(request_id)
             elif direction == "result":
                 proxy.upstream_answered(request_id)
+            if direction == "result":
+                bound = model_bound_tools(message)
+                if bound is not None:
+                    proxy._emit("MODEL_BOUND_TOOLS", request_id, tools=bound,
+                                count=len(bound))
             leaves = inspection_input(message, direction)
             if not leaves:
                 # Nothing inspectable in this frame: a handshake, an empty result,
@@ -814,7 +854,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
 
             def settle(handle=handle, raw=raw, sink=sink, request_id=request_id):
                 try:
-                    deliver(sink, raw, handle.result())
+                    deliver(sink, raw, handle.result(), direction)
                 except WatchdogTripped as tripped:
                     # A harness fault, not a scenario result. It is recorded and
                     # nothing is written, because writing either the payload or
@@ -830,7 +870,8 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         # merely because the stream ended while it was being inspected.
         for worker in list(inflight):
             worker.join(timeout=(watchdog_ms / 1000) + 1)
-        proxy._emit("PUMP_CLOSED", None, direction=direction, label=label)
+        proxy._emit("PUMP_CLOSED", None, direction=direction, label=label,
+                    byte_counts=proxy.byte_counts())
         if direction == "request":
             # The client hung up. Close the upstream's stdin so IT exits, which
             # is what ends the other pump. Without this the result pump blocks on
@@ -860,6 +901,58 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             # emitted nothing at all, so the file exists either way.
             pathlib.Path(receipts).write_text("")
     return 0
+
+
+def _source_digest():
+    """The mediator's own source, so a receipt names the code that produced it."""
+    try:
+        return hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
+    except OSError:                                        # pragma: no cover
+        return None
+
+
+def _argv_digest(argv):
+    return hashlib.sha256(
+        "\x00".join(str(part) for part in argv).encode("utf-8", "surrogatepass")
+    ).hexdigest()
+
+
+def model_bound_tools(message):
+    """What the MODEL was actually given, recorded apart from what we inspected.
+
+    A descriptor scan says what the proxy looked at. It does not say what
+    reached the model, and on a tools/list those are different questions the
+    moment anything is withheld or replaced. ASTRA asked for the model-bound
+    tools array captured separately for exactly that reason: G2-06's whole
+    observation requirement is "model-bound tool definitions, not a tool_result
+    block".
+
+    Names in full, text by digest and length. The descriptions are the hostile
+    content in these scenarios and a receipt is not the place to reproduce them.
+    """
+    result = message.get("result")
+    if not isinstance(result, dict) or not isinstance(result.get("tools"), list):
+        return None
+    tools = []
+    for index, tool in enumerate(result["tools"]):
+        if not isinstance(tool, dict):
+            tools.append({"index": index, "malformed": True})
+            continue
+        entry = {"index": index, "name": tool.get("name")}
+        for field in ("description", "title"):
+            text = tool.get(field)
+            if isinstance(text, str):
+                entry[f"{field}_bytes"] = len(text.encode("utf-8", "surrogatepass"))
+                entry[f"{field}_sha256"] = hashlib.sha256(
+                    text.encode("utf-8", "surrogatepass")).hexdigest()
+        schema = tool.get("inputSchema")
+        if schema is not None:
+            raw = json.dumps(schema, sort_keys=True,
+                             separators=(",", ":")).encode("utf-8", "surrogatepass")
+            entry["input_schema_sha256"] = hashlib.sha256(raw).hexdigest()
+            entry["input_schema_bytes"] = len(raw)
+        tools.append(entry)
+    return tools
 
 
 def bounded_lines(source, limit):
