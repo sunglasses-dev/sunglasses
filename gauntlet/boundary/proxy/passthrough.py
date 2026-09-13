@@ -413,10 +413,36 @@ class Passthrough:
 
     # ── cancellation ────────────────────────────────────────────────────────
     def cancel(self, request_id) -> None:
+        """Accept the cancellation, and retire the id in the same breath.
+
+        RETIREMENT WAS ONLY EVER A COMMENT. `serve_stdio` said this method
+        "drops the id from pending and kills the worker"; it added the id to
+        `_cancelled`, emitted the acknowledgement, and left it in `_pending`
+        until the worker happened to finish. ASTRA's exam caught it by asking
+        for `pending_ids()` the moment `cancel` returned, which is the only
+        moment that matters: between the acknowledgement and the settlement, a
+        proxy that has told its client the request is cancelled while still
+        listing the id as in flight disagrees with itself about what it is
+        waiting for.
+
+        The retirement is EMITTED. A state change with no event cannot appear in
+        a receipt, and a receipt that cannot show it is a receipt that cannot be
+        graded on it.
+
+        An id this side never held is acknowledged and not retired. `cancel`
+        used to index `_cancel_accepted[request_id]` directly, so a notification
+        naming an unknown id raised KeyError inside the pump: the upstream
+        chooses the ids, and being surprised by one is not an error condition.
+        """
         with self._lock:
             self._cancelled.add(request_id)
-        self._emit("CANCEL_ACCEPTED", request_id)
-        self._cancel_accepted[request_id].set()
+            retired = self._pending.pop(request_id, None) is not None
+            accepted = self._cancel_accepted.get(request_id)
+        if retired:
+            self._emit("PENDING_RETIRED", request_id, reason=REQUEST_CANCELLED)
+        self._emit("CANCEL_ACCEPTED", request_id, retired=retired)
+        if accepted is not None:
+            accepted.set()
 
     def expect_upstream(self, request_id) -> None:
         with self._lock:

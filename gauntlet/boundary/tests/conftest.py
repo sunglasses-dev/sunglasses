@@ -36,18 +36,41 @@ REPO = pathlib.Path(__file__).resolve().parents[3]
 # linked rather than copied so it cannot be edited by accident.
 FRESH = {"evidence", "source", "__pycache__", ".pytest_cache"}
 
+# COPIED, NOT LINKED, and this is the whole reason the first version of this
+# file did nothing. `probe_support` computes ROOT from
+# `Path(__file__).resolve().parent`, and `resolve()` follows symlinks. Reached
+# through a link, it resolved straight back into ASTRA's directory, so ROOT was
+# his, SOURCE was his, BOUNDARY was his frozen copy of the candidate, and the
+# whole exam ran against 0ba36c8 while appearing to run against this branch. A
+# traceback pointing at his Desktop path is what gave it away.
+#
+# Copied byte for byte, and the digest is asserted below, so this relocates the
+# file without reinterpreting it.
+COPIED = {"probe_support.py"}
+
 
 def _build_live_root() -> pathlib.Path | None:
     if not EXAM.is_dir():
         return None
     LIVE.mkdir(parents=True, exist_ok=True)
+    import hashlib
+    import shutil
+
     for item in EXAM.iterdir():
         if item.name in FRESH:
             continue
-        link = LIVE / item.name
-        if link.is_symlink() or link.exists():
+        target = LIVE / item.name
+        if item.name in COPIED:
+            if not target.exists() or target.read_bytes() != item.read_bytes():
+                if target.is_symlink():
+                    target.unlink()
+                shutil.copy2(item, target)
+            assert hashlib.sha256(target.read_bytes()).hexdigest() == \
+                hashlib.sha256(item.read_bytes()).hexdigest(), item.name
             continue
-        link.symlink_to(item)
+        if target.is_symlink() or target.exists():
+            continue
+        target.symlink_to(item)
 
     source = LIVE / "source"
     if not source.is_symlink():
