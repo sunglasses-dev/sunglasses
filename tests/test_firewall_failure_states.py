@@ -395,34 +395,65 @@ def test_control_removing_the_nul_check_brings_the_silent_answer_back(home, monk
 
 @pytest.mark.parametrize("kind", ["fifo", "directory"])
 def test_a_non_regular_policy_asks_immediately_instead_of_blocking(home, kind, tmp_path):
+    """Through a bounded subprocess, because a FIFO read cannot be interrupted.
+
+    This asserted `elapsed < 1.0` around an IN PROCESS call. If the regular file
+    check ever goes away the call never returns, so the assertion never runs and
+    the suite hangs instead of failing. A deadline the harness can enforce is the
+    only version of this test that can go red.
+    """
     import os
-    import time
     (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
     target = home / "policy.yaml"
     if kind == "fifo":
         os.mkfifo(target)
     else:
         target.mkdir()
-
-    started = time.perf_counter()
-    decision, reason = _decision(home)
-    elapsed = time.perf_counter() - started
+    try:
+        elapsed, out = _hook_subprocess(CLEAN, home)
+    finally:
+        if kind == "fifo":
+            try:
+                target.unlink()
+            except OSError:
+                pass
 
     assert elapsed < 1.0, (
         f"{kind} took {elapsed:.1f}s; the hook is still blocking on the read and "
         "the harness will time it out and fail open"
     )
-    assert decision == "ask", f"{kind} produced {decision!r}"
-    assert "cannot be read" in reason, reason
+    decision = out.get("hookSpecificOutput", {})
+    assert decision.get("permissionDecision") == "ask", decision
+    assert "cannot be read" in decision.get("permissionDecisionReason", "")
+
+
+NODE_TYPE_SNIPPET = """
+import os, pathlib, sys
+from sunglasses import firewall
+home = pathlib.Path(os.environ["SUNGLASSES_HOME"])
+try:
+    firewall.load_policy(home / "policy.yaml")
+except firewall.PolicyDown as exc:
+    print(exc)
+else:
+    print("NO EXCEPTION")
+"""
 
 
 def test_the_node_type_is_named_in_the_failure(home):
+    """Same reason. `load_policy` on a FIFO is the call that blocks."""
     import os
     (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
-    os.mkfifo(home / "policy.yaml")
-    with pytest.raises(PolicyDown) as caught:
-        firewall.load_policy(home / "policy.yaml")
-    assert "FIFO" in str(caught.value), str(caught.value)
+    fifo = home / "policy.yaml"
+    os.mkfifo(fifo)
+    try:
+        said = _in_subprocess(NODE_TYPE_SNIPPET, home)
+    finally:
+        try:
+            fifo.unlink()
+        except OSError:
+            pass
+    assert "FIFO" in said, said
 
 
 # R3. The regression the round-2 PR body claimed and the suite did not contain.
@@ -471,8 +502,18 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 HOOK_DEADLINE_S = 2.0
 
 
-def _installed_hook(payload, home, deadline=HOOK_DEADLINE_S):
-    """The hook as a real install runs it. Returns (elapsed, parsed stdout)."""
+def _hook_subprocess(payload, home, deadline=HOOK_DEADLINE_S):
+    """The hook in a SEPARATE PROCESS with a deadline. (elapsed, parsed stdout).
+
+    Named for what it does. It runs this repository's source through
+    `python -m sunglasses.firewall`, not an installed wheel, so it does not
+    prove packaging. What it does prove is the only thing these two faults are
+    about: that the process can be KILLED. A FIFO blocks in the kernel, and in
+    the test process there is nothing to kill it, so an in-process version of
+    that assertion passes while a real install sits past its deadline and the
+    host fails open. `test_v056_matrix.py` owns the console-script and wheel
+    legs; this file owns the boundary.
+    """
     import time as _time
     env = dict(_os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(_REPO))
     started = _time.perf_counter()
@@ -489,6 +530,21 @@ def _installed_hook(payload, home, deadline=HOOK_DEADLINE_S):
     return elapsed, (json.loads(proc.stdout) if proc.stdout.strip() else {})
 
 
+def _in_subprocess(snippet, home, deadline=HOOK_DEADLINE_S):
+    """Run a snippet against this source with a deadline. Returns its stdout.
+
+    For the assertions that call into `firewall` directly rather than through
+    the hook. Same reason as above: with the regular-file check removed, an
+    in-process `load_policy` on a FIFO never returns and takes the whole suite
+    with it, which is a hang rather than a failure.
+    """
+    env = dict(_os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(_REPO))
+    proc = _subprocess.run([_sys.executable, "-c", snippet], capture_output=True,
+                           text=True, cwd=str(_REPO), env=env, timeout=deadline)
+    assert proc.returncode == 0, f"snippet exited {proc.returncode}: {proc.stderr[:400]}"
+    return proc.stdout.strip()
+
+
 def _receipt_rows(home):
     return [json.loads(line)
             for f in sorted((home / "receipts").glob("*.jsonl"))
@@ -499,7 +555,7 @@ def test_an_unreadable_policy_and_a_first_sighting_both_reach_the_same_receipt(h
     """The regression the round 2 PR body claimed and the suite did not contain.
 
     An invalid-byte policy AND a tool this install has never seen, on one call,
-    through the installed command. The pin lane must still decide, and the
+    in a separate process. The pin lane must still decide, and the
     receipt it writes must confess that the policy control was down while it
     did. The reviewer's surviving mutation returns early on
     `state == "unreadable"`, which produces a policy answer where the TOFU
@@ -508,7 +564,7 @@ def test_an_unreadable_policy_and_a_first_sighting_both_reach_the_same_receipt(h
     (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
     (home / "policy.yaml").write_bytes(b"blocked_paths:\n\xff\xfe\n")
 
-    _elapsed, out = _installed_hook(NEW_MCP_CALL, home)
+    _elapsed, out = _hook_subprocess(NEW_MCP_CALL, home)
     decision = out.get("hookSpecificOutput", {})
     assert decision.get("permissionDecision") == "ask", decision
 
@@ -524,20 +580,20 @@ def test_an_unreadable_policy_and_a_first_sighting_both_reach_the_same_receipt(h
     assert last.get("error"), "the receipt does not say the policy control was down"
 
 
-def test_a_fifo_policy_answers_through_the_installed_command_within_a_second(home):
+def test_a_fifo_policy_answers_in_a_separate_process_within_a_second(home):
     """R2, at the boundary where it actually bit.
 
     A FIFO with no writer blocks in the kernel. In this process there is no
     harness to time the hook out, so the in-process version of this test could
-    pass while the installed hook sat past its deadline and the host failed
-    open. The subprocess has a hard deadline, so a regression here is a
+    pass while a real install sat past its deadline and the host failed open.
+    The subprocess has a hard deadline, so a regression here is a
     TimeoutExpired rather than a green run.
     """
     (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
     fifo = home / "policy.yaml"
     _os.mkfifo(fifo)
     try:
-        elapsed, out = _installed_hook(CLEAN, home)
+        elapsed, out = _hook_subprocess(CLEAN, home)
     finally:
         try:
             fifo.unlink()
