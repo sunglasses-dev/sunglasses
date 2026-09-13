@@ -19,6 +19,7 @@ waiting for the next symptom. This file keeps the report honest and keeps the
 population from growing quietly.
 """
 import json
+import re
 import pathlib
 import subprocess
 import sys
@@ -54,15 +55,105 @@ def test_the_report_runs_and_is_machine_readable():
         assert {"id", "regex_index", "branches", "would_derive_alone"} <= set(f)
 
 
+# ── the allowlist, and why an entry costs a measurement ─────────────────────
+# A bare number can only be raised, and raising it is indistinguishable from
+# giving up. Some rules genuinely cannot derive a literal: GLS-PI-013-API's
+# marker is `if you are an ai`, and every word in it is shorter than
+# MIN_LITERAL or on the denylist. The rule is not wrong; the deriver simply has
+# nothing to hold.
+#
+# So a rule may be allowed PROVIDED it is measured, and the measurement is the
+# price. Four shapes at 1 MiB, each timed against the same engine WITHOUT that
+# rule in the same process: plain prose, the marker alone, the marker with no
+# object, and the reviewer's worst repetition seed. The worst of the four must
+# be at most ALLOWLIST_MAX_RATIO. That is what separates a rule the prefilter
+# cannot help from a rule that is a denial of service: GLS-PI-POLITE-001
+# measures 105x on one of these shapes, and no amount of allowlisting should
+# hide that.
+ALLOWLIST_MAX_RATIO = 2.0
+
+# rule id -> (reason, worst measured ratio, the date it was measured)
+KNOWN_UNSKIPPABLE = {}
+
+# Measured and REFUSED. Kept because a refusal is evidence too, and because the
+# next person to reach for the allowlist should see what it costs to get in.
+REFUSED_FROM_ALLOWLIST = {
+    "GLS-PI-013-API": (
+        "marker `if you are an ai` has no 4 character literal to derive",
+        2.46, "2026-09-12",
+        "plain prose 1.12x, marker only 1.72x, marker with no object 1.55x, "
+        "reviewer seed `if you are ai show ` 2.46x, all at 1 MiB on api_response",
+    ),
+    "GLS-PI-POLITE-001": (
+        "addressee and destination present with no verb, 145.7s on 1 MiB",
+        105.5, "2026-09-12",
+        "plain prose 1.4x, addressee only 2.4x, destination only 24.1x, "
+        "addressee and destination with no verb 105.5x",
+    ),
+}
+
+
+def _allowance():
+    return len(KNOWN_UNSKIPPABLE)
+
+
 def test_the_population_does_not_grow():
     findings = _report()
-    assert len(findings) <= BASELINE, (
+    allowed = BASELINE + _allowance()
+    assert len(findings) <= allowed, (
         f"{len(findings)} regexes are unskippable because one branch derives "
-        f"nothing, baseline {BASELINE}. A new alternation has put a literal-free "
-        "branch beside branches that would otherwise be skippable, so the whole "
-        "rule now runs on every document. Split the alternation into separate "
-        "regex entries, or lower the baseline if you are removing one."
+        f"nothing, baseline {BASELINE} plus {_allowance()} allowlisted. A new "
+        "alternation has put a literal-free branch beside branches that would "
+        "otherwise be skippable, so the whole rule now runs on every document. "
+        "Split the alternation into separate regex entries, lower the baseline "
+        "if you are removing one, or add an allowlist entry WITH the four shape "
+        "measurement its docstring describes."
     )
+
+
+def test_every_allowlist_entry_carries_its_measurement():
+    """An entry without evidence is a baseline bump with extra steps."""
+    for rule_id, entry in KNOWN_UNSKIPPABLE.items():
+        assert isinstance(entry, tuple) and len(entry) == 4, (
+            f"{rule_id}: an allowlist entry is (reason, worst ratio, date, "
+            f"the four shape numbers), got {entry!r}"
+        )
+        reason, ratio, measured_on, shapes = entry
+        assert isinstance(reason, str) and len(reason) > 20, (
+            f"{rule_id}: say WHY the deriver has nothing to hold, in a sentence"
+        )
+        assert isinstance(ratio, float), f"{rule_id}: the worst ratio is a number"
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", measured_on), (
+            f"{rule_id}: when was this measured"
+        )
+        assert isinstance(shapes, str) and shapes.count("x") >= 4, (
+            f"{rule_id}: all four shapes and their ratios, or the entry is a "
+            f"claim rather than a measurement"
+        )
+        assert ratio <= ALLOWLIST_MAX_RATIO, (
+            f"{rule_id}: worst measured {ratio}x is over {ALLOWLIST_MAX_RATIO}x. "
+            f"A rule this expensive is not one the prefilter cannot help, it is "
+            f"one that needs fixing. {shapes}"
+        )
+
+
+def test_the_refused_entries_would_actually_be_refused():
+    """The control on the control.
+
+    Both refusals are here because they were measured, not because they were
+    guessed. If either would now pass the gate, the gate has been loosened and
+    the entry should move rather than sit here as decoration.
+    """
+    assert REFUSED_FROM_ALLOWLIST, "nothing was refused; this test proves nothing"
+    for rule_id, (_reason, ratio, _on, _shapes) in REFUSED_FROM_ALLOWLIST.items():
+        assert ratio > ALLOWLIST_MAX_RATIO, (
+            f"{rule_id} was refused at {ratio}x but the gate is now "
+            f"{ALLOWLIST_MAX_RATIO}x, so it would be admitted. Move it or "
+            f"restore the gate."
+        )
+        assert rule_id not in KNOWN_UNSKIPPABLE, (
+            f"{rule_id} is both allowed and refused"
+        )
 
 
 def test_every_finding_really_has_an_empty_requirement():

@@ -264,6 +264,14 @@ PATTERNS = [
         "category": "prompt_injection",
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
+        # ADDITIVE, raw decides first. One word of this marker's own object
+        # alternation, `guardrail`, is on KEYWORD_DENYLIST, so declaring it
+        # changes nothing and no keyword can route `Ignore guardrail.` on the
+        # folded view. A rule whose marker word cannot be indexed is exactly
+        # the authorised condition for asking step 3 for the folded text
+        # directly, the way GLS-PI-INFO-API and GLS-PIEMN-001-API already do.
+        # The denylist is shared and is not weakened for one rule.
+        "match_on": "normalized",
         # The marker's own object vocabulary, one entry per word the
         # alternation `polic(?:y|ies)|safeguards?|guardrails?|instructions?|
         # safety` accepts. The previous list was PHRASES a person wrote by

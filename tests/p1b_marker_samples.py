@@ -12,7 +12,7 @@ except ImportError:                                   # pragma: no cover
     import sre_parse
 
 
-def _emit(node, spaced, pick=None, counter=None):
+def _emit(node, spaced, pick=None, counter=None, optional=None):
     """A minimal string matching one parsed sequence.
 
     `spaced` widens a zero-or-more to one repetition, which is how the tag
@@ -20,6 +20,11 @@ def _emit(node, spaced, pick=None, counter=None):
     alternative of the Nth nested alternation, so the five names inside
     `<(?:information|important|instructions|system|admin)>` are each covered
     rather than only the first one.
+
+    `optional` is `[counter, dropped]`, where `dropped` is the set of optional
+    arm indices to leave OUT of this sample. `s?` and `(?:...)?` are branches of
+    the marker grammar and emitting only one side of them is how `guardrail`
+    stayed invisible while `guardrails` was covered.
     """
     out = []
     for op, av in node:
@@ -33,11 +38,21 @@ def _emit(node, spaced, pick=None, counter=None):
         elif name == "IN":
             out.append(_from_class(av))
         elif name in ("MAX_REPEAT", "MIN_REPEAT"):
-            lo, _hi, item = av
-            reps = lo if lo else (1 if spaced else 0)
-            out.append(_emit(item, spaced, pick, counter) * max(reps, 0))
+            lo, hi, item = av
+            if lo == 0 and hi == 1 and optional is not None:
+                # An OPTIONAL arm is a branch of the marker grammar like any
+                # other, and it was only ever emitted one way. `guardrails?`
+                # produced the plural and never the singular, so the per family
+                # guard could not see that `guardrail` is denylisted and reaches
+                # nothing. Walk both arms.
+                here = optional[0]
+                optional[0] += 1
+                reps = 1 if (optional[1] is None or here not in optional[1]) else 0
+            else:
+                reps = lo if lo else (1 if spaced else 0)
+            out.append(_emit(item, spaced, pick, counter, optional) * max(reps, 0))
         elif name == "SUBPATTERN":
-            out.append(_emit(av[-1], spaced, pick, counter))
+            out.append(_emit(av[-1], spaced, pick, counter, optional))
         elif name == "BRANCH":
             alts = av[1]
             idx = 0
@@ -45,16 +60,17 @@ def _emit(node, spaced, pick=None, counter=None):
                 here = counter[0]; counter[0] += 1
                 if pick is not None and pick[0] == here:
                     idx = pick[1] % len(alts)
-            out.append(_emit(alts[idx], spaced, pick, counter))
+            out.append(_emit(alts[idx], spaced, pick, counter, optional))
         elif name in ("AT", "ASSERT", "ASSERT_NOT"):
             continue
         elif name == "ATOMIC_GROUP":
-            out.append(_emit(av, spaced, pick, counter))
+            out.append(_emit(av, spaced, pick, counter, optional))
     return "".join(out)
 
 
 _SPACE = [' ']          # swapped to a newline for the third variant
 MAX_NESTED_ALTS = 24   # widest nested alternation in the sibling markers
+MAX_OPTIONAL_ARMS = 24  # most optional arms in any one marker branch
 
 
 _GAP_PREFERENCE = (" ", "x", "a", "0", "-", "_")
@@ -150,13 +166,28 @@ def branch_samples(marker_source):
         _emit(seq, False, None, c)
         return c[0]
 
+    def optional_count(seq):
+        o = [0, None]
+        _emit(seq, False, None, [0], o)
+        return o[0]
+
     out = []
     for i, b in enumerate(branches):
         n_nested = nested_count(b)
         picks = [None] + [(g, k) for g in range(n_nested) for k in range(MAX_NESTED_ALTS)]
         for spaced in (False, True):
             for pk in picks:
-                s = _emit(b, spaced, pk, [0])
+              # Every optional arm on its own, present and absent. `guardrails?`
+              # has to yield BOTH `guardrail` and `guardrails`, because the two
+              # route differently and only the plural was ever generated. The
+              # arm indices depend on WHICH alternative `pk` selected, so they
+              # are counted per pick rather than once for the branch.
+              counted = [0, None]
+              _emit(b, spaced, pk, [0], counted)
+              n_opt = min(counted[0], MAX_OPTIONAL_ARMS)
+              drops = [frozenset()] + [frozenset({k}) for k in range(n_opt)]
+              for dropped in drops:
+                s = _emit(b, spaced, pk, [0], [0, dropped])
                 if not s.strip():
                     continue
                 out.append((i, s, "core"))
