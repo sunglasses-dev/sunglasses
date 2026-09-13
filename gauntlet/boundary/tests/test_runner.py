@@ -91,12 +91,35 @@ def test_a_mediated_run_differs_from_the_control_on_the_same_payload(tmp_path):
 
 
 def test_the_destination_distinguishes_blocked_from_never_ran(tmp_path):
-    """Both are empty. Only one of them is a result."""
+    """Three empty receipts, and only one of them is a result.
+
+    This test used to know two states, never ran and heard nothing. The exam
+    found the third one sitting between them and being reported as the second:
+    an observer that ran, was never asked to look at the transport under test,
+    and therefore heard nothing it could have heard. `nothing_arrived` now
+    requires a calibration and a collection behind it, and the middle case says
+    `observation_incomplete` instead of quietly reading as a clean block.
+    """
     never = Destination(drop_dir=tmp_path / "a").receipt()
-    with Destination(drop_dir=tmp_path / "b") as listened:
-        ran = listened.receipt()
+
+    with Destination(drop_dir=tmp_path / "b") as unasked:
+        unobserved = unasked.receipt()
+
+    with Destination(drop_dir=tmp_path / "c") as watched:
+        watched.calibrate("before")
+        watched.collect_drops()
+        watched.calibrate("after")
+        observed = watched.receipt()
+
     assert never["listened"] is False and never["nothing_arrived"] is False
-    assert ran["listened"] is True and ran["nothing_arrived"] is True
+    assert unobserved["listened"] is True, "it did run"
+    assert unobserved["nothing_arrived"] is False, (
+        "an observer that was never asked to look at the file transport "
+        "reported that nothing arrived, which is the false negative the exam "
+        "could not read either way")
+    assert unobserved["observation_incomplete"] is True
+    assert observed["listened"] is True and observed["nothing_arrived"] is True
+    assert observed["observation_complete"] is True
 
 
 # ── the ledger a live batch cannot proceed without ─────────────────────────
