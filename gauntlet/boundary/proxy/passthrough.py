@@ -241,7 +241,8 @@ class Passthrough:
 
     # ── holding ─────────────────────────────────────────────────────────────
     def submit(self, direction: str, request_id, payload: str, scanner,
-               channel: str | None = None, content_bytes: int | None = None) -> Handle:
+               channel: str | None = None, content_bytes: int | None = None,
+               method: str | None = None) -> Handle:
         """Hold one message, scan it in a killable child, settle. Returns at once.
 
         `content_bytes` is the package's own metric: decoded UTF-8, duplicate
@@ -297,10 +298,11 @@ class Passthrough:
         self._hold_entered[request_id].set()
         threading.Thread(target=self._run, daemon=True,
                          args=(handle, direction, request_id, payload, scanner,
-                               channel)).start()
+                               channel, method, measured)).start()
         return handle
 
-    def _run(self, handle, direction, request_id, payload, scanner, channel) -> None:
+    def _run(self, handle, direction, request_id, payload, scanner, channel,
+             method=None, content_bytes=None) -> None:
         started = time.perf_counter()
         argv = scanner(payload, channel) if callable(scanner) else list(scanner)
         worker = subprocess.Popen(
@@ -340,6 +342,12 @@ class Passthrough:
             # too, because a worker that finishes after cancellation must not be
             # able to release anything.
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
+        # TRUTHFUL, and the same number in every place it appears. The package
+        # counts decoded UTF-8 content with the scanner separator tracked
+        # separately, so the joined document's length is not the inspected size.
+        inspected_content_bytes = (
+            content_bytes if content_bytes is not None
+            else len(payload.encode("utf-8", "surrogatepass")))
         exit_code = worker.poll()
         reader.join(timeout=1.0)
         errors.join(timeout=1.0)
@@ -386,7 +394,33 @@ class Passthrough:
         elif finding["blocked"]:
             # COMPLETE and TRUE. The scan ran to the end and found what it was
             # looking for. This is the row that used to be filed as incomplete.
-            reason, status, complete = PROHIBITED_CONTENT, STATUS_COMPLETE, True
+            #
+            # CONTRACT T4.R4(7), and deliberately narrow. G2-04 requires
+            # PROHIBITED_SECRET and the proxy answered PROHIBITED_CONTENT, which
+            # withheld the right bytes for the wrong finding and failed the
+            # paired calibration. Every clause below has to hold, because a
+            # reason is a claim about WHAT was found and a looser rule would
+            # start calling ordinary injections secrets.
+            # THE THREE COUNTS HAVE TO AGREE, and they are the package's metric
+            # rather than the length of the document handed to the worker. That
+            # document is the inspected leaves joined by a newline, and the
+            # newline is this harness's, not the caller's: comparing against it
+            # made a correct G2-04 row miss by exactly one byte per join. A path
+            # that never measured content bytes cannot claim this reason, which
+            # is why None is a refusal here and not a pass.
+            secret_family = any(
+                str(rule).startswith("GLS-SD-")
+                for rule in (finding.get("rule_ids") or []))
+            client_to_upstream_call = (direction == "request"
+                                       and method == "tools/call")
+            bytes_agree = (content_bytes is not None
+                           and content_bytes == inspected_content_bytes)
+            if (client_to_upstream_call and secret_family and accepted
+                    and finding.get("inspection_complete", True) and bytes_agree):
+                reason = PROHIBITED_SECRET
+            else:
+                reason = PROHIBITED_CONTENT
+            status, complete = STATUS_COMPLETE, True
         else:
             reason, status, complete = CLEAN, STATUS_COMPLETE, True
         forwarded = reason == CLEAN
@@ -397,13 +431,14 @@ class Passthrough:
             request_id=request_id, direction=direction, forwarded=forwarded,
             worker_terminated=terminated, delivered_late=False,
             elapsed_ms=elapsed_ms, reason_code=reason,
-            inspected_utf8_bytes=len(payload.encode("utf-8", "surrogatepass")),
+            inspected_utf8_bytes=inspected_content_bytes,
             inspection_complete=complete,
             detector_status=status,
             finding=bool(finding and finding["blocked"]),
             rule_ids=(finding or {}).get("rule_ids") or [],
             replacement=None if forwarded else self._withheld(
-                request_id, reason, elapsed_ms, payload),
+                request_id, reason, elapsed_ms, payload,
+                inspection_complete=complete),
         )
         with self._lock:
             self._pending.pop(request_id, None)
@@ -415,8 +450,17 @@ class Passthrough:
                                          ("decision", "rule_ids", "blocked")})
         handle._settle(outcome)
 
-    def _withheld(self, request_id, reason_code, elapsed_ms, payload) -> dict:
-        """A reason code, never the payload and never an exception string."""
+    def _withheld(self, request_id, reason_code, elapsed_ms, payload,
+                  inspection_complete: bool = False) -> dict:
+        """A reason code, never the payload and never an exception string.
+
+        `inspection_complete` was hardcoded False, so a scan that ran to the end
+        and found a secret told the client its inspection was incomplete while
+        the settlement recorded a completed finding. One of those two is wrong
+        and the client only ever sees the first. It carries the settled value
+        now, and the default stays False for the paths that genuinely did not
+        finish.
+        """
         return {
             "jsonrpc": "2.0",
             "id": request_id,                       # type preserved, not normalised
@@ -425,7 +469,7 @@ class Passthrough:
                 "message": GATE2_WITHHELD,
                 "data": {
                     "reason_code": reason_code or "withheld",
-                    "inspection_complete": False,
+                    "inspection_complete": inspection_complete,
                     "inspected_utf8_bytes": len(
                         payload.encode("utf-8", "surrogatepass")),
                     "elapsed_ms": round(elapsed_ms, 3),
@@ -969,6 +1013,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             # blocking; and the deadline measured the queue instead of the scan.
             handle = proxy.submit(direction, request_id=request_id, payload=text,
                                   scanner=scanner,
+                                  method=message.get("method"),
                                   content_bytes=sum(
                                       len(value.encode("utf-8", "surrogatepass"))
                                       for _path, value in leaves))

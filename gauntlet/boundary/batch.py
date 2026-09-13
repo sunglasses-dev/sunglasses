@@ -44,6 +44,13 @@ HOOK_COMPARISON_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
 # The scanner faults a session can select. Kept beside the configuration because
 # the configuration is where a reader looks to see what a run was able to do.
 FAULT_MODES = ("exception", "hang", "barrier")
+
+# The inspection bound every seed in the package declares, all 28 of them, and
+# the DEFAULT rather than None. A configuration built without one used to
+# instantiate byte_budget=None, so the bound was recorded in the receipt and
+# enforced nowhere; defaulting to nothing is how a bound goes missing quietly.
+# A caller with a scenario that declares something else passes it.
+PACKAGE_INSPECTION_BYTE_BUDGET = 262144
 CONTROL_SEEDS = HOOK_COMPARISON_SEEDS  # kept: read by the loader's docstring and tests
 
 
@@ -66,7 +73,7 @@ def upstream_for(entry, variant, run_dir, default_argv):
 
 
 def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms,
-               byte_budget=None):
+               byte_budget=PACKAGE_INSPECTION_BYTE_BUDGET):
     """ONE server named `fs`. Candidate puts the proxy in front; control does not."""
     if route == "control":
         server = {"command": upstream_argv[0], "args": upstream_argv[1:]}
@@ -331,7 +338,12 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                "verdict": {"model_view": {"state": "INVALID_STIMULUS"}}}
         sink.stop()
         (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
-        _settle("INVALID_STIMULUS")
+        # NO SETTLEMENT HERE, because there is no charge yet. The ledger is
+        # charged further down, after this refusal, so a row that terminates on
+        # a method the driver cannot issue never spent anything. My first
+        # version called the settle helper from here and raised
+        # UnboundLocalError before it was even defined, which is the honest
+        # shape of the mistake: settling a charge that does not exist.
         return row
     tool = f"mcp__fs__{params.get('name', 'read_text_file')}"
     arguments = params.get("arguments") or {"path": str(run_dir / "payload.txt")}
