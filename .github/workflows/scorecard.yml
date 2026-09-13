@@ -18,8 +18,11 @@ on:
     branches: [main]
   schedule:
     # Weekly, Saturday 14:00 UTC (07:00 PT): the plan's Saturday scorecard
-    # refresh, so the number the README badge shows is never more than a
-    # week behind the tree.
+    # refresh. Intended cadence, not a guarantee: GitHub can delay or drop a
+    # scheduled run, and the action retries a failed publication and then
+    # returns success with a warning, so a green job does not by itself
+    # prove the public badge updated. The Saturday refresh reads the
+    # published date on scorecard.dev and says so if it is stale.
     - cron: '0 14 * * 6'
   workflow_dispatch:
 
@@ -63,6 +66,6 @@ jobs:
           retention-days: 5
 
       - name: Upload to code-scanning
-        uses: github/codeql-action/upload-sarif@311b4ee155dcdab395044f00946f664bd51ff173 # v4
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: results.sarif
