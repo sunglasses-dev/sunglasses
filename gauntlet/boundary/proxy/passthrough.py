@@ -230,12 +230,45 @@ class Passthrough:
         """Hold one message, scan it in a killable child, settle. Returns at once."""
         channel = channel or ("message" if direction == "request" else "api_response")
         handle = Handle(self, request_id, self.watchdog_ms)
+        measured = len(payload.encode("utf-8", "surrogatepass"))
         with self._lock:
             self._pending[request_id] = handle
             self._hold_entered[request_id] = threading.Event()
             self._cancel_accepted[request_id] = threading.Event()
         self._emit("HOLD_ENTERED", request_id, direction=direction, channel=channel,
-                   bytes=len(payload.encode("utf-8", "surrogatepass")))
+                   bytes=measured, byte_budget=self.byte_budget)
+        # THE BUDGET WAS ACCEPTED AND NEVER READ. `byte_budget` was stored on
+        # the instance by a constructor that nothing consulted, so ASTRA
+        # measured 32,768 bytes forwarded under a budget of 1. A bound that is
+        # configured, documented, recorded in the receipt and not enforced is
+        # worse than no bound, because the receipt says it held.
+        #
+        # Measured as the package defines it: the sum of UTF-8 bytes in all
+        # inspected text and structured string leaves of this message, which is
+        # exactly the payload assembled by the caller, and INCLUSIVE at the
+        # budget, so `>` and not `>=`.
+        #
+        # Decided BEFORE the worker starts. Scanning a document you have already
+        # decided to refuse spends the very resource the budget exists to bound.
+        if self.byte_budget is not None and measured > self.byte_budget:
+            self._hold_entered[request_id].set()
+            self._emit("OVER_BUDGET", request_id, direction=direction,
+                       bytes=measured, byte_budget=self.byte_budget)
+            outcome = Outcome(
+                request_id=request_id, direction=direction, forwarded=False,
+                worker_terminated=False, delivered_late=False, elapsed_ms=0.0,
+                reason_code=OVER_BYTE_BUDGET, inspected_utf8_bytes=measured,
+                inspection_complete=False, detector_status=STATUS_UNREADABLE,
+                finding=False, rule_ids=[],
+                replacement=self._withheld(request_id, OVER_BYTE_BUDGET, 0.0, payload))
+            with self._lock:
+                self._pending.pop(request_id, None)
+            self._emit("SETTLED", request_id, forwarded=False,
+                       reason=OVER_BYTE_BUDGET, detector_status=STATUS_UNREADABLE,
+                       inspection_complete=False, finding=False,
+                       terminated=False, elapsed_ms=0.0, detector=None)
+            handle._settle(outcome)
+            return handle
         self._hold_entered[request_id].set()
         threading.Thread(target=self._run, daemon=True,
                          args=(handle, direction, request_id, payload, scanner,
@@ -591,15 +624,15 @@ def _string_leaves(node, path, out):
 
 
 def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
-          wire_frame_limit=DEFAULT_WIRE_FRAME_LIMIT, receipts=None,
-          stdin=None, stdout=None) -> int:
+          wire_frame_limit=DEFAULT_WIRE_FRAME_LIMIT, byte_budget=None,
+          receipts=None, stdin=None, stdout=None) -> int:
     """Sit between a client on stdio and an upstream MCP server."""
     import sys as _sys
     stdin = stdin if stdin is not None else _sys.stdin.buffer
     stdout = stdout if stdout is not None else _sys.stdout.buffer
     proxy = Passthrough(deadline_ms=deadline_ms, watchdog_ms=watchdog_ms,
                         wire_frame_limit=wire_frame_limit,
-                        receipts_path=receipts)
+                        byte_budget=byte_budget, receipts_path=receipts)
     upstream = subprocess.Popen(upstream_argv, stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 start_new_session=True)
@@ -639,7 +672,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         return target if target is not None else params.get("request_id")
 
     def pump(source, sink, direction, label):
-        for raw in iter(source.readline, b""):
+        for raw in bounded_lines(source, proxy.wire_frame_limit):
             line = raw.decode("utf-8", "surrogatepass").rstrip("\n")
             if not line.strip():
                 continue
@@ -761,6 +794,47 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             # emitted nothing at all, so the file exists either way.
             pathlib.Path(receipts).write_text("")
     return 0
+
+
+def bounded_lines(source, limit):
+    """Frames, read with a ceiling, instead of `readline` with none.
+
+    `iter(source.readline, b"")` reads until it finds a newline, however far
+    away that is. The wire frame limit was then checked against the line it
+    returned, which is a bound applied AFTER the unbounded thing has already
+    happened: an upstream that never sends a newline makes the proxy allocate
+    until it dies, and it dies inside a component whose job is to survive a
+    hostile upstream.
+
+    Reads in chunks, stops at the limit, and yields the over-long frame's
+    prefix so the caller still refuses it through the ordinary path rather than
+    through an exception. The rest of that frame is drained and discarded, since
+    it is the tail of something already refused.
+    """
+    buffer = b""
+    while True:
+        chunk = source.read1(65536) if hasattr(source, "read1") else source.read(65536)
+        if not chunk:
+            if buffer:
+                yield buffer
+            return
+        buffer += chunk
+        while b"\n" in buffer:
+            line, buffer = buffer.split(b"\n", 1)
+            yield line
+        if len(buffer) > limit:
+            # Over the limit with no newline in sight. Hand the caller the
+            # prefix to refuse and drop the rest of this frame.
+            yield buffer[:limit + 1]
+            buffer = b""
+            while True:
+                chunk = (source.read1(65536) if hasattr(source, "read1")
+                         else source.read(65536))
+                if not chunk:
+                    return
+                if b"\n" in chunk:
+                    buffer = chunk.split(b"\n", 1)[1]
+                    break
 
 
 def _write(sink, raw: bytes) -> None:
