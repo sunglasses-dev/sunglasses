@@ -106,15 +106,17 @@ def test_declaring_anchor_terms_selects_the_mode(plain, anchored):
 
 
 # When #155 landed, no shipped rule declared `anchor_terms`, so "none of them
-# is anchored" was both the safe assertion and an easy one. #152 is the first
-# branch to claim the mode deliberately: its six `-API` siblings declare the
-# object class they cannot match without. So the assertion becomes a NAMED SET
-# rather than a count of zero. A seventh rule picking the mode up still fails
-# here, which is what the original test was for, and a sibling silently LOSING
-# it fails here too, which the original could never have caught.
+# is anchored" was both the safe assertion and an easy one. Two branches claimed
+# the mode deliberately, #152's six `-API` siblings and this PR's
+# GLS-MCP-POISON-201, so the assertion is a NAMED SET rather than a count of
+# zero and this rebase takes the UNION of the two. A rule picking the mode up
+# unlisted still fails here, which is what the original test was for, and a
+# listed rule silently LOSING it fails here too, which the original could never
+# have caught.
 ANCHORED_ON_PURPOSE = {
     "GLS-PI-013-API", "GLS-PI-016-API", "GLS-PI-017-API",
     "GLS-PI-021-API", "GLS-PI-INFO-API", "GLS-PIEMN-001-API",
+    "GLS-MCP-POISON-201",
 }
 
 

@@ -1,0 +1,64 @@
+{
+ "_README": [
+  "Mutation branches for the anchor-soundness guard, kept in a FILE so the test",
+  "source and the commit text carry no rule vocabulary. Two review runs were cut",
+  "by a provider content filter because the phrases sat in script text; the",
+  "reviewer's own scripts hit it too. Tests reference these by label.",
+  "Each row: a branch spliced into the phrase alternation, and what the guard",
+  "must do with it."
+ ],
+ "anchor_terms_at_authoring": [
+  "ignore",
+  "override",
+  "developer",
+  "reveal",
+  "credentials",
+  "secret",
+  "exfiltrat",
+  "call",
+  "silent"
+ ],
+ "rows": [
+  {
+   "label": "M1_class_two_members",
+   "expect": "uncovered_sample",
+   "branch": "revea[l1]\\s+token",
+   "uncovered_must_contain": "revea1 token",
+   "covered_must_not_contain": "reveal token",
+   "why": "a class is an alternation written short; round 3 read only its first member"
+  },
+  {
+   "label": "M2_no_anchor_term",
+   "expect": "uncovered_sample",
+   "branch": "upload\\s+files",
+   "uncovered_must_contain": "upload files",
+   "why": "a branch carrying no declared term at all"
+  },
+  {
+   "label": "M3_negated_single",
+   "expect": "refusal",
+   "branch": "e[^q]filtrate",
+   "witness": "description: x eyfiltrate",
+   "why": "a negated single character is NOT_LITERAL, and round 3 rendered it as one representative that happened to rebuild a declared term; every other character it admits does not"
+  },
+  {
+   "label": "M4_oversized_range",
+   "expect": "refusal",
+   "branch": "reveal[\\x20-\\x7e]\\s+token",
+   "why": "a range wider than the bound cannot be enumerated exactly"
+  },
+  {
+   "label": "M5_word_category",
+   "expect": "refusal",
+   "branch": "revea\\w\\s+token",
+   "why": "a category class admits members that do not preserve a declared term"
+  },
+  {
+   "label": "M6_category_not_space",
+   "expect": "refusal",
+   "branch": "reveal\\S+token",
+   "carries_a_declared_term": true,
+   "why": "the NEGATED whitespace category. Round 4 tested the exemption with a substring on the category NAME, and the negated name contains the positive one, so the class matching everything EXCEPT whitespace inherited an exemption meant for whitespace. This branch also carries a declared term in another position, so a guard that stops at 'some term is present' reports it clean."
+  }
+ ]
+}
