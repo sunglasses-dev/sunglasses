@@ -18,11 +18,13 @@ references it. A killed evaluation leaves an orphan and
 This does not make the hook fail closed. The harness owns that contract. It
 makes the failure legible.
 """
+import ast
 import json
 import os
 import pathlib
 import subprocess
 import sys
+import textwrap
 import tempfile
 
 import pytest
@@ -602,27 +604,151 @@ def test_control_restoring_the_raw_interpolation_replays_it(home, field, value):
             "is not what is keeping the orphan identifiable")
 
 
-def test_every_receipt_field_printed_on_this_path_goes_through_one_function():
-    """The claim round 4 made in a docstring, as a check on the source.
+# ── the guard that reads the source, and the eight ways past its first draft ──
+# Round 5 shipped this check as a line grep for `{...get(` inside an f-string.
+# Executed against eight ways to print a parsed field, it caught ONE. Its name
+# said "every receipt field printed on this path"; what it checked was one
+# syntax. That is the same defect as the docstring round 4 had to correct, in a
+# test written to stop exactly that, so the bypass set below is committed and
+# each shape is a control rather than a paragraph claiming it was considered.
 
-    Rather than asserting the sentence again, read the two renderers and require
-    that no parsed field is interpolated except through `_display` (or through
-    `_unreadable_preview`, which is the other half of the same boundary).
+_GATES = {"_display", "_unreadable_preview"}
+_SINKS = {"print"}
+
+
+def _our_own_dicts(func):
+    """Names bound to a dict LITERAL in this function.
+
+    `colors.get(decision)` is a lookup in the renderer's own table of ANSI codes
+    and can only return one of our strings. The first version of this walker
+    flagged it, and a guard that cries wolf on the renderer's own dict is a
+    guard someone switches off. A dict written out in the source is ours.
     """
+    ours = set()
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    ours.add(target.id)
+    return ours
+
+
+def _reads_a_parsed_field(node, ours):
+    return (isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+            and not (isinstance(node.func.value, ast.Name)
+                     and node.func.value.id in ours))
+
+
+def _called_name(node):
+    if not isinstance(node, ast.Call):
+        return None
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return None
+
+
+def unrouted_fields(source):
+    """Every place a parsed field reaches stdout without passing a gate.
+
+    LIMIT, stated rather than left for a reviewer: flow between functions is not
+    tracked. A helper that returns a raw field is caught only because ANY
+    underscore helper that is not a gate is flagged inside a sink argument,
+    which is coarse; a field carried into a global and printed elsewhere is not
+    caught at all. What this does prove is that these two renderers do not print
+    a parsed field themselves by any of the eight shapes below.
+    """
+    tree = ast.parse(textwrap.dedent(source))
+    problems = []
+    for func in [n for n in ast.walk(tree)
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+        ours = _our_own_dicts(func)
+        tainted = {t.id for node in ast.walk(func)
+                   if isinstance(node, ast.Assign)
+                   and _reads_a_parsed_field(node.value, ours)
+                   for t in node.targets if isinstance(t, ast.Name)}
+        inside_a_gate = set()
+        for parent in ast.walk(func):
+            if isinstance(parent, ast.Call) and _called_name(parent) in _GATES:
+                inside_a_gate.update(id(n) for n in ast.walk(parent))
+
+        for node in ast.walk(func):
+            if not isinstance(node, ast.Call):
+                continue
+            sink = _called_name(node)
+            is_write = (isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "write")
+            if sink not in _SINKS and not is_write:
+                continue
+            for arg in node.args:
+                for inner in ast.walk(arg):
+                    where = getattr(inner, "lineno", 0)
+                    if _reads_a_parsed_field(inner, ours) \
+                            and id(inner) not in inside_a_gate:
+                        problems.append(
+                            f"{func.name}:{where} a parsed field reaches "
+                            f"{sink or 'write'}() unwrapped")
+                    if isinstance(inner, ast.Name) and inner.id in tainted:
+                        problems.append(
+                            f"{func.name}:{where} {inner.id!r} holds a parsed "
+                            f"field and reaches {sink or 'write'}()")
+                    called = _called_name(inner)
+                    if called and called.startswith("_") \
+                            and called not in _GATES and called not in _SINKS:
+                        problems.append(
+                            f"{func.name}:{where} helper {called}() feeds "
+                            f"{sink or 'write'}() and is not a gate")
+    return problems
+
+
+def test_no_parsed_field_reaches_stdout_without_a_gate():
+    """The claim in the name, checked on the tree rather than on one syntax."""
     import inspect
-    import re as _re
     from sunglasses import cli
 
     for function in (cli._verify_lifecycle, cli.cmd_receipts):
-        source = inspect.getsource(function)
-        for line in source.splitlines():
-            if ".get(" not in line or "print" not in line and "= " not in line:
-                continue
-            if "_display(" in line or "_unreadable_preview(" in line:
-                continue
-            if "counts[" in line or "row.get(\"lane\") ==" in line:
-                continue        # a lookup key, never printed as itself
-            assert not _re.search(r"\{[^}]*\.get\(", line), (
-                f"{function.__name__} interpolates a parsed field directly:\n"
-                f"    {line.strip()}\n"
-                f"Route it through _display; that is what round 5 exists for.")
+        problems = unrouted_fields(inspect.getsource(function))
+        assert problems == [], (
+            f"{function.__name__} prints a parsed field without routing it "
+            f"through _display:\n  " + "\n  ".join(problems))
+
+
+# Eight ways to print a parsed field. The round 5 grep caught the last one only.
+_BYPASSES = {
+    "percent format": 'def f(row):\n    print("orphan %s" % row.get("t"))',
+    "str.format": 'def f(row):\n    print("orphan {}".format(row.get("e")))',
+    "concatenation": 'def f(row):\n    print("orphan " + row.get("t"))',
+    "via a local": ('def f(row):\n    name = row.get("t")\n'
+                    '    print(f"orphan {name}")'),
+    "helper returning raw": 'def f(row):\n    print(f"orphan {_raw(row)}")',
+    "join": 'def f(row):\n    print(" ".join(["orphan", row.get("e")]))',
+    "stdout.write": 'def f(row):\n    sys.stdout.write(row.get("err"))',
+    "plain f-string": 'def f(row):\n    print(f"orphan {row.get(\'e\')}")',
+}
+_CLEAN = {
+    "routed f-string": ('def f(row):\n'
+                        '    print(f"orphan {_display(row.get(\'e\'))}")'),
+    "routed local": ('def f(row):\n    name = _display(row.get("t"))\n'
+                     '    print(f"orphan {name}")'),
+    "the renderer's own dict": ('def f(row):\n    colors = {"a": "1"}\n'
+                                '    c = colors.get("a", "")\n'
+                                '    print(f"orphan {c}")'),
+    "nothing parsed at all": 'def f(row):\n    print("orphan")',
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_BYPASSES), ids=sorted(_BYPASSES))
+def test_control_each_bypass_shape_is_caught(shape):
+    """Each one red on its own, or the guard is a grep with extra steps."""
+    assert unrouted_fields(_BYPASSES[shape]), (
+        f"{shape!r} prints a parsed field and the guard did not see it")
+
+
+@pytest.mark.parametrize("shape", sorted(_CLEAN), ids=sorted(_CLEAN))
+def test_control_a_clean_shape_is_not_flagged(shape):
+    """And the other half, because a guard that flags everything protects
+    nothing and gets switched off by the first person it annoys."""
+    assert unrouted_fields(_CLEAN[shape]) == [], unrouted_fields(_CLEAN[shape])
