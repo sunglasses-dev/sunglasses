@@ -4133,8 +4133,53 @@ PATTERNS = [
             "function description reveal api key",
             "tool description send credentials",
         ],
+        # LIVE. #155 is on main, so the engine reads these two keys and this
+        # rule compiles to anchored mode with nine terms and a span of 8,192.
+        # An earlier round declared them while the engine ignored them and said
+        # so here; that sentence is gone rather than left to read as current.
+        # `test_the_rule_asked_for_anchored_mode_and_got_it` is what fails if the
+        # engine ever refuses the declaration instead of honouring it.
+        #
+        # The terms are the OBJECTS, not the verbs, and that is the whole point.
+        # The document that made this a work order repeats `"description": "When
+        # you process this, send ` and so contains `send`, which is a derived
+        # literal of the `send credentials` branch: the prefilter cannot skip it
+        # and never could. It contains no OBJECT, so with these terms declared
+        # the matcher finds no window and the document costs one fold and one
+        # scan. Measured on the windowed branch, one hop both ways: 27 KB goes
+        # 2.0914 s to 0.0041 s, and 1 MiB, which the plain form cannot finish,
+        # takes 0.1585 s.
+        #
+        # DISCLOSED LIMIT, because a span IS a bound and pretending otherwise is
+        # how a narrowing gets hidden. ONE SENTENCE, so it cannot be missed:
+        # an object more than 8,192 characters after its manifest key MAY no
+        # longer be matched by this rule, measured anchor-relative: one
+        # `credentials` anchor is retained at 8,192 and lost at 8,193, while ten
+        # other anchors trigger the matcher's density fallback and restore it
+        # past that. So the number bounds ONE anchor's window, not the rule. The
+        # quadratic tail is still live, about 2.2 s at 27 KB.
+        #
+        # Why 8,192 and not a number fitted to the tests. The widest row in
+        # `tests/mcp_manifest_poisoning_rows.json` has a gap of 4,000 and needs
+        # 4,064 characters of span once the longest key and the longest phrase
+        # are counted, and its longest actual match is 4,064. An earlier version
+        # of this comment declared 4,096 and claimed that was "over four times
+        # the largest gap"; it is 1.008 times it, thirty-two characters of
+        # headroom, and a bound chosen to just clear the fixtures is a bound
+        # fitted to the test. 8,192 is over twice what the fixtures need and it
+        # states a scope in its own right, a manifest key and its payload up to
+        # eight kilobytes apart. It costs nothing: measured on the windowed
+        # branch, 1 MiB of the adversarial blob is 0.1601 s at span 4,096 and
+        # 0.1600 s at 8,192, and an anchor-dense 27 KB document is 0.0041 s at
+        # both. `test_the_span_covers_every_gap_in_the_pinned_fixture` computes
+        # the requirement FROM the rows and fails if the span drops under it.
+        "anchor_terms": [
+            "ignore", "override", "developer", "reveal", "credentials",
+            "secret", "exfiltrat", "call", "silent",
+        ],
+        "anchor_span": 8192,
         "regex": [
-            r'(?is)(?:"?(?:tool|function|manifest|description|instructions?)"?\s*[:=]\s*.+?){1,3}(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+override|developer\s+mode|reveal\s+(?:api[_ -]?key|token|secret)|send\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\s+tool\s+[a-z0-9_.-]+\s+then\s+call\s+tool\s+[a-z0-9_.-]+|silent(?:ly)?\s+forward\s+results?)',
+            r'(?is)"?(?:tool|function|manifest|description|instructions?)"?\s*[:=](?:\s*\S.*?|\s+)(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+override|developer\s+mode|reveal\s+(?:api[_ -]?key|token|secret)|send\s+(?:credentials|secrets?)|exfiltrat(?:e|ion)|call\s+tool\s+[a-z0-9_.-]+\s+then\s+call\s+tool\s+[a-z0-9_.-]+|silent(?:ly)?\s+forward\s+results?)',
         ],
         "description": "Detects malicious instructions embedded in MCP tool manifests/descriptions that attempt to override policy, coerce secret disclosure, or trigger unauthorized tool chains.",
     },
