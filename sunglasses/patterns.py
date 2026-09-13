@@ -121,6 +121,572 @@ PATTERNS = [
         "description": "Detects chained prompt-injection attacks where the attacker first asks to disable/bypass/ignore safety constraints (including leet/typo variants) then requests disclosure of system or developer prompt material."
     },
 
+
+    # =========================================================================
+    # api_response / log_memory / agent_input SIBLINGS (2026-09-11, WO-P1B round 4)
+    #
+    # Three rounds tried to give the six parent rules one safe regex covering every
+    # channel at once. Each was rejected, and the last two for REGRESSIONS on the
+    # EXISTING channels rather than for the new one: tightening a predicate that had
+    # been a bare keyword verdict changed live behaviour, and every follower rule
+    # invented to keep it tight turned out to be a word-keyed escape of its own.
+    #
+    # So the shape changed. The parents are untouched and keep parent behaviour on
+    # their existing channels, which makes "zero regressions" true by construction
+    # rather than by measurement. The three new channels get these siblings with the
+    # conservative pairing predicate, so the new reach is bounded and disclosed
+    # instead of being a bare keyword.
+    # =========================================================================
+
+    {
+        "id": "GLS-PI-021-API",
+        "name": 'Authority impersonation to disclosure (api_response)',
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        "keywords": [
+            'anthropic',
+            'at anthropic',
+            'at openai',
+            'authorization from anthropic',
+            'authorization from openai',
+            'authorized by anthropic',
+            'authorized by openai',
+            'developer at anthropic',
+            'developer at openai',
+            'emergency override',
+            'employee at anthropic',
+            'employee at openai',
+            'engineer at anthropic',
+            'engineer at openai',
+            'grandmother used to',
+            'life depends on',
+            'life is at stake',
+            'my grandmother used to tell',
+            'openai',
+            'penetration test',
+            'red team exercise',
+            'safety audit',
+            'security researcher',
+            'testing your guardrails',
+            'testing your safety',
+            'your grandmother used to',
+        ],
+        "regex": [
+            '(?is)(?:\\b(?:developer|employee|engineer)\\s+at\\s+(?:anthropic|openai)\\b|\\bauthoriz(?:ed\\s+by|ation\\s+from)\\s+(?:anthropic|openai)\\b|\\btesting\\s+your\\s+(?:safety|guardrails)\\b|\\bsafety\\s+audit\\b|\\bred\\s+team\\s+exercise\\b|\\bpenetration\\s+test\\b|\\bsecurity\\s+researcher\\b|\\bemergency\\s+override\\b|\\bgrandmother\\s+used\\s+to\\b|\\blife\\s+(?:is\\s+at\\s+stake|depends\\s+on)\\b)[\\s\\S]{0,200}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,200}?(?:\\b(?:developer|employee|engineer)\\s+at\\s+(?:anthropic|openai)\\b|\\bauthoriz(?:ed\\s+by|ation\\s+from)\\s+(?:anthropic|openai)\\b|\\btesting\\s+your\\s+(?:safety|guardrails)\\b|\\bsafety\\s+audit\\b|\\bred\\s+team\\s+exercise\\b|\\bpenetration\\s+test\\b|\\bsecurity\\s+researcher\\b|\\bemergency\\s+override\\b|\\bgrandmother\\s+used\\s+to\\b|\\blife\\s+(?:is\\s+at\\s+stake|depends\\s+on)\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
+    {
+        "id": "GLS-PI-INFO-API",
+        "name": 'INFORMATION wrapper injection (api_response)',
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        "match_on": "normalized",
+        "keywords": [
+            '<admin>',
+            '<important>',
+            '<information>',
+            '<instructions>',
+            '<system>',
+            'before the original task',
+            'before you can solve the task',
+            'before you continue',
+            'before you solve the task',
+            'important',
+            'important message from',
+            'information',
+            'instructions',
+            'please do the following first',
+            'please do this first',
+            'system',
+            'this is a message from the user',
+            'this is an important message from me',
+        ],
+        "regex": [
+            '(?is)(?:<\\s*/?\\s*(?:information|important|instructions|system|admin)\\s*>|\\bthis\\s+is\\s+an?\\s+important\\s+message\\s+from\\b|\\bthis\\s+is\\s+a\\s+message\\s+from\\s+the\\s+user\\b|\\bimportant\\s+message\\s+from\\b|\\bbefore\\s+the\\s+original\\s+task\\b)[\\s\\S]{0,260}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,260}?(?:<\\s*/?\\s*(?:information|important|instructions|system|admin)\\s*>|\\bthis\\s+is\\s+an?\\s+important\\s+message\\s+from\\b|\\bthis\\s+is\\s+a\\s+message\\s+from\\s+the\\s+user\\b|\\bimportant\\s+message\\s+from\\b|\\bbefore\\s+the\\s+original\\s+task\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
+    {
+        "id": "GLS-PI-013-API",
+        "name": 'Malicious README agent targeting (api_response)',
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        "keywords": [
+            'follow this README',
+            'higher priority',
+            'if you are',
+            'if you are an AI agent',
+            'override instructions',
+            'these instructions have greater priority',
+            'these instructions have higher priority',
+            'these instructions have top priority',
+        ],
+        "regex": [
+            '(?is)(?:\\bif\\s+you\\s+are\\s+(?:an?\\s+)?(?:ai|assistant|agent|coding\\s+agent|research\\s+agent)\\b|\\bfollow\\s+this\\s+readme\\b|\\bthese\\s+instructions\\s+have\\s+(?:higher|greater|top)\\s+priority\\b|\\boverride\\s+instructions\\s+from\\s+the\\s+user\\b)[\\s\\S]{0,200}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,200}?(?:\\bif\\s+you\\s+are\\s+(?:an?\\s+)?(?:ai|assistant|agent|coding\\s+agent|research\\s+agent)\\b|\\bfollow\\s+this\\s+readme\\b|\\bthese\\s+instructions\\s+have\\s+(?:higher|greater|top)\\s+priority\\b|\\boverride\\s+instructions\\s+from\\s+the\\s+user\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
+    {
+        "id": "GLS-PIEMN-001-API",
+        "name": 'Hidden comment agent instruction (api_response)',
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        "match_on": "normalized",
+        "keywords": [
+            'hidden comment',
+            'hidden comment for the agent',
+            'hidden comment for the assistant',
+            'hidden instruction',
+            'hidden instruction for the agent',
+            'hidden note',
+            'note to agent',
+            'note to ai',
+            'note to assistant',
+            'note to the agent',
+            'note to the ai',
+            'note to the assistant',
+        ],
+        "regex": [
+            '(?is)(?:<!--[^>]{0,200}(?:agent|assistant|ai)\\b|\\bhidden\\s+(?:comment|instruction|note)\\s+for\\s+the\\s+(?:agent|assistant|ai)\\b|\\bnote\\s+to\\s+(?:the\\s+)?(?:agent|assistant|ai)\\b)[\\s\\S]{0,200}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,200}?(?:<!--[^>]{0,200}(?:agent|assistant|ai)\\b|\\bhidden\\s+(?:comment|instruction|note)\\s+for\\s+the\\s+(?:agent|assistant|ai)\\b|\\bnote\\s+to\\s+(?:the\\s+)?(?:agent|assistant|ai)\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
+    {
+        "id": "GLS-PI-016-API",
+        "name": 'Policy override to prompt exfiltration (api_response)',
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        # ADDITIVE, raw decides first. One word of this marker's own object
+        # alternation, `guardrail`, is on KEYWORD_DENYLIST, so declaring it
+        # changes nothing and no keyword can route `Ignore guardrail.` on the
+        # folded view. A rule whose marker word cannot be indexed is exactly
+        # the authorised condition for asking step 3 for the folded text
+        # directly, the way GLS-PI-INFO-API and GLS-PIEMN-001-API already do.
+        # The denylist is shared and is not weakened for one rule.
+        "match_on": "normalized",
+        # The marker's own object vocabulary, one entry per word the
+        # alternation `polic(?:y|ies)|safeguards?|guardrails?|instructions?|
+        # safety` accepts. The previous list was PHRASES a person wrote by
+        # reading the rule ('safety policy', 'policy checks'), and the marker
+        # requires no such phrase, so `Ignore policy.` reached nothing.
+        # Singular and plural are both here because the index is word bounded
+        # and 'policies' does not contain a bounded 'policy'.
+        "keywords": [
+            'policy',
+            'policies',
+            'safeguard',
+            'safeguards',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'safety',
+        ],
+        "regex": [
+            '(?is)(?:\\b(?:ignore|bypass|disable|override|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:polic(?:y|ies)|safeguards?|guardrails?|instructions?|safety)\\b)[\\s\\S]{0,24}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,24}?(?:\\b(?:ignore|bypass|disable|override|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:polic(?:y|ies)|safeguards?|guardrails?|instructions?|safety)\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
+    {
+        "id": "GLS-PI-017-API",
+        "name": 'Redaction override to secret disclosure (api_response)',
+        "category": "prompt_injection",
+        "severity": "critical",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        # The object class of this rule, as anchor terms for the windowed
+        # matching in #155. Inert here: the engine on this branch ignores
+        # the key. Declared NOW so #155 rebases onto a tree that already
+        # states what each rule's rare token is.
+        #
+        # TAIL words, not phrases. The separator between `system` and
+        # `prompt` is `(?:\s|<tag>|quote|(paren)){1,4}`, so `system prompt`
+        # as one term would miss `system<b>prompt` while `prompt` does not.
+        # Every term is lower case ASCII, which is what makes it invariant
+        # under the fold; a term that is not is refused by #155.
+        "anchor_terms": [
+            '.env',
+            'api key',
+            'api keys',
+            'config',
+            'configuration',
+            'confirmation',
+            'credentials',
+            'key',
+            'keys',
+            'password',
+            'passwords',
+            'prompt',
+            'prompts',
+            'secret',
+            'secrets',
+            'token',
+            'tokens',
+            'var',
+            'vars',
+            'variable',
+            'variables',
+            'approval',
+            'check',
+            'checks',
+            'filter',
+            'filters',
+            'guardrail',
+            'guardrails',
+            'instruction',
+            'instructions',
+            'policies',
+            'policy',
+            'restriction',
+            'restrictions',
+            'rules',
+            'safeguard',
+            'safeguards',
+            'safety',
+            'mask',
+            'masking',
+            'redact',
+            'redaction',
+            'sanitisation',
+            'sanitization',
+        ],
+        # Longest match these regexes can make is about 470 characters
+        # (marker, a 200 character gap, a verb, a 48 character gap and an
+        # object whose separators can run to four repetitions). 800 leaves
+        # room and costs only window width.
+        "anchor_span": 800,
+        # One entry per word in `redaction|redact|masking|mask|sanitization|
+        # sanitisation`. 'mask' was the one that was simply absent, so
+        # `Disable mask.` with a folded object reached nothing.
+        "keywords": [
+            'redaction',
+            'redact',
+            'masking',
+            'mask',
+            'sanitization',
+            'sanitisation',
+        ],
+        "regex": [
+            '(?is)(?:\\b(?:ignore|ignroe|bypass|byapss|override|ovverride|disable|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:redaction|redact|masking|mask|sanitization|sanitisation)\\b)[\\s\\S]{0,24}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)',
+            '(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|["‘’“”\\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,24}?(?:\\b(?:ignore|ignroe|bypass|byapss|override|ovverride|disable|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:redaction|redact|masking|mask|sanitization|sanitisation)\\b)',
+        ],
+        "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+    },
     # --- GLS-PI-017: Typoglycemic override of redaction + secret disclosure (Jack Cycle 60, FP=0 FN=0) ---
     {
         "id": "GLS-PI-017",

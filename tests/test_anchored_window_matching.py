@@ -105,10 +105,33 @@ def test_declaring_anchor_terms_selects_the_mode(plain, anchored):
     assert [m for m, _, _ in plain._compiled_by_id[RULE_ID]] == ["plain"]
 
 
-def test_no_shipped_rule_picked_up_the_mode_by_accident():
+# When #155 landed, no shipped rule declared `anchor_terms`, so "none of them
+# is anchored" was both the safe assertion and an easy one. #152 is the first
+# branch to claim the mode deliberately: its six `-API` siblings declare the
+# object class they cannot match without. So the assertion becomes a NAMED SET
+# rather than a count of zero. A seventh rule picking the mode up still fails
+# here, which is what the original test was for, and a sibling silently LOSING
+# it fails here too, which the original could never have caught.
+ANCHORED_ON_PURPOSE = {
+    "GLS-PI-013-API", "GLS-PI-016-API", "GLS-PI-017-API",
+    "GLS-PI-021-API", "GLS-PI-INFO-API", "GLS-PIEMN-001-API",
+}
+
+
+def test_only_the_rules_that_declare_the_mode_on_purpose_have_it():
     engine = SunglassesEngine(PATTERNS)
-    modes = {m for entries in engine._compiled_by_id.values() for m, _, _ in entries}
-    assert "anchored" not in modes
+    anchored = {rule_id for rule_id, entries in engine._compiled_by_id.items()
+                if any(m == "anchored" for m, _, _ in entries)}
+    unexpected = sorted(anchored - ANCHORED_ON_PURPOSE)
+    missing = sorted(ANCHORED_ON_PURPOSE - anchored)
+    assert unexpected == [], (
+        f"{unexpected} picked up anchored mode without being listed here. A "
+        f"window is a claim about where a match can be; a rule that gets one by "
+        f"accident can lose a detection silently.")
+    assert missing == [], (
+        f"{missing} are listed as anchored on purpose and are NOT anchored. "
+        f"Either the declaration was dropped or the engine refused it; "
+        f"`engine._anchor_refusals` says which.")
 
 
 # ── detection is unchanged ───────────────────────────────────────────────────
@@ -550,8 +573,15 @@ RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 # prefilter is cheap and the anchored mode's saving is most of the scan. Without
 # it every engine is slower, main included (about 6x on the same documents), so
 # the same absolute saving is a smaller SHARE of a bigger total. Measured
-# 2026-09-12 on the reviewer's eleven documents at 1 MiB: 0.67 with the
-# extension on 3.14, 0.80 without it on 3.9. Both lines carry the same headroom.
+# 2026-09-12 at 1 MiB: 0.67 with the extension on 3.14, 0.80 without it on 3.9.
+# Both lines carry the same headroom.
+#
+# WHICH DOCUMENTS. This file GATES on eight seeds, `RARE_OBJECT_SEEDS` plus
+# `GROUP_B_SEEDS` below. The sentence above used to say "the reviewer's eleven
+# documents", which is neither this file's eight nor the reviewer's own set:
+# that set is thirteen, eleven core overlay documents plus two storms, and it
+# lives in the review evidence rather than here. Naming a count the file does
+# not use made the gate look wider than it is.
 TOTALS_SAVING_WITH_AHO = 0.75
 TOTALS_SAVING_WITHOUT_AHO = 0.85
 

@@ -86,6 +86,16 @@ def _branch_literals(branch):
 def scan():
     findings = []
     for pattern in PATTERNS:
+        # A rule that declares `anchor_terms` states the rare token its match
+        # cannot happen without, and the windowed matcher reads only the text
+        # around it. The prefilter question this report asks, "can we decide not
+        # to run this regex at all", is answered by the anchor instead of by a
+        # derived literal, so the regex is not in the population. The exemption
+        # is only as good as the declaration, which is why
+        # `test_an_anchor_exemption_declares_terms_the_matcher_will_accept`
+        # checks every declared term against the rule that #155 applies.
+        if pattern.get("anchor_terms"):
+            continue
         for index, source in enumerate(pattern.get("regex") or []):
             try:
                 if pf.requirement(source):
