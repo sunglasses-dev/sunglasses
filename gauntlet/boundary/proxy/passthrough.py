@@ -240,11 +240,21 @@ class Passthrough:
 
     # ── holding ─────────────────────────────────────────────────────────────
     def submit(self, direction: str, request_id, payload: str, scanner,
-               channel: str | None = None) -> Handle:
-        """Hold one message, scan it in a killable child, settle. Returns at once."""
+               channel: str | None = None, content_bytes: int | None = None) -> Handle:
+        """Hold one message, scan it in a killable child, settle. Returns at once.
+
+        `content_bytes` is the package's own metric: decoded UTF-8, duplicate
+        data counted, SCANNER SEPARATOR TRACKED SEPARATELY. The caller joins the
+        inspected leaves with a newline to make one document for the worker, and
+        that newline is an artefact of this harness, not bytes the upstream
+        sent. Counting it put two one-byte leaves over a two-byte budget. When
+        the caller does not measure, the payload's own length is used, which is
+        the same number for a single leaf.
+        """
         channel = channel or ("message" if direction == "request" else "api_response")
         handle = Handle(self, request_id, self.watchdog_ms)
-        measured = len(payload.encode("utf-8", "surrogatepass"))
+        measured = (len(payload.encode("utf-8", "surrogatepass"))
+                    if content_bytes is None else content_bytes)
         with self._lock:
             self._pending[request_id] = handle
             self._hold_entered[request_id] = threading.Event()
@@ -306,11 +316,22 @@ class Passthrough:
                                   args=(worker, collected))
         errors.start()
         terminated = False
-        try:
-            worker.wait(timeout=self.deadline_ms / 1000)
-        except subprocess.TimeoutExpired:
+        # THE DEADLINE BOUNDS THE INSPECTION, NOT THE WAIT. `started` was
+        # already taken before the spawn, but the worker was then handed the
+        # FULL deadline on top of however long starting it took, so a 300 ms
+        # cold start under a 100 ms deadline produced a CLEAN result at about
+        # 340 ms. The contract puts extraction, queue and cold start inside the
+        # clock, so what is left is what is left.
+        remaining = self.deadline_ms / 1000 - (time.perf_counter() - started)
+        if remaining <= 0:
             terminated = True
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
+        else:
+            try:
+                worker.wait(timeout=remaining)
+            except subprocess.TimeoutExpired:
+                terminated = True
+                _kill_group(worker, TERMINATION_GRACE_MS / 1000)
         elapsed_ms = (time.perf_counter() - started) * 1000
         cancelled = request_id in self._cancelled
         if not terminated and cancelled:
@@ -590,6 +611,16 @@ def _finding_of(raw):
         if not isinstance(result, dict):
             continue
         decision = result.get("decision")
+        # A RESULT OBJECT WITH NO DECISION IS SILENCE IN ANOTHER SHAPE. `{"result":
+        # {}}` parsed, so the old path read it as a scan that had happened and
+        # found nothing: decision None means `blocked` False, and the absent
+        # `inspection_complete` defaulted to True, so an empty one-line worker
+        # result forwarded the payload as a complete clean inspection. That is
+        # the same fault as deciding from the exit code, which this function
+        # exists to avoid. The worker either says what it decided or it has not
+        # told us anything, and unreadable fails closed.
+        if not isinstance(decision, str) or not decision:
+            continue
         findings = result.get("findings") or []
         return {
             "decision": decision,
@@ -685,6 +716,15 @@ def inspection_input(message: dict, direction: str):
         for block in (result or {}).get("content") or []:
             if isinstance(block, dict) and isinstance(block.get("text"), str):
                 leaves.append(("result.content[].text", block["text"]))
+        # STRUCTURED CONTENT IS A DELIVERY SURFACE. MCP results may carry
+        # `structuredContent` beside `content`, the model is given both, and
+        # this function walked only the second. A real engine scan of the text
+        # lane therefore permitted a response whose structured lane held the
+        # G2-01 fixture verbatim. Every string leaf, with its path, for the same
+        # reason the descriptor schema is walked in full: a check that knows
+        # where to look only finds the mutation it was told about.
+        _string_leaves((result or {}).get("structuredContent"),
+                       "result.structuredContent", leaves)
         if not leaves and isinstance(result, dict):
             for key in ("content", "text"):
                 if isinstance(result.get(key), str):
@@ -876,7 +916,10 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             # was reported as slow mediation rather than as head of line
             # blocking; and the deadline measured the queue instead of the scan.
             handle = proxy.submit(direction, request_id=request_id, payload=text,
-                                  scanner=scanner)
+                                  scanner=scanner,
+                                  content_bytes=sum(
+                                      len(value.encode("utf-8", "surrogatepass"))
+                                      for _path, value in leaves))
 
             def settle(handle=handle, raw=raw, sink=sink, request_id=request_id):
                 try:
@@ -1037,6 +1080,13 @@ def _main(argv=None) -> int:
     parser.add_argument("--deadline-ms", type=int, default=2000)
     parser.add_argument("--watchdog-ms", type=int, default=3000)
     parser.add_argument("--receipts")
+    # THE BUDGET HAD NO WAY IN. `serve` took one and the command line did not
+    # offer it, so every batch run instantiated byte_budget=None and the bound
+    # the package declares was configured nowhere. A budget the driver cannot
+    # pass is a budget that does not exist.
+    parser.add_argument("--byte-budget", type=int, default=None,
+                        help="inspected content bytes allowed, per the scenario's "
+                             "size_policy.inspection_byte_budget")
     # ONE shell-quoted string, split here. `nargs="+"` swallowed the worker's own
     # flags and argparse then rejected them as unknown options, which is a parsing
     # accident that would have read as a broken worker.
@@ -1051,7 +1101,8 @@ def _main(argv=None) -> int:
         parser.error("give the upstream argv after --")
     import shlex
     return serve(upstream, shlex.split(args.scanner), deadline_ms=args.deadline_ms,
-                 watchdog_ms=args.watchdog_ms, receipts=args.receipts)
+                 watchdog_ms=args.watchdog_ms, receipts=args.receipts,
+                 byte_budget=args.byte_budget)
 
 
 if __name__ == "__main__":

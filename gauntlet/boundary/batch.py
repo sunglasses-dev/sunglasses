@@ -27,7 +27,7 @@ from client.observe import (                                             # noqa:
 )
 from destination.sink import Destination
 import fidelity
-from runner import Ledger                                                 # noqa: E402
+from runner import Ledger, scenario_of                                   # noqa: E402
 
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 PY = "/opt/homebrew/opt/python@3.14/bin/python3.14"
@@ -53,7 +53,8 @@ def upstream_for(entry, variant, run_dir, default_argv):
     return default_argv, kind or "filesystem"
 
 
-def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms):
+def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms,
+               byte_budget=None):
     """ONE server named `fs`. Candidate puts the proxy in front; control does not."""
     if route == "control":
         server = {"command": upstream_argv[0], "args": upstream_argv[1:]}
@@ -64,6 +65,12 @@ def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms):
             "command": PY,
             "args": [str(HERE / "proxy" / "passthrough.py"),
                      "--deadline-ms", str(deadline_ms),
+                     # THE PACKAGE'S OWN NUMBER, not a default and not None.
+                     # Every run before this configured no budget at all, so the
+                     # bound each scenario declares in size_policy was recorded
+                     # in the receipt and enforced nowhere.
+                     *(["--byte-budget", str(byte_budget)]
+                       if byte_budget is not None else []),
                      "--receipts", str(run_dir / "proxy.receipts.jsonl"),
                      "--scanner", scanner, "--"] + upstream_argv,
         }
@@ -242,8 +249,10 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                     "--run-root", str(run_dir)],
                    check=True, capture_output=True)
     chosen_argv, upstream_kind = upstream_for(entry, variant, run_dir, upstream_argv)
+    policy = (scenario_of(entry).get("setup") or {}).get("size_policy") or {}
     config = mcp_config(run_dir, chosen_argv, route=route, engine_root=engine_root,
-                        deadline_ms=variant.get("deadline_ms", 2000))
+                        deadline_ms=variant.get("deadline_ms", 2000),
+                        byte_budget=policy.get("inspection_byte_budget"))
     sink = Destination(drop_dir=run_dir / "drop")
     sink_url = sink.start()
     # BEFORE, so that a negative at the end is backed by a demonstration that
