@@ -20,6 +20,7 @@ population from growing quietly.
 """
 import collections as _collections
 import datetime as _dt
+import importlib.util
 import json
 import math
 import re
@@ -429,20 +430,121 @@ def _judge(tmp_path, rule_id, entry, receipt_body, reported=None, name=None):
     return ok, problems
 
 
-def test_control_a_member_cannot_lend_its_allowance_to_another_rule(tmp_path):
-    """THE round 10 defect, in one assertion.
+# ── the controls below run the real functions, not copies of them ───────────
+# Round 12 wrote this next control by copying the population comprehension into
+# the test body with a hand-written `excused` set. It never called
+# `_excused_ids`, so `return {"GLS-PI-013-API"}` at the top of that function
+# passed all 36 root checks with an empty allowlist, no receipts and the real
+# 14-pair population. A control that reimplements the thing it is controlling
+# proves the reimplementation.
+#
+# The obstacle was `_report()`: it shells out, which is right for the gate and
+# wrong for a control that has to ask what happens when a rule LOSES its
+# declaration, because a subprocess reads the files on disk. So the control
+# loads `scan()`, the function `--json` prints, and varies the PATTERNS list
+# that function reads. `test_the_in_process_report_is_the_same_report` holds the
+# harness to the subprocess on the untouched tree; if they ever disagree, these
+# controls are measuring a copy and that test says so.
+
+def _report_module():
+    """The report script as a module, so its PATTERNS can be varied."""
+    spec = importlib.util.spec_from_file_location("_p1b_report_script", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _report_without_anchor_declaration(rule_id):
+    """What the report says when `rule_id` declares no anchor terms.
+
+    Idempotent on purpose. The postcondition that matters is that the rule is
+    IN the returned report, and the caller asserts it; requiring a declaration
+    to remove here would make this raise, rather than test the seam, on a tree
+    where the declaration has already been taken away.
+    """
+    module = _report_module()
+    varied = [{k: v for k, v in p.items() if k != "anchor_terms"}
+              if p["id"] == rule_id else p
+              for p in module.PATTERNS]
+    assert len(varied) == len(module.PATTERNS)
+    assert any(p["id"] == rule_id for p in varied), f"{rule_id} is not a rule"
+    module.PATTERNS = varied
+    return module.scan()
+
+
+def _allowlist(monkeypatch, entries, receipts):
+    """Point the REAL `_excused_ids` at an allowlist and a receipts directory."""
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "KNOWN_UNSKIPPABLE", entries)
+    monkeypatch.setattr(module, "RECEIPTS", receipts)
+
+
+def test_the_in_process_report_is_the_same_report():
+    """The harness the controls use is the gate's own report, not a copy."""
+    assert _report_module().scan() == _report()
+
+
+def test_control_an_empty_allowlist_excuses_nothing(monkeypatch, tmp_path):
+    """`_excused_ids` answers from the allowlist. Round 12 never asked it.
+
+    This is the assertion ASTRA's `return {"GLS-PI-013-API"}` has to get past.
+    """
+    _allowlist(monkeypatch, {}, tmp_path)
+    assert _excused_ids() == set()
+
+
+def test_control_a_valid_entry_excuses_exactly_the_id_it_names(monkeypatch, tmp_path):
+    (tmp_path / "GLS-TP-002.json").write_text(json.dumps(_receipt("GLS-TP-002")))
+    _allowlist(monkeypatch, {"GLS-TP-002": _entry()}, tmp_path)
+    problems = []
+    assert _excused_ids(problems) == {"GLS-TP-002"}, problems
+    assert problems == []
+
+
+def test_control_an_invalid_entry_excuses_nothing(monkeypatch, tmp_path):
+    (tmp_path / "GLS-TP-002.json").write_text(
+        json.dumps(_receipt("GLS-TP-002", engine_sha="0" * 64)))
+    _allowlist(monkeypatch, {"GLS-TP-002": _entry()}, tmp_path)
+    problems = []
+    assert _excused_ids(problems) == set()
+    assert any("engine_sha" in p for p in problems), problems
+
+
+def test_control_a_member_cannot_lend_its_allowance_to_another_rule(monkeypatch, tmp_path):
+    """THE round 10 defect, executed through the real path.
 
     The reviewer removed GLS-PI-013-API's anchor declaration, which returned its
     two regexes to the report, then wrote perfectly consistent receipts for
     GLS-TP-002 and GLS-SC-014. Both are real baseline members, so every field
     checked out and the count rose by two. Under set containment the returned
     pairs are simply not excused by anyone else's entry.
+
+    Every step here is the shipped one: the real report with one declaration
+    removed, the real `_excused_ids`, and the real population test function.
+    The two entries are asserted VALID before the population is asked, because
+    a control where the entries silently fail to validate would pass for the
+    wrong reason.
     """
-    returned = {("GLS-PI-013-API", 0), ("GLS-PI-013-API", 1)}
-    excused = {"GLS-TP-002", "GLS-SC-014"}       # as if both entries were valid
-    arrived = sorted(p for p in (BASELINE_PAIRS | returned) - BASELINE_PAIRS
-                     if p[0] not in excused)
-    assert arrived == sorted(returned), (
+    returned = _report_without_anchor_declaration("GLS-PI-013-API")
+    monkeypatch.setattr(sys.modules[__name__], "_report", lambda: returned)
+    assert ("GLS-PI-013-API", 0) in _reported_pairs(), (
+        "removing the declaration did not return GLS-PI-013-API to the report, "
+        "so nothing below is under test")
+
+    _allowlist(monkeypatch, {}, tmp_path)
+    with pytest.raises(AssertionError) as unexcused:
+        test_the_population_does_not_grow()
+    assert "GLS-PI-013-API" in str(unexcused.value), unexcused.value
+
+    for rule_id in ("GLS-TP-002", "GLS-SC-014"):
+        (tmp_path / f"{rule_id}.json").write_text(json.dumps(_receipt(rule_id)))
+    _allowlist(monkeypatch,
+               {rid: _entry() for rid in ("GLS-TP-002", "GLS-SC-014")}, tmp_path)
+    problems = []
+    assert _excused_ids(problems) == {"GLS-TP-002", "GLS-SC-014"}, problems
+    with pytest.raises(AssertionError) as lent:
+        test_the_population_does_not_grow()
+    assert "GLS-PI-013-API" in str(lent.value), (
         "a measurement of TP-002 and SC-014 excused PI-013-API; the allowance "
         "is fungible again")
 
