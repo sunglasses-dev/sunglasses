@@ -1,0 +1,68 @@
+name: scorecard
+
+# OpenSSF Scorecard: an outside auditor scores this repository's supply-chain
+# practices (branch protection, pinned dependencies, token permissions, signed
+# releases, dangerous workflow patterns, ...) and publishes the numbers where
+# anyone can read them without trusting us. Added 2026-09-13 as the first
+# "proof outside the agent" item of the parity plan (WS2b). The score is what
+# the tool measures, not what we say, and a low check stays low until the
+# practice actually changes.
+#
+# The result is published only from the default branch (the action refuses
+# otherwise) and the SARIF is uploaded to the Security tab so each finding is
+# a line item with the exact remediation the auditor asks for.
+
+on:
+  branch_protection_rule:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, Saturday 14:00 UTC (07:00 PT): the plan's Saturday scorecard
+    # refresh, so the number the README badge shows is never more than a
+    # week behind the tree.
+    - cron: '0 14 * * 6'
+  workflow_dispatch:
+
+# Default-deny. Each job asks for exactly what it needs.
+permissions: read-all
+
+jobs:
+  analysis:
+    name: scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Needed to upload the SARIF to code-scanning.
+      security-events: write
+      # Needed to publish results and get a badge (see publish_results below).
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publishing sends the result to the public OpenSSF API, which is
+          # what the README badge reads. Public repository, default branch
+          # only: the action enforces both.
+          publish_results: true
+
+      # The SARIF stays attached to the run for 5 days so a reviewer can read
+      # the raw checks without the Security tab.
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@311b4ee155dcdab395044f00946f664bd51ff173 # v4
+        with:
+          sarif_file: results.sarif
