@@ -381,8 +381,12 @@ jobs:
     needs: [classify, fast, integrity]
     if: always()
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    # No per-job permissions here, deliberately. `coverage` is THE gate and
+    # its key set is an ASTRA reviewed contract (tests/test_ci_gate.py,
+    # COVERAGE_JOB_KEYS, round 3 R3-2) that exists so an unreviewed shape
+    # cannot change what the gate means. The top-level `permissions: read-all`
+    # already grants this job the minimum, so a block here would buy nothing
+    # and would edit a shape somebody approved.
     timeout-minutes: 5
     env:
       CLASSIFY: ${{ needs.classify.result }}
