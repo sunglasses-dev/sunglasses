@@ -493,18 +493,42 @@ private key files are named individually and matching is boundary-aware, so
   as a dangerous shell command), and it costs ~902ms per call because the
   pattern database is rebuilt in every hook subprocess. Enable with
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
-- **It fails open.** A crash, a bad config, an unparseable policy — all fall
-  through to Claude Code's own permission flow rather than wedging your agent.
-  Every one of those writes a receipt saying the call was *not* checked, because
-  a firewall that is quietly off is worse than no firewall.
+- **It fails open, and says so.** A crash falls through to Claude Code's own
+  permission flow rather than wedging your agent. A *dead control* is different:
+  if the policy file is missing, empty, unreadable or unparseable, or if the audit
+  trail cannot be written, the firewall now ASKS and names which control is down,
+  and unreadable includes the shapes that are not a file you can read at all: a
+  FIFO, socket, device node or directory in that path is answered from metadata
+  before anything opens it, because a FIFO with no writer blocks in the kernel
+  and a blocked hook is timed out by the harness and fails open. A NUL byte
+  anywhere in the policy counts as unparseable, comments included: YAML will
+  happily keep one inside a value, and a path with a NUL in it silently matches
+  nothing, which is the one answer indistinguishable from a clean scan.
+  because an empty answer on the wire is indistinguishable from "checked, nothing
+  found". A missing policy only counts as dead where one was installed; a machine
+  that never configured one is not nagged.
+  Those write a receipt saying the call was *not* checked, because a firewall
+  that is quietly off is worse than no firewall — but the receipt is conditional
+  on reaching the write with working storage, and two cases do not get one. The
+  audit-trail state is itself the case where the trail cannot be written, so it
+  ASKS and records nothing. A DENY under obstructed storage is enforced and may
+  fail to record. "Every such event writes a receipt" would be false in exactly
+  the states this section is about, so it is not claimed.
+
+  The precedence, so an unrecorded event is not read as an unchecked one. A
+  later lane still decides: a dead policy does not short-circuit the rest of the
+  call, and its failure rides along in whatever receipt that call produces. An
+  audit-trail failure never weakens a DENY — the block is enforced whether or
+  not it can be written down.
 
 ### Cost
 
 ~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
 is 19ms of that). Zero network calls — nothing about your work leaves the
-machine. Every invocation appends one line to
-`~/.sunglasses/receipts/YYYY-MM-DD.jsonl`, recording a SHA-256 of the tool input
-and never the input itself.
+machine. An invocation appends to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`
+when the write succeeds, recording a SHA-256 of the tool input and never the
+input itself. A hook killed during the policy read never reaches the write, so
+"every invocation appends" is not a promise this makes.
 
 ## Roadmap
 
