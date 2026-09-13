@@ -28,11 +28,16 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "report_unskippable_rules.py"
 
-# Measured 2026-09-12 on main. This is a RATCHET, not a target: every one of
-# these is a rule where splitting the alternation would give the prefilter its
-# literals back. The number may fall and may not rise. Lower it when one is
-# fixed, the way GLS-ENC-ALT-210 was.
-BASELINE = 13
+# Measured 2026-09-12. This is a RATCHET, not a target: every one of these is a
+# rule where splitting the alternation would give the prefilter its literals
+# back. The number may fall and may not rise. Lower it when one is fixed, the
+# way GLS-ENC-ALT-210 was.
+#
+# 13 on main. 12 here, because the class clause work on this branch gives
+# GLS-ENC-ALT-210 a requirement it did not have. A ratchet left loose for a
+# round is a ratchet that is not doing its job, so it moves with the change
+# rather than after it.
+BASELINE = 12
 
 
 def _report():
@@ -77,13 +82,20 @@ def test_every_finding_really_has_an_empty_requirement():
 def test_a_split_alternation_is_not_reported():
     """The control: the shape the report exists to find, and its repair.
 
-    A literal-free branch beside a derivable one is reported. The same two
-    branches as separate regexes are not, because each derives on its own.
-    That is exactly the repair applied to GLS-ENC-ALT-210.
+    A branch that derives NOTHING, beside a derivable one, blinds the whole
+    regex and is reported. The same two branches as separate regexes are not,
+    because each derives on its own. That is the repair the report exists to
+    suggest.
+
+    The braille class used to be the example here. It is not one any more: the
+    class clause work gives a bare positive class its own requirement, so
+    `decode OR braille` now derives and the merged form is no longer blind. A
+    negated class still derives nothing, and there is no plan for it to, since
+    it matches nearly everything. That is the shape the remaining twelve have.
     """
     sys.path.insert(0, str(ROOT))
     from sunglasses import _prefilter as pf
-    blind = r"[⠀-⣿]{8,}"
+    blind = r"[^.\n]{8,}"
     derivable = r"\bdecode\b.{0,40}\bbase64\b"
 
     together = f"(?is)({derivable})|({blind})"
@@ -93,4 +105,9 @@ def test_a_split_alternation_is_not_reported():
     )
     assert pf.requirement(f"(?is){derivable}"), (
         "the derivable branch must derive on its own, or the control proves nothing"
+    )
+    # And the branch that USED to be blind is not any more, which is why the
+    # ratchet moved by one.
+    assert pf.requirement(r"(?is)(\bdecode\b.{0,40}\bbase64\b)|([⠀-⣿]{8,})"), (
+        "a positive class beside a literal branch should now derive a clause"
     )

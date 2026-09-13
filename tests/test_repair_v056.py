@@ -531,9 +531,20 @@ def test_engine_cost_is_linear_only_for_whitespace_separated_input():
     # 4x the input. Linear would be ~4x the time; quadratic is ~16x.
     assert word_growth < 8, (
         f"whitespace-separated input stopped scaling linearly ({word_growth:.1f}x for 4x input)")
-    assert token_growth > word_growth, (
-        "the documented unbroken-token blowup did not reproduce; if this has been "
-        f"fixed, delete this test (token {token_growth:.1f}x vs words {word_growth:.1f}x)")
+    # Sep-12: this used to assert `token_growth > word_growth`, and it no longer
+    # holds at these sizes. Not because the quadratic curve was fixed, but
+    # because the rule that dominated it, GLS-ENC-ALT-210, is now SKIPPED on a
+    # document with no braille character and no decode/base64 literal. The
+    # prefilter learned to derive a clause from a bare character class, so the
+    # 2 KB and 8 KB probes below never reach the expensive rule at all.
+    #
+    # The class is NOT gone, so this test does not get deleted. The surviving
+    # evidence is a document the prefilter cannot skip because the literal IS
+    # present while the blob never matches: 207 s at 27 KB, measured on this
+    # head and on main, unchanged. That belongs to the bounding work order.
+    assert token_growth < 8, (
+        f"the unbroken-token curve is back at these sizes ({token_growth:.1f}x "
+        "for 4x input); the class-clause skip has stopped working")
 
 
 def test_mcp_never_reports_zero_threats_on_an_incomplete_read():

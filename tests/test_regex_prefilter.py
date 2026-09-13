@@ -359,3 +359,176 @@ def test_the_suite_rejects_a_skip_everything_mutation(engine):
     again = eng.scan(text)
     again_findings = again.findings if hasattr(again, "findings") else again
     assert rule_id in {f["id"] for f in again_findings}, "mutation leaked"
+
+
+# ── round 3: a class clause has to survive case, and nesting ─────────────────
+# Round 2 derived a ClassClause from any positive character class under a `{n,}`
+# repeat. The reviewer found two ways that skips a document the regex matches,
+# neither of them reachable from the shipped inventory, both reachable through
+# the public `SunglassesEngine(patterns=...)` and `extra_patterns` doors.
+#
+#   CASE. The pages were recorded from the class AS WRITTEN and answered against
+#   the FOLDED document. `re.IGNORECASE` matches KELVIN SIGN U+212A against a
+#   plain `K`, and `fold` turns it into `k` on page 0, so a class holding `K` on
+#   page 0 never sees page 0x21 and the rule is skipped on a document it
+#   matches. Micro sign, Greek mu and 76 Georgian letters do the same.
+#
+#   NESTING. A nested alternation reaches the combining step as an inner
+#   `Clause`. Iterating one yields its LITERALS, so the class half was dropped
+#   and `decode OR braille` became `decode` alone, which is a STRONGER
+#   requirement than the regex has.
+#
+# The repair is conservative on the first and complete on the second. A class
+# earns a clause only when every character in it is untouched by lower, upper,
+# casefold and the engine's own fold, so no case operation can move a match off
+# the recorded page. Braille and punctuation qualify; `A-Za-z` no longer does,
+# and derives nothing rather than something wrong.
+
+CASE_SENSITIVE_CLASS = r"(?:decode|[K-Å]{8,})"
+NESTED_CLASS = r"(?:outer|(?:(?:decode|[⠀-⣿]{8,})!))"
+
+_ROUND3_CASES = [
+    ("case_ascii_K", CASE_SENSITIVE_CLASS, "K" * 8),
+    ("case_kelvin_sign", CASE_SENSITIVE_CLASS, "K" * 8),
+    ("case_micro_sign", r"(?:decode|[µ-·]{8,})", "µ" * 8),
+    # The direction only the inertness gate catches. `re.IGNORECASE` matches
+    # MICRO SIGN U+00B5 against GREEK SMALL MU U+03BC, and `fold` does NOT
+    # unify them, mu staying on page 3 and micro on page 0. Recording the
+    # pages from the FOLDED class is not enough by itself, because the
+    # character that reaches the document was never in the class at all.
+    ("case_greek_mu_class_micro_document", r"(?:decode|[μ-ν]{8,})", "µ" * 8),
+    ("case_capital_s_class_long_s_document", r"(?:decode|[S-T]{8,})", "ſ" * 8),
+    ("case_georgian", r"(?:decode|[ა-ჺ]{8,})", "ა" * 8),
+    ("nested_braille", NESTED_CLASS, "⠁" * 8 + "!"),
+    ("nested_literal_branch", NESTED_CLASS, "outer"),
+    ("nested_inner_literal", NESTED_CLASS, "decode!"),
+]
+
+
+@pytest.mark.parametrize("path", ["automaton", "substring"])
+@pytest.mark.parametrize("name,pattern,text", _ROUND3_CASES,
+                         ids=[c[0] for c in _ROUND3_CASES])
+def test_a_class_clause_never_skips_a_document_the_regex_matches(name, pattern, text, path):
+    """Through the public custom-rule door, both lookup paths."""
+    import re as _re
+    assert _re.search(pattern, text, _re.IGNORECASE | _re.DOTALL), (
+        f"{name}: the fixture does not match its own regex"
+    )
+    rule_id = f"PREFILTER-round3-{name}"
+    eng = _probe_engine(_custom(rule_id, pattern))
+    if path == "substring":
+        eng._literal_index._automaton = None      # force the fallback lookup
+    found = {f["id"] for f in eng.scan(text).findings}
+    assert rule_id in found, (
+        f"{name} ({path}): the regex matches and the engine reported nothing. "
+        f"Derived requirement {_prefilter.requirement(pattern)!r}"
+    )
+
+
+@pytest.mark.parametrize("name,pattern,text", _ROUND3_CASES,
+                         ids=[c[0] for c in _ROUND3_CASES])
+def test_the_same_cases_through_the_patterns_argument(name, pattern, text):
+    """`SunglassesEngine(patterns=...)` is the other public door."""
+    rule_id = f"PREFILTER-round3-only-{name}"
+    eng = SunglassesEngine(patterns=[_custom(rule_id, pattern)], mechanisms=False)
+    assert rule_id in {f["id"] for f in eng.scan(text).findings}
+
+
+def test_a_cased_class_derives_nothing_rather_than_something_wrong():
+    """The conservative half, stated as a fact rather than left implicit."""
+    assert _prefilter.requirement(CASE_SENSITIVE_CLASS) == ()
+    assert _prefilter.requirement(r"(?:decode|[A-Za-z]{8,})") == ()
+
+
+def test_a_nested_alternation_keeps_both_halves_of_its_inner_clause():
+    """The complete half. Dropping the classes made the requirement stronger."""
+    req = _prefilter.requirement(NESTED_CLASS)
+    assert len(req) == 1
+    clause = req[0]
+    assert isinstance(clause, _prefilter.Clause)
+    assert {"outer", "decode"} <= set(clause.literals)
+    assert clause.classes, "the inner braille class was dropped again"
+
+
+def test_the_recorded_pages_hold_for_every_codepoint():
+    """The proof, swept rather than sampled.
+
+    For every class that actually gains a clause anywhere in the shipped
+    inventory, every codepoint in the whole Unicode space that the class matches
+    under IGNORECASE must fold onto a page the clause recorded. This is the
+    property the reviewer's Kelvin case broke, and it is checked here over all
+    1,114,112 codepoints rather than argued about.
+    """
+    import re as _re
+    from sunglasses.patterns import PATTERNS as _ALL
+    seen = {}
+    for pattern in _ALL:
+        for source in pattern.get("regex", []):
+            for clause in _prefilter.requirement(source):
+                for klass in getattr(clause, "classes", ()):
+                    seen.setdefault(klass.ranges, klass)
+    assert seen, "no shipped rule gains a class clause; this test proves nothing"
+
+    for ranges, klass in seen.items():
+        body = "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in ranges)
+        matcher = _re.compile(f"[{body}]", _re.IGNORECASE)
+        escaped = []
+        for cp in range(0x110000):
+            ch = chr(cp)
+            if not matcher.match(ch):
+                continue
+            for folded in _prefilter.fold(ch):
+                if (ord(folded) >> _prefilter.PAGE_SHIFT) not in klass.pages:
+                    escaped.append(hex(cp))
+                    break
+            if len(escaped) > 5:
+                break
+        assert not escaped, (
+            f"{klass!r} matches {escaped} under IGNORECASE, and folding those "
+            f"lands outside the pages it recorded, so a document containing one "
+            f"would be skipped"
+        )
+
+
+# The reviewer's own 84 rows, kept rather than paraphrased. Each is a custom
+# rule plus a document, through the public constructor, on one channel, with the
+# decision `main` gives. Round 2 changed the decision on every one of them. They
+# are here because reading a guard is not the same as executing the adversary's
+# fixtures against it.
+
+_SOUNDNESS_ROWS = _json_rows = None
+
+
+def _soundness_rows():
+    global _SOUNDNESS_ROWS
+    if _SOUNDNESS_ROWS is None:
+        import json
+        import pathlib as _pathlib
+        _SOUNDNESS_ROWS = json.loads(
+            (_pathlib.Path(__file__).resolve().parent
+             / "prefilter_class_soundness_rows.json").read_text())
+    return _SOUNDNESS_ROWS
+
+
+def test_the_reviewers_soundness_rows_all_decide_the_way_main_does():
+    rows = _soundness_rows()
+    assert len(rows) == 84, f"the reviewer supplied 84 rows, found {len(rows)}"
+    wrong = []
+    for row in rows:
+        rule = _custom("ASTRA-" + row["case"], row["source"])
+        rule["severity"] = "critical"
+        # `_custom` does not declare agent_input, and 12 of these rows run on
+        # it. A rule that is not scoped to the channel returns allow for a
+        # reason that has nothing to do with the prefilter.
+        rule["channel"] = sorted({*rule["channel"], row["channel"]})
+        eng = SunglassesEngine(patterns=[rule], mechanisms=False)
+        if row["fallback"]:
+            eng._literal_index._automaton = None
+        got = eng.scan(row["text"], channel=row["channel"]).decision
+        if got != row["main_decision"]:
+            wrong.append(f"{row['case']} on {row['channel']}: "
+                         f"{got} where main says {row['main_decision']}")
+    assert wrong == [], (
+        f"{len(wrong)} of {len(rows)} reviewer rows decide differently from "
+        f"main:\n  " + "\n  ".join(wrong[:10])
+    )

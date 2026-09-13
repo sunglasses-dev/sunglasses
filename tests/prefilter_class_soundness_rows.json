@@ -1,0 +1,674 @@
+[
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_original",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "KKKKKKKK",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_kelvin_equivalent",
+    "source": "(?:decode|[\\u212a-\\u212b]{8,})",
+    "text": "kkkkkkkk",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_micro_equivalent",
+    "source": "(?:decode|[\\u00b5\\u00b6]+)",
+    "text": "μ",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "unicode_georgian_original",
+    "source": "(?:decode|[\\u10a0-\\u10c5]+)",
+    "text": "Ⴀ",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_clause",
+    "source": "(?:outer|(?:(?:decode|[\\u2800-\\u28ff]{8,})!))",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁!",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "message",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "file",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "web_content",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "tool_output",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "api_response",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "log_memory",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "agent_input",
+    "fallback": false,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "message",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "file",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "web_content",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "tool_output",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "api_response",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "log_memory",
+    "fallback": true,
+    "main_decision": "block"
+  },
+  {
+    "case": "nested_lookahead",
+    "source": "(?:outer|(?=(?:decode|[\\u2800-\\u28ff]{8,})).)",
+    "text": "⠁⠁⠁⠁⠁⠁⠁⠁",
+    "channel": "agent_input",
+    "fallback": true,
+    "main_decision": "block"
+  }
+]
