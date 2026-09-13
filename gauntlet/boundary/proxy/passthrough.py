@@ -151,7 +151,7 @@ class Handle:
 class Passthrough:
     def __init__(self, deadline_ms: int = 2000, watchdog_ms: int = 3000,
                  wire_frame_limit: int = DEFAULT_WIRE_FRAME_LIMIT,
-                 byte_budget: int | None = None):
+                 byte_budget: int | None = None, receipts_path=None):
         self.deadline_ms = deadline_ms
         self.watchdog_ms = watchdog_ms
         self.wire_frame_limit = wire_frame_limit
@@ -164,13 +164,31 @@ class Passthrough:
         self._hold_entered: dict = {}
         self._cancel_accepted: dict = {}
         self._upstream_forwards = 0
+        # WRITTEN DURING THE RUN, not at shutdown. Holding the events in memory
+        # until `serve` returns means a run that is killed, hangs, or is being
+        # watched from outside leaves NOTHING behind, and the state a reader
+        # most wants is the state of a run that did not end well. It also made
+        # the live cancellation test below impossible to write against the real
+        # adapter, because nothing was observable until the thing it was
+        # observing had finished.
+        self._receipts_path = pathlib.Path(receipts_path) if receipts_path else None
+        if self._receipts_path:
+            self._receipts_path.parent.mkdir(parents=True, exist_ok=True)
+            self._receipts_path.write_text("")
 
     # ── receipts ────────────────────────────────────────────────────────────
     def _emit(self, kind: str, request_id, **fields) -> None:
         with self._lock:
-            self.events.append({"run_id": self.run_id, "seq": len(self.events),
-                                "at": time.time(), "kind": kind,
-                                "request_id": request_id, **fields})
+            event = {"run_id": self.run_id, "seq": len(self.events),
+                     "at": time.time(), "kind": kind,
+                     "request_id": request_id, **fields}
+            self.events.append(event)
+            if self._receipts_path:
+                # Appended and flushed inside the lock, so the file's order is
+                # the sequence order and a reader never sees a half line.
+                with self._receipts_path.open("a", encoding="utf-8") as sink:
+                    sink.write(json.dumps(event, default=str) + "\n")
+                    sink.flush()
 
     # ── frames ──────────────────────────────────────────────────────────────
     def read_frame(self, line: str) -> FrameVerdict:
@@ -489,7 +507,8 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
     stdin = stdin if stdin is not None else _sys.stdin.buffer
     stdout = stdout if stdout is not None else _sys.stdout.buffer
     proxy = Passthrough(deadline_ms=deadline_ms, watchdog_ms=watchdog_ms,
-                        wire_frame_limit=wire_frame_limit)
+                        wire_frame_limit=wire_frame_limit,
+                        receipts_path=receipts)
     upstream = subprocess.Popen(upstream_argv, stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 start_new_session=True)
@@ -497,6 +516,36 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
 
     def scanner(payload, channel):
         return list(scanner_argv) + ["--channel", channel]
+
+    write_lock = threading.Lock()
+    inflight: list = []
+
+    def deliver(sink, raw, outcome):
+        """One writer at a time, so two settling scans cannot interleave bytes.
+
+        Order is NOT preserved and does not need to be: JSON-RPC correlates by
+        id, and preserving arrival order is exactly what made a hung scan block
+        every healthy message behind it.
+        """
+        with write_lock:
+            if outcome.forwarded:
+                _write(sink, raw)
+            else:
+                _write(stdout, (json.dumps(outcome.replacement) + "\n").encode())
+
+    def cancellation_target(message):
+        """The id a `notifications/cancelled` is about, or None.
+
+        Notifications used to pass straight through on the strength of having no
+        `id` of their own, so a cancellation was forwarded upstream and the
+        proxy never learned of it. G2-11 could not have worked: nothing on this
+        path ever called `cancel`.
+        """
+        if message.get("method") != "notifications/cancelled":
+            return None
+        params = message.get("params") or {}
+        target = params.get("requestId")
+        return target if target is not None else params.get("request_id")
 
     def pump(source, sink, direction, label):
         for raw in iter(source.readline, b""):
@@ -511,8 +560,17 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 continue
             message = verdict.message
             request_id = message.get("id")
-            if request_id is None:            # notifications pass through
-                _write(sink, raw)
+            if request_id is None:            # notifications
+                target = cancellation_target(message)
+                if target is not None:
+                    # RETIRE BEFORE RELEASE. `cancel` records CANCEL_ACCEPTED,
+                    # drops the id from pending and kills the worker, and it
+                    # happens before the notification is forwarded, so there is
+                    # no window in which the upstream has been told to stop
+                    # while this side still believes a release is coming.
+                    proxy.cancel(target)
+                with write_lock:
+                    _write(sink, raw)
                 continue
             leaves = inspection_input(message, direction)
             if not leaves:
@@ -526,12 +584,35 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             proxy._emit("INSPECTING", request_id, direction=direction,
                         leaves=[path for path, _v in leaves],
                         utf8_bytes=len(text.encode("utf-8", "surrogatepass")))
-            outcome = proxy.submit(direction, request_id=request_id, payload=text,
-                                   scanner=scanner).result()
-            if outcome.forwarded:
-                _write(sink, raw)
-            else:
-                _write(stdout, (json.dumps(outcome.replacement) + "\n").encode())
+            # THE PUMP DOES NOT WAIT. It used to call `.result()` here, which
+            # blocked this thread until the scan settled, so the reader could
+            # not take the next frame. Three consequences, all of them fatal to
+            # the scenarios that need them: a cancellation for the message being
+            # scanned queued up BEHIND the scan it was meant to cancel and could
+            # never arrive in time; a healthy request sat behind a hung one and
+            # was reported as slow mediation rather than as head of line
+            # blocking; and the deadline measured the queue instead of the scan.
+            handle = proxy.submit(direction, request_id=request_id, payload=text,
+                                  scanner=scanner)
+
+            def settle(handle=handle, raw=raw, sink=sink, request_id=request_id):
+                try:
+                    deliver(sink, raw, handle.result())
+                except WatchdogTripped as tripped:
+                    # A harness fault, not a scenario result. It is recorded and
+                    # nothing is written, because writing either the payload or
+                    # a replacement here would invent an outcome.
+                    proxy._emit("WATCHDOG_TRIPPED", request_id,
+                                direction=direction, detail=str(tripped))
+
+            worker = threading.Thread(target=settle, daemon=True)
+            inflight.append(worker)
+            worker.start()
+        # Every scan still in flight is given until its own watchdog to settle
+        # before this direction is declared closed, so a message is never lost
+        # merely because the stream ended while it was being inspected.
+        for worker in list(inflight):
+            worker.join(timeout=(watchdog_ms / 1000) + 1)
         proxy._emit("PUMP_CLOSED", None, direction=direction, label=label)
         if direction == "request":
             # The client hung up. Close the upstream's stdin so IT exits, which
@@ -557,9 +638,10 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             thread.join()
     finally:
         _kill_group(upstream, TERMINATION_GRACE_MS / 1000)
-        if receipts:
-            pathlib.Path(receipts).write_text(
-                "\n".join(json.dumps(e) for e in proxy.events) + "\n")
+        if receipts and not proxy.events:
+            # The stream already holds every event. This only covers a run that
+            # emitted nothing at all, so the file exists either way.
+            pathlib.Path(receipts).write_text("")
     return 0
 
 
