@@ -12,6 +12,7 @@ the evidence rather than a clean-looking directory.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import re
@@ -40,6 +41,9 @@ MODEL = "claude-haiku-4-5-20251001"
 # and "the payload never arrived" produce the same empty destination, so 17 of
 # the 21 first-generation rows were being graded with no baseline.
 HOOK_COMPARISON_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
+# The scanner faults a session can select. Kept beside the configuration because
+# the configuration is where a reader looks to see what a run was able to do.
+FAULT_MODES = ("exception", "hang", "barrier")
 CONTROL_SEEDS = HOOK_COMPARISON_SEEDS  # kept: read by the loader's docstring and tests
 
 
@@ -67,8 +71,19 @@ def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms,
     if route == "control":
         server = {"command": upstream_argv[0], "args": upstream_argv[1:]}
     else:
-        scanner = (f"{PY} {PACKAGE / 'fault_worker.py'} scan "
-                   f"--engine-root {engine_root}")
+        # A DISPATCHER, not a fixed mode. `fault_worker.py scan` was written into
+        # every configuration, so all six G2-08/09/11 rows ran an ordinary scan
+        # and measured an unfaulted session; ASTRA had to supply his own
+        # dispatcher to exercise the fault seeds at all, which means the
+        # instrument could not run its own scenarios. The mode cannot be chosen
+        # here because one session carries both the faulted message and the
+        # healthy one that proves the fault was not global, so it is chosen per
+        # scan from the payload actually held. The modes are named in the argv so
+        # a reader of the configuration can see which faults this session can
+        # inject without running it.
+        scanner = (f"{PY} {HERE / 'proxy' / 'fault_dispatch.py'} "
+                   f"--run-dir {run_dir} --engine-root {engine_root} "
+                   f"--modes {' '.join(FAULT_MODES)}")
         server = {
             "command": PY,
             "args": [str(HERE / "proxy" / "passthrough.py"),
@@ -270,6 +285,22 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                     "materialize", "--variant", variant["name"],
                     "--run-root", str(run_dir)],
                    check=True, capture_output=True)
+    # WHAT THE DISPATCHER READS. Written from the variant this row materialised,
+    # keyed by the digest of the payload it declares, so the fault is selected by
+    # the document actually held and never by arrival order. Without this file
+    # the dispatcher is configured and inert, which would be a green
+    # configuration test over a capability that does nothing.
+    fault = variant.get("fault") or {}
+    payload_name = variant.get("payload")
+    if fault.get("kind") and payload_name and (run_dir / payload_name).is_file():
+        (run_dir / "materialised.fault.json").write_text(json.dumps({
+            "scenario_id": entry["id"], "variant": variant["name"],
+            "fault": fault,
+            "payload": payload_name,
+            "payload_sha256": hashlib.sha256(
+                (run_dir / payload_name).read_bytes()).hexdigest(),
+        }, indent=1) + "\n")
+
     chosen_argv, upstream_kind = upstream_for(entry, variant, run_dir, upstream_argv)
     policy = (scenario_of(entry).get("setup") or {}).get("size_policy") or {}
     config = mcp_config(run_dir, chosen_argv, route=route, engine_root=engine_root,
