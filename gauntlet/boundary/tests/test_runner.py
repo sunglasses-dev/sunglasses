@@ -15,7 +15,9 @@ import runner                                              # noqa: E402
 from client.observe import InstrumentedClient, Mode        # noqa: E402
 from destination.sink import Destination                   # noqa: E402
 from proxy.passthrough import Passthrough                  # noqa: E402
-from runner import Ledger, LedgerRequired, Timeline        # noqa: E402
+from runner import (                                       # noqa: E402
+    Ledger, LedgerRequired, SpendNotAuthorised, Timeline,
+)
 
 PAYLOAD = b'{"jsonrpc":"2.0","id":"c-1","result":{"content":"SYNTHETIC-CANARY-01"}}'
 
@@ -29,10 +31,23 @@ def _stub_transcript(path, content):
 # ── the package is consumed as delivered ───────────────────────────────────
 
 def test_the_manifest_is_read_not_rebuilt():
+    """SELF CONSISTENT, not a remembered pair of numbers.
+
+    This used to assert 12 scenarios and 21 variants. Those were true of the
+    package as first delivered and they are a statement about one delivery
+    rather than about the loader, so the arrival of G2-13 onwards would fail
+    this test for being correct. What has to hold is that the manifest's own
+    counts describe what is actually on disk, which is the thing that catches a
+    seed added to the directory and not to the manifest, or the reverse.
+    """
     manifest = runner.load_manifest()
-    assert manifest["scenario_count"] == 12 and manifest["variant_count"] == 21
     ids = [e["id"] for e in manifest["scenarios"]]
-    assert ids == sorted(ids) and len(ids) == 12
+    assert ids == sorted(ids), f"the manifest is not in id order: {ids}"
+    assert len(ids) == len(set(ids)), "a scenario id appears twice"
+    assert manifest["scenario_count"] == len(ids), (
+        f"the manifest claims {manifest['scenario_count']} scenarios and lists "
+        f"{len(ids)}")
+    assert ids, "the package is empty"
 
 
 def test_every_scenario_directory_has_its_variants():
@@ -166,3 +181,106 @@ def test_replay_makes_no_live_calls_at_all(tmp_path):
     client = InstrumentedClient(tmp_path, mode=Mode.REPLAY)
     assert client.calls_made == 0
     assert not (tmp_path / "calls.jsonl").exists()
+
+
+# ── the ledger, which is the only thing between a run and an overspend ─────
+
+def test_an_unreadable_ledger_line_refuses_instead_of_skipping_it(tmp_path):
+    """The old loop did `continue`, which BUYS a call.
+
+    A truncated write, a partial flush or two writers interleaving produces a
+    line that will not parse, and skipping it under-counts by exactly the
+    mechanism the class comment calls the dangerous direction. Not readable is
+    not the same as not a charge.
+    """
+    path = tmp_path / "calls.jsonl"
+    ledger = Ledger(path, budget=2)
+    ledger.charge("G2-01", "main")
+    with path.open("a") as fh:
+        fh.write('{"charge": true, "charge_i\n')          # truncated
+    with pytest.raises(runner.LedgerUnreadable):
+        Ledger(path, budget=2)
+
+
+def test_an_ambiguous_charge_field_is_refused(tmp_path):
+    """Only the literal true is a charge. `"true"`, 1 and null are not."""
+    path = tmp_path / "calls.jsonl"
+    for value in ('"true"', "1", "null", "false"):
+        path.write_text('{"charge": %s, "charge_id": "abc"}\n' % value)
+        with pytest.raises(runner.LedgerUnreadable):
+            Ledger(path, budget=5)
+
+
+def test_a_repeated_charge_id_is_refused(tmp_path):
+    path = tmp_path / "calls.jsonl"
+    path.write_text('{"charge": true, "charge_id": "dup"}\n'
+                    '{"charge": true, "charge_id": "dup"}\n')
+    with pytest.raises(runner.LedgerUnreadable):
+        Ledger(path, budget=5)
+
+
+def test_the_budget_holds_against_a_second_process(tmp_path):
+    """Two runners each read `spent`, each see room, and the budget buys one
+    more call than it authorised, with neither receipt showing a fault.
+
+    The count is re-read from disk inside an exclusive lock, so the number an
+    instance remembers cannot be what authorises a call.
+    """
+    path = tmp_path / "calls.jsonl"
+    first, second = Ledger(path, budget=1), Ledger(path, budget=1)
+    first.charge("G2-01", "main")
+    with pytest.raises(SpendNotAuthorised):
+        second.charge("G2-02", "main")
+    assert len(Ledger(path, budget=1)._charges()) == 1
+
+
+def test_a_charge_is_tied_to_what_it_produced(tmp_path):
+    """A charge written before a call and never answered is a call whose result
+    nobody can find, and the exam had rows in exactly that state."""
+    path = tmp_path / "calls.jsonl"
+    ledger = Ledger(path, budget=3)
+    paid = ledger.charge("G2-01", "main")
+    orphan = ledger.charge("G2-02", "main")
+    ledger.settle(paid, artifact="live/G2-01.main.proxy_strict/row.json",
+                  outcome="SETTLED")
+    unsettled = ledger.unsettled()
+    assert [row["charge_id"] for row in unsettled] == [orphan], unsettled
+    assert Ledger(path, budget=3).spent == 2, "a terminal row was counted as a charge"
+
+
+def test_the_matrix_drives_every_variant_not_only_the_first():
+    """`variants[0]` reported on a scenario having exercised a third of it.
+
+    A scenario's variants are different experiments, not restatements of one.
+    G2-06's three are a description mutation, a schema mutation and a benign
+    drift, and only one of those can be run first. Driven as source, because the
+    matrix cannot be executed here without live calls.
+    """
+    import ast
+    import pathlib as _pathlib
+
+    source = (_pathlib.Path(__file__).resolve().parents[1] / "batch.py").read_text()
+    assert 'scenario["variants"][0]' not in source, (
+        "the batch still drives only the first variant of each scenario")
+
+    tree = ast.parse(source)
+    main = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef) and node.name == "main")
+    # run_one is reached from a loop over the variant list, not from an index.
+    subscripts = [node for node in ast.walk(main) if isinstance(node, ast.Subscript)
+                  and isinstance(node.value, ast.Subscript)]
+    assert not subscripts, ast.dump(subscripts[0]) if subscripts else ""
+
+
+def test_a_scenario_with_several_variants_is_actually_several_experiments():
+    """The claim the test above depends on, checked against the package."""
+    manifest = runner.load_manifest()
+    several = {}
+    for entry in manifest["scenarios"]:
+        names = [v["name"] for v in runner.scenario_of(entry)["variants"]]
+        if len(names) > 1:
+            several[entry["id"]] = names
+    assert several, "no scenario has more than one variant, so this matters less"
+    assert "G2-06" in several and len(several["G2-06"]) == 3, several.get("G2-06")
+    for scenario_id, names in several.items():
+        assert len(set(names)) == len(names), f"{scenario_id} repeats a variant name"

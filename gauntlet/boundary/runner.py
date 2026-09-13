@@ -15,7 +15,10 @@ enforced only in memory is a budget that disappears with the process.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
+import os
 import pathlib
 import sys
 import time
@@ -33,6 +36,15 @@ class LedgerRequired(RuntimeError):
     """A live batch was started without a durable call ledger."""
 
 
+class LedgerUnreadable(RuntimeError):
+    """The ledger contains a line that cannot be read as a charge or not a charge.
+
+    Separate from SpendNotAuthorised because it is a different answer: not "you
+    have spent enough" but "I cannot tell you what has been spent", and the two
+    must never be confused by a caller deciding whether to make a call.
+    """
+
+
 class Ledger:
     """Every live call, on disk, BEFORE it is made.
 
@@ -45,34 +57,119 @@ class Ledger:
         self.path = pathlib.Path(path)
         self.budget = budget
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Count CHARGES, not lines. The probe wrote a second line recording its
-        # outcome and the ledger read it as another call: 3 calls reported as 4.
-        # Over-counting is the safe direction and it is still wrong, and the same
-        # bug under-counting would have quietly raised the ceiling.
-        self.spent = 0
-        if self.path.exists():
-            for line in self.path.read_text().splitlines():
-                try:
-                    row = json.loads(line)
-                except ValueError:
-                    continue
-                if row.get("charge") is True:
-                    self.spent += 1
+        self.spent = len(self._charges())
+
+    def _charges(self) -> dict:
+        """Every charge on disk, by id. A line it cannot read is FATAL.
+
+        Count CHARGES, not lines. The probe wrote a second line recording its
+        outcome and the ledger read it as another call: 3 calls reported as 4.
+        Over-counting is the safe direction and it is still wrong, and the same
+        bug under-counting would have quietly raised the ceiling.
+
+        AND AN UNREADABLE LINE IS NOT A LINE THAT SAYS NOTHING. This used to
+        `continue` past anything that failed to parse, which is under-counting
+        by exactly the mechanism the paragraph above calls dangerous: a truncated
+        write, a partial flush, or two writers interleaving produces garbage that
+        silently buys another call. A ledger that cannot be read in full cannot
+        authorise anything, so it refuses instead.
+        """
+        charges: dict = {}
+        if not self.path.exists():
+            return charges
+        for number, line in enumerate(self.path.read_text().splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError as broken:
+                raise LedgerUnreadable(
+                    f"{self.path} line {number} is not readable JSON ({broken}). "
+                    f"A ledger that cannot be read in full cannot authorise a "
+                    f"call, because an unreadable line is indistinguishable from "
+                    f"a charge. Repair or archive it deliberately.") from broken
+            if not isinstance(row, dict):
+                raise LedgerUnreadable(f"{self.path} line {number} is not an object")
+            if "charge" not in row:
+                continue                      # a terminal row, not a charge
+            if row["charge"] is not True:
+                raise LedgerUnreadable(
+                    f"{self.path} line {number} has an ambiguous charge field "
+                    f"{row['charge']!r}. Only the literal true is a charge.")
+            charge_id = row.get("charge_id")
+            if not charge_id:
+                raise LedgerUnreadable(
+                    f"{self.path} line {number} is a charge with no charge_id, "
+                    f"so no terminal artifact can be tied to it.")
+            if charge_id in charges:
+                raise LedgerUnreadable(
+                    f"{self.path} records charge_id {charge_id!r} twice.")
+            charges[charge_id] = row
+        return charges
 
     def remaining(self) -> int:
         return self.budget - self.spent
 
-    def charge(self, scenario_id: str, variant: str, note: str = "") -> None:
-        if self.spent >= self.budget:
-            raise SpendNotAuthorised(
-                f"the ledger at {self.path} already records {self.spent} calls "
-                f"against a budget of {self.budget}. Stop and report the count; "
-                f"raising the ceiling is not this run's decision.")
-        with self.path.open("a") as fh:
-            fh.write(json.dumps({"charge": True, "at": time.time(),
-                                 "scenario_id": scenario_id,
-                                 "variant": variant, "note": note}) + "\n")
-        self.spent += 1
+    @contextlib.contextmanager
+    def _exclusive(self):
+        """One writer at a time, across PROCESSES.
+
+        Two runners could each read `spent` and each decide there was room, so a
+        budget of 35 buys 36 calls and the receipt shows neither writer doing
+        anything wrong. The count is re-read from disk INSIDE the lock, because
+        the number this instance remembers is exactly the stale thing.
+        """
+        with self.path.open("a+") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield handle
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def charge(self, scenario_id: str, variant: str, note: str = "") -> str:
+        charge_id = uuid.uuid4().hex[:12]
+        with self._exclusive() as handle:
+            spent = len(self._charges())
+            if spent >= self.budget:
+                self.spent = spent
+                raise SpendNotAuthorised(
+                    f"the ledger at {self.path} already records {spent} calls "
+                    f"against a budget of {self.budget}. Stop and report the "
+                    f"count; raising the ceiling is not this run's decision.")
+            handle.write(json.dumps({"charge": True, "charge_id": charge_id,
+                                     "at": time.time(),
+                                     "scenario_id": scenario_id,
+                                     "variant": variant, "note": note}) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+            self.spent = spent + 1
+        return charge_id
+
+    def settle(self, charge_id: str, artifact: str, outcome: str = "") -> None:
+        """Tie a charge to the thing it produced.
+
+        A charge written before a call and never answered is a call whose result
+        nobody can find, and the exam had rows in exactly that state. Recording
+        the terminal artifact makes the gap visible instead of arithmetical.
+        """
+        with self._exclusive() as handle:
+            handle.write(json.dumps({"settled": charge_id, "at": time.time(),
+                                     "artifact": artifact,
+                                     "outcome": outcome}) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def unsettled(self) -> list:
+        """Charges with no terminal artifact behind them."""
+        charges = self._charges()
+        settled = set()
+        for line in self.path.read_text().splitlines() if self.path.exists() else []:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if isinstance(row, dict) and row.get("settled"):
+                settled.add(row["settled"])
+        return [row for charge_id, row in charges.items() if charge_id not in settled]
 
 
 class Timeline:
