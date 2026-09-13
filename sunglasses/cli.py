@@ -1190,7 +1190,12 @@ def _display(value, limit: int = 96) -> str:
     and dump a traceback instead of naming the orphan it was asked about. The
     outer quotes are stripped so an ordinary value still renders as itself.
     `sanitize_receipt_field` stays behind it as depth and as the single place
-    this module defines control and bidi; on repr's ASCII output it is a no-op.
+    this module defines control and bidi. Its output is NOT ASCII: repr keeps
+    printable non-ASCII as itself, and an earlier version of this sentence said
+    otherwise. What repr does guarantee, swept over all 1,114,112 code points,
+    is that nothing in category Cc, Cf, Cs, Zl or Zp survives it and every
+    output code point is one of a bounded printable set, which is the property
+    the sanitizer behind it has nothing left to remove from.
 
     This is display only. The raw id is what pairs the records, and it is never
     passed through here.
@@ -1216,8 +1221,10 @@ def _unreadable_preview(material, reason: str = "") -> str:
     `repr` makes a control VISIBLE instead of active and keeps the preview
     faithful (an audit preview that silently dropped bytes would be its own small
     lie), and `sanitize_receipt_field` behind it is depth and the single place
-    this module defines "control character" and "bidi". On repr's ASCII output it
-    is a no-op, which is what a gate behind a correct step should be.
+    this module defines "control character" and "bidi". Repr's output is not
+    ASCII, it keeps printable non-ASCII as itself; what it leaves behind carries
+    nothing in Cc, Cf, Cs, Zl or Zp, so the sanitizer is a no-op on it, which is
+    what a gate behind a correct step should be.
 
     An earlier version of this docstring called that sanitizer "the same function
     every other untrusted field on this render path goes through". It was not.

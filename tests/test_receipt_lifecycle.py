@@ -604,41 +604,237 @@ def test_control_restoring_the_raw_interpolation_replays_it(home, field, value):
             "is not what is keeping the orphan identifiable")
 
 
-# ── the guard that reads the source, and the eight ways past its first draft ──
-# Round 5 shipped this check as a line grep for `{...get(` inside an f-string.
-# Executed against eight ways to print a parsed field, it caught ONE. Its name
-# said "every receipt field printed on this path"; what it checked was one
-# syntax. That is the same defect as the docstring round 4 had to correct, in a
-# test written to stop exactly that, so the bypass set below is committed and
-# each shape is a control rather than a paragraph claiming it was considered.
+# ── the per-site runtime matrix: the gate ────────────────────────────────────
+# Round 6 proved the helper is correct and that removing it GLOBALLY replays the
+# bytes. Neither statement says every display site calls it. The reviewer put
+# ONE site back to raw, the pretty table's timestamp, and all 433 selected tests
+# stayed green: the timestamp is assigned through `str(...)` and a `[11:19]`
+# slice, so the source guard below never taints it, and no fixture put hostile
+# bytes inside those eight characters. A global mutation cannot find a site that
+# is missing; only a per-site one can.
+#
+# So every display site on this path is listed here BY ITS SOURCE TEXT, each
+# with a fixture that puts terminal-control bytes and a lone surrogate inside
+# the slice that site actually displays, and each with a restore control that
+# puts that ONE call back to raw and must go red by itself. The list is the
+# claim: `test_the_matrix_covers_every_display_site` compares it against the
+# `_display(` calls in the file, so a new site added tomorrow fails here rather
+# than shipping unproven.
+
+# site -> (exact source text, that same call put back to raw)
+_SITE_RESTORES = {
+    "orphan_ts": ("_display(rec.get('ts'), 32)",
+                  "str(rec.get('ts', ''))"),
+    "orphan_tool": ("_display(rec.get('tool_name'), 48)",
+                    "str(rec.get('tool_name', ''))"),
+    "orphan_eval_id": ("_display(eid, 64)",
+                       "str(eid)"),
+    "pretty_decision": ('decision = _display(row.get("decision", "?"), limit=10)',
+                        'decision = str(row.get("decision", "?"))'),
+    "pretty_ts": ('stamp = _display(str(row.get("ts", ""))[11:19], limit=8)',
+                  'stamp = str(row.get("ts", ""))[11:19]'),
+    "pretty_rule_id": ('note = _display(row.get("rule_id", ""), limit=44)',
+                       'note = str(row.get("rule_id", ""))'),
+    "pretty_error": ('note = _display(row.get("error", "error"), limit=44)',
+                     'note = str(row.get("error", "error"))'),
+    "pretty_tool": ('tool = _display(row.get("tool_name"), limit=24) or "-"',
+                    'tool = str(row.get("tool_name", "")) or "-"'),
+    "pretty_lane": ("_display(row.get('lane', ''), limit=13)",
+                    "str(row.get('lane', ''))"),
+    "summary_decision": ("_display(k, 10)", "str(k)"),
+}
+
+# Every payload carries an erase, a cursor home and a bidi override, which is
+# what a receipt would use to rewrite the audit line above it, and separately a
+# LONE SURROGATE, which no sanitizer removes and which makes `print` raise
+# instead of naming what it was asked about.
+_CONTROL_PAYLOAD = "\x1b[2J\x1b[H\u202e"
+_SURROGATE_PAYLOAD = "\ud800tail"
+_PAYLOADS = {"control": _CONTROL_PAYLOAD, "surrogate": _SURROGATE_PAYLOAD}
+
+
+def _clean_decision(**over):
+    row = {"ts": "2026-09-12T00:00:00", "kind": "decision", "eval_id": "clean",
+           "decision": "allow", "tool_name": "Bash", "rule_id": "GLS-OK-001",
+           "lane": "fast"}
+    row.update(over)
+    return row
+
+
+def _fixture(site, payload):
+    """(rows, verify) for one site, with `payload` inside the DISPLAYED slice."""
+    if site.startswith("orphan_"):
+        started, decided = _pair()
+        field = {"orphan_ts": "ts", "orphan_tool": "tool_name",
+                 "orphan_eval_id": "eval_id"}[site]
+        orphan = {"ts": "2026-09-12T00:00:00", "kind": "in_flight",
+                  "eval_id": "orphan1", "tool_name": "Bash"}
+        orphan[field] = payload + "x"
+        return [started, decided, json.dumps(orphan)], True
+    if site == "pretty_ts":
+        # The displayed slice is characters 11 to 18 of `ts`, so the payload has
+        # to live THERE. A payload at the front of the field is exactly what the
+        # round-6 fixtures did, and it is why this site was never covered.
+        stamp = "2026-09-12T" + payload
+        assert payload in stamp[11:19] or stamp[11:19].startswith(payload[:8]), stamp[11:19]
+        return [json.dumps(_clean_decision(ts=stamp))], False
+    if site == "pretty_error":
+        return [json.dumps(_clean_decision(lane="error", error=payload + "x"))], False
+    field = {"pretty_decision": "decision", "pretty_rule_id": "rule_id",
+             "pretty_tool": "tool_name", "pretty_lane": "lane",
+             "summary_decision": "decision"}[site]
+    return [json.dumps(_clean_decision(**{field: payload + "x"}))], False
+
+
+def _run_cli(home, verify, restore=None):
+    """The real CLI in a subprocess, with at most ONE display site put to raw."""
+    prelude = "import pathlib, sys, types\nfrom sunglasses import cli\n"
+    if restore is not None:
+        old, new = _SITE_RESTORES[restore]
+        prelude += (
+            "src = pathlib.Path(cli.__file__).read_text()\n"
+            f"old, new = {old!r}, {new!r}\n"
+            "assert src.count(old) == 1, (old, src.count(old))\n"
+            "exec(compile(src.replace(old, new), cli.__file__, 'exec'), cli.__dict__)\n"
+        )
+    code = prelude + (
+        f"sys.exit(cli.cmd_receipts(types.SimpleNamespace("
+        f"verify={verify!r}, today=False, limit=40)))\n"
+    )
+    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    proc = subprocess.run([sys.executable, "-c", code], cwd=TREE,
+                          capture_output=True, env=env)
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def _write_rows(home, rows):
+    _write_bytes_file(home, "2026-09-12.jsonl",
+                      ("\n".join(rows) + "\n").encode("utf-8", "surrogatepass"))
+
+
+def test_what_the_gate_actually_leaves_behind_over_every_code_point():
+    """The corrected docstring sentence, as an assertion.
+
+    Rounds 4 to 6 said the sanitizer behind repr is a no-op "on repr's ASCII
+    output". Repr's output is NOT ASCII: it keeps printable non-ASCII as itself.
+    The claim that holds is about CATEGORIES, so that is what is checked, over
+    every code point rather than over a sample. Takes about a second.
+    """
+    from sunglasses.cli import _display
+
+    dangerous, nonascii = [], 0
+    for cp in range(0x110000):
+        out = _display(chr(cp))
+        for ch in out:
+            if _unicodedata.category(ch) in ("Cc", "Cf", "Cs", "Zl", "Zp"):
+                dangerous.append((hex(cp), hex(ord(ch))))
+            if ord(ch) > 0x7F:
+                nonascii += 1
+    assert dangerous == [], dangerous[:10]
+    assert nonascii > 0, (
+        "every output character is ASCII after all, so the docstring's old "
+        "sentence was right and this correction should be reverted")
+
+
+def test_the_matrix_covers_every_display_site():
+    """The list is a claim about the file, so the file is what checks it.
+
+    A `_display(` call that nobody added a row for is a site with no fixture and
+    no restore control, which is precisely the state the pretty timestamp was in.
+    """
+    source = (TREE / "sunglasses" / "cli.py").read_text()
+    calls = [line.strip() for line in source.splitlines()
+             if "_display(" in line and not line.strip().startswith(("#", "*"))
+             and "def _display" not in line]
+    # every listed site must appear exactly once, and the counts must agree
+    for site, (old, _new) in _SITE_RESTORES.items():
+        assert source.count(old) == 1, (site, source.count(old))
+    listed = sum(old.count("_display(") for old, _ in _SITE_RESTORES.values())
+    found = sum(line.count("_display(") for line in calls)
+    assert found == listed, (
+        f"cli.py makes {found} `_display` calls on this path and the matrix "
+        f"lists {listed}. A display site without a row here has no fixture and "
+        f"no restore control.\n  " + "\n  ".join(calls))
+
+
+@pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
+@pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
+def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, payload):
+    """Twenty runtime assertions: ten sites, control bytes and a lone surrogate."""
+    rows, verify = _fixture(site, _PAYLOADS[payload])
+    _write_rows(home, rows)
+    _code, raw = _run_cli(home, verify)
+    assert b"Traceback" not in raw, raw.decode("utf-8", "replace")
+    _assert_inert(raw)
+
+
+@pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
+@pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
+def test_control_restoring_one_site_replays_it(home, site, payload):
+    """And each of the twenty goes red on its own when that ONE call is raw.
+
+    Not the helper globally. The reviewer's finding was a site the global
+    mutation could not distinguish from a covered one.
+    """
+    rows, verify = _fixture(site, _PAYLOADS[payload])
+    _write_rows(home, rows)
+    _code, raw = _run_cli(home, verify, restore=site)
+    if payload == "control":
+        assert ESC_ERASE in raw and CURSOR_HOME in raw, (
+            f"{site}: restoring this one call did not replay its controls, so "
+            f"the assertion above is not what is stopping them.\n"
+            + raw.decode("utf-8", "replace"))
+    else:
+        assert b"Traceback" in raw, (
+            f"{site}: restoring this one call did not crash on the lone "
+            f"surrogate, so repr is not what is keeping this field printable.\n"
+            + raw.decode("utf-8", "replace"))
+
+
+# ── the source-reading SMOKE CHECK, and what it does not claim ───────────────
+# Round 5 shipped this as a line grep for `{...get(` inside an f-string, and it
+# caught one of eight shapes. Round 6 replaced it with an AST walk that caught
+# all eight and then claimed, by its name, that no parsed field reaches stdout
+# without a gate. The reviewer put 29 more shapes to it and 24 escaped: wrapped
+# assignment, tuple and dict unpacking, comprehensions, a saved generator, an
+# alias to stderr, a class method, subscript access, the walrus, and the
+# dict-literal exemption six different ways.
+#
+# So this stops claiming to be the proof. THE PROOF IS THE RUNTIME MATRIX
+# ABOVE: ten display sites, hostile bytes inside the slice each one displays,
+# and a per-site restore that goes red on its own. This is a smoke check with a
+# narrow claim it can keep: within one function, a `.get` call interpolated
+# DIRECTLY into a sink argument, and a local assigned DIRECTLY from one. It is
+# here to catch the careless case in review, not to certify the file.
+#
+# Two things the reviewer got past it are gone rather than documented. The
+# dict-literal exemption trusted any `.get` on any name bound to a dict literal,
+# which is six lines of setup to defeat; it is replaced by an allowlist of exact
+# source lines, currently one. And a gate was trusted by NAME, so a method
+# merely called `_display` counted; a gate must now be a bare call to a name
+# this module resolves to the real function.
 
 _GATES = {"_display", "_unreadable_preview"}
 _SINKS = {"print"}
 
 
-def _our_own_dicts(func):
-    """Names bound to a dict LITERAL in this function.
-
-    `colors.get(decision)` is a lookup in the renderer's own table of ANSI codes
-    and can only return one of our strings. The first version of this walker
-    flagged it, and a guard that cries wolf on the renderer's own dict is a
-    guard someone switches off. A dict written out in the source is ours.
-    """
-    ours = set()
-    for node in ast.walk(func):
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    ours.add(target.id)
-    return ours
+# Exact source lines this check is allowed to pass, each with the reason. An
+# allowlist of LINES, not of a syntax: the previous exemption was "any `.get` on
+# a name bound to a dict literal", which the reviewer satisfied six ways.
+# `test_the_allowlisted_line_is_still_there_and_still_needs_allowlisting` keeps
+# this honest in both directions.
+_ALLOWED_LINES = {
+    'color = colors.get(decision, "")':
+        "the renderer's own ANSI table, keyed by a `decision` that has already "
+        "been through _display on the line above. Nothing receipt-supplied can "
+        "come out of it.",
+}
 
 
-def _reads_a_parsed_field(node, ours):
+def _reads_a_parsed_field(node):
     return (isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "get"
-            and not (isinstance(node.func.value, ast.Name)
-                     and node.func.value.id in ours))
+            and node.func.attr == "get")
 
 
 def _called_name(node):
@@ -651,28 +847,55 @@ def _called_name(node):
     return None
 
 
-def unrouted_fields(source):
-    """Every place a parsed field reaches stdout without passing a gate.
+def _is_gate_call(node):
+    """A gate is a BARE call to one of the gate names, never an attribute.
 
-    LIMIT, stated rather than left for a reviewer: flow between functions is not
-    tracked. A helper that returns a raw field is caught only because ANY
-    underscore helper that is not a gate is flagged inside a sink argument,
-    which is coarse; a field carried into a global and printed elsewhere is not
-    caught at all. What this does prove is that these two renderers do not print
-    a parsed field themselves by any of the eight shapes below.
+    `self._display(x)` and `evil._display(x)` are not this module's gate; round
+    6 trusted both because it compared the attribute name.
+    `test_the_gate_names_resolve_to_the_real_functions` checks that these names
+    mean in `cli` what they mean here.
+    """
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in _GATES)
+
+
+def unrouted_fields(source):
+    """Direct `.get` interpolation and directly tainted locals. Nothing wider.
+
+    WHAT THIS CATCHES, and the name of the test says only this: inside one
+    function, a `.get` call written straight into a sink argument, a local
+    assigned straight from a `.get`, and an underscore helper that is not a gate
+    appearing in a sink argument.
+
+    WHAT IT DOES NOT CATCH, executed by the reviewer, 24 shapes of 29: an
+    assignment wrapped in anything at all (`str(row.get(...))`, a slice, a
+    conditional), tuple and dict unpacking, comprehension targets, a generator
+    saved and consumed later, an alias bound to `sys.stderr.write`, a method on
+    a class, subscript access instead of `.get`, and the walrus. Flow between
+    functions is not tracked in either direction.
+
+    The pretty table's timestamp is the worked example and the reason this
+    docstring exists: `_display(str(row.get("ts", ""))[11:19], limit=8)` is
+    assigned through a conversion and a slice, so removing the gate there leaves
+    this check silent. The RUNTIME MATRIX above is what proves that site, and
+    every other one.
     """
     tree = ast.parse(textwrap.dedent(source))
+    lines = textwrap.dedent(source).splitlines()
+    def allowed(where):
+        return (1 <= where <= len(lines)
+                and lines[where - 1].strip() in _ALLOWED_LINES)
     problems = []
     for func in [n for n in ast.walk(tree)
                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
-        ours = _our_own_dicts(func)
         tainted = {t.id for node in ast.walk(func)
                    if isinstance(node, ast.Assign)
-                   and _reads_a_parsed_field(node.value, ours)
+                   and _reads_a_parsed_field(node.value)
+                   and not allowed(getattr(node, "lineno", 0))
                    for t in node.targets if isinstance(t, ast.Name)}
         inside_a_gate = set()
         for parent in ast.walk(func):
-            if isinstance(parent, ast.Call) and _called_name(parent) in _GATES:
+            if _is_gate_call(parent):
                 inside_a_gate.update(id(n) for n in ast.walk(parent))
 
         for node in ast.walk(func):
@@ -686,7 +909,9 @@ def unrouted_fields(source):
             for arg in node.args:
                 for inner in ast.walk(arg):
                     where = getattr(inner, "lineno", 0)
-                    if _reads_a_parsed_field(inner, ours) \
+                    if allowed(where):
+                        continue
+                    if _reads_a_parsed_field(inner) \
                             and id(inner) not in inside_a_gate:
                         problems.append(
                             f"{func.name}:{where} a parsed field reaches "
@@ -704,16 +929,56 @@ def unrouted_fields(source):
     return problems
 
 
-def test_no_parsed_field_reaches_stdout_without_a_gate():
-    """The claim in the name, checked on the tree rather than on one syntax."""
+def test_no_direct_parsed_field_interpolation_reaches_stdout():
+    """The narrowed claim: no DIRECT interpolation, in these two functions.
+
+    Not "no parsed field reaches stdout". That sentence belongs to the runtime
+    matrix above, which executes every display site.
+    """
     import inspect
     from sunglasses import cli
 
     for function in (cli._verify_lifecycle, cli.cmd_receipts):
         problems = unrouted_fields(inspect.getsource(function))
         assert problems == [], (
-            f"{function.__name__} prints a parsed field without routing it "
-            f"through _display:\n  " + "\n  ".join(problems))
+            f"{function.__name__} interpolates a parsed field directly without "
+            f"routing it through _display:\n  " + "\n  ".join(problems))
+
+
+def test_the_gate_names_resolve_to_the_real_functions():
+    """`_GATES` is a set of strings. This is what makes them mean something."""
+    import types
+    from sunglasses import cli
+
+    for name in _GATES:
+        gate = getattr(cli, name, None)
+        assert isinstance(gate, types.FunctionType), f"{name} is {gate!r}"
+        assert gate.__module__ == "sunglasses.cli", gate.__module__
+
+
+def test_the_allowlisted_line_is_still_there_and_still_needs_allowlisting():
+    """Both directions, so the allowlist cannot rot into a blanket.
+
+    If the line is gone, the entry is dead and must be deleted. If the line is
+    there and the walker would NOT flag it, the entry is doing nothing and hides
+    the next real one.
+    """
+    import inspect
+    from sunglasses import cli
+
+    source = inspect.getsource(cli.cmd_receipts)
+    for line in _ALLOWED_LINES:
+        assert line in source, f"allowlisted line is gone from cli.py: {line!r}"
+    saved = dict(_ALLOWED_LINES)
+    try:
+        _ALLOWED_LINES.clear()
+        problems = unrouted_fields(source)
+    finally:
+        _ALLOWED_LINES.update(saved)
+    assert problems, (
+        "with the allowlist empty the walker flags nothing, so every entry in "
+        "it is decoration")
+    assert unrouted_fields(source) == [], unrouted_fields(source)
 
 
 # Eight ways to print a parsed field. The round 5 grep caught the last one only.
@@ -733,10 +998,39 @@ _CLEAN = {
                         '    print(f"orphan {_display(row.get(\'e\'))}")'),
     "routed local": ('def f(row):\n    name = _display(row.get("t"))\n'
                      '    print(f"orphan {name}")'),
-    "the renderer's own dict": ('def f(row):\n    colors = {"a": "1"}\n'
-                                '    c = colors.get("a", "")\n'
-                                '    print(f"orphan {c}")'),
     "nothing parsed at all": 'def f(row):\n    print("orphan")',
+}
+# Round 6 had the shape below in `_CLEAN`, passing because any `.get` on a name
+# bound to a dict literal was exempt. That exemption is gone, so this is now a
+# FALSE POSITIVE and it is filed as one: asserted flagged, so the cost of
+# dropping the exemption is visible rather than discovered, and handled by the
+# one line in `_ALLOWED_LINES` rather than by a rule anyone can satisfy.
+# Six of the reviewer's 24 escapes, executed. The docstring above states them
+# in prose; these make the statement checkable, and they are the reason the
+# runtime matrix and not this walker is the gate.
+_SHAPES_THAT_ESCAPE = {
+    "assignment wrapped in str()":
+        'def f(row):\n    t = str(row.get("t"))\n    print(f"orphan {t}")',
+    "assignment through a slice":
+        'def f(row):\n    t = str(row.get("t"))[11:19]\n    print(f"orphan {t}")',
+    "tuple unpacking":
+        'def f(row):\n    a, b = row.get("a"), row.get("b")\n    print(f"{a}{b}")',
+    "comprehension target":
+        'def f(rows):\n    xs = [r.get("t") for r in rows]\n    print(" ".join(xs))',
+    "saved generator":
+        'def f(rows):\n    g = (r.get("t") for r in rows)\n    print(next(g))',
+    # The walrus ESCAPES only when it binds outside the sink: `tainted` is
+    # built from ast.Assign and a NamedExpr is not one. Written INSIDE the
+    # print argument the `.get` is visible and this walker does catch it, which
+    # is why that form is in _BYPASSES and this one is here.
+    "walrus binding outside the sink":
+        'def f(row):\n    if (t := row.get("t")):\n        print(f"orphan {t}")',
+}
+_ACCEPTED_FALSE_POSITIVES = {
+    "a lookup in the renderer's own dict": (
+        'def f(row):\n    colors = {"a": "1"}\n'
+        '    c = colors.get("a", "")\n'
+        '    print(f"orphan {c}")'),
 }
 
 
@@ -752,3 +1046,31 @@ def test_control_a_clean_shape_is_not_flagged(shape):
     """And the other half, because a guard that flags everything protects
     nothing and gets switched off by the first person it annoys."""
     assert unrouted_fields(_CLEAN[shape]) == [], unrouted_fields(_CLEAN[shape])
+
+
+@pytest.mark.parametrize("shape", sorted(_ACCEPTED_FALSE_POSITIVES),
+                         ids=sorted(_ACCEPTED_FALSE_POSITIVES))
+def test_the_accepted_false_positive_really_is_flagged(shape):
+    """The price of dropping the dict-literal exemption, stated as a fact.
+
+    If this ever stops being flagged, someone has put a category exemption back
+    and `_ALLOWED_LINES` is no longer the only way past.
+    """
+    assert unrouted_fields(_ACCEPTED_FALSE_POSITIVES[shape]), (
+        f"{shape!r} is no longer flagged, so an exemption wider than "
+        f"_ALLOWED_LINES has come back")
+
+
+@pytest.mark.parametrize("shape", sorted(_SHAPES_THAT_ESCAPE),
+                         ids=sorted(_SHAPES_THAT_ESCAPE))
+def test_the_documented_escapes_really_do_escape(shape):
+    """The docstring says 24 of the reviewer's 29 shapes get past. Six of them
+    are here as executed evidence, because a limit nobody runs is a guess.
+
+    Each of these prints a parsed field and this check stays silent. That is
+    the stated behaviour, not a defect to fix here: the runtime matrix is what
+    covers the real file.
+    """
+    assert unrouted_fields(_SHAPES_THAT_ESCAPE[shape]) == [], (
+        f"{shape!r} is now caught. Good, but the docstring says it is not; "
+        f"move it to _BYPASSES and narrow the paragraph.")
