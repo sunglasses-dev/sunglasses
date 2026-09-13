@@ -82,8 +82,22 @@ def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms,
                      "--receipts", str(run_dir / "proxy.receipts.jsonl"),
                      "--scanner", scanner, "--"] + upstream_argv,
         }
+    servers = {"fs": server}
+    if route != "control":
+        # THE SECOND ROUTE, and G2-12 has no scenario without it. Its question is
+        # what happens to a call that reaches the upstream WITHOUT passing the
+        # mediator, and a configuration with one server cannot pose that
+        # question: there is nowhere else to go, so the scenario could only ever
+        # report on the route it was trying to avoid. `direct` is the same
+        # upstream with no proxy in front.
+        #
+        # Deliberately NOT added to fidelity.DEFAULT_ROUTES. For every other
+        # scenario a call that went around the mediator is a different
+        # experiment and must read as one; G2-12 is the case that passes its own
+        # allowed set.
+        servers["direct"] = {"command": upstream_argv[0], "args": upstream_argv[1:]}
     path = run_dir / f"mcp.{route}.json"
-    path.write_text(json.dumps({"mcpServers": {"fs": server}}, indent=1) + "\n")
+    path.write_text(json.dumps({"mcpServers": servers}, indent=1) + "\n")
     return path
 
 
