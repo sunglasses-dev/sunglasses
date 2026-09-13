@@ -16,10 +16,21 @@ def _emit(node, spaced, pick=None, counter=None, optional=None):
     """A minimal string matching one parsed sequence.
 
     `spaced` widens a zero-or-more to one repetition, which is how the tag
-    spacing variants (`< / admin >`) get generated. `pick` selects the Nth
-    alternative of the Nth nested alternation, so the five names inside
-    `<(?:information|important|instructions|system|admin)>` are each covered
-    rather than only the first one.
+    spacing variants (`< / admin >`) get generated.
+
+    `pick` is a VECTOR: a mapping from an alternation node to which of its
+    alternatives to take, so alternations can be varied TOGETHER. It used to be
+    a single (which alternation, which alternative) pair, which varied one
+    alternation at a time and left every other one on its first alternative.
+    For `ignore (?:old|stale) (?:local|remote) policy` that yields
+    `ignore stale local policy` and `ignore old remote policy` and never
+    `ignore stale remote policy`, which is the reviewer's round 9 witness: a
+    marker the regex accepts that the sampler could not produce, so nothing
+    could ask whether it routes.
+
+    The key is the alternation's own alternatives list, not a position in a
+    traversal, because a traversal only enters the alternative it picked and
+    the numbering would shift underneath the vector.
 
     `optional` is `[counter, choices]`, where `choices` maps an optional group's
     index to how many repetitions it should take. `s?` and `(?:...)?` are
@@ -59,16 +70,68 @@ def _emit(node, spaced, pick=None, counter=None, optional=None):
         elif name == "BRANCH":
             alts = av[1]
             idx = 0
-            if counter is not None:
-                here = counter[0]; counter[0] += 1
-                if pick is not None and pick[0] == here:
-                    idx = pick[1] % len(alts)
+            if pick:
+                idx = pick.get(id(alts), 0) % len(alts)
             out.append(_emit(alts[idx], spaced, pick, counter, optional))
         elif name in ("AT", "ASSERT", "ASSERT_NOT"):
             continue
         elif name == "ATOMIC_GROUP":
             out.append(_emit(av, spaced, pick, counter, optional))
     return "".join(out)
+
+
+# Full product up to here, pairwise beyond. 960 is the widest sibling today.
+MAX_PICK_VECTORS = 4000
+
+
+def alternations(node, table=None):
+    """Every alternation in this tree, keyed by its own alternatives list.
+
+    Walks into EVERY alternative, not only the one a pick would take, so the
+    keys are stable whatever the vector says. Returns key -> how many
+    alternatives it offers.
+    """
+    table = {} if table is None else table
+    for op, av in node:
+        name = str(op)
+        if name == "BRANCH":
+            table.setdefault(id(av[1]), len(av[1]))
+            for branch in av[1]:
+                alternations(branch, table)
+        elif name == "SUBPATTERN":
+            alternations(av[-1], table)
+        elif name in ("MAX_REPEAT", "MIN_REPEAT"):
+            alternations(av[2], table)
+        elif name == "ATOMIC_GROUP":
+            alternations(av, table)
+    return table
+
+
+def pick_vectors(sizes, cap=MAX_PICK_VECTORS):
+    """Which combinations of alternatives to emit.
+
+    The full product where it fits, because these markers are small: the widest
+    sibling is 960 combinations. Where it does not fit, every PAIR of choices,
+    which is the combinatorial-testing standard and still covers the reviewer's
+    witness, since `stale` with `remote` is a pair. The caller is told which
+    regime it got rather than left to assume the stronger one.
+    """
+    import itertools
+    keys = list(sizes)
+    total = 1
+    for key in keys:
+        total *= sizes[key]
+    if total <= cap:
+        return [dict(zip(keys, combo))
+                for combo in itertools.product(*(range(sizes[k]) for k in keys))], "full"
+    vectors = [{}]
+    for key in keys:
+        vectors += [{key: i} for i in range(1, sizes[key])]
+    for left, right in itertools.combinations(keys, 2):
+        for i in range(sizes[left]):
+            for j in range(sizes[right]):
+                vectors.append({left: i, right: j})
+    return vectors, "pairwise"
 
 
 _SPACE = [' ']          # swapped to a newline for the third variant
@@ -165,20 +228,16 @@ def branch_samples(marker_source):
 
     branches = top_alternation(parsed) or [parsed]
 
-    def nested_count(seq):
-        c = [0]
-        _emit(seq, False, None, c)
-        return c[0]
-
     def optional_count(seq):
         o = [0, None]
         _emit(seq, False, None, [0], o)
         return o[0]
 
     out = []
+    regimes = {}
     for i, b in enumerate(branches):
-        n_nested = nested_count(b)
-        picks = [None] + [(g, k) for g in range(n_nested) for k in range(MAX_NESTED_ALTS)]
+        picks, regime = pick_vectors(alternations(b))
+        regimes[i] = regime
         for spaced in (False, True):
             for pk in picks:
               # Every optional arm on its own, present and absent. `guardrails?`

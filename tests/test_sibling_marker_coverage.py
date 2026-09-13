@@ -223,10 +223,26 @@ def test_match_on_normalized_adds_a_view_and_never_replaces_the_raw_one(engine):
 # Round 9 raised this from 59 without any behaviour changing. The generator now
 # walks optional arms, so it emits samples it never used to (`guardrail` beside
 # `guardrails`, `instruction` beside `instructions`), and ten more of GLS-PI-013-API's
-# markers turn out to be in the same residual. They always were. Per family, the
-# 69 is 27 for GLS-PI-021-API and 42 for GLS-PI-013-API; GLS-PI-017-API is 0 and
-# the three rules on the normalized path do not need a keyword at all.
-NEWLINE_SPLIT_UNROUTED = 69
+# markers turn out to be in the same residual. They always were.
+#
+# Round 11 raises it again for the same reason and it is worth being exact about
+# why, because a residual baseline that drifts upward every round is how a gate
+# stops meaning anything. The sampler used to vary ONE nested alternation at a
+# time, leaving every other one on its first alternative, so combinations like
+# `stale` with `remote` were never produced. It now takes a pick VECTOR. Nothing
+# about the rules or the index changed; four markers that were always in this
+# residual became visible, all four in GLS-PI-021-API and all four the same
+# `openai` alternative crossed with a prefix the old walker never paired it with:
+#
+#   'authorization\nfrom openai'   'authorization from\nopenai'
+#   'employee at\nopenai'          'engineer at\nopenai'
+#
+# Per family the 73 is 31 for GLS-PI-021-API and 42 for GLS-PI-013-API;
+# GLS-PI-017-API is 0 and the three rules on the normalized path do not need a
+# keyword at all. Core coverage widened at the same time and every new core
+# sample still routes, which is the half of this that is good news:
+# GLS-PI-013-API went from 39 generated core samples to 144.
+NEWLINE_SPLIT_UNROUTED = 73
 
 
 def test_the_newline_split_residual_does_not_grow(engine):
@@ -474,3 +490,78 @@ def test_every_shipped_marker_branch_reaches_the_sampler():
     assert not empty, f"{empty} produce no accepted sample at all"
     assert len(counts) == 6, counts
     print("\n".join(f"  {pid}: {n} unique accepted" for pid, n in sorted(counts.items())))
+
+
+# ── a route may be added and may not be removed ─────────────────────────────
+# Round 10's exemption test asked whether an exempt rule has a marker sample
+# that reaches nothing through the index. The reviewer satisfied it by DELETING
+# `if you are` from GLS-PI-013-API's keywords and adding the flag: a sample that
+# used to route stopped routing, so the exemption looked earned. The test was
+# reading the branch's own data as the standard for the branch's own data.
+#
+# So the standard moves off the branch. `p1b_routing_baseline.json` records
+# which keywords actually reach each family through the BUILT index, frozen at
+# the reviewed head. Growing a family is free. Shrinking one now needs a second,
+# visible edit to a pinned file rather than a quiet deletion inside a large
+# patterns diff.
+ROUTING_BASELINE = _json.loads(
+    (pathlib.Path(__file__).resolve().parent / "p1b_routing_baseline.json").read_text()
+)["families"]
+
+
+def _indexed_keywords(engine, pattern_id):
+    return {k for k, patterns in engine._keyword_to_patterns.items()
+            if any(p["id"] == pattern_id for p in patterns)}
+
+
+def test_no_family_has_lost_a_route(engine):
+    """Containment, per family, against the pinned set."""
+    assert ROUTING_BASELINE, "the pinned baseline is empty; it proves nothing"
+    lost = {}
+    for pattern_id, pinned in ROUTING_BASELINE.items():
+        missing = sorted(set(pinned) - _indexed_keywords(engine, pattern_id))
+        if missing:
+            lost[pattern_id] = missing
+    assert lost == {}, (
+        f"routes disappeared: {lost}. A keyword that used to reach a rule no "
+        f"longer does, which makes that rule look less routable than it is and "
+        f"is exactly how `match_on: normalized` was earned in round 10. If the "
+        f"removal is deliberate, say why in the PR and regenerate "
+        f"p1b_routing_baseline.json in the same commit."
+    )
+
+
+def test_the_pinned_baseline_describes_this_engine(engine):
+    """The pin is only a standard while it is about the rules that exist."""
+    known = {p["id"] for p in SIBLINGS}
+    unknown = sorted(set(ROUTING_BASELINE) - known)
+    assert unknown == [], (
+        f"{unknown} are pinned and no longer exist; the file is describing a "
+        f"tree that is gone")
+    unpinned = sorted(known - set(ROUTING_BASELINE))
+    assert unpinned == [], (
+        f"{unpinned} are siblings with no pinned routes, so nothing stops their "
+        f"routes being deleted")
+
+
+def test_control_deleting_a_route_is_caught_by_name():
+    """The reviewer's exact move, executed.
+
+    Build an engine whose GLS-PI-013-API has lost `if you are`, and the
+    containment check names that rule and that keyword.
+    """
+    victim = "GLS-PI-013-API"
+    doomed = "if you are"
+    assert doomed in ROUTING_BASELINE[victim], (
+        f"{doomed!r} is not a pinned route of {victim}; this control is aimed "
+        f"at nothing")
+    patched = []
+    for pattern in PATTERNS:
+        if pattern["id"] == victim:
+            pattern = dict(pattern, keywords=[k for k in pattern["keywords"]
+                                              if k != doomed])
+        patched.append(pattern)
+    broken = SunglassesEngine(patched)
+    missing = sorted(set(ROUTING_BASELINE[victim])
+                     - _indexed_keywords(broken, victim))
+    assert missing == [doomed], missing
