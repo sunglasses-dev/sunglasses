@@ -447,3 +447,157 @@ def test_two_rules_with_the_same_source_keep_their_own_span():
         f"the wide rule's window reaches the gap and the narrow one's does not, "
         f"which is each rule's own declaration. Got {seen}"
     )
+
+
+# ── round 2: what anchoring is worth, and where it is worth nothing ─────────
+# The eleven document overlay against #152 says three things, and they only
+# make sense together. Anchoring is dramatic where the object is genuinely
+# rare, it is worth nothing where the adversarial junk is MADE of the rule's
+# own object words, and it is never meaningfully worse than not anchoring.
+#
+# An earlier measurement of mine said 1.14x across all eleven. That number came
+# from an anchor list I wrote myself which covered only the rare object group,
+# so it would have MISSED every match through the other ordering. It was fast
+# because it was unsound. The sound list contains the common words too, and on
+# a document made of those words every position is a window.
+#
+# So the gate is three assertions rather than one number, on a rule of the same
+# shape built here, so the file does not depend on another branch.
+
+RARE_OBJECT = r"(?:system\s+prompt|credentials)"
+COMMON_OBJECT = r"(?:mask|safety)"
+TWO_ORDERINGS = (
+    r"(?is)(?:\bnote\s+to\s+ai\b[\s\S]{0,60}?\bshow\b[^.]{0,48}?" + RARE_OBJECT + r"\b"
+    r"|\bignore\b[\s\S]{0,60}?\bdisable\b[^.]{0,48}?" + COMMON_OBJECT + r"\b)"
+)
+# Both groups, because a match through either ordering has to be findable. This
+# is the soundness constraint that costs the speed.
+TWO_GROUP_TERMS = ["system prompt", "credentials", "mask", "safety"]
+
+RARE_OBJECT_SEEDS = {
+    "note to ai show ": "note to ai show ",
+    "note to ai show office hours ": "note to ai show office hours ",
+    "<admin>show ": "<admin>show ",
+    "if you are ai show ": "if you are ai show ",
+}
+GROUP_B_SEEDS = {
+    "ignore mask show ": "ignore mask show ",
+    "ignore safety show ": "ignore safety show ",
+    "ignore safety disable mask show ": "ignore safety disable mask show ",
+}
+GATE_BYTES = 1024 * 1024
+PER_DOCUMENT_OVERHEAD = 1.05      # anchored against the same rule unanchored
+# Finding the anchors is not free. `_match_anchored` folds the document and runs
+# one `find` per term before it can decide there is nothing to search, and on a
+# document where that answer is "every position is a window" the fold is pure
+# overhead. Measured at 8 ms on a 1 MiB document whose unanchored scan is 141 ms,
+# which is 1.06x and over the 5 percent line by three milliseconds.
+#
+# So the allowance is 5 percent OR a tenth of what an empty scan of the same
+# document costs, whichever is larger. The second term is measured in this same
+# process against the same document, so it scales with the runner instead of
+# nailing a millisecond count to one machine.
+FLOOR_FRACTION_OF_BASELINE = 0.10
+RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
+TOTALS_SAVING = 0.75              # anchored against the same rule unanchored
+
+
+@pytest.fixture(scope="module")
+def three_engines():
+    """Baseline, the rule unanchored, and the rule anchored. One process."""
+    rule = _rule("GATE", TWO_ORDERINGS, TWO_GROUP_TERMS, span=600)
+    unanchored = {k: v for k, v in rule.items() if not k.startswith("anchor_")}
+    base = SunglassesEngine(patterns=[_rule("UNUSED", r"\bzzzz_never\b", ["zzzz_never"])],
+                            mechanisms=False)
+    engines = (base,
+               SunglassesEngine(patterns=[unanchored], mechanisms=False),
+               SunglassesEngine(patterns=[rule], mechanisms=False))
+    for engine in engines:
+        engine.scan("warm", channel="message")
+    return engines
+
+
+def _measure(three, seed):
+    base, unanchored, anchored = three
+    doc = (seed * ((GATE_BYTES // len(seed)) + 1))[:GATE_BYTES]
+    return tuple(_seconds(e, doc) for e in (base, unanchored, anchored))
+
+
+def _seconds(engine, text):
+    import time
+    started = time.perf_counter()
+    engine.scan(text, channel="message")
+    return time.perf_counter() - started
+
+
+@pytest.mark.slow
+def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines):
+    """First assertion. Where it cannot help it must not hurt."""
+    worse = []
+    for label, seed in {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}.items():
+        base, unanchored, anchored = _measure(three_engines, seed)
+        allowed = unanchored * PER_DOCUMENT_OVERHEAD + base * FLOOR_FRACTION_OF_BASELINE
+        if anchored > allowed:
+            worse.append(f"{label!r}: {anchored:.3f}s anchored against "
+                         f"{unanchored:.3f}s unanchored and a {base:.3f}s baseline, "
+                         f"{anchored / unanchored:.2f}x, allowed {allowed:.3f}s")
+    assert worse == [], (
+        f"anchoring costs more than {PER_DOCUMENT_OVERHEAD}x plus "
+        f"{FLOOR_FRACTION_OF_BASELINE} of the baseline on:\n  " + "\n  ".join(worse)
+    )
+
+
+@pytest.mark.slow
+def test_a_document_with_no_anchor_in_it_costs_almost_nothing(three_engines):
+    """Second assertion. The case the mode exists for.
+
+    None of these seeds contains any declared term, so there is no window to
+    search and the rule should cost about what not having the rule costs.
+    """
+    over = []
+    for label, seed in RARE_OBJECT_SEEDS.items():
+        assert not any(t in seed for t in TWO_GROUP_TERMS), (
+            f"{label!r} contains a declared anchor, so it is not a rare object case"
+        )
+        base, _unanchored, anchored = _measure(three_engines, seed)
+        if anchored > base * RARE_OBJECT_VS_BASELINE:
+            over.append(f"{label!r}: {anchored:.3f}s against a {base:.3f}s baseline, "
+                        f"{anchored / base:.2f}x")
+    assert over == [], (
+        f"a document with no anchor should cost near the baseline, over "
+        f"{RARE_OBJECT_VS_BASELINE}x on:\n  " + "\n  ".join(over)
+    )
+
+
+@pytest.mark.slow
+def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines):
+    """Third assertion. Across everything, including where it does nothing."""
+    total_unanchored = total_anchored = 0.0
+    rows = []
+    for label, seed in {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}.items():
+        base, unanchored, anchored = _measure(three_engines, seed)
+        total_unanchored += unanchored
+        total_anchored += anchored
+        rows.append(f"{label:36}{base:7.3f}s{unanchored:8.3f}s{anchored:8.3f}s")
+    saving = total_anchored / total_unanchored
+    assert saving <= TOTALS_SAVING, (
+        f"anchored {total_anchored:.2f}s against {total_unanchored:.2f}s "
+        f"unanchored, {saving:.2f}x, gate {TOTALS_SAVING}x. The mode is not "
+        f"paying for itself.\n  " + "\n  ".join(rows)
+    )
+
+
+def test_a_document_made_of_the_rules_own_object_words_is_all_window(three_engines):
+    """The honest sentence, as an assertion rather than a claim in a PR body.
+
+    `mask` and `safety` ARE this rule's object class, so a document made of them
+    has an anchor at every position, the windows merge into the whole document,
+    and there is nothing for the mode to skip. That is not a defect in the
+    implementation, it is what an anchor is. A rule whose object class is common
+    words gets no benefit, and this asserts the reason rather than asserting a
+    number that would drift.
+    """
+    for seed in GROUP_B_SEEDS.values():
+        assert any(t in seed for t in TWO_GROUP_TERMS), seed
+    for seed in RARE_OBJECT_SEEDS.values():
+        assert not any(t in seed for t in TWO_GROUP_TERMS), seed
