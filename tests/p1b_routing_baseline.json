@@ -18,7 +18,9 @@
   "instead of a quiet deletion inside a large patterns diff. Adding a route",
   "needs no change here.",
   "",
-  "Regenerate ONLY when deliberately removing a route, and say why in the PR."
+  "Regenerate ONLY when deliberately removing a route, and say why in the PR.",
+  "",
+  "Round 12 added the bare vendor tokens `anthropic` and `openai` to GLS-PI-021-API, so this file gains two routes for that family and loses none. Verified as a superset of the previous pin before it was rewritten."
  ],
  "families": {
   "GLS-PI-013-API": [
@@ -50,6 +52,7 @@
    "sanitization"
   ],
   "GLS-PI-021-API": [
+   "anthropic",
    "at anthropic",
    "at openai",
    "authorization from anthropic",
@@ -67,6 +70,7 @@
    "life depends on",
    "life is at stake",
    "my grandmother used to tell",
+   "openai",
    "penetration test",
    "red team exercise",
    "safety audit",

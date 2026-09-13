@@ -225,24 +225,34 @@ def test_match_on_normalized_adds_a_view_and_never_replaces_the_raw_one(engine):
 # `guardrails`, `instruction` beside `instructions`), and ten more of GLS-PI-013-API's
 # markers turn out to be in the same residual. They always were.
 #
-# Round 11 raises it again for the same reason and it is worth being exact about
-# why, because a residual baseline that drifts upward every round is how a gate
-# stops meaning anything. The sampler used to vary ONE nested alternation at a
-# time, leaving every other one on its first alternative, so combinations like
-# `stale` with `remote` were never produced. It now takes a pick VECTOR. Nothing
-# about the rules or the index changed; four markers that were always in this
-# residual became visible, all four in GLS-PI-021-API and all four the same
-# `openai` alternative crossed with a prefix the old walker never paired it with:
+# Round 11's pick VECTOR made four more visible, and round 12 ROUTED them rather
+# than raising the number for them, because a residual baseline that drifts up
+# every round is how a gate stops meaning anything.
+#
+# What the vector exposed: the sampler used to vary ONE nested alternation at a
+# time with every other left on its first alternative, so `openai` crossed with
+# a prefix was never produced. Four samples of GLS-PI-021-API had always been in
+# this residual and nothing could see them:
 #
 #   'authorization\nfrom openai'   'authorization from\nopenai'
 #   'employee at\nopenai'          'engineer at\nopenai'
 #
-# Per family the 73 is 31 for GLS-PI-021-API and 42 for GLS-PI-013-API;
-# GLS-PI-017-API is 0 and the three rules on the normalized path do not need a
-# keyword at all. Core coverage widened at the same time and every new core
-# sample still routes, which is the half of this that is good news:
-# GLS-PI-013-API went from 39 generated core samples to 144.
-NEWLINE_SPLIT_UNROUTED = 73
+# The gap was an asymmetry in the keywords, not in the regex. Every vendor
+# mention was indexed only as a PHRASE (`at openai`, `employee at anthropic`),
+# and a newline anywhere inside a phrase destroys it, while the bare vendor token
+# was never indexed at all. Adding `anthropic` and `openai` as routing keywords
+# closes all four and seven more that the old sampler had produced but nobody had
+# routed. No regex changed and no decision changed; a routing keyword only
+# decides whether the rule's regex RUNS. Measured cost of the two tokens at
+# 1 MiB on 2026-09-12: 1.05x on a megabyte of the bare token, 1.00x on prose.
+#
+# 59 is also where this number stood before round 9, which is the point: the
+# residual came back down instead of settling one round higher. Per family it is
+# 17 for GLS-PI-021-API and 42 for GLS-PI-013-API; GLS-PI-017-API is 0 and the
+# three rules on the normalized path do not need a keyword at all. Core coverage
+# widened too and every new core sample routes: GLS-PI-013-API went from 39
+# generated core samples to 144.
+NEWLINE_SPLIT_UNROUTED = 59
 
 
 def test_the_newline_split_residual_does_not_grow(engine):

@@ -206,6 +206,7 @@ PATTERNS = [
         # room and costs only window width.
         "anchor_span": 800,
         "keywords": [
+            'anthropic',
             'at anthropic',
             'at openai',
             'authorization from anthropic',
@@ -223,6 +224,7 @@ PATTERNS = [
             'life depends on',
             'life is at stake',
             'my grandmother used to tell',
+            'openai',
             'penetration test',
             'red team exercise',
             'safety audit',
