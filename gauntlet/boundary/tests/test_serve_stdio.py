@@ -16,6 +16,7 @@ of the faults below live in `serve`'s pump and are INVISIBLE from the helper:
 All 77 tests in this directory passed with both faults in place.
 """
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -67,8 +68,7 @@ _SCAN_HANG_ON_MARKER = [
 class _Proxy:
     """`serve` on a thread, talking over os pipes like the real thing."""
 
-    def __init__(self, tmp_path, scanner_argv, **kwargs):
-        import os
+    def __init__(self, tmp_path, scanner_argv, upstream_argv=None, **kwargs):
         self._c_r, self._c_w = os.pipe()          # client -> proxy stdin
         self._p_r, self._p_w = os.pipe()          # proxy stdout -> client
         self.receipts = tmp_path / "receipts.jsonl"
@@ -78,7 +78,7 @@ class _Proxy:
         self._from_proxy = os.fdopen(self._p_r, "rb")
         self._thread = threading.Thread(
             target=serve, daemon=True,
-            args=(_UPSTREAM, scanner_argv),
+            args=(upstream_argv or _UPSTREAM, scanner_argv),
             kwargs=dict(receipts=str(self.receipts), stdin=self._stdin,
                         stdout=self._stdout, **kwargs))
         self._thread.start()
@@ -88,18 +88,37 @@ class _Proxy:
         self._to_proxy.flush()
 
     def read_until(self, wanted_ids, timeout=12.0):
-        """Every line the client receives, until all `wanted_ids` have arrived."""
+        """Every line the client receives, until all `wanted_ids` have arrived.
+
+        `select` rather than a bare `readline`, because a blocking readline only
+        checks the deadline BETWEEN lines: a test asserting that something never
+        arrives would block here forever waiting for the thing it expects not to
+        get. Half of the assertions below are of exactly that shape.
+        """
+        import select
         seen, deadline = {}, time.monotonic() + timeout
-        while time.monotonic() < deadline and set(wanted_ids) - set(seen):
-            line = self._from_proxy.readline()
-            if not line:
+        buffer = b""
+        while set(wanted_ids) - set(seen):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
-            try:
-                message = json.loads(line)
-            except ValueError:
-                continue
-            if message.get("id") is not None:
-                seen[message["id"]] = message
+            ready, _, _ = select.select([self._from_proxy], [], [], remaining)
+            if not ready:
+                break
+            chunk = os.read(self._from_proxy.fileno(), 65536)
+            if not chunk:
+                break
+            buffer += chunk
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if not line.strip():
+                    continue
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(message, dict) and message.get("id") is not None:
+                    seen[message["id"]] = message
         return seen
 
     def close(self):
@@ -226,3 +245,94 @@ def test_an_ordinary_session_still_works_end_to_end(tmp_path):
     for request_id in (201, 202):
         assert seen[request_id]["result"]["content"][0]["text"] == \
             f"UPSTREAM-{request_id}", seen[request_id]
+
+
+# ── S5: a tainted upstream is refused, never resumed ───────────────────────
+# ASTRA graded G2-10 as the one row that was genuinely exercised and genuinely
+# failed: the proxy resynchronised after an invalid frame instead of closing the
+# stream. `read_frame` was never the problem. It refused the frame and reported
+# resynchronised=False. The PUMP then read the next line, which is
+# resynchronisation at the stream level however carefully the frame level
+# declines to guess.
+
+def _tainting_upstream(first_line, follower_text):
+    """An upstream that emits one bad frame and then a perfectly good one.
+
+    The follower is CLEAN on purpose. G2-10's own script follows its truncated
+    frame with a well formed one carrying an injection, so a proxy that resynced
+    would produce a detector finding and the finding would look like the
+    mediator working. With a clean follower there is nothing for a resync to
+    hide behind: either the client gets that content, which means the stream was
+    resumed, or it does not.
+    """
+    # Built by concatenation rather than as an f-string. The first version of
+    # this helper escaped the closing braces of a dict literal one short, so the
+    # generated program was a SyntaxError, the upstream died before writing
+    # anything, and the test failed reporting "the stream was not tainted" about
+    # a proxy that had never been given a frame to taint on.
+    follower = {"jsonrpc": "2.0", "id": 777,
+                "result": {"content": [{"type": "text", "text": follower_text}]}}
+    script = (
+        "import sys, json, time\n"
+        "sys.stdin.readline()\n"
+        "sys.stdout.write(" + repr(first_line) + " + '\\n')\n"
+        "sys.stdout.flush()\n"
+        "sys.stdout.write(" + repr(json.dumps(follower)) + " + '\\n')\n"
+        "sys.stdout.flush()\n"
+        "time.sleep(5)\n")
+    compile(script, "<upstream>", "exec")   # never ship a broken stub again
+    return [_PY, "-c", script]
+
+
+@pytest.mark.parametrize("bad_first,expected_reason", [
+    # The truncated frame from G2-10's invalid_json seed, in shape.
+    ('{"jsonrpc":"2.0","id":666,"result":', "unparseable"),
+    # invalid_result_shape: parses, is jsonrpc 2.0, and `content` is a STRING
+    # where MCP defines a list. The old path scanned it as content.
+    ('{"jsonrpc":"2.0","id":666,"result":{"content":"not a list"}}',
+     "result_content_not_a_list"),
+])
+def test_a_bad_upstream_frame_taints_the_stream_instead_of_resyncing(
+        tmp_path, bad_first, expected_reason):
+    proxy = _Proxy(tmp_path, _SCAN_CLEAN,
+                   deadline_ms=8000, watchdog_ms=20000,
+                   upstream_argv=_tainting_upstream(bad_first, "PERFECTLY-CLEAN"))
+    try:
+        proxy.send(_call(666, "anything"))
+        seen = proxy.read_until([777], timeout=5.0)
+    finally:
+        proxy.close()
+
+    events = proxy.events()
+    tainted = [e for e in events if e.get("kind") == "STREAM_TAINTED"]
+    assert tainted, (
+        f"the stream was not tainted; kinds seen: "
+        f"{sorted({e.get('kind') for e in events})}")
+    assert tainted[0]["reason"] == expected_reason, tainted[0]
+
+    assert 777 not in seen, (
+        "the frame AFTER the bad one reached the client, which means the pump "
+        "resumed reading a stream whose framing it had already lost")
+
+    # And the id the client was actually waiting on is answered, not left to
+    # hang. Refusing without answering is a different bug with the same shape.
+    dropped = [e for e in events if e.get("kind") == "FRAME_DROPPED"]
+    assert dropped and dropped[0]["reason"] == expected_reason, dropped
+
+
+def test_the_client_is_answered_when_its_upstream_is_refused(tmp_path):
+    """MALFORMED_UPSTREAM to the waiting id, rather than silence."""
+    proxy = _Proxy(tmp_path, _SCAN_CLEAN, deadline_ms=8000, watchdog_ms=20000,
+                   upstream_argv=_tainting_upstream(
+                       '{"jsonrpc":"2.0","id":666,"result":', "PERFECTLY-CLEAN"))
+    try:
+        proxy.send(_call(666, "anything"))
+        seen = proxy.read_until([666], timeout=6.0)
+    finally:
+        proxy.close()
+
+    assert 666 in seen, "the client was left waiting on a stream we had refused"
+    error = seen[666].get("error") or {}
+    assert error.get("message") == "GATE2_WITHHELD", seen[666]
+    assert (error.get("data") or {}).get("reason_code") == \
+        passthrough.MALFORMED_UPSTREAM, seen[666]
