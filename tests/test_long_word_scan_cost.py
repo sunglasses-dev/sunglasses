@@ -42,7 +42,12 @@ RULE = "GLS-ENC-ALT-210"
 LONG_WORD_DOC = "Assistant: please send " + "a" * 26977
 MATCHING_BLOB = ("QUJD" * 6750)[:26990] + " decode"
 BUDGET_S = 2.0
-MATCHING_BUDGET_S = 0.1
+# What the class clause may cost on a document it CANNOT skip, against the same
+# document with the derivation switched off in this same process. A ratio, not a
+# wall clock: 0.1 s absolute went red at 0.1463 s on a shared runner while the
+# regression it guards was 7.03 s, which is 380x. Measuring the machine is not
+# measuring the change.
+MATCHING_RATIO = 3.0
 
 
 @pytest.fixture(scope="module")
@@ -84,14 +89,46 @@ def test_the_long_word_document_is_skipped_not_scanned(engine):
     )
 
 
-def test_a_document_that_DOES_match_is_not_slowed_down(engine):
-    """The skip must not cost anything on the documents it cannot skip."""
-    engine.scan("warm", channel="message")
+@pytest.fixture(scope="module")
+def engine_without_class_clauses():
+    """The same engine with class derivation off, built in THIS process.
+
+    Requirements are derived once at construction, so the switch has to be off
+    while the engine is built rather than while it scans.
+    """
+    original = _prefilter._class_requirement
+    _prefilter._class_requirement = lambda _seq: None
+    try:
+        return SunglassesEngine(PATTERNS)
+    finally:
+        _prefilter._class_requirement = original
+
+
+def _seconds(target, text):
     started = time.perf_counter()
-    result = engine.scan(MATCHING_BLOB, channel="message")
-    elapsed = time.perf_counter() - started
+    result = target.scan(text, channel="message")
+    return time.perf_counter() - started, result
+
+
+def test_a_document_that_DOES_match_is_not_slowed_down(engine, engine_without_class_clauses):
+    """The skip must not cost anything on the documents it cannot skip.
+
+    This blob contains `decode`, so neither engine can skip the rule and both
+    do the same work. Round 1 bounded the unbounded run instead of fixing the
+    skip and made exactly this document 380x slower, which the absent-literal
+    fixture could never see. Both halves are timed here, so whatever the runner
+    is, both pay for it.
+    """
+    for target in (engine_without_class_clauses, engine):
+        target.scan("warm", channel="message")
+    without, _ = _seconds(engine_without_class_clauses, MATCHING_BLOB)
+    with_clauses, result = _seconds(engine, MATCHING_BLOB)
     assert RULE in {f.get("id") for f in result.findings}, "the blob stopped matching"
-    assert elapsed < MATCHING_BUDGET_S, f"{elapsed:.4f}s, budget {MATCHING_BUDGET_S}s"
+    assert with_clauses <= without * MATCHING_RATIO, (
+        f"{with_clauses:.4f}s with class clauses against {without:.4f}s without "
+        f"them on a document neither can skip, ratio "
+        f"{with_clauses / without:.1f}x, gate {MATCHING_RATIO}x"
+    )
 
 
 def test_control_removing_the_class_clause_brings_the_255_seconds_back(monkeypatch):
