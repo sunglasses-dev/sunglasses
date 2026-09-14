@@ -273,3 +273,118 @@ def test_an_integer_id_and_a_float_id_do_not_collide():
     assert answer is not None and type(answer["id"]) is int
     assert session.expects(1.0, origin="client"), (
         "answering the integer id also retired the float id")
+
+
+# ── T7.R1 + T8.R12: the exit is a PROCESS fact, never an inactivity guess ──
+
+def test_an_upstream_exit_with_pending_calls_closes_even_though_the_pipe_stays_open():
+    """The F21 shape, driven through the handle the contract requires.
+
+    A leader spawns a grandchild and exits. The grandchild holds the write end,
+    so the pipe never reaches EOF and the reader would wait for ever on a server
+    that is already dead. An inactivity deadline cannot tell that from a healthy
+    server thinking hard, and would eventually fire on both, so the signal is
+    the HANDLE: wait on the process, not on the silence.
+
+    Stopping the group is what actually releases the reader, because it closes
+    the descendant's copy of the write end.
+    """
+    import subprocess
+    import sys
+    import threading
+    import time
+
+    child_code = "import sys,time;sys.stdout.write('R');sys.stdout.flush();time.sleep(30)"
+    leader_code = "import subprocess,sys;subprocess.Popen([sys.executable,'-c',sys.argv[1]])"
+    leader = subprocess.Popen([sys.executable, "-c", leader_code, child_code],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              start_new_session=True)
+    try:
+        assert leader.stdout.read(1) == b"R", "the grandchild never started"
+        assert leader.wait(timeout=5) == 0, "the leader was supposed to exit"
+
+        session = pump.Session()
+        session.attach_upstream(leader, pgid=leader.pid)
+        session.admit_request(41, method="tools/call", origin="client")
+
+        done, yielded = threading.Event(), []
+
+        def drive():
+            try:
+                yielded.extend(session.read_upstream(leader.stdout))
+            finally:
+                done.set()
+
+        thread = threading.Thread(target=drive, daemon=True)
+        thread.start()
+        assert done.wait(5), (
+            "the reader never returned, so stopping the group did not release "
+            "the descendant's write end")
+        assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+    finally:
+        try:
+            os.killpg(leader.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        leader.wait(timeout=5)
+        leader.stdout.close()
+
+
+def test_an_upstream_that_exits_owing_nothing_is_a_normal_shutdown():
+    """T7.R1 says exit WITH PENDING CALLS. A server that answered everything and
+    then exited has done nothing wrong, and faulting there would turn every
+    clean shutdown into an S5.
+
+    Without this the watcher could close on any exit at all and no test would
+    notice, which is what the mutation removing the pending check proved.
+    """
+    import io as _io
+    import subprocess
+    import sys
+    import time
+
+    finished = subprocess.Popen([sys.executable, "-c", "pass"],
+                                start_new_session=True)
+    finished.wait(timeout=5)
+
+    session = pump.Session(upstream=finished, pgid=finished.pid)
+    list(session.read_upstream(_io.BytesIO(b"")))      # nothing owed
+    for _ in range(50):
+        if session.closed_with():
+            break
+        time.sleep(0.02)
+    assert session.closed_with() is None, (
+        "a clean exit with nothing pending was reported as a protocol fault")
+
+
+def test_strict_mode_refuses_to_read_without_a_handle():
+    """An unsupervised upstream is the hang above, so it is a startup error
+    rather than a quieter mode that fails later and less clearly."""
+    import io as _io
+
+    session = pump.Session(strict=True)
+    with pytest.raises(pump.UnsupervisedUpstream):
+        list(session.read_upstream(_io.BytesIO(b"")))
+
+
+def test_a_handle_that_is_still_running_does_not_close_anything():
+    """Or the watcher would be an inactivity timeout wearing a process fact's
+    clothes."""
+    import io as _io
+    import subprocess
+    import sys
+
+    live = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"],
+                            start_new_session=True)
+    try:
+        session = pump.Session(upstream=live, pgid=live.pid)
+        session.admit_request(41, method="tools/call", origin="client")
+        list(session.read_upstream(_io.BytesIO(wire(response(41)))))
+        assert session.closed_with() is None
+    finally:
+        live.kill()
+        live.wait(timeout=5)
+
+
+import os      # noqa: E402
+import signal  # noqa: E402
