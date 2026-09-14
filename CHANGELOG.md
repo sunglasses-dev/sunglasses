@@ -3,6 +3,15 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Added
+- **Secrets arriving in a TOOL RESULT are detected. Eight `-API` siblings for the GLS-SD rules.** Nine of the ten secret rules carried no `api_response` channel, so an AWS key id, a private key, a GitHub or Slack token coming back FROM a tool was not detected at all; only GLS-SD-005 (JWT) reached that direction. Measured before the change: the AWS shape, `ghp_` and `API_KEY=sk-` each BLOCK on `file` and ALLOW with zero findings on `api_response`, including an env line inside a tool-result JSON. Each sibling copies its parent predicate character for character and adds channels only, so the file lane and the result lane now return the same answer on the same bytes; that equality is the test, rather than each sibling naming itself, because GLS-SD-001's predicate is a superset that already outranks the Slack and Google rules on `file` and a faithful port must reproduce that. Proven: 65 comparisons across every channel the parents carry show 0 differences, 78 benign documents show 0 genuinely new detections and 0 regressions, and removing all eight siblings leaves every shape undetected on `api_response` again. 1 MiB costs 1.03x, so no `anchor_terms` were needed.
+- **Known limitation, stated rather than discovered:** AWS's documented example key AKIAIOSFODNN7EXAMPLE blocks in a tool result exactly as it blocks in a file; an agent reading AWS documentation through a tool will see that block; the remedy is a policy allowlist entry for known vendor examples, which is a follow-up item, not a weaker rule. One fixture per affected sibling pins this, so the limit is asserted and cannot drift unnoticed in either direction. It is not theoretical: on the benign corpus the only two changed results are trufflehog's README, whose own text demonstrates a found AWS key.
+- **Still open:** 8 of the 9 gaps closed; GLS-SD-010 (line-anchored `API_KEY=`) stays open in the result direction because its anchor cannot match inside a JSON string; a new embedded-content rule follows. Measured: the same env line hits GLS-SD-001 and GLS-SD-010 as a bare line, and only GLS-SD-001 once it is inside a tool-result JSON. A sibling that cannot fire in the channel it exists for would review as coverage, which is worse than none.
+- GLS-SD-008 and GLS-SD-009 siblings carry `api_response` and `agent_input` only. Their parents have no `log_memory`, so granting it would be new coverage outside the result direction wearing a sibling's name; with it the no-widening comparison reports a difference on a channel the parent never had, without it the comparison is exactly zero.
+
+
 ## [0.5.8] — 2026-09-14
 
 ### Fixed
