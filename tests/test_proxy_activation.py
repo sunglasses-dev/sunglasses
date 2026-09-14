@@ -45,8 +45,9 @@ def _pages(*pages):
 
 
 def _clean(_page):
+    # T5.R3(c) counts the helper's pin outcome as part of the page's evidence.
     return {"accepted": True, "status": "complete", "inspection_complete": True,
-            "decision": "allow", "findings": []}
+            "decision": "allow", "findings": [], "check_pin": "clean"}
 
 
 def _store(tmp_path):
