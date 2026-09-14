@@ -649,8 +649,8 @@ def test_package_reads_no_undeclared_environment_variables():
     # SUNGLASSES_* name that appears anywhere without being read.
     SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
-    ENV_METHODS = {"get", "pop", "setdefault"}
-    ENV_COPY_SITES = {"firewall.py"}
+    ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
+    ENV_COPY_SITES = {"firewall.py"}   # exact relative path inside the package, never a basename (ASTRA E39)
 
     def _os_names(tree):
         """Names bound to the os module by a plain import. Any other way of
@@ -705,6 +705,12 @@ def test_package_reads_no_undeclared_environment_variables():
                     bind(name)
             elif isinstance(node, ast.ExceptHandler) and node.name:
                 bind(node.name)
+            elif isinstance(node, ast.MatchAs) and node.name:
+                bind(node.name)
+            elif isinstance(node, ast.MatchStar) and node.name:
+                bind(node.name)
+            elif isinstance(node, ast.MatchMapping) and node.rest:
+                bind(node.rest)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
                 a = node.args
                 for arg in a.posonlyargs + a.args + a.kwonlyargs:
@@ -736,7 +742,8 @@ def test_package_reads_no_undeclared_environment_variables():
                     yield node, (node.args[0] if node.args else None), {id(f)}
                 elif isinstance(f, ast.Attribute) and f.attr in ENV_METHODS and environ_attr(f.value):
                     yield node, (node.args[0] if node.args else None), {id(f.value)}
-            elif isinstance(node, ast.Subscript) and environ_attr(node.value):
+            elif isinstance(node, ast.Subscript) and environ_attr(node.value) \
+                    and isinstance(node.ctx, ast.Load):
                 yield node, node.slice, {id(node.value)}
             elif isinstance(node, ast.Compare) and len(node.ops) == 1 \
                     and isinstance(node.ops[0], (ast.In, ast.NotIn)) \
@@ -759,13 +766,22 @@ def test_package_reads_no_undeclared_environment_variables():
                 refusals.append(f"{relpath}:{node.lineno} read with a key that is not a literal "
                                 f"or a once-bound module constant")
         # The enumerated environment copy: dict(os.environ) in firewall.py only.
-        if relpath.split("/")[-1] in ENV_COPY_SITES:
+        if relpath in ENV_COPY_SITES:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
                         and node.func.id == "dict" and len(node.args) == 1 \
                         and isinstance(node.args[0], ast.Attribute) and node.args[0].attr == "environ" \
                         and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id in os_names:
                     consumed.add(id(node.args[0]))
+        # A computed lookup on the os module is a reader in disguise: getattr(os, ...),
+        # os.__dict__[...], vars(os), or any os name passed to getattr/vars (ASTRA E33/E34).
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"getattr", "vars"} \
+                    and node.args and isinstance(node.args[0], ast.Name) and node.args[0].id in os_names:
+                refusals.append(f"{relpath}:{node.lineno} computed lookup on the os module")
+            elif isinstance(node, ast.Attribute) and node.attr in {"__dict__", "__getattribute__", "__getattr__"} \
+                    and isinstance(node.value, ast.Name) and node.value.id in os_names:
+                refusals.append(f"{relpath}:{node.lineno} os.{node.attr} access")
         # Every other sensitive token refuses.
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and node.attr in SENSITIVE and id(node) not in consumed:
