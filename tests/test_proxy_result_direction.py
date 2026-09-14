@@ -233,28 +233,36 @@ def test_results_are_scanned_on_the_api_response_channel(tmp_path):
     assert seen == ["api_response"]
 
 
-def test_notifications_message_is_dropped_and_that_is_a_contract_conflict(tmp_path):
-    """MEASURED, not chosen. Two rows disagree and this pins what the code does.
+def test_notifications_message_now_reaches_the_client(tmp_path):
+    """This test used to pin the OPPOSITE, and flipping is what it was for.
 
-    T2.R12 names `message` as an upstream notification to inspect on the
-    api_response channel. T1.R3's advertised set does not contain
-    `notifications/message`, it contains the `logging` capability, and
-    handshake.SUPPORTED_NOTIFICATIONS follows T1.R3, so the notification the
-    logging capability exists to deliver is dropped as unsupported before any
-    scan runs.
+    T2.R12 names `message` as an upstream notification to inspect and T1.R3's
+    enumeration did not contain it, so handshake dropped it before any scan and
+    T2.R12's row could never execute. That was written down here as a measured
+    contract conflict rather than repaired on my own authority.
 
-    The consequence is that T2.R12's `message` row can never execute. A rule
-    scoped to it would read as covered and never fire, which is the check that
-    skips itself. Written down here rather than repaired, because repairing it
-    means editing either handshake.py or a frozen contract row and that is not
-    a call this slice gets to make.
+    ASTRA's C10 ruled the same way and the repair landed on the core, so the
+    row is reachable now: the notification is inspected on api_response and a
+    clean one is forwarded. The assertion is inverted and the history is kept,
+    because a test that quietly changed sides would leave nobody able to tell
+    that the conflict was ever resolved.
     """
     raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/message",
                        "params": {"data": "build finished"}}) + "\n").encode()
     engine, client, stream = _engine(tmp_path, [raw], pending=False)
     engine.pump_upstream(stream)
-    assert client.bytes == b"", \
-        "dropped as unsupported, so T2.R12's message row is unreachable"
+    assert client.bytes == raw, "the logging notification was dropped again"
+
+
+def test_a_logging_notification_carrying_an_injection_is_still_dropped(tmp_path):
+    """The other half of the row now that it is reachable. Forwarding it is not
+    the point; INSPECTING it is, and a finding drops it with a receipt and no
+    response, because a notification has nowhere to put one."""
+    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/message",
+                       "params": {"data": INJECTION}}) + "\n").encode()
+    engine, client, stream = _engine(tmp_path, [raw], pending=False)
+    engine.pump_upstream(stream)
+    assert client.bytes == b""
 
 
 # ── the mutation round: three clauses the first spec did not reach ───────
