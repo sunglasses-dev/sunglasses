@@ -819,7 +819,6 @@ ENVELOPE_DATA = {"reason_code", "rule", "budget", "accepted", "status",
                  "observed_content_bytes", "elapsed_ms", "rule_ids"}
 
 
-@pytest.mark.xfail(strict=True, reason="T410: the slice being specified here")
 def test_the_refusal_the_pump_writes_is_the_envelope():
     """T410. `envelope.withheld` exists because the refusal is the one
     structure an adversary is guaranteed to read, and the pump builds its own
@@ -842,3 +841,49 @@ def test_the_refusal_the_pump_writes_is_the_envelope():
     written = json.loads(out[0])
     assert set(written["error"]["data"]) == ENVELOPE_DATA
     assert written["error"]["data"]["reason_code"] in envelope.REASONS
+
+
+def test_an_over_budget_refusal_names_the_budget_that_broke():
+    """T410's other half. The envelope REFUSES an OVER_BUDGET that cannot say
+    which bound broke, and refuses a budget on any reason that has none, so the
+    pair has to travel together from the close to the wire.
+
+    Dropping the budget on the way left every field-set assertion green, which
+    means the plumbing was covered by nothing: a breach nobody can attribute to
+    a bound is a receipt that cannot be graded, and the row bounds four
+    different things.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    over = json.dumps({"jsonrpc": "2.0", "id": 41,
+                       "result": {"content": [{"type": "text",
+                                               "text": "x" * 5_000_000}]}})
+    out = list(session.read_upstream(over.encode() + b"\n"))
+    assert session.closed_with() == ("OVER_BUDGET", "S3")
+    assert len(out) == 1
+    data = json.loads(out[0])["error"]["data"]
+    assert data["reason_code"] == "OVER_BUDGET"
+    assert data["budget"] == "frame"
+
+
+def test_a_refusal_does_not_claim_a_scan_that_never_happened():
+    """T410's values, not only its field names.
+
+    A fault the pump found is a fault found BEFORE any scan, so the refusal
+    must say so: not accepted, `not_run`, inspection not complete, nothing
+    inspected. An envelope carrying every required member and claiming a
+    complete finished inspection over bytes nobody read is the exact lie the
+    module exists to prevent, and it passes any test that only checks which
+    keys are present.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    out = list(session.read_upstream(b"{not json\n"))
+    assert len(out) == 1
+    data = json.loads(out[0])["error"]["data"]
+    assert data["accepted"] is False
+    assert data["status"] == "not_run"
+    assert data["inspection_complete"] is False
+    assert data["inspected_utf8_bytes"] == 0
+    assert data["observed_content_bytes"] == 0
+    assert data["rule_ids"] == []

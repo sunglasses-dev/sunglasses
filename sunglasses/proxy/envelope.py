@@ -36,6 +36,16 @@ REASONS = frozenset({
 })
 
 RULES = frozenset({"S1", "S2", "S3", "S4", "S5", "S6", "S7"})
+
+# T409. The worker's own status vocabulary, frozen here for the same reason the
+# reasons are. `status` is copied out of a worker result, so an open field is a
+# worker choosing text that lands in the structure an attacker reads. It is
+# written out rather than imported from `worker` on purpose: this module names
+# what may cross the boundary and takes no dependency that could widen the set
+# from elsewhere. `tests/test_proxy_envelope.py` asserts the two agree, so the
+# duplication is guarded rather than hoped about.
+STATUSES = frozenset({"complete", "incomplete", "exception", "deadline",
+                      "cancelled", "not_run"})
 BUDGETS = frozenset({"content", "frame", "depth", "nodes"})
 
 # T4.R7. Bounded so a worker cannot make the envelope arbitrarily large, and
@@ -86,8 +96,11 @@ def withheld(*, request_id, reason_code, rule, accepted, status,
     if not isinstance(inspection_complete, bool):
         raise ValueError(
             f"inspection_complete is {inspection_complete!r}, not a boolean")
-    if not isinstance(status, str):
-        raise ValueError(f"status is {status!r}, not a string")
+    if status not in STATUSES:
+        raise ValueError(
+            f"status {status!r} is not one of {sorted(STATUSES)}; a status the "
+            f"worker chose the spelling of is free text in the one structure "
+            f"an adversary is guaranteed to read")
 
     # CATALOG ONLY, deduplicated, ORDERED BY CATALOG ID ASCENDING, then bounded,
     # in that order. An id we cannot vouch for is not evidence, and echoing one

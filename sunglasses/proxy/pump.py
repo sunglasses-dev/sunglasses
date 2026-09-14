@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 
-from . import framing, handshake, supervisor
+from . import envelope, framing, handshake, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
 ORIGIN_CLIENT = "client"
@@ -922,9 +922,14 @@ class Session:
         stdin = getattr(handle, "stdin", None) if handle is not None else None
         if stdin is None:
             return
-        body = {"jsonrpc": "2.0", "id": request_id,
-                "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
-                          "data": {"reason_code": reason, "rule": rule}}}
+        # T410. The same single constructor. A refusal going UP the pipe is
+        # the same wire object as one going down, and a second way of building
+        # it is a second set of rules to keep in step.
+        body = envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            rule_ids=(), catalog=frozenset())
         try:
             stdin.write((_json.dumps(body, separators=(",", ":"))
                          + "\n").encode("utf-8"))
@@ -933,17 +938,32 @@ class Session:
             self._core._emit("UPSTREAM_REQUEST_REFUSED", request_id,
                              reason="write_failed")
 
-    def _client_refusal(self, identity, reason, rule):
-        """One JSON-RPC error to the client, in the id it used."""
+    def _client_refusal(self, identity, reason, rule, budget=None):
+        """One JSON-RPC error to the client, in the id it used.
+
+        T410. Built by `envelope.withheld` and by nothing else. This used to
+        assemble its own `{reason_code, rule}` beside the envelope module,
+        which is the exact failure that module was written to prevent: every
+        rule it enforces -- the frozen reason catalog, the frozen statuses, the
+        catalog-only bounded rule_ids, `**ignored` swallowing a caller's detail
+        string -- applied to the construction that was NOT on the wire, and the
+        one that was answered to nothing.
+
+        The counters are zero and the status is `not_run` because that is what
+        is true: a fault the pump found is a fault found BEFORE any scan, so no
+        bytes were inspected. Saying so is what makes the refusal comparable to
+        a fixture; a refusal that cannot state whether anything was looked at
+        cannot be graded at all.
+        """
         import json as _json
 
-        _origin, _type_name, request_id = identity[0], identity[1], identity[2]
-        return (_json.dumps({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
-                      "data": {"reason_code": reason, "rule": rule}},
-        }, separators=(",", ":")) + "\n").encode()
+        request_id = identity[2]
+        body = envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            rule_ids=(), catalog=frozenset(), budget=budget)
+        return (_json.dumps(body, separators=(",", ":")) + "\n").encode()
 
     # ── outcome ─────────────────────────────────────────────────────────────
 
@@ -1211,10 +1231,16 @@ class Session:
                 if identity[0] != ORIGIN_CLIENT:
                     continue
                 own = self._core.terminal_cause(self._core_key(identity))
-                self._owed_refusals.append(
-                    (identity,
-                     own.reason if own is not None else reason,
-                     own.rule if own is not None else rule))
+                # The budget travels with the reason it belongs to. The
+                # envelope refuses an OVER_BUDGET that cannot name which bound
+                # broke, and refuses a budget on any reason that has none, so
+                # carrying the pair together is what lets either be built.
+                if own is not None:
+                    self._owed_refusals.append(
+                        (identity, own.reason, own.rule,
+                         getattr(own, "budget", None)))
+                else:
+                    self._owed_refusals.append((identity, reason, rule, budget))
             self._pending.clear()
             # The debt above is now recorded for both tables, so the record has
             # done its job and must not keep the watcher awake (RC15) or block
@@ -1247,8 +1273,8 @@ class Session:
             with self._settlement:
                 if not self._owed_refusals:
                     return
-                identity, reason, rule = self._owed_refusals.pop(0)
-            yield self._client_refusal(identity, reason, rule)
+                identity, reason, rule, budget = self._owed_refusals.pop(0)
+            yield self._client_refusal(identity, reason, rule, budget)
 
     def control_answer(self, request_id):
         """The frame a proxy-owned request got, or None while it is unanswered."""

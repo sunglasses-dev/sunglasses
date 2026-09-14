@@ -443,3 +443,56 @@ to re-issue his selectors in a form that does NOT depend on the yield's
 syntactic shape: three of his instruments have now broken on ruled lines. An ast
 walk for the yield whose value calls `_handoff_notification` is one, and marking
 the delivery line explicitly would be another.
+## RC03 against T410: the refusal's data shape, measured both ways
+
+Two of ASTRA's own control sets disagree about one object, and the
+disagreement is exact rather than a matter of degree. Neither file has been
+edited.
+
+`test_review_core.py::test_RC03_refusal_preserves_per_item_first_cause` asserts
+
+    json.loads(out[0])['error']['data'] == {'reason_code': reason, 'rule': rule}
+
+by EQUALITY, so the data may carry those two members and nothing else.
+
+`test_stack_independent.py::test_T410_actual_pump_refusal_uses_full_envelope`
+asserts
+
+    set(json.loads(out[0])['error']['data']) == set(envelope.withheld(**error_fields())['error']['data'])
+
+which is the ten-member set T4.R7 names: reason_code, rule, budget, accepted,
+status, inspection_complete, inspected_utf8_bytes, observed_content_bytes,
+elapsed_ms, rule_ids.
+
+No implementation satisfies both. Measured on this head, PYTHONDONTWRITEBYTECODE=1
+with `__pycache__` cleared:
+
+    pump builds its own two-field data   RC03 3/3 pass    T410 fails
+      (core head 2f17e13, tests/proxy green at 391 passed)
+    pump builds envelope.withheld        RC03 3/3 fail    T410 passes
+      (this head; the three are the SCAN_EXCEPTION-S3, REQUEST_CANCELLED-S6
+       and DESCRIPTOR_CHANGED-S4 rows)
+
+The implementation here takes the second, for three reasons that are about the
+contract rather than about which control is newer.
+
+1. T4.R7 states the data shape as a literal, and it is the ten members. RC03's
+   equality is narrower than the row it is testing under.
+2. RC03's SUBJECT is the per-item first cause: that a session-wide
+   MALFORMED_UPSTREAM does not rewrite an item that already settled S3, S4 or
+   S6. Under the envelope every one of its three rows still carries exactly
+   the reason_code and rule it asserts. What fails is only the `==`, which
+   pins members RC03 is not about.
+3. The envelope module exists so the wire object has ONE constructor. A second
+   construction beside it is the failure it was written to prevent, and it is
+   the failure that was actually present: the frozen reason catalog, the frozen
+   statuses, the catalog-only bounded rule_ids and the `**ignored` that
+   swallows a caller's detail string all applied to the copy that was not on
+   the wire.
+
+A refusal that cannot say whether any bytes were inspected also cannot be
+compared to a fixture, which is the property T0.R2's grading depends on.
+
+@T9: this needs a ruling in the shape of R-W03-2. The narrow one is to keep
+RC03's three substantive assertions and split its `==` into its own strict
+xfail tripwire. Nothing has been changed in either control file pending it.
