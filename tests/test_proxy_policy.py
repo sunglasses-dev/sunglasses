@@ -123,7 +123,10 @@ def test_the_direction_predicate_excludes_what_the_row_says_it_excludes(held, ex
 @pytest.mark.parametrize("status,reason,rule", [
     (worker.STATUS_EXCEPTION, policy.SCAN_EXCEPTION, "S3"),
     (worker.STATUS_DEADLINE, policy.SCAN_DEADLINE, "S3"),
-    (worker.STATUS_CANCELLED, policy.REQUEST_CANCELLED, "S6"),
+    # T406. This row used to read `cancelled -> REQUEST_CANCELLED, S6` with no
+    # mention of who cancelled, which is the behaviour the row replaces: the
+    # status alone never said. Ownership is asserted on its own below.
+    (worker.STATUS_CANCELLED, policy.SCAN_EXCEPTION, "S3"),
     (worker.STATUS_INCOMPLETE, policy.SCAN_EXCEPTION, "S3"),
     (worker.STATUS_NOT_RUN, policy.SCAN_EXCEPTION, "S3"),
 ])
@@ -197,13 +200,7 @@ def test_an_earlier_cause_is_not_relabelled_by_a_later_completion():
 
 
 # ── T406 and T407: who owns a cancellation, and the rule a recorded cause keeps
-#
-# Strict xfail rather than a skip, because a skip proves nothing at spec time.
-# These three assert that the defect is real RIGHT NOW; the implementation
-# commit removes the markers, and strict means an XPASS is a failure, so a
-# marker cannot be left behind on a row that has been fixed.
 
-@pytest.mark.xfail(strict=True, reason="T406: the slice being specified here")
 def test_a_cancellation_nobody_asked_for_is_a_scan_that_did_not_happen():
     """T406. `cancelled` from the worker, with no client cancellation behind
     it, is not a client withdrawing a request.
@@ -218,7 +215,6 @@ def test_a_cancellation_nobody_asked_for_is_a_scan_that_did_not_happen():
     assert (settled.reason, settled.rule) == (policy.SCAN_EXCEPTION, "S3")
 
 
-@pytest.mark.xfail(strict=True, reason="T406: the slice being specified here")
 def test_a_cancellation_the_client_asked_for_is_still_s6():
     """The positive control, or the row above is just deleting S6."""
     settled = _settle(_result(status=worker.STATUS_CANCELLED,
@@ -228,12 +224,9 @@ def test_a_cancellation_the_client_asked_for_is_still_s6():
 
 
 @pytest.mark.parametrize("cause,rule", [
-    pytest.param("MALFORMED_UPSTREAM", "S5",
-                 marks=pytest.mark.xfail(strict=True, reason="T407")),
-    pytest.param("MALFORMED_CLIENT", "S5",
-                 marks=pytest.mark.xfail(strict=True, reason="T407")),
-    pytest.param(policy.REQUEST_CANCELLED, "S6",
-                 marks=pytest.mark.xfail(strict=True, reason="T407")),
+    ("MALFORMED_UPSTREAM", "S5"),
+    ("MALFORMED_CLIENT", "S5"),
+    (policy.REQUEST_CANCELLED, "S6"),
     (policy.SCAN_DEADLINE, "S3"),
     (policy.SCAN_EXCEPTION, "S3"),
 ])

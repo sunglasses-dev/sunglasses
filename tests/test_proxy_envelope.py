@@ -156,8 +156,6 @@ def test_the_envelope_is_json_serialisable_as_built():
     json.dumps(_built())
 
 
-@pytest.mark.xfail(strict=True, reason="T409: the frozen status set is the "
-                                       "slice being specified here")
 def test_the_status_field_is_frozen_not_free_text():
     """T409. Every other field here is an allowlist and this one is a string.
 
@@ -176,3 +174,14 @@ def test_every_worker_status_still_passes(status):
     """The positive half. Freezing the field must not reject the real statuses,
     or T409 is satisfied by an envelope that can no longer be built."""
     assert _built(status=status)["error"]["data"]["status"] == status
+
+
+def test_the_frozen_status_set_agrees_with_the_worker():
+    """The envelope writes its own copy so it takes no dependency that could
+    widen it from elsewhere, and a copy that drifts is worse than the coupling
+    it avoids: a status the worker can legitimately produce would make a
+    legitimate refusal unbuildable, which fails closed into a crash on the one
+    path that exists to say something to the client."""
+    from sunglasses.proxy import worker
+
+    assert envelope.STATUSES == worker.STATUSES
