@@ -31,6 +31,17 @@ ORIGIN_UPSTREAM = "upstream"
 TOMBSTONE_LIMIT = 10_000
 
 
+def parsed_ok_but_unterminated(raw):
+    """True for a frame that is within the wire bound and has no terminator.
+
+    The size test comes first because an over-long frame arrives as a bounded
+    PREFIX that also has no terminator, and that one is OVER_BUDGET rather than
+    malformed: reporting it as a missing terminator would name the wrong bound
+    and could not be graded against the fixture that describes it.
+    """
+    return len(raw) <= framing.MAX_FRAME_BYTES and not raw.endswith(b"\n")
+
+
 def key(origin, request_id):
     """T6.R6's identity: origin, JSON type, value.
 
@@ -59,6 +70,12 @@ class Session:
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
         self._tombstones: list = []       # keys, oldest first
+        # T6.R1. Who is still owed one answer, retained across the close that
+        # discovered the fault so the reader can deliver it on the way out.
+        self._owed_refusals: list = []
+        # One settlement owner. The reader and the watcher both reach the debt
+        # and only one of them may be holding it at a time.
+        self._settlement = threading.Lock()
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -152,7 +169,18 @@ class Session:
         "tools/call": "content",
         "tools/list": "tools",
         "resources/read": "contents",
+        # prompts/get had NO ROW, so every shape answered it, including `{}`
+        # and `7`. A missing row reads as "nothing required" and is the
+        # quietest way for a schema check to check nothing.
+        "prompts/get": "messages",
     }
+
+    # Each member is a list of OBJECTS, and `content` blocks are discriminated
+    # by a string `type`. A container test that stops at "is it a list" accepts
+    # `[{}]` and `[7]`, and an inspection of those is vacuously clean: there is
+    # nothing to read, so nothing is found, and the client receives a result
+    # nobody looked at.
+    _TYPED_MEMBERS = frozenset({"content"})
 
     def _shape_matches(self, identity, frame):
         """T2 and G2-10. What a result must look like, GIVEN the request.
@@ -181,8 +209,15 @@ class Session:
             return False              # 7, [], a string: not a result object
         if required not in result:
             return False              # {} answering a tools/call
-        if not isinstance(result[required], list):
+        items = result[required]
+        if not isinstance(items, list):
             return False
+        for item in items:
+            if not isinstance(item, dict):
+                return False          # contents: [7]
+            if required in self._TYPED_MEMBERS and not isinstance(
+                    item.get("type"), str):
+                return False          # content: [{}], a block of no kind
         return True
 
     def settle_from(self, origin, request_id, reason, rule):
@@ -254,10 +289,11 @@ class Session:
         # exit rather than whatever the kill produces, and the group is then
         # stopped, which closes the descendant's copy of the write end and is
         # what actually releases the reader.
+        # _close supervises now, so the group is stopped as part of the
+        # teardown rather than beside it. Doing it twice was how the close
+        # could be claimed before anything had actually been stopped.
         self._close("MALFORMED_UPSTREAM",
                     "the upstream process exited with calls still pending")
-        if self._pgid is not None:
-            supervisor.stop_group(self._pgid, grace_ms=250, handle=handle)
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream):
@@ -285,6 +321,16 @@ class Session:
                                          framing.MAX_FRAME_BYTES):
             if self._closed:
                 return
+            if parsed_ok_but_unterminated(raw):
+                # C15 and T1.R2. The transport is newline delimited, so a
+                # trailing fragment at EOF is not a short frame, it is the
+                # beginning of one that never arrived. Forwarding it hands the
+                # client a truncated message as a complete answer, and the one
+                # place that is certain to happen is a server dying mid write.
+                self._close("MALFORMED_UPSTREAM",
+                            "the last frame ended without its terminator")
+                yield from self._drain_refusals()
+                return
             parsed = framing.parse_frame(raw, origin=ORIGIN_UPSTREAM)
             if not parsed:
                 # The BUDGET travels with the cause. T8's rows name which bound
@@ -292,6 +338,7 @@ class Session:
                 # which one cannot be graded against a fixture.
                 self._close(parsed.reason, parsed.detail, rule=parsed.rule,
                             budget=parsed.budget)
+                yield from self._drain_refusals()
                 return
             message = parsed.message
 
@@ -304,6 +351,14 @@ class Session:
             if "method" in message and "id" in message:
                 self._core._emit("UPSTREAM_REQUEST_REFUSED", message["id"],
                                  reason="UNINSPECTED_METHOD")
+                # T6.R3 and T2.R15. ONE response, to UPSTREAM, in upstream's
+                # own id namespace. Dropping it silently was half the row: the
+                # client is correctly never told, but the server is left
+                # waiting for an answer to a request it is entitled to have
+                # refused, and a server blocked on sampling/createMessage
+                # stops serving the calls the client actually made. Refusing
+                # is the mediation; silence is a hang.
+                self._respond_upstream(message["id"], "UNINSPECTED_METHOD")
                 continue
 
             if "id" not in message:
@@ -324,6 +379,7 @@ class Session:
                     "initialize" and "result" in message:
                 forwarded = self._initialize_result(message, raw)
                 if forwarded is None:
+                    yield from self._drain_refusals()
                     return
                 yield forwarded
                 continue
@@ -342,21 +398,20 @@ class Session:
                                            request_id=message["id"],
                                            frame=message)
             if answer is None:
+                yield from self._drain_refusals()
                 return
             yield raw
 
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
-            owed = [identity for identity in self._pending
-                    if identity[0] == ORIGIN_CLIENT]
             self._close("MALFORMED_UPSTREAM",
                         "upstream exited with calls still pending")
-            # T4.R7 and T6.R1. The client is WAITING. Recording the fault and
-            # saying nothing leaves it waiting for ever on a session that has
-            # already decided it is over, so each owed request gets its one
-            # answer, on the wire, in its own typed id.
-            for identity in owed:
-                yield self._client_refusal(identity, "MALFORMED_UPSTREAM", "S5")
+        # T4.R7 and T6.R1. The client is WAITING, whoever closed the session
+        # and whenever. Recording the fault and saying nothing leaves it
+        # waiting for ever on a session that has already decided it is over, so
+        # every retained debt is paid here, including the ones a watcher thread
+        # recorded while this reader was blocked on the pipe.
+        yield from self._drain_refusals()
 
     def _initialize_result(self, message, raw):
         """T1.R2 and T1.R3, on the one frame where they apply.
@@ -372,7 +427,19 @@ class Session:
         """
         import json as _json
 
-        result = message.get("result") or {}
+        result = message.get("result")
+        capabilities = result.get("capabilities") if isinstance(result, dict) else None
+        if not isinstance(result, dict) or (capabilities is not None
+                                            and not isinstance(capabilities, dict)):
+            # C09. `7` and `{"capabilities": 7}` reached negotiate() and
+            # advertise() and came back out as AttributeError. A malformed
+            # frame is a protocol fault with a named cause, and a traceback
+            # escaping the reader is not a teardown: nothing is settled, the
+            # client is told nothing, and the exception surfaces wherever the
+            # caller happens to be standing.
+            self._close("MALFORMED_UPSTREAM",
+                        "the initialize result is not a result object")
+            return None
         negotiated = handshake.negotiate(result)
         if not negotiated.ok:
             self._close(negotiated.reason,
@@ -394,6 +461,30 @@ class Session:
             return None
         return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
 
+    def _respond_upstream(self, request_id, reason, rule="S1"):
+        """T6.R3. The refusal goes back up the pipe it came down.
+
+        Best effort and bounded: a server whose stdin has already closed cannot
+        be told anything, and failing to tell it is not a reason to tear down a
+        session that is otherwise healthy.
+        """
+        import json as _json
+
+        handle = self._upstream
+        stdin = getattr(handle, "stdin", None) if handle is not None else None
+        if stdin is None:
+            return
+        body = {"jsonrpc": "2.0", "id": request_id,
+                "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
+                          "data": {"reason_code": reason, "rule": rule}}}
+        try:
+            stdin.write((_json.dumps(body, separators=(",", ":"))
+                         + "\n").encode("utf-8"))
+            stdin.flush()
+        except (OSError, ValueError):
+            self._core._emit("UPSTREAM_REQUEST_REFUSED", request_id,
+                             reason="write_failed")
+
     def _client_refusal(self, identity, reason, rule):
         """One JSON-RPC error to the client, in the id it used."""
         import json as _json
@@ -408,11 +499,67 @@ class Session:
 
     # ── outcome ─────────────────────────────────────────────────────────────
     def _close(self, reason, detail, rule="S5", budget=None):
-        if self._closed:
-            return
-        self._closed = (reason, rule)
-        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail))
-        self._pending.clear()
+        """Tear down once, supervise the processes, and RETAIN what is owed.
+
+        Two things were missing and they were the same mistake twice.
+
+        The teardown ran with no supervisor, so a protocol fault settled every
+        item and stopped nothing: the child was still alive afterwards holding
+        the pipes (C06), and the core could not tell a completed teardown from
+        one whose supervisor failed, because it was never given one to fail
+        (C11). The core already refuses to claim closure over a supervisor that
+        returns False; it was simply never handed one.
+
+        And the pending table was CLEARED here, which is the only record of who
+        is still waiting. Whoever closed the session first won, and the reader
+        that reached the exit afterwards found nothing owed and said nothing to
+        a client that is still blocked on a request (C05, C07). The owed
+        refusals are retained on the session now and drained by the reader on
+        its way out, so the close records the debt and the exit pays it.
+        """
+        with self._settlement:
+            if self._closed:
+                return
+            self._closed = (reason, rule)
+            # THE DEBT IS RECORDED BEFORE THE TEARDOWN, not after it. The
+            # teardown supervises, which blocks for up to the kill grace, and
+            # stopping the group is exactly what releases the reader waiting on
+            # the pipe. Recording afterwards left a window in which the reader
+            # woke, found `_closed` set, `_pending` cleared and the debt not yet
+            # written, and delivered nothing to a client still blocked on its
+            # request. One owner, one lock, and the write happens first.
+            self._owed_refusals.extend(
+                (identity, reason, rule) for identity in self._pending
+                if identity[0] == ORIGIN_CLIENT)
+            self._pending.clear()
+        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
+                            stop_processes=self._stop_processes())
+
+    def _stop_processes(self):
+        """The supervisor callback, or None when there is nothing supervised.
+
+        None is not a quieter kind of success. T8.R12 and the core's own
+        teardown treat a missing supervisor as "this caller stopped nothing",
+        which is why an API session with no handle records SESSION_TORN_DOWN
+        and never UPSTREAM_CLOSED (C12).
+        """
+        if self._upstream is None and self._pgid is None:
+            return None
+        target = self._pgid if self._pgid is not None else self._upstream.pid
+
+        def stop():
+            return supervisor.stop_group(target, grace_ms=250,
+                                         handle=self._upstream)
+        return stop
+
+    def _drain_refusals(self):
+        """T6.R1. Each retained refusal is handed over exactly once."""
+        while True:
+            with self._settlement:
+                if not self._owed_refusals:
+                    return
+                identity, reason, rule = self._owed_refusals.pop(0)
+            yield self._client_refusal(identity, reason, rule)
 
     def closed_with(self):
         return self._closed

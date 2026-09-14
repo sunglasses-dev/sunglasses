@@ -24,6 +24,12 @@ SUPPORTED_CAPABILITIES = frozenset({
 SUPPORTED_NOTIFICATIONS = frozenset({
     "notifications/cancelled",
     "notifications/initialized",
+    # T2.R12 names `message` as an upstream notification to INSPECT, and T1.R3
+    # advertises the `logging` capability whose only wire traffic this is.
+    # Omitting it advertised a capability that could never carry a message and
+    # made T2.R12's row unreachable: a rule scoped to it would have read as
+    # covered and never fired, which is the check that skips itself.
+    "notifications/message",
     "notifications/progress",
     "notifications/roots/list_changed",
     "notifications/tools/list_changed",

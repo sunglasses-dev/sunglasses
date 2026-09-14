@@ -164,3 +164,79 @@ F21 itself constructs `pump.Session()` with no arguments and hands it only
 pump to wait on. As written it can only be satisfied by the inactivity heuristic
 the ruling forbids. It stays red, ASTRA decides in the combined review, and the
 behaviour it is reaching for is demonstrated by the test named above.
+
+## G2-15 reverse wire, the fourth contradiction, measured both ways
+
+`scripts/test_reverse_wire.py` asserts two things in this order, 0.3 s after the
+peer signals ready:
+
+    assert not out                            # line 21
+    assert (tmp_path/'response.bin').exists()  # line 22
+
+They cannot both hold once the row is actually implemented, and the reason is
+`reverse_peer.py` rather than either assertion. The peer's last two statements
+are `response=sys.stdin.buffer.readline()` and a write of that line, so the
+moment the proxy answers the reverse request the peer RETURNS and its stdout
+closes. The client's own request, admitted from the requests fixture and sharing
+id 1501 on purpose, is still pending at that EOF, and T7.R1 makes an upstream
+exit with pending calls an S5 fault whose one owed answer T6.R1 requires on the
+wire. So the refusal arrives inside the same 0.3 s.
+
+Measured both ways on this head:
+
+  WITHOUT the upstream response (the graded candidate): the peer blocks on
+  readline for ever, no EOF arrives, `out` stays empty and line 21 passes;
+  `response.bin` is never written and line 22 fails. That is the shape ASTRA
+  graded NON-CONFORMANT.
+
+  WITH the upstream response (this head): `response.bin` contains
+  `reason_code: UNINSPECTED_METHOD` and line 22 passes; the peer exits, T7.R1
+  fires, and `out` holds exactly one frame, so line 21 fails.
+
+The single frame in `out` is
+`{"jsonrpc":"2.0","id":1501,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD","data":{"reason_code":"MALFORMED_UPSTREAM","rule":"S5"}}}`.
+It is a settlement of the CLIENT's own pending request, not a relay of anything
+the server sent. The substantive property line 21 exists to protect holds
+exactly: the server's `sampling/createMessage` frame, its params and its text
+never reach the client, and the id in the refusal is the client's own typed id
+answering the client's own request.
+
+So line 21 is a "nothing was relayed to C" assertion written for a peer that
+never exits, and it reads as false against a peer that exits the instant it is
+answered. T9 rules. The row itself is implemented: `_respond_upstream` writes
+one JSON-RPC error in upstream's id namespace back up the pipe, and nothing is
+ever yielded toward the client from the reverse branch.
+
+## The empty-output assertion, now in fourteen more places
+
+C07 and W01 use the SAME fixture, `G2-10/invalid_json`, and require opposite
+things. C07 asserts the client pipe receives a refusal whose `reason_code`
+equals `closed_with()[0]`. W01 asserts `not got`. Implementing the bounded
+repair route therefore turns fourteen round-4 controls red, and every one of
+them is red on that clause alone:
+
+    W01 x2, W02 x5, W05, F06, F08 x4 (compound), F11, F14, W20
+
+Measured on this head, all five W02 variants:
+
+    invalid_utf8          closed=(MALFORMED_UPSTREAM,S5) as expected, 1 frame, id 2103, reason MALFORMED_UPSTREAM, settled S5
+    duplicate_keys        closed=(MALFORMED_UPSTREAM,S5) as expected, 1 frame, id 2102, reason MALFORMED_UPSTREAM, settled S5
+    ambiguous_result      closed=(MALFORMED_UPSTREAM,S5) as expected, 1 frame, id 2104, reason MALFORMED_UPSTREAM, settled S5
+    malformed_clean_tail  closed=(MALFORMED_UPSTREAM,S5) as expected, 1 frame, id 2101, reason MALFORMED_UPSTREAM, settled S5
+    deep_json             closed=(OVER_BUDGET,S3)        as expected, 1 frame, id 2105, reason OVER_BUDGET,        settled S3
+
+Every substantive half still holds. The close reason and rule match the row, the
+item settles under the right rule, and what is yielded is exactly ONE frame: a
+SUNGLASSES_WITHHELD error carrying the CLIENT's own typed id and the same
+reason_code the session closed with. Nothing the server sent is relayed, which
+is the property the empty-output assertion was written to protect.
+
+This is the shape ASTRA already withdrew once. The verdict says "W03's old
+empty-output assertion is withdrawn while its three substantive assertions
+stand", and W01, W02, W05, F06, F08, F11, F14, W20 and reverse-wire line 21 all
+carry the same clause, written when a fault yielded nothing because the refusal
+had not been built yet. T6.R1 gives a client request exactly one response and
+C07 now requires it on these exact paths, so silence here is the hang F15 ruled
+against.
+
+Not repaired by editing a control. Measured, written down, and T9 rules.
