@@ -43,11 +43,21 @@ def _leader_with_child(marker):
 
 
 def _alive(pid):
+    """Running, and NOT a zombie.
+
+    `os.kill(pid, 0)` succeeds on a process that has been killed and not yet
+    reaped, so on its own it reports a corpse as alive. That is not pedantry: it
+    is why the stubborn case below has to pass its handle, and it is worth
+    stating because a supervisor test that cannot tell a zombie from a live
+    process will happily pass for a supervisor that kills nothing.
+    """
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    state = subprocess.run(["ps", "-o", "state=", "-p", str(pid)],
+                           capture_output=True, text=True).stdout.strip()
+    return not state.startswith("Z")
 
 
 def test_a_group_is_killed_even_after_its_leader_has_exited(tmp_path):
@@ -95,7 +105,11 @@ def test_a_process_that_ignores_sigterm_is_killed(tmp_path):
     time.sleep(0.3)
     assert _alive(stubborn.pid)
 
-    supervisor.stop_group(stubborn.pid, grace_ms=250)
+    # The HANDLE is passed because this test owns the process, which is how a
+    # real caller uses this and the only way the child can be reaped. Without
+    # it the process is killed and stays a zombie, and a zombie answers
+    # `os.kill(pid, 0)`.
+    supervisor.stop_group(stubborn.pid, grace_ms=250, handle=stubborn)
 
     for _ in range(100):
         if not _alive(stubborn.pid):
@@ -124,5 +138,56 @@ def test_the_group_is_reaped_so_nothing_is_left_a_zombie():
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"],
                              start_new_session=True)
     time.sleep(0.2)
-    supervisor.stop_group(child.pid, grace_ms=250)
+    supervisor.stop_group(child.pid, grace_ms=250, handle=child)
     assert child.poll() is not None, "the child was killed but never reaped"
+    assert not _alive(child.pid), "it was reaped and is still a zombie"
+
+
+def test_the_group_is_resolved_from_the_process_not_assumed_to_be_its_pid(tmp_path):
+    """`os.getpgid(pid)`, not `pid`.
+
+    Every other test here starts its process with `start_new_session=True`,
+    which makes the pid and the group id the same number, so a supervisor that
+    simply used the pid as the group id passed all of them. It is not the same
+    number for anything that did not create its own session, and using the pid
+    there signals a group that may not exist, or worse, one that does and is
+    somebody else's.
+
+    A grandchild inside a leader's session is the case: its pid differs from its
+    group, its group is the leader's, and stopping it must take the whole group
+    down with it.
+    """
+    marker = str(tmp_path / "grandchild.pid")
+    code = (
+        "import subprocess, sys, time\n"
+        f"subprocess.Popen([sys.executable, '-c', "
+        f"\"open({marker!r},'w').write(str(__import__('os').getpid()));"
+        f" import time; time.sleep(120)\"])\n"
+        "time.sleep(120)\n"
+    )
+    leader = subprocess.Popen([sys.executable, "-c", code], start_new_session=True)
+    for _ in range(100):
+        if os.path.exists(marker):
+            break
+        time.sleep(0.05)
+    grandchild = int(open(marker).read())
+
+    from sunglasses.proxy import supervisor as sup
+    assert sup._group_of(grandchild) == leader.pid, (
+        "the grandchild's group is the leader's, and this is the only test here "
+        "where the pid and the group differ")
+    assert grandchild != leader.pid, "the two numbers must differ for this to mean anything"
+
+    try:
+        supervisor.stop_group(grandchild, grace_ms=250)
+        for _ in range(100):
+            if not _alive(leader.pid) and not _alive(grandchild):
+                break
+            time.sleep(0.05)
+        assert not _alive(grandchild), "the grandchild survived"
+        assert leader.poll() is not None or not _alive(leader.pid), (
+            "the leader survived, so the pid was signalled rather than the group")
+    finally:
+        if leader.poll() is None:
+            leader.kill()
+        leader.wait(timeout=5)
