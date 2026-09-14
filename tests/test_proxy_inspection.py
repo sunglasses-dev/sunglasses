@@ -275,9 +275,20 @@ def test_the_helper_lane_is_enumerated_and_not_matched_by_shape():
     from sunglasses import firewall
 
     helper = inspection.helper_catalog()
-    assert {rule.id for rule in firewall.SECRET_RULES} <= helper
-    assert set(inspection.HELPER_PIN_IDS) <= helper
+    assert helper == ({rule.id for rule in firewall.SECRET_RULES}
+                      | set(inspection.HELPER_PIN_IDS)), \
+        "equality, not containment: a catalog with room for extras is a shape"
     assert "GLS-FW-SEC-MADE-UP" not in helper
+
+
+def test_the_trusted_catalog_carries_both_lanes():
+    """The route validates against this one. Dropping the helper lane rejects
+    every deterministic credential finding as an untrusted id, which withholds
+    the message saying the scan could not be believed rather than that a
+    credential was found."""
+    assert inspection.trusted_catalog() == (inspection.engine_catalog()
+                                            | inspection.helper_catalog())
+    assert inspection.helper_catalog() <= inspection.trusted_catalog()
 
 
 def test_a_mechanism_finding_validates_against_the_trusted_catalog():
