@@ -60,10 +60,22 @@ def _clean(_page):
 
 
 def _engine(tmp_path, pages, scan=_clean):
-    """A route whose upstream answers tools/list from `pages`, in order."""
-    upstream, client = _Sink(), _Sink()
+    """A route whose upstream answers tools/list from `pages`, in order.
+
+    Over a REAL PIPE with a reader thread, the way serve.py runs it. The first
+    version of this fixture called `read_upstream` once per frame, which is an
+    upstream that exits after every message: EOF arrived with the client's own
+    request still pending, T7.R1 tore the session down, and the first list
+    passed for the wrong reason while the second could not run at all.
+    """
+    import os
+    import threading
+
+    client = _Sink()
+    upstream = _Sink()
     session = pump.Session()
     store = approvals.Store(tmp_path, server_id="s1")
+    read_fd, write_fd = os.pipe()
     answered = {"n": 0}
 
     def upstream_write(raw):
@@ -72,9 +84,9 @@ def _engine(tmp_path, pages, scan=_clean):
         if sent.get("method") == "tools/list":
             page = pages[min(answered["n"], len(pages) - 1)]
             answered["n"] += 1
-            list(session.read_upstream(
-                (json.dumps({"jsonrpc": "2.0", "id": sent["id"],
-                             "result": page}) + "\n").encode()))
+            os.write(write_fd, (json.dumps(
+                {"jsonrpc": "2.0", "id": sent["id"], "result": page})
+                + "\n").encode())
 
     engine = route.Route(session=session, log=_log(tmp_path),
                          upstream_write=upstream_write, client_write=client,
@@ -83,6 +95,12 @@ def _engine(tmp_path, pages, scan=_clean):
                                      upstream_write=upstream_write,
                                      deadline_ms=2000)
     engine.page_scan = scan
+
+    reader = threading.Thread(
+        target=lambda: list(session.read_upstream(os.fdopen(read_fd, "rb", 0))),
+        daemon=True)
+    reader.start()
+    engine._close_pipe = lambda: os.close(write_fd)
     return engine, upstream, client, store
 
 
@@ -176,3 +194,39 @@ def test_a_server_that_never_stops_paging_withholds_rather_than_hangs(tmp_path):
     engine.client_frame(_list_request())
     assert client.messages()[0]["error"]["data"]["reason_code"] == \
         "APPROVAL_REQUIRED"
+
+
+def test_without_a_control_channel_the_list_is_refused_not_forwarded(tmp_path):
+    """T2.R6 has no fallback. If the proxy cannot run its own list it must
+    refuse, because the one answer this row never permits is handing the
+    client's request to the server unread, and leaving the client with no
+    answer at all is the hang F15 ruled against."""
+    client = _Sink()
+    engine = route.Route(session=pump.Session(), log=_log(tmp_path),
+                         upstream_write=_Sink(), client_write=client,
+                         approvals=approvals.Store(tmp_path, server_id="s1"))
+    engine.client_frame(_list_request())
+    assert len(client.messages()) == 1
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "APPROVAL_REQUIRED"
+
+
+def test_a_server_that_stops_answering_gives_no_page_at_all(tmp_path):
+    """A timeout is not an empty page. Reading it as one completes a snapshot
+    out of a list that never finished arriving, and T8.R13's whole point is
+    that a prefix is a different document rather than a shorter one."""
+    engine, _upstream, _client, _store = _engine(tmp_path, [_page(["echo"])])
+    engine.control.deadline_ms = 50
+    engine.control.upstream_write = lambda raw: None      # the server goes quiet
+    assert engine._pager()(None) is None
+
+
+def test_an_unanswered_list_is_incomplete_rather_than_complete_and_empty(tmp_path):
+    from sunglasses.proxy import snapshot as _snapshot
+
+    engine, _upstream, _client, _store = _engine(tmp_path, [_page(["echo"])])
+    engine.control.deadline_ms = 50
+    engine.control.upstream_write = lambda raw: None
+    found = _snapshot.collect(engine._pager(), scan=_clean)
+    assert found.complete is False
+    assert found.sha256 is None
