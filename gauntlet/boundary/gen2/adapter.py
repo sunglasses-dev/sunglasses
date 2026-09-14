@@ -26,7 +26,16 @@ from __future__ import annotations
 
 # Every operation this adapter can actually execute. Growing it is a deliberate
 # edit, made in the same commit as the implementation and the test.
-IMPLEMENTED = frozenset({"send_file", "await_primary_terminal"})
+IMPLEMENTED = frozenset({
+    "send_file", "await_primary_terminal",
+    # The four assertion steps. Measured, not chosen: implementing exactly these
+    # takes the drivable set from 19 to 27, and every one of them reads evidence
+    # the executor already collects rather than needing new machinery.
+    "assert_no_rpc_response_to_notification_or_borrowed_id",
+    "assert_zero_upstream_copies",
+    "await_client_error",
+    "await_error",
+})
 
 # tools_v2/PROFILE_STEPS.md, 2026-09-13. Pinned, not fetched: a contract that
 # silently follows the file it describes cannot tell you the file changed.

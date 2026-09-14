@@ -25,6 +25,31 @@ def _frames(path: pathlib.Path) -> list[bytes]:
     return [line for line in pathlib.Path(path).read_bytes().splitlines() if line.strip()]
 
 
+def _flush_pushes(stdout, declared, served: int) -> int:
+    """Emit every declared frame that the upstream SENDS rather than answers.
+
+    A declared frame carrying a `method` is a notification or a server initiated
+    request: G2-14's upstream logs a `notifications/message`, G2-15's sends a
+    `sampling/createMessage`. Those are pushes. Holding them until some client
+    request arrives to be answered with them was wrong in both directions, it
+    delayed the push and consumed it as a reply, and the three scenarios built
+    on that shape could not run at all.
+
+    A frame with no method is a reply and waits for something to reply to.
+    """
+    while served < len(declared):
+        try:
+            frame = json.loads(declared[served])
+        except ValueError:
+            break
+        if not frame.get("method"):
+            break
+        stdout.write(declared[served] + b"\n")
+        stdout.flush()
+        served += 1
+    return served
+
+
 def serve(handshake_path, stream_path, stdin=None, stdout=None) -> int:
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
@@ -53,7 +78,9 @@ def serve(handshake_path, stream_path, stdin=None, stdout=None) -> int:
             # same method, and the fixtures correlate by id on both sides.
             stdout.write(handshake[handshake_ids.index(message["id"])] + b"\n")
             stdout.flush()
+            served = _flush_pushes(stdout, declared, served)
             continue
+        served = _flush_pushes(stdout, declared, served)
         if served >= len(declared):
             # SILENCE, not an invented error. A refusal frame is content on the
             # wire the scenario never declared, and G2-21.client_malformed_tail
@@ -72,6 +99,9 @@ def serve(handshake_path, stream_path, stdin=None, stdout=None) -> int:
         stdout.write(declared[served] + b"\n")
         stdout.flush()
         served += 1
+    # ANY REMAINING PUSH still belongs to the scenario. The client closing its
+    # stdin does not retract a frame the seed says the upstream sends.
+    _flush_pushes(stdout, declared, served)
     return 0
 
 

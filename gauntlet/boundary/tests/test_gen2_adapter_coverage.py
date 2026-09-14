@@ -60,7 +60,10 @@ def test_the_operations_this_adapter_implements_are_written_down():
     If this assertion fails because the adapter grew, that is correct and the
     fix is to update the list in the same commit that adds the operation.
     """
-    assert adapter.IMPLEMENTED == frozenset({"send_file", "await_primary_terminal"})
+    assert adapter.IMPLEMENTED == frozenset({
+        "send_file", "await_primary_terminal",
+        "assert_no_rpc_response_to_notification_or_borrowed_id",
+        "assert_zero_upstream_copies", "await_client_error", "await_error"})
 
 
 def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
@@ -68,7 +71,7 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
 
     Written as numbers rather than a ratio so a variant moving from cannot to
     can shows up as a one line change. Today the adapter drives the shape G2-13
-    uses and nothing else, which is 19 of 74 variants, and every other variant
+    uses and nothing else, which is 27 of 74 variants, and every other variant
     is refused by name rather than half run.
 
     19 is measured, not chosen. The first version of this test said 18 because I
@@ -88,7 +91,9 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
                 missing_ops |= set(exc.operations)
 
     assert len(drivable) + len(refused) == 74, (len(drivable), len(refused))
-    assert len(drivable) == 19, sorted(drivable)
+    # 27, measured. It was 19 before the four assertion steps, which were chosen
+    # because the sweep said those four unlock the most for the least.
+    assert len(drivable) == 27, sorted(drivable)
     assert "arm_fault" in missing_ops, sorted(missing_ops)
     assert not (missing_ops & adapter.IMPLEMENTED), (
         "an operation cannot be both implemented and missing")
