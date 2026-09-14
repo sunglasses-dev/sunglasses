@@ -51,6 +51,34 @@ def _run(frames, tmp_path, poison=None, timeout=60, linger=False):
     return proc, replies, arrived
 
 
+
+def _approve_the_server(tmp_path, poison=None):
+    """Do what a human does: list the server, look at the capture, approve it.
+
+    The capture's filename is `<server-id>.<sha>.json`, so both halves of the
+    approval come from the artifact's own output rather than from the test
+    recomputing an identity the proxy derived.
+
+    `poison` has to be passed through, and finding that out was the product
+    being right. T1.R1 derives the server identity from its argv, so a server
+    started with an extra flag IS a different server and needs its own
+    approval. Approving one command line and then running another is exactly
+    the substitution the identity exists to catch.
+    """
+    from sunglasses.proxy import approvals
+
+    listing = (json.dumps({"jsonrpc": "2.0", "id": 99, "method": "tools/list"})
+               + "\n").encode()
+    _run([listing], tmp_path, poison=poison)
+    captures = sorted((tmp_path / "state" / "captures").glob("*.json"))
+    assert captures, "the proxy captured nothing to approve"
+    server_id, sha, _ = captures[-1].name.split(".")
+    approvals.Store(tmp_path / "state",
+                    server_id=server_id).approve(snapshot_sha256=sha,
+                                                 viewed=True)
+    return sha
+
+
 def _call(text, request_id=1):
     return (json.dumps({"jsonrpc": "2.0", "id": request_id,
                         "method": "tools/call",
@@ -71,14 +99,21 @@ def test_a_call_is_refused_until_a_human_has_approved_the_server(tmp_path):
     """
     call = _call("please save the meeting notes")
     _proc, replies, arrived = _run([call], tmp_path)
-    assert arrived == b"", "an unapproved call reached the server"
+    assert call not in arrived, "an unapproved call reached the server"
+    # Not "zero bytes". The proxy's OWN tools/list reaches the server, because
+    # that is how T5.R3 finds out whether this server is approved at all. The
+    # comparison that matters is the protected payload, not the traffic.
+    assert all(json.loads(line)["id"].startswith("sg-")
+               for line in arrived.splitlines() if line), \
+        "something other than our own control traffic reached the server"
     assert replies[0]["error"]["data"]["reason_code"] == "APPROVAL_REQUIRED"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "blocked on the list and activation flow, T2.R6/R7 and T5.R3. "
-    "strict, so the day approval can be granted this turns XPASS and says so"))
 def test_an_ordinary_call_reaches_the_server_and_its_answer_comes_back(tmp_path):
+    """It used to be xfail(strict) waiting on the list and activation flow.
+    That flow landed, so the approval below is a real one and this is the
+    artifact doing its whole job: list, approve, call, answer."""
+    _approve_the_server(tmp_path)
     call = _call("please save the meeting notes")
     proc, replies, arrived = _run([call], tmp_path)
     assert call in arrived, "the call never reached the server"
@@ -99,7 +134,9 @@ def test_a_credential_in_a_call_never_reaches_the_server(tmp_path):
     """
     _proc, replies, arrived = _run([_call(f"my key is {SECRET}")], tmp_path)
     assert SECRET.encode() not in arrived, "the credential reached the server"
-    assert arrived == b"", "any byte of a withheld call is a delivery"
+    assert all(json.loads(line)["id"].startswith("sg-")
+               for line in arrived.splitlines() if line), \
+        "only our own control traffic may reach the server on a withheld call"
     assert replies[0]["error"]["message"] == "SUNGLASSES_WITHHELD"
 
 
@@ -110,14 +147,11 @@ def test_the_refusal_does_not_hand_the_payload_back_either(tmp_path):
 
 # ── inbound · the compromised server ─────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason=(
-    "blocked on the list and activation flow: nothing can be forwarded yet, "
-    "so no result comes back to poison. Proven at the route level in "
-    "tests/test_proxy_result_direction.py meanwhile"))
 def test_a_poisoned_result_never_reaches_the_model(tmp_path):
     """The reason this direction exists. The user asked for something ordinary
     and the SERVER is the hostile party, which is the shape of every poisoned
     document, every compromised MCP server and every repository nobody read."""
+    _approve_the_server(tmp_path, poison=INJECTION)
     call = _call("read the README")
     _proc, replies, arrived = _run([call], tmp_path, poison=INJECTION)
     assert call in arrived, "the ordinary call should have been forwarded"

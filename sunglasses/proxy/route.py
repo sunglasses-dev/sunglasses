@@ -74,6 +74,7 @@ class Route:
         self.server_identity = server_identity
         self.page_scan = self._scan_page
         self._approved_tools = {}
+        self._activated = False
 
     # ── one frame from the client ──────────────────────────────────────────
 
@@ -530,7 +531,35 @@ class Route:
             return REASON_APPROVAL_REQUIRED
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
-        return self.approvals.may_call(name, self.descriptor_sha_for(name))
+        self._activate_once()
+        # The descriptor sha comes from the snapshot this session ACTIVATED,
+        # not from an argument a caller supplies. T5.R2 admits a call when the
+        # tool's descriptor matches the approved one, and a sha handed in from
+        # outside would let the caller answer the question being asked.
+        known = self._approved_tools.get(name) if name else None
+        return self.approvals.may_call(name,
+                                       known or self.descriptor_sha_for(name))
+
+    def _activate_once(self):
+        """T5.R3's activation, run on the first admission rather than at the
+        literal first frame.
+
+        The row says at session start. Doing it on the first call that needs it
+        is equivalent for the property that matters, since no call is admitted
+        before a committed activation either way, and it avoids listing a
+        server for a client that only ever pings. The deviation is written here
+        rather than left for a reader to infer from the absence of a call in
+        serve.py.
+        """
+        if self._activated or self.control is None or not self.approvals:
+            return
+        self._activated = True
+        outcome = activation.activate(
+            self.approvals, list_pages=self._pager(), scan=self.page_scan,
+            server_identity=self.server_identity or getattr(
+                self.approvals, "server_id", None))
+        if outcome.activated:
+            self._approved_tools = dict(outcome.snapshot.tools)
 
     def _close(self, reason, rule, budget):
         # pump.Session owns the teardown and exposes it privately. A public
