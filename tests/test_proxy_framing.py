@@ -227,3 +227,43 @@ def test_the_origin_decides_which_side_is_named_and_nothing_else():
     big = json.dumps({"jsonrpc": "2.0", "id": 1,
                       "pad": "x" * (framing.MAX_FRAME_BYTES + 10)}).encode()
     assert framing.parse_frame(big, origin="client").reason == framing.OVER_BUDGET
+
+
+# ── AR15: a tail is not a frame ────────────────────────────────────────────
+
+def test_an_unterminated_tail_is_not_yielded_as_a_frame():
+    """AR15. The reader used to hand the caller whatever was in the buffer at
+    EOF, so a partial line read as a complete one.
+
+    On the client direction that meant forwarding an unterminated request to
+    the server: the mediator delivering something nobody finished sending. "A
+    frame is its bytes including the LF" is this module's own rule and it
+    decides the EOF case too.
+    """
+    import io
+
+    source = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n{"partial"')
+    tail = []
+    frames = list(framing.bounded_lines(source, framing.MAX_FRAME_BYTES, tail))
+    assert frames == [b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n']
+    assert tail == [b'{"partial"']
+
+
+def test_a_clean_ending_reports_no_tail():
+    """The positive half, or the row above is satisfied by always reporting
+    one."""
+    import io
+
+    source = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n')
+    tail = []
+    frames = list(framing.bounded_lines(source, framing.MAX_FRAME_BYTES, tail))
+    assert len(frames) == 1 and tail == []
+
+
+def test_the_tail_list_is_optional():
+    """Callers that do not care must not have to pass one, and the generator
+    must not grow a None check in its hot loop."""
+    import io
+
+    source = io.BytesIO(b'{"partial"')
+    assert list(framing.bounded_lines(source)) == []

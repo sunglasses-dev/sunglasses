@@ -23,6 +23,8 @@ import os
 import subprocess
 import sys
 
+import threading
+
 import pytest
 
 pytest.importorskip("sunglasses.proxy.serve",
@@ -301,3 +303,51 @@ class _Out:
 
     def write(self, chunk):
         self.text += chunk
+
+
+# ── AR15: a client that stops mid-frame has not ended cleanly ──────────────
+
+def test_a_client_tail_closes_the_session_malformed_client():
+    """AR15's other half, which its own control does not pin.
+
+    The artifact test asserts the proxy exits non-zero, and the upstream also
+    exits non-zero when its stdin closes, so that assertion passes either way:
+    a mutation removing this close survived it. What has to be true is that the
+    SESSION says why -- a truncated request is a client fault, not a clean
+    ending -- and that the partial bytes never reach the engine.
+    """
+    import io
+
+    from sunglasses.proxy import pump, serve
+
+    forwarded = []
+
+    class Engine:
+        def client_frame(self, raw):
+            forwarded.append(raw)
+
+    session = pump.Session()
+    stream = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n{"trunc')
+    done = threading.Event()
+    serve._drain_client(Engine(), session, stream, done)
+
+    assert done.is_set()
+    assert forwarded == [b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n']
+    assert session.closed_with() == ("MALFORMED_CLIENT", "S5")
+
+
+def test_a_client_that_ends_on_a_frame_boundary_is_not_a_fault():
+    """The positive half. An ordinary client closing its pipe after a complete
+    frame must not be reported as a protocol fault."""
+    import io
+
+    from sunglasses.proxy import pump, serve
+
+    class Engine:
+        def client_frame(self, raw):
+            pass
+
+    session = pump.Session()
+    stream = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n')
+    serve._drain_client(Engine(), session, stream, threading.Event())
+    assert session.closed_with() is None

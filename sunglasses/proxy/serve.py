@@ -147,24 +147,91 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
                          upstream_write=to_upstream, client_write=to_client,
                          root=root)
 
-    reader = threading.Thread(target=_drain, args=(engine, child), daemon=True)
+    # AR14. BOTH directions are threads, and the process ends when EITHER of
+    # them does.
+    #
+    # The client loop used to run on the main thread, so a server that exited
+    # left the proxy blocked on a client read that would never return: the
+    # upstream was gone, the reader thread had finished, and the mediator sat
+    # there mediating nothing until the client happened to close its end. A
+    # server's exit status could not propagate because the process it should
+    # propagate through was still running.
+    #
+    # There is nothing to mediate once either side is gone, so whichever
+    # finishes first ends the session, and the teardown below runs exactly once
+    # on the main thread.
+    done = threading.Event()
+    # AR14. Set once the teardown has run, so a caller that OWNS the process
+    # can leave without waiting on a client reader that is blocked on a pipe
+    # nobody will write to again. See `exit_process`.
+    finished = _FINISHED
+    finished.clear()
+    reader = threading.Thread(target=_drain, args=(engine, child, done),
+                              daemon=True)
+    client = threading.Thread(
+        target=_drain_client, args=(engine, session, stdin, done), daemon=True)
     reader.start()
+    client.start()
 
     try:
-        for raw in framing.bounded_lines(stdin, framing.MAX_FRAME_BYTES):
-            engine.client_frame(raw)
-            if session.closed_with():
-                break
+        done.wait()
     finally:
         _close(child)
         reader.join(timeout=5)
         code = _exit_code(session, child)
+        finished.set()
+        # T905. The log needs a terminal event or it does not verify, and it
+        # did not have one: every receipt this command produced described a
+        # session whose ending was never written down.
+        _record_ending(log, session, code)
         log.close()
         supervisor.stop_group(child.pid, handle=child)
     return code
 
 
-def _drain(engine, child):
+
+def _record_ending(log, session, code):
+    """The terminal row, best effort. A log we can no longer write is already
+    a stop the session has recorded, and failing to close the record is not a
+    reason to raise on the way out."""
+    try:
+        closed = session.closed_with()
+        log.event("SESSION_TORN_DOWN",
+                  reason_code=closed[0] if closed else None,
+                  rule=closed[1] if closed else None,
+                  settled=True)
+    except Exception:
+        pass
+
+
+# AR14. The client reader is a DAEMON thread blocked in a read on this
+# process's own stdin. When `main` returns, interpreter shutdown tries to close
+# that buffered reader, cannot take its lock, and aborts the process with
+# "could not acquire lock ... at interpreter shutdown, possibly due to daemon
+# threads" -- SIGABRT instead of the server's exit status, which is the very
+# thing AR14 is about.
+#
+# So the teardown is complete BEFORE anyone leaves -- the child is closed, the
+# reader joined, the log written and closed, the group stopped -- and the entry
+# point that owns the process then leaves without running finalizers. That is
+# `os._exit`, and it is confined to `exit_process` so `main` stays a function a
+# test can call in-process without killing the test runner.
+_FINISHED = threading.Event()
+
+
+def exit_process(code):
+    """Leave, from a caller that owns the process and nothing else."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:
+            pass
+    if _FINISHED.is_set():
+        os._exit(code if isinstance(code, int) else EXIT_FAULT)
+    raise SystemExit(code)
+
+
+def _drain(engine, child, done):
     try:
         engine.pump_upstream(child.stdout)
     except Exception:
@@ -172,6 +239,27 @@ def _drain(engine, child):
         # upstream-adjacent text could reach an operator's terminal, and
         # T10.R3's last sentence refuses that for the same reason.
         pass
+    finally:
+        done.set()
+
+
+def _drain_client(engine, session, stdin, done):
+    tail = []
+    try:
+        for raw in framing.bounded_lines(stdin, framing.MAX_FRAME_BYTES, tail):
+            engine.client_frame(raw)
+            if session.closed_with():
+                break
+        # AR15. A client that stops mid-frame has not ended cleanly. The bytes
+        # are never forwarded -- that is the reader's rule now -- and the
+        # session says so rather than exiting zero on a truncated request.
+        if tail and not session.closed_with():
+            session._close("MALFORMED_CLIENT",
+                           "the client stopped in the middle of a frame")
+    except Exception:
+        pass
+    finally:
+        done.set()
 
 
 def _close(child):

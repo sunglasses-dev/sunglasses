@@ -29,17 +29,19 @@ USAGE = """usage:
   python -m sunglasses.proxy doctor [--config PATH]          report the route
   python -m sunglasses.proxy install <name> --config PATH -- <argv>
   python -m sunglasses.proxy uninstall <name> --config PATH
+  python -m sunglasses.proxy approve <server-id> --snapshot SHA [--state-root PATH]
 """
 
 EXIT_OK = 0
 EXIT_FAULT = 1
 EXIT_USAGE = 2
 
-COMMANDS = ("doctor", "install", "uninstall")
+COMMANDS = ("doctor", "install", "uninstall", "approve")
 SEPARATOR = "--"
 
 
-def main(argv=None, *, stdout=None, stderr=None, serve=None, report=None):
+def main(argv=None, *, stdout=None, stderr=None, serve=None, report=None,
+         confirm=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     stdout = stdout if stdout is not None else sys.stdout
     stderr = stderr if stderr is not None else sys.stderr
@@ -68,6 +70,8 @@ def main(argv=None, *, stdout=None, stderr=None, serve=None, report=None):
     name = rest[0]
     if head == "install":
         return _install(name, options, stdout, stderr)
+    if head == "approve":
+        return _approve(name, options, stdout, stderr, confirm=confirm)
     return _uninstall(name, options, stdout)
 
 
@@ -90,7 +94,7 @@ def _options(argv):
         if token == SEPARATOR:
             wrapped = argv[index + 1:]
             break
-        if token in ("--config", "--state-root") and index + 1 < len(argv):
+        if token in ("--config", "--state-root", "--snapshot") and index + 1 < len(argv):
             options[token[2:]] = argv[index + 1]
             index += 2
             continue
@@ -122,6 +126,77 @@ def _doctor(options, stdout, report):
                                        row.get("state")))
     stdout.write("aggregate: %s\n" % rendered["aggregate"])
     return rendered["exit_code"]
+
+
+
+def _approve(server_id, options, stdout, stderr, *, confirm=None):
+    """T5.R1's door, and the only one. Nothing on the serving path may write an
+    approval record; this is what does, after a human has seen the capture.
+
+    The command existed only in the contract and in `approvals.py`'s own
+    refusal message, which named a command the package did not ship. A gate
+    nobody can open is a gate that gets worked around.
+
+    Three refusals, and none of them is exit 2, because none of them is a
+    mistyped command line:
+
+      the capture named does not exist -- there is nothing a human could have
+      looked at, so there is nothing to record;
+
+      this is not an interactive terminal -- `viewed` records that a PERSON
+      looked, and a pipe cannot look. Approving here would write the record on
+      their behalf, which is exactly what T5.R1 forbids and what
+      `write_without_human` refuses in the library;
+
+      the person said no.
+    """
+    import json
+    import pathlib
+
+    from . import approvals
+
+    snapshot = options.get("snapshot")
+    if not snapshot:
+        return _usage(stderr)
+    root = pathlib.Path(options.get("state-root") or ".")
+    store = approvals.Store(root, server_id=server_id)
+    capture = store.captures / f"{server_id}.{snapshot}.json"
+    if not capture.exists():
+        stderr.write(
+            f"no stored capture {snapshot[:12]} for {server_id}; the sha "
+            f"approved must be the sha that was shown\n")
+        return EXIT_FAULT
+
+    stored = json.loads(capture.read_text())
+    tools = stored.get("tools_by_name") or {}
+    stdout.write(f"server {server_id}\nsnapshot {snapshot}\n")
+    stdout.write(f"{len(tools)} tool(s) in this capture\n")
+    for tool_name in sorted(tools):
+        digest = (tools[tool_name] or {}).get("descriptor_sha256") or "?"
+        stdout.write(f"  {tool_name}  {digest[:16]}\n")
+
+    answered = confirm() if confirm is not None else _ask(stdout)
+    if answered is None:
+        stderr.write(
+            "approving records that a human viewed this capture, and this is "
+            "not an interactive terminal, so nobody did\n")
+        return EXIT_FAULT
+    if not answered:
+        stderr.write("not approved\n")
+        return EXIT_FAULT
+
+    store.approve(snapshot_sha256=snapshot, viewed=True)
+    stdout.write("approved\n")
+    return EXIT_OK
+
+
+def _ask(stdout):
+    """None when there is no person to ask, which is not the same as no."""
+    if not sys.stdin or not sys.stdin.isatty():
+        return None
+    stdout.write("approve these descriptors? [y/N] ")
+    stdout.flush()
+    return sys.stdin.readline().strip().lower() in ("y", "yes")
 
 
 def _install(name, options, stdout, stderr):

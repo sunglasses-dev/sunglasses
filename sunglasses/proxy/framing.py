@@ -171,7 +171,7 @@ def valid_id(value):
     return isinstance(value, (str, int, float))
 
 
-def bounded_lines(source, limit=MAX_FRAME_BYTES):
+def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None):
     """Frames, read with a ceiling, instead of `readline` with none.
 
     T1.R2's bounded reader, which ASTRA's review noted was absent.
@@ -188,11 +188,25 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES):
     too much swallows the next message.
     """
     buffer = b""
+    # The caller's list, when it wants to know; a private one otherwise, so the
+    # generator never has to test for None in the loop.
+    unterminated = [] if unterminated is None else unterminated
     while True:
         chunk = source.read1(65536) if hasattr(source, "read1") else source.read(65536)
         if not chunk:
+            # AR15. A TAIL IS NOT A FRAME. This used to yield whatever was in
+            # the buffer at EOF, which handed the caller a partial line as
+            # though a complete one had arrived: on the client direction that
+            # forwarded an unterminated request to the server, which is the
+            # mediator delivering something nobody finished sending.
+            #
+            # "A frame is its bytes including the LF" is the rule two lines
+            # below, and it decides this case too. The tail is reported rather
+            # than dropped silently -- `unterminated_tail` is what the caller
+            # reads to close the session, since a peer that stops mid-frame has
+            # not made an ordinary clean ending.
             if buffer:
-                yield buffer
+                unterminated.append(buffer)
             return
         buffer += chunk
         while b"\n" in buffer:

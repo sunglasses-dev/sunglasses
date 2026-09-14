@@ -427,3 +427,27 @@ def test_the_default_route_forwards_an_ordinary_call_untouched(tmp_path):
     engine.client_frame(raw)
     assert upstream.bytes == raw
     assert client.bytes == b""
+
+
+# ── AR09: the content bound is a bound on content, not on a direction ──────
+
+def test_a_client_call_over_the_content_bound_is_refused(route_fixture=None):
+    """AR09, T8.R2. The bound was applied to results and not to calls, so the
+    limit that exists to stop an unbounded scan was reachable by sending the
+    bytes the other way."""
+    from sunglasses.proxy import bounds, selector
+
+    params = {"name": "read_text_file",
+              "arguments": {"text": "a" * (bounds.CONTENT_BYTES + 1)}}
+    assert selector.content_bytes(params) > bounds.CONTENT_BYTES
+    over = bounds.check_content(selector.content_bytes(params))
+    assert over.reason == "OVER_BUDGET" and over.budget == "content"
+
+
+def test_a_client_call_exactly_at_the_content_bound_is_not_refused():
+    """Inclusive, and two shipped fixtures sit precisely on it."""
+    from sunglasses.proxy import bounds, selector
+
+    params = {"arguments": {"text": "a" * bounds.CONTENT_BYTES}}
+    assert selector.content_bytes(params) == bounds.CONTENT_BYTES
+    assert not bounds.check_content(selector.content_bytes(params))

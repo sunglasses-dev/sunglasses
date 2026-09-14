@@ -28,8 +28,8 @@ import json
 import pathlib
 import uuid
 
-from . import (activation, envelope, framing, inspection, policy, receipts,
-               selector, snapshot, worker)
+from . import (activation, bounds, envelope, framing, inspection, policy,
+               receipts, selector, snapshot, worker)
 
 CLIENT = "client"
 UPSTREAM = "upstream"
@@ -366,6 +366,21 @@ class Route:
                 # a call whose contents are interesting.
                 self._withhold(request_id, blocked, RULE_APPROVAL)
                 return
+
+        # AR09, T8.R2. The content bound is a bound on CONTENT, not on the
+        # direction it happens to be travelling. It was applied to results and
+        # not to calls, so a client request carrying more than the cap went to
+        # the worker and then to the server: the limit that exists to stop an
+        # unbounded scan was reachable by sending the bytes the other way.
+        #
+        # Refused BEFORE inspection, because the point of the bound is that the
+        # scan never runs on that much input.
+        over = bounds.check_content(
+            selector.content_bytes(message.get("params") or {}))
+        if over:
+            self._withhold(request_id, over.reason, over.rule,
+                           budget=over.budget)
+            return
 
         self._inspect(raw, message, method, request_id=request_id)
 
