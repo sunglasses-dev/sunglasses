@@ -493,9 +493,28 @@ contract rather than about which control is newer.
 A refusal that cannot say whether any bytes were inspected also cannot be
 compared to a fixture, which is the property T0.R2's grading depends on.
 
-@T9: this needs a ruling in the shape of R-W03-2. The narrow one is to keep
-RC03's three substantive assertions and split its `==` into its own strict
-xfail tripwire. Nothing has been changed in either control file pending it.
+### R-RC03-1, the ruling (T9, 2026-09-14 10:00)
+
+T4.R7's ten-member data WINS. RC03 is split in place, the way R-W03-2 split the
+seventeen:
+
+  1. `test_RC03_refusal_preserves_per_item_first_cause` keeps its substantive
+     assertions unchanged and live -- the per-item first cause reaches both the
+     settlement and the wire -- and now reads `reason_code` and `rule` by
+     member instead of pinning the whole object;
+  2. `test_RC03_two_member_data_tripwire` carries the withdrawn equality as its
+     own `xfail(strict=True)`. If the refusal ever shrinks back to two members
+     that XPASSes and the suite goes red, so the clause still watches what it
+     was written for;
+  3. `test_RC03_positive_control_ten_members_and_their_values` asserts the ten
+     members AND their values, per row. The values half is the point: an
+     envelope carrying all ten while claiming a complete, finished inspection
+     over bytes nobody read passes any test that only checks which keys are
+     present. That exact mutant survived my first pass on T410 and this control
+     is what kills it.
+
+`test_review_core.py` is 20 passed, 3 xfailed, zero failed on this head.
+ASTRA versions this as v7 in the stack round.
 
 ### Running the round-4 controls in a fresh worktree
 
