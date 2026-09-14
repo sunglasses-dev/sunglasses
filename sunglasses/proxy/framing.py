@@ -42,6 +42,17 @@ BUDGET_DEPTH = "depth"
 BUDGET_NODES = "nodes"
 
 
+class NotJsonNumber(ValueError):
+    """`NaN`, `Infinity` or `-Infinity` appeared in the frame.
+
+    `json.loads` accepts all three by default. They are a Python extension and
+    not JSON, no MCP peer is entitled to send them, and they poison every
+    numeric comparison downstream: a budget check against NaN is false whichever
+    way it is written, so a counter of NaN passes "at most" and "at least" at
+    once. Found by ASTRA's independent checks, not by mine.
+    """
+
+
 class DuplicateKey(ValueError):
     """Two entries for one key in one object.
 
@@ -49,6 +60,10 @@ class DuplicateKey(ValueError):
     treats it as a PROTOCOL fault and not as a parse failure, and the two lead
     to different rules.
     """
+
+
+def _reject_constant(literal):
+    raise NotJsonNumber(f"{literal} is not a JSON number")
 
 
 def _no_duplicate_keys(pairs):
@@ -60,9 +75,15 @@ def _no_duplicate_keys(pairs):
     another. Rejecting it is the only reading that cannot be played.
     """
     seen = set()
-    for key, _value in pairs:
+    for position, (key, _value) in enumerate(pairs):
         if key in seen:
-            raise DuplicateKey(f"duplicate key {key!r}")
+            # The KEY IS NOT QUOTED. It is attacker controlled text and `detail`
+            # is carried into a receipt, so naming it here would put an
+            # untrusted string into the evidence. Position and length identify
+            # it for anyone holding the frame, and neither reproduces it.
+            raise DuplicateKey(
+                f"duplicate key at position {position}, {len(str(key))} "
+                f"characters; the key itself is withheld from the receipt")
         seen.add(key)
     return dict(pairs)
 
@@ -141,6 +162,37 @@ def valid_id(value):
     return isinstance(value, (str, int, float))
 
 
+def _envelope_fault(message):
+    """Every frame is a request, a notification or a response, and nothing else.
+
+    A frame that is none of the three has no meaning to act on, and the shapes
+    that reach this check are not exotic. `{"jsonrpc":"2.0"}` carries nothing.
+    A `result` with no `id` is a response to nobody. A `method` that is not a
+    string is not a method name. An `error` that is not an object has no code.
+
+    The parser accepted all four before ASTRA's checks found them, because it
+    validated the FIELDS a frame had and never asked whether the combination was
+    a frame at all.
+    """
+    has_method = "method" in message
+    has_id = "id" in message
+    has_result = "result" in message
+    has_error = "error" in message
+
+    if has_method:
+        if not isinstance(message["method"], str):
+            return (f"method is {type(message['method']).__name__}, not a "
+                    f"string")
+        return None                    # request when it has an id, else a notification
+    if has_result or has_error:
+        if not has_id:
+            return "a response carries no id, so it answers nobody"
+        if has_error and not isinstance(message["error"], dict):
+            return f"error is {type(message['error']).__name__}, not an object"
+        return None
+    return "the frame is neither a request, a notification nor a response"
+
+
 def parse_frame(raw, *, origin="upstream"):
     """One line of wire bytes to a Frame, with the cause named.
 
@@ -167,7 +219,11 @@ def parse_frame(raw, *, origin="upstream"):
                      detail=f"invalid UTF-8 at byte {bad.start}", size=size)
 
     try:
-        message = json.loads(text, object_pairs_hook=_no_duplicate_keys)
+        message = json.loads(text, object_pairs_hook=_no_duplicate_keys,
+                             parse_constant=_reject_constant)
+    except NotJsonNumber as constant:
+        return Frame(ok=False, rule=S5, reason=malformed,
+                     detail=str(constant), size=size)
     except DuplicateKey as duplicated:
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=str(duplicated), size=size)
@@ -204,6 +260,10 @@ def parse_frame(raw, *, origin="upstream"):
         # meant the other.
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail="both result and error are present", size=size)
+    envelope = _envelope_fault(message)
+    if envelope:
+        return Frame(ok=False, rule=S5, reason=malformed, detail=envelope,
+                     size=size)
     if "id" in message and not valid_id(message["id"]):
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=f"id is {type(message['id']).__name__}, which is not "

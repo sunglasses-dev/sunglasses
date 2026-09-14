@@ -172,13 +172,21 @@ def test_nesting_deep_enough_to_exhaust_the_parser_reports_the_same_cause():
 
 
 def test_a_frame_just_inside_the_depth_limit_is_accepted():
-    """Or the test above would pass for a parser that refused everything."""
-    body = {"jsonrpc": "2.0", "id": 1}
+    """Or the test above would pass for a parser that refused everything.
+
+    The `method` is not decoration. An earlier version of this test built
+    `{"jsonrpc": "2.0", "id": 1}` with nothing else, which is not a request, a
+    notification or a response, and the envelope check added after ASTRA's
+    review correctly refuses it. The test had been asserting that an invalid
+    frame parses, and it passed because the parser had the same hole.
+    """
+    body = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
     node = body
     for _ in range(framing.MAX_DEPTH - 3):
         node["deep"] = {}
         node = node["deep"]
-    assert framing.parse_frame(json.dumps(body).encode())
+    parsed = framing.parse_frame(json.dumps(body).encode())
+    assert parsed, parsed.detail
 
 
 def test_too_many_nodes_is_a_budget_breach_naming_nodes():
