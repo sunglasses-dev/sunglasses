@@ -60,12 +60,43 @@ def default_engine():
     return _engine
 
 
+# T4.R6's helper lane pins, which are string literals at their call sites in
+# firewall.py rather than a collection. Named here so the catalog ENUMERATES
+# them. A prefix test would accept any id shaped like one of these, and a
+# catalog that accepts a shape is not a catalog.
+HELPER_PIN_IDS = ("GLS-FW-PIN-TOFU", "GLS-FW-PIN-MISMATCH", "GLS-FW-PIN-DRIFT")
+
+
 def engine_catalog():
-    """T4.R6's pinned engine ids, from the pattern set this build loaded."""
-    from .. import patterns
-    return frozenset(
-        str(pattern["id"]) for pattern in patterns.PATTERNS
-        if isinstance(pattern, dict) and pattern.get("id"))
+    """T4.R6's pinned engine ids: the pattern set AND the mechanism lane.
+
+    Both, and the second half is the part that was missing. The mechanism rules
+    are eleven ids the engine can return like any other, and 1,546 + 11 is
+    exactly the 1,557 the row names. Leaving them out did not let anything
+    through, because an id outside the catalog is refused and the message is
+    withheld, but it withheld them as SCAN_EXCEPTION, which says the scan could
+    not be believed rather than that the scan found something. Every mechanism
+    detection in the product would have carried the wrong reason and read as an
+    instrument fault.
+    """
+    from .. import mechanisms, patterns
+    ids = {str(pattern["id"]) for pattern in patterns.PATTERNS
+           if isinstance(pattern, dict) and pattern.get("id")}
+    ids |= {str(rule["id"]) for rule in mechanisms.MECHANISM_PATTERNS
+            if isinstance(rule, dict) and rule.get("id")}
+    return frozenset(ids)
+
+
+def helper_catalog():
+    """T4.R6's enrolled deterministic helper lane, enumerated from firewall.py."""
+    from .. import firewall
+    return frozenset({str(rule.id) for rule in firewall.SECRET_RULES}
+                     | set(HELPER_PIN_IDS))
+
+
+def trusted_catalog():
+    """T4.R6 in full: engine ids union helper lane ids."""
+    return engine_catalog() | helper_catalog()
 
 
 def scanner_input(params):
