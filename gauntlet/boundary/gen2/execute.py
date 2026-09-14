@@ -28,7 +28,17 @@ from . import adapter, artifacts, materialize
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPLAY = HERE / "upstream_replay.py"
-SUPPORTED_ROUTES = frozenset({"no_mediation"})
+SUPPORTED_ROUTES = frozenset({"no_mediation", "proxy_strict"})
+BOUNDARY = HERE.parent
+PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
+FAULT_WORKER = PACKAGE / "fault_worker.py"
+PACKAGE_INSPECTION_BYTE_BUDGET = 262144
+
+# What the mediator says it DID about a held message. Both are dispositions: one
+# says it inspected and decided, the other says it found nothing it inspects in
+# that frame, which for a carriers scenario is the measurement rather than a
+# failure to take one.
+TERMINAL_KINDS = ("SETTLED", "NO_INSPECTABLE_CONTENT")
 
 
 class UnsupportedRoute(Exception):
@@ -53,6 +63,7 @@ class Run:
     primary_id: object
     upstream_as_declared: bool
     terminal_expected: bool
+    disposition: str | None = None
 
 
 def _frames(path: pathlib.Path) -> list[bytes]:
@@ -73,9 +84,62 @@ def _primary_id(run_dir: pathlib.Path, id_from: str):
     return None
 
 
+def _disposition(receipts: pathlib.Path, primary_id) -> str | None:
+    """What the mediator DID about the primary result, in its own vocabulary.
+
+    Not "did it settle". G2-13 is a carriers scenario: it puts the injection in
+    `error.message`, in a resource, in a display field, in the initialize result,
+    places a mediator may or may not look. Requiring a settlement here would
+    assume the answer to the question the scenario asks, and a row that asserts
+    its own expectation measures nothing.
+
+    So the run records the mediator's own terminal event for that request and
+    lets the grader decide what it means. `NO_INSPECTABLE_CONTENT` on a carrier
+    is a measurement about the product, not a defect in this harness.
+    """
+    if not receipts.is_file():
+        return None
+    last = None
+    for line in receipts.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        # BY REQUEST ID, not by direction. `SETTLED` carries no direction field
+        # at all, so filtering on one silently dropped every settlement and left
+        # rows looking as though the mediator had said nothing about them. The
+        # id is what ties an event to this request, and the handshake's own
+        # disposition is a different id.
+        if event.get("kind") not in TERMINAL_KINDS:
+            continue
+        if event.get("request_id") == primary_id:
+            last = event.get("kind")
+    return last
+
+
+def _mediator_ingress(receipts: pathlib.Path) -> list[bytes]:
+    """The result frames the mediator saw arrive from the upstream, in order."""
+    if not receipts.is_file():
+        return []
+    frames = []
+    for line in receipts.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("kind") == "RPC_INGRESS" and event.get("direction") == "result":
+            frames.append((event.get("raw") or "").rstrip("\n").encode())
+    return [f for f in frames if f]
+
+
 def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         materialise: bool = True, timeout_ms: int = 3000,
-        materialised: pathlib.Path | None = None) -> Run:
+        materialised: pathlib.Path | None = None,
+        engine_root: pathlib.Path | None = None) -> Run:
     """Execute one variant on one route and hand back what was observed."""
     if route not in SUPPORTED_ROUTES:
         raise UnsupportedRoute(
@@ -116,9 +180,25 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     declared = [frame for name in upstream_paths
                 for frame in _frames(record.path / name)]
 
-    argv = [sys.executable, str(REPLAY),
-            "--handshake", str(run_root / "initialize.response.jsonl"),
-            "--stream", str(upstream_file)]
+    upstream_argv = [sys.executable, str(REPLAY),
+                     "--handshake", str(run_root / "initialize.response.jsonl"),
+                     "--stream", str(upstream_file)]
+    if route == "proxy_strict":
+        # THE MEDIATOR IN FRONT OF THE SAME UPSTREAM. The client's frames and
+        # the declared answers do not change between the routes; what changes is
+        # that this one has something in the middle, which is the entire
+        # experiment. Same scanner the package ships, same byte budget it
+        # declares.
+        scanner = (f"{sys.executable} {FAULT_WORKER} scan "
+                   f"--engine-root {engine_root}" if engine_root else
+                   f"{sys.executable} {FAULT_WORKER} scan")
+        argv = [sys.executable, str(BOUNDARY / "proxy" / "passthrough.py"),
+                "--deadline-ms", str(timeout_ms),
+                "--byte-budget", str(PACKAGE_INSPECTION_BYTE_BUDGET),
+                "--receipts", str(run_root / "proxy.receipts.jsonl"),
+                "--scanner", scanner, "--"] + upstream_argv
+    else:
+        argv = upstream_argv
     server = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
 
@@ -180,11 +260,18 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     # the declared frames in the declared order.
     answered = [line for line in bytes(upstream_wire).splitlines() if line.strip()]
     handshake = _frames(record.path / "initialize.response.jsonl")
-    # THE WHOLE STREAM, not a prefix of it. Checking only as far as the declared
-    # frames reach let an extra frame through unexamined, and the replay's own
-    # "no further declared frame" refusal carries the client's id, so it arrived
-    # looking exactly like a terminal reply.
+    # WHERE THE UPSTREAM SPOKE, which is not the same place on the two routes.
+    # On the control the client's wire IS the upstream's, so it is the thing to
+    # compare. On strict the client's wire is the MEDIATOR'S OUTPUT, and
+    # comparing that against the seed would call every correct withholding a
+    # stream that is not the scenario. The mediator records what arrived from
+    # the upstream, so that is what the declaration is checked against.
     complete = handshake + declared
+    if route == "proxy_strict":
+        # The handshake reply crosses the mediator too, so it is in the ingress
+        # and belongs in the expectation. Comparing against the declared frames
+        # alone made a correct session look like one frame too long.
+        answered = _mediator_ingress(run_root / "proxy.receipts.jsonl")
     as_declared = answered == complete
     # A PREFIX IS SHORT, NOT WRONG. An upstream that is slow or dies mid stream
     # has sent nothing the seed does not declare, it has simply not finished, and
@@ -203,7 +290,9 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     result = Run(run_dir=run_root, steps=steps, client_wire=bytes(client_wire),
                  upstream_wire=bytes(upstream_wire), terminal=terminal,
                  primary_id=primary_id, upstream_as_declared=as_declared,
-                 terminal_expected=expected)
+                 terminal_expected=expected,
+                 disposition=_disposition(run_root / "proxy.receipts.jsonl",
+                                          primary_id))
     (run_root / "execution.json").write_text(json.dumps({
         "scenario_id": entry["id"], "variant": variant["name"], "route": route,
         "steps": [step["op"] for step in steps],
@@ -212,6 +301,8 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         "upstream_wire_bytes": len(upstream_wire),
         "upstream_as_declared": as_declared,
         "terminal_expected": expected,
+        "mediator_disposition": _disposition(
+            run_root / "proxy.receipts.jsonl", primary_id),
         "terminal_arrived": terminal is not None,
     }, indent=1) + "\n")
 
