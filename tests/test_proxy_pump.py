@@ -812,3 +812,33 @@ def test_a_handoff_for_another_generations_record_faults_the_session():
     assert session._settling_key.get(identity, theirs) == theirs or \
         identity not in session._settling, (
         "the other generation's record was not discharged by this reader")
+# ── T410: the refusal the client actually gets is the envelope, not a lookalike
+
+ENVELOPE_DATA = {"reason_code", "rule", "budget", "accepted", "status",
+                 "inspection_complete", "inspected_utf8_bytes",
+                 "observed_content_bytes", "elapsed_ms", "rule_ids"}
+
+
+@pytest.mark.xfail(strict=True, reason="T410: the slice being specified here")
+def test_the_refusal_the_pump_writes_is_the_envelope():
+    """T410. `envelope.withheld` exists because the refusal is the one
+    structure an adversary is guaranteed to read, and the pump builds its own
+    two-field dictionary beside it.
+
+    A second construction of the same wire object is the failure mode the
+    envelope module was written to prevent: every rule it enforces (the frozen
+    reason catalog, the bounded rule_ids, `**ignored` swallowing a caller's
+    detail string) applies to the copy that is NOT used, and the one on the
+    wire is governed by nothing. The fields also have to be there for a
+    receipt to be gradeable at all -- a refusal that cannot say whether any
+    bytes were inspected cannot be compared to a fixture.
+    """
+    from sunglasses.proxy import envelope
+
+    session = pump.Session()
+    session.admit_request(1, method="ping", origin="client")
+    out = list(session.read_upstream(b""))
+    assert out, "the fault produced no client frame at all"
+    written = json.loads(out[0])
+    assert set(written["error"]["data"]) == ENVELOPE_DATA
+    assert written["error"]["data"]["reason_code"] in envelope.REASONS

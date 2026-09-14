@@ -199,3 +199,59 @@ def test_an_earlier_cause_is_not_relabelled_by_a_later_completion():
                       independent_cause=policy.SCAN_DEADLINE)
     assert settled.reason == policy.SCAN_DEADLINE
     assert settled.inspection_complete is False
+
+
+# ── T406 and T407: who owns a cancellation, and the rule a recorded cause keeps
+#
+# Strict xfail rather than a skip, because a skip proves nothing at spec time.
+# These three assert that the defect is real RIGHT NOW; the implementation
+# commit removes the markers, and strict means an XPASS is a failure, so a
+# marker cannot be left behind on a row that has been fixed.
+
+@pytest.mark.xfail(strict=True, reason="T406: the slice being specified here")
+def test_a_cancellation_nobody_asked_for_is_a_scan_that_did_not_happen():
+    """T406. `cancelled` from the worker, with no client cancellation behind
+    it, is not a client withdrawing a request.
+
+    S6 reads as an intentional withdrawal: the bytes were never in question.
+    A worker that stopped on its own produced no verdict about bytes that WERE
+    in question, which is S3. Settling one as the other attributes the abort to
+    the client and hides that an inspection failed to reach an answer.
+    """
+    settled = _settle(_result(status=worker.STATUS_CANCELLED,
+                              inspection_complete=False))
+    assert (settled.reason, settled.rule) == (policy.SCAN_EXCEPTION, "S3")
+
+
+@pytest.mark.xfail(strict=True, reason="T406: the slice being specified here")
+def test_a_cancellation_the_client_asked_for_is_still_s6():
+    """The positive control, or the row above is just deleting S6."""
+    settled = _settle(_result(status=worker.STATUS_CANCELLED,
+                              inspection_complete=False),
+                      cancellation_owned=True)
+    assert (settled.reason, settled.rule) == (policy.REQUEST_CANCELLED, "S6")
+
+
+@pytest.mark.parametrize("cause,rule", [
+    pytest.param("MALFORMED_UPSTREAM", "S5",
+                 marks=pytest.mark.xfail(strict=True, reason="T407")),
+    pytest.param("MALFORMED_CLIENT", "S5",
+                 marks=pytest.mark.xfail(strict=True, reason="T407")),
+    pytest.param(policy.REQUEST_CANCELLED, "S6",
+                 marks=pytest.mark.xfail(strict=True, reason="T407")),
+    (policy.SCAN_DEADLINE, "S3"),
+    (policy.SCAN_EXCEPTION, "S3"),
+])
+def test_a_recorded_cause_keeps_its_own_rule_not_a_fixed_one(cause, rule):
+    """T407. Rule A makes an earlier fault terminal, which is right, and it was
+    also flattening every one of them to S3.
+
+    The reason survived and the rule did not, which files a framing fault at
+    the severity of a failed scan. The two protocol reasons are S5 everywhere
+    else in this package -- `pump._close` defaults to S5 for exactly those two
+    -- so a settlement that renames them is the outlier, not the authority. The
+    last two rows carry no marker: they are the causes that ARE S3, and without
+    them the row could be satisfied by mapping everything to something else.
+    """
+    settled = _settle(_result(), independent_cause=cause)
+    assert (settled.reason, settled.rule) == (cause, rule)

@@ -154,3 +154,25 @@ def test_the_envelope_is_json_serialisable_as_built():
     """It goes on the wire. A structure that cannot be serialised is discovered
     at the worst possible moment."""
     json.dumps(_built())
+
+
+@pytest.mark.xfail(strict=True, reason="T409: the frozen status set is the "
+                                       "slice being specified here")
+def test_the_status_field_is_frozen_not_free_text():
+    """T409. Every other field here is an allowlist and this one is a string.
+
+    `status` arrives from the worker result, so leaving it open lets a worker
+    choose text that lands in the one structure an attacker is guaranteed to
+    read. An allowlist with one open field is not an allowlist; it is an
+    allowlist with a door in it.
+    """
+    with pytest.raises(ValueError):
+        _built(status="review-status-marker")
+
+
+@pytest.mark.parametrize("status", ["complete", "incomplete", "exception",
+                                    "deadline", "cancelled", "not_run"])
+def test_every_worker_status_still_passes(status):
+    """The positive half. Freezing the field must not reject the real statuses,
+    or T409 is satisfied by an envelope that can no longer be built."""
+    assert _built(status=status)["error"]["data"]["status"] == status
