@@ -49,6 +49,10 @@ class UpstreamNotAsDeclared(Exception):
     """What came back is not what the seed declares, so there is no row here."""
 
 
+class DeclaredFileMissing(Exception):
+    """A file the schedule names is in neither the run root nor the delivery."""
+
+
 class TerminalNeverArrived(Exception):
     """The primary request was never answered. Not an empty result, an absence."""
 
@@ -64,6 +68,7 @@ class Run:
     upstream_as_declared: bool
     terminal_expected: bool
     disposition: str | None = None
+    assertions: list = dataclasses.field(default_factory=list)
 
 
 def _frames(path: pathlib.Path) -> list[bytes]:
@@ -119,6 +124,54 @@ def _disposition(receipts: pathlib.Path, primary_id) -> str | None:
     return last
 
 
+def _messages(raw: bytes) -> list:
+    """Every readable JSON-RPC frame in a captured stream."""
+    out = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def _check_correlation(client_sent, upstream_answered) -> dict:
+    """Nothing answers a notification, and nothing borrows a pending id.
+
+    Two halves of one rule. A notification has no id, so a frame that claims to
+    answer one is answering something that cannot be answered; and a frame
+    carrying an id the client is still waiting on, while being a REQUEST rather
+    than a reply, has taken that id for a different conversation. G2-15's
+    upstream does exactly the second, with `sampling/createMessage` on the
+    client's pending 1501.
+    """
+    pending = {m["id"] for m in client_sent
+               if m.get("id") is not None and m.get("method")}
+    borrowed = sorted({m["id"] for m in upstream_answered
+                       if m.get("id") in pending and m.get("method")})
+    # A reply to a notification would have to carry an id nobody requested.
+    requested = {m.get("id") for m in client_sent if m.get("id") is not None}
+    unrequested = sorted({m["id"] for m in upstream_answered
+                          if m.get("id") is not None and not m.get("method")
+                          and m["id"] not in requested})
+    return {"held": not borrowed and not unrequested,
+            "borrowed_ids": borrowed, "unrequested_reply_ids": unrequested}
+
+
+def _count_copies(reference: list, delivered: list) -> int:
+    """How many of the referenced frames reached the upstream, by exact equality."""
+    return sum(1 for r in reference if r in delivered)
+
+
+def _error_for(messages: list, wanted) -> dict | None:
+    for m in messages:
+        if m.get("id") == wanted and m.get("error") is not None:
+            return m
+    return None
+
+
 def _mediator_ingress(receipts: pathlib.Path) -> list[bytes]:
     """The result frames the mediator saw arrive from the upstream, in order."""
     if not receipts.is_file():
@@ -159,6 +212,27 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     record = artifacts.of_record(entry, variant, materialised=materialised)
     steps = adapter.plan(record.schedule)
 
+    def declared(name: str) -> pathlib.Path:
+        """A file the schedule names, from the run first and the delivery second.
+
+        ASTRA's materialiser writes most of a variant's artifacts into the run
+        root and not all of them: `pending-clean.response.jsonl` is named by
+        G2-14's schedule, is listed in the delivery, and never appears in the
+        run. The run's copy wins where it exists, because that is the file this
+        session actually used; the delivery answers for the rest, because it is
+        the declaration. A name in neither is refused rather than skipped, since
+        a skipped send is a session missing a frame nobody will notice.
+        """
+        run_copy = run_root / name
+        if run_copy.is_file():
+            return run_copy
+        delivered = record.path / name
+        if delivered.is_file():
+            return delivered
+        raise DeclaredFileMissing(
+            f"{entry['id']}.{variant['name']}: the schedule names {name!r} and it "
+            f"is in neither the run root nor the delivered artifacts.")
+
     if materialise:
         materialize.materialize(entry, variant, run_root=run_root)
 
@@ -173,15 +247,15 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                       if step["op"] == "send_file" and step["origin"] == "upstream"]
     upstream_file = run_root / "upstream.declared.jsonl"
     upstream_file.write_bytes(b"".join(
-        (run_root / name).read_bytes().rstrip(b"\n") + b"\n"
+        declared(name).read_bytes().rstrip(b"\n") + b"\n"
         for name in upstream_paths) if upstream_paths else b"")
     # Checked against the DELIVERY's copies of those same named files. Reading
     # both from the run root would compare the run to itself.
-    declared = [frame for name in upstream_paths
-                for frame in _frames(record.path / name)]
+    declared_frames = [frame for name in upstream_paths
+                       for frame in _frames(record.path / name)]
 
     upstream_argv = [sys.executable, str(REPLAY),
-                     "--handshake", str(run_root / "initialize.response.jsonl"),
+                     "--handshake", str(declared("initialize.response.jsonl")),
                      "--stream", str(upstream_file)]
     if route == "proxy_strict":
         # THE MEDIATOR IN FRONT OF THE SAME UPSTREAM. The client's frames and
@@ -212,16 +286,16 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     # THE HANDSHAKE THE SEED DECLARES, not one this adapter composed. Its
     # `required_steps` names all three files, and the notification goes after
     # the response, which is the ordering the document spells out.
-    for frame in _frames(run_root / "initialize.request.jsonl"):
+    for frame in _frames(declared("initialize.request.jsonl")):
         send(frame + b"\n")
-    for frame in _frames(run_root / "initialized.notification.jsonl"):
+    for frame in _frames(declared("initialized.notification.jsonl")):
         send(frame + b"\n")
 
     primary_id = None
     for step in steps:
         if step["op"] == "send_file":
             if step["origin"] == "client":
-                for frame in _frames(run_root / step["path"]):
+                for frame in _frames(declared(step["path"])):
                     send(frame + b"\n")
             # `origin: upstream` is the frames the server is to answer with, and
             # it is seeded from that same file. It is CHECKED below rather than
@@ -255,18 +329,51 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     (run_root / "client.wire.jsonl").write_bytes(bytes(client_wire))
     (run_root / "upstream.wire.jsonl").write_bytes(bytes(upstream_wire))
 
+    # THE ASSERTION STEPS, executed and RECORDED. None of them raises. On the
+    # control route `assert_zero_upstream_copies` is expected not to hold,
+    # because the control is defined by having nothing in the middle, and a step
+    # that threw would turn that finding into an error the grader never sees.
+    # An exception means this harness could not carry the step out; a recorded
+    # `held: false` means it did and the answer was no.
+    sent = _messages(bytes(client_wire))
+    received = _messages(bytes(upstream_wire))
+    assertions = []
+    for step in steps:
+        op = step["op"]
+        if op == "assert_no_rpc_response_to_notification_or_borrowed_id":
+            assertions.append({"op": op, **_check_correlation(sent, received)})
+        elif op == "assert_zero_upstream_copies":
+            reference = _messages(declared(step["path"]).read_bytes())
+            copies = _count_copies(reference, sent)
+            assertions.append({"op": op, "path": step["path"], "copies": copies,
+                               "held": copies == 0})
+        elif op in ("await_client_error", "await_error"):
+            wanted = _primary_id(run_root, step["id_from"])
+            # THE CONTRACT GIVES THESE NO PER STEP TIMEOUT, so the enclosing
+            # deadline applies and the run records WHICH, because a wait with an
+            # unrecorded bound is not a measurement anyone can repeat.
+            where = received if op == "await_client_error" else sent
+            found = _error_for(where, wanted)
+            entry_row = {"op": op, "id": wanted, "held": found is not None,
+                         "deadline_ms": timeout_ms}
+            if op == "await_error":
+                entry_row["recipient"] = step["recipient"]
+            if found is not None:
+                entry_row["code"] = (found.get("error") or {}).get("code")
+            assertions.append(entry_row)
+
     # WHAT CAME BACK AGAINST WHAT THE SEED DECLARES. The handshake response is
     # part of the stream and is checked as such; everything after it has to be
     # the declared frames in the declared order.
     answered = [line for line in bytes(upstream_wire).splitlines() if line.strip()]
-    handshake = _frames(record.path / "initialize.response.jsonl")
+    handshake = _frames(declared("initialize.response.jsonl"))
     # WHERE THE UPSTREAM SPOKE, which is not the same place on the two routes.
     # On the control the client's wire IS the upstream's, so it is the thing to
     # compare. On strict the client's wire is the MEDIATOR'S OUTPUT, and
     # comparing that against the seed would call every correct withholding a
     # stream that is not the scenario. The mediator records what arrived from
     # the upstream, so that is what the declaration is checked against.
-    complete = handshake + declared
+    complete = handshake + declared_frames
     if route == "proxy_strict":
         # The handshake reply crosses the mediator too, so it is in the ingress
         # and belongs in the expectation. Comparing against the declared frames
@@ -285,14 +392,20 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     # that absence IS the scenario. A guard that read the outcome could not tell
     # it from a harness that failed to drive one, and called a correctly
     # executed scenario a fault. The declaration knows, so it is asked.
-    expected = any(json.loads(frame).get("id") == primary_id for frame in declared)
+    # `primary_id is not None` FIRST. A schedule with no `await_primary_terminal`
+    # has no primary request, and a declared notification carries no id, so
+    # `frame.get("id") == None` matched and the run demanded a terminal for a
+    # request that was never made. None equalling None is the whole bug.
+    expected = primary_id is not None and any(
+        json.loads(frame).get("id") == primary_id for frame in declared_frames)
 
     result = Run(run_dir=run_root, steps=steps, client_wire=bytes(client_wire),
                  upstream_wire=bytes(upstream_wire), terminal=terminal,
                  primary_id=primary_id, upstream_as_declared=as_declared,
                  terminal_expected=expected,
                  disposition=_disposition(run_root / "proxy.receipts.jsonl",
-                                          primary_id))
+                                          primary_id),
+                 assertions=assertions)
     (run_root / "execution.json").write_text(json.dumps({
         "scenario_id": entry["id"], "variant": variant["name"], "route": route,
         "steps": [step["op"] for step in steps],
@@ -304,6 +417,7 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         "mediator_disposition": _disposition(
             run_root / "proxy.receipts.jsonl", primary_id),
         "terminal_arrived": terminal is not None,
+        "assertions": assertions,
     }, indent=1) + "\n")
 
     if expected and terminal is None and truncated:
