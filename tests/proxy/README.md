@@ -524,3 +524,34 @@ fails all fourteen with `FileNotFoundError` before a single assertion runs.
 That is a harness fact, not a product one: on #166 the same controls went from
 14 failed to 133 passed with the directory created and `pump.py` byte-identical
 to the core head either way. `mkdir -p tests/evidence` before the first run.
+
+---
+
+## T903's id_token, checked structurally and not by its grammar
+
+T903 requires that a permitted receipt field's VALUE be validated, not only its
+name. Four of the five are checked against a vocabulary we define: `reason_code`
+against the frozen reason catalog, `status` against the worker statuses,
+`method` against the known methods, `rule_ids` against the engine rule-id
+grammar. The fifth is checked only for being a string.
+
+The stronger rule is available and is not applied. `session._item_token`
+produces sixteen lowercase hex characters, so matching that grammar would also
+refuse a PEER-SUPPLIED id passed under this field name, which is the actual
+risk the field carries: a raw JSON-RPC id is peer text, and a receipt is read
+as a record of what happened.
+
+It is not applied because ASTRA's own T904 control writes
+`log.record_or_stop('HOLD_ENTERED', id_token='review')`. Measured both ways on
+this head:
+
+    id_token must match the 16-hex grammar   T903 passes, T904 FAILS
+    id_token must be a string                T903 passes, T904 passes
+
+Tightening it would fail a control rather than a defect, and the controls are
+vendored unchanged. The structural check still keeps the shape T903 sends
+(`{'raw': <marker>}`) out of the evidence, which is what that row asserts.
+
+@T9: if the grammar is wanted, T904 needs a token of the right shape and that
+is a control edit, so it needs a ruling. Nothing has been changed in the
+control.

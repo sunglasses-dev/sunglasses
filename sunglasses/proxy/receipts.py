@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import pathlib
 import threading
 import time
@@ -31,7 +32,21 @@ EVENTS = frozenset({
     "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE", "WRITE_STALLED",
     "SETTLED", "UPSTREAM_CLOSED", "SESSION_TORN_DOWN", "WATCHDOG",
     "RECEIPT_IO_ERROR", "NOTIFICATION_DROPPED", "TEARDOWN",
+    # T902, T9.R2. Required by the row and missing from the allowlist, so the
+    # one event that says the stderr cap was applied could not be written.
+    "STDERR_BOUNDED",
 })
+
+# T9.R5. The events that END a session. A log that stops without one of these
+# is not a clean short session; it is a session whose ending is unknown, and a
+# verifier that returns ok for it certifies the absence of evidence.
+TERMINAL_EVENTS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
+
+# T903. The VALUES, not only the field names. An allowlist of names says which
+# fields may appear and nothing about what may be inside them, so every one of
+# these carried peer-chosen text straight into the evidence.
+_ID_TOKEN = re.compile(r"\A[0-9a-f]{16}\Z")
+_RULE_ID = re.compile(r"\AGLS-[A-Z0-9-]{1,60}\Z")
 
 # T9.R3's never-list, as field names rather than as a hope. Anything not in the
 # permitted set for an event is dropped, and these are named so a reader can see
@@ -50,6 +65,62 @@ PERMITTED_FIELDS = frozenset({
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
 })
+
+
+
+def _check_value(name, value):
+    """T903. What may be INSIDE a permitted field.
+
+    The allowlist above says which names may appear. Five of them were carrying
+    whatever the peer chose: a method, a status, a reason code, a rule id and
+    an id token all arrived from the wire and were written into the evidence
+    verbatim. A receipt is read as a record of what happened, so text an
+    attacker picked appears there as fact.
+
+    Each of these has a vocabulary or a grammar that WE define, so each is
+    checked against it and a value outside is refused rather than trimmed. The
+    refusal is a ValueError because the caller has a bug or the peer has an
+    attack, and neither should produce a quietly shortened receipt.
+    """
+    if value is None:
+        return
+    if name == "reason_code":
+        from .envelope import REASONS
+        if value not in REASONS:
+            raise ValueError(f"reason_code {value!r} is not in the frozen catalog")
+    elif name == "status":
+        from .envelope import STATUSES
+        if value not in STATUSES:
+            raise ValueError(f"status {value!r} is not a worker status")
+    elif name == "method":
+        from .selector import KNOWN_METHODS
+        if value not in KNOWN_METHODS:
+            raise ValueError(f"method {value!r} is not a method this proxy knows")
+    elif name == "rule_ids":
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("rule_ids is not a list")
+        for rule_id in value:
+            if not isinstance(rule_id, str) or not _RULE_ID.match(rule_id):
+                raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
+    elif name == "id_token":
+        # STRUCTURAL only, deliberately, and this is weaker than it could be.
+        #
+        # `_item_token` produces sixteen lowercase hex characters, and matching
+        # `_ID_TOKEN` against that would also refuse a peer-supplied id passed
+        # under this name, which is the risk the field carries. ASTRA's own
+        # T904 control writes `id_token='review'`, so the grammar is not the
+        # contract his controls encode, and tightening it here would fail a
+        # control rather than a defect. Refusing a non-string still keeps the
+        # shape ASTRA's T903 sends (`{'raw': ...}`) out of the evidence.
+        # Recorded in tests/proxy/README.md for a ruling.
+        if not isinstance(value, str):
+            raise ValueError(
+                f"id_token {value!r} is not a string; the token is OURS, and a "
+                f"structure arriving under its name was built by somebody else")
+    elif name == "rule":
+        from .envelope import RULES
+        if value not in RULES:
+            raise ValueError(f"rule {value!r} is not one of S1 to S7")
 
 
 class ReceiptIOError(RuntimeError):
@@ -73,13 +144,18 @@ class Stop:
         component that has just discovered it cannot write anything down, so it
         does not get to assert that anything was recorded.
         """
-        return [{
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
-                      "data": {"reason_code": self.reason, "rule": "S3"}},
-        } for request_id in pending_ids]
+        # T906. Built by the single constructor, like every other refusal. A
+        # second hand-rolled copy of the wire object is the thing envelope.py
+        # exists to prevent, and this one is written by the component that has
+        # just lost its log, which is the worst place to be improvising a
+        # shape.
+        from .envelope import withheld
 
+        return [withheld(
+            request_id=request_id, reason_code=self.reason, rule="S3",
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            rule_ids=(), catalog=frozenset()) for request_id in pending_ids]
 
 class Verification:
     __slots__ = ("ok", "reason", "detail", "proves", "signed", "proves_delivery")
@@ -113,7 +189,13 @@ class Log:
         self._write_row(dict(header or {}), kind="HEADER")
 
     # ── writing ─────────────────────────────────────────────────────────────
-    def event(self, kind, **fields):
+    def event(self, kind, /, **fields):
+        """T901. `kind` is POSITIONAL ONLY, so a caller passing a field of that
+        name lands it in `fields` instead of colliding with the discriminator.
+        It used to raise TypeError out of the logging path, which is a receipt
+        that cannot be written because of what someone tried to record in it.
+        The discriminator then wins over the field, in `_write_row`.
+        """
         if kind not in EVENTS:
             raise ValueError(
                 f"{kind!r} is not an allowlisted receipt event; a log that "
@@ -131,8 +213,21 @@ class Log:
                 "kind": kind,
             }
             row.update(self._clean(fields))
-            self._handle.write(json.dumps(row, sort_keys=True) + "\n")
-            self._handle.flush()
+            # T901. The EVENT decides the kind. A `kind` field describes the
+            # frame, not the record, and letting it through would let a caller
+            # relabel the row it is writing.
+            row["kind"] = kind
+            try:
+                self._handle.write(json.dumps(row, sort_keys=True) + "\n")
+                self._handle.flush()
+            except OSError as failure:
+                # T904. The write itself failing is the case this class exists
+                # for, and only a PREVIOUSLY recorded failure was being turned
+                # into a ReceiptIOError. A raw OSError escaping here goes
+                # straight past `record_or_stop` and out of the caller, so the
+                # session never stops and nobody is told the log is gone.
+                self._failure = failure
+                raise ReceiptIOError(str(failure)) from failure
             self._seq += 1
             return row
 
@@ -145,6 +240,7 @@ class Log:
             if name == "leaf_provenance":
                 clean[name] = [self._leaf(entry) for entry in value or ()]
                 continue
+            _check_value(name, value)
             clean[name] = value
         return clean
 
@@ -227,6 +323,15 @@ def verify(path):
     if rows[0].get("kind") != "HEADER":
         return Verification(False, "MALFORMED_RECEIPT", "missing header")
 
+    # T905. The KINDS were never checked. A row naming an event that does not
+    # exist passed the verifier, so a log could carry anything at all under a
+    # made-up name and be certified as well formed.
+    for row in rows:
+        if row.get("kind") not in EVENTS:
+            return Verification(
+                False, "MALFORMED_RECEIPT",
+                f"{row.get('kind')!r} is not an allowlisted receipt event")
+
     seen = set()
     previous_seq, previous_mono = -1, -1
     for row in rows:
@@ -247,6 +352,14 @@ def verify(path):
     if admitted - settled:
         return Verification(False, "INCOMPLETE_SESSION",
                             "an ADMITTED item has no terminal SETTLED")
+    # T905. A log that simply stops has no terminal event, and returning ok for
+    # it certifies the absence of evidence: a header alone, or a header and an
+    # UPSTREAM_CLOSED, describes a session whose ending nobody wrote down. That
+    # is precisely the shape a truncated or abandoned log has.
+    if not any(row["kind"] in TERMINAL_EVENTS for row in rows):
+        return Verification(False, "INCOMPLETE_SESSION",
+                            "the log has no terminal event, so how the session "
+                            "ended was never recorded")
     return Verification(True)
 
 
@@ -255,9 +368,10 @@ def write_broken_log(root, how):
     path = pathlib.Path(root) / "broken.jsonl"
     base = [{"seq": 0, "mono_ns": 1, "wall": 1.0, "kind": "HEADER"},
             {"seq": 1, "mono_ns": 2, "wall": 1.0, "kind": "ADMITTED",
-             "id_token": "t1"},
+             "id_token": "a1b2c3d4e5f60718"},
             {"seq": 2, "mono_ns": 3, "wall": 1.0, "kind": "SETTLED",
-             "id_token": "t1"}]
+             "id_token": "a1b2c3d4e5f60718"},
+            {"seq": 3, "mono_ns": 4, "wall": 1.0, "kind": "SESSION_TORN_DOWN"}]
     if how == "drop_header":
         base = base[1:]
         base[0]["seq"] = 0
@@ -271,6 +385,6 @@ def write_broken_log(root, how):
     elif how == "back_in_time":
         base[2]["mono_ns"] = 1
     elif how == "no_terminal":
-        base = base[:2]
+        base = base[:2]        # ADMITTED with no SETTLED and no ending
     path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in base) + "\n")
     return path

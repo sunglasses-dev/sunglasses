@@ -195,10 +195,26 @@ def test_prior_forwarded_state_is_recorded_unknown_not_guessed(log):
 # ── T9.R5: the verifier, and what it does NOT claim ───────────────────────
 
 def test_a_well_formed_log_verifies(log):
+    """T905. The terminal event is part of being well formed now. A log that
+    simply stops does not say how the session ended, and this test used to
+    assert that such a log verified."""
+    log.event("ADMITTED", id_token="t1")
+    log.event("SETTLED", id_token="t1")
+    log.event("SESSION_TORN_DOWN")
+    log.close()
+    assert receipts.verify(log.path).ok
+
+
+def test_a_log_that_simply_stops_does_not_verify(log):
+    """The other side of the same row, because "well formed" is now a claim
+    about the ending as well as the rows. Certifying a truncated log describes
+    a session whose ending nobody wrote down as one that ended cleanly."""
     log.event("ADMITTED", id_token="t1")
     log.event("SETTLED", id_token="t1")
     log.close()
-    assert receipts.verify(log.path).ok
+    outcome = receipts.verify(log.path)
+    assert not outcome.ok and outcome.reason == "INCOMPLETE_SESSION"
+    assert "terminal" in outcome.detail
 
 
 @pytest.mark.parametrize("break_it,reason", [
@@ -234,3 +250,44 @@ def test_verification_does_not_claim_the_model_received_anything(log):
     assert outcome.proves == ("schema", "order", "completion")
     assert outcome.signed is False
     assert outcome.proves_delivery is False
+
+
+def test_an_invented_event_kind_is_rejected_on_an_otherwise_complete_log(tmp_path):
+    """T905. The kinds were never checked, so a row naming an event that does
+    not exist verified as well formed.
+
+    The log here is complete in every other way -- header, an admitted item
+    settled, a terminal event -- so the ONLY thing wrong with it is the invented
+    kind. ASTRA's fixture for this row has no terminal event either, so the
+    completion check rejects it first and the kind check is never reached;
+    the mutation that deleted the kind check survived his control and this one
+    kills it.
+    """
+    rows = [
+        {"seq": 0, "mono_ns": 1, "wall": 1.0, "kind": "HEADER"},
+        {"seq": 1, "mono_ns": 2, "wall": 1.0, "kind": "ADMITTED", "id_token": "t1"},
+        {"seq": 2, "mono_ns": 3, "wall": 1.0, "kind": "review-invalid-event"},
+        {"seq": 3, "mono_ns": 4, "wall": 1.0, "kind": "SETTLED", "id_token": "t1"},
+        {"seq": 4, "mono_ns": 5, "wall": 1.0, "kind": "SESSION_TORN_DOWN"},
+    ]
+    path = tmp_path / "invented.jsonl"
+    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
+    outcome = receipts.verify(path)
+    assert not outcome.ok
+    assert outcome.reason == "MALFORMED_RECEIPT"
+    assert "review-invalid-event" in outcome.detail
+
+
+def test_the_same_log_with_a_real_kind_verifies(tmp_path):
+    """The positive control, or the row above is satisfied by a verifier that
+    rejects everything."""
+    rows = [
+        {"seq": 0, "mono_ns": 1, "wall": 1.0, "kind": "HEADER"},
+        {"seq": 1, "mono_ns": 2, "wall": 1.0, "kind": "ADMITTED", "id_token": "t1"},
+        {"seq": 2, "mono_ns": 3, "wall": 1.0, "kind": "WATCHDOG"},
+        {"seq": 3, "mono_ns": 4, "wall": 1.0, "kind": "SETTLED", "id_token": "t1"},
+        {"seq": 4, "mono_ns": 5, "wall": 1.0, "kind": "SESSION_TORN_DOWN"},
+    ]
+    path = tmp_path / "real.jsonl"
+    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
+    assert receipts.verify(path).ok
