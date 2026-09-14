@@ -1,0 +1,167 @@
+{
+ "coverage": {
+  "blocked_ids": [
+   "G2-17.complete_finding",
+   "G2-17.conflicting_allow",
+   "G2-17.false_string",
+   "G2-17.finding_incomplete",
+   "G2-17.missing_axes",
+   "G2-17.review_only",
+   "G2-17.wrong_binding",
+   "G2-18.approval_snapshot_race",
+   "G2-18.first_seen",
+   "G2-18.invalid_pin_record",
+   "G2-18.restart_changed",
+   "G2-19.call_during_relist",
+   "G2-19.changed_server_identity",
+   "G2-19.paged_list",
+   "G2-19.removed_tool",
+   "G2-20.duplicate_pending",
+   "G2-20.reused_id_late",
+   "G2-20.typed_ids",
+   "G2-21.ambiguous_result",
+   "G2-21.deep_json",
+   "G2-21.duplicate_keys",
+   "G2-21.invalid_utf8",
+   "G2-21.malformed_clean_tail",
+   "G2-22.admission_flood",
+   "G2-22.descendant_pipe",
+   "G2-22.exit_with_pending",
+   "G2-22.partial_line",
+   "G2-22.stderr_backpressure",
+   "G2-22.stdout_backpressure",
+   "G2-22.upstream_silent",
+   "G2-24.before_worker",
+   "G2-24.before_write",
+   "G2-24.result_hold",
+   "G2-25.crash_after_intent",
+   "G2-25.identifier_redaction",
+   "G2-25.runtime_io_error",
+   "G2-25.sequence_integrity",
+   "G2-25.worker_redaction",
+   "G2-26.missing_invocation",
+   "G2-26.partial_inventory",
+   "G2-26.wrong_binary",
+   "G2-26.wrong_config",
+   "G2-26.wrong_fault",
+   "G2-27.concurrent_edit",
+   "G2-27.repeat_install",
+   "G2-27.restore_unchanged",
+   "G2-27.write_interruption"
+  ],
+  "ceiling": {
+   "blocked_by_adapter_work_alone": null,
+   "blocked_needing_route": null,
+   "reason_code": "CEILING_UNCLASSIFIED_OPS",
+   "state": "not_computed",
+   "unclassified": {
+    "assert_no_second_forward_and_no_pending_overwrite": "whether the mediator can express this at all is a question about T8's real route, not about the adapter",
+    "assert_pending_retired": "retirement is emitted at passthrough.py:528 but whether the adapter can assert it is unevidenced",
+    "assert_secondary_and_reverse_complete_independently": "as above: a route question, not an adapter question",
+    "execute_armed_worker_fault": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
+    "release_any_old_workers": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
+    "release_fault_barrier": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration"
+   },
+   "unclassified_count": 6
+  },
+  "drivable_ids": [
+   "G2-13.display_meta",
+   "G2-13.embedded_text",
+   "G2-13.error_data",
+   "G2-13.error_message",
+   "G2-13.initialize_text",
+   "G2-13.prompt_text",
+   "G2-13.resource_text",
+   "G2-13.structured_key",
+   "G2-14.client_notification",
+   "G2-14.upstream_log",
+   "G2-14.upstream_progress",
+   "G2-15.audio_blob_mixed",
+   "G2-15.extension_request",
+   "G2-15.image_mixed",
+   "G2-15.reverse_request",
+   "G2-16.argument_key",
+   "G2-16.nested_value",
+   "G2-16.wire_name",
+   "G2-20.unsolicited_response",
+   "G2-21.client_malformed_tail",
+   "G2-23.content_exact",
+   "G2-23.content_over",
+   "G2-23.frame_exact",
+   "G2-23.frame_over",
+   "G2-28.clean_error",
+   "G2-28.empty_control",
+   "G2-28.structured_preserved"
+  ],
+  "execution_partition": {
+   "errored": 0,
+   "failed": 0,
+   "not_run": 74,
+   "passed": 0,
+   "refused": 0
+  },
+  "execution_reason_code": "EXEC_NOT_RUN",
+  "execution_state": "not_run",
+  "invalid_detail": {},
+  "plan_partition": {
+   "blocked": 47,
+   "drivable": 27,
+   "invalid": 0
+  },
+  "state": "measured",
+  "total": 74,
+  "unit": "corpus variants"
+ },
+ "freshness": {
+  "generated_at": "2026-09-14T18:35:17.692467+00:00",
+  "measured_at": "2026-09-14T18:35:17.632433+00:00",
+  "note": "Generation, measurement and publication are different times. Republishing an old measurement does not refresh it.",
+  "policy_hours": 36,
+  "published_at": null
+ },
+ "harness": {
+  "detail": "no examiner-authored machine-readable record. FIT is a finding about the instrument made by the examiner on a dated head under a named contract; this run may reference such a record and may not write one. The delivered mutation plan holds 73 entries over 7 requirements and is not the 119-mutation examination manifest, so it cannot stand in for one.",
+  "reason_code": "EVIDENCE_UNBOUND",
+  "state": "unavailable"
+ },
+ "identities": {
+  "adapter_source_digest": "9b389b9f57403ac0b2e6465eec62438a6906b629cf83fcfd3590a81c852abae9",
+  "capability_map_digest": "d981756185f00347fe057eb31e8691cd6785521f592fc24774a5614e4787986b",
+  "capability_map_review_state": "unreviewed",
+  "capability_map_revision": "2026-09-14-a",
+  "corpus_digest": "9660a1836eede238955210a7f6b962e63271645131288a887736817f6effdcee",
+  "corpus_path_label": "GATE3 delivered materialisation, 74 variants",
+  "loader_source_digest": "38ecc0d11b1e2a117aeecb2899ffc0338b3dc35dd3e837848da42152cfc0f38b",
+  "producer_digest": "229dae571c98fca97baec4232612a98df5fe1435efc8590ed0749cd8d336a7c6"
+ },
+ "ledger": {
+  "detail": "no ledger record declaring its own scope, cap, updated_at and digest. Budget policy is T9's; this process does not author it.",
+  "reason_code": "EVIDENCE_UNBOUND",
+  "state": "unavailable"
+ },
+ "routes": [
+  {
+   "head": null,
+   "head_reachable_on_origin": "unknown",
+   "head_state": "unavailable",
+   "implementation_kind": "harness_stand_in",
+   "name": "proxy_strict",
+   "reachability_checked_at": null,
+   "rows": {
+    "detail": "no row results are bound to an executed head. Stand-in planning counts are not route conformance and are never relabelled as such.",
+    "reason_code": "EVIDENCE_UNBOUND",
+    "state": "unavailable"
+   }
+  }
+ ],
+ "run": {
+  "attempt": 1,
+  "exit_code": 3,
+  "finished_at": "2026-09-14T18:35:17.692472+00:00",
+  "id": "574f2593befd4b98",
+  "outcome": "refused",
+  "reason_code": "RUN_REFUSED",
+  "started_at": "2026-09-14T18:35:17.632433+00:00"
+ },
+ "schema": 2
+}
