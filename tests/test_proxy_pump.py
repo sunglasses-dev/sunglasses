@@ -727,3 +727,50 @@ def test_the_handoff_decision_is_made_by_the_yield_and_not_before_it():
         "the record was discharged BEFORE the delivery line ran, so a close "
         "arriving at that instant would stand down and the frame would cross")
     assert len(out) == 1
+
+
+def test_a_refused_handoff_is_always_a_closed_session_and_pays_everyone():
+    """The attacker's move behind the refusal, and the answer is not the one it
+    first looks like.
+
+    "One forced refusal silences the rest" is the right worry. It does not
+    apply here, and asserting that a later frame STILL crosses would contradict
+    T7.R2, which says never resynchronise: a clean frame arriving after a fault
+    is discarded on purpose, because a session that keeps serving after a
+    protocol fault is one an attacker can steer by causing the fault.
+
+    A handoff refuses for exactly one reason -- the session is closed -- so the
+    property that matters is that a refusal is never a SILENT drop. Everyone
+    still owed an answer gets exactly one, the session says why, and the frame
+    that did not cross is accounted for rather than lost.
+    """
+    session = pump.Session()
+    for request_id in (41, 42):
+        assert session.admit_request(request_id, method="tools/call",
+                                     origin="client")
+    original = session._handoff
+
+    def closing(identity, raw):
+        session._close("MALFORMED_UPSTREAM", "review controlled close")
+        return original(identity, raw)
+
+    session._handoff = closing
+    out = [frame for frame in session.read_upstream(
+        wire(response(41)) + wire(response(42))) if frame]
+
+    # Nothing crossed for the refused frame, and both owed clients were paid.
+    assert not any("result" in json.loads(frame) for frame in out)
+    assert sorted(json.loads(frame)["id"] for frame in out) == [41, 42]
+    assert all("error" in json.loads(frame) for frame in out)
+    assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+
+
+def test_a_refusal_cannot_happen_while_the_session_is_open():
+    """The invariant the test above rests on, asserted rather than assumed: if
+    a handoff could refuse on a live session, "silencing the rest" would be a
+    real attack and the answer above would be the wrong one."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    assert session.closed_with() is None
+    assert session._handoff(identity, b"frame\n") == b"frame\n"

@@ -952,7 +952,14 @@ class Session:
         none should have crossed. Inside the yield expression the decision
         happens when the line RUNS, so a close that completes while the reader
         is parked at that line still finds the record owed, wins, and this
-        returns None -- nothing crosses.
+        returns `b""` -- nothing crosses.
+
+        `b""` AND NOT `None`, and the docstring says so because the code does.
+        A consumer writes what the reader yields, and on a byte stream zero
+        bytes IS nothing: it needs no special case. `None` would raise in any
+        writer that does not special-case it, which is what a reviewer's
+        control does -- it writes the yielded value unconditionally, and with
+        `None` it raised TypeError in place of a refusal.
 
         After the yield there is no line event before the suspension, so a
         close landing there finds the record discharged and does not pay: one
