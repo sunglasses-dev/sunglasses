@@ -37,9 +37,13 @@ def test_an_operation_the_adapter_cannot_drive_is_refused_by_name():
     A partially executed schedule is worse than a refused one: it produces
     evidence, and the evidence is about a scenario that did not happen.
     """
+    # A CONTRACT-VALID step, deliberately. `plan` checks shape before capability,
+    # so a hand-made step missing its required fields would be refused for the
+    # wrong reason and this test would pass while proving something else.
     schedule = {"profile_steps": [
         {"op": "send_file", "origin": "client", "path": "a.jsonl"},
-        {"op": "arm_fault", "target": "worker"},
+        {"op": "arm_fault", "kind": "barrier_hold", "target": "scanner_worker",
+         "require_fresh_barrier": True},
     ]}
 
     with pytest.raises(adapter.UnimplementedOperation) as exc:
