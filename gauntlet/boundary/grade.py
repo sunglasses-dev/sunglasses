@@ -35,6 +35,12 @@ def expectation(scenario_id, variant, route):
 
 ENDPOINT_FIELDS = ("declared_port", "bound_port", "endpoint_as_declared")
 
+# Off. A row that reports none of the endpoint group is graded as missing that
+# evidence. Only a caller replaying artifacts produced before the group existed
+# turns this on, deliberately and in its own code, which is what makes it a
+# trusted context rather than an exception the grader grants itself.
+LEGACY_DESTINATION_SHAPE = False
+
 
 def _endpoint_verdict(receipt, package_port):
     """Why this destination block cannot be believed about the endpoint, or None.
@@ -51,7 +57,15 @@ def _endpoint_verdict(receipt, package_port):
     """
     present = [f for f in ENDPOINT_FIELDS if f in receipt]
     if not present:
-        return None
+        # THE WHOLE GROUP MISSING IS MISSING EVIDENCE, not an older shape to be
+        # waved through. Treating it as a legacy receipt was an exception with
+        # no version on it and nothing to trust: any current row could reach a
+        # clean destination grade by carrying none of the three, which is E24.
+        #
+        # A caller that genuinely holds archived evidence says so explicitly.
+        # Nothing infers it from the row, because the row is exactly what an
+        # absent producer fails to write.
+        return None if LEGACY_DESTINATION_SHAPE else "INVALID_NO_ENDPOINT_EVIDENCE"
     if len(present) != len(ENDPOINT_FIELDS):
         return "INVALID_ENDPOINT_EVIDENCE_INCOMPLETE"
     declared, bound = receipt["declared_port"], receipt["bound_port"]
