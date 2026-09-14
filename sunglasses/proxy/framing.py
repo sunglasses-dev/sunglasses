@@ -171,6 +171,46 @@ def valid_id(value):
     return isinstance(value, (str, int, float))
 
 
+def bounded_lines(source, limit=MAX_FRAME_BYTES):
+    """Frames, read with a ceiling, instead of `readline` with none.
+
+    T1.R2's bounded reader, which ASTRA's review noted was absent.
+    `iter(source.readline, b"")` reads until it finds a newline however far away
+    that is, and checking the wire limit against the line it returns applies the
+    bound AFTER the unbounded thing has already happened. An upstream that never
+    sends a newline makes the proxy allocate until it dies, inside the one
+    component whose job is to survive a hostile upstream.
+
+    An over-long frame is yielded as a bounded PREFIX so the caller refuses it
+    through the ordinary path rather than through an exception, and the rest of
+    that frame is drained and discarded. Draining too little resumes inside the
+    frame just refused, which is the resynchronisation T7.R2 forbids; draining
+    too much swallows the next message.
+    """
+    buffer = b""
+    while True:
+        chunk = source.read1(65536) if hasattr(source, "read1") else source.read(65536)
+        if not chunk:
+            if buffer:
+                yield buffer
+            return
+        buffer += chunk
+        while b"\n" in buffer:
+            line, buffer = buffer.split(b"\n", 1)
+            yield line
+        if len(buffer) > limit:
+            yield buffer[:limit + 1]
+            buffer = b""
+            while True:
+                chunk = (source.read1(65536) if hasattr(source, "read1")
+                         else source.read(65536))
+                if not chunk:
+                    return
+                if b"\n" in chunk:
+                    buffer = chunk.split(b"\n", 1)[1]
+                    break
+
+
 def _envelope_fault(message):
     """Every frame is a request, a notification or a response, and nothing else.
 

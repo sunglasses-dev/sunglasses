@@ -53,6 +53,17 @@ _PRECEDENCE = {
 }
 
 
+def _snapshot(value):
+    """A deep copy for the shapes a detail is allowed to be."""
+    if isinstance(value, dict):
+        return {k: _snapshot(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_snapshot(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_snapshot(v) for v in value)
+    return value
+
+
 def _item_digest(request_id):
     """A stable, non-reversing handle for an id of any JSON type."""
     if request_id is None:
@@ -93,6 +104,25 @@ class Cause:
                 f"{name} stays {getattr(self, name, None)!r}")
         object.__setattr__(self, name, value)
 
+    def __delattr__(self, name):
+        """Deleting is changing, and `__setattr__` does not cover it.
+
+        The guard above refused writes and left `del cause.rule` open, so a
+        holder of a returned record could remove the field rather than alter it
+        and the stored record lost it too. An attribute that is GONE is worse
+        than one that is wrong: the receipt no longer says anything about the
+        rule, and code that reads it raises rather than disagreeing.
+
+        Found by review as V05, on values returned by `record()` and `settle()`.
+        The lesson is that "immutable" is a property of every mutating verb, and
+        I had only thought of one of them.
+        """
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"this cause is a settled record and cannot be changed; "
+                f"{name} cannot be deleted")
+        object.__delattr__(self, name)
+
     def frozen(self):
         """A copy, because the caller keeps a reference to the original.
 
@@ -100,14 +130,27 @@ class Cause:
         changed what `settled_as` reported, so a settled record was only as
         immutable as the politeness of whoever held the other reference.
         """
-        copy = Cause(self.reason, self.rule, self.budget, self.detail)
+        # SNAPSHOT the detail. It may be a mutable structure the caller still
+        # holds, and a frozen record whose contents change underneath it is not
+        # frozen in any sense that matters. V01 mutates a nested list to prove
+        # it, and a shallow copy of the Cause is not enough.
+        copy = Cause(self.reason, self.rule, self.budget,
+                     _snapshot(self.detail))
         copy.at = self.at
         object.__setattr__(copy, "_frozen", True)
         return copy
 
     def as_receipt(self):
+        """An ALLOWLIST, for the same reason `Frame.as_receipt` is one.
+
+        `detail` is prose, it is built around whatever the situation contained,
+        and a session cause carries it into every event. The frame receipt leaked
+        peer material through exactly this field twice. Reason, rule and budget
+        come from fixed vocabularies; detail does not, so it stays on the object
+        for logs and exceptions and never enters evidence.
+        """
         return {"reason_code": self.reason, "rule": self.rule,
-                "budget": self.budget, "detail": self.detail}
+                "budget": self.budget}
 
     def __repr__(self):
         return f"<Cause {self.rule}/{self.reason}>"
@@ -169,6 +212,7 @@ class Session:
         self._torn_down = None
         self._tearing_down = False
         self._closed = False
+        self._pending_supervisor = None
         self._answers: dict = {}
         self.events: list = []
 
@@ -395,8 +439,23 @@ class Session:
         previous attempt that failed, because the batch is only safe to hand
         back once something has actually stopped the processes holding it.
         """
-        if stop_processes is not None and not self._closed:
-            stop_processes()            # raises out of teardown, nothing claimed
+        # THE SUPERVISOR THAT FAILED IS REMEMBERED. A retry that arrives with no
+        # callback used to skip supervision entirely, set `_closed`, emit the
+        # closure and hand back the batch with the child still alive. The
+        # default argument is not a statement that nothing needs stopping; it is
+        # a caller who did not say. So the last supervisor that did not complete
+        # is retained and reused, and a close cannot be claimed while one is
+        # outstanding and unsupplied.
+        supervisor = stop_processes if stop_processes is not None else self._pending_supervisor
+        if supervisor is not None and not self._closed:
+            self._pending_supervisor = supervisor
+            supervisor()                # raises out of teardown, nothing claimed
+            self._pending_supervisor = None
+        if self._closed:
+            # V03. Closure is announced once. A retry after a successful close
+            # redelivers the batch; it does not re-announce an event that
+            # already happened.
+            return dict(self._answers)
         self._closed = True
         self._emit("UPSTREAM_CLOSED", None, settled=len(self._answers))
         return dict(self._answers)
