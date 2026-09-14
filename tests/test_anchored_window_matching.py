@@ -224,10 +224,32 @@ def test_repeating_the_anchor_does_not_multiply_the_work(plain, anchored):
     """
     reference = _timed(plain, ANCHOR_STORM)
     measured = _timed(anchored, ANCHOR_STORM)
-    assert measured < reference * 2, (
-        f"anchored {measured:.3f}s vs plain {reference:.3f}s on a megabyte of "
-        "anchors; the windows are not merging"
-    )
+    print(f"anchor storm: anchored {measured:.3f}s vs plain {reference:.3f}s, "
+          f"{measured / reference:.3f}x (reported, not gated)")
+    # REPORTED, NOT ASSERTED, since 2026-09-14, and this one is the sharpest
+    # case in the file for why.
+    #
+    # The assertion that used to be here read `measured < reference * 2` and its
+    # message said "the windows are not merging". Mutation on 2026-09-14 says it
+    # checks neither thing it is near:
+    #
+    #   break window merging outright     this row PASSES;
+    #                                     test_windows_that_touch_are_merged_
+    #                                     into_one_search fails, as it should
+    #   remove the density bail           this row PASSES;
+    #                                     test_the_cost_of_deciding_to_bail_
+    #                                     does_not_grow_with_the_document fails
+    #
+    # It cannot see merging because a megabyte of anchors trips the density bail
+    # long before any window is merged, so this document never reaches the code
+    # the message names. Its spread under 64 burners is 0.981x to 1.105x against
+    # a 2.0x gate, so it was not flaky either: it was simply measuring the
+    # machine with a name that promised otherwise, which is worse than flaky.
+    # A green row nobody can cash is how a test suite grows a number that only
+    # ever fails for reasons unrelated to its subject.
+    #
+    # The numbers stay printed. Both regressions in its neighbourhood are held
+    # exactly, as integers, by the two tests named above.
 
 
 # ── the span is proof where it can be, a claim where it cannot ──────────────
@@ -633,6 +655,61 @@ ALL_SEEDS = {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}
 TRIALS = 7
 CONFIRM_TRIALS = 15
 ANCHOR_OVERHEAD_VS_BASELINE = 0.10
+
+# THE INSTRUMENT CHANGED 2026-09-14, after the first assertion failed #164's
+# integrity (3.14) job on a green tree while passing the other five interpreters
+# and every main run that week. Four PRs times eight jobs were sharing runners.
+#
+# Measured here rather than reasoned about, on 16 cores with 64 CPU burners, the
+# real test, four repetitions:
+#     unloaded, healthy           +0.007x .. +0.024x
+#     loaded, healthy             max 0.0404x, 0.1363x, 0.1059x, 0.0246x
+# Two of four crossed the 0.10x ceiling with nothing regressed. The median of
+# seven plus a recheck at fifteen rescued both, and CI's failure is simply the
+# case where the recheck crossed too. That is not a ceiling that is slightly too
+# tight; it is an instrument that cannot resolve what it is pointed at.
+#
+# WHY IT CANNOT. The gated quantity is `anchored - unanchored`, a difference
+# between two ~0.5s engine scans whose true difference is about 2 ms. Under
+# contention each timing moves by tens of milliseconds, so the difference is
+# noise by an order of magnitude. The ceiling scales with the baseline but
+# scheduling jitter does not scale proportionally, so contention eats the
+# headroom faster than it grants it.
+#
+# AND IT WAS NEVER CATCHING THE REGRESSIONS ANYWAY. Read the numbers in the
+# section above: a fold per declared term measures 0.043x - 0.046x against a
+# 0.10x ceiling. It passes. The ceiling is deliberately set ABOVE the known
+# regressions because noise forced it there, which means at engine level this
+# clock fires on scheduling and on nothing else. The fold count catches that
+# regression exactly, and always did.
+#
+# SO THE CLOCK KEEPS ITS JOB AND LOSES THE INSTRUMENT. Its job, stated in the
+# section above, is the one thing no count can see: a primitive getting slower,
+# a fold that stops being a C-level translate. That is measured directly below
+# against a reference primitive doing the same two C-level passes over the same
+# bytes, best-of-N because scheduling only ever ADDS time so the minimum is the
+# closest estimate of the true cost. Both sides are ~2 ms and adjacent, so a
+# starved runner slows both and the ratio holds:
+#     healthy, unloaded                      0.976x .. 1.026x
+#     healthy, 64 burners, five runs         0.933x .. 1.196x
+#     fold rewritten off the C-level path    4.82x .. 5.00x
+# A band a fifth of a turn wide instead of one that doubles, and the regression
+# is four times outside it.
+#
+# The ceiling is 2.0x and not 1.5x because 1.5x is what the FIRST loaded probe
+# supported, at 1.05x worst. Five more loaded runs then produced 1.196x, and a
+# ceiling justified by the smaller sample would have been the same mistake this
+# whole change is fixing, one decimal place further along. 2.0x sits 67% above
+# the worst excursion measured and 2.4x below the nearest proven regression.
+#
+# WHAT IT DOES NOT CATCH, said plainly: a primitive that gets 1.5x slower lands
+# inside the band. That is deliberate. This instrument is for a call becoming a
+# different KIND of call, which is an order-of-magnitude event; the counts hold
+# everything about how many calls there are, and they are exact.
+PRIMITIVE_TRIALS = 15            # best-of, per round. Stated because N matters.
+PRIMITIVE_ROUNDS = 7             # rounds, so the ratio itself has a spread
+ANCHOR_PRIMITIVE_CEILING = 2.0   # worst healthy under load 1.196x;
+                                 # a fold off the C-level path 4.82x
 RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 
 # The saving depends on a mechanism, so the gate names the mechanism rather than
@@ -649,8 +726,30 @@ RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 # that set is thirteen, eleven core overlay documents plus two storms, and it
 # lives in the review evidence rather than here. Naming a count the file does
 # not use made the gate look wider than it is.
-TOTALS_SAVING_WITH_AHO = 0.75
-TOTALS_SAVING_WITHOUT_AHO = 0.85
+# WIDENED 2026-09-14, from 0.75 / 0.85, after this row failed an archive run of
+# #173 under load with the same defect as the overhead row above.
+#
+# Surveyed under 64 burners on 16 cores, four repetitions, the quantity this row
+# gates: 0.7273 .. 0.7668, crossing the old 0.75 on TWO of four. And UNLOADED,
+# on a quiet machine, 0.7245 .. 0.7287 against 0.75: 2.8% headroom before a
+# single competing process exists. A gate with 2.8% headroom is not measuring
+# whether the mode pays for itself, it is measuring what else the machine was
+# doing.
+#
+# The old numbers were set just above the measured value, 0.67 with the
+# automaton and 0.80 without, which makes them a detector for small drifts. A
+# small drift in a wall-clock ratio is noise, so that is a noise detector.
+#
+# WHAT THE ROW ACTUALLY CLAIMS is in its own failure message: "the mode is not
+# paying for itself". That failure looks like a saving near or above 1.0, not
+# like 0.77. So the gate is set where it separates paying from not paying, and
+# the mechanisms that PRODUCE the saving are pinned as integers elsewhere:
+# a document with no declared term is searched zero times, touching windows
+# merge into one search, a document made of the anchor bails to one search.
+# Those are exact and a shared runner cannot argue with them; this row is the
+# end-to-end sanity check on top, and it is now wide enough to be one.
+TOTALS_SAVING_WITH_AHO = 0.90
+TOTALS_SAVING_WITHOUT_AHO = 0.95
 
 
 def _has_aho(engine):
@@ -750,14 +849,110 @@ def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines,
                          f"({overhead / base:+.4f}x of a {base:.3f}s baseline) "
                          f"on {CONFIRM_TRIALS} trials, allowed "
                          f"{allowed * 1e3:.1f} ms")
-    print("anchoring overhead, the gated number and the old strict ratio:\n  "
+    print("anchoring overhead, the old gated number and the old strict ratio:\n  "
           + "\n  ".join(rows))
-    assert worse == [], (
-        f"anchoring costs more than {ANCHOR_OVERHEAD_VS_BASELINE}x of the "
-        f"baseline scan of the same document, twice measured, on:\n  "
-        + "\n  ".join(worse)
-        + "\nevery document:\n  " + "\n  ".join(rows)
-    )
+    if worse:
+        # REPORTED, NOT ASSERTED, since 2026-09-14. See the section above: at
+        # this ceiling the number crossed on two of four loaded repetitions of a
+        # green tree, and it does not cross on the fold-per-term regression it
+        # would supposedly be guarding. Failing the build on it fails green
+        # trees and catches nothing the fold count does not catch exactly.
+        # The numbers stay because they are still worth reading, and because a
+        # quantity that disappears cannot be argued with later.
+        print("NOTE, not a failure: over the old ceiling on\n  "
+              + "\n  ".join(worse))
+
+
+def _primitive_best(work, trials=PRIMITIVE_TRIALS):
+    """Best of `trials`. The minimum, deliberately, not the median.
+
+    Scheduling only ever ADDS time to a measurement, so the fastest observation
+    is the one least disturbed and the closest estimate of the true cost. A
+    median still carries whatever the runner did to most of the trials, which is
+    exactly the property that made the engine-level gate above unusable on a
+    shared machine.
+    """
+    best = None
+    for _ in range(trials):
+        started = time.perf_counter()
+        work()
+        elapsed = time.perf_counter() - started
+        best = elapsed if best is None else min(best, elapsed)
+    return best
+
+
+def test_the_mechanism_primitives_are_still_c_level():
+    """The one thing no count can see, measured against a primitive.
+
+    The counts pin what the mechanism DOES: one fold of the document, one find
+    per term per occurrence plus one per term for the miss that ends it. They
+    are exact and a shared runner cannot argue with them. What they cannot see
+    is one of those calls becoming a slower KIND of call while the number of
+    calls stays the same, and that is what this measures.
+
+    THE REFERENCE IS THE POINT. It does the same two C-level passes over the
+    same bytes, a translate and a lower, then the same find loop. Both sides are
+    about two milliseconds and run adjacently, so a starved runner slows both
+    and the ratio between them survives. That is what the engine-level gate
+    could not do: it differenced two half-second numbers to find two
+    milliseconds, and contention moved each of them by tens.
+
+    Measured 2026-09-14 on 16 cores. Unloaded 0.976x to 1.026x; with 64 CPU
+    burners, five runs, 0.933x to 1.196x. Rewriting `fold` off its C-level path
+    puts it at 4.82x to 5.00x, four times outside the loaded band.
+
+    WHAT THIS DOES NOT CATCH, and which test does. Folding once per declared
+    term instead of once for the document does NOT fail here, and should not:
+    it is a change in how many calls are made, it is caught exactly by
+    `test_the_mechanism_makes_exactly_one_fold_and_one_find_pass_per_term`, and
+    both were verified by mutation on 2026-09-14. Each guard catches its own
+    class and neither catches the other's, which is the point of having two.
+    """
+    from sunglasses import _prefilter
+
+    document = _document(next(iter(GROUP_B_SEEDS.values())))
+    terms = sorted(TWO_GROUP_TERMS)[:4]
+
+    def find_loop(haystack):
+        for term in terms:
+            at = haystack.find(term)
+            while at != -1:
+                at = haystack.find(term, at + 1)
+
+    def mechanism():
+        find_loop(_prefilter.fold(document))
+
+    def reference():
+        # `fold` is `translate(table).lower()`. This is the same two passes with
+        # an empty table, so it measures the machine and the document rather
+        # than the table, and it moves with the runner exactly as the mechanism
+        # does. SAME DOCUMENT ON BOTH SIDES: an earlier version of this probe
+        # ran the regression over a fraction of the document and divided by a
+        # whole-document reference, which reported a 16x regression as 0.59x,
+        # faster than healthy. A ratio between two different amounts of work is
+        # not a ratio.
+        find_loop(document.translate({}).lower())
+
+    ratios = []
+    for _ in range(PRIMITIVE_ROUNDS):
+        mech = _primitive_best(mechanism)
+        ref = _primitive_best(reference)
+        ratios.append(mech / ref)
+
+    worst = max(ratios)
+    print(f"mechanism against a reference primitive over "
+          f"{len(document):,} bytes, best of {PRIMITIVE_TRIALS}, "
+          f"{PRIMITIVE_ROUNDS} rounds: "
+          f"{min(ratios):.3f}x - {worst:.3f}x "
+          f"(median {statistics.median(ratios):.3f}x), "
+          f"ceiling {ANCHOR_PRIMITIVE_CEILING}x")
+    assert worst <= ANCHOR_PRIMITIVE_CEILING, (
+        f"the mechanism costs {worst:.3f}x a reference primitive doing the same "
+        f"two C-level passes over the same {len(document):,} bytes, over a "
+        f"ceiling of {ANCHOR_PRIMITIVE_CEILING}x. The call COUNTS are checked "
+        f"elsewhere and are exact, so this is not more calls: it is one of the "
+        f"calls having become a slower kind of call. All {PRIMITIVE_ROUNDS} "
+        f"rounds: " + ", ".join(f"{r:.3f}" for r in ratios))
 
 
 @pytest.mark.slow
@@ -817,6 +1012,9 @@ def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines, measu
     aho = _has_aho(three_engines[2])
     gate = TOTALS_SAVING_WITH_AHO if aho else TOTALS_SAVING_WITHOUT_AHO
     measured_on = 0.67 if aho else 0.80
+    # The value this used to be gated at, kept visible so the widening is not a
+    # quantity that disappeared.
+    former_gate = 0.75 if aho else 0.85
     why = ("with the Aho-Corasick extension, where the literal prefilter is "
            "cheap and the saving is most of the scan"
            if aho else
@@ -826,7 +1024,8 @@ def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines, measu
     assert saving <= gate, (
         f"anchored {total_anchored:.2f}s against {total_unanchored:.2f}s "
         f"unanchored, {saving:.2f}x, gate {gate}x {why}. Measured {measured_on}x "
-        f"on 2026-09-12. The mode is not paying for itself.\n  "
+        f"on 2026-09-12, and gated at {former_gate}x until 2026-09-14. The mode "
+        f"is not paying for itself.\n  "
         + "\n  ".join(rows)
     )
 
@@ -998,6 +1197,32 @@ class _CountingRegex:
 
     def match(self, text, pos):
         return self._rx.match(text, pos)
+
+
+def test_a_document_with_no_declared_term_is_not_searched_at_all():
+    """Zero searches, as an integer. The saving, in the unit it is made of.
+
+    Added 2026-09-14 while surveying this file's wall-clock gates. Three of them
+    assert the economic claim that the mode pays for itself, and the mechanism
+    underneath that claim is this one: a document containing no declared term
+    cannot match, so it is not searched. Merging and the density bail were both
+    pinned as counts already; THIS one, the largest saving of the three, was
+    resting entirely on wall-clock ratios.
+
+    A regression here does not slow the mode down a little. It turns the case
+    the mode exists for into a full scan, and it is one integer away from being
+    visible on any runner, loaded or not.
+    """
+    engine = _spy_engine(r"MARKER.*Q", 600)
+    _, rx, key = engine._compiled_by_id["GUARD"][0]
+    spy = _CountingRegex(rx, 2)
+    # Not one `q` in it, so there is no window to search and nothing to merge.
+    document = "x" * 200_000
+    assert engine._match_anchored(spy, key, document) is None
+    assert spy.count == 0, (
+        f"a document with no declared term was searched {spy.count} time(s). "
+        "The mode's whole saving is that this document costs a fold and one "
+        "miss per term, and nothing else.")
 
 
 def test_windows_that_touch_are_merged_into_one_search():
