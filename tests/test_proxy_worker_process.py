@@ -216,3 +216,23 @@ def test_a_fault_never_carries_the_childs_own_words():
                      "print('SECRET-FROM-THE-WORKER');sys.exit(3)")
     out = worker_process.run({"params": {}}, argv=shouty, binding=BINDING)
     assert "SECRET-FROM-THE-WORKER" not in json.dumps(out)
+
+
+def test_the_worker_runs_in_its_own_process_group(tmp_path):
+    """T8.R12, and the reason the kill is safe to send.
+
+    `stop_group` signals a GROUP. If the child shared ours, the deadline kill
+    would land on the proxy itself, so this property is what makes every other
+    test in this file survivable. It is asserted directly rather than by
+    mutation: the mutant that sets start_new_session=False kills whatever runs
+    it, which on 2026-09-14 included a harness that then left three mutants in
+    the working tree. Some mutants are not worth executing to learn from.
+    """
+    marker = tmp_path / "group"
+    report = _script(
+        f"import os,sys;open({str(marker)!r},'w').write(str(os.getpgid(0)));"
+        "sys.stdin.read()")
+    worker_process.run({"params": {}}, argv=report, binding=BINDING,
+                       timeout_ms=300)
+    assert int(marker.read_text()) != os.getpgid(0), \
+        "the worker shares our group, so its deadline kill would hit us"
