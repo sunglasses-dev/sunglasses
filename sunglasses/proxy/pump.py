@@ -592,8 +592,17 @@ class Session:
                     "the upstream process exited with calls still pending")
 
     # ── reading ─────────────────────────────────────────────────────────────
-    def read_upstream(self, stream):
+    def read_upstream(self, stream, inspect=None):
         """Yield the frames a client should see. Stops for good at a fault.
+
+        `inspect` is the seam the result direction needs and defaults to None,
+        which is this method exactly as it was. When it is given it is called
+        BEFORE the settlement, never after, because T6.R2 allows one outcome
+        per held item and a scan that runs after delivery can only ever be a
+        second one. It returns None to deliver the original, or a triple
+        (replacement, reason, rule) to withhold: the replacement is the one
+        answer the client gets, or None for a notification, which has nowhere
+        to put an answer.
 
         T7.R2's last sentence is the whole design: never resynchronise at the
         next newline. Everything after a frame we could not trust is discarded
@@ -675,6 +684,13 @@ class Session:
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=False)
                     continue
+                verdict = inspect(raw, message) if inspect is not None else None
+                if verdict is not None:
+                    # T2.R12. Dropped with a receipt and never a response,
+                    # because a notification has no id to answer in.
+                    self._core._emit("NOTIFICATION_DROPPED", None,
+                                     supported=True)
+                    continue
                 # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
                 # record gate that gives responses their boundary does not
@@ -692,7 +708,10 @@ class Session:
             # T2.R6. OUR OWN control traffic, handed to the collector and never
             # yielded toward the client, who asked once and is not part of this
             # conversation. Checked before the client correlation because the
-            # two namespaces share one table and only the key tells them apart.
+            # two namespaces share one table and only the key tells them apart,
+            # and BEFORE the inspection because a page of our own tool list is
+            # not a message held on the client's behalf: the collector scans
+            # every page itself under T5.R3(c).
             #
             # The hand-off is an assignment into a dict the collector reads. It
             # CANNOT BLOCK, which is the point: the collector runs on the
@@ -732,6 +751,18 @@ class Session:
                 # No wire handoff for a control page: nobody is waiting on it,
                 # so the obligation ends with the settlement.
                 self._retire_record(identity)
+                continue
+
+            # T2.R2 and T2.R4/R5. The inspection happens here, before either
+            # the initialize negotiation or the ordinary delivery, so the
+            # settlement below is the FIRST and only one for this item.
+            verdict = inspect(raw, message) if inspect is not None else None
+            if verdict is not None:
+                replacement, reason, rule = verdict
+                self.settle_from(ORIGIN_CLIENT, message["id"], reason, rule)
+                if replacement is not None:
+                    yield replacement
+                continue
                 continue
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
