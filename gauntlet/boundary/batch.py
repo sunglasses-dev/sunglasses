@@ -28,6 +28,7 @@ from client.observe import (                                             # noqa:
 )
 from client import descriptor
 from destination.sink import Destination
+from proxy import passthrough
 import fidelity
 from runner import Ledger, scenario_of                                   # noqa: E402
 
@@ -296,6 +297,24 @@ def verdict(run_dir, route, observed_bytes, receipts_path, destination_receipt=N
     }
 
 
+
+def _held_inspection_input(run_dir: pathlib.Path, direction: str) -> str:
+    """The exact text the proxy will hand the scanner for this direction.
+
+    Built from the same function the proxy uses, on the frame this run
+    materialised: the client's own request for `request`, the scenario's first
+    declared upstream frame for `result`. Recomputing the rule here instead of
+    calling it would let the record and the boundary drift apart silently, and
+    the record exists precisely to be compared against the boundary.
+    """
+    if direction == "result":
+        lines = (run_dir / "upstream.jsonl").read_bytes().splitlines()
+        message = json.loads(next(line for line in lines if line.strip()))
+    else:
+        message = json.loads((run_dir / "request.json").read_text())
+    return "\n".join(value for _, value in passthrough.inspection_input(message, direction))
+
+
 def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
             ledger, dry_run, call_no):
     run_dir = outdir / f"{entry['id']}.{variant['name']}.{route}"
@@ -312,14 +331,35 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
     # the dispatcher is configured and inert, which would be a green
     # configuration test over a capability that does nothing.
     fault = variant.get("fault") or {}
-    payload_name = variant.get("payload")
-    if fault.get("kind") and payload_name and (run_dir / payload_name).is_file():
+    # THE NAME IN THE SEED IS NOT THE NAME IN THE RUN. The variant declares
+    # `payload: "result.payload.txt"`, which is how the file is spelled in the
+    # scenario directory; materialisation writes the same bytes as `payload.txt`
+    # in the run root. Keying off the declared name meant this record was never
+    # written for a single real row, so the dispatcher was configured and inert
+    # and ASTRA measured 0 fault records and 0 fault-worker starts across all six
+    # G2-08/09/11 configurations.
+    #
+    # My own test for this passed, because it built a run directory with the
+    # declared name in it. A fixture assembled from my assumption instead of from
+    # the materialiser proves the assumption, not the code.
+    materialised_payload = run_dir / "payload.txt"
+    if fault.get("kind") and materialised_payload.is_file():
+        held = _held_inspection_input(run_dir, fault.get("direction") or "result")
         (run_dir / "materialised.fault.json").write_text(json.dumps({
             "scenario_id": entry["id"], "variant": variant["name"],
             "fault": fault,
-            "payload": payload_name,
-            "payload_sha256": hashlib.sha256(
-                (run_dir / payload_name).read_bytes()).hexdigest(),
+            "payload": materialised_payload.name,
+            "declared_payload": variant.get("payload"),
+            # WHAT THE PROXY WILL HOLD, which is not the payload file. A request
+            # puts the declared document in one argument and the proxy inspects
+            # every string leaf of the arguments joined, so G2-08.request holds
+            # 52 bytes for a 21-byte secret. Pinning the file's digest matched
+            # only the result direction, where the payload happens to BE the
+            # whole inspection input, and the three request rows ran an ordinary
+            # scan and reported PROHIBITED_SECRET with no fault worker started.
+            "payload_sha256": hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest(),
+            "payload_file_sha256": hashlib.sha256(
+                materialised_payload.read_bytes()).hexdigest(),
         }, indent=1) + "\n")
 
     chosen_argv, upstream_kind = upstream_for(entry, variant, run_dir, upstream_argv)

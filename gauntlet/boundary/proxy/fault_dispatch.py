@@ -59,6 +59,11 @@ def declared_fault(run_dir: pathlib.Path, held: str):
         record = json.loads(manifest.read_text())
     except ValueError:
         return None
+    # EXACT, over the whole held text. The record pins the digest of the
+    # inspection input this run will hand the scanner, so there is nothing to
+    # reason about here: these are the declared bytes or they are not. Anything
+    # looser, containment most of all, would fault a message that merely quotes
+    # the document, and that message is a different experiment.
     digest = hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest()
     if record.get("payload_sha256") != digest:
         return None
