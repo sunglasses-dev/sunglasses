@@ -49,6 +49,7 @@ class Session:
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
         self._tombstones: list = []       # keys, oldest first
+        self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
     # ── admission ───────────────────────────────────────────────────────────
@@ -76,9 +77,18 @@ class Session:
                 self._close("MALFORMED_UPSTREAM",
                             "upstream reused an id that was already pending")
             return False
+        # T6.R6 stores an id with its GENERATION. A cancelled id is tombstoned
+        # for the session, but a COMPLETED one may legitimately be used again,
+        # and without a generation the core refuses the second request because
+        # it has already settled that identity. The generation is what makes
+        # "the same id, a later request" a different item rather than a repeat.
+        self._generation[identity] = self._generation.get(identity, 0) + 1
         self._pending[identity] = method
-        self._core.admit(identity, method=method, origin=origin)
+        self._core.admit(self._core_key(identity), method=method, origin=origin)
         return True
+
+    def _core_key(self, identity):
+        return identity + (self._generation.get(identity, 0),)
 
     def expects(self, request_id, *, origin):
         return key(origin, request_id) in self._pending
@@ -114,7 +124,7 @@ class Session:
 
         self._pending.pop(identity)
         self._answered.add(identity)
-        self._core.settle(identity, Cause("CLEAN", "S1"))
+        self._core.settle(self._core_key(identity), Cause("CLEAN", "S1"))
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -172,7 +182,7 @@ class Session:
             return None
         self._pending.pop(identity)
         self._answered.add(identity)
-        return self._core.settle(identity, Cause(reason, rule))
+        return self._core.settle(self._core_key(identity), Cause(reason, rule))
 
     def cancel(self, request_id, *, origin):
         """T6.R5 and T6.R6. The id is retired and tombstoned for the session."""
@@ -184,7 +194,7 @@ class Session:
             # call. The item is already settled by the teardown, and settling it
             # again would raise `Settled` out of an ordinary cancellation.
             return identity
-        self._core.settle(identity, Cause("REQUEST_CANCELLED", "S6"))
+        self._core.settle(self._core_key(identity), Cause("REQUEST_CANCELLED", "S6"))
         return identity
 
     def _remember_tombstone(self, identity):
@@ -278,8 +288,16 @@ class Session:
 
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
+            owed = [identity for identity in self._pending
+                    if identity[0] == ORIGIN_CLIENT]
             self._close("MALFORMED_UPSTREAM",
                         "upstream exited with calls still pending")
+            # T4.R7 and T6.R1. The client is WAITING. Recording the fault and
+            # saying nothing leaves it waiting for ever on a session that has
+            # already decided it is over, so each owed request gets its one
+            # answer, on the wire, in its own typed id.
+            for identity in owed:
+                yield self._client_refusal(identity, "MALFORMED_UPSTREAM", "S5")
 
     def _initialize_result(self, message, raw):
         """T1.R2 and T1.R3, on the one frame where they apply.
@@ -317,6 +335,18 @@ class Session:
             return None
         return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
 
+    def _client_refusal(self, identity, reason, rule):
+        """One JSON-RPC error to the client, in the id it used."""
+        import json as _json
+
+        _origin, _type_name, request_id = identity[0], identity[1], identity[2]
+        return (_json.dumps({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
+                      "data": {"reason_code": reason, "rule": rule}},
+        }, separators=(",", ":")) + "\n").encode()
+
     # ── outcome ─────────────────────────────────────────────────────────────
     def _close(self, reason, detail, rule="S5", budget=None):
         if self._closed:
@@ -329,7 +359,7 @@ class Session:
         return self._closed
 
     def answer_for(self, request_id, *, origin):
-        return self._core.settled_as(key(origin, request_id))
+        return self._core.settled_as(self._core_key(key(origin, request_id)))
 
     @property
     def events(self):

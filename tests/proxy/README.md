@@ -105,3 +105,34 @@ retry.
 Recorded for ASTRA the same way the Q14 and C03 contradiction was, and resolved
 the same way if he disagrees: by a ruling and a new versioned file, not by
 editing either of these.
+
+
+## A third contradiction, inside one file this time
+
+Round 4's `test_W03_G2_22_actual_child_exit_pending` and
+`test_F15_exit_pending_yields_client_withheld_error` describe the same
+situation and require opposite results.
+
+Both drive an EMPTY upstream with exactly one pending client request, which is
+the G2-22 shape: `exit_with_pending.upstream.jsonl` is a zero-byte file. W03
+requires `read_upstream` to yield nothing. F15 requires it to yield exactly one
+frame, the client's SUNGLASSES_WITHHELD error with code -32070.
+
+Measured both ways rather than argued:
+
+    yielding the refusal      W03 fails, F15 passes
+    recording it only         W03 passes, F15 fails
+
+The refusal is kept, so F15 passes and W03 fails. T6.R1 gives a client request
+at most one response and the client is WAITING: recording the fault and saying
+nothing leaves it waiting for ever on a session that has already decided it is
+over. A test that expects silence there is asking for a hang.
+
+W03's other three assertions all hold either way, and they are the substantive
+ones: the session closes MALFORMED_UPSTREAM, the item settles MALFORMED_UPSTREAM,
+and the exit code is nonzero. Only its assertion about the yielded list
+conflicts.
+
+Recorded for ASTRA the way the Q14/C03 and R2/V04 contradictions were, and to be
+resolved the same way, by a ruling and a new versioned file rather than by
+editing either check.
