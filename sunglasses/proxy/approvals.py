@@ -170,11 +170,24 @@ class Store:
         """
         from .. import firewall
 
+        # The two invariants of the approving-pins ruling.
+        #
+        # 1. The pins come from THIS capture, the one whose sha the record
+        #    names. `stored` is the re-read file `approve` validated, so a
+        #    second capture sitting in the directory (every `list_changed`
+        #    writes one) is not reachable from here.
+        # 2. A pin is only ever written for a tool the RECORD names. `pages`
+        #    and `tools_by_name` are separate keys and nothing in the file
+        #    format makes them agree, so a page could carry a descriptor the
+        #    human's record never listed. Pinning it would make `check_pin`
+        #    read clean for a tool nobody approved, which is an open gate with
+        #    a clean receipt attached.
+        approved_names = set(stored.get("tools_by_name") or {})
         tools = {}
         for page in stored.get("pages") or []:
             for tool in (page or {}).get("tools") or []:
                 name = tool.get("name")
-                if not isinstance(name, str):
+                if not isinstance(name, str) or name not in approved_names:
                     continue
                 qualified = "mcp__%s__%s" % (self.server_id[:8], name)
                 tools[qualified] = {"sha256": firewall.descriptor_hash(tool)}
@@ -310,8 +323,14 @@ class Store:
         changed underneath an approval that existed. The provenance outlives
         the activation on purpose.
         """
+        # Only a generation that EXISTED can be invalidated. T5.R4 names the
+        # state "INVALIDATED (from gen N)", so claiming it where nothing was
+        # ever activated reports a server that changed underneath an approval
+        # it never had. That one stays UNAPPROVED.
+        had_generation = self._active is not None
         self._active = None
-        self._invalidation = reason
+        if had_generation:
+            self._invalidation = reason
 
     # ── T5.R4: invalidation, with provenance that outlives it ──────────────
     def invalidate(self, *, reason=DESCRIPTOR_CHANGED):

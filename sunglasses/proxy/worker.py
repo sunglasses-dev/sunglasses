@@ -46,6 +46,7 @@ BLOCKING_SEVERITIES = frozenset({"high", "critical"})
 
 _BINDING_FIELDS = ("digest", "channel", "generation", "invocation_token")
 _COUNTERS = ("inspected_utf8_bytes", "observed_content_bytes", "elapsed_ms")
+_BYTE_COUNTERS = frozenset({"inspected_utf8_bytes", "observed_content_bytes"})
 
 
 class Invalid(ValueError):
@@ -134,11 +135,16 @@ def validate(result, *, binding, held_content_bytes, catalog):
 
     for counter in _COUNTERS:
         value = result.get(counter)
-        # T403. A count of bytes is an integer. 19.5 bytes were not inspected
-        # by anything, and accepting it lets a worker report a number that
-        # cannot be compared to the byte counts T4.R2 checks it against.
-        if not _typed(value, int):
-            raise Invalid(f"{counter} is {value!r}, not a whole number")
+        # T403 applies to the BYTE counters. 19.5 bytes were not inspected by
+        # anything, and a fractional count cannot be compared to the byte
+        # totals T4.R2 checks it against. `elapsed_ms` is a DURATION and half a
+        # millisecond is an ordinary measurement, so it stays a finite number:
+        # applying the byte rule to it was me over-reading the row.
+        if counter in _BYTE_COUNTERS:
+            if not _typed(value, int):
+                raise Invalid(f"{counter} is {value!r}, not a whole number")
+        elif not _typed(value, float):
+            raise Invalid(f"{counter} is {value!r}, not a number")
         if value < 0:
             raise Invalid(f"{counter} is negative")
         if value != value or value in (float("inf"), float("-inf")):
