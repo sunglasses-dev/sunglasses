@@ -224,10 +224,32 @@ def test_repeating_the_anchor_does_not_multiply_the_work(plain, anchored):
     """
     reference = _timed(plain, ANCHOR_STORM)
     measured = _timed(anchored, ANCHOR_STORM)
-    assert measured < reference * 2, (
-        f"anchored {measured:.3f}s vs plain {reference:.3f}s on a megabyte of "
-        "anchors; the windows are not merging"
-    )
+    print(f"anchor storm: anchored {measured:.3f}s vs plain {reference:.3f}s, "
+          f"{measured / reference:.3f}x (reported, not gated)")
+    # REPORTED, NOT ASSERTED, since 2026-09-14, and this one is the sharpest
+    # case in the file for why.
+    #
+    # The assertion that used to be here read `measured < reference * 2` and its
+    # message said "the windows are not merging". Mutation on 2026-09-14 says it
+    # checks neither thing it is near:
+    #
+    #   break window merging outright     this row PASSES;
+    #                                     test_windows_that_touch_are_merged_
+    #                                     into_one_search fails, as it should
+    #   remove the density bail           this row PASSES;
+    #                                     test_the_cost_of_deciding_to_bail_
+    #                                     does_not_grow_with_the_document fails
+    #
+    # It cannot see merging because a megabyte of anchors trips the density bail
+    # long before any window is merged, so this document never reaches the code
+    # the message names. Its spread under 64 burners is 0.981x to 1.105x against
+    # a 2.0x gate, so it was not flaky either: it was simply measuring the
+    # machine with a name that promised otherwise, which is worse than flaky.
+    # A green row nobody can cash is how a test suite grows a number that only
+    # ever fails for reasons unrelated to its subject.
+    #
+    # The numbers stay printed. Both regressions in its neighbourhood are held
+    # exactly, as integers, by the two tests named above.
 
 
 # ── the span is proof where it can be, a claim where it cannot ──────────────
@@ -704,8 +726,30 @@ RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 # that set is thirteen, eleven core overlay documents plus two storms, and it
 # lives in the review evidence rather than here. Naming a count the file does
 # not use made the gate look wider than it is.
-TOTALS_SAVING_WITH_AHO = 0.75
-TOTALS_SAVING_WITHOUT_AHO = 0.85
+# WIDENED 2026-09-14, from 0.75 / 0.85, after this row failed an archive run of
+# #173 under load with the same defect as the overhead row above.
+#
+# Surveyed under 64 burners on 16 cores, four repetitions, the quantity this row
+# gates: 0.7273 .. 0.7668, crossing the old 0.75 on TWO of four. And UNLOADED,
+# on a quiet machine, 0.7245 .. 0.7287 against 0.75: 2.8% headroom before a
+# single competing process exists. A gate with 2.8% headroom is not measuring
+# whether the mode pays for itself, it is measuring what else the machine was
+# doing.
+#
+# The old numbers were set just above the measured value, 0.67 with the
+# automaton and 0.80 without, which makes them a detector for small drifts. A
+# small drift in a wall-clock ratio is noise, so that is a noise detector.
+#
+# WHAT THE ROW ACTUALLY CLAIMS is in its own failure message: "the mode is not
+# paying for itself". That failure looks like a saving near or above 1.0, not
+# like 0.77. So the gate is set where it separates paying from not paying, and
+# the mechanisms that PRODUCE the saving are pinned as integers elsewhere:
+# a document with no declared term is searched zero times, touching windows
+# merge into one search, a document made of the anchor bails to one search.
+# Those are exact and a shared runner cannot argue with them; this row is the
+# end-to-end sanity check on top, and it is now wide enough to be one.
+TOTALS_SAVING_WITH_AHO = 0.90
+TOTALS_SAVING_WITHOUT_AHO = 0.95
 
 
 def _has_aho(engine):
@@ -968,6 +1012,9 @@ def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines, measu
     aho = _has_aho(three_engines[2])
     gate = TOTALS_SAVING_WITH_AHO if aho else TOTALS_SAVING_WITHOUT_AHO
     measured_on = 0.67 if aho else 0.80
+    # The value this used to be gated at, kept visible so the widening is not a
+    # quantity that disappeared.
+    former_gate = 0.75 if aho else 0.85
     why = ("with the Aho-Corasick extension, where the literal prefilter is "
            "cheap and the saving is most of the scan"
            if aho else
@@ -977,7 +1024,8 @@ def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines, measu
     assert saving <= gate, (
         f"anchored {total_anchored:.2f}s against {total_unanchored:.2f}s "
         f"unanchored, {saving:.2f}x, gate {gate}x {why}. Measured {measured_on}x "
-        f"on 2026-09-12. The mode is not paying for itself.\n  "
+        f"on 2026-09-12, and gated at {former_gate}x until 2026-09-14. The mode "
+        f"is not paying for itself.\n  "
         + "\n  ".join(rows)
     )
 
@@ -1149,6 +1197,32 @@ class _CountingRegex:
 
     def match(self, text, pos):
         return self._rx.match(text, pos)
+
+
+def test_a_document_with_no_declared_term_is_not_searched_at_all():
+    """Zero searches, as an integer. The saving, in the unit it is made of.
+
+    Added 2026-09-14 while surveying this file's wall-clock gates. Three of them
+    assert the economic claim that the mode pays for itself, and the mechanism
+    underneath that claim is this one: a document containing no declared term
+    cannot match, so it is not searched. Merging and the density bail were both
+    pinned as counts already; THIS one, the largest saving of the three, was
+    resting entirely on wall-clock ratios.
+
+    A regression here does not slow the mode down a little. It turns the case
+    the mode exists for into a full scan, and it is one integer away from being
+    visible on any runner, loaded or not.
+    """
+    engine = _spy_engine(r"MARKER.*Q", 600)
+    _, rx, key = engine._compiled_by_id["GUARD"][0]
+    spy = _CountingRegex(rx, 2)
+    # Not one `q` in it, so there is no window to search and nothing to merge.
+    document = "x" * 200_000
+    assert engine._match_anchored(spy, key, document) is None
+    assert spy.count == 0, (
+        f"a document with no declared term was searched {spy.count} time(s). "
+        "The mode's whole saving is that this document costs a fold and one "
+        "miss per term, and nothing else.")
 
 
 def test_windows_that_touch_are_merged_into_one_search():
