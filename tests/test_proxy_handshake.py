@@ -110,6 +110,14 @@ def test_the_supported_set_is_the_one_the_row_names():
     })
     assert handshake.SUPPORTED_NOTIFICATIONS == frozenset({
         "notifications/cancelled", "notifications/initialized",
+        # T1.R3's enumeration does not contain this one and T2.R12 names it as
+        # an upstream notification to INSPECT. Both rows are frozen and they
+        # disagree, so the set follows the row that has traffic: T1.R3
+        # advertises the `logging` capability, notifications/message is the
+        # only wire message that capability produces, and leaving it out
+        # advertised something that could never carry anything while making
+        # T2.R12's row unreachable. ASTRA's C10 rules the same way.
+        "notifications/message",
         "notifications/progress", "notifications/roots/list_changed",
         "notifications/tools/list_changed",
     })
@@ -123,7 +131,10 @@ def test_a_supported_notification_is_accepted(method):
 
 
 @pytest.mark.parametrize("method", [
-    "notifications/message", "notifications/resources/updated",
+    # `notifications/message` used to be here and is now supported, per C10 and
+    # the note above. `notifications/resources/updated` stays: `resources` is
+    # advertised as read only, so its update stream is not part of the bargain.
+    "notifications/resources/updated",
     "notifications/", "notifications/cancelled/extra",
 ])
 def test_an_unlisted_notification_is_rejected_on_arrival(method):

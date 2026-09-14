@@ -127,8 +127,19 @@ def test_a_clean_frame_after_a_protocol_fault_is_discarded():
     session.admit_request(41, method="tools/call", origin="client")
     delivered = list(session.read_upstream(stream))
     assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
-    assert delivered == [], (
+    # What must never appear is the FOLLOWER. The one frame that may appear is
+    # the client's own settlement: T6.R1 gives an admitted request exactly one
+    # answer, and C07 requires it on this path, so the old `delivered == []`
+    # would now leave a client blocked for ever on a session that has already
+    # decided it is over. Asserting the absence of the follower is the property
+    # this test was written for; asserting the absence of everything was the
+    # spelling it had when a fault produced nothing at all.
+    assert b"PERFECTLY-CLEAN" not in b"".join(delivered), (
         "a frame after the fault reached the client, so the stream was resumed")
+    assert len(delivered) == 1
+    settlement = json.loads(delivered[0])
+    assert settlement["id"] == 41
+    assert settlement["error"]["data"]["reason_code"] == "MALFORMED_UPSTREAM"
 
 
 def test_the_item_owed_when_the_stream_faults_is_answered_not_stranded():

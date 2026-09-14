@@ -207,15 +207,20 @@ answered. T9 rules. The row itself is implemented: `_respond_upstream` writes
 one JSON-RPC error in upstream's id namespace back up the pipe, and nothing is
 ever yielded toward the client from the reverse branch.
 
-## The empty-output assertion, now in fourteen more places
+## The empty-output assertion, now in sixteen more places
 
 C07 and W01 use the SAME fixture, `G2-10/invalid_json`, and require opposite
 things. C07 asserts the client pipe receives a refusal whose `reason_code`
 equals `closed_with()[0]`. W01 asserts `not got`. Implementing the bounded
-repair route therefore turns fourteen round-4 controls red, and every one of
-them is red on that clause alone:
+repair route therefore turns sixteen round-4 controls red, and every one of
+them is red on that clause alone. Counted from a run rather than by eye, since
+the first version of this paragraph said fourteen and then listed sixteen:
 
-    W01 x2, W02 x5, W05, F06, F08 x4 (compound), F11, F14, W20
+    W01 x2, W02 x5, W05 x1, F06 x1, F08 x4, F11 x1, F14 x1, W20 x1   = 16
+    plus test_reverse_wire.py line 21                                = 17
+
+    tests/proxy total reds = 19, of which W03 and F21 are the two already
+    ruled, leaving 17 on the empty-output clause.
 
 Measured on this head, all five W02 variants:
 
