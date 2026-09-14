@@ -251,8 +251,14 @@ def test_the_receipt_shows_the_teardown_and_what_it_settled():
     session.record(1, _deadline())
     session.teardown(_protocol())
     kinds = [e["kind"] for e in session.events]
-    assert kinds == ["CAUSE_RECORDED", "TEARDOWN", "SETTLED", "UPSTREAM_CLOSED"]
+    # SESSION_TORN_DOWN rather than UPSTREAM_CLOSED, because this teardown was
+    # given no supervisor. Claiming the upstream closed when nothing supervised
+    # the processes puts a false sentence in the evidence while a child may
+    # still be running, which is ASTRA's F14.
+    assert kinds == ["CAUSE_RECORDED", "TEARDOWN", "SETTLED",
+                     "SESSION_TORN_DOWN"]
     assert session.events[-1]["settled"] == 1
+    assert session.events[-1]["supervised"] is False
     stamps = [e["mono"] for e in session.events]
     assert stamps == sorted(stamps)
 

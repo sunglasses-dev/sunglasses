@@ -476,7 +476,17 @@ class Session:
             # already happened.
             return dict(self._answers)
         self._closed = True
-        self._emit("UPSTREAM_CLOSED", None, settled=len(self._answers))
+        if supervisor is not None:
+            # UPSTREAM_CLOSED IS A CLAIM ABOUT PROCESSES, so it is only made
+            # when something actually supervised them. A teardown with no
+            # supervisor has settled every item and stopped nothing, which is a
+            # true and different statement, and saying the upstream closed there
+            # puts a false sentence in the evidence while a child is still
+            # running.
+            self._emit("UPSTREAM_CLOSED", None, settled=len(self._answers))
+        else:
+            self._emit("SESSION_TORN_DOWN", None, settled=len(self._answers),
+                       supervised=False)
         return dict(self._answers)
 
     @property
