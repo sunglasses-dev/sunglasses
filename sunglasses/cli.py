@@ -2145,6 +2145,17 @@ def main():
     config_parser.add_argument("--email", "-e", help="Set email for daily reports")
     config_parser.set_defaults(func=cmd_config)
 
+    # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
+    # 0.6.0 beta's product surface is this command, and everything it does
+    # lives in sunglasses.proxy.commands. It is intercepted rather than made a
+    # subparser because `sunglasses proxy -- npx server` carries a bare
+    # separator and the server's own flags: a subparser would have to be told
+    # to keep its hands off all of it, and getting that wrong edits somebody
+    # else's command line. Handing the rest over whole is smaller and exact.
+    if len(sys.argv) > 1 and sys.argv[1] == "proxy":
+        from .proxy.commands import main as proxy_main
+        sys.exit(proxy_main(sys.argv[2:]))
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
