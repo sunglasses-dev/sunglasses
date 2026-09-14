@@ -56,11 +56,18 @@ def _log(tmp_path):
     return receipts.Log(tmp_path, run_id="run", header={"session": "s"})
 
 
-def _engine(tmp_path, upstream_frames, approvals=True):
-    """A session that has already sent one tools/call and is owed its answer."""
+def _engine(tmp_path, upstream_frames, pending=True):
+    """A session that has already sent one tools/call and is owed its answer.
+
+    `pending=False` for the notification rows. T7.R1 makes EOF with a client
+    request still outstanding an S5 fault, so a session left owing an answer
+    ends with one MALFORMED_UPSTREAM refusal on the wire. That is correct and
+    it is not what those rows are about.
+    """
     upstream, client = _Sink(), _Sink()
     session = pump.Session(strict=False)
-    session.admit_request(1, method="tools/call", origin="client")
+    if pending:
+        session.admit_request(1, method="tools/call", origin="client")
     engine = route.Route(session=session, log=_log(tmp_path),
                          upstream_write=upstream, client_write=client)
     stream = b"".join(upstream_frames)
@@ -159,17 +166,17 @@ def test_an_error_carrying_an_injection_is_still_withheld(tmp_path):
 # ── T2.R12 · an upstream notification has no response either ─────────────
 
 def test_an_upstream_notification_with_a_finding_is_dropped_silently(tmp_path):
-    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/message",
+    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/progress",
                        "params": {"data": INJECTION}}) + "\n").encode()
-    engine, client, stream = _engine(tmp_path, [raw])
+    engine, client, stream = _engine(tmp_path, [raw], pending=False)
     engine.pump_upstream(stream)
     assert client.bytes == b"", "a notification was answered or forwarded"
 
 
 def test_a_clean_upstream_notification_is_forwarded(tmp_path):
-    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/message",
+    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/progress",
                        "params": {"data": "build finished"}}) + "\n").encode()
-    engine, client, stream = _engine(tmp_path, [raw])
+    engine, client, stream = _engine(tmp_path, [raw], pending=False)
     engine.pump_upstream(stream)
     assert client.bytes == raw
 
@@ -185,7 +192,14 @@ def test_an_upstream_request_never_reaches_the_client(tmp_path):
                        "params": {"prompt": INJECTION}}) + "\n").encode()
     engine, client, stream = _engine(tmp_path, [raw])
     engine.pump_upstream(stream)
-    assert client.bytes == b""
+    assert INJECTION not in client.bytes.decode(), \
+        "the server's own request was relayed to the client"
+    # T7.R1. The server then exited still owing the answer to the client's
+    # call, so the client gets exactly one MALFORMED_UPSTREAM refusal. That is
+    # the fault being reported, not the upstream request being forwarded.
+    replies = client.messages()
+    assert len(replies) == 1
+    assert replies[0]["error"]["data"]["reason_code"] == "MALFORMED_UPSTREAM"
 
 
 # ── the channel, because a rule scoped to one cannot run on the other ────
@@ -207,3 +221,27 @@ def test_results_are_scanned_on_the_api_response_channel(tmp_path):
                          scan=recording)
     engine.pump_upstream(_result_frame("all good"))
     assert seen == ["api_response"]
+
+
+def test_notifications_message_is_dropped_and_that_is_a_contract_conflict(tmp_path):
+    """MEASURED, not chosen. Two rows disagree and this pins what the code does.
+
+    T2.R12 names `message` as an upstream notification to inspect on the
+    api_response channel. T1.R3's advertised set does not contain
+    `notifications/message`, it contains the `logging` capability, and
+    handshake.SUPPORTED_NOTIFICATIONS follows T1.R3, so the notification the
+    logging capability exists to deliver is dropped as unsupported before any
+    scan runs.
+
+    The consequence is that T2.R12's `message` row can never execute. A rule
+    scoped to it would read as covered and never fire, which is the check that
+    skips itself. Written down here rather than repaired, because repairing it
+    means editing either handshake.py or a frozen contract row and that is not
+    a call this slice gets to make.
+    """
+    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/message",
+                       "params": {"data": "build finished"}}) + "\n").encode()
+    engine, client, stream = _engine(tmp_path, [raw], pending=False)
+    engine.pump_upstream(stream)
+    assert client.bytes == b"", \
+        "dropped as unsupported, so T2.R12's message row is unreachable"

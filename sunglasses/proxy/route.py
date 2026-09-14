@@ -30,11 +30,14 @@ import uuid
 from . import envelope, framing, inspection, policy, receipts, selector, worker
 
 CLIENT = "client"
+UPSTREAM = "upstream"
 REQUEST = "request"
+RESULT = "result"
 
 REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
+REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
 REASON_CLEAN = "CLEAN"
 
@@ -90,6 +93,118 @@ class Route:
             self._client_request(raw, message, method)
         else:
             self._client_notification(raw, message, method)
+
+    # ── the upstream direction ─────────────────────────────────────────────
+
+    def pump_upstream(self, stream):
+        """Every frame the client is allowed to see, and nothing else.
+
+        This is the half people mean by mediation. A request carries what the
+        user asked for; a RESULT carries whatever the server decided to say
+        back, which is where an injection arrives from a poisoned document or a
+        compromised server. Inspecting only the outbound direction reads the
+        letters you send and none of the letters you receive.
+        """
+        for raw in self.session.read_upstream(stream,
+                                              inspect=self._inspect_result):
+            self.client_write(raw)
+
+    def _inspect_result(self, raw, message):
+        """None to deliver the original, or (replacement, reason, rule).
+
+        Called by the pump BEFORE it settles, so whatever this returns is the
+        item's first and only outcome.
+        """
+        request_id = message.get("id")
+        is_response = request_id is not None
+        method = (self.session.expected_method(request_id, origin=CLIENT)
+                  if is_response else message.get("method"))
+        if not method:
+            return None
+
+        surface, channel = self._surface(message, method)
+        if surface is None:
+            return None
+
+        # T2.R4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
+        # message is withheld. Skipping the blob and inspecting the rest
+        # reports a clean scan of a message we did not read.
+        if selector.unsupported(method, surface) is not None:
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE)
+
+        held_bytes = selector.content_bytes(surface)
+        binding = {"digest": hashlib.sha256(raw).hexdigest(),
+                   "channel": channel,
+                   "generation": 1,
+                   "invocation_token": uuid.uuid4().hex}
+        if not self._record("SCAN_STARTED", method=method):
+            return self._withhold_result(request_id, REASON_RECEIPT_IO_ERROR,
+                                         RULE_RESOURCE)
+
+        result = self.scan(surface, channel=channel, binding=binding,
+                           content_bytes=held_bytes)
+        try:
+            worker.validate(result, binding=binding,
+                            held_content_bytes=held_bytes,
+                            catalog=self.catalog)
+        except worker.Invalid:
+            return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
+                                         RULE_RESOURCE)
+
+        # An inbound result is not an outbound call, so T4.R4(7)'s direction
+        # test is false here and a finding settles PROHIBITED_CONTENT. Saying
+        # SECRET on an arriving message would describe an exfiltration that did
+        # not happen.
+        held = {"direction": RESULT, "is_request": False, "method": method}
+        settlement = policy.settle(result, held=held,
+                                   held_content_bytes=held_bytes)
+        self._record("SCAN_RESULT", accepted=settlement.accepted,
+                     status=settlement.status,
+                     inspection_complete=settlement.inspection_complete,
+                     rule_ids=[r for r in settlement.rule_ids
+                               if r in self.catalog])
+        if settlement.reason == REASON_CLEAN:
+            # T2.R5, CB06. The ENTIRE original, its own id and its own code.
+            # An error is a real answer and rewriting it into ours loses what
+            # the server said.
+            return None
+        return self._withhold_result(request_id, settlement.reason,
+                                     settlement.rule, settlement=settlement,
+                                     result=result)
+
+    def _surface(self, message, method):
+        """The inspected surface and its channel, per T2's result rows."""
+        for member in ("result", "error", "params"):
+            if member in message:
+                surface = message[member]
+                if not isinstance(surface, (dict, list)):
+                    return None, None
+                return surface, selector.channel_for(method, RESULT)
+        return None, None
+
+    def _withhold_result(self, request_id, reason, rule, *, settlement=None,
+                         result=None):
+        """One answer in the client's own typed id, or nothing at all when the
+        thing withheld was a notification."""
+        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        if request_id is None:
+            return (None, reason, rule)
+        result = result or {}
+        body = envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=bool(settlement.accepted) if settlement else False,
+            status=settlement.status if settlement else "not_run",
+            inspection_complete=(bool(settlement.inspection_complete)
+                                 if settlement else False),
+            inspected_utf8_bytes=result.get("inspected_utf8_bytes", 0),
+            observed_content_bytes=result.get("observed_content_bytes", 0),
+            elapsed_ms=result.get("elapsed_ms", 0),
+            rule_ids=settlement.rule_ids if settlement else (),
+            catalog=self.catalog)
+        return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
+                reason, rule)
 
     # ── requests ───────────────────────────────────────────────────────────
 
