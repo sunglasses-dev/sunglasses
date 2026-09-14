@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":"malformed-malformed_hook_output","method":"tools/call","params":{"name":"gate2_fetch","arguments":{}}}

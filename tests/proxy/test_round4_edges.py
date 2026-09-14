@@ -17,7 +17,7 @@ def test_RC11_tool_schema_discriminant(tmp_path,case,schema,valid):
  response=wire({'jsonrpc':'2.0','id':17,'result':{'tools':[{'name':'review','inputSchema':schema}]}})
  out=list(s.read_upstream(response))
  observed={'case':case,'valid':valid,'frames':len(out),'originals':sum('result' in json.loads(x) for x in out),'closed':s.closed_with(),'answer':s.answer_for(17,origin='client').reason}
- folder=R/'evidence/rc11';folder.mkdir(exist_ok=True);(folder/(case+'_'+str(valid)+'.json')).write_text(json.dumps(observed,indent=2))
+ folder=R/'evidence/rc11';folder.mkdir(parents=True,exist_ok=True);(folder/(case+'_'+str(valid)+'.json')).write_text(json.dumps(observed,indent=2))
  if valid:assert out==[response] and s.closed_with() is None
  else:
   assert s.closed_with()==('MALFORMED_UPSTREAM','S5')

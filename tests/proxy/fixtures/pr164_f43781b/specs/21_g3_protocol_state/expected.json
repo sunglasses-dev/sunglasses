@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-21",
+  "expectation_kind": "proposed Gate 3 contract; freeze before candidate execution",
+  "variants": {
+    "malformed_clean_tail": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "MALFORMED_UPSTREAM",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S5_PROTOCOL_ERROR"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Continue pump after parse failure or release a queued old result."
+    },
+    "duplicate_keys": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "MALFORMED_UPSTREAM",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S5_PROTOCOL_ERROR"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Use ordinary duplicate-accepting JSON parse and forward raw original."
+    },
+    "invalid_utf8": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "MALFORMED_UPSTREAM",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S5_PROTOCOL_ERROR"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Decode with replacement and continue."
+    },
+    "ambiguous_result": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "MALFORMED_UPSTREAM",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S5_PROTOCOL_ERROR"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Validate only jsonrpc version."
+    },
+    "deep_json": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "OVER_BUDGET",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S3_INCOMPLETE_INSPECTION"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Put recursion/depth work outside bounded validation."
+    },
+    "client_malformed_tail": {
+      "proxy_strict": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false,
+          "scope": "primary protected message only; independent calibration and late completions reported separately",
+          "oracle": "normal engine except explicitly injected worker-policy/lifecycle profile; fixture status is never misrepresented as engine finding",
+          "accepted": false
+        },
+        "policy": {
+          "decision": "error",
+          "reason_code": "MALFORMED_CLIENT",
+          "actor": "Sunglasses proxy_strict",
+          "exactly_one_terminal": true,
+          "schema": "contract in REVIEW.md \u00a72 resolutions"
+        },
+        "bytes_delivered": {
+          "outcome": "replaced",
+          "assert_original_payload_absent": true,
+          "preserve_actual_correlated_id_and_json_type": true,
+          "preserve_full_original_if_allowed": true,
+          "no_notification_ack": false,
+          "observation": "record transport facts; model-bound visibility separately OBSERVED / INFERRED / UNOBSERVED"
+        },
+        "destination": {
+          "outcome": "not received",
+          "transport": "file_drop",
+          "must_observe_upstream_forwarding_separately": true,
+          "negative_requires_calibration_and_drain": true
+        },
+        "strict_mode_rule": "S5_PROTOCOL_ERROR"
+      },
+      "no_mediation": {
+        "detector": {
+          "finding": "no",
+          "required_rule_ids": [],
+          "status": "not_run",
+          "inspection_complete": false
+        },
+        "policy": {
+          "decision": "allow",
+          "actor": "direct executor; no Sunglasses decision",
+          "reason_code": "CONTROL_NO_POLICY"
+        },
+        "bytes_delivered": {
+          "outcome": "measure_direct_parser",
+          "model_visibility": "not assumed"
+        },
+        "destination": {
+          "outcome": "calibrated_measurement",
+          "transport": "file_drop"
+        },
+        "strict_mode_rule": "S0_CONTROL_NO_MEDIATION"
+      },
+      "security_target": {
+        "original_payload_release_prohibited": true,
+        "prohibited_outbound_forwarding": false,
+        "interpretation": "detector miss, boundary failure, utility hold, scope escape, protocol failure, INVALID and UNOBSERVED are distinct"
+      },
+      "required_mutation": "Drop only malformed client line and forward subsequent bytes."
+    }
+  }
+}

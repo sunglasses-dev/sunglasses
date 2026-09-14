@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "id": "G2-20",
+  "slot": "correlation",
+  "setup": {
+    "canonical_root": "/private/tmp/gate3-fixture",
+    "engine_commit": "4480f1f7754dba7d19b6029180119b5d565ea2de",
+    "mechanisms": true,
+    "size_policy": {
+      "inspection_byte_budget": 262144,
+      "wire_frame_byte_limit": 4194304,
+      "wire_cap_includes_lf": true,
+      "deadline_ms": 2000,
+      "kill_grace_ms": 250,
+      "watchdog_ms": 3000,
+      "content_metric": "decoded UTF-8, duplicate data counted, scanner separator tracked separately"
+    },
+    "freeze_required_before_execution": [
+      "frame_assembly_ms",
+      "upstream_response_ms",
+      "write_ms",
+      "maximum_inflight",
+      "maximum_queue_bytes",
+      "maximum_json_depth",
+      "maximum_json_nodes",
+      "worker_output_bytes"
+    ],
+    "missing_freeze": "INVALID; never choose values after a candidate run",
+    "isolation": "fresh private root, pipes, children, receipt file and calibrated file observer; no live user config",
+    "approval": "provision an explicit fixture approval of exact initial descriptor before session unless variant replaces enrollment state",
+    "model_visibility": "separate model-bound observer; without it bytes_delivered is transport-only and model_visibility UNOBSERVED",
+    "control": "unmediated equivalent plus observer health before/after; absent required execution INVALID",
+    "no_live_model_authorization": true,
+    "proposed_limits": {
+      "frame_assembly_ms": 2000,
+      "upstream_response_ms": 30000,
+      "write_ms": 2000,
+      "maximum_inflight": 4,
+      "maximum_queue_bytes": 8388608,
+      "maximum_json_depth": 64,
+      "maximum_json_nodes": 32768,
+      "worker_output_bytes": 1048576,
+      "worker_stderr_bytes": 65536
+    },
+    "method_contract_note": "Control notification fixture uses notifications/roots/list_changed with extensible _meta; add it explicitly to the supported control table. Initialization must negotiate a pinned supported protocol; fixture revision uses 2024-11-05 for replay, not a claim of full client version compatibility."
+  },
+  "variants": [
+    {
+      "name": "typed_ids",
+      "request_id": 2001,
+      "upstream": "controllable_stub",
+      "profile": "ids_typed",
+      "payload_ref": {
+        "scenario_id": "G2-02",
+        "variant": "main",
+        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
+      },
+      "payload_symbol": "B",
+      "detector_channel": "api_response",
+      "requests": "typed_ids.requests.jsonl",
+      "upstream_output": "typed_ids.upstream.jsonl",
+      "schedule_file": "typed_ids.schedule.json",
+      "fault": {
+        "target": "none",
+        "profile": "ids_typed"
+      },
+      "sequence": "Hold string ID 2001; process numeric ID 2001 independently; include upstream-owned request using 2001; settle each toward its origin.",
+      "routes": [
+        "proxy_strict",
+        "no_mediation"
+      ],
+      "expected": "expected.json",
+      "mutation_must_reject": "Normalize IDs to string or share origins.",
+      "section": "2.1",
+      "observe_until": "all workers, upstream descendants and destination drained plus 500 ms; failing watchdog must reap them",
+      "calibration": "same payload/operation/route identity, required fault disabled; pin exact payload bytes at ingress; separate before/after observer health",
+      "seed_request_id": 2001,
+      "actual_id_source": "typed_ids.requests.jsonl#/id",
+      "materialized_example": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/materialized/G2-20.typed_ids",
+      "schedule_operations": [
+        "arm_fault",
+        "send_file",
+        "send_file",
+        "send_file",
+        "send_file",
+        "assert_secondary_and_reverse_complete_independently",
+        "send_file",
+        "release_fault_barrier"
+      ]
+    },
+    {
+      "name": "duplicate_pending",
+      "request_id": 2002,
+      "upstream": "controllable_stub",
+      "profile": "ids_duplicate",
+      "payload_ref": {
+        "scenario_id": "G2-02",
+        "variant": "main",
+        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
+      },
+      "payload_symbol": "B",
+      "detector_channel": "api_response",
+      "requests": "duplicate_pending.requests.jsonl",
+      "upstream_output": "duplicate_pending.upstream.jsonl",
+      "schedule_file": "duplicate_pending.schedule.json",
+      "fault": {
+        "target": "none",
+        "profile": "ids_duplicate"
+      },
+      "sequence": "Send a second client request with the same still-pending typed ID; reject session ambiguity before any second forward.",
+      "routes": [
+        "proxy_strict",
+        "no_mediation"
+      ],
+      "expected": "expected.json",
+      "mutation_must_reject": "Overwrite pending dictionary entry.",
+      "section": "2.1",
+      "observe_until": "all workers, upstream descendants and destination drained plus 500 ms; failing watchdog must reap them",
+      "calibration": "same payload/operation/route identity, required fault disabled; pin exact payload bytes at ingress; separate before/after observer health",
+      "seed_request_id": 2002,
+      "actual_id_source": "duplicate_pending.requests.jsonl#/id",
+      "materialized_example": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/materialized/G2-20.duplicate_pending",
+      "schedule_operations": [
+        "arm_fault",
+        "send_file",
+        "await_event",
+        "send_file",
+        "assert_no_second_forward_and_no_pending_overwrite"
+      ]
+    },
+    {
+      "name": "unsolicited_response",
+      "request_id": 2003,
+      "upstream": "controllable_stub",
+      "profile": "ids_unsolicited",
+      "payload_ref": {
+        "scenario_id": "G2-01",
+        "variant": "main",
+        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
+        "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
+      },
+      "payload_symbol": "P",
+      "detector_channel": "api_response",
+      "requests": "unsolicited_response.requests.jsonl",
+      "upstream_output": "unsolicited_response.upstream.jsonl",
+      "schedule_file": "unsolicited_response.schedule.json",
+      "fault": {
+        "target": "none",
+        "profile": "ids_unsolicited"
+      },
+      "sequence": "Upstream sends result for unissued ID while an unrelated valid request is pending; terminate and settle only known IDs.",
+      "routes": [
+        "proxy_strict",
+        "no_mediation"
+      ],
+      "expected": "expected.json",
+      "mutation_must_reject": "Trust result.id without a pending-map match.",
+      "section": "2.1",
+      "observe_until": "all workers, upstream descendants and destination drained plus 500 ms; failing watchdog must reap them",
+      "calibration": "same payload/operation/route identity, required fault disabled; pin exact payload bytes at ingress; separate before/after observer health",
+      "seed_request_id": 2003,
+      "actual_id_source": "unsolicited_response.requests.jsonl#/id",
+      "materialized_example": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/materialized/G2-20.unsolicited_response",
+      "schedule_operations": [
+        "send_file",
+        "send_file",
+        "await_primary_terminal"
+      ]
+    },
+    {
+      "name": "reused_id_late",
+      "request_id": 2004,
+      "upstream": "controllable_stub",
+      "profile": "ids_reused",
+      "payload_ref": {
+        "scenario_id": "G2-02",
+        "variant": "main",
+        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
+      },
+      "payload_symbol": "B",
+      "detector_channel": "api_response",
+      "requests": "reused_id_late.requests.jsonl",
+      "upstream_output": "reused_id_late.upstream.jsonl",
+      "schedule_file": "reused_id_late.schedule.json",
+      "fault": {
+        "target": "none",
+        "profile": "ids_reused"
+      },
+      "sequence": "Cancel generation 1; attempt same typed ID reuse; then release old worker/result. Require session-lifetime ID rejection/tombstone or fresh wire-ID translation.",
+      "routes": [
+        "proxy_strict",
+        "no_mediation"
+      ],
+      "expected": "expected.json",
+      "mutation_must_reject": "Accept old completion for replacement pending entry.",
+      "section": "2.1",
+      "observe_until": "all workers, upstream descendants and destination drained plus 500 ms; failing watchdog must reap them",
+      "calibration": "same payload/operation/route identity, required fault disabled; pin exact payload bytes at ingress; separate before/after observer health",
+      "seed_request_id": 2004,
+      "actual_id_source": "reused_id_late.requests.jsonl#/id",
+      "materialized_example": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/materialized/G2-20.reused_id_late",
+      "schedule_operations": [
+        "arm_fault",
+        "send_file",
+        "send_file",
+        "await_event",
+        "send_file",
+        "await_event",
+        "assert_pending_retired",
+        "send_file",
+        "release_fault_barrier",
+        "send_file",
+        "send_file"
+      ]
+    }
+  ],
+  "expect": "expected.json",
+  "why": "WHY.txt",
+  "hook_box": false
+}

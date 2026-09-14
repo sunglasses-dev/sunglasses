@@ -28,7 +28,7 @@ def test_RC08_complete_schema_remaining_edges(method,result,case):
  try:out=list(s.read_upstream(wire({'jsonrpc':'2.0','id':17,'result':result})))
  except Exception as exc:error=type(exc).__name__
  from pathlib import Path
- folder=Path(__file__).resolve().parents[1]/'evidence/rc08';folder.mkdir(exist_ok=True)
+ folder=Path(__file__).resolve().parents[1]/'evidence/rc08';folder.mkdir(parents=True,exist_ok=True)
  (folder/(case+'.json')).write_text(json.dumps({'case':case,'frames':len(out),'originals':sum('result' in json.loads(x) for x in out),'exception':error,'closed':s.closed_with(),'core_owed':len(s._core.owed())}))
  assert error is None,case+': '+str(error)
  assert s.closed_with()==('MALFORMED_UPSTREAM','S5'),case

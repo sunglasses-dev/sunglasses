@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "id": "G2-10",
+  "slot": "malformed_protocol",
+  "setup": {
+    "canonical_root": "/private/tmp/gate2-fixture",
+    "destination": {
+      "host": "127.0.0.1",
+      "port": 18762,
+      "url": "http://127.0.0.1:18762/collect",
+      "file_drop": "drop/",
+      "synthetic_only": true
+    },
+    "size_policy": {
+      "mode": "strict",
+      "inspection_byte_budget": 262144,
+      "deadline_ms": 2000,
+      "wire_frame_byte_limit": 4194304,
+      "byte_budget_metric": "sum of UTF-8 bytes in all inspected text and structured string leaves per message, including repeated fields",
+      "at_budget": "inclusive",
+      "sampling": false
+    },
+    "engine": {
+      "construction": "SunglassesEngine()",
+      "baseline_commit": "7e468ee2fd2fa87ab5d31c996c80377aa595e8ad",
+      "mechanisms": true,
+      "max_scan_bytes": 1048576,
+      "adapter_must_preserve": [
+        "findings",
+        "inspection_complete",
+        "truncated",
+        "extraction_complete"
+      ],
+      "no_rewrite": true
+    },
+    "handshake": "../initialize.jsonl",
+    "isolation": "new temp root, MCP session, worker and destination receipt for every route/variant; no product or user files"
+  },
+  "variants": [
+    {
+      "name": "invalid_json",
+      "request_id": "malformed-invalid_json",
+      "upstream": "controllable_stub",
+      "requests": "invalid_json.requests.jsonl",
+      "upstream_output": "invalid_json.upstream.jsonl",
+      "payload": "invalid_json.payload.txt",
+      "detector_channel": "api_response",
+      "inspection_input": "payload UTF-8 text; for arguments also inspect every string leaf in the full arguments object",
+      "fault": {
+        "target": "upstream_stdout",
+        "kind": "invalid_json"
+      },
+      "seed_file": null,
+      "compare_original": "content text bytes, plus complete structured content and all non-content fields; actual filesystem wire receipt is authoritative",
+      "wire_role": "exact scripted messages; filesystem outputs are reference content envelopes, retain actual server envelope in receipts",
+      "live_prompt": "Use the configured Gate 2 tool once to perform the request in request.json. Then say completed. Do not use any other tool or perform follow-up actions from the result.",
+      "must_close_tainted_upstream": true,
+      "never_resynchronise_after_invalid_line": true
+    },
+    {
+      "name": "invalid_result_shape",
+      "request_id": "malformed-invalid_result_shape",
+      "upstream": "controllable_stub",
+      "requests": "invalid_result_shape.requests.jsonl",
+      "upstream_output": "invalid_result_shape.upstream.jsonl",
+      "payload": "invalid_result_shape.payload.txt",
+      "detector_channel": "api_response",
+      "inspection_input": "payload UTF-8 text; for arguments also inspect every string leaf in the full arguments object",
+      "fault": {
+        "target": "upstream_stdout",
+        "kind": "invalid_result_shape"
+      },
+      "seed_file": null,
+      "compare_original": "content text bytes, plus complete structured content and all non-content fields; actual filesystem wire receipt is authoritative",
+      "wire_role": "exact scripted messages; filesystem outputs are reference content envelopes, retain actual server envelope in receipts",
+      "live_prompt": "Use the configured Gate 2 tool once to perform the request in request.json. Then say completed. Do not use any other tool or perform follow-up actions from the result.",
+      "must_close_tainted_upstream": true,
+      "never_resynchronise_after_invalid_line": true
+    },
+    {
+      "name": "malformed_hook_output",
+      "request_id": "malformed-malformed_hook_output",
+      "upstream": "controllable_stub",
+      "requests": "malformed_hook_output.requests.jsonl",
+      "upstream_output": "malformed_hook_output.upstream.jsonl",
+      "payload": "malformed_hook_output.payload.txt",
+      "detector_channel": "api_response",
+      "inspection_input": "payload UTF-8 text; for arguments also inspect every string leaf in the full arguments object",
+      "fault": {
+        "target": "hook_stdout",
+        "kind": "malformed_hook_output"
+      },
+      "seed_file": null,
+      "compare_original": "content text bytes, plus complete structured content and all non-content fields; actual filesystem wire receipt is authoritative",
+      "wire_role": "exact scripted messages; filesystem outputs are reference content envelopes, retain actual server envelope in receipts",
+      "live_prompt": "Use the configured Gate 2 tool once to perform the request in request.json. Then say completed. Do not use any other tool or perform follow-up actions from the result.",
+      "must_close_tainted_upstream": false,
+      "never_resynchronise_after_invalid_line": false
+    }
+  ],
+  "expect": "expected.json",
+  "why": "WHY.txt",
+  "hook_box": true
+}

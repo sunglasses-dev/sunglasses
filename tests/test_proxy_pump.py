@@ -189,7 +189,13 @@ def test_a_response_whose_shape_does_not_match_the_request_is_refused():
 
 import pathlib
 
-FIX = pathlib.Path("/private/tmp/PR164_REVIEW_f43781b_2026-09-13/fixtures")
+# CI. These were read from ASTRA's review directory in /private/tmp, which
+# exists on one Mac and nowhere else. The `skipif` meant the rows did not fail
+# in CI, they SKIPPED -- which is worse than the FileNotFoundError the controls
+# produced, because a skip is silent and these are the checks that read the
+# real wire bytes rather than an analogue I wrote.
+FIX = (pathlib.Path(__file__).resolve().parent
+       / "proxy/fixtures/pr164_f43781b")
 fixtures = pytest.mark.skipif(not FIX.exists(),
                               reason=f"review fixtures not present at {FIX}")
 

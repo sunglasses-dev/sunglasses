@@ -4,7 +4,8 @@ import pytest
 from sunglasses.proxy import framing, handshake, pump, supervisor
 from sunglasses.proxy.session import Cause, Session as Core
 ROOT=Path(__file__).resolve().parents[1]
-FIX=Path('/private/tmp/PR164_REVIEW_f43781b_2026-09-13/fixtures')
+# CI: vendored beside this file, byte-identical. Path only. See README.md.
+FIX=Path(__file__).resolve().parent / 'fixtures/pr164_f43781b'
 
 
 # ── R-W03-2 (T9, 2026-09-14) ────────────────────────────────────────────────

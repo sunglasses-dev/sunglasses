@@ -4,8 +4,14 @@ import pytest
 from sunglasses.proxy import framing
 from sunglasses.proxy.session import Cause, Session, Settled
 
-ROOT = Path('/private/tmp/PR164_REVIEW_f43781b_2026-09-13')
-FIX = ROOT / 'fixtures'
+# CI. The fixtures were read from ASTRA's review directory in /private/tmp,
+# which exists on one Mac and nowhere else, so CI failed 67 times with
+# FileNotFoundError and zero product signal. They are vendored beside this
+# file, byte-identical (252 files, verified by a full recursive diff). This
+# is a PATH change and nothing else; no assertion, fixture or expectation is
+# touched. Recorded in README.md.
+ROOT = Path(__file__).resolve().parent
+FIX = ROOT / 'fixtures/pr164_f43781b'
 
 def wire(body):
     return json.dumps(body, separators=(',', ':')).encode() + bytes([10])

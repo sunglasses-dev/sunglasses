@@ -1,0 +1,8 @@
+ASTRA's review controls write their observations here.
+
+Several of them do it with a bare `write_text` and no mkdir at all, so the
+DIRECTORY has to exist in the tree or the control dies with FileNotFoundError
+before it reaches a single assertion. That is how #164's CI produced 67 red
+rows carrying no product signal.
+
+The observations themselves are run output, not source, so they are ignored.
