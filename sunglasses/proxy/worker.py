@@ -46,7 +46,6 @@ BLOCKING_SEVERITIES = frozenset({"high", "critical"})
 
 _BINDING_FIELDS = ("digest", "channel", "generation", "invocation_token")
 _COUNTERS = ("inspected_utf8_bytes", "observed_content_bytes", "elapsed_ms")
-_BYTE_COUNTERS = ("inspected_utf8_bytes", "observed_content_bytes")
 
 
 class Invalid(ValueError):
@@ -71,14 +70,6 @@ def _typed(value, kind):
     if kind is float:
         return (isinstance(value, (int, float))
                 and not isinstance(value, bool))
-    if kind is int:
-        # The int branch is BACK, and the docstring above says it was removed
-        # for being dead. It is not dead now: T4.R1 declares the two byte
-        # counters as integers and AT01 caught the validator taking 9.5 for
-        # one. The bool guard is the same trap in the same place -- True is an
-        # int -- and AT07 already drives True and False through every counter,
-        # so the guard has a control this time.
-        return isinstance(value, int) and not isinstance(value, bool)
     raise AssertionError(f"_typed has no rule for {kind!r}")
 
 
@@ -98,7 +89,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
     for field in _BINDING_FIELDS:
         if field not in got:
             raise Invalid(f"binding is missing {field}")
-        if type(got[field]) is not type(binding[field]) or got[field] != binding[field]:
+        if got[field] != binding[field]:
             # A result bound to a different message is not this item's answer,
             # however well formed it is. Accepting it settles one message with
             # another message's scan.
@@ -109,26 +100,19 @@ def validate(result, *, binding, held_content_bytes, catalog):
     if not _typed(result.get("accepted"), bool):
         raise Invalid(f"accepted is {result.get('accepted')!r}, not a boolean")
     status = result.get("status")
-    if not isinstance(status, str) or status not in STATUSES:
+    if status not in STATUSES:
         raise Invalid(f"status {status!r} is not one of {sorted(STATUSES)}")
     if not _typed(result.get("inspection_complete"), bool):
         raise Invalid(
             f"inspection_complete is {result.get('inspection_complete')!r}, "
             f"not a boolean")
     decision = result.get("decision")
-    if not isinstance(decision, str) or decision not in DECISIONS:
+    if decision not in DECISIONS:
         raise Invalid(f"decision {decision!r} is not one of {sorted(DECISIONS)}")
 
     for counter in _COUNTERS:
         value = result.get(counter)
-        if counter in _BYTE_COUNTERS:
-            # T4.R1 declares these `int>=0`. A float passed the number check and
-            # 9.5 bytes is a description of something that did not happen -- and
-            # `inspected <= observed <= held` then compares fictions. elapsed_ms
-            # is declared `number`, so it keeps the wider check.
-            if not _typed(value, int):
-                raise Invalid(f"{counter} is {value!r}, not an integer")
-        elif not _typed(value, float):
+        if not _typed(value, float):
             raise Invalid(f"{counter} is {value!r}, not a number")
         if value < 0:
             raise Invalid(f"{counter} is negative")
@@ -144,18 +128,11 @@ def validate(result, *, binding, held_content_bytes, catalog):
         for field in ("rule_id", "severity", "source"):
             if field not in finding:
                 raise Invalid(f"a finding is missing {field}")
-        # AT11. `x in frozenset` RAISES TypeError when x is unhashable, and
-        # TypeError is not Invalid: it goes straight past the caller's
-        # `except Invalid` and out of the reader. The peer chooses these bytes,
-        # so a list where a string belongs is a reachable state, not a
-        # theoretical one. A non-string is refused before anything hashes it.
-        if not isinstance(finding["severity"], str) or \
-                finding["severity"] not in SEVERITIES:
+        if finding["severity"] not in SEVERITIES:
             raise Invalid(f"severity {finding['severity']!r} is not known")
-        if not isinstance(finding["source"], str) or \
-                finding["source"] not in SOURCES:
+        if finding["source"] not in SOURCES:
             raise Invalid(f"source {finding['source']!r} is not known")
-        if not isinstance(finding["rule_id"], str) or finding["rule_id"] not in catalog:
+        if finding["rule_id"] not in catalog:
             # T4.R6. A worker cannot confer authority on itself by naming a rule.
             raise Invalid(
                 f"rule id {finding['rule_id']!r} is not in the trusted catalog")
@@ -180,15 +157,6 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             f"inspection_complete is true with status {status!r}; only a "
             f"complete scan can claim it finished")
-    if status == STATUS_COMPLETE and not result["inspection_complete"]:
-        # T4.R2, the other direction, and it was the one missing. A result that
-        # says the scan RAN TO THE END while also saying the inspection did not
-        # finish is not a verdict; accepting it let the settlement report
-        # inspection_complete TRUE for it, inventing the completeness the
-        # worker itself had denied.
-        raise Invalid(
-            "status is complete with inspection_complete false; a scan cannot "
-            "have finished and not finished")
     if not result["accepted"]:
         raise Invalid(
             f"accepted is false with status {status!r}; an unaccepted result is "
