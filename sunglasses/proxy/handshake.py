@@ -31,6 +31,19 @@ SUPPORTED_NOTIFICATIONS = frozenset({
 
 UNSUPPORTED_PROTOCOL = "UNSUPPORTED_PROTOCOL"
 
+# T2.R16. The methods a CLIENT may send. Anything else is an extension or an
+# unknown, and the row answers it to the client without upstream ever seeing it.
+# Declared here, once, so the selector table and the reader cannot drift into
+# two vocabularies that disagree about what a known method is.
+CLIENT_METHODS = frozenset({
+    "initialize", "ping", "tools/call", "tools/list", "resources/read",
+    "resources/list", "prompts/get", "prompts/list", "logging/setLevel",
+}) | SUPPORTED_NOTIFICATIONS
+
+
+def client_method_known(method):
+    return method in CLIENT_METHODS
+
 
 class Negotiation:
     __slots__ = ("ok", "version", "reason", "close", "detail")
@@ -70,16 +83,41 @@ def negotiate(params):
     return Negotiation(True, version=version)
 
 
+# T1.R3 names `resources(read)`. The parenthesis is a restriction and not a
+# gloss: a server may advertise `resources` with `subscribe` and `listChanged`,
+# and those are separate capabilities the client will use if it is told they
+# exist. The frozen subset is the read side only.
+_CAPABILITY_SUBSET = {
+    "resources": frozenset({"read"}),
+}
+
+
 def advertise(upstream_capabilities):
     """T1.R3. Upstream's capabilities INTERSECTED with what we support.
 
-    The value is upstream's own, carried through rather than invented, because
-    a value we make up claims a shape we have not seen. Only the NAMES are
-    filtered.
+    The intersection is applied at TWO levels, and the second is the one I
+    missed. Filtering the names alone advertises `resources` with whatever
+    members upstream attached, so a client told that `subscribe` and
+    `listChanged` exist will use them and the proxy has promised to mediate
+    traffic it has no rule for. The row says `resources(read)`; the parenthesis
+    is the restriction.
+
+    Values are otherwise upstream's own, carried through rather than invented,
+    because a value we make up claims a shape we have not seen.
     """
     upstream = upstream_capabilities or {}
-    return {name: value for name, value in upstream.items()
-            if name in SUPPORTED_CAPABILITIES}
+    advertised = {}
+    for name, value in upstream.items():
+        if name not in SUPPORTED_CAPABILITIES:
+            continue
+        allowed = _CAPABILITY_SUBSET.get(name)
+        if allowed is not None and isinstance(value, dict):
+            advertised[name] = {member: member_value
+                                for member, member_value in value.items()
+                                if member in allowed}
+        else:
+            advertised[name] = value
+    return advertised
 
 
 def notification_supported(method):

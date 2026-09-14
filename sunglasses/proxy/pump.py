@@ -18,7 +18,7 @@ the next newline, so reading stops rather than resumes.
 """
 from __future__ import annotations
 
-from . import framing
+from . import framing, handshake
 from .session import Cause, Session as CoreSession
 
 ORIGIN_CLIENT = "client"
@@ -55,6 +55,13 @@ class Session:
     def admit_request(self, request_id, *, method, origin):
         """T6.R6. A duplicate typed id from the client closes the session."""
         if self._closed:
+            return False
+        # T2.R16. An extension or unknown method from the client is refused AT
+        # ADMISSION, so upstream never sees it. Refusing it later, after it has
+        # been forwarded, is a different and much weaker promise.
+        if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
+            self._core._emit("ADMISSION_REFUSED", request_id,
+                             reason="UNINSPECTED_METHOD", method_known=False)
             return False
         identity = key(origin, request_id)
         if identity in self._tombstones:
@@ -108,25 +115,54 @@ class Session:
         self._pending.pop(identity)
         self._answered.add(identity)
         self._core.settle(identity, Cause("CLEAN", "S1"))
+
+        # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
+        # disposition CLEAN and is forwarded AS IT IS, with its own code, message
+        # and data. Rebuilding it as a result would answer an error with a
+        # success, and replacing it with our own error would tell the client we
+        # withheld something when the server simply said no.
+        if frame is not None and "error" in frame:
+            return frame
         # T6.R1: C's TYPED id, returned as it was issued.
         return {"jsonrpc": "2.0", "id": request_id, "result": (frame or {}).get(
             "result", {})}
 
-    def _shape_matches(self, identity, frame):
-        """T2.R0 and G2-10. What a `tools/call` result must look like.
+    # T2. The member a result MUST carry, per the method that asked for it.
+    _REQUIRED_RESULT_MEMBER = {
+        "tools/call": "content",
+        "tools/list": "tools",
+        "resources/read": "contents",
+    }
 
-        This is the check that needed the pending METHOD, and the reason
-        `_owed` storing a bare timestamp made it impossible. A response is only
-        well formed relative to the request it answers.
+    def _shape_matches(self, identity, frame):
+        """T2 and G2-10. What a result must look like, GIVEN the request.
+
+        This is the check that needed the pending METHOD, and the reason `_owed`
+        storing a bare timestamp made it impossible: a response is only well
+        formed relative to the request it answers.
+
+        The first version only rejected a required member of the WRONG TYPE and
+        accepted one that was missing entirely, or a result that was not an
+        object at all. Those are the same fault and the milder-looking spelling
+        is the more dangerous one: a `tools/call` answered with `{}` has no
+        content to inspect, so an inspection of it is vacuously clean and the
+        client receives a result nobody read. ASTRA's F08 is four cases and all
+        four were accepted.
         """
+        if "error" in frame:
+            # T2.R5. An error is a legitimate answer and has no result member.
+            return True
         method = self._pending.get(identity)
+        required = self._REQUIRED_RESULT_MEMBER.get(method)
+        if required is None:
+            return True
         result = frame.get("result")
-        if method == "tools/call" and isinstance(result, dict):
-            if "content" in result and not isinstance(result["content"], list):
-                return False
-        if method == "tools/list" and isinstance(result, dict):
-            if "tools" in result and not isinstance(result["tools"], list):
-                return False
+        if not isinstance(result, dict):
+            return False              # 7, [], a string: not a result object
+        if required not in result:
+            return False              # {} answering a tools/call
+        if not isinstance(result[required], list):
+            return False
         return True
 
     def settle_from(self, origin, request_id, reason, rule):
@@ -169,12 +205,57 @@ class Session:
                 return
             parsed = framing.parse_frame(raw, origin=ORIGIN_UPSTREAM)
             if not parsed:
-                self._close(parsed.reason, parsed.detail, rule=parsed.rule)
+                # The BUDGET travels with the cause. T8's rows name which bound
+                # broke, and an answer that says OVER_BUDGET without saying
+                # which one cannot be graded against a fixture.
+                self._close(parsed.reason, parsed.detail, rule=parsed.rule,
+                            budget=parsed.budget)
                 return
             message = parsed.message
-            if "id" not in message:
-                yield raw                        # a notification, forwarded
+
+            # T2.R15. A frame carrying BOTH a method and an id is an upstream
+            # REQUEST, not a response, however much its id resembles one of
+            # ours. G2-15 shares the client's id on purpose. Treating it as the
+            # response settled the client's item on a frame the client never
+            # asked for, and yielded the server's request toward the client,
+            # which is upstream driving the client through us.
+            if "method" in message and "id" in message:
+                self._core._emit("UPSTREAM_REQUEST_REFUSED", message["id"],
+                                 reason="UNINSPECTED_METHOD")
                 continue
+
+            if "id" not in message:
+                # T1.R3's last sentence. A notification outside the frozen set
+                # is NOT forwarded. The helper existed and this loop did not
+                # call it, which is the whole shape of ASTRA's round 4 finding:
+                # a component that is correct and never invoked protects
+                # nothing.
+                method = message.get("method")
+                if not handshake.notification_supported(method):
+                    self._core._emit("NOTIFICATION_DROPPED", None,
+                                     supported=False)
+                    continue
+                yield raw
+                continue
+
+            if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
+                    "initialize" and "result" in message:
+                forwarded = self._initialize_result(message, raw)
+                if forwarded is None:
+                    return
+                yield forwarded
+                continue
+
+            # T6.R5. A response for an id that was cancelled is DISCARDED and
+            # the session stays serviceable. It is not an unsolicited response:
+            # we did issue that request, we simply stopped waiting. Closing S5
+            # here would let any peer end a session by answering a cancellation
+            # slightly too late, which is ordinary timing rather than an attack.
+            if key(ORIGIN_CLIENT, message["id"]) in self._tombstones:
+                self._core._emit("DISCARDED_LATE", message["id"],
+                                 reason="the id was cancelled before this arrived")
+                continue
+
             answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
                                            request_id=message["id"],
                                            frame=message)
@@ -187,12 +268,48 @@ class Session:
             self._close("MALFORMED_UPSTREAM",
                         "upstream exited with calls still pending")
 
+    def _initialize_result(self, message, raw):
+        """T1.R2 and T1.R3, on the one frame where they apply.
+
+        Negotiation and the capability intersection are not advisory helpers a
+        reader may consult. The version decides whether the session may
+        continue at all, and the capability set decides what the client is told
+        it can do. Forwarding an initialize result unread hands both decisions
+        to the server, which is exactly the arrangement a mediator exists to
+        replace.
+
+        Returns the bytes to forward, or None when the session has closed.
+        """
+        import json as _json
+
+        result = message.get("result") or {}
+        negotiated = handshake.negotiate(result)
+        if not negotiated.ok:
+            self._close(negotiated.reason,
+                        "the server offered a protocol version outside the "
+                        "frozen set",
+                        rule="S3")
+            return None
+
+        filtered = handshake.advertise(result.get("capabilities") or {})
+        if filtered != (result.get("capabilities") or {}):
+            self._core._emit("CAPABILITIES_FILTERED", message.get("id"),
+                             advertised=sorted(filtered))
+        rebuilt = dict(message)
+        rebuilt["result"] = dict(result, capabilities=filtered)
+
+        self.deliver_response(origin=ORIGIN_UPSTREAM,
+                              request_id=message["id"], frame=rebuilt)
+        if self._closed:
+            return None
+        return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
+
     # ── outcome ─────────────────────────────────────────────────────────────
-    def _close(self, reason, detail, rule="S5"):
+    def _close(self, reason, detail, rule="S5", budget=None):
         if self._closed:
             return
         self._closed = (reason, rule)
-        self._core.teardown(Cause(reason, rule, detail=detail))
+        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail))
         self._pending.clear()
 
     def closed_with(self):

@@ -197,7 +197,13 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES):
         buffer += chunk
         while b"\n" in buffer:
             line, buffer = buffer.split(b"\n", 1)
-            yield line
+            # THE TERMINATOR STAYS ON. A frame is its bytes including the LF:
+            # T8.R1 bounds the "raw wire frame incl. LF", and a reader that
+            # strips it measures one byte short, so a frame exactly one over the
+            # inclusive cap passes. Keeping it also means what the reader
+            # forwards is byte-for-byte what arrived, rather than a
+            # reconstruction that happens to look the same.
+            yield line + b"\n"
         if len(buffer) > limit:
             yield buffer[:limit + 1]
             buffer = b""
@@ -278,7 +284,11 @@ def parse_frame(raw, *, origin="upstream"):
 
     if isinstance(raw, str):
         raw = raw.encode("utf-8", "surrogatepass")
+    # T8.R1 bounds the frame INCLUDING its terminator, so the size is measured
+    # before the terminator is removed for parsing. Measuring the stripped line
+    # lets a frame exactly one byte over the inclusive cap through.
     size = len(raw)
+    body = raw[:-1] if raw.endswith(b"\n") else raw
 
     # T8.R1 BEFORE the parse. A frame over the wire limit is refused without
     # being parsed, because parsing it is the cost the bound exists to refuse.
@@ -288,7 +298,7 @@ def parse_frame(raw, *, origin="upstream"):
                      size=size)
 
     try:
-        text = raw.decode("utf-8")
+        text = body.decode("utf-8")
     except UnicodeDecodeError as bad:
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=f"invalid UTF-8 at byte {bad.start}", size=size)
