@@ -1,5 +1,10 @@
 """The child `worker_process` spawns: one payload in, one result line out.
 
+At `sunglasses/_proxy_worker.py` because T4.R1 names that path. It sits beside
+the package rather than inside `proxy/` so the thing being spawned is one file
+with one job, and the underscore says what the name already implies: it is
+spawned, not imported by anyone else.
+
 Deliberately tiny. Everything it knows about the contract lives in
 `inspection`, and everything it knows about bounds is that it has none: the
 clock and the stdout limit are enforced by the parent, because a worker
@@ -14,7 +19,7 @@ from __future__ import annotations
 import json
 import sys
 
-from . import inspection
+from .proxy import inspection
 
 
 def main(stdin=None, stdout=None):
