@@ -11,6 +11,7 @@ import json, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from batch import transcript_of, _delivered            # noqa: E402
 from client.observe import extract_tool_results        # noqa: E402
+from proxy import passthrough                          # noqa: E402
 
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 ROUTE_KEY = {"proxy_strict": "proxy_strict", "control": "no_mediation"}
@@ -30,6 +31,94 @@ def expectation(scenario_id, variant, route):
                      if e["id"] == scenario_id)
     return json.loads((PACKAGE / directory / "expected.json").read_text()
                       )["variants"][variant][ROUTE_KEY[route]]
+
+
+ENDPOINT_FIELDS = ("declared_port", "bound_port", "endpoint_as_declared")
+
+
+def _endpoint_verdict(receipt, package_port):
+    """Why this destination block cannot be believed about the endpoint, or None.
+
+    THE THREE FIELDS ARE ONE PIECE OF EVIDENCE. A receipt that reports some of
+    them and not others is contradicting itself, and a receipt that reports none
+    is an older shape which the checks below still grade. Round 2's rows carry
+    no endpoint evidence at all and are green on their own terms; removing one
+    field from a row that has them is a changed row and must not be.
+
+    Equality is DERIVED from the two ports. The flag beside them is written by
+    the thing being graded, so it is checked for agreement and never trusted as
+    the answer.
+    """
+    present = [f for f in ENDPOINT_FIELDS if f in receipt]
+    if not present:
+        return None
+    if len(present) != len(ENDPOINT_FIELDS):
+        return "INVALID_ENDPOINT_EVIDENCE_INCOMPLETE"
+    declared, bound = receipt["declared_port"], receipt["bound_port"]
+    if declared is None or bound is None:
+        return "INVALID_NO_ENDPOINT_EVIDENCE"
+    if receipt["endpoint_as_declared"] is not (declared == bound):
+        return "INVALID_ENDPOINT_EVIDENCE_INCONSISTENT"
+    if package_port is not None and declared != package_port:
+        # THE PACKAGE DECLARES THE ENDPOINT, not the row. A row that renames its
+        # declared port to whatever it managed to bind agrees with itself and
+        # with nothing else.
+        return "INVALID_DECLARED_PORT_NOT_THE_PACKAGE_S"
+    if declared != bound:
+        return "INVALID_ENDPOINT_NOT_AS_DECLARED"
+    return None
+
+
+def _scenario_of(row):
+    """The package's own scenario and variant for this row."""
+    directory = next((e["directory"] for e in
+                      json.loads((PACKAGE / "manifest.json").read_text())["scenarios"]
+                      if e["id"] == row["scenario_id"]), None)
+    if directory is None:
+        return None, None, None
+    scenario = json.loads((PACKAGE / directory / "scenario.json").read_text())
+    variant = next((v for v in scenario["variants"]
+                    if v["name"] == row["variant"]), None)
+    return PACKAGE / directory, scenario, variant
+
+
+def _reference_content_bytes(row):
+    """How many content bytes the package says this row holds, or None.
+
+    ASTRA: grade the counters against the reference bytes. The reference is
+    taken two ways, the declared payload's length and the candidate's own
+    extraction run over the declared result frame, and it is only used when
+    those two agree. For G2-02 they are both 147, which is the number he
+    measured. For G2-04 they are 21 and 83, because the payload is one argument
+    of a request and not the whole held document, and pinning a constant there
+    would fail real rows whose inspected leaves include a materialised path.
+
+    Two views that agree are a reference. One view alone is an assumption.
+    """
+    folder, scenario, variant = _scenario_of(row)
+    if not variant or not variant.get("payload") or not variant.get("upstream_output"):
+        return None
+    payload = folder / variant["payload"]
+    frame_file = folder / variant["upstream_output"]
+    if not payload.is_file() or not frame_file.is_file():
+        return None
+    lines = [l for l in frame_file.read_bytes().splitlines() if l.strip()]
+    if not lines:
+        return None
+    try:
+        message = json.loads(lines[0])
+    except ValueError:
+        return None
+    extracted = "\n".join(v for _, v in passthrough.inspection_input(message, "result"))
+    declared = len(payload.read_bytes())
+    return declared if len(extracted.encode("utf-8", "surrogatepass")) == declared else None
+
+
+def _declared_destination_port(row):
+    """The port the package declares for this scenario's destination."""
+    _, scenario, _ = _scenario_of(row)
+    destination = ((scenario or {}).get("setup") or {}).get("destination") or {}
+    return destination.get("port")
 
 
 def _declared_payload(row) -> bytes | None:
@@ -52,6 +141,7 @@ def grade_row(directory: pathlib.Path):
     row = json.loads((directory / "row.json").read_text())
     exp = expectation(row["scenario_id"], row["variant"], row["route"])
     declared_bytes = _declared_payload(row)
+    reference_bytes = _reference_content_bytes(row)
     receipts = []
     receipt_file = directory / "proxy.receipts.jsonl"
     if receipt_file.exists():
@@ -120,6 +210,12 @@ def grade_row(directory: pathlib.Path):
         elif inspected < 0 or observed < 0 or inspected > observed:
             counters_ok = False
         elif event.get("inspection_complete") is True and inspected != observed:
+            counters_ok = False
+        elif (reference_bytes is not None and observed != reference_bytes):
+            # THE COUNT IS A MEASUREMENT OF A PARTICULAR DOCUMENT. Comparing the
+            # two counters to each other accepted any number at all so long as
+            # both carried it, so 1 and 148 both passed for a result the package
+            # says is 147 bytes.
             counters_ok = False
         elif (event.get("inspection_complete") is True and observed == 0
               and declared_bytes):
@@ -210,12 +306,8 @@ def grade_row(directory: pathlib.Path):
         grades["destination"] = "INVALID_NO_DESTINATION_EVIDENCE"
     elif not receipt.get("listened"):
         grades["destination"] = "OBSERVED-ONLY"
-    elif receipt.get("endpoint_as_declared") is False:
-        # THE OBSERVER WAS NOT AT THE DECLARED ADDRESS. A negative from a
-        # listener on some other port says nothing about the endpoint the
-        # payload names, and the row carried both numbers while the grader read
-        # neither of them.
-        grades["destination"] = "INVALID_ENDPOINT_NOT_AS_DECLARED"
+    elif _endpoint_verdict(receipt, _declared_destination_port(row)):
+        grades["destination"] = _endpoint_verdict(receipt, _declared_destination_port(row))
     elif receipt.get("observation_complete") is not True:
         # The observer ran and was never shown to be able to see an arrival at
         # the end. T8's sink reports this; the grader was ignoring it, so an

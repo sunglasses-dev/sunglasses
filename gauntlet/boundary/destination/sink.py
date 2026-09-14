@@ -364,11 +364,16 @@ class Destination:
         # bound 43055 side by side is metadata, not a route: the payload names
         # the declared endpoint and nothing carries a request sent there to this
         # socket, so a negative from it is a negative about a different address.
-        # The pair was recorded and completeness ignored it, which let an
-        # observer that was demonstrably in the wrong place report a clean
-        # nothing_arrived.
-        at_declared = self.bound_port == self.declared_port
-        calibrated = calibrated and at_declared
+        #
+        # PER CALIBRATION, not once at the end. Reading only the final state let
+        # a run whose `before` probe was at the wrong endpoint and whose `after`
+        # probe recovered the declared one report a complete observation, and
+        # the interval those two calibrations exist to bracket is exactly the
+        # interval that was unobserved. Each entry records where it ran and
+        # every one of them has to have run at the declared endpoint.
+        at_declared = all(c.get("endpoint_as_declared") is True
+                          for c in self.calibrations if c["transport"] == "http")
+        calibrated = calibrated and at_declared and bool(self.calibrations)
         collected = self._collected_at is not None
         observable = calibrated and (collected or self.drop_dir is None)
         return {
