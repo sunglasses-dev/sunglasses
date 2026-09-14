@@ -1,0 +1,36 @@
+{
+  "id": "GLS-PI-016-API",
+  "name": "Policy override to prompt exfiltration (api_response)",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
+  "keywords": [
+    "policy",
+    "policies",
+    "safeguard",
+    "safeguards",
+    "guardrail",
+    "guardrails",
+    "instruction",
+    "instructions",
+    "safety"
+  ],
+  "regex": [
+    "(?is)(?:\\b(?:ignore|bypass|disable|override|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:polic(?:y|ies)|safeguards?|guardrails?|instructions?|safety)\\b)[\\s\\S]{0,24}?(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)",
+    "(?is)(?:\\b(?:reveal|show|print|send|forward|include|leak|disclose|dump|export|paste|share|publish|upload|transmit|email|post|relay|provide|give|output|copy|attach|divulge|surrender|expose|exfiltrate|return|display|render|echo|list|report|emit|deliver|submit|stream|broadcast|hand\\s+over|turn\\s+over|pass\\s+along|write\\s+out|read\\s+out|spell\\s+out|lay\\s+out|set\\s+out|give\\s+up)\\b[^.]{0,48}?(?:configuration|config|credentials|secrets?|tokens?|passwords?|system(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}prompts?|environment(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}variables?|env(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}vars?|api(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|private(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}keys?|\\.env)\\b|\\b(?:ignore|override|disregard|bypass|skip|disable|turn\\s+off)\\b[^.]{0,48}?(?:safety(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}polic(?:y|ies)|safety(?:\\s|<[^<>]{0,20}>|[\"\u2018\u2019\u201c\u201d\\'*_`]|\\([^()]{0,30}\\)){1,4}rules|polic(?:y|ies)|guardrails?|instructions?|restrictions?|filters?|approval|confirmation|checks?)\\b)[\\s\\S]{0,24}?(?:\\b(?:ignore|bypass|disable|override|turn\\s+off)\\b[^.\\n]{0,60}\\b(?:polic(?:y|ies)|safeguards?|guardrails?|instructions?|safety)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PI-016-API"
+}

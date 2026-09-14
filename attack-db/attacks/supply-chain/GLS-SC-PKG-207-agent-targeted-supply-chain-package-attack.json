@@ -25,7 +25,7 @@
     "prepare script silently patches"
   ],
   "regex": [
-    "(?is)\\b(pip\\s+install|npm\\s+(i|install)|poetry\\s+add|uv\\s+pip\\s+install)\\b.{0,220}\\b(--extra-index-url|--index-url\\s+http|--trusted-host|--no-verify|disable\\s+hash|skip\\s+signature|latest\\s+from\\s+fork)\\b|\\b(postinstall|preinstall|setup\\.py|prepare\\s+script|install\\s+hook)\\b.{0,180}\\b(read|collect|upload|exfil|send)\\b.{0,120}\\b(token|credential|api[_\\s-]?key|\\.npmrc|\\.pypirc|env)\\b|\\b(typosquat|dependency\\s+confusion|internal\\s+package\\s+name)\\b.{0,180}\\b(install|publish|override)\\b"
+    "(?is)\\b(pip\\s+install|npm\\s+(i|install)|poetry\\s+add|uv\\s+pip\\s+install)\\b.{0,220}(?:\\b|(?<!\\S))(--extra-index-url|--index-url\\s+http|--trusted-host|--no-verify|disable\\s+hash|skip\\s+signature|latest\\s+from\\s+fork)\\b|\\b(postinstall|preinstall|setup\\.py|prepare\\s+script|install\\s+hook)\\b.{0,180}\\b(read|collect|upload|exfil|send)\\b.{0,120}(?:\\b|(?<!\\S))(token|credential|api[_\\s-]?key|\\.npmrc|\\.pypirc|env)\\b|\\b(typosquat|dependency\\s+confusion|internal\\s+package\\s+name)\\b.{0,180}\\b(install|publish|override)\\b"
   ],
   "examples": {
     "malicious": [],

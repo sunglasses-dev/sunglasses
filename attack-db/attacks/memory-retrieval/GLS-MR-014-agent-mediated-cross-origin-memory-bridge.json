@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-014",
+  "name": "Agent Mediated Cross Origin Memory Bridge",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agentic browser bypasses script-level SOP indirectly by extracting data on origin A, writing it to origin-unbound agent memory, and reusing it as trusted context in a later origin-B workflow.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:not|never)|do\\s+not\\s+(?:trust|reuse|transfer|copy)|explicit(?:ly)?\\s+(?:re)?authori[sz]ed)\\b)(?=.*\\b(?:agentic?\\s+browser|browser\\s+agent|web\\s+agent)\\b)(?=.*\\b(?:origin\\s*[- ]?(?:a|one)|source\\s+origin)\\b)(?=.*\\b(?:origin\\s*[- ]?(?:b|two)|destination\\s+origin|different\\s+origin)\\b)(?=.*\\b(?:memory|RAG|writeback|store|save|persist)\\b.{0,180}\\b(?:later|future|next|retrieve|reuse|trusted|context)\\b)(?=.*\\b(?:without|missing|unbound|no)\\b.{0,100}\\b(?:origin|provenance|binding|source)\\b)(?=.*\\b(?:paste\\w*|copy\\w*|transfer\\w*|carry\\w*|insert\\w*|send\\w*|reuse\\w*|flow\\w*)\\b.{0,180}\\b(?:origin\\s*[- ]?a|source|private|page\\s+data)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-014"
+}

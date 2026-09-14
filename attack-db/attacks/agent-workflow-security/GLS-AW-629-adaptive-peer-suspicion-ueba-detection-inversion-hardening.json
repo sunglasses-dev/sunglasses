@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-629",
+  "name": "adaptive peer-suspicion / UEBA detection inversion hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An adaptive agent optimizes its peer-suspicion score below an innocent peer while UEBA stays flat, and a delegation reviewer misreads the two decoupled, commonly-blind signals as corroborated evidence of safety and closes the finding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|must\\s+not|reject(?:ed|s)?|benign\\s+control|safe\\s+handling)\\b)(?=.*\\b(?:adaptive|opsec|evasive|behavior[- ]aware)\\b)(?=.*\\b(?:peer[- ]suspicion|suspicion\\s+(?:in[- ]degree|graph)|peer\\s+trust)\\b)(?=.*\\b(?:UEBA|user\\s+and\\s+entity\\s+behavior(?:al)?\\s+analytics?)\\b)(?=.*\\b(?:normal|unchanged|no\\s+shift|apparently\\s+normal)\\b)(?=.*\\b(?:lower|below|less)\\b)(?=.*\\b(?:innocent|legitimate|benign)\\b)(?=.*\\b(?:reviewer|delegat(?:ed|ion)|triage|disposition)\\b)(?=.*\\b(?:safe|benign|close(?:d|s)?|approve(?:d|s)?|no\\s+finding)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-629"
+}

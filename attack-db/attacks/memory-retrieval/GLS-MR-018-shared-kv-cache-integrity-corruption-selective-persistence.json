@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-018",
+  "name": "Shared Kv Cache Integrity Corruption Selective Persistence",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A targeted bit flip in one physically shared BF16 prefix-cache block can silently and persistently alter only the requests that reuse that prefix.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|scanner\\s+rule|defensive|blocked|quarantined|must\\s+(?:detect|reject|verify)|do\\s+not\\s+(?:trust|accept|reuse)|checksum\\s+countermeasure\\s+passed)\\b)(?=.*\\b(?:shared|single[- ]copy|physically\\s+shared)\\b)(?=.*\\b(?:prefix|KV[- ]?cache|key[- ]value\\s+cache)\\b)(?=.*\\b(?:bit[- ]flip|single[- ]bit|BF16|bit\\s+corrupt(?:ion|ed)|fault\\s+inject(?:ion|ed))\\b)(?=.*\\b(?:silent|coherent|altered|diverg(?:ence|ent))\\w*\\b)(?=.*\\b(?:output|response|token|generation)\\w*\\b)(?=.*\\b(?:selective|only\\s+requests?|same\\s+prefix|prefix[- ]sharing)\\b)(?=.*\\b(?:propagat|affected|inherit|share)\\w*\\b)(?=.*\\b(?:persist|accumulat|cache\\s+lifetime|until\\s+evict|subsequent\\s+requests?)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-018"
+}

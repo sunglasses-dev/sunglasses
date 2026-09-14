@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-041",
+  "name": "Model Serving Parameter Amplification Resource Exhaustion",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid model-completion request can amplify internal candidate generation through an extreme best_of value before admission limits or timeout enforcement, exhausting service resources and denying availability.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:advisory|guide|rule|training)|scanner\\s+(?:rule|test)|blocked\\s+(?:payload|sample)|negative\\s+fixture|incident\\s+report|must\\s+not\\s+(?:obey|trust)|do\\s+not\\s+(?:accept|run|allow)|patched|fixed|capped|bounded\\s+request|remains\\s+responsive)\\b)(?=.*\\b(?:vllm|ilab|model[- ]serv(?:e|ing)|completion\\s+api)\\b)(?=.*[\\\"']?best[_ -]?of[\\\"']?\\s*(?:(?:[:=])|(?:\\bvalue\\s+of\\b))\\s*(?:\\d{5,}|(?:1e|10\\^?)\\d{3,}|(?:large|extreme|unbounded))\\b)(?=.*\\b(?:resource|cpu|gpu|memory|worker|timeout|fan[- ]?out|candidate[- ]generation|excessive\\s+(?:work|generation))\\b)(?=.*\\b(?:accepted|admitted|without\\s+(?:a\\s+)?(?:hard\\s+)?(?:limit|cap|timeout)|not\\s+bounded|unbounded|exhaust(?:s|ed|ing)?|out\\s+of\\s+memory|unresponsive|unavailable|denial\\s+of\\s+service|availability\\s+failure)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-041"
+}

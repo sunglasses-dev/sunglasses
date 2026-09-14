@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-617",
+  "name": "Authorization-context safety-state transition hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Adding 'approved internal red team' authorization metadata and dense cybersecurity framing to an unchanged capability request flips a delegated model/reviewer from refuse to allow, promoting context fields into a permission change.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:defensive|documentation|unit test|safe handling|unchanged safety))(?=.*delegated[_ -]vulnerability[_ -]analysis)(?=.*approved[_ -]internal[_ -]red[_ -]team)(?=.*cybersecurity[_ -]density.*high)(?=.*operational[_ -]exploit[_ -]steps)(?=.*(?:refuse[_ -]to[_ -]allow|limited[_ -]to[_ -]operational)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-617"
+}

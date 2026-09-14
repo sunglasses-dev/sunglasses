@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SMP-021",
+  "name": "Evidence Label Boundary Poisoning",
+  "version": "1.0",
+  "category": "structured_metadata_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Untrusted CTI evidence carries label-set-shaped delimiters (labels=[...], <label-set>) that a classifier/parser conflates with its own authoritative multi-label output, and downstream safety routing then acts on the attacker-supplied label set.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:untrusted|attacker[- ]controlled|hostile)\\b)(?=.*\\b(?:cti|incident\\s+sentence|unstructured\\s+evidence)\\b)(?=.*(?:labels?\\s*[:=]\\s*\\[|<label[- ]set>|\\[labels?))(?=.*\\b(?:classifier|parser|downstream)\\b)(?=.*\\b(?:evidence|report|text|sentence)\\b)(?=.*\\b(?:label[- ]set|authoritative|misclassif|poison|inject|wrong)\\w*\\b)(?=.*\\b(?:allow|approve|route|authorize|downstream)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SMP-021"
+}

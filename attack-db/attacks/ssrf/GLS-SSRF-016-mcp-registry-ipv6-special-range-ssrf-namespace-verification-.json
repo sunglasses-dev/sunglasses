@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-016",
+  "name": "MCP Registry IPv6 special-range SSRF namespace-verification bypass",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Incomplete IPv6 special-range classification (6to4, NAT64, RFC8215, deprecated site-local) lets a publisher-supplied namespace domain encode a private or cloud-metadata IPv4 destination that passes the blocklist, turning a server-side verification fetch into SSRF.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|defensive|remediation|patched|fixed|blocked|quarantined|must\\s+not|do\\s+not|never|safe\\s+target|no\\s+(?:network|request)|negative\\s+example)\\b)(?=.*\\b(?:mcp\\s+registry|namespace\\s+verification|well[- ]known|public[- ]key|safeDialContext|publisher[- ]supplied|registry)\\b)(?=.*\\b(?:ssrf|server[- ]side|outbound|fetch|dial|request|connect|resolve)\\w*\\b)(?=.*\\b(?:ipv6|6to4|nat64|site[- ]local|encoded|embedded|mapped)\\b)(?=.*(?:2002:[0-9a-f:]+|64:ff9b(?::1)?:|fec[0-9a-f:]{1,3}:|rfc1918|private\\s+(?:ip|address|network)|cloud[- ]metadata|169\\.254\\.169\\.254|10\\.0\\.0\\.1|192\\.168\\.1\\.1)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-016"
+}

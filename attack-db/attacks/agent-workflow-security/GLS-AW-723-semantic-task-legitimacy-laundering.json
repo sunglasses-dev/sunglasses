@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-723",
+  "name": "Semantic Task Legitimacy Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An authorized-clinician or medical-board wrapper makes the unchanged restricted request appear legitimate, weakening a downstream safety or delegation decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review|documentation)|unit\\s+test|negative\\s+fixture|blocked\\s+sample|incident\\s+report|postmortem|defensive|must\\s+not\\s+(?:obey|follow|answer)|should\\s+(?:reject|deny|refuse))\\b)(?=.*\\b(?:doctor|physician|clinician|medical\\s+board|authorized|licensed)\\b)(?=.*\\b(?:exam|examination|training|case[- ]study|simulation|hypothetical|scenario)\\b)(?=.*\\b(?:reframe|present(?:\\s+it)?\\s+as|treat(?:\\s+\\w+){0,4}\\s+as|because\\s+this|approved|frame|framing|says?)\\b)(?=.*\\b(?:ignore|skip|bypass|do\\s+not\\s+give|answer\\s+directly|usual\\s+refusal|refusal)\\b)(?=.*\\b(?:dosage|dose|diagnos(?:e|is)|prescrib(?:e|ing)|treatment|drug[- ]drug|restricted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-723"
+}

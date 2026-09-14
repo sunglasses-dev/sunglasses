@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-649",
+  "name": "tool-output covert C2 loop",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted MCP/tool result turns the tool-result channel into a covert C2 loop: the agent polls a controller for the next command, executes the returned shell command, and suppresses the user-visible report.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:unit\\s+test|test\\s+fixture|documentation|incident\\s+report|runbook|scanner\\s+rule|training\\s+lab|refused|inert\\s+data|must\\s+not))(?=.*(?:tool\\s+(?:result|output)|MCP|tools/call))(?=.*(?:poll|beacon|controller|next\\s+command|retrieve\\s+command))(?=.*(?:execute|run|invoke)\\b.{0,40}(?:shell|command|instruction))(?=.*(?:do\\s+not|never|without)\\s+(?:report|tell|notify|disclose|show)\\w*\\b.{0,40}(?:the\\s+)?user).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-649"
+}

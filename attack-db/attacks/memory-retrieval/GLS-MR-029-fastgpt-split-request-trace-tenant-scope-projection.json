@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-029",
+  "name": "Fastgpt Split Request Trace Tenant Scope Projection",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid authenticated session and known requestId are correlated with a foreign-team FastGPT trace across separate request/response records, projecting prompts, retrieved RAG context, or completions into the agent context without tenant binding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:advisory|guide|documentation|training|review)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|runbook|blocked|quarantined|defensive|patched|fixed\\s+in|must\\s+(?:bind|check|enforce|reject|scope|verify)|should\\s+(?:bind|check|enforce|reject|scope|verify)|do\\s+not|never|same[- ](?:team|tenant)|authorized\\s+(?:trace|record)|no\\s+foreign)\\b)(?=.*\\b(?:FastGPT|Fast\\s*GPT)\\b)(?=.*\\b(?:request[- ]?record|LLM\\s+trace|record\\s+lookup|getRecord|requestId)\\b)(?=.*\\b(?:authenticated|valid)\\s+(?:caller|session|user|token)|session\\s+(?:valid|authenticated)|caller\\s+is\\s+authenticated\\b)(?=.*\\b(?:foreign|another|different|cross[- ](?:team|tenant)|other\\s+team|outside\\s+(?:the\\s+)?(?:caller|current)\\s+(?:team|tenant))\\b)(?=.*\\b(?:team|tenant|organization)\\b)(?=.*\\b(?:missing|omitted|without|failed\\s+to|not\\s+(?:checked|verified|validated|bound|scoped)|no\\s+(?:team|tenant)\\s+(?:scope|binding|authorization)|ownership)\\b)(?=.*\\b(?:prompt|RAG|retrieved|completion|LLM\\s+response|context)\\b)(?=.*\\b(?:return(?:ed|s)?|expos(?:e|ed|ure|ing)|disclos(?:e|d|ure|ing)|leak(?:ed|s|ing)?|ingest(?:ed|s|ing)?|project(?:ed|s|ing)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-029"
+}

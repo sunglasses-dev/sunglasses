@@ -9,7 +9,7 @@
     "file",
     "code"
   ],
-  "description": "Detects curl commands used for outbound data upload, a common exfiltration technique in agent workflows.",
+  "description": "Detects a curl command uploading a credential file (.env, .npmrc, SSH or AWS credentials, tokens) to a remote endpoint \u2014 the payload shape of agent-workflow exfiltration. A plain upload of ordinary data is not flagged.",
   "keywords": [
     "curl POST",
     "curl PUT",
@@ -19,7 +19,7 @@
     "curl --upload-file"
   ],
   "regex": [
-    "curl\\b[^\\n]{0,200}\\b(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary)?\\b|-F\\b|--upload-file\\b)"
+    "curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)(?:\\b|(?!\\S))[^\\n]{0,160}?@[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)(?:\\b|(?!\\S))|curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:--upload-file|-T)(?:\\b|(?!\\S))\\s+[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)(?:\\b|(?!\\S))"
   ],
   "examples": {
     "malicious": [],

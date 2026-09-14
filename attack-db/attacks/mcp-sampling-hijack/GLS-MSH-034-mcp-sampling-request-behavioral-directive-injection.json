@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MSH-034",
+  "name": "MCP Sampling Request Behavioral Directive Injection",
+  "version": "1.0",
+  "category": "mcp_sampling_hijack",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP Sampling Request Behavioral Directive Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique protocol-specific syntax for MCP sampling request redirection/hijack.",
+  "keywords": [],
+  "regex": [
+    "(?i)sampling/createMessage[\\s\\S]{0,600}systemPrompt[\\s\\S]{0,300}(?:after(?:\\s+\\w+){0,5}\\s+(?:task|step|this)|before\\s+(?:returning|respond|answer)|append|prepend|encode\\s+(?:and\\s+)?(?:send|attach|add)|include\\s+(?:the\\s+)?(?:session|context|memory|history))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MSH-034"
+}

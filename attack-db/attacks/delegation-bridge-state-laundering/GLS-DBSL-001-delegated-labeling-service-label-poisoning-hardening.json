@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-001",
+  "name": "delegated labeling-service label poisoning hardening",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A compromised outside labeling-service worker flips a record's label in a delegated annotation batch and the dataset aggregator promotes the worker value over the reference label without independent adjudication or provenance binding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:independent\\s+adjudication|provenance\\s+(?:preserved|verified)|safe\\s+(?:handling|aggregation)|benign|documentation|unit\\s+test))(?=.*(?:label(?:ing|er)|annotation|annotator))(?=.*(?:delegat|outside|vendor|worker|service))(?=.*(?:dataset|training|evaluation|batch|record))(?=.*(?:reference_label|ground_truth)[\"'=:\\s]{0,20}(?:unsafe|safe))(?=.*(?:worker_label|annotator_label)[\"'=:\\s]{0,20}(?:safe|unsafe)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-001"
+}

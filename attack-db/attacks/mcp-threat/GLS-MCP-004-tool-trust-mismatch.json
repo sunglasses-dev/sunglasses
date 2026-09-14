@@ -16,7 +16,7 @@
     "viewer webhook"
   ],
   "regex": [
-    "(?i)(?:read[- ]only|safe|viewer|search).{0,120}(?:send|post|export|sync|webhook|write|delete|execute)"
+    "(?i)\\b(?:read[- ]only|viewer(?:\\s+(?:tool|role|scope))?|no[- ]?write)\\b.{0,120}\\b(?:send|post|export|sync|webhook|write|delete|execute)\\b"
   ],
   "examples": {
     "malicious": [],

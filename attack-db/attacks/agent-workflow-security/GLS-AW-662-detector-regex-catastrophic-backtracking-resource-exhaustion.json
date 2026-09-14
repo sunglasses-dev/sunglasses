@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-662",
+  "name": "Detector-regex catastrophic backtracking resource exhaustion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled dataset record reaches an evaluation detector whose ambiguous nested-quantifier regex triggers catastrophic backtracking, exhausting the shared detector worker with no tool authority or credential required (ReDoS).",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|documentation|postmortem|defensive|benign|must\\s+not|do\\s+not|reject|limit|timeout|bounded|patched|fixed)\\b)(?=.*\\b(?:attacker[- ]controlled|untrusted|external|user[- ]supplied)\\b.{0,220}\\b(?:dataset|record|text|input|payload)\\b)(?=.*\\b(?:regex|regexp|regular[- ]expression|pattern)\\b.{0,220}\\b(?:nested[- ]quantifier|ambiguous|catastrophic[- ]backtracking|exponential|superlinear)\\b)(?=.*\\b(?:detector|evaluation|worker|processor|matcher)\\b.{0,220}\\b(?:exhaust|hang|denial[- ]of[- ]service|resource|evaluation[- ]time|compute)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-662"
+}

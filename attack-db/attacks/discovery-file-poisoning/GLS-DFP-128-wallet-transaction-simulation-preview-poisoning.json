@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-128",
+  "name": "Wallet Transaction-Simulation Preview Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Transaction-Simulation Preview Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 poisoning of wallet transaction simulations and decoded preview metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|rejected|quarantined|incident\\s+report|defensive\\s+docs?|security\\s+training|unit\\s+test|test\\s+fixture|scanner\\s+keywords\\s+only|should\\s+(?:detect|flag|block|reject)|must\\s+(?:detect|flag|block|reject)|do\\s+not\\s+(?:decode|render|obey|trust)|never\\s+(?:decode|render|obey|trust)|preserve\\s+warnings?|keep\\s+confirmation|required\\s+confirmation)\\b)(?=.*\\b(?:wallet[_ -]?preview|wallet\\s+ui\\s+preview|signing\\s+request|transaction\\s+simulation|simulation\\s+receipt|decoded\\s+(?:calldata|instruction|message)|risk[_ -]?assessment|wallet\\s+receipt|bridge\\s+route|swap\\s+route|permit\\s+preview|permission\\s+update|wallet[_ -]?grant|grantPermissions)\\b)(?=.*\\b(?:base64|b64|percent[-\\s]?encoded|url[-\\s]?encoded|html\\s+entit(?:y|ies)|unicode\\s+escape|escaped\\s+string|qr\\s+payload|quoted[-\\s]?printable|mime\\s+soft\\s+break|encoded[_ -]?(?:notice|message|description|summary|label)|decode(?:d|s|r)?|render(?:ed|s|er)?|normaliz(?:e|ed|ation)|reassembl(?:e|ed|y)|chunk(?:ed|s)?)\\b)(?=.*\\b(?:approve|approval|permit|sign|transfer|bridge|swap|spender|allowance|unlimited|delegated\\s+authority|session\\s+key|permission|slippage|confirmation|warning|human\\s+approval)\\b)(?=.*\\b(?:agent|assistant|wallet[_\\s-]*agent|scanner|reviewer|copilot|model)\\b)(?=.*\\b(?:safe\\s+to\\s+sign|suppress\\s+(?:[\\w-]+\\s+){0,4}warnings?|hide\\s+(?:[\\w-]+\\s+){0,4}risk|ignore\\s+(?:[\\w-]+\\s+){0,4}(?:warning|allowance|slippage|scope|session|permission)|skip\\s+(?:extra\\s+)?confirmation|mark\\s+(?:this|it|transaction|route|session).{0,50}\\bsafe|trust\\s+(?:the\\s+)?(?:spender|route|session|permission|grant)|proceed\\s+without\\s+asking|treat\\s+(?:as\\s+)?(?:approved|pre[-\\s]?approved)|override\\s+(?:wallet|security|warning|confirmation)\\s+policy)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-128"
+}

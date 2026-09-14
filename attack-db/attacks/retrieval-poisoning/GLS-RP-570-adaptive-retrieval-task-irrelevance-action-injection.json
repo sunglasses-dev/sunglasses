@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-570",
+  "name": "adaptive retrieval task-irrelevance action injection",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A retrieved RAG chunk phrases a task-irrelevant external side effect (send/export/forward) as ordinary next-step guidance, so a task-following agent executes it without any authority claim or override wording for lexical detectors to catch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:retriev(?:ed|al)|RAG|knowledge[- ]base|search)\\s+(?:chunk|record|result|snippet|context|note))(?=.*(?:for this (?:request|task)|next step|when processing|to complete).{0,100}(?:send|export|forward|upload|delete|publish|reveal|share|email|post)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-570"
+}

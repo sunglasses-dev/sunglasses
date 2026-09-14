@@ -27,7 +27,7 @@
   ],
   "regex": [
     "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}\\b(?:in\\s+your\\s+(?:reply|response|output|answer))\\b",
-    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}(?:<\\s*(?:button|iframe|script|a|form|input|img)\\b|onclick\\s*=|onerror\\s*=)"
+    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}(?:<\\s*(?:iframe|script|form)\\b|onclick\\s*=|onerror\\s*=|onload\\s*=|javascript:)"
   ],
   "examples": {
     "malicious": [],

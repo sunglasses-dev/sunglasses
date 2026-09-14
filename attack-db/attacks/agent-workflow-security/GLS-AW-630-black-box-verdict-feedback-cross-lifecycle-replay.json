@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-630",
+  "name": "black-box verdict-feedback cross-lifecycle replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Allow/block verdict responses are used as a feedback oracle to optimize a bypass payload, and the accepted result is then replayed at a later MCP/tool lifecycle boundary as if it were still authorized.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|benign|refused|must\\s+not|do\\s+not|never|re-?evaluate)\\b)(?=.*\\b(?:repeated|iterative|adaptive|many|multiple)\\b)(?=.*\\b(?:black[- ]box|inference|verdict|allow|block|accept|reject)\\b)(?=.*\\b(?:feedback|signal|response|oracle)\\b)(?=.*\\b(?:mutat|optimiz|evolv|adapt)\\w*\\b)(?=.*\\b(?:bypass|evad|circumvent)\\w*\\b)(?=.*\\b(?:later|next|subsequent|future)\\s+(?:MCP|tool|invocation|request|lifecycle)\\b)(?=.*\\b(?:without|missing|no|lacking)\\b.{0,120}\\b(?:fresh|new|independent)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-630"
+}

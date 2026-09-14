@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-028",
+  "name": "SMT solver certificate authority laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "SMT/SAT proof-certificate text launders a bounded formal result into authorization to patch or deploy while relegating business/security review to appendix notes.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-028"
+}

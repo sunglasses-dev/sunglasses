@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SE-007",
+  "name": "Generator Frame Attribute Sandbox Escape",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A computed-field extraction expression reaches non-underscore generator/frame attributes (gi_frame, f_back, f_builtins) that an underscore-only AST denylist permits, recovering the evaluator frame and escaping the restricted evaluator into arbitrary code execution.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|defensive|test|benign|must\\s+(?:reject|block)|do\\s+not|never|blocked|quarantined)\\b)(?=.*\\b(?:computed[- ]?field|extraction\\s+schema|safe[_ -]?eval|AST\\s+validator)\\b)(?=.*\\b(?:gi_frame|f_back|f_builtins|generator|frame)\\b)(?=.*\\b(?:escape|arbitrary\\s+code|execute|exec|os\\.system|__import__)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SE-007"
+}

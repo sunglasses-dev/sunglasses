@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-011",
+  "name": "rotated-truncated embedding retrieval collision",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A stale or cross-tenant SVD-truncated, rotated vector record whose rotation epoch, dimension, embedding version, tenant, and document identity are unbound is accepted as authoritative retrieval context via its decrypted reranking result.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit[- ]?test|benign|defensive|must\\s+not\\s+(?:be\\s+)?authoritative|do\\s+not\\s+(?:treat|obey|promote)|blocked|quarantined|safe\\s+handling)\\b)(?=.*\\b(?:rotated|orthogonal|SVD[- ]?truncated|truncated)\\b)(?=.*\\bvector\\b)(?=.*\\b(?:rotation|dimension|embedding\\s+version|tenant|document\\s+(?:id|identity))\\b)(?=.*\\b(?:stale|cross[- ]?tenant|mismatch|unbound|without\\s+revalidation)\\b)(?=.*\\b(?:authoritative\\s+context|treat(?:ed)?\\s+as\\s+authoritative|decrypted\\s+reranking)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-011"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MSR-001",
+  "name": "Session-State Snapshot Revoked-Grant Replay",
+  "version": "1.0",
+  "category": "memory_state_replay",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Session-State Snapshot Revoked-Grant Replay: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new mechanism targeting re-activation of revoked capabilities via rehydration of stale memory snapshots.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:memory|checkpoint|snapshot|state(?:\\s+sync)?|resume|rollback)\\b)(?=.*\\b(?:revoked|expired|tombstoned?|deleted|invalidated)\\b)(?=.*\\b(?:approval|token|scope|grant|capability|credential)s?\\b)(?=.*\\b(?:replay(?:ed)?|rehydrat(?:e|ed|ion)|reinject(?:ed|ion)?|resurrect(?:ed|ion)?|restore(?:d)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MSR-001"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-EX-029",
+  "name": "Targeted Runtime Skill Scope Bypass",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A skill whose static manifest declares public-only read-only behavior conditionally reads a local workspace asset when a targeted request arrives and emits it into a browser-visible preview/result sink, defeating static skill review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|safe\\s+control|must\\s+(?:reject|quarantine)|do\\s+not)\\b)(?=.*\\b(?:SKILL\\.md|skill\\s+(?:contract|manifest|specification))\\b)(?=.*\\b(?:public[- ]only|public\\s+data|read[- ]only|no\\s+local|offline)\\b)(?=.*\\b(?:targeted|particular|specific)\\s+(?:user\\s+)?(?:request|prompt|trigger)\\b)(?=.*\\b(?:local\\s+(?:asset|file|workspace)|runtime\\s+(?:state|context))\\b)(?=.*\\b(?:browser[- ]visible|preview|rendered(?:\\s+\\w+){0,3}\\s+output|result)\\b)(?=.*\\b(?:emit|include|copy|expose|render|return)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-EX-029"
+}

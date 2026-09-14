@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-569",
+  "name": "Retrieval Context Safety Control Eviction",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-supplied plausible passages consume a finite retrieval context budget and evict the safety-control passage, and the downstream agent treats the missing control as permission to act.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:safe\\s+control|benign\\s+control|test\\s+fixture|unit\\s+test|defensive|preserve|retain|refuse|reject|block|untrusted)\\b)(?=.*\\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|evidence)(?:\\s+\\w+){0,2}\\s+(?:pack|context|bundle|chunk|result|record|passage|snippet)\\b)(?=.*\\b(?:(?:finite|fixed|limited)\\s+(?:(?:context|token)\\s+)?(?:budget|window|capacity)|limited\\s+by\\s+(?:a\\s+)?(?:context|token)\\s+window)\\b)(?=.*\\b(?:evict\\w*|displace\\w*|truncate\\w*|drop\\w*|omit\\w*|push\\w*\\s+out|crowd\\w*\\s+out)\\b.{0,120}\\b(?:safety|policy|control|approval|verification)\\b|\\b(?:safety|policy|control|approval|verification)\\b.{0,120}\\b(?:evict\\w*|displace\\w*|truncate\\w*|drop\\w*|omit\\w*|push\\w*\\s+out|crowd\\w*\\s+out)\\b)(?=.*\\b(?:proceed|proceeds|continue|continues|allow|allows|allowed|answer|answers|execute|executes|act|acts)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-569"
+}

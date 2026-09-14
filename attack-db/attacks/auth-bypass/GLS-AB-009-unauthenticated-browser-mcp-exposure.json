@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AB-009",
+  "name": "Unauthenticated Browser MCP Exposure",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP HTTP/streamable transport that accepts session initialize and tools/call without authentication lets any network-reachable caller or visited website drive a connected real browser profile \u2014 navigation, JavaScript evaluation, cookies, and storage \u2014 with no human authorization step.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs|test|fixture|patched|fixed|mitigated|blocked|quarantined|safe|requires authentication|stdio-only)\\b)(?=.*\\b(?:mcp|model context protocol)\\b)(?=.*\\b(?:http|http transport|streamable)\\b)(?=.*(?:\\b(?:unauthenticated|anonymous|without authentication|without auth|no authentication|auth disabled|missing auth)\\b|\\b(?:auth|authentication)\\s*[\"']?\\s*:\\s*[\"']?(?:disabled|none|false)))(?=.*\\b(?:initialize|session|tools?/call|tool invocation|invoke|browser bridge|browser-control)\\b)(?=.*\\b(?:navigation|javascript evaluation|cookie|storage|real browser|browser profile)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AB-009"
+}

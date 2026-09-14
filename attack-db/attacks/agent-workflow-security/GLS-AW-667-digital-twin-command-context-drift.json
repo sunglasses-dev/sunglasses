@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-667",
+  "name": "Digital Twin Command Context Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A command safe in a twin snapshot is dispatched to a live asset after state drift without rebinding target identity, state digest, and execution epoch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review|documentation)|unit\\s+test|negative\\s+fixture|blocked\\s+sample|incident\\s+report|postmortem|defensive|must\\s+(?:reject|revalidate|bind|compare)|fail[- ]closed|safe\\s+(?:example|control))\\b)(?=.*\\b(?:digital\\s+twin|twin\\s+snapshot|replica)\\b)(?=.*\\b(?:live\\s+(?:asset|system|target)|production\\s+(?:asset|system|target)|operational\\s+target)\\b)(?=.*\\b(?:state\\s+(?:changed|drift|digest)|state\\s+is\\s+stale|stale|snapshot\\s+is\\s+old|epoch)\\b)(?=.*\\b(?:dispatch|execute|apply|send)\\w*\\b)(?=.*\\b(?:without|skip\\w*|no|not)\\b.{0,80}\\b(?:rebind|revalidat\\w*|verif\\w*|current[- ]state|target[- ]identity|state[- ]digest|execution[- ]epoch)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-667"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-044",
+  "name": "Temporal Fragment Fusion Access Control Bypass",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Marker-tagged memory writes can each pass access control, then a later request joins hidden fragments into a restricted disclosure that was absent from the final query.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training|policy)|unit\\s+test|test\\s+fixture|incident\\s+report|blocked|quarantined|defensive|must\\s+(?:reject|block|not\\s+obey)|do\\s+not\\s+promote)\\b)(?=.*\\b(?:memory|persistent\\s+store|RAG|retrieval)\\b)(?=.*\\b(?:marker|tag|carrier|fragment|part|piece)\\w*\\b)(?=.*\\b(?:write|store|inject|save|record)\\w*\\b)(?=.*\\b(?:retriev|recall|fetch|later|follow-up|subsequent)\\w*\\b)(?=.*\\b(?:fuse|fusion|join|combine|reconstruct|reassembl|merge)\\w*\\b)(?=.*(?:\\b(?:per[- ]?(?:fragment|query)|individually|separately|local)\\b.{0,80}\\b(?:allow|authoriz|approv|pass)\\w*\\b|\\b(?:allow|authoriz|approv|pass)\\w*\\b.{0,80}\\b(?:per[- ]?(?:fragment|query)|individually|separately|local)\\b))(?=.*(?:\\b(?:final\\s+query|request)\\s+(?:does\\s+not|never|cannot)\\s+(?:contain|show|include|expose)|hidden\\s+(?:from|in)\\s+the\\s+final))(?=.*\\b(?:restricted|private|confidential|secret|protected|unauthorized)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-044"
+}

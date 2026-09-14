@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-064",
+  "name": "MCP tool-result embedding safeguard re-trigger abort",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted MCP/tool result carrying embedding-perturbation evidence re-triggers a model safeguard after return, and the executor mutates lifecycle state into an abort/refusal of a permitted action without any independent task-level review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|fixture|incident|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|simulation|simulated)\\b)(?=.*\\b(?:tool\\s+result|mcp|connector|plugin)\\b)(?=.*\\b(?:embedding|latent|vector|semantic)\\b)(?=.*\\b(?:perturb|disrupt|re[-_ ]?trigger|reactivat|safeguard)\\w*\\b)(?=.*\\b(?:post[-_ ]?tool|after\\s+return|lifecycle|executor|dispatch)\\b)(?=.*\\b(?:refus|abort|cancel|halt)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-064"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-CI-011",
+  "name": "MCP Download Output Path Shell Injection",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled MCP outputPath argument is string-concatenated into a shell command instead of passed as an argv element with shell disabled, so a filename-shaped value becomes shell grammar at the host process boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs|guide|patched|fixed|safe|argv|execfile|spawn|shell\\s*:\\s*false|reject|defensive|fixture|test\\s+case|must\\s+not|never)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol|download_website)\\b)(?=.*\\b(?:outputpath|output\\s*path)\\b)(?=.*\\b(?:shell|exec|command|child\\s*process|spawn)\\b)(?=.*[;&|`$])(?=.*\\b(?:concatenat|interpolat|unsanitized|injection|reinterpret|execute)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-CI-011"
+}

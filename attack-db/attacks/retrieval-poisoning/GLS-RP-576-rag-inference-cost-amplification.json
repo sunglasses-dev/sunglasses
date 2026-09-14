@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-576",
+  "name": "RAG Inference Cost Amplification",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A semantically relevant retrieved document carries token-budget, fan-out, or repeat-synthesis metadata that the generator obeys as operational instruction, burning inference budget and degrading availability without any authority override.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked|quarantined|must\\s+not|do\\s+not\\s+obey|defensive|fixed\\s+(?:512|bounded|context))\\b)(?=.*\\b(?:retrieved|reranked|top[- ]k|knowledge[- ]base|RAG|memory\\s+record)\\b.{0,180}\\b(?:document|chunk|passage|record|context)\\b)(?=.*\\b(?:token(?:s)?\\s*(?:budget|expansion|burst)|multipl(?:y|ies|ied)\\s+tokens?|context\\s+expansion|expand(?:\\s+the)?\\s+context|recursive\\s+retrieval|repeat(?:\\s+the)?\\s+synthesis|unbounded\\s+generation|inference\\s+cost|fan[- ]out)\\b)(?=.*\\b(?:generator|generation|completion|inference|answerer|agent)\\b.{0,120}\\b(?:consume|spend|repeat|expand|loop|continue|budget|tokens?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-576"
+}

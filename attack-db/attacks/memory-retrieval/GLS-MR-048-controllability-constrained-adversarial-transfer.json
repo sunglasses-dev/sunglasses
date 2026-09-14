@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-048",
+  "name": "Controllability-Constrained-Adversarial-Transfer",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker changes only directly controllable network-flow features, freezes indirect/uncontrollable context, and transfers a surrogate-crafted benign label across an agent-facing IDS classifier boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|blocked|quarantined|example\\s+of)\\b)(?=.*\\b(?:network[- ]flow|traffic[- ]flow|flow\\s+record|network\\s+traffic\\s+classifier|IDS)\\b)(?=.*\\b(?:directly\\s+)?controllable\\b)(?=.*\\b(?:feature|field|input|dimension)\\b)(?=.*\\b(?:perturb\\w*|modif(?:y|ied|ying)\\w*|alter\\w*|tweak\\w*|change\\w*|shift\\w*)\\b)(?=.*\\b(?:indirect(?:ly)?\\s+controllable|uncontrollable|frozen|held\\s+constant)\\b)(?=.*\\b(?:surrogate|transfer|black[- ]box|coordinate|PGD|NES)\\b)(?=.*\\b(?:benign|allow(?:ed)?|safe|normal)\\s+(?:label|classification|verdict|decision|prediction)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-048"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-672",
+  "name": "Historical Case Retrieval Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled or stale historical exploit case is semantically matched to a current function/call sequence without provenance or temporal-scope binding, and its misleading context changes the agent's current safety decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|do\\s+not|never|safe\\s+example|validated|signed\\s+corpus)\\b)(?=.*\\b(?:historical\\s+(?:exploit|attack)\\s+(?:case|library)|exploit[- ]case|attack[- ]case|attack[- ]pattern\\s+library|historical\\s+case\\s+record)\\b)(?=.*\\b(?:untrusted|unsigned|stale|spoofed|poisoned|attacker[- ]controlled|out[- ]of[- ]date)\\b)(?=.*\\b(?:semantic\\s+(?:embedding|match)|(?:embedding\\s+)?similarity\\s+matched|matched\\s+(?:by\\s+)?(?:embedding|similarity|to)|function\\s+call\\s+sequence|current\\s+function)\\b)(?=.*\\b(?:without|missing|absent|no)\\s+(?:(?:source|current|valid)\\s+)?(?:provenance|lineage|epoch|temporal\\s+scope|freshness)|\\b(?:lacked?|lacking)\\s+(?:(?:source|current|valid)\\s+)?(?:provenance|lineage|epoch|temporal\\s+scope|freshness))(?=.*\\b(?:approve|approved|allow|safe|suppress|omit|waive|bypass|mislead|wrong)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-672"
+}

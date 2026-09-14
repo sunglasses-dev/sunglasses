@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-727",
+  "name": "Semantic Checkpoint Tuple Binding Omission",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A decompiler review can approve source-like Solidity because compilability and ABI recovery look valid even though differential-replay evidence is missing, stale, or bound to another bytecode/input/state tuple.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+(?:guide|documentation|training|policy)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|must\\s+(?:bind|match|replay|reject|verify)|fail[- ]closed|do\\s+not\\s+(?:approve|accept|trust)|checkpoint\\s+(?:is|remains)\\s+(?:bound|valid|current)|complete\\s+(?:differential|semantic)\\s+replay\\s+passed)\\b)(?=.*\\b(?:smart\\s+contract|Solidity|bytecode|decompiler|decompilation)\\b)(?=.*\\b(?:compil(?:e|ability|es|ed)|ABI|application\\s+binary\\s+interface)\\b)(?=.*\\b(?:differential\\s+replay|semantic\\s+(?:checkpoint|consistency)|behavior(?:al|al\\s+equivalence)|execution\\s+trace)\\b)(?=.*\\b(?:absent|missing|stale|outdated|mismatch(?:ed)?|wrong|different|unbound|omitted|not\\s+run|not\\s+observed|another\\s+(?:bytecode|input|state)|without\\s+(?:the\\s+)?(?:exact\\s+)?(?:tuple|checkpoint|replay))\\b)(?=.*\\b(?:approve|approval|accept|authoriz\\w*|promot\\w*|ship\\w*|reviewer|delegat\\w*|greenlight)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-727"
+}

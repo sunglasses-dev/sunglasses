@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-003",
+  "name": "Tool Result Lifecycle Authority Laundering",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A structured tool result asserting verified/complete lifecycle metadata is promoted from evidence to workflow authority at queue admission and auto-forwarded to a peer agent without fresh provenance, freshness, or audience revalidation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:do not|must not|never|reject|quarantine|untrusted|treat as inert|require fresh|revalidate|verify provenance|safe handling|incident report))(?=.*(?:MCP|tool)\\s*(?:result|response|output))(?=.*(?:status|state|lifecycle|verified|complete|approved|trusted))(?=.*(?:queue|enqueue|work item|job))(?=.*(?:forward|handoff|relay|transmit|peer agent|next agent))(?=.*(?:automatically|without (?:a )?(?:fresh )?(?:validation|review|provenance)|skip(?:ping)? (?:revalidation|provenance)|no (?:second|fresh) check|enters the queue|without revalidation|without freshness check)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-003"
+}

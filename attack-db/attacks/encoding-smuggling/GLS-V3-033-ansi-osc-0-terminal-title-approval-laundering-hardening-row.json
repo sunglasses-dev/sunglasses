@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-033",
+  "name": "ANSI OSC-0 terminal title approval laundering (hardening row)",
+  "version": "1.0",
+  "category": "encoding_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "ANSI OSC-0/OSC-2 terminal title controls can smuggle approval and suppression claims through CI or shell transcripts when an AI release agent treats terminal window-title metadata as operational evidence.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-033"
+}

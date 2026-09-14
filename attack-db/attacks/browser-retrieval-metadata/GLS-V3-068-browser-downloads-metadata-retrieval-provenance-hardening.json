@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-068",
+  "name": "Browser downloads metadata retrieval-provenance hardening",
+  "version": "1.0",
+  "category": "browser_retrieval_metadata",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Browser download metadata can launder a completed download record, filename, or source URL into a fake source-of-record approval receipt, causing publishing agents to skip canonical-source verification and publish while hiding drift warnings.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-068"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-692",
+  "name": "Non Transferable Experience Rule Overgeneralization",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A clean but non-transferable edge-case experience, amplified by a severe plausible consequence, is consolidated by an agent into a global rule that is unsafe outside the original scope.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+(?:not|preserve|scope)|do\\s+not\\s+(?:generalize|apply|trust|promote))\\b)(?=.*\\b(?:experience|edge[- ]case|hypothetical|scenario|example)\\b)(?=.*\\b(?:locally\\s+correct|works?\\s+here|valid\\s+only|non[- ]?transferable|narrow\\s+case|specific\\s+context)\\b)(?=.*\\b(?:severe|catastrophic|critical|disastrous|high[- ]?risk|data\\s+loss)\\b)(?=.*\\b(?:reflect(?:ion|ive|ed)?|self[- ]review|consolidat(?:e|ed|ion)|distill(?:ed|ing)?|learn(?:ed|ing)?)\\b)(?=.*\\b(?:always|never|must|global|universal|all\\s+tasks|high[- ]?priority|default\\s+rule|generalize|apply\\s+everywhere)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-692"
+}

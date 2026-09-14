@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-643",
+  "name": "MCP HTTP request-body limit enforcement gap",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP HTTP transport concatenates unauthenticated POST body chunks without ever checking the configured maxMessageSize at the read sink, so a single oversized request exhausts process memory and denies service.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:fixed|patched|mitigated|safe|bounded|reject(?:ed|s)?|defensive|unit test|test fixture|security advisory|must not|do not|never)\\b)(?=.*\\b(?:mcp|model context protocol)\\b)(?=.*\\b(?:http|post|request body|body reader|readrequestbody)\\b)(?=.*\\b(?:unauthenticated|anonymous|without authentication|no auth)\\b)(?=.*\\b(?:oversized|overlong|unbounded|without (?:a|any) (?:size )?limit|maxmessagesize|no size limit|large payload)\\b)(?=.*\\b(?:concatenat\\w*|chunks?|append\\w*|body)\\b)(?=.*\\b(?:memory exhaustion|out of memory|oom|crash\\w*|denial[- ]of[- ]service|unavailable)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-643"
+}

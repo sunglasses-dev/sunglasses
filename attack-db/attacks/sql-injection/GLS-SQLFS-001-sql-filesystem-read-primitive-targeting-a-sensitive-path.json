@@ -1,0 +1,34 @@
+{
+  "id": "GLS-SQLFS-001",
+  "name": "SQL filesystem-read primitive targeting a sensitive path",
+  "version": "1.0",
+  "category": "sql-injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "A filesystem-read SQL primitive (Postgres pg_read_file/pg_read_binary_file/pg_stat_file, MSSQL OPENROWSET/OPENDATASOURCE, MySQL LOAD_FILE, SQLite ATTACH) targets a SENSITIVE path (/etc/{shadow,passwd}, DB config like pg_hba.conf, SSH keys, cloud credentials, .env files, secrets dirs, PEM keys) in agent-generated/untrusted query text. Detection requires the primitive AND a sensitive-path argument together, which separates an attack from benign admin SQL (GRANT/REVOKE/COMMENT/monitoring). Source: CVE-2026-50180 (Langroid SQLChatAgent).",
+  "keywords": [
+    "pg_read_file /etc/passwd",
+    "pg_read_binary_file id_rsa",
+    "pg_stat_file /etc/shadow",
+    "OPENROWSET BULK sensitive",
+    "LOAD_FILE /etc/passwd",
+    "ATTACH DATABASE ssh key",
+    "pg_read_file .env"
+  ],
+  "regex": [
+    "(?i)\\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\\s*(?:/\\*.*?\\*/)?\\s*\\(\\s*(?:BULK\\s+)?['\\\"]?[^'\\\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\\.conf|/root/|/proc/self|\\.ssh/|\\.aws/credentials|\\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\\.pem\\b|\\.env\\b|private[_-]?key)",
+    "(?i)\\bATTACH\\s+(?:DATABASE\\s+)?['\\\"][^'\\\"]*(?:\\.ssh/|id_rsa|\\.pem|\\.env|/etc/|credentials)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SQLFS-001"
+}

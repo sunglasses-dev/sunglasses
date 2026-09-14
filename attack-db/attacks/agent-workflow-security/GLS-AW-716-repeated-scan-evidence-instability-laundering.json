@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-716",
+  "name": "Repeated Scan Evidence Instability Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated security-review aggregator turns a finding observed in only one stochastic repetition into stable remediation or suppression evidence, despite absent repetition consensus and deterministic-scan provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs?|unit\\s+test|test\\s+fixture|security\\s+(?:guide|training)|incident\\s+report|benchmark\\s+documentation|blocked|quarantined|must\\s+not|should\\s+reject|preserve\\s+(?:all\\s+)?(?:runs|provenance)|safe(?:ly)?\\s+(?:queue|promote))\\b)(?=.*\\b(?:delegat\\w*|orchestrat\\w*|aggregat\\w*|review\\s+handoff)\\b)(?=.*\\b(?:repeated|identical|five|multiple|multi[- ]run)\\s+(?:security\\s+)?(?:scan|review|run|repetition)s?\\b)(?=.*\\b(?:unmatched|single[- ]run|one[- ]off|run[- ]index)\\w*\\b)(?=.*(?:\\b(?:no|without|lack\\w*|absent|missing)\\s+(?:repetition\\s+)?(?:consensus|agreement|corroboration|deterministic|provenance)\\b|\\b(?:appeared|occurred)\\s+in\\s+only\\s+(?:one|1)\\s+(?:run|repetition)\\b))(?=.*\\b(?:promot\\w*|suppress\\w*|treat\\w*\\s+as\\s+stable|steer\\w*\\s+remediation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-716"
+}

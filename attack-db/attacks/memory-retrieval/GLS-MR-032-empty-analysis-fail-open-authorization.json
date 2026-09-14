@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-032",
+  "name": "Empty Analysis Fail Open Authorization",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A SQL policy gate treats an empty dependency/reference set from a specialized query as proof that no restricted dataset is used, then admits excluded schema or federated data through an MCP database tool.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|scanner rule|unit test|test fixture|training|incident report|postmortem|blocked sample|must not|do not|never|reject\\w*|deny\\w*|block\\w*|fail closed|denied)\\b)(?=.*\\b(?:bigquery|big query|dry[- ]run|query planner)\\b)(?=.*\\b(?:referenced\\s*[_-]?\\s*(?:datasets?|tables?)|dependencies|dependency\\s+set)\\b)(?=.*(?:\\[\\s*\\]|\\bempty\\b|\\bnone\\b|\\bnull\\b|\\bzero\\b))(?=.*\\b(?:allowed\\s*[_-]?\\s*datasets?|dataset\\s+restriction|authorization|policy\\s+gate|validator)\\b)(?=.*\\b(?:fail[- ]open|allow\\w*|bypass\\w*|permit\\w*|admit\\w*|pass\\w*)\\b)(?=.*\\b(?:information_schema|external_query|federated|excluded|restricted|sensitive)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-032"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DAR-002",
+  "name": "Alembic Migration Legacy-Schema Approval Rebind",
+  "version": "1.0",
+  "category": "delegated_approval_rebinding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Alembic Migration Legacy-Schema Approval Rebind: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific mechanism of exploiting schema-version fallbacks/downgrades to rebind approvals is not covered.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:cannot|can(?:'t|not)|block(?:ed|s|ing)?|refus(?:e|ed|es|ing)|reject(?:ed|s|ing)?|prevent(?:ed|s|ing)?|never)\\b[^\\n]{0,100}\\b(?:override|swap(?:ped|ping)?|alias(?:ed|ing)?|rebind(?:ed|ing)?|escalat(?:e|ed|ing)|promot(?:e|ed|ing)))(?=.*(?:schema[-\\s]*version|versioned\\s*schema(?:\\s*check)?|schema\\s*migration|legacy\\s*schema|older\\s*schema))(?=.*(?:fallback|downgrad(?:e|ed|ing)|legacy\\s*path|failed\\s*open|compatibility\\s*mode|older\\s*schema\\s*version))(?=.*(?:approval|consent|authorization|permission|grant))(?=.*(?:scope|role|privilege|tenant|audience|principal))(?=.*(?:override|swap(?:ped|ping)?|alias(?:ed|ing)?|rebind(?:ed|ing)?|escalat(?:e|ed|ing)|promot(?:e|ed|ing)|reus(?:e|ed|ing))).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DAR-002"
+}

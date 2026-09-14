@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-706",
+  "name": "Stix Adjudication Provenance Rebinding",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-authored STIX graph object claims gold-standard or reviewer-verified adjudication; a provenance-blind normalizer rebinds that claim to the independent judge and a downstream CTI agent excludes the linked finding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|policy)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not|do\\s+not\\s+trust|reject(?:ed|s)?|benign)\\b)(?=.*\\b(?:STIX\\s*2\\.1|CTI|cyber\\s+threat\\s+intelligence)\\b)(?=.*\\b(?:attack[- ]pattern|relationship|object|graph|bundle)\\b)(?=.*\\b(?:gold[- ]standard|adjudicat(?:ed|ion)|reviewer[- ]verified|human[- ]review)\\b)(?=.*\\b(?:rebind(?:ed|ing)?|inherit(?:ed|s)?|provenance|source)\\b)(?=.*\\b(?:exclude|omit|drop|downgrade|hide|suppress|leave\\s+out)\\w*\\b.{0,100}\\b(?:finding|indicator|report|alert|technique)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-706"
+}

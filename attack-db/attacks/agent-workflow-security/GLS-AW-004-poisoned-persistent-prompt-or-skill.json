@@ -25,8 +25,9 @@
     "reuse this exact instruction set on all future jobs"
   ],
   "regex": [
-    "(?i)(save|store|persist|append|update).{0,60}(skill|prompt|playbook|memory|workflow|template)",
-    "(?i)(always|every future|from now on).{0,70}(publish|include|link|mention|promote)"
+    "(?i)\\b(?:save|store|persist|append|remember|keep)\\s+(?:this|these)\\b.{0,60}\\b(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|rules?|instructions?)\\b",
+    "(?i)\\b(?:save|store|persist|append|update|write)\\b.{0,40}\\b(?:your|the)\\s+(?:persistent|saved|evergreen|default|reusable)\\s+(?:skills?|prompts?|playbooks?|memor(?:y|ies)|workflows?|templates?|instructions?)\\b",
+    "(?i)\\b(?:always|every\\s+future|from\\s+now\\s+on|on\\s+all\\s+future)\\b.{0,70}\\b(?:publish|include|link\\s+to|mention|promote)\\s+(?:this|these|the\\s+following)\\b"
   ],
   "examples": {
     "malicious": [],

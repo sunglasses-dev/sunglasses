@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-070",
+  "name": "Browser Web Locks API approval-state laundering hardening",
+  "version": "1.0",
+  "category": "browser_runtime_state",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Browser Web Locks API state can launder a tab/worker coordination lock into a fake operator approval record, causing browser automation or deployment agents to deploy and hide approval warnings.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-070"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-680",
+  "name": "Ranked Target Selection Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-influenced enrichment label or rationale makes a credential-sensitive function look low-risk, causing a security agent's priority sampler to replace the true target with decoys and silently starve analysis coverage.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|rule|training|review)|scanner\\s+(?:rule|test)|blocked\\s+(?:payload|sample)|negative\\s+fixture|incident\\s+report|postmortem|priority\\s+sampler\\s+telemetry|must\\s+not\\s+(?:trust|select|follow)|independently\\s+verified)\\b)(?=.*\\b(?:priority[- ]weighted|priority\\s+sampl(?:er|ing)|importance\\s+sampl(?:er|ing)|rank(?:ed|ing)?\\s+(?:\\w+\\s+)?(?:queue|target|weight)|research\\s+queue)\\b)(?=.*\\b(?:credential|bearer\\s+token|auth(?:entication|orization)|auth_token_validate|secret[- ]loading|session\\s+token)\\b)(?=.*\\b(?:demot(?:e|ed|ing)|depriorit(?:y|ized)|low[- ]risk|low[- ]reachability|weight\\s*0?\\.0?1|tiny\\s+weight|decoy|skip(?:ped|ping)?|omit(?:ted|ting)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-680"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-604",
+  "name": "Abstention-conditioned benchmark metric laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An evaluator drops refusals, abstentions, and parse failures from the denominator, computes a high score over answered cases only, and launders that selective metric into a downstream allow/safety decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit test|fixture|defensive|must not|do not|reject|quarantine|fail closed|all cases)\\b)(?=.*\\b(?:refus\\w*|abstent\\w*|parse[- ]?fail\\w*|unparse\\w*)\\b)(?=.*\\b(?:exclud\\w*|drop\\w*|omit\\w*|ignor\\w*)\\b)(?=.*\\b(?:denominator|answered|responded|remaining|scored)\\b)(?=.*\\b(?:correlation|pearson|metric|score|\\br\\b)\\b)(?=.*(?:\\b0\\.[89]\\d\\b|\\bhigh\\b|\\bstrong\\b))(?=.*\\b(?:permit|allow|continue|safe|control decision)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-604"
+}

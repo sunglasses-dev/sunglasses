@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DOAS-002",
+  "name": "Aggregate Request Budget Exhaustion",
+  "version": "1.0",
+  "category": "denial_of_ai_service",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Many individually ordinary low-complexity requests each pass per-request admission checks, but because the shared actor/tenant budget is absent or evaluated only after scheduling, concurrent volume crosses the aggregate budget into queueing, autoscaling, and billing amplification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|safe handling|defensive|quarantine|bounded|no\\s+(?:flood|cost\\s+spike|service\\s+degradation))\\b)(?=.*\\b(?:concurrent|simultaneous|high[- ]volume|sustained|burst|flood|excessive|many)\\b)(?=.*\\b(?:ordinary|normal|low[- ]complexity|otherwise normal|simple)\\b)(?=.*\\b(?:actor|tenant|principal|client)\\b)(?=.*\\b(?:aggregate|shared|global|per[- ]actor|per[- ]tenant|request budget|quota|rate limit|admission)\\b)(?=.*\\b(?:autoscal|scale out|pay[- ]per[- ]use|cost|billing|queue|latency|overload|exhaust|degrad|availability)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DOAS-002"
+}

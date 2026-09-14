@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-583",
+  "name": "loss-landscape poisoning targeted extraction of an unseen record",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted training shard reshapes the optimizer's local loss geometry so the completion for an inaccessible private record becomes the unique low-loss solution and is later extracted from the checkpoint.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit test|test fixture|safe example|blocked|defensive|incident report|redacted|do not|never)\\b)(?=.*\\b(?:training|fine[- ]?tun(?:e|ing)|optimizer|gradient|checkpoint|federated)\\b)(?=.*\\b(?:poison(?:ed|ing)?|loss landscape|loss geometry)\\b)(?=.*\\b(?:target record|unseen record|private record)\\b)(?=.*\\b(?:sharp minimum|low[- ]loss|nearby alternative|unique completion)\\b)(?=.*\\b(?:extract|reveal|memor|regurgitat)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-583"
+}

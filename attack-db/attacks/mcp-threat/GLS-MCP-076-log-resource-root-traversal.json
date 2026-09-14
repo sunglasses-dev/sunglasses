@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-076",
+  "name": "Log Resource Root Traversal",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP log-resource handler joins an attacker-supplied dirname to a log root without canonical containment, so a delegated remote resource read returns files from outside the authorized resource scope to the agent.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|must\\s+(?:not|reject)|benign\\s+control|safe\\s+handling|blocked\\s+by)\\b)(?=.*\\bMCP\\b)(?=.*\\b(?:log[- ]resource|resource[- ]handler|resource\\s+read)\\b)(?=.*\\bdirname\\s*[:=])(?=.*(?:\\.\\./|%2e%2e|%252e|\\.\\.%2f|%2f\\.\\.%2f))(?=.*\\b(?:escape|travers(?:al|e)|outside|exfiltrat|read|expos|return)\\w*\\b)(?=.*\\b(?:root|directory|filesystem|path)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-076"
+}

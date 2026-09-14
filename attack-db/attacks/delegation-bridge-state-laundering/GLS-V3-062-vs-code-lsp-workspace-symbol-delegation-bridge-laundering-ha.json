@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-062",
+  "name": "VS Code/LSP workspace-symbol delegation-bridge laundering (hardening row)",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "VS Code/LSP symbol-search results can launder IDE retrieval metadata into forged delegation continuity or accepted merge/release path for code-review agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-062"
+}

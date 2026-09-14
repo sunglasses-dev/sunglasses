@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-621",
+  "name": "Delegated data-scope inheritance",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated worker inherits the parent agent's privileged AI-service/RAG handle instead of a task-scoped capability, enumerates restricted records outside its task scope, and the orchestrator launders the collection by accepting it as approved task output.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|runbook|security\\s+guide|unit\\s+test|fixture|postmortem|defensive|must\\s+not|do\\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|prevent(?:ed|s|ing)?)\\b)(?=.*\\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|orchestrator|coordinator)\\b)(?=.*\\b(?:inherit(?:ed|s|ing)?|pass(?:ed|es|ing)?|reuse(?:d|s|ing)?|shared)\\b)(?=.*\\b(?:privileged|elevated|admin|parent)\\s+(?:AI[- ]?service|RAG|retrieval|data|access|handle|capability|credential)\\b|\\b(?:AI[- ]?service|RAG|retrieval)\\s+(?:handle|capability|access)\\b)(?=.*\\b(?:outside|beyond|exceed(?:ed|s|ing)?|cross[- ]?(?:tenant|workspace|scope)|out[- ]of[- ]scope|unauthori[sz]ed|restricted)\\b)(?=.*\\b(?:collect(?:ed|s|ing)?|enumerat(?:ed|es|ing)?|retriev(?:ed|es|ing)?|read(?:s|ing)?|exfiltrat(?:ed|es|ing)?)\\b)(?=.*\\b(?:record|document|customer|proprietary|sensitive|database|RAG)\\w*\\b)(?=.*\\b(?:approved|accepted|trusted|treated)\\b.*\\b(?:output|result|collection|task)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-621"
+}

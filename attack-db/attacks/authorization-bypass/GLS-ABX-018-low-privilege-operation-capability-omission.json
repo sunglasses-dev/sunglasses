@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-018",
+  "name": "Low-privilege operation capability omission",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A state-changing operation omits its own capability check, so a valid but low-privilege authenticated session is treated as authorization and can mutate privileged attachment/alt-text metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|security\\s+policy|incident\\s+report|patched|fixed|remediated|defensive|must\\s+(?:authenticate|authorize|check|reject)|denied|rejected|blocked|benign|safe)\\b)(?=.*\\b(?:authenticated|logged[- ]in|subscriber|contributor|low[- ]privilege|unprivileged)\\b)(?=.*\\b(?:lacks?|lacking|missing|absent|omits?|without)\\b.{0,60}\\b(?:capability|permission|authorization|access\\s+control|role\\s+check)\\b)(?=.*\\b(?:image[- ]alt[- ]text|alt[- ]text|attachment\\s+metadata|media\\s+metadata|content)\\b)(?=.*\\b(?:action|endpoint|route|tool|function|operation|request)\\b)(?=.*\\b(?:invoke|execute|trigger|reach|dispatch|accept|update|mutat|write|change)\\w*\\b)(?=.*\\b(?:privileged|admin|protected|metadata|attachment|media)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-018"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-724",
+  "name": "Configuration Surface Enumeration",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker elicits a complete agent capability/configuration inventory through a message or rendered configuration view, giving downstream targeting a map of reachable tools, services, scopes, or privileged operations.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|negative\\s+fixture|scanner\\s+rule|security\\s+(?:guide|policy|training)|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|do\\s+not|never\\s+(?:expose|enumerate|list|disclose))\\b)(?=.*\\b(?:agent|assistant|copilot|bot)\\b.{0,180}\\b(?:configuration|config|dashboard|settings|tools?|services?|access)\\b)(?=.*\\b(?:enumerate|list|discover|reveal|expose|dump|inventory|disclose|show|tell)\\w*\\b.{0,220}\\b(?:every|all|available|configured|connected|enabled|privileged|complete|full|scope|names?|paths?|endpoints?)\\b)(?=.*\\b(?:tool|service|mcp|filesystem|network|credential|permission|capabilit)\\w*\\b.{0,240}\\b(?:target|attack|exploit|planner|attacker|recon|highest[- ]impact)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-724"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-036",
+  "name": "Connector-poisoned latent centroid cross-modal transfer",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A lightweight multimodal connector/adapter artifact is poisoned from a single modality to carry a malicious latent centroid that input-side steering activates from a different modality, bypassing text-only and single-modality lifecycle review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\n?(?!.*\\b(?:security\\s+(?:guide|policy|training)|documentation|unit\\s+test|benign\\s+example|defensive|must\\s+not|do\\s+not|never|blocked|refused|quarantined|safe\\s+handling)\\b)(?=.*\\b(?:multimodal|cross[- ]modal)\\b)(?=.*\\b(?:connector|adapter|projection)\\b)(?=.*\\b(?:poison(?:ed|ing)?|backdoor|malicious)\\b)(?=.*\\b(?:latent\\s+centroid|latent\\s+anchor|poisoned\\s+latent)\\b)(?=.*\\b(?:source|one|other|target|different)\\s+modality\\b)(?=.*\\b(?:steer|activat|transfer|trigger)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-036"
+}

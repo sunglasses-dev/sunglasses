@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-702",
+  "name": "Stateful Ui Persistence Evaluator Desynchronization",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A browser agent or state-management extension treats a toggle/checkbox visual state or stale initialized account state as authoritative while the website's persisted privacy/security setting differs, and the evaluator records success across the run boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|documentation)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never\\s+trust|safe\\s+control)\\b)(?=.*\\b(?:chrome\\s+extension|browser\\s+agent|web\\s+agent|evaluator|account\\s+state)\\b)(?=.*\\b(?:toggle|checkbox|check\\s*box|switch|cookie|privacy|session\\s+revocation)\\b)(?=.*\\b(?:visual|rendered|DOM|UI)\\s+state\\b)(?=.*\\b(?:persisted|backend|server|database)(?:\\s+\\w+){0,3}\\s+(?:setting|state|value)\\b)(?=.*\\b(?:stale|mismatch|desynchron|differs|not\\s+actually)\\b)(?=.*\\b(?:success|passed|green|complete|authorized|accepted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-702"
+}

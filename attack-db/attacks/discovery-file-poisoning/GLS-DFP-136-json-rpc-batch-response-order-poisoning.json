@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-136",
+  "name": "JSON-RPC Batch Response-Order Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "JSON-RPC Batch Response-Order Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jSON-RPC batch response ID/order poisoning, distinct from static API metadata poisoning.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|fixture|scanner\\s+rule|detector\\s+training|documentation|negative\\s+example|do\\s+not\\s+trust|must\\s+reject|should\\s+reject|client\\s+should\\s+reject|quarantine(?:d)?|redacted|blocked|must\\s+correlate\\s+by\\s+id|validate\\s+response\\s+id\\s+mapping)\\b)(?=.*\\b(?:json\\s*-?\\s*rpc|jsonrpc|rpc)\\b)(?=.*\\b(?:batch|response\\s+array|out[-\\s]*of[-\\s]*order|id(?:/order|\\s+order)?\\s*(?:mismatch|rebind(?:ing)?|swap|collision|map(?:ping)?)|request\\s*id)\\b)(?=.*\\b(?:id|request\\s*id|correlation|mapping|provenance)\\b)(?=.*\\b(?:treat|use|map|bind|apply|associate|route|consider)\\b.{0,140}\\b(?:previous|prior|trusted|original|first|next|different|other)\\b.{0,140}\\b(?:call|request|tool|response|result|id)\\b)(?=.*\\b(?:ignore|override|disregard|skip|bypass|do\\s+not\\s+(?:check|verify|validate)|no\\s+need\\s+to\\s+(?:check|verify|validate))\\b.{0,160}\\b(?:id|order|mismatch|correlation|mapping|provenance|validation|check)\\b).{0,4000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-136"
+}

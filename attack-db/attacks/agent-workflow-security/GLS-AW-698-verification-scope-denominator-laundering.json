@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-698",
+  "name": "Verification Scope Denominator Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A ZKP verification report analyzes only supported or isolated targets, omits unsupported DSL/zkVM files from the denominator, and an agent-facing summary turns the partial result into repository-wide security evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|training|policy)|unit\\s+test|test\\s+fixture|incident\\s+report|benchmark\\s+notes|blocked|quarantined|defensive|must\\s+not|should\\s+not|never\\s+treat|reject\\s+any)\\b)(?=.*\\b(?:zkp|zero[- ]knowledge|proof\\s+(?:audit|verif(?:ier|ication))|constraint\\s+verif(?:ier|ication))\\b)(?=.*\\b(?:unsupported|out[- ]of[- ]scope|excluded|omitted|not\\s+(?:analyzed|counted|verified)|partial|un(?:tested|covered))\\b)(?=.*\\b(?:denominator|coverage|full[- ]codebase|repository|total|coverage\\s+ratio)\\b)(?=.*\\b(?:agent|reviewer|dashboard|report|summary|audit)\\b.{0,180}\\b(?:treat|accept|approve|greenlight|route|present|complete|safe|assurance|evidence)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-698"
+}

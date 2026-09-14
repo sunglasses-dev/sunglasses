@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-065",
+  "name": "Normalized Execution Policy Rebinding",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP/SQL pipeline authorizes one query representation but a later normalizer or rewriter hands the executor a materially different plan (widened projection, relation, or database) that is never rebound or reauthorized against the policy decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|scanner rule|defensive|must reject|should reject|safe path|policy binds|digest equality verified)\\b)(?=.*\\b(?:policy\\s+stage|check_policy|authorization\\s+decision|policy[_\\s]digest|policy\\s+record)\\b)(?=.*\\b(?:normalized|canonical|rewritten|execution_plan|executor|materiali[sz]ed)\\b)(?=.*\\b(?:different|drift|mismatch|not recomputed|without binding|not bound|after the check)\\b)(?=.*\\b(?:projection|column set|database|relation|plan_digest)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-065"
+}

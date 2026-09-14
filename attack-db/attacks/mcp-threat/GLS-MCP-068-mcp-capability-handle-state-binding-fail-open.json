@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-068",
+  "name": "MCP capability-handle state binding fail-open",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP executor invokes a capability handle on a client/peer-reported READY state while the server holds PENDING/REVOKED/CLOSED/EXPIRED, never revalidating the server-side state transition at execution time.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|fail[- ]?closed)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol|tool\\s+handle|capability\\s+handle)\\b)(?=.*(?:client[_ -]?(?:state|status)|server[_ -]?(?:state|status)|peer[_ -]?(?:state|status)|runtime[_ -]?(?:state|status)|client\\s+(?:ready|pending|revoked|closed|expired)|server\\s+(?:ready|pending|revoked|closed|expired)|peer\\s+state|runtime\\s+state|locally.{0,30}(?:ready|pending|revoked|closed|expired).{0,30}(?:remotely|server)|state\\s+(?:conflict|mismatch|desync|diverg)))(?=.*\\b(?:ready|pending|revoked|closed|expired|invalid)\\b)(?=.*\\b(?:invoke|invokes|invoked|execute|executes|dispatch|dispatches|call|calls|run|runs)\\b)(?=.*\\b(?:without|skip\\w*|missing|unvalidated|no)\\b.{0,100}\\b(?:transition|state|recheck|validation|handshake|authorization|check)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-068"
+}

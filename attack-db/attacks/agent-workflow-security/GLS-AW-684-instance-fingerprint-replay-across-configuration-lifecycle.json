@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-684",
+  "name": "Instance Fingerprint Replay Across Configuration Lifecycle",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model-instance fingerprint captured under one configuration is replayed after configuration drift and treated as current safety identity.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|defensive|must\\s+(?:recheck|revalidate|bind)|do\\s+not\\s+(?:reuse|trust)|safe\\s+workflow)\\b)(?=.*\\b(?:model[- ]instance|instance[- ]level|serving[- ]instance|fingerprint|pseudo[- ]random)\\b)(?=.*\\b(?:cached|stale|replay(?:ed)?|reuse|reused|old|previous)\\b.{0,140}\\b(?:configuration|config|sampling|quantization|policy|safety|live|current)\\b)(?=.*\\b(?:skip|without|no|omit|fails?\\s+to)\\b.{0,100}\\b(?:fresh|current|live|re-?validation|re-?assess|bind|verify)\\w*\\b)(?=.*\\b(?:trust|approve|allow|route|safety\\s+profile|identity)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-684"
+}

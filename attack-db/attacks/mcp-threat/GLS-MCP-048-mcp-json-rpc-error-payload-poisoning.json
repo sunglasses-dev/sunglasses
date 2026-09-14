@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-048",
+  "name": "MCP JSON-RPC error payload poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP JSON-RPC error payload poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targeting runtime tool error responses in MCP, distinct from logs/SRE tool outputs.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security|training|guide|docs?|reference|runbook|incident\\s+report|postmortem|scanner\\s+(?:guide|docs?|reference|runbook)).{0,140}\\b(?:should|must|will|was|were)?\\s*(?:report|detect|flag|refus(?:e|ed)|block(?:ed)?|not\\s+obey|never\\s+obey|must\\s+not\\s+obey|do\\s+not\\s+obey)\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|trust|treat|use|include|forward|send|share|attach)\\b.{0,120}\\b(?:json-rpc|jsonrpc|mcp|error(?:\\.(?:message|data))?|tool\\s+error))\n(?=.*(?:\\bjsonrpc\\b|json-rpc|MCP\\s+(?:tool|resource|prompt|client)\\s+error|error\\.(?:message|data)|\"error\"\\s*:|\"code\"\\s*:\\s*-?\\d+|request\\s+failed|resource\\s+error|prompt\\s+error|failed\\s+(?:tool|resource|prompt)\\s+request))\n(?=.*(?:\\bagents?\\b|\\bassistants?\\b|\\bscanners?\\b|review\\s+bots?|mcp\\s+clients?|debugging\\s+agents?|automated\\s+(?:security\\s+)?(?:review|scan|audit|verification)|(?:agent|scanner|assistant)\\s+instructions?))\n(?=.*(?:\n  (?:agent|scanner|assistant|mcp\\s+client)\\s+instructions?|\n  supersed(?:e|es|ed|ing)|overrid(?:e|es|ing)|takes?\\s+precedence|(?:primary|single)\\s+source\\s+of\\s+truth|authoritative|governing\\s+document|canonical\\s+(?:retry|error|debug|scanner|agent)\\s+(?:policy|guidance|instructions?)|defines?\\s+(?:all\\s+)?(?:scanner|agent|retry|debug)\\s+rules?|\n  (?:do\\s+not|not)\\s+report\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|errors?|failures?|requests?|auth|evidence|results?|diagnostics?|observations?)|\n  (?:suppress|hide|omit|downgrade|exclude|redact|deprioritize|demote|reclassify)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|errors?|failures?|requests?|evidence|results?|diagnostics?|observations?)|\n  (?:mark|classify|treat).{0,60}?\\b(?:clean|safe|inconclusive|informational|advisory-only|non-blocking|background-only)\\b|\n  (?:findings?|warnings?|alerts?|errors?|failures?|observations?|diagnostics?|results?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|downgraded|excluded|redacted|ignored|treated\\s+as\\s+(?:informational|advisory-only|non-blocking))|\n  (?:include|forward|send|share|attach|pass\\s+along|provide|expose|collect|relay|transmit|hand\\s+over)\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?)|local\\s+(?:state|config(?:uration)?|settings?)|bearer\\s+tokens?|authorization\\s+headers?|api\\s+keys?|session\\s+cookies?|debug\\s+context)|\n  (?:environment\\s+(?:variables?|context)|bearer\\s+tokens?|authorization\\s+headers?|api\\s+keys?|session\\s+cookies?|local\\s+state).{0,60}?\\b(?:include|forward|send|share|attach|provide|expose|collect|relay|transmit)\\b\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-048"
+}

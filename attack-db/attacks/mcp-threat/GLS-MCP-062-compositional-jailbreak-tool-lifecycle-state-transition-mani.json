@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-062",
+  "name": "Compositional jailbreak tool-lifecycle state-transition manipulation",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fluent multi-strategy jailbreak continuation embedded in an MCP/tool result composes ordinary lifecycle phrases (validation, nonterminal retry, transition, execute) to drive an invalid jump from a nonterminal state straight to tool dispatch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|benign|incident\\s+report|operator\\s+guide|safe|do\\s+not|refus(?:e|ed|es)|rejected|monitoring)\\b)(?=.*\\b(?:MCP|tool\\s+(?:result|continuation)|lifecycle)\\b)(?=.*\\b(?:validation|pre[- ]?check|validated)\\b)(?=.*\\b(?:retry\\s+state|retry\\s+window|nonterminal|pending)\\b)(?=.*\\b(?:skip|bypass|jump|advance).{0,80}\\b(?:validation|review|transition|state)\\b)(?=.*\\b(?:execute|dispatch|invoke|run)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-062"
+}

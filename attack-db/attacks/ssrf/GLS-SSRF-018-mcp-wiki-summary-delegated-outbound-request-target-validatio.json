@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-018",
+  "name": "MCP wiki-summary delegated outbound-request target-validation hardening",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated MCP tool's URL argument passes only a `startswith(\"http\")` prefix check before `requests.get`, turning a nominally-public article fetcher into a server-side request primitive whose internal response crosses back over the tool boundary as tool output.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe example|validation passes)\\b)(?=.*\\b(?:mcp|model context protocol)\\b)(?=.*\\b(?:read[_ -]?wikipedia[_ -]?article|wiki[- ]summary|delegated tool|tool call)\\b)(?=.*\\b(?:url|uri|endpoint|destination)\\b)(?=.*(?:localhost|127\\.0\\.0\\.1|169\\.254\\.169\\.254|link[- ]local|private|internal|metadata))(?!.*\\b(?:allowlist|approved public|explicit user click|human approved)\\b)(?=.*\\b(?:requests?\\.get|server[- ]side fetch|outbound request|http request)\\b)(?=.*\\b(?:response|body|content)\\b.{0,100}\\b(?:tool output|agent|caller|returned|expos|disclos)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-018"
+}

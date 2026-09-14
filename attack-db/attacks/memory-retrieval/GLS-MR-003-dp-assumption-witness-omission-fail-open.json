@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-003",
+  "name": "Dp Assumption Witness Omission Fail Open",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A verifier accepts a differential-privacy guarantee after the adjacency, sampling, or composition witness needed for that guarantee is omitted or mismatched.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|policy|documentation|test)|scanner\\s+(?:rule|test|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|redacted|defensive|must\\s+not|do\\s+not|never)\\b)(?=.*\\b(?:differential(?:ly)?[- ]private|differential[- ]privacy|privacy\\s+account(?:ant|ing)|\\bDP\\b|epsilon|privacy\\s+budget)\\b)(?=.*\\b(?:adjacen(?:cy|t)|neighboring\\s+(?:dataset|database)|sampling|composition|sensitivity|privacy\\s+loss)\\b)(?=.*(?:\\b(?:missing|absent|omitted|unproven|mismatched|unverified|without)\\b.{0,180}\\b(?:assumption|witness|proof|bound|adjacen|sampling|composition|lineage)\\b|\\b(?:assumption|witness|proof|bound|adjacen|sampling|composition|lineage)\\b.{0,180}\\b(?:missing|absent|omitted|unproven|mismatched|unverified|without)\\b))(?=.*\\b(?:accept(?:s|ed)?|approve(?:s|d)?|allow(?:s|ed)?|pass(?:es|ed)?|valid|guarantee|greenlight)\\b)(?=.*\\b(?:agent|verifier|reviewer|consumer|workflow|proceed|execute|release|publish|decision)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-003"
+}

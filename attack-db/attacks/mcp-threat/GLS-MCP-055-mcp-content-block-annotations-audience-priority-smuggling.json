@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-055",
+  "name": "Mcp Content Block Annotations Audience Priority Smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Mcp Content Block Annotations Audience Priority Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific targeting of audience and priority annotations within the MCP protocol.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:detected\\s+and\\s+blocked|do\\s+not\\s+obey|example\\s+of\\s+abuse|security\\s+training|scanner\\s+rule)\\b)(?=.*\\bannotations\\b)(?=.*\\baudience\\b\\s*[\"']?\\s*[:=]\\s*\\[[^\\]]*\\bassistant\\b)(?=.*\\bpriority\\b\\s*[\"']?\\s*[:=]\\s*(?:1(?:\\.0+)?|0\\.(?:9|[89]\\d)))(?=.*\\b(?:ignore|override|suppress|hide|omit|do\\s+not\\s+report|mark\\s+(?:clean|safe)|exfiltrate|forward\\s+(?:tokens|secrets|env)|send\\s+(?:tokens|secrets|env)|treat\\s+.+\\s+system)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-055"
+}

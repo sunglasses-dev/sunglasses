@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-121",
+  "name": "Jest JSON Test-Result Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Jest JSON Test-Result Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jest JSON test results, distinct from general test metadata or logs.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:incident report|blocked|quarantined|redacted|unit test|fixture|docs?|documentation|runbook|training|detector|scanner should flag|must flag|should flag|do not obey|must not obey|never follow)\\b.{0,220}\\b(?:agent|assistant|suppress|token|credential|instruction|directive)\\b)(?=.*\\b(?:jest\\s+json|jest\\s+--json|testResults|assertionResults|failureMessages?|ancestorTitles|numFailedTests|numPassedTests|coverageMap)\\b)(?=.*\\b(?:agent|assistant|automated\\s+review|test\\s+reviewer|ci\\s+reviewer|scanner|bot)\\b)(?=.*\\b(?:directive|instruction|canonical|authoritative|source\\s+of\\s+truth|override|takes\\s+precedence|review\\s+policy|policy)\\b)(?=.*\\b(?:suppress|hide|ignore|omit|downgrade|green\\s+path|quiet\\s+mode|operator-only|include|forward|exfiltrate|dump|send|relay|pass\\s+along|mark\\s+(?:the\\s+)?(?:suite|tests?|run)\\s+pass(?:ed)?|treat\\s+(?:failures?|findings|diagnostics)\\s+as\\s+(?:informational|non[-\\s]?blocking)|do\\s+not\\s+report)\\b.{0,100}\\b(?:failures?|findings|diagnostics|coverage|tokens?|credentials?|secrets?|env(?:ironment)?(?:\\s+variables?)?|api\\s*keys?|runtime\\s+context|ci\\s+variables?)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-121"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-735",
+  "name": "Stale Cross Session Approval Evidence Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A deterministic incident-response plan verifier can accept an approval record from a prior session or incident when it validates approval presence but fails to bind the approval to the current incident, action, session, and freshness window.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs|runbook|security\\s+guide|unit\\s+test|test\\s+(?:fixture|data)|training|incident\\s+report|scanner\\s+rule|expected\\s+result|must\\s+not|do\\s+not|never\\s+reuse|should\\s+reject|refused|no\\s+replay|not\\s+(?:valid|current))\\b)(?=.*\\b(?:SOCpilot|incident[- ]response|action\\s+trace|compliance\\s+verifier)\\b)(?=.*\\b(?:approval|approved|approval[_ -]?id|approval\\s+gate)\\b)(?=.*\\b(?:stale|prior|previous|cross[- ]session|replayed|old)\\b)(?=.*\\b(?:contain(?:ment)?|recover(?:y)?|isolate|quarantine|mandatory\\s+(?:approval\\s+)?gate|verifier\\s+accepts?|approval\\s+evidence)\\b)(?=.*\\b(?:accept(?:s|ed)?|replay(?:ed)?|reus(?:e|ed)|satisf(?:y|ied)|pass(?:es|ed)?|without\\s+(?:binding|revalidation)|skip(?:ping)?\\s+(?:the\\s+)?fresh)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-735"
+}

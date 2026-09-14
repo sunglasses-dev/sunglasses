@@ -1,0 +1,25 @@
+{
+  "id": "GLS-JBE-007",
+  "name": "Paraphrase-induced refusal-filter drift",
+  "version": "1.0",
+  "category": "jailbreak_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A semantics-preserving paraphrase strips the lexical cues a refusal-only classifier depends on, and the downstream action selector treats the absent refusal signal as permission for a still-restricted request.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked)\\b)(?=.*\\b(?:refusal[-_ ]?(?:filter|only|classifier)|surface[-_ ]form)\\b)(?=.*\\b(?:paraphras\\w*|reword\\w*|transformed\\s+wording|semantic(?:ally)?[-_ ]equivalent)\\b)(?=.*\\b(?:restricted|disallowed|prohibited|unsafe)\\b)(?=.*\\b(?:permit|proceed|allow|approve)\\w*\\b)(?=.*\\b(?:miss|absent|false|brittle|drift|evad)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-JBE-007"
+}

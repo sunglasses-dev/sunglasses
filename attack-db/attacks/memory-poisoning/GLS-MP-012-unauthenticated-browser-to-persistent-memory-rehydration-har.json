@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MP-012",
+  "name": "Unauthenticated browser-to-persistent-memory rehydration hardening",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious webpage reaches an unauthenticated loopback dashboard API (no CSRF or Host validation, DNS-rebinding reachable), writes attacker-controlled persistent agent memory, and a later startup or session rehydration promotes that record into trusted standing policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|patched|fixed|safe|read[- ]only|rejected|must\\s+not|do\\s+not|never|unit\\s+test|example)\\b)(?=.*\\b(?:unauthenticated|no\\s+authentication|missing\\s+(?:auth|authentication))\\b)(?=.*\\b(?:browser[- ]origin|cross[- ]origin|dns[- ]rebind|host\\s+header)\\b)(?=.*\\b(?:local|loopback|dashboard|flask|http)\\b)(?=.*\\b(?:api|server|endpoint)\\b)(?=.*\\b(?:write|store|save|persist|append|update)\\w*\\s+(?:attacker[- ]controlled\\s+)?(?:persistent\\s+)?(?:agent\\s+)?(?:memory|memories|state|context)|\\b(?:persistence|persistent)\\s+(?:of\\s+)?(?:agent\\s+)?(?:memory|memories|state|context)\\b)(?=.*\\b(?:rehydrat|reload|startup|next\\s+session|future\\s+run)\\w*\\b)(?=.*\\b(?:trusted|authoritative|obey|follow|suppress|forward|override)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MP-012"
+}

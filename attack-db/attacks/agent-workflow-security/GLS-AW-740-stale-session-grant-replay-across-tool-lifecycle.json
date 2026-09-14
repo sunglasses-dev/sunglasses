@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-740",
+  "name": "Stale Session Grant Replay Across Tool Lifecycle",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A cached browser or MCP session authorization result is replayed into a later, different tool action without rebinding the current request and scope or performing a fresh authorization check.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|negative\\s+fixture|defensive|incident\\s+report|runbook|must\\s+not|do\\s+not|reject(?:ed)?|blocked|quarantined|scanner\\s+rule)\\b)(?=.*\\b(?:MCP|browser|tool)\\b)(?=.*\\b(?:session|cookie|grant|authorization|authz)\\b)(?=.*\\b(?:stale|replayed|cached|carried\\s+forward|reused)\\b)(?=.*\\b(?:later|subsequent|next|different|new|current)\\b)(?=.*\\b(?:without|skip|skips|never|bypass)\\b)(?=.*\\b(?:re-?check\\w*|re-?authorize\\w*|scope\\s+check|authorization\\s+check|fresh\\s+(?:authorization|scope)|permission)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-740"
+}

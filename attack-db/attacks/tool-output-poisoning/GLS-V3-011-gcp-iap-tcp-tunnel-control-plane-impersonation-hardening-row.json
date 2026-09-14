@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-011",
+  "name": "GCP IAP TCP tunnel control-plane impersonation (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Google Cloud IAP TCP forwarding or `gcloud compute start-iap-tunnel` terminal text can impersonate an approval/control plane by telling an automation agent that IAP access proves operator approval and authorizes privileged remediation without separate change-control verification.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-011"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-124",
+  "name": "Web3 Wallet Signing-Queue Approval-Graph Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Web3 Wallet Signing-Queue Approval-Graph Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 web3 wallet signing queues and approval graphs not covered elsewhere.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|rejected|quarantined|incident\\s+report|security\\s+training|defensive\\s+docs?|unit\\s+tests?|test\\s+fixture|scanner\\s+keywords\\s+only|must\\s+not\\s+(?:trust|obey|treat|skip|suppress)|do\\s+not\\s+(?:trust|obey|treat|skip|suppress)|does\\s+not\\s+(?:trust|obey|treat|skip|suppress|override)|never\\s+(?:trust|obey|treat|skip|suppress|override)|preserve\\s+warnings?|keep\\s+confirmation|required\\s+confirmation|confirmation\\s+required|structured\\s+approval\\s+metadata\\s+(?:cannot|must\\s+not|should\\s+not)|approval\\s+graph\\s+was\\s+(?:rejected|blocked))\\b)(?=.*(?:wallet[_\\s-]?signing[_\\s-]?queue|signing\\s+(?:queue|request|item)|wallet\\s+(?:approval|signing|assistant|agent|review)|eth_signTypedData|personal_sign|safe\\s*tx|multisig|transaction|tx\\b|permit|approve|approval|spender|allowance|transfer|bridge|swap|session\\s+key|human\\s+confirmation|user\\s+confirmation))(?=.*(?:approval[_\\s-]?graph|approval[_\\s-]?status|approval[_\\s-]?badge|verification[_\\s-]?badge|verified[_\\s-]?by[_\\s-]?agent|reviewer[_\\s-]?score|quorum[_\\s-]?(?:status|met|state|count)|vote[_\\s-]?tally|signoff[_\\s-]?(?:matrix|graph|path)|trust[_\\s-]?score|risk[_\\s-]?badge|approval[_\\s-]?policy|structured\\s+(?:approval|verification|quorum)\\s+(?:metadata|field|badge|status)))(?=.*\\b(?:verified|approved|validated|cleared|attested|greenlit|pre[-\\s]?cleared|quorum(?:[_\\s-]?status)?\\s+(?:met|satisfied|complete)|threshold\\s+satisfied|consensus\\s+reached|green\\s+(?:badge|path|status)|trusted\\s+(?:badge|review|approval)|trust\\s+(?:the\\s+)?(?:badge|approval|graph|quorum|status)|carry\\s+forward\\s+(?:the\\s+)?(?:approval|verification|quorum)|reuse\\s+(?:the\\s+)?(?:approval|verification))\\b)(?=.*\\b(?:suppress|hide|omit|downgrade|silence|skip|bypass|do\\s+not\\s+show|do\\s+not\\s+ask|no\\s+need\\s+to\\s+(?:warn|confirm|ask)|without\\s+(?:warning|confirmation)|mark\\s+(?:as\\s+)?(?:safe|green|approved|verified)|treat\\s+(?:as\\s+)?(?:safe|green|approved|verified))\\b)(?=.*\\b(?:warnings?|wallet\\s+warnings?|allowance\\s+(?:warning|alert)|risk\\s+(?:banner|prompt|warning)|confirmation|confirmation\\s+(?:screen|prompt)|human\\s+confirmation|user\\s+confirmation|review\\s+prompt|mismatch\\s+(?:finding|warning)|spender\\s+(?:alert|warning))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-124"
+}

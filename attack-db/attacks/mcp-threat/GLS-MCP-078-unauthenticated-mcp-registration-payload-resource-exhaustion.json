@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-078",
+  "name": "unauthenticated MCP registration payload resource exhaustion",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An unauthenticated MCP OAuth dynamic client-registration endpoint stays reachable even when the MCP feature toggle is off and accepts oversized registration payloads with no allocation bound, exhausting shared service memory.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe|mitigated|bounded)\\b)(?=.*\\b(?:mcp|oauth)\\b)(?=.*\\b(?:client[ -]?registration|registration|register(?:ation)? endpoint|dynamic registration)\\b)(?=.*\\b(?:unauthenticated|without authentication|without auth|no auth|anonymous|public)\\b)(?=.*\\b(?:oversized|large|unbounded|unlimited|without (?:a|any) (?:limit|cap)|resource control|memory|allocation|exhaust|oom|out of memory|unavailable|denial[- ]of[- ]service)\\b)(?=.*\\b(?:disabled|enable/disable|toggle|off|not enabled|ignored|does not restrict|still reachable|regardless)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-078"
+}

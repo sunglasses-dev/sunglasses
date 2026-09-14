@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-673",
+  "name": "Duplicate Citation Corroboration Laundering",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "One attacker-controlled citation is replicated under aliases so a verifier counts the aliases as independent corroboration and promotes an unsupported causal edge into a trusted hypothesis.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|mitigation|patched|fixed|blocked|safe|test\\s+fixture|documentation|must\\s+not|do\\s+not|never|deduplicat(?:e|ed|ion)|independent\\s+source|verified\\s+unique)\\b)(?=.*\\b(?:provenance|causal|lineage|attack[- ]graph|backward[- ]track)\\w*\\b)(?=.*\\b(?:citation|reference|source|evidence)\\w*\\b)(?=.*\\b(?:duplicate|duplicated|alias(?:ed|es)?|same\\s+(?:source|id)|repeated|copy)\\b)(?=.*\\b(?:corroborat|independent|confirm|agreement|consensus)\\w*\\b)(?=.*\\b(?:verif(?:y|ier|ied|ication)|trust|accept|launder|promot|hypothesis|steer)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-673"
+}

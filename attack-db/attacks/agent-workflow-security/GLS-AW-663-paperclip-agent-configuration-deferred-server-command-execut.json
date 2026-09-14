@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-663",
+  "name": "Paperclip agent configuration deferred server-command execution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent credential self-updates persistent adapterConfig with a shell-bearing provisionCommand that a later server-side workspace-provisioning event executes on the host, splitting the attack across two moments so no single request crosses a trust boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|test|review)|unit\\s+test|fixture|example|fixed|patched|reject(?:ed|s)|prevent(?:ed|s)|must\\s+(?:not|reject|validate)|safe|benign|refuse|quarantine)\\b)(?=.*\\b(?:paperclip|agent\\s+api\\s+key|agent\\s+credential|adapterConfig|adapter\\s*config)\\b)(?=.*\\b(?:provisionCommand|provision\\s+command|workspace\\s+provision(?:ing)?|workspaceStrategy)\\b)(?=.*\\b(?:self[- ]?update\\w*|update\\w*|mutat\\w*|change\\w*|caller[- ]controlled|attacker[- ]controlled|tamper\\w*|inject\\w*)\\b)(?=.*(?:[;&|`]|\\$\\(|\\b(?:sh|bash|shell|exec|command|run)\\b))(?=.*\\b(?:later|defer(?:red|s)?|subsequent|during|when)\\b)(?=.*\\b(?:server|host|runtime|provision(?:ing)?|execute|execution|code\\s+execution|RCE)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-663"
+}

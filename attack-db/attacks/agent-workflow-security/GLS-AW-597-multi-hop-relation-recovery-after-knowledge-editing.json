@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-597",
+  "name": "Multi-hop relation recovery after knowledge editing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A knowledge-edited model that refuses direct recall still reconstructs the suppressed fact by chaining entity, relation, and former-attribute hops and emitting the recovered value into a serialized report field.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|incident|postmortem|defensive|reject|block|quarantine|safe\\s+control)\\b)(?=.*\\b(?:edit(?:ed|ing)?|suppressed|post[- ]edit|pre[- ]edit)\\w*\\b)(?=.*\\b(?:entity|relation|relationship|attribute|graph|edge)\\w*\\b)(?=.*\\b(?:multi[- ]?hop|chain|reconstruct|reconstruction|recover|derive|triangulat)\\w*\\b)(?=.*\\b(?:contrast|former|original|before|comparison)\\w*\\b)(?=.*\\b(?:report|table|serialized|field|output)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-597"
+}

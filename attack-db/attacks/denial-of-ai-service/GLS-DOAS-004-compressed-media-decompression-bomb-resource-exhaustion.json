@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DOAS-004",
+  "name": "Compressed-media decompression-bomb resource exhaustion",
+  "version": "1.0",
+  "category": "denial_of_ai_service",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A compressed audio upload passes the compressed-size check but forces the decoder to materialize an unbounded float32 PCM buffer (25MB OPUS to ~14.9GB), exhausting shared service memory and denying service.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe)\\b)(?=.*\\b(?:audio|sound|opus|vorbis|mp3|media|transcription|transcribe)\\b)(?=.*\\b(?:compress(?:ed|ion)?|decode(?:r|d|s|ing)?|expand(?:ed|s|ing)?|decompress(?:ed|es|ing|ion)?)\\b)(?=.*\\b(?:pcm|float32|decoded output|materiali[sz]e|buffer|allocation|memory|ram)\\b)(?=.*\\b(?:unbounded|unlimited|without (?:a|any) (?:limit|cap)|amplif(?:y|ied|ication)|exhaust|out of memory|oom|crash|unavailable|denial[- ]of[- ]service)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DOAS-004"
+}

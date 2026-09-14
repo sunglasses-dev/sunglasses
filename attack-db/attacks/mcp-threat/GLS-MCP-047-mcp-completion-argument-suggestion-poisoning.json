@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-047",
+  "name": "MCP Completion Argument Suggestion Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP Completion Argument Suggestion Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting Model Context Protocol (MCP) autocomplete suggestions specifically.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:no\\s+(?:policy\\s+)?overrides?\\s+(?:are\\s+)?present|do\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|does\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|never\\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|must\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|(?:security|incident|training)\\s+(?:report|guide|doc).*\\b(?:detected|flagged|blocked|refused))\\b)\n(?=.*(?:\\bMCP\\b|Model\\s+Context\\s+Protocol|completion/complete|completions?/complete|argument\\s+completion|autocomplete\\s+(?:suggestions?|values?)|completion\\s+(?:result|response|metadata)|values?\\[\\]|hasMore|total|ref/prompt|ref/resource|prompt\\s+argument\\s+completion|resource\\s+argument\\s+completion))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|coding\\s+agents?|security\\s+scanners?|scanners?|review\\s+bots?|tool\\s+builders?|llms?|models?)(?![A-Za-z0-9]))\n(?=.*(?:agent\\s+(?:instructions?|notes?|policy)|scanner\\s+(?:instructions?|notes?|policy)|assistant\\s+(?:instructions?|notes?|policy)|(?:system|developer|user)\\s+(?:instructions?|policy)|supersed(?:e|es|ed|ing)|overrid(?:e|es|den|ing)|outranks?|takes?\\s+precedence|highest\\s+priority|(?:primary|single)\\s+source\\s+of\\s+truth|authoritative|governing\\s+(?:policy|instructions?)|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|treat.{0,50}?as\\s+(?:informational|safe|non-blocking)|(?:include|forward|send|share|attach|copy|collect|provide|read)\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context)|api\\s+keys?|tokens?|bearer\\s+tokens?|authorization\\s+headers?|session\\s+cookies?|local\\s+state|workspace\\s+secrets?|hidden\\s+config)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-047"
+}

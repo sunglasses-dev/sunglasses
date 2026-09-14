@@ -1,0 +1,24 @@
+{
+  "id": "GLS-ALP-001",
+  "name": "in-toto/SLSA Attestation Lineage Pointer Swap",
+  "version": "1.0",
+  "category": "attestation_lineage_poisoning",
+  "severity": "critical",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "in-toto/SLSA Attestation Lineage Pointer Swap: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structural lineage/pointer swapping in signed chains, distinct from general provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(attestation|provenance|lineage|signed\\s+chain|proof\\s+chain)\\b)(?=.*\\b(pointer|parent|head|latest|canonical|anchor)\\b)(?=.*\\b(swap|replace|rebind|redirect|override|substitute|retarget)\\b)(?=.*\\b(approval|consent|grant|authorized?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ALP-001"
+}

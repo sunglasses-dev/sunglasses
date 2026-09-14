@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-039",
+  "name": "platform-conditioned model-artifact activation",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model artifact carries an input-independent backdoor keyed to the serving platform's numerical signature, so a clean audit verdict from platform A is reused to release malicious behavior on platform B.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|documentation|unit test|negative fixture|must not|do not|never|blocked|rejected|safe handling|revalidated|independently checked)\\b)(?=.*\"audit_platform\"\\s*:)(?=.*\"serve_platform\"\\s*:)(?=.*\"audited_behavior\"\\s*:\\s*\"(?:benign|safe|clean|approved benign)\")(?=.*\"served_behavior\"\\s*:\\s*\"(?:malicious|backdoor|malicious downstream task|unsafe|backdoor active|attacker-selected malicious behavior)\")(?=.*\"reuses_audit_verdict\"\\s*:\\s*true).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-039"
+}

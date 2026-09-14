@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPD-005",
+  "name": "Cross-agent decode-state desynchronization",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegator and delegate apply different normalization/decoding policies to the same handoff, so each local view scans benign while the delegate reconstructs and forwards a restricted request.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|safe\\s+test|unit\\s+test|documentation|security\\s+guide|incident\\s+report|postmortem|reject(?:s|ed)?|blocked|fail[- ]?closed|must\\s+not)\\b)(?=.*\\b(?:delegate|delegator|handoff|reviewer)\\b)(?=.*\\b(?:decode|decoded|decoding|normaliz(?:e|ation|ed)|canonical)\\w*\\b)(?=.*\\b(?:mismatch|desynchron|different|diverg|partial(?:ly)?)\\w*\\b)(?=.*\\b(?:reconstruct|reassembled|downstream|hidden)\\w*\\b)(?=.*\\b(?:allow|approve|permit|forward)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPD-005"
+}

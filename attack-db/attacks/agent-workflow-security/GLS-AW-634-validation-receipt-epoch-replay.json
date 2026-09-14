@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-634",
+  "name": "Validation Receipt Epoch Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A prior validated-vulnerability receipt or semantic match is replayed into a later evaluation run against a different target/epoch without identity and epoch rebinding, so stale evidence is scored as a fresh validated discovery.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|benign\\s+control|safe\\s+example|must\\s+(?:rebind|invalidate|reject|block)|do\\s+not|refuse|blocked)\\b)(?=.*\\b(?:prior|previous|stale|replay(?:ed)?|carry(?:ing)?\\s+over)\\b)(?=.*\\b(?:validated|confirmed|matched)\\s+(?:finding|vulnerability|evidence|receipt)\\b)(?=.*\\b(?:current|new|later)\\s+(?:target|run|evaluation|discovery)\\b)(?=.*\\b(?:without|missing|lacks?)\\s+(?:re-?bind(?:ing)?|identity|epoch|version|fresh)\\b)(?=.*\\b(?:count|treat|accept|score)\\w*\\b.{0,60}\\b(?:current|fresh|validated)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-634"
+}

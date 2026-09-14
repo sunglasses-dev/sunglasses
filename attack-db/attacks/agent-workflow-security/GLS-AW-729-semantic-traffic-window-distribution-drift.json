@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-729",
+  "name": "Semantic Traffic Window Distribution Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model extractor can make each API query look benign while the aggregate semantic distribution of a mixed-user traffic window drifts from a benign-calibrated baseline; MMD-style window testing detects the evidence shape that single-query rules miss.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+guide|documentation|unit\\s+test|negative\\s+fixture|postmortem|incident\\s+report|blocked|quarantined|benign\\s+example|must\\s+not|do\\s+not)\\b)(?=.*\\b(?:traffic[- ]window|query[- ]window|windowed|rolling\\s+window)\\b)(?=.*\\b(?:semantic\\s+(?:space|embedding|distribution)|embedding(?:s)?|vector[- ]space)\\b)(?=.*\\b(?:aggregate|aggregated|distribution|two[- ]sample|population)\\w*\\b)(?=.*\\b(?:benign[- ]calibrated|historical\\s+benign|benign[- ]vs[- ]benign|baseline)\\b)(?=.*\\b(?:MMD|maximum\\s+mean\\s+discrepancy|kernel\\s+(?:test|distance))\\b)(?=.*\\b(?:model\\s+extraction|extract(?:ion|or)|model\\s+steal(?:ing)?|surrogate)\\b)(?=.*\\b(?:mixed[- ]user|attacker\\s+fraction|attacker\\s+traffic|multi[- ]user|fraction)\\b)(?=.*\\b(?:deviat(?:e|ion)|drift|shift|reject|alert|detect)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-729"
+}

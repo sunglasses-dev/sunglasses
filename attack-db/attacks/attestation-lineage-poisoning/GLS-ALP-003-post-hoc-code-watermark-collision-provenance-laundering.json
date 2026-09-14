@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ALP-003",
+  "name": "Post-Hoc Code Watermark Collision Provenance Laundering",
+  "version": "1.0",
+  "category": "attestation_lineage_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker preserves or reproduces a trusted model's post-hoc multi-channel code watermark through variable-name and semantically equivalent pattern choices while inserting unsafe code, laundering the watermark into trusted-origin authorship evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training)|documentation|unit\\s+test|test\\s+fixture|blocked|must\\s+not|do\\s+not|reject(?:ed)?|quarantine)\\b)(?=.*\\b(?:post[- ]hoc|code|source)\\s+(?:watermark|provenance)\\b)(?=.*\\b(?:variable\\s+names?|semantically\\s+equivalent|multi[- ]channel|keyed)\\b)(?=.*\\b(?:reproduc|collid|preserv|forge|clone|mimic)\\w*\\b)(?=.*\\b(?:trusted|model[- ]origin|authorship|attribution)\\b)(?=.*\\b(?:accept|approve|bypass|skip|suppress|unsafe|malicious)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ALP-003"
+}

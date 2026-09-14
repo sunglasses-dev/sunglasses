@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-039",
+  "name": "Cloudflare Access audit log control-plane impersonation (hardening row)",
+  "version": "1.0",
+  "category": "cloudflare_access_audit_log_tool_output",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Cloudflare Access audit/tunnel output can launder Zero Trust access telemetry into forged control-plane approval for deployment and release agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-039"
+}

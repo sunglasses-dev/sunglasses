@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-607",
+  "name": "Citation Presence Validation Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A verifier or human reviewer accepts an unsupported claim because a real-looking citation field exists, never checking that the cited evidence span entails the claim, and forwards it downstream as verified intelligence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive\\s+(?:guidance|analysis|runbook)|security\\s+test|unit\\s+test|negative\\s+fixture|benign\\s+example|must\\s+(?:not|reject)|do\\s+not\\s+(?:accept|approve)|safe\\s+(?:verification|handling))\\b)(?=.*\\b(?:claim|finding|assertion)\\b)(?=.*\\b(?:citation|source[_ ]url|reference)\\b)(?=.*\\b(?:evidence[_ ]span|quoted[_ ]span|supporting[_ ]span)\\b)(?=.*\\b(?:does\\s+not\\s+entail|unsupported|not\\s+supported|mismatch|unsubstantiated)\\b)(?=.*\\b(?:verif(?:y|ier|ication)|analyst|reviewer|approval|handoff|downstream)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-607"
+}

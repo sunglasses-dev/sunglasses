@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-599",
+  "name": "Scalar-to-list scope coercion split",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A runtime guard authorizes a narrow scalar scope/recipient field while the executor coerces the same field into a list or wildcard, widening the tool dispatch target set with no new authorization step.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:example|documentation|unit\\s+test|defensive|reject|block|quarantine|must\\s+not|do\\s+not|safe)\\b)(?=.*\\b(?:json|tool\\s*(?:call|argument)|function\\s*(?:call|argument)|payload)\\b)(?=.*\\b(?:scope|scopes|recipient|recipients|audience|targets?)\\b)(?=.*\\b(?:scalar|string|single[- ]value)\\b)(?=.*\\b(?:array|list|coerc(?:e|ion)|cast|widen|split|expand)\\w*\\b)(?=.*\\b(?:validator|guard|checker|policy)\\b)(?=.*\\b(?:executor|runtime|deserializ|dispatch|invoke)\\w*\\b)(?=.*\\b(?:external|wildcard|all[- ]targets?|broader|additional)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-599"
+}

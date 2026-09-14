@@ -1,0 +1,25 @@
+{
+  "id": "GLS-VMIS-001",
+  "name": "Vector Store Metadata Authority Injection",
+  "version": "1.0",
+  "category": "vector_metadata_instruction_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Vector Store Metadata Authority Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 distinct vector targeting trust in cited RAG source metadata fields via role markers.",
+  "keywords": [],
+  "regex": [
+    "(?i)\"(?:title|source|author|description|label)\"\\s*:\\s*\"[^\"]{0,120}\\[(?:ctx|admin|sys|meta|context|role)\\s*[:=][^\\]]{1,60}\\][^\"]*\""
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-VMIS-001"
+}

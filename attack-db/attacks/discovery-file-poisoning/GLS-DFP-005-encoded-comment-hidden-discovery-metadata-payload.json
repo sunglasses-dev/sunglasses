@@ -27,7 +27,7 @@
     "authoritative"
   ],
   "regex": [
-    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refus(?:e|ed)|block(?:ed)?|ignore\\s+any)\\b.{0,180}\\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\\b)(?=.*\\b(?:llms\\.txt|robots\\.txt|sitemap(?:\\.xml)?|\\.well-known|manifest|openapi|ai-plugin|agent[-\\s]*json|agent[-\\s]*discovery|metadata)\\b)(?=.*\\b(?:agent|assistant|ai[-\\s]*agent|crawler|bot|tool|connector|model)\\b)(?=.*\\b(?:comment|cdata|json-ld|opengraph|meta\\s+tag|frontmatter|base64|b64|percent[-\\s]*encod(?:e|ed|ing)|url[-\\s]*encod(?:e|ed|ing)|zero[-\\s]*width|hidden|decode|encoded)\\b)(?=.*\\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\\s*variables?|authorization|bearer|scanner|guardrail|safety)\\b).*$"
+    "(?is)^(?!.*\\b(?:do\\s+not|don't|never|must\\s+not|should\\s+not|refus(?:e|ed)|block(?:ed)?|ignore\\s+any)\\b.{0,180}\\b(?:obey|execute|decode|load|follow|treat|override|supersede|exfiltrate|forward|send)\\b)(?=.*\\b(?:llms\\.txt|robots\\.txt|sitemap(?:\\.xml)?|\\.well-known|openapi|ai-plugin|agent[-\\s]*json|agent[-\\s]*discovery)\\b)(?=.*\\b(?:agents?|assistants?|ai[-\\s]*agents?|crawlers?|bots?|tools?|connectors?|models?)\\b)(?=.*\\b(?:comment|cdata|json-ld|opengraph|meta\\s+tag|frontmatter|base64|b64|percent[-\\s]*encod(?:e|ed|ing)|url[-\\s]*encod(?:e|ed|ing)|zero[-\\s]*width|hidden|decode|encoded)\\b)(?=.*\\b(?:system|developer|policy|instruction|override|supersede|authoritative|token|secret|env(?:ironment)?\\s*variables?|authorization|bearer|scanner|guardrail|safety)\\b).*$"
   ],
   "examples": {
     "malicious": [],

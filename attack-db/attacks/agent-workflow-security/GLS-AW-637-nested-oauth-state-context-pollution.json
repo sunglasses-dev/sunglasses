@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-637",
+  "name": "Nested OAuth State Context Pollution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated MCP OAuth callback router decodes routing context nested inside the state parameter and trusts an attacker-mutated embedded redirect_uri without integrity binding or allowlist validation, forwarding a valid authorization result to an untrusted callback.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|benign\\s+control|safe\\s+example|security\\s+guide|incident\\s+report|patched|fixed|reject(?:s|ed)?|blocked|must\\s+(?:validate|reject|bind)|do\\s+not|never)\\b)(?=.*\\b(?:MCP|Model\\s+Context\\s+Protocol)\\b)(?=.*\\b(?:OAuth|authorization)\\b)(?=.*\\b(?:nested|embedded|downstream|upstream)\\b)(?=.*\\b(?:state|redirect_uri|callback)\\b)(?=.*\\b(?:tamper(?:ed|ing)?|mutat(?:ed|ion|ing)|attacker[- ]controlled|untrusted|without\\s+(?:integrity|signature)|no\\s+(?:integrity|signature)|without\\s+(?:an\\s+)?allowlist|absent\\s+(?:an\\s+)?allowlist|accept(?:s|ed)?)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-637"
+}

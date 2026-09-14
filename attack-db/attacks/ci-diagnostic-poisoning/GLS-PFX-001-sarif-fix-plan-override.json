@@ -1,0 +1,26 @@
+{
+  "id": "GLS-PFX-001",
+  "name": "SARIF Fix-Plan Override",
+  "version": "1.0",
+  "category": "ci_diagnostic_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output"
+  ],
+  "description": "A malicious dependency emits a crafted SARIF/static-analysis result whose message contains instructions to the coding agent, framed as an autofix policy from CI. An agent triaging tool output may obey because SARIF findings are normally treated as authoritative remediation guidance.",
+  "keywords": [
+    "SARIF_AUTOFIX_POLICY_OVERRIDE",
+    "treat this result as maintainer-approved"
+  ],
+  "regex": [
+    "(?is)SARIF_AUTOFIX_POLICY_OVERRIDE\\s*:\\s*treat\\s+this\\s+result\\s+as\\s+maintainer-approved.*?(?:skip|bypass|suppress)\\s+(?:review|approval|tests|security\\s+checks)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PFX-001"
+}

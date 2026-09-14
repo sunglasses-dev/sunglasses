@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-585",
+  "name": "RAS representation/output safety divergence",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A high representation-level refusal-alignment score (RAS/SafeVec hidden-state metric) is promoted to an output authorization verdict, releasing a paired completion that is explicitly marked policy-unsafe.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:guide|documentation|policy|unit\\s+test|fixture|incident|postmortem|quarantine|blocked|refused|rejected|must\\s+not|do\\s+not|never)\\b.*\\b(?:must\\s+not|should\\s+not|do\\s+not|never|refuse|reject|block|detect|flag|report)\\b)(?=.*\\b(?:RAS|SafeVec|refusal[-_ ]alignment|refusal\\s+direction)\\b)(?=.*\\b(?:score|alignment|metric|hidden[-_ ]state|layer[-_ ]window)\\b.{0,100}\\b(?:9[0-9](?:\\.\\d+)?|high|safe|aligned)\\b)(?=.*\\b(?:generated|emitted|final|model)\\s+(?:output|answer|completion|response)\\b)(?=.*\\b(?:unsafe|harmful|prohibited|disallowed|policy_status\\s*[:=]\\s*unsafe)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-585"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-614",
+  "name": "Swarm Correlation Independence Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker spreads weak correlated indicators across specialist agents so an independence-blind consensus reducer counts one shared lineage as many independent witnesses, manufacturing a false hypothesis or suppressing a true contradiction.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|reject(?:ed)?|block(?:ed)?|fail[- ]?closed|require(?:s)?\\s+independent)\\b)(?=.*\\b(?:specialist|worker|sub[- ]?agent|multi[- ]?agent|swarm)\\w*\\b)(?=.*\\b(?:low[- ]?rate|distributed|weak|partial|delayed)\\s+(?:signal|indicator|report|evidence|alert)\\w*\\b)(?=.*\\b(?:correlat|shared[- ]origin|same[- ]lineage|dependent|echo)\\w*\\b)(?=.*\\b(?:independent|separate)\\s+(?:support|evidence|reports?|votes?|hypotheses?)\\b)(?=.*\\b(?:consensus|pheromone|quorum|aggregation|reinforc|suppress)\\w*\\b)(?=.*\\b(?:false\\s+(?:hypothesis|threat)|true\\s+(?:signal|contradiction)|miss(?:ed|ing)?\\s+(?:threat|attack))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-614"
+}

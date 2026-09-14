@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-140",
+  "name": "JUnit XML system-output base64 rehydration prompt smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "JUnit XML system-output base64 rehydration prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structural targeting of JUnit XML output combined with base64 rehydration instructions.",
+  "keywords": [],
+  "regex": [
+    "(?is)<(?:system-out|system-err|failure|error)\\b[^>]*>(?=[\\s\\S]{0,1500}</(?:system-out|system-err|failure|error)>)(?![\\s\\S]{0,500}\\b(?:security test|scanner should|do not comply|not comply|should quarantine)\\b)(?=[\\s\\S]{0,1200}\\b(?:base64|b64)\\b)(?=[\\s\\S]{0,1200}\\b(?:decode|decoded|decoding)\\b)(?=[\\s\\S]{0,1200}\\b(?:follow|obey|execute|run|treat|use)\\b.{0,100}\\b(?:instruction|instructions|prompt|directive|directives|system message)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-140"
+}

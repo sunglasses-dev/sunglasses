@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-013",
+  "name": "Git conflict-marker resolution authority laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Unresolved Git conflict markers can carry branch-local resolver metadata that launders one side of the conflict into approval/release authority for coding agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-013"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-571",
+  "name": "Delegated RAG provenance and access-scope loss",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A RAG-derived recommendation crosses a cross-agent delegation boundary with source identity, query scope, access scope and transformation lineage stripped, so a downstream delegate accepts it as verified and executes a privileged action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|scanner\\s+rule|negative\\s+fixture|documentation|incident\\s+report|postmortem|benign|must\\s+not|do\\s+not|reject(?:ed|s)?|quarantine|preserve\\s+provenance|intact\\s+lineage|no\\s+privileged\\s+action)\\b)(?=.*\\b(?:delegat(?:e|ed|ion)|downstream\\s+(?:worker|agent|delegate)|cross[- ]agent|handoff)\\b)(?=.*\\b(?:RAG|retriev(?:ed|al)|retrieval\\s+chunk|knowledge\\s+base|external\\s+evidence)\\b)(?=.*\\b(?:omit(?:ted)?|missing|without|lost|dropped|stripped|unlabeled|no)\\b)(?=.*\\b(?:provenance|lineage|source(?:\\s+identity)?|query\\s+scope|access[- ]scope|retrieval\\s+(?:trace|metadata))\\b)(?=.*\\b(?:recommendation|summary|derivative|transformed|conclusion)\\b)(?=.*\\b(?:accept|approve|execute|privileged|verified|trusted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-571"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-040",
+  "name": "optimization-conditioned compiled model-artifact backdoor",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A checkpoint passes clean eager/uncompiled safety evaluation while compiler/JIT/graph optimization materializes a compiled-only dormant backdoor, and the pre-compile verdict is reused to ship the optimized artifact.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|documentation|unit test|negative fixture|must not|do not|never|blocked|rejected|safe|quarantined|verified|defensive|incident report)\\b)(?=.*\\b(?:uncompiled|unoptimized|eager|fp32|full[- ]precision|pre[- ]compile)\\b)(?=.*\\b(?:clean|benign|trusted|passed|approved)\\b)(?=.*\\b(?:compil|optim|jit|graph)\\w*\\b)(?=.*\\b(?:model|checkpoint|artifact|weights|inference|inputs?)\\b)(?=.*\\b(?:backdoor|malicious|unsafe|trigger|hijack)\\w*\\b)(?=.*\\b(?:activat|hid|dormant|changed|generated|side[- ]effect|fired|diverg|numerical)\\w*\\b)(?=.*\\b(?:verdict|approval|validation|revalidat|canary|test|gate)\\w*\\b)(?=.*\\b(?:deploy|release|ship|serve|reuse|skip|stale|trust|without|pre[- ]compile|compiled[- ]path|inherit)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-040"
+}

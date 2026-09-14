@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-584",
+  "name": "Multimodal Invocation Residual Safety Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "When an image request skips the explicit image-tool invocation lifecycle, the safety residual is absent and a downstream consumer that treats missing invocation state as neutral answers an unsafe request it would otherwise refuse.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:trusted|verified|safe|benign|documentation|unit\\s+test|test\\s+fixture|must\\s+not|display_only)\\b)(?=.*\"modality\"\\s*:\\s*\"image\")(?!.*\"image_tool_invoked\"\\s*:\\s*true)(?=.*\"control_paradigm\"\\s*:\\s*\"text_only_prior_turn\")(?=.*\"safety_residual\"\\s*:\\s*\"absent\")(?=.*\"downstream_request\"\\s*:\\s*\"unsafe_lab_request\").*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-584"
+}

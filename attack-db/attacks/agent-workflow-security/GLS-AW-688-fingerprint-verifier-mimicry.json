@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-688",
+  "name": "Fingerprint Verifier Mimicry",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A weaker inference model is fine-tuned to imitate a premium model on a finite client fingerprint suite, and the verifier mistakes bounded behavioral similarity for proof of the advertised model identity.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantin\\w*|must\\s+not|do\\s+not|never\\s+accept)\\b)(?=.*\\b(?:model\\s+fingerprint|model[- ]identity|inference\\s+service|premium\\s+model)\\b)(?=.*\\b(?:finite|limited|small|short|budgeted)\\s+(?:query|probe|test|fingerprint)\\w*\\b)(?=.*\\b(?:surrogate|weaker\\s+model|distill\\w*|fine[- ]tun\\w*|mimic\\w*|imitat\\w*)\\b)(?=.*\\b(?:accept|certif\\w*|trust|proof|verify|pass)\\w*.{0,140}\\b(?:identity|premium|advertised|origin|model)\\b)(?=.*\\b(?:without|no|lack\\w*|missing|unbound|unpredictable|provider[- ]side)\\b.{0,100}\\b(?:challenge|digest|weights?|binding|identity|verification)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-688"
+}

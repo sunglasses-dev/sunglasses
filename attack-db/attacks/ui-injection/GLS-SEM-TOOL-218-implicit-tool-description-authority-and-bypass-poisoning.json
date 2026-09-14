@@ -20,7 +20,7 @@
     "for safety avoid confirmation"
   ],
   "regex": [
-    "(?i)\\b(?:official|trusted|certified|highest\\s+priority|always\\s+prefer)\\b.{0,120}\\b(?:tool|plugin|connector|integration|api)\\b|\\b(?:for\\s+safety|for\\s+compliance|policy\\s+requires)\\b.{0,140}\\b(?:skip|omit|disable|avoid)\\b.{0,80}\\b(?:verification|validation|confirmation|checks?)\\b"
+    "(?i)\\b(?:official|trusted|certified|highest[- ]priority|always\\s+prefer(?:\\s+this)?)\\s+(?:\\w+\\s+){0,1}(?:tool|plugin|connector|integration|mcp\\s+server)\\b|\\b(?:for\\s+safety|for\\s+compliance|policy\\s+requires)\\b.{0,140}\\b(?:skip|omit|disable|avoid)\\b.{0,80}\\b(?:verification|validation|confirmation|checks?)\\b"
   ],
   "examples": {
     "malicious": [],

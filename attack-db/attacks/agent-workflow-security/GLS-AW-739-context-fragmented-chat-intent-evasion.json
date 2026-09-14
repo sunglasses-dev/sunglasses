@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-739",
+  "name": "Context Fragmented Chat Intent Evasion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker distributes an unsafe solicitation across innocuous-looking chat turns so turn-level moderation misses the emergent intent reconstructed by the session-aware agent.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|negative\\s+fixture|blocked|quarantined|must\\s+not|do\\s+not\\s+obey|safe\\s+example|incident\\s+report)\\b)(?=.*\\b(?:meet|come)\\b)(?=.*\\b(?:don't|do\\s+not)\\s+(?:tell|mention)\\b)(?=.*\\b(?:parent|guardian|family)(?:s)?\\b)(?=.*\\b(?:address|where\\s+you\\s+live|location)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-739"
+}

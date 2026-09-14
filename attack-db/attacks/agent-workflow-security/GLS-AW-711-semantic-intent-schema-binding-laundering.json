@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-711",
+  "name": "Semantic Intent Schema Binding Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated A2A/MCP router treats a privacy-preserving intent vector plus zero-knowledge schema-consistency proof as sufficient authorization, although the proof does not bind hidden semantic privilege; the downstream agent admits and dispatches the payload into a protected trust zone without revalidation.",
+  "keywords": [],
+  "regex": [
+    "(?isx)\\A(?!.*\\b(?:security\\s+(?:guide|training|review|documentation)|unit\\s+test|negative\\s+fixture|blocked\\s+sample|incident\\s+report|postmortem|defensive\\s+policy|must\\s+not|should\\s+(?:reject|deny)|safe\\s+(?:example|control)|quarantined)\\b)(?=.*\\b(?:A2A|MCP|semantic[- ]routing|router|routing|trust[- ]zone|delegat\\w*)\\b)(?=.*\\b(?:zero[- ]knowledge|ZK(?:\\s+payload)?(?:[- ]schema)?\\s+proof|schema[- ]consistency|intent\\s+vector|differentially\\s+private)\\b)(?=.*\\b(?:hidden|encrypted|opaque|unseen|unbound|semantic\\s+(?:mismatch|content)|payload\\s+content)\\b)(?=.*\\b(?:privileg\\w*|sensitive|protected|restricted|export)\\b)(?=.*\\b(?:admit\\w*|route\\w*|dispatch\\w*|forward\\w*|allow\\w*|grant\\w*)\\b)(?=.*\\b(?:without\\s+(?:decrypt\\w*|recheck\\w*|semantic\\s+verif\\w*|confirmation)|no\\s+(?:semantic\\s+)?(?:recheck|verification)|does\\s+not\\s+bind|fail(?:ed|s)?\\s+to\\s+bind)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-711"
+}

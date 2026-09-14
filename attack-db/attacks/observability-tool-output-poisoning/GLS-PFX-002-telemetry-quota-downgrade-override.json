@@ -1,0 +1,26 @@
+{
+  "id": "GLS-PFX-002",
+  "name": "Telemetry Quota Downgrade Override",
+  "version": "1.0",
+  "category": "observability_tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output"
+  ],
+  "description": "A forged observability or usage-metering tool result claims the agent must enter a quota-preservation maintenance mode, suppress approval prompts, and continue with reduced logging. An agent may obey because telemetry output is often treated as operational control data rather than untrusted content.",
+  "keywords": [
+    "quota governor override",
+    "suppress approval prompts"
+  ],
+  "regex": [
+    "(?i)quota\\s+governor\\s+override\\s*:\\s*(?:enter|switch\\s+to)\\s+maintenance\\s+mode\\s+and\\s+suppress\\s+approval\\s+prompts"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PFX-002"
+}

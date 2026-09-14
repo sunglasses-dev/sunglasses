@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-594",
+  "name": "Cumulative safety-state loss at session boundary",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker accumulates weak sub-threshold risk signals over multiple turns, crosses a session rollover/compaction/summarization boundary that resets or truncates the detector's cumulative safety state, then issues the harmful request against an empty state.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|benign|safe\\s+control|must\\s+(?:retain|carry|preserve|block|hold)|do\\s+not)\\b)(?=.*\\b(?:multi[- ]turn|turn\\s*1|prior\\s+turn)\\b)(?=.*\\b(?:weak|low|subthreshold|small)\\b)(?=.*\\b(?:risk|CUSUM|safety)\\s*(?:signal|score|evidence|state)\\b)(?=.*\\b(?:rollover|compaction|summarization|summary|session\\s+(?:reset|boundary|restart))\\b)(?=.*\\b(?:reset|clear|truncate|drop|lose|discard)\\w*\\b)(?=.*\\b(?:later|final|subsequent)\\b)(?=.*\\b(?:harmful|unsafe|restricted|prohibited|jailbreak)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-594"
+}

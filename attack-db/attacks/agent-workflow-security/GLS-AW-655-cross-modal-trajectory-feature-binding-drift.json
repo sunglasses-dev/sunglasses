@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-655",
+  "name": "cross-modal trajectory feature-binding drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A multimodal trajectory monitor computes unsafe cumulative drift but binds it to a different trajectory identity across a modality/session transition, so the credential-scoped action reads the benign identity and is approved.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|defensive|unit\\s+test|fixture|incident\\s+report|postmortem|must\\s+not|do\\s+not|never|rejected|blocked|fail[- ]?closed)\\b)(?=.*(?:trajectory[_ -]?records?|trajectory\\s+(?:id|identity)|cross[-_ ]modal|modality|session))(?=.*trajectory[_ -]?id.*trajectory[_ -]?id)(?=.*(?:unsafe|accelerating|cumulative[_ -]?risk|covariance\\s+shift))(?=.*(?:unbound|identity\\s+mismatch|trajectory[_ -]?mismatch|cross[-_ ]modal/session))(?=.*(?:credential|session).*?(?:approve|allow|permit|execute|proceed)\\w*).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-655"
+}

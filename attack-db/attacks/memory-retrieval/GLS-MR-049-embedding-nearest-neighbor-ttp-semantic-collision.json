@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-049",
+  "name": "Embedding Nearest Neighbor Ttp Semantic Collision",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An embedding-only TTP mapper makes a plausible but wrong nearest-technique assignment, drops uncertainty, and lets downstream mitigation or finding closure treat the label as verified evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|documentation|training)|scanner\\s+(?:rule|test)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked\\s+(?:sample|payload)|must\\s+not\\s+(?:trust|accept|promote)|preserve(?:s)?\\s+(?:top[- ]?k|uncertainty|provenance)|requires?\\s+independent\\s+validation)\\b)(?=.*\\b(?:ThreatForest|attack[- ]tree|TTP(?:\\s+mapping)?|ATT&CK|CAPEC)\\b)(?=.*\\b(?:embedding|cosine|nearest[- ]neighbor|similarity\\s+(?:score|mapping))\\b)(?=.*\\b(?:wrong|incorrect|misclassif\\w*|collision|semantically\\s+mismatch\\w*|drops?\\s+(?:the\\s+)?(?:alternative|uncertainty)|discard\\w*\\s+(?:the\\s+)?(?:alternative|uncertainty)|treats?\\s+(?:the\\s+)?(?:nearest|mapped)\\s+(?:TTP|technique|label)\\s+as\\s+verified)\\b)(?=.*\\b(?:mitigation|close\\w*\\s+(?:the\\s+)?(?:finding|alert)|suppress\\w*\\s+(?:the\\s+)?(?:finding|alert)|hide\\w*\\s+(?:the\\s+)?(?:finding|alert)|credential|secret|token)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-049"
+}

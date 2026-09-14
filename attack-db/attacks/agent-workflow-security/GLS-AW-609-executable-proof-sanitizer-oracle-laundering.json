@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-609",
+  "name": "Executable Proof Sanitizer Oracle Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agentic vulnerability detector generates an executable Proof-of-Vulnerability from attacker-controlled repository content, runs it with ambient capabilities, and launders sanitizer success into trusted evidence with no independent execution-policy boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:proof[- ]of[- ]vulnerability|PoV|proof artifact))(?=.*(?:generated|executable))(?=.*(?:attacker[- ]controlled|repository code))(?=.*sanitizer)(?=.*(?:trust|oracle|evidence)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-609"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-030",
+  "name": "Unicode Homoglyph Approval Laundering",
+  "version": "1.0",
+  "category": "unicode_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Unicode Cyrillic homoglyphs can visually preserve approval-laundering instructions while bypassing literal Latin-token detection; normalize confusables before applying the parent encoding-smuggling authority/action rules.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-030"
+}

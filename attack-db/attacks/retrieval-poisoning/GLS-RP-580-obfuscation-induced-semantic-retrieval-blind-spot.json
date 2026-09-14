@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-580",
+  "name": "Obfuscation-induced semantic retrieval blind spot",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent treats a benign-looking retrieved or summarized slice of obfuscated Android code as complete evidence and authorizes the artifact without deobfuscation or behavior-complete analysis of the omitted slices.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security guide|unit test|fixture|incident report|postmortem|defensive|must not|do not|never|blocked|rejected|benign example|safe review)\\b)(?=.*\\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|decompiled|code evidence|summary|snippet|slice)\\b)(?=.*\\b(?:obfuscat(?:ed|ion)|rename(?:d)? identifiers?|opaque control flow|encoded strings?|dead code|polymorph)\\b)(?=.*\\b(?:benign[- ]looking|incomplete|partial|missing|omits?|not all|without behavior[- ]complete|incomplete evidence)\\b)(?=.*\\b(?:permit|allow|approve|authorize|pass|safe|no threat|no malicious)\\b)(?=.*\\b(?:without|skip|lack(?:s|ing)?|not)\\b.{0,100}\\b(?:full|complete|whole|behavior|semantic|deobfuscat|cross[- ]slice|artifact)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-580"
+}

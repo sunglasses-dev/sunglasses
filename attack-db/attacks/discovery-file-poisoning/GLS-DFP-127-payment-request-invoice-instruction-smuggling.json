@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-127",
+  "name": "Payment-Request / Invoice Instruction Smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Payment-Request / Invoice Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 malicious instructions within payment requests, invoices, and checkout metadata.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|postmortem|forensic|training|docs?|guide|reference|runbook|playbook)\\b.{0,140}\\b(?:detected|blocked|reported|flagged|refused|warned)\\b|\n  (?:wallet\\s+)?scanners?\\s+(?:docs?|guide|reference)\\s+should\\s+(?:report|detect|flag|refuse|block)\\b|\n  (?:do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override)|\n     does\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|instruct)|\n     never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override)|\n     must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|report|override))\n))\n(?=.*(?:\\bpayment[_ -]?(?:request|intent|invoice|memo|note|message|uri|link)\\b|\\binvoice\\b|\\bcheckout\\s+(?:request|link|description|memo)\\b|\\bwallet\\s+(?:uri|dee?p[- ]?link|qr|payment)\\b|\\b(?:ethereum|bitcoin):[^\\s]+|\\beip[- ]?681\\b|\\btransaction\\s+(?:memo|note|message|label)\\b|\\brecipient\\s+(?:note|label|message)\\b|\\bmessage=|\\blabel=|(?<![a-zA-Z0-9])payment_(?:memo|note|message|label|description)(?![a-zA-Z0-9])))\n(?=.*\\b(?:wallet|sign(?:ing|ature)?|send\\s+transaction|transfer|payment|token|spender|allowance|recipient|amount|chain|domain|session|auth|human\\s+confirmation|confirmation)\\b)\n(?=.*(?:\\b(?:ai\\s+)?(?:wallet\\s+)?agents?\\b|\\bwallet\\s+assistants?\\b|\\bassistants?\\b|\\bcopilots?\\b|\\bmodels?\\b|\\bverifiers?\\b|\\bscanners?\\b|\\breviewers?\\b|(?<![a-zA-Z0-9])(?:agent|assistant|scanner|verifier|reviewer)[_-](?:instruction|note|policy|label|description)s?(?![a-zA-Z0-9])))\n(?=.*\\b(?:\n  (?:authoritative|canonical|primary|single)\\s+(?:checkout\\s+|payment\\s+|wallet\\s+)?(?:policy|source\\s+of\\s+truth|instruction|guidance)|\n  (?:verified|approved|pre[- ]?cleared|trusted)\\s+(?:payment|invoice|checkout|transfer|recipient|request)|\n  (?:suppress|hide|redact|downgrade|reclassify)\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|risks?|recipient|spender|allowance|amount|chain|domain|confirmation)s?|\n  (?:treat|mark|classify).{0,50}?\\bas\\s+(?:informational|safe|trusted|routine|low[- ]?risk)|\n  (?:skip|bypass|omit)\\s+(?:[\\w-]+\\s+){0,3}(?:human\\s+)?confirmation|\n  (?:approve|proceed|sign|send)\\s+without\\s+(?:[\\w-]+\\s+){0,3}(?:asking|confirmation|review|warning)|\n  (?:ignore|override|supersede)\\s+(?:[\\w-]+\\s+){0,3}(?:wallet|system|developer|security|scanner|review|warning|confirmation|risk)s?|\n  (?:include|attach|forward|send|share|copy|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|authorization\\s+headers?|bearer\\s+tokens?|api\\s+keys?|environment\\s+(?:variables?|context)|local\\s+state|wallet\\s+state|cookies?)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-127"
+}

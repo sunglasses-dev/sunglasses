@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-104",
+  "name": "Hardware-Wallet Ledger Policy Approval Suppression",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Hardware-Wallet Ledger Policy Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 hardware wallet (Ledger/Trezor) and blind signing metadata poisoning.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\\b.{0,90}?\\b(?:hardware\\s+wallet|device\\s+(?:prompt|screen|display)|companion\\s+app|wallet\\s+bridge|blind\\s+signing|confirm\\s+on\\s+device)\\b|\n  never\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\\b.{0,90}?\\b(?:hardware\\s+wallet|device\\s+(?:prompt|screen|display)|companion\\s+app|wallet\\s+bridge|blind\\s+signing|confirm\\s+on\\s+device)\\b|\n  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook|support\\s+article)\\b.{0,90}?\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block|warn|reject)\\b.{0,120}?\\b(?:safe\\s+to\\s+sign|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|confirm\\s+on\\s+device\\s+without|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:blind\\s+signing|allowance|risk)|include\\s+(?:[\\w-]+\\s+){0,4}(?:session|token|cookie|env|api\\s*key))|\n  (?:incident|postmortem|security\\s+report)\\b.{0,140}?(?:(?:blocked|detected|flagged|refused|warned|rejected)\\b.{0,140}?\\b(?:agent\\s+instruction|safe\\s+to\\s+sign|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|confirm\\s+on\\s+device\\s+without)|(?:agent\\s+instruction|safe\\s+to\\s+sign|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|confirm\\s+on\\s+device\\s+without)\\b.{0,140}?\\b(?:blocked|detected|flagged|refused|warned|rejected))\n))\n(?=.*(?<![a-zA-Z0-9])(?:hardware[-\\s]?wallet|ledger[-\\s]?(?:style|live|device)?|trezor(?:\\s+suite)?|coldcard|keystone\\s+wallet|device\\s+(?:prompt|screen|display|review)|on[-\\s]?device\\s+review|companion\\s+app|wallet\\s+companion|usb\\s+bridge|hid\\s+bridge|wallet\\s+bridge|blind\\s+signing|contract\\s+data|firmware\\s+prompt|confirm\\s+on\\s+device)(?![a-zA-Z0-9]))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|wallet\\s+agents?|browser\\s+assistants?|security\\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent|companion[_-]?note)(?![a-zA-Z0-9]))\n(?=.*\\b(?:sign(?:ature|ing)?|approve|approval|confirm(?:ation)?|transaction|permit2?|allowance|spender|contract\\s+data|blind\\s+signing|unknown\\s+contract|device\\s+confirmation|warning|warnings|risk|human\\s+review|review\\s+screen|on\\s+device|token)\\b)\n(?=.*\\b(?:\n  (?:agent|assistant|model|wallet\\s+agent|verifier|scanner)\\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|\n  (?:authoritative|canonical|primary|single)\\s+(?:wallet\\s+|device\\s+|companion\\s+)?(?:source\\s+of\\s+truth|policy|guidance|instruction)|\n  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\\s+precedence\\s+over|ignore|disregard)\\b.{0,90}?\\b(?:wallet|device|hardware|system|developer|security|warning|confirmation|approval)\\b|\n  safe\\s+to\\s+sign|mark\\s+(?:it|this|transaction|signature|approval|device\\s+prompt).{0,45}?\\bas\\s+safe|treat.{0,60}?as\\s+(?:safe|verified|read[-\\s]?only|informational|pre[-\\s]?approved)|\n  (?:do\\s+not|not)\\s+(?:warn|report|ask|prompt|escalate)|skip\\s+(?:the\\s+)?(?:warning|confirmation|review|human\\s+review)|proceed\\s+without\\s+(?:extra\\s+|user\\s+|human\\s+)?(?:review|confirmation)|confirm\\s+on\\s+device\\s+without\\s+(?:extra\\s+)?review|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|blind\\s+signing)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|blind\\s+signing)|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:blind\\s+signing|contract\\s+data|allowance|spender|risk|warning|device\\s+prompt)|\n  (?:include|forward|send|attach|provide|copy|read|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|wallet\\s+state|local\\s+state|environment\\s+(?:variables?|context)|cookies?|api\\s*keys?|authorization\\s+headers?)\n)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-104"
+}

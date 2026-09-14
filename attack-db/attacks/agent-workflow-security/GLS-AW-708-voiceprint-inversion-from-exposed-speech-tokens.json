@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-708",
+  "name": "Voiceprint Inversion From Exposed Speech Tokens",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An exposed intermediate speech-token preview can be inverted into an attacker-specified speaker representation and used to link a session to a voice identity.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|docs?|guide|runbook|unit\\s+test|test\\s+fixture|negative\\s+fixture|must\\s+not|do\\s+not|never|refused|blocked|redacted|sanitized|privacy\\s+warning)\\b)(?=.*\\b(?:speech[_ -]?tokens?|discrete\\s+(?:audio|speech)\\s+tokens?|frontend\\s+output|token\\s+embedding)\\b)(?=.*\\b(?:speaker[_ -]?encoder|speaker\\s+embedding|voiceprint|speaker\\s+identity)\\b)(?=.*\\b(?:invert|inversion|recover|reconstruct|derive|link|identify)\\b)(?=.*\\b(?:attacker[- ]specified|target\\s+speaker|speaker\\s+match|identity\\s+inference)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-708"
+}

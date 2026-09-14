@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-007",
+  "name": "Long Horizon Dormant Activation Predicate Persistence",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker plants a dormant activation predicate in persistent memory; after many benign sessions, a later sensitive-topic match wakes it and forwards private data.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|do\\s+not\\s+obey|should\\s+not)\\b)(?=.*\\b(?:memory|memory\\s+write|memory\\s+record|persistent)\\b)(?=.*\\b(?:dormant|latent|sleep(?:er)?|stays?\\s+dormant|remains?\\s+asleep|survive(?:s|d)?\\s+(?:\\d+\\s+)?benign\\s+sessions?|after\\s+\\d+\\s+benign)\\b)(?=.*\\b(?:later|when|upon|if)\\b.{0,140}\\b(?:finance|health|identity|tax|medical|bank)\\b)(?=.*\\b(?:private|personal|sensitive|bank|health)\\b)(?=.*\\b(?:send|forward|upload|exfiltrat|external\\s+callback|to\\s+the\\s+callback)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-007"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-709",
+  "name": "Edge Cloud Kv Cache Session Binding Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid authenticated KV-cache fragment from one edge endpoint/session can be replayed into another edge-cloud inference session when authentication is checked without jointly binding cache identity, endpoint, session, epoch, and transcript digest.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|blocked\\s+sample|quarantine|defensive|must\\s+(?:reject|deny|bind)|do\\s+not|never|fails?\\s+closed|mismatch\\s+(?:is|was)\\s+rejected|same\\s+(?:request|session)|tenant[- ]isolated)\\b)(?=.*\\b(?:edge[- ]cloud|split[- ]inference|endpoint|cloud\\s+decoder|partial\\s+logits?|KV[-_ ]cache|cache[_ -]?fragment)\\b)(?=.*\\b(?:authenticated|AES[- ]GCM|signed|MAC|valid)\\b.{0,160}\\b(?:cache(?:[_ -]?id|[_ -]?fragment)?|fragment|stream|logits?|envelope)\\b)(?=.*\\b(?:session|endpoint|tenant|principal|device|identity)\\b)(?=.*\\b(?:replay|reused?|accept(?:ed|s)?|fuse[sd]?|join(?:ed|s)?|restore[sd]?|carry\\s+forward|wrong|other|different|mismatch|cross[- ]session|unbound|without\\s+(?:fresh\\s+)?(?:session|identity|binding|validation|verification))\\b)(?=.*\\b(?:skip|without|despite|missing|ignoring|proceed|continue|restore|fuse|accept|reuse|replay)\\w*\\b.{0,120}\\b(?:bind|rebind|verify|validate|check|reject|fresh|epoch|digest|nonce|identity|session|endpoint|cache|fragment|logits?|context)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-709"
+}

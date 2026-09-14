@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-007",
+  "name": "Public Flow File Source Disclosure",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An anonymous request to a public/shareable flow endpoint supplies an attacker-chosen local or S3 file reference that is resolved, read, and injected into LLM context because flow-execution permission is wrongly treated as source-read authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:patched|fixed|upgrade|documentation|defensive|unit\\s+test|test\\s+asserts|reject(?:s|ed)?|403|disabled|allowlist|approved|capability[- ]bound|incident[- ]response)\\b)(?=.*(?:\\b(?:public|shareable)\\s+(?:flow|playground)\\b|\\bbuild_public_tmp\\b))(?=.*\\b(?:unauthenticated|anonymous|without\\s+authentication|no\\s+session)\\b)(?=.*\\b(?:files?\\b|file\\s+list|file\\s+reference|local\\s+path|s3\\s+path|s3://|file://)\\b)(?=.*\\b(?:read|reads|resolve|resolves|accepts|accept|load|loaded|loads|open|opens|ingest|injected|feeds?|fed\\s+into\\s+the\\s+llm|retrieval\\s+context)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-007"
+}

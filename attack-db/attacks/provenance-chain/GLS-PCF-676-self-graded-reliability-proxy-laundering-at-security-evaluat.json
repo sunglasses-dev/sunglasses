@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-676",
+  "name": "Self-graded reliability proxy laundering at security-evaluation output",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model's self-graded reliability or safety score is rendered as an approval badge and consumed as security evidence downstream, even though the independent adversarial evaluation is materially weaker, missing, or not comparable.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|documentation|defensive|benign|example|do\\s+not|never|quarantine|reject)\\b)(?=.*\\b(?:self[- ]?graded|self[- ]?assessed|model[- ]?reported|internal)\\s+(?:reliability|quality|safety)\\s*(?:proxy|score|rating)\\b)(?=.*\\b(?:external|independent|adversarial|third[- ]?party)\\s+(?:security|judge|evaluation|score|assessment)\\b)(?=.*\\b(?:lower|missing|absent|not comparable|weak|gap|20[-\u2013]61|14[-\u2013]42|24\\.8[-\u2013]88\\.2)\\b)(?=.*\\b(?:approve|approval|pass|accept|safe|release|ship|green[- ]?light)\\w*\\b)(?=.*\\b(?:render|display|report|summary|dashboard|output|badge)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-676"
+}

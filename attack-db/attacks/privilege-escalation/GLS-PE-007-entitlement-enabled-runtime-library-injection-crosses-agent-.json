@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PE-007",
+  "name": "Entitlement-enabled runtime library injection crosses agent process integrity",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent host shipped with allow-dyld-environment-variables plus disable-library-validation lets DYLD_INSERT_LIBRARIES load an untrusted dylib into the host process, where it inherits every capability already granted to that application.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:allow-dyld-environment-variables|dyld environment variables enabled))(?=.*(?:disable-library-validation|library validation disabled))(?=.*(?:DYLD_INSERT_LIBRARIES|insert library|untrusted dylib)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PE-007"
+}

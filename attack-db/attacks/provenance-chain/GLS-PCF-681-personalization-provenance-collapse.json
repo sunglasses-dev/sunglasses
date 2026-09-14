@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-681",
+  "name": "Personalization Provenance Collapse",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A troubleshooting agent fuses device diagnostics, user-profile inference and service-recommender output into one personalization record without preserving channel provenance, letting a stale or attacker-controlled low-trust profile claim acquire the authority of a device/security fact and steer remediation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|runbook|unit\\s+test|postmortem|benign|safe\\s+(?:path|merger)|must\\s+(?:preserve|bind|separate|reject)|fail[- ]closed|negative\\s+fixture|do\\s+not\\s+(?:merge|treat|accept))\\b)(?=.*\\b(?:tri[- ]context|device\\s+(?:diagnostic|evidence)|user\\s+(?:profile|proficiency|inference)|service\\s+(?:recommend(?:er|ation)|context))\\b)(?=.*\\b(?:merge|combine|conflat|corroborat|cross[- ]channel|(?:without|no|missing|lost)\\s+(?:source|field)?[ -]?(?:identity|provenance|lineage)|field\\s+identity)\\w*\\b)(?=.*\\b(?:stale|attacker[- ]controlled|low[- ]trust|untrusted|poisoned|profile\\s+claim)\\b)(?=.*\\b(?:device|security)\\s+(?:fact|evidence|signal)|treat\\w*\\s+.*(?:device|security))(?=.*\\b(?:unsafe|remote\\s+support|install|forward|upload|execute|proceed|remediat|service\\s+action)\\w*\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-681"
+}

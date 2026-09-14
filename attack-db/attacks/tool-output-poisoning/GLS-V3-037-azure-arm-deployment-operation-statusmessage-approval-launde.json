@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-037",
+  "name": "Azure ARM deployment-operation statusMessage approval laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Azure Resource Manager deployment-operation status messages can launder cloud deployment telemetry into forged human approval evidence for deployment and security-review agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-037"
+}

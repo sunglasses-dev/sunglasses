@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-045",
+  "name": "dedup-check output verdict authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned dedup/novelty-preflight helper output can claim that `LOW overlap` or empty nearest-neighbor results are authoritative ship approval, causing a pattern agent to skip self-index review, deterministic gates, duplicate-risk notes, or status discipline.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-045"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-697",
+  "name": "Schema Valid Probe Result Provenance Collapse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A schema-valid MCP probe response is laundered into runtime proof for a different invocation when the adjudicator does not bind tool, arguments, server, request identity, and observed effect.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training|policy)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:reject|fail)|(?:reject|deny|fail)[^\\n]{0,50}\\b(?:probe|evidence|binding|correlat))\\b)(?=.*\\b(?:MCP|schema[- ]valid|recon[- ]guided|probe|runtime\\s+evidence)\\b)(?=.*\\b(?:probe\\s+(?:result|response|output)|result|response|output)\\b)(?=.*\\b(?:sufficient|certif(?:y|ies)|approve|approval|allow|accept|evidence)\\b)(?=.*\\b(?:skip|omit|without|no|do\\s+not|does\\s+not|not)\\b[^\\n.]{0,100}\\b(?:rebind|bind|verify|re[- ]?check|correlat|validat)\\w*\\b)(?=.*\\b(?:tool|argument|server|request|identity|effect|invocation)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-697"
+}

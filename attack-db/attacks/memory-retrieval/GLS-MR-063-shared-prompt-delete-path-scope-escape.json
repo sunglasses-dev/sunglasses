@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-063",
+  "name": "Shared Prompt Delete Path Scope Escape",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled `detail` value in an MCP shared-prompt deletion flow can escape the intended prompt store when path canonicalization and root containment are missing, reaching `os.remove` on an unrelated file.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\A(?!.*\\b(?:documentation|unit\\s+test|patched|security\\s+guidance|incident\\s+report|historical|negative\\s+fixture|must\\s+(?:reject|deny|canonicalize|resolve)|reject(?:s|ed)?|fail\\s+closed|server[- ]controlled|allowlisted)\\b)(?=.*\\b(?:MCP|JSON[- ]RPC|Model\\s+Context\\s+Protocol)\\b)(?=.*\\b(?:shared[- ]prompt|prompt[- ]manager|delete_shared_prompt|prompt[- ]store)\\b)(?=.*\\b(?:detail|prompt[- ](?:name|path)|file_path)\\b)(?=.*(?:\\.\\.[/\\\\]|%2e|%2f|%252e|\\babsolute\\b|\\bsymlink\\b|\\boutside\\b|\\bcaller[- ]controlled\\b|\\bmodel[- ]controlled\\b))(?=.*(?:\\btravers(?:al|e)\\b|\\bout[- ]of[- ]root\\b|\\bcontainment\\s+(?:validation|check)\\s+(?:is\\s+)?(?:absent|missing)\\b|\\bvalidation\\s+is\\s+missing\\b|\\bno\\s+(?:workspace\\s+)?(?:boundary|containment)\\b|\\bwithout\\s+(?:canonical|root|scope|containment)\\b|\\bescap(?:e|es|ed)\\b|\\bunrestricted\\b))(?=.*(?:os\\.path\\.exists|os\\.remove|\\b(?:exists|remove|delete|unlink|filesystem)\\w*\\b|file\\s+sink)).*\\Z"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-063"
+}

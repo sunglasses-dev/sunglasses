@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-032",
+  "name": "PhantomSkill dormant trigger-gated auxiliary skill resource",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A third-party agent skill hides malicious logic in a benign-looking auxiliary resource (vulnerability-shaped helper) that stays dormant through review and executes a data-forwarding path only when an attacker-controlled trigger fires.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|test)|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|remediation|patched|fixed|blocked|must\\s+not|do\\s+not|never\\s+execute|inert)\\b)(?!.*\\bno\\s+(?:hidden|dormant|latent|conditional)\\s+trigger\\b)(?!.*\\bno\\s+(?:forwarding|data\\s+access|access\\s+to)\\b)(?=.*\\b(?:(?:third[- ]party|marketplace|untrusted)\\s+(?:agent\\s+)?skill|agent\\s+marketplace\\s+package)\\b)(?=.*\\b(?:auxiliary|helper|resource|sample)\\b)(?=.*\\b(?:vulnerability[- ]shaped|validation\\s+helper|parser\\s+utility|sanitization\\s+routine|error[- ]handling)\\b)(?=.*\\b(?:dormant|hidden|latent|conditional|trigger[- ]gated|rare[- ]path)\\b)(?=.*\\b(?:trigger|condition|keyword|environment|attacker[- ]controlled)\\b)(?=.*\\b(?:read|collect|forward|send|exfiltrat|alter|execute)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-032"
+}

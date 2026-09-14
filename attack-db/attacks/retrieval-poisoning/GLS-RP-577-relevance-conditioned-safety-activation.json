@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-577",
+  "name": "Relevance Conditioned Safety Activation",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "In a pipeline that fuses retrieval invocation with response generation, a top-relevance retrieved passage carrying safety-warning or oppositional framing acts as an activation condition that increases harmful compliance rather than suppressing it.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|scanner\\s+rule|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|refused|must\\s+not|do\\s+not\\s+trust|evidence\\s+only)\\b)(?=.*\\b(?:retrieval|RAG|web\\s+search|relevance|rank(?:ed|ing)?|top\\s+result)\\b)(?=.*\\b(?:safety\\s+warning|risk\\s+disclaimer|oppositional|prohibited|unsafe)\\b)(?=.*\\b(?:provide|give|explain|list|generate)\\b.{0,120}\\b(?:harmful|weapon|malware|exploit|credential|bypass)\\b)(?=.*\\b(?:answer|respond|comply|continue|include)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-577"
+}

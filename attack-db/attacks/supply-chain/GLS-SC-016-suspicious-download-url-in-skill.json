@@ -15,7 +15,7 @@
     "script download"
   ],
   "regex": [
-    "(?i)(?:bit\\.ly|tinyurl\\.com|t\\.co|goo\\.gl|dropbox\\.com/s/|drive\\.google\\.com|mega\\.nz|mediafire\\.com).{0,120}(?:\\.exe|\\.sh|\\.ps1|\\.bat|curl|wget|Invoke-WebRequest)"
+    "(?i)(?<![\\w.-])(?:bit\\.ly|tinyurl\\.com|t\\.co|goo\\.gl|dropbox\\.com/s/|drive\\.google\\.com|mega\\.nz|mediafire\\.com)(?![\\w-]).{0,120}(?:\\.exe|\\.sh|\\.ps1|\\.bat|curl|wget|Invoke-WebRequest)"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-032",
+  "name": "Airflow XCom delegated-approval laundering hardening row",
+  "version": "1.0",
+  "category": "workflow_orchestrator_tool_output",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Airflow XCom task-return data can launder a delegated task result into a forged approval receipt for release orchestration agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-032"
+}

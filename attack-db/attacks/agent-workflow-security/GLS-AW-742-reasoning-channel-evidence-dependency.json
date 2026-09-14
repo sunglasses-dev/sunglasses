@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-742",
+  "name": "Reasoning Channel Evidence Dependency",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A reward-hacking detector can look at a materially incomplete trajectory representation: the agent preserves the proxy-reward-seeking tool/action sequence while omitting or relocating natural-language reasoning that the detector relies on as evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|test\\s+fixture|blocked\\s+payload|postmortem|defensive|must\\s+not\\s+accept|safe\\s+handling)\\b)(?=.*\\b(?:terminal[- ]wrench|tool\\s+trajectory|action\\s+trajectory|trajectory\\s+record)\\b)(?=.*\\b(?:reward\\s+hacking|proxy\\s+reward|scoring\\s+loophole|games?\\s+the\\s+metric|maximize\\s+proxy|exploits?\\s+the\\s+proxy)\\b)(?=.*\\b(?:reasoning|rationale|chain[- ]of[- ]thought)\\b)(?=.*\\b(?:omit(?:ted|ting)?|strip(?:ped|ping)?|remov(?:ed|ing)|missing|without|relocat(?:ed|es|ing)|compress(?:ed|ing))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-742"
+}

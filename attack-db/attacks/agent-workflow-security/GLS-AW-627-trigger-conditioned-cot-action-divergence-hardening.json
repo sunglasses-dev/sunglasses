@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-627",
+  "name": "trigger-conditioned CoT/action divergence hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A trigger-conditioned adapter keeps the visible chain-of-thought approval-safe while emitting a divergent malicious downstream tool action, so trace-only review authorizes an action it never actually saw.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|must\\s+not|reject(?:ed|s)?|benign\\s+control|safe\\s+handling)\\b)(?=.*\\b(?:clean|benign|approval[- ]safe|safe[- ]looking)\\s+(?:CoT|chain[- ]of[- ]thought|reasoning|trace)\\b)(?=.*\\b(?:trigger[- ]condition(?:ed)?|latent\\s+trigger|adapter|backdoor)\\b)(?=.*\\b(?:tool|action|dispatch|invoke|execute|call)\\b)(?=.*\\b(?:malicious|harmful|unauthorized|attacker[- ]selected|poisoned|diverg(?:e|ence)|mismatch|different)\\b)(?=.*\\b(?:downstream|final|emitted|output)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-627"
+}

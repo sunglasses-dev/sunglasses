@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-109",
+  "name": "Blockchain Transaction Simulation Trace Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Blockchain Transaction Simulation Trace Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 blockchain transaction simulation and trace metadata for authority inversion attacks.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:wallet[_ -]?preview|transaction\\s+simulation|signing\\s+request|decoded\\s+calldata|simulation\\s+logs?|trace|receipt|swap\\s+preview|bridge\\s+route|risk[_ -]?assessment|spender[_ -]?label|permit\\s+preview|wallet\\s+receipt)\\b)(?=.*\\b(?:sign|approve|approval|permit|token\\s+approval|spender|allowance|unlimited|transfer|bridge|swap|stake|mint|confirmation|human\\s+approval|warning|slippage)\\b)(?=.*\\b(?:agent|assistant|wallet\\s+agent|scanner|model|autonomous\\s+wallet)\\b)(?=.*\\b(?:routine\\s+allowance|house\\s+spender|gasless\\s+(?:approval|route|permit)|zero[-\\s]?value\\s+(?:approval|permit)|permit[-\\s]?only|harmless\\s+signature|standard\\s+route|low[-\\s]?risk\\s+spender|no\\s+material\\s+risk|classif(?:y|ied).{0,60}\\b(?:routine|low[-\\s]?risk|safe)|treat.{0,60}\\b(?:routine|gasless|permit[-\\s]?only|safe|low[-\\s]?risk))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-109"
+}

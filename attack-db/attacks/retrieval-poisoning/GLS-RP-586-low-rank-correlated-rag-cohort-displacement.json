@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-586",
+  "name": "Low-rank correlated RAG cohort displacement",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-rank correlated perturbation moves several memory embeddings together so the top-k retrieval cohort changes and poisoned evidence is elevated, without any single chunk looking malicious.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|benchmark|incident|postmortem|defensive|quarantin\\w*|reject\\w*|prevent\\w*|without|no\\s+(?:retrieval|evidence)\\s+(?:action|promotion))\\b)(?=.*\\b(?:low[- ]?rank|low[- ]?dimensional)\\b)(?=.*\\b(?:correlated|coordinated|shared|joint(?:ly)?|displacement|drift)\\b)(?=.*\\b(?:multiple|several|cohort|related)\\b)(?=.*\\b(?:embedding\\w*|vector\\w*|document\\w*|chunk\\w*)\\b)(?=.*\\b(?:top[- ]?k|retrieval\\s+(?:rank|set|cohort)|rerank\\w*|rank\\s+shift)\\b)(?=.*\\b(?:poisoned|malicious|unsafe|untrusted)\\s+(?:evidence|memory|document\\w*|chunk\\w*)\\b)(?=.*\\b(?:elevat\\w*|promot\\w*|select\\w*|trust\\w*|accept\\w*)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-586"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-647",
+  "name": "Vitest Structured-Report Poisoning",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Vitest Structured-Report Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 vitest structured reports, a distinct attack surface from Playwright or general logs.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|quarantined|saniti[sz]ed|stripped|rejects?|ignored|must\\s+not|do\\s+not|never)\\b.{0,140}\\b(?:failureMessages|assertionResults|vitest|json\\s+reporter|prompt|instruction)\\b)(?=.*\\b(?:vitest|json\\s+reporter|test-output\\.json|--reporter=json|outputFile|assertionResults|failureMessages|testResults)\\b)(?=.*\\b(?:failureMessages|assertionResults|message|fullName|title)\\b)(?=.*\\b(?:ignore|override|system\\s+prompt|developer\\s+instruction|treat\\s+(?:this|the)\\s+(?:failure|message|output)\\s+as\\s+trusted|execute|run\\s+(?:the\\s+)?tool|exfiltrate|write\\s+(?:to\\s+)?memory)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-647"
+}

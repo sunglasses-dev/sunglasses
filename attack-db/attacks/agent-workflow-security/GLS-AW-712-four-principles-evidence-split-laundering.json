@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-712",
+  "name": "Four Principles Evidence Split Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A generated fuzz harness passes logic, API, and entry-point checks while its diagnostic callback treats attacker-controlled fuzz bytes as trusted agent-facing guidance; an aggregate quality verdict launders the missing security-boundary evidence and authorizes fuzzing.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|documentation|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|must\\s+not|never\\s+(?:accept|trust|approve|merge|authorize)|fail[- ]closed|preserve\\s+(?:all|each|the)\\s+(?:principle|evidence|finding))\\b)(?=.*\\b(?:fuzz\\s+harness|harness\\s+generator|generate[- ]check[- ]fix|fuzzing\\s+entry[- ]point|four[- ]principles\\s+harness|generated\\s+harness)\\b)(?=.*\\b(?:logic(?:\\s+correctness)?|api(?:\\s+protocol(?:\\s+compliance)?)?|security\\s+boundary|entry\\s+point(?:\\s+adequacy)?|four\\s+principles|p[1-4])\\b)(?=.*\\b(?:pass(?:es|ed)?|satisf(?:y|ies|ied)|green|approved|quality\\s+verdict|aggregate|all\\s+checks?)\\b)(?=.*\\b(?:omit|skip|ignore|launder|treat|promote|trust|forward|interpret|parse).{0,140}\\b(?:diagnostic|callback|crash|fuzz\\s+input|mutated\\s+bytes|runtime\\s+feedback|output|evidence|guidance)\\b)(?=.*\\b(?:agent|reviewer|scanner|fuzzer|approval|authorize|safe|trusted|instruction|recommendation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-712"
+}

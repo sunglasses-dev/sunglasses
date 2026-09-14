@@ -27,7 +27,7 @@
     "x-mcp-*"
   ],
   "regex": [
-    "(?is)(?=.*\\b(?:mcp(?:\\.json|-server|\\s+server)?|model\\s+context\\s+protocol|tools?\\[?\\]?\\.description|tool\\s+description|inputSchema|argument\\s+schema|x-mcp|\\.well-known/[^\\s\"'`]*mcp)\\b)(?=.*\\b(?:agent|assistant|model|tool\\s+user|scanner)\\b)(?=.*\\b(?:ignore|override|outrank|highest\\s+priority|must\\s+obey|do\\s+not\\s+(?:mention|report)|suppress|disable|bypass|read|paste|include|forward|send|exfiltrat(?:e|ion))\\b)(?=.*\\b(?:system|developer|previous\\s+instructions|policy|secret|token|api[-_\\s]*key|env(?:ironment)?\\s*(?:var|variable)s?|hidden\\s+config|workspace\\s+policy|scanner\\s+reports?)\\b).*"
+    "(?is)(?=.*\\b(?:mcp(?:\\.json|-server|\\s+server)?|model\\s+context\\s+protocol|tools?\\[?\\]?\\.description|tool\\s+description|inputSchema|argument\\s+schema|x-mcp|\\.well-known/[^\\s\"'`]*mcp)\\b)(?=.*\\b(?:agent|assistant|model|tool\\s+user|scanner)\\b)(?=.*(?:\\b(?:ignore|override|supersede|outrank|highest\\s+priority|must\\s+obey|takes\\s+precedence|governing\\s+policy)\\b|do\\s+not\\s+(?:mention|report|flag)|\\b(?:suppress|hide|omit|redact|exfiltrat\\w*)\\b))(?=.*\\b(?:system|developer|previous\\s+instructions|policy|secret|token|api[-_\\s]*key|env(?:ironment)?\\s*(?:var|variable)s?|hidden\\s+config|workspace\\s+policy|scanner\\s+reports?)\\b).*"
   ],
   "examples": {
     "malicious": [],

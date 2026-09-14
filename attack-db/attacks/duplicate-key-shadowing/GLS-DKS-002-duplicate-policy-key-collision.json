@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DKS-002",
+  "name": "Duplicate Policy Key Collision",
+  "version": "1.0",
+  "category": "duplicate_key_shadowing",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A student-controlled serialized answer repeats a rubric/policy key so a last-key-wins JSON/YAML parser resolves the attacker's later value as the active grading rule, awarding credit without changing the visible answer evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|training lab|incident report|postmortem|defensive analysis|documentation|docs say|reject(?:ed|s)? duplicate|do not award|must not|expected result)\\b)(?=.*\\b(?:student[_ -]?answer|submission|student|answer)\\b)(?=.*\\b(?:json|yaml|serialized|serialization|parser|duplicate|repeated|last[- ]key|field)\\b|\\{\\s*\")(?=.*\"([^\"]+)\"\\s*:\\s*\"[^\"]*\"\\s*,\\s*\"\\1\"\\s*:)(?=.*\\b(?:rubric|grading(?:[_ -]?policy)?|criterion|policy)\\b)(?=.*\\b(?:award|full[- ]credit|score\\s*[:=]?\\s*10|accept any|ignore (?:missing|errors?|proof|steps)|replace|override)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DKS-002"
+}

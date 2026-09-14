@@ -1,0 +1,36 @@
+{
+  "id": "GLS-SQLX-001",
+  "name": "Untrusted instruction to execute model-generated SQL without validation",
+  "version": "1.0",
+  "category": "code_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Untrusted content directs an agent to execute LLM/model-generated database query language as privileged authority WITHOUT validation \u2014 i.e. to run a generated SQL/query/statement/stored-procedure, or to disable statement allowlisting, parameterization, query review, or the approval gate. Detection requires the generated-query-execution verb OR an explicit disable/bypass-of-a-query-control instruction, which separates it from benign requests to explain, format, or review query text. Carrier hardening within the generated_query_execution_authority family (nearest GLS-AW-137). Source: CVE-2026-55615.",
+  "keywords": [
+    "execute this model-generated SQL",
+    "run the generated query",
+    "disable statement allowlisting",
+    "bypass the approval gate",
+    "skip the query review",
+    "bypass parameterization",
+    "ignore query validation"
+  ],
+  "regex": [
+    "(?i)\\b(?:execute|run|apply|feed|pass|pipe|send)\\b[^.\\n]{0,70}\\b(?:model[- ]?generated|model[- ]?produced|model[- ]?wrote|assistant[- ]?(?:generated|produced|wrote)|llm[- ]?(?:produced|generated)|ai[- ]?(?:written|generated)|auto[- ]?generated|generated|model'?s)\\b[^.\\n]{0,45}\\b(?:sql|cypher|query|statement|command|stored\\s+procedure|proc(?:edure)?)\\b",
+    "(?i)\\b(?:disable|bypass(?:ing)?|skipp?(?:ing)?|turn\\s+off|without|ignore)\\b[^.\\n]{0,45}\\b(?:(?:sql|query|statement)\\s+(?:validation|review|approval(?:\\s+gate)?|allow[- ]?list(?:ing)?)|statement\\s+restriction|parameteriz\\w+|injection\\s+filter)\\b",
+    "(?i)\\bvalidation\\s+(?:is\\s+)?(?:unnecessary|not\\s+needed|optional|off|disabled)\\b",
+    "(?i)\\b(?:generated|model[- ]?(?:generated|produced|wrote)|ai[- ]?(?:written|generated)|llm[- ]?(?:generated|produced))\\b[^.\\n]{0,60}\\b(?:sent|applied|executed|run|pushed|deployed|piped)\\b[^.\\n]{0,30}\\b(?:as[- ]?is|to\\s+prod|without\\s+(?:validation|review|checks?)|skipp?(?:ing)?\\s+(?:the\\s+)?review)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SQLX-001"
+}

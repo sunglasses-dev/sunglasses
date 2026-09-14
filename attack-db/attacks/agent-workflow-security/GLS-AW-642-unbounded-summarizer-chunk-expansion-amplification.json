@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-642",
+  "name": "Unbounded summarizer chunk expansion amplification",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent text-summarizer block lets an untrusted caller set chunk overlap to nearly max_tokens, driving stride toward zero so a bounded input expands near-quadratically into repeated intermediate chunks and exhausts shared agent memory.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|bounded|safe\\s+example)\\b)(?=.*\\b(?:summarizer|summarization|AITextSummarizerBlock)\\b)(?=.*\\bmax[_ -]?tokens\\b)(?=.*\\boverlap\\b)(?=.*\\b(?:quadratic|unbounded|amplif\\w*|repeat\\w*)\\b)(?=.*\\b(?:memory|out[- ]of[- ]memory|exhaust\\w*|denial\\s+of\\s+service|DoS)\\b)(?=.*\\b(?:attacker|malicious|user[- ]controlled|untrusted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-642"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-138",
+  "name": "Wallet Deeplink Decoder Prompt Reassembly",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Deeplink Decoder Prompt Reassembly: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 reassembly of fragmented/encoded deep-link parameters during wallet signing flows.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do\\s+not|never|must\\s+not|refuse|reject|blocked?|quarantine(?:d)?|scanner\\s+flags?|unit\\s+test|runbook|defensive\\s+docs?|incident\\s+report|policy\\s+says)\\b.{0,160}\\b(?:decode|decoded|decoder|normalize|reassemble|qr|deep[-\\s]*link|uri|url[-\\s]*encoded|base64|b64|percent[-\\s]*encoded)\\b.{0,220}\\b(?:suppress\\s+warnings?|hide\\s+risk|skip\\s+confirmation|safe\\s+to\\s+sign|mark\\s+green|do\\s+not\\s+ask|override|fast[-\\s]*track)\\b)(?=.*\\b(?:wallet|sign(?:ing|ature)?|sign\\s+request|send\\s+transaction|transfer|spender|allowance|permission|permit|session|auth(?:entication)?|human\\s+confirmation|siwe|eip[-\\s]*681|walletconnect)\\b)(?=.*\\b(?:qr\\s*(?:payload|code|payment)|deep[-\\s]*link|deeplink|wallet\\s*uri|payment\\s*uri|ethereum:|bitcoin:|wc:|walletconnect|checkout\\s+(?:link|callback)|bridge\\s+(?:link|route)|eip[-\\s]*681|uri\\s+(?:query|parameter|message)|url\\s+parameter|payment\\s+request)\\b)(?=.*\\b(?:decode(?:d|r)?|normaliz(?:e|ed|er|ation)|reassembl(?:e|ed|y)|rehydrat(?:e|ed|ion)|percent[-\\s]*(?:encoded|decode)|url[-\\s]*(?:encoded|decode)|base64|b64|unicode\\s+escape|qr[-\\s]*decoded|split\\s+chunks?|duplicate\\s+parameters?|message_b64|encoded[_\\s-]*(?:message|memo|notice))\\b)(?=.*\\b(?:suppress\\s+warnings?|hide\\s+(?:risk|allowance|recipient)|skip\\s+confirmation|safe\\s+to\\s+sign|mark\\s+(?:safe|green)|do\\s+not\\s+ask|override\\s+(?:warning|policy)|fast[-\\s]*track|no\\s+escalation|quiet\\s+(?:approval|signing))\\b).{0,3000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-138"
+}

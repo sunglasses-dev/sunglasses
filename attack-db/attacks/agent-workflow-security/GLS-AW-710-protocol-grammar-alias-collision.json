@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-710",
+  "name": "Protocol Grammar Alias Collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An LLM-generated pseudo-C2 server collapses distinct wire commands through alias normalization, and a downstream agent accepts the result as faithful without command-identity validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+(?:guide|documentation|training)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|scanner\\s+rule|must\\s+(?:reject|preserve|validate|distinguish)|do\\s+not\\s+(?:accept|enable|trust)|fail[- ]closed|safe\\s+workflow|benign\\s+example)\\b)(?=.*\\b(?:pseudo[- ]?C2|command[- ]and[- ]control|C2)\\b)(?=.*\\b(?:binary|wire|opcode|protocol)\\b)(?=.*\\b(?:extract|interpret|parse|generate|generated|synthesi[sz]e)\\w*\\b)(?=.*\\b(?:alias|collision|normaliz|coalesc|merged?|same\\s+handler|distinct\\s+(?:wire\\s+)?commands?)\\b)(?=.*\\b(?:command\\s+identit|opcode\\s+(?:map|binding)|field\\s+(?:identity|mapping)|validation|coverage)\\b)(?=.*\\b(?:omit|drop|misbind|collapse|uncheck|without|missing|incomplete|ambig|conflict)\\w*\\b)(?=.*\\b(?:faithful|accepted?|enabled?|approved?|reproduces?|attack\\s+vector|DDoS|destructive)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-710"
+}

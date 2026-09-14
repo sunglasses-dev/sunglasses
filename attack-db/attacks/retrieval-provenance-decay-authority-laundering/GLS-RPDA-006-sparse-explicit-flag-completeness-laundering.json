@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-006",
+  "name": "Sparse explicit-flag completeness laundering",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-recall threat-hunting result that explicitly flags only a handful of malicious timestamps out of a huge log corpus is converted at the report/dashboard boundary into a 'coverage complete, ready for approval' state, laundering incomplete evidence into a completion decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|remediation|patched|fixed|blocked|quarantined|must\\s+not|do\\s+not|never|should\\s+reject|incomplete\\s+coverage)\\b)(?=.*\\b(?:soc|security\\s+operations|threat[- ]hunting|hunt|event\\s+log|windows\\s+event)\\b)(?=.*(?:\\b\\d{2,}[,\\d]*\\s*(?:event|record|log)\\b|\\b(?:large|huge|full)\\b))(?=.*\\b(?:flag(?:ged|s)?|mark(?:ed)?|identified|reported)\\b)(?=.*\\b(?:malicious|suspicious|attack)\\b)(?=.*\\b(?:timestamp\\w*|time\\s*stamp\\w*|event\\s+time\\w*)\\b)(?=.*\\b(?:only|just|subset|few|one|two|three|four|five|six|seven|\\d+)\\b)(?=.*\\b(?:complete|fully\\s+reviewed|coverage\\s+complete|no\\s+further\\s+review|all\\s+clear|ready\\s+for\\s+approval)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-006"
+}

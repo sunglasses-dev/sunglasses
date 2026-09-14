@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-619",
+  "name": "Cloud service discovery without identity, tenant, scope, and epoch binding",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent promotes cloud/AIaaS service-discovery output (resource graph, service catalog, model endpoint inventory) from availability evidence into an authorization grant and invokes the discovered endpoint without rebinding tenant, principal, region, scope, and discovery epoch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|training|unit\\s+test|benign|authorized|must\\s+(?:bind|verify|reject|quarantine)|do\\s+not|never|safe|blocked|fail[- ]closed|simulated|fixture)\\b)(?=.*\\b(?:cloud|iaas|paas|saas|ai[aA]as|azure|aws|gcp|tenant|resource\\s+graph|service\\s+catalog|model\\s+(?:catalog|endpoint))\\b)(?=.*\\b(?:discover|discovery|enumerate|inventory|list|catalog|resource\\s+graph)\\w*\\b)(?=.*\\b(?:service|endpoint|api|model|resource|logging|security|inference)\\w*\\b)(?=.*\\b(?:invoke|connect|route|select|call|use|dispatch|target)\\w*\\b)(?=.*\\b(?:without|missing|no|unverified|unbound|stale|old|mismatched)\\b)(?=.*\\b(?:tenant|identity|principal|region|scope|authorization|epoch|version|provenance)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-619"
+}

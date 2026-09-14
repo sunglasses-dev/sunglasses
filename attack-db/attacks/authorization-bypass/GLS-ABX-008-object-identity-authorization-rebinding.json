@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-008",
+  "name": "Object Identity Authorization Rebinding",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated approval for one subject is reused as authorization for a caller-supplied object ID, so a record-view response returns another subject's data labeled authorized because the returned object's identity is never rebound to the approved subject/task.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked|historical\\s+incident\\s+report|denied|docs/view_student)\\b)(?=.*\"endpoint\"\\s*:\\s*\"/index\\.php\\?action=view_student\")(?=.*\"approved_subject_id\"\\s*:\\s*\"([^\\\"]+)\")(?=.*\"record_subject_id\"\\s*:\\s*\"(?!\\1\\b)[^\\\"]+\")(?=.*\"requested_id\"\\s*:\\s*\\d+)(?=.*\"authorization_result\"\\s*:\\s*\"(?:returned_as_authorized|authorized)\").*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-008"
+}

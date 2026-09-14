@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-693",
+  "name": "Policy Concept Calibration Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker poisons or relabels the compliant/violating contrastive examples used to derive hidden policy-violation concepts, shifting the offline concept centroid so a later purpose-conflicting action aligns with the compliant concept and receives allow.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not\\s+(?:poison|alter|shift|allow)|do\\s+not\\s+(?:poison|alter|trust)|should\\s+(?:flag|detect|reject))\\b)(?=.*\\b(?:PVDetector|policy[- ]violation)\\b)(?=.*\\b(?:hidden[- ]state|activation|concept|centroid)\\b)(?=.*\\b(?:contrastive|compliant|violating)\\s+(?:pair|example|label|concept)s?\\b)(?=.*\\b(?:calibrat|derive|embedding|alignment|prototype)\\w*\\b)(?=.*\\b(?:poison|mislab|flip|shift|contaminat|corrupt)\\w*\\b)(?=.*\\b(?:allow|compliant|under[- ]detect|miss|bypass)\\w*\\b)(?=.*\\b(?:export|forward|send|upload|disclose|credential|secret|customer)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-693"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-042",
+  "name": "Archive Member Path Traversal Memory Staging Escape",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A crafted LiteLLM Skills ZIP member name can escape the intended memory staging directory during extraction when parent segments or encoded dot segments are not canonicalized and contained before writing.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:patched|fixed|blocked|safe|benign|defensive|test\\s+fixture|must\\s+not|never\\s+extract|validated\\s+relative|no\\s+parent\\s+segments|remain\\s+within))(?=.*(?:litellm|skill\\s+(?:upload|archive)|skills?\\s+zip|zip\\s+skill\\s+upload))(?=.*(?:(?:zip|archive).{0,80}(?:member|entry|filename)|(?:member|entry|filename).{0,80}(?:zip|archive)))(?=.*(?:\\.\\./|\\.\\.\\\\|%2e%2e|path\\s+traversal|\\btraversal\\b|parent[-\\s]+segments?))(?=.*(?:extract|unpack|staging|memory|write|escape|outside)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-042"
+}

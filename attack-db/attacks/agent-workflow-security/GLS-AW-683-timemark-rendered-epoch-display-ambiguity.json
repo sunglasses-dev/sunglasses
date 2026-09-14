@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-683",
+  "name": "Timemark Rendered Epoch Display Ambiguity",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A rendered TimeMark verification report shows a valid but coarse/local generation time while hiding the time-dependent key epoch or exact artifact digest; an agent upgrades the visible badge into current exact-generation proof and approves the wrong artifact or epoch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|documentation|policy)|unit\\s+test|parser\\s+test|negative\\s+fixture|incident\\s+report|postmortem|scanner\\s+rule|blocked|quarantined|must\\s+not|do\\s+not|never\\s+(?:accept|trust|approve|treat))\\b)(?=.*\\b(?:TimeMark|time[- ]dependent\\s+(?:secret[- ]key|key)|watermark|exact\\s+generation[- ]time)\\b)(?=.*\\b(?:rendered|display(?:ed|s)?|dashboard|browser|UI|locale|local\\s+time|rounded|coarse|hidden|omitted)\\b)(?=.*\\b(?:valid|verified|authentic|recovered)\\b)(?=.*\\b(?:missing|hidden|hides?|omitted|absent|no|not\\s+(?:shown|exposed)|does\\s+not\\s+(?:show|expose)|without|mismatch(?:ed)?|differ(?:s|ent)?|old)\\b)(?=.*\\b(?:epoch|artifact\\s+(?:digest|hash|SHA)|exact\\s+(?:time|timestamp)|binding)\\b)(?=.*\\b(?:accept|approve|release|continue|treat|promote|use)\\w*\\b.{0,140}\\b(?:current|exact|proof|evidence|generation[- ]time|timestamp|watermark)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-683"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-142",
+  "name": "Readme Encoded Source Archive Helper Lure",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Readme Encoded Source Archive Helper Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 doc-based lures for fetching and executing malicious encoded archives.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\\b(?:readme|security\\.md|install(?:ation)?\\s+(?:note|guide)|source[-\\s]*tree|repository\\s+(?:archive|bundle)|repo\\s+(?:archive|bundle|reviewer)|download\\s+badge|audit\\s+bundle|scanner\\s+setup|encoded\\s+archive\\s+link)\\b)(?=.*\\b(?:ai\\s+(?:agent|scanner|reviewer|auditor)|security\\s+scanner|repo\\s+reviewer|automated\\s+(?:review|audit)|model\\s+auditor)\\b)(?=.*(?:https?%3a%2f%2f|base64|encoded\\s+(?:url|link|archive)|[\\w./:%-]+\\.(?:tar\\.gz|tgz|tar\\.xz|7z|rar|zip|iso|sh|ps1|exe)\\b|source[-\\s]*tree\\s+(?:archive|bundle)))(?=.*\\b(?:fetch|download|curl|open|decode|expand|extract|unpack|mount|launch|run|execute|bootstrap|initialize|start)\\b)(?=.*\\b(?:authoritative|canonical|trusted|preferred\\s+runbook|suppress|hide|omit|do\\s+not\\s+report|skip\\s+(?:audit|scan|warning)|no\\s+need\\s+to\\s+(?:scan|warn|report)|mark\\s+(?:clean|safe))\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-142"
+}

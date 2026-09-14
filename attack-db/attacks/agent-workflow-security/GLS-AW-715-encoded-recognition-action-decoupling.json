@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-715",
+  "name": "Encoded Recognition Action Decoupling",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A reconnaissance trap is hidden in encoded evidence; after normalization the agent recognizes the honeypot yet continues the deceptive action, while a pre-normalization scanner sees only opaque text.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:security\\s+guide|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|quarantined|postmortem|must\\s+not\\s+(?:obey|follow|connect|continue)|should\\s+(?:stop|reject)|safely\\s+(?:refused|stopped)|no\\s+(?:action|execution)\\s+(?:is\\s+)?taken))(?=.*\\b(?:base64|base-64|encoded)\\b.{0,180}\\b(?:recon(?:naissance)?|payload|response|result|trap)\\b)(?=.*\\b(?:decoded|normalized|after\\s+decoding|decode)\\b)(?=.*\\b(?:honeypot|honey[- ]?trap|deceptive\\s+(?:trap|host|service|decoy)|fake\\s+(?:admin|login|service))\\b)(?=.*\\b(?:recogniz(?:e|ed|es|ing)|identified|noticed|flagged)\\b)(?=.*\\b(?:nevertheless|still|despite|but\\s+then|even\\s+though)\\b)(?=.*\\b(?:connect|follow|click|submit|continue|retrieve|execute|exploit)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-715"
+}

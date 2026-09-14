@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CMP-009",
+  "name": "Github Actions Step Summary Tool Output Poisoning",
+  "version": "1.0",
+  "category": "cicd_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Github Actions Step Summary Tool Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific vector targeting GITHUB_STEP_SUMMARY injection not covered by existing metadata patterns.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:GITHUB_STEP_SUMMARY|job summary|workflow summary|step summary).{0,500}(?:system|developer|assistant|agent|claude|codex|copilot).{0,200}(?:ignore\\s+(?:all\\s+)?(?:previous|prior|above)\\s+instructions|do\\s+not\\s+(?:report|mention|summarize)|treat\\s+.{0,80}\\s+as\\s+(?:system|developer|trusted|authoritative)|(?:exfiltrate|copy|print|reveal)\\s+.{0,80}\\s+(?:secret|token|credential|env)|mark\\s+.{0,80}\\s+(?:clean|safe|passed))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-CMP-009"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-601",
+  "name": "terminal fixer status-parse skip residue",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An ambiguous or malformed QA status envelope in a linear Engineer->QA->Fixer workflow is parsed as clean, so the repair stage is skipped and a sabotaged artifact is emitted as approved.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|defensive|benign|must not|do not|quarantine|training|unit test|no sabotage|no harmful)\\b)(?=.*\\b(?:terminal fixer|qa\\s*\\+?\\s*fixer|downstream fixer)\\b)(?=.*\\b(?:status parser|status parsing|status gate|parser artifact|status artifact)\\b)(?=.*\\b(?:skip(?:s|ped|ping)?|bypass(?:ed|es|ing)?|did not invoke|not invoked|terminat(?:e|ed|es)|stop(?:ped|s)?)\\b)(?=.*\\b(?:bug|defect(?:ive)?|issue|malicious|sabotage|harmful)\\b)(?=.*\\b(?:pass|green|approved|clean)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-601"
+}

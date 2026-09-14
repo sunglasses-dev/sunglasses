@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-132",
+  "name": "Wallet Preview Safe-Verdict Injection",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Preview Safe-Verdict Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 direct injection of safe security verdicts/scores into wallet preview metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|rejected|quarantined|incident\\s+report|defensive\\s+docs?|unit\\s+test|test\\s+fixture|scanner\\s+keywords\\s+only|never\\s+trust|do\\s+not\\s+trust|must\\s+not\\s+use|ignore\\s+untrusted\\s+scores?|preserve\\s+warnings?|keep\\s+confirmation|required\\s+confirmation)\\b)(?=.*\\b(?:wallet[_ -]?preview|wallet\\s+ui\\s+preview|signing\\s+request|transaction\\s+simulation|simulation\\s+receipt|decoded\\s+calldata|risk[_ -]?assessment|simulation\\s+logs?|trace|receipt|swap\\s+preview|bridge\\s+route|permit\\s+preview|wallet\\s+receipt)\\b)(?=.*\\b(?:approve|approval|permit|sign|transfer|bridge|swap|spender|allowance|unlimited|session\\s+key|delegated\\s+authority|confirmation|warning|slippage)\\b)(?=.*(?:\\b(?:agent|assistant|scanner|reviewer|copilot|model)\\b|\\bwallet[_\\s-]*agent\\b|for[_\\s-]?agent|assistant[_\\s-]?(?:risk|verdict|warning)|wallet[_\\s-]?agent[_\\s-]?(?:risk|warning)))(?=.*\\b(?:(?:agent|assistant|wallet[_ -]?agent|reviewer|scanner|copilot|model)[_ -]?(?:risk[_ -]?score|warning[_ -]?level|severity[_ -]?code|verdict[_ -]?code|policy[_ -]?score|confidence)|(?:risk[_ -]?score|warning[_ -]?level|severity[_ -]?code|verdict[_ -]?code|policy[_ -]?score)[_ -]?(?:for[_ -]?(?:agent|assistant|reviewer|wallet)|override|source))\\b\\s*[:=]\\s*['\"]?(?:0(?:\\.0+)?|green|none|clear|low)['\"]?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-132"
+}

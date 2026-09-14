@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-009",
+  "name": "Memory Writeback Provenance Rebinding",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A command-specific memory entry approved for one target/epoch is replayed after the live task changes, so stale authorization reaches a consequential dispatcher action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|rule)|unit\\s+test|test\\s+fixture|negative\\s+(?:fixture|example)|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not|do\\s+not\\s+(?:replay|dispatch|trust|execute)|should\\s+reject)\\b)(?=.*\\b(?:command[_ -]?id|command-specific|operational\\s+memory|command\\s+memory|replay\\s+record)\\b)(?=.*\\b(?:stale|old|prior|previous|replay(?:ed)?|re-?use\\w*)\\b)(?=.*\\b(?:target|session|task|approval|epoch|scope)\\b)(?=.*\\b(?:change|changed|mismatch|different|transition|current|new|stale|old|prior|epoch\\s*4[12])\\b)(?=.*\\b(?:dispatch|execute|send|forward|dump|export|record|exfiltrat|suppress|ignore)\\w*\\b)(?=.*(?:without|missing|skip\\w*|no|ignore|bypass))(?=.*(?:reauthoriz|approval|validation|check|consent|scope)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-009"
+}

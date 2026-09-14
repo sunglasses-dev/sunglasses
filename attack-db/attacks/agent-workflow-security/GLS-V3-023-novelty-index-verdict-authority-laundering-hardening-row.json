@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-023",
+  "name": "novelty-index verdict authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A forged or attacker-controlled novelty/dedup tool result can claim that a candidate is unique, pre-approved, or safe to ship, causing a pattern agent to bypass shipped-detector checks, deterministic gates, or duplicate warnings.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-023"
+}

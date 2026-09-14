@@ -1,0 +1,25 @@
+{
+  "id": "GLS-UINJ-004",
+  "name": "GUI semantic overlay persistent grounding",
+  "version": "1.0",
+  "category": "ui_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A harmless-looking injected screenshot overlay becomes a persistent semantic attractor that wins visual grounding and displaces the task-relevant click target, with no hostile instruction text for text-only defenses to see.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign|documentation|unit test|test fixture|incident report|postmortem|safe|reject|quarantine|no click|do not click|not an overlay|unrelated|normal dashboard|ordinary grounding)\\b)(?=.*\\b(?:screenshot|rendered view|ui canvas|viewport)\\b)(?=.*\\b(?:overlay|injected element|floating element|badge|button)\\b)(?=.*\\b(?:semantic(?:ally)? salient|recommended|continue|harmless|safety[- ]aligned|persistent attractor)\\b)(?=.*\\b(?:ground(?:ing)?|visual target|click target|select|click)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-UINJ-004"
+}

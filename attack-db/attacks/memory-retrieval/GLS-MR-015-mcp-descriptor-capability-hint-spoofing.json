@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-015",
+  "name": "Mcp Descriptor Capability Hint Spoofing",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A browser-reachable MCP Inspector proxy turns DNS-rebound local reachability plus missing client authentication into an MCP stdio process launch whose output can enter the agent evidence path.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guidance|guide|documentation|review|training)|fixed\\s+release|unit\\s+test|negative\\s+(?:scanner|fixture|example)|incident\\s+report|remediat(?:ed|ion)|topology\\s+documentation|must\\s+(?:reject|require|validate|block)|requires?\\s+(?:strict\\s+)?(?:valid\\s+)?authentication|authenticated\\s+(?:proxy|session)|no\\s+attack)\\b)(?=.*\\b(?:MCP\\s+Inspector|Inspector.{0,60}proxy|MCP\\s+proxy)\\b)(?=.*\\b(?:attacker[- ]controlled|malicious|hostile|untrusted|browser[- ]origin)\\b)(?=.*\\b(?:browser|web\\s+page|web\\s+content|website|origin|page)\\b)(?=.*\\b(?:DNS\\s+rebind(?:ing|ed)?|rebound\\s+(?:hostname|host)|0\\.0\\.0\\.0|localhost|loopback|127\\.0\\.0\\.1)\\b)(?=.*\\b(?:unauthenticated|without\\s+(?:any\\s+)?authentication|no\\s+authentication|missing\\s+(?:client\\s+)?authentication|no\\s+valid\\s+session|without\\s+(?:an\\s+)?authenticated\\s+session|no\\s+authenticated\\s+principal|no\\s+valid\\s+principal)\\b)(?=.*\\b(?:launch(?:es|ed|ing)?|start(?:s|ed|ing)?|spawn(?:s|ed|ing)?|execute(?:s|d|ing)?)\\b.{0,140}\\b(?:MCP\\s+command|stdio|std\\s*io\\s+(?:server|process))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-015"
+}

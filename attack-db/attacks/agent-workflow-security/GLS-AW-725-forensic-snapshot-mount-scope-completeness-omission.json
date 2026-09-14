@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-725",
+  "name": "Forensic Snapshot Mount Scope Completeness Omission",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A post-compromise response agent treats an alert-linked mounted subset as a complete forensic snapshot, omits silent artifacts outside mount scope, and closes remediation without a coverage proof.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|parser\\s+documentation|must\\s+not|do\\s+not|dry\\s+run|fully\\s+enumerated|all\\s+(?:mounted|unmounted)|verified\\s+complete)\\b)(?=.*\\b(?:forensic|disk\\s+snapshot|forensic\\s+image|post[- ]compromise|incident\\s+response)\\b)(?=.*\\b(?:unmounted|mount(?:ed|\\s+point|\\s+scope|\\s+inventory)?|partition|volume|snapshot\\s+coverage)\\b)(?=.*\\b(?:only|limited|omitted|excluded|outside\\s+scope|not\\s+(?:enumerated|inventoried)|lacked|did\\s+not\\s+(?:enumerate|inventory))\\b)(?=.*\\b(?:unmounted|separate|deleted(?:[- ]open)?\\s+files?|deleted[- ]open|silent\\s+intrusion|excluded\\s+path|alternate\\s+partitions?|hidden\\s+persistence)\\b)(?=.*\\b(?:complete|comprehensive|fully\\s+investigated|verified|closure|remediation\\s+(?:plan|disposition|complete))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-725"
+}

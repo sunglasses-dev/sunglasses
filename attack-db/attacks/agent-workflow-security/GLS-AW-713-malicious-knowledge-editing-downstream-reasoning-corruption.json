@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-713",
+  "name": "Malicious Knowledge Editing Downstream Reasoning Corruption",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A malicious knowledge edit silently replaces a factual premise, and downstream reasoning accepts it to produce an unsafe security conclusion without an instruction-shaped payload.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|security\\s+(?:guide|training|documentation)|defensive|blocked\\s+payload|negative\\s+fixture|verified\\s+edit|conflict[_ -]?check\\s*[\"']?\\s*[:=]\\s*[\"']?passed)\\b)(?=.*\\bknowledge[_ -]?edit\\b)(?=.*\\bedit[_ -]?status\\b.{0,80}\\bapplied\\b)(?=.*\\bprovenance\\b.{0,100}\\b(?:missing|unverified|external)\\b)(?=.*\\b(?:downstream[_ -]?reasoning|reasoning)\\b.{0,140}\\b(?:conclusion|decision)\\b.{0,100}\\b(?:allow|approve|safe)\\b)(?=.*\\bconflict[_ -]?check\\b.{0,60}\\b(?:not\\s+run|skipped|absent)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-713"
+}

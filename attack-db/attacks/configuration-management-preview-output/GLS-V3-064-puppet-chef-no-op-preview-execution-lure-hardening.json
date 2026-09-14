@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-064",
+  "name": "Puppet/Chef no-op preview execution-lure hardening",
+  "version": "1.0",
+  "category": "configuration_management_preview_output",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Puppet `--noop`, Chef `why-run`, and adjacent configuration-management no-op preview output can launder a non-mutating simulation result into a false approval receipt that tells deployment agents to run the real mutating apply path.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-064"
+}

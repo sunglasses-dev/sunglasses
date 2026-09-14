@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-050",
+  "name": "MCP completion values instruction smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP completion values instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 covers MCP completion suggestions; shipped patterns only cover prompts and resources.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:refus(?:e|es|ed|al)|cannot|can't|must\\s+not|do\\s+not|blocked|prevent(?:s|ed)?|safe\\s+behavior|detect(?:s|ed)?|flag(?:s|ged)?)\\b.{0,180}\\b(?:ignore|override|bypass|supersede|send|post|upload|forward|exfiltrate|suppress|hide|persist|remember|save\\s+to\\s+memory|do\\s+not\\s+report)\\b)(?!.*\\b(?:no|not|without)\\b.{0,80}\\b(?:mcp\\s+server|assistant\\s+context|agent\\s+context|model\\s+context)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol|jsonrpc|completion/complete|completion\\s+suggestions?|autocomplet(?:e|ion))\\b)(?=.*\\b(?:completion|values|suggestions?|dropdown|popup|argument)\\b)(?=.*\\b(?:agent|assistant|llm|model|scanner|review\\s*bot|developer|system|secret|token|credential|env(?:ironment)?)\\b)(?=.*\\b(?:ignore|override|bypass|supersede|system\\s+instruction|developer\\s+instruction|send|post|upload|forward|exfiltrate|suppress|hide|do\\s+not\\s+report|persist|remember|save\\s+to\\s+memory)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-050"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-006",
+  "name": "Resolver Parser State Corruption Retrieval Reuse",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A malformed LLMNR/DNS query or resolver record can cross into retrieval-backed agent memory as an apparently trusted answer, suppressing provenance checks and redirecting a later tool action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security guide|scanner rule|unit test|test fixture|training lab|incident report|quarantine|redacted sample|must reject|must not trust|do not trust|defensive|safe example|blocked|patched|fixed)\\b)(?=.*\\b(?:LLMNR|DNS|resolver|qname|qtype|DNSAPI\\.dll)\\b)(?=.*\\b(?:malformed|compressed[- ]name|invalid|parser|bounds rejection|unverified|attacker[- ]controlled)\\b)(?=.*\\b(?:agent|assistant|retrieval|memory|cache|tool|host)\\b)(?=.*\\b(?:trust|trusted|skip|suppress|provenance|warning|validation|reuse|returned host|next tool)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-006"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-582",
+  "name": "Semantic Neighbor Evidence Poisoning",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A paraphrase-expanded corpus supplies a fluent high-similarity neighbor that a downstream mapper accepts as compliance/control evidence, laundering nearest-neighbor relevance into asserted truth with no provenance or independent corroboration.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|benign|audited|independently\\s+corroborated|must\\s+not|do\\s+not|never|unit\\s+test|safe\\s+example|quarantin)\\b)(?=.*\\b(?:semantic\\s+(?:retrieval|similarity)|embedding|high[- ]similarity|nearest\\s+neighbor)\\b)(?=.*\\b(?:compliance\\s+(?:control|mapping|metric|evidence)|security\\s+(?:control|metric))\\b)(?=.*\\b(?:accept|accepted|treat|mapped|launder|pass|approve)\\w*\\b)(?=.*\\b(?:top\\s+(?:neighbor|match|result)|without\\s+(?:independent\\s+)?corroboration|no\\s+independent\\s+corroboration|paraphrase[- ]expanded|synthetic\\s+pair)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-582"
+}

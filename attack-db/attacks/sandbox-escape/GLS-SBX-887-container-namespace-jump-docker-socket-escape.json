@@ -11,7 +11,7 @@
   "description": "Detects text in which a container, sandbox, or jail escape or breakout via namespace switching, nsenter, docker.sock, or setns is described as ignoring, bypassing, overriding, or disabling policy, guardrail, isolation boundary, or approval-check controls.",
   "keywords": [],
   "regex": [
-    "(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$"
+    "(?is)^(?=.*\\b(?:container|sandbox(?:ed)?|jail)\\b)(?=.*\\b(?:escape|break\\s*out|breakout|pivot|jump|switch(?:ing)?)\\b)(?=.*\\b(?:namespace(?:s)?|setns|nsenter|host\\s+namespace|/proc/)\\b)(?=.*(?:\\b|(?<!\\S))(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:ignore|bypass|override|disabl(?:e|ed|es|ing)|skip)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|isolation|boundar(?:y|ies)|approval\\s*check(?:s)?)\\b).*$"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-003",
+  "name": "purpose-bound private-atom routing over-disclosure",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent completes a legitimate multi-tool workflow but serializes a task-private atom into a downstream tool that is not authorized for that atom, because authorization is evaluated at workflow level instead of at each atom-to-tool edge.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:<REDACTED>|redacted|safe\\s+(?:handling|result)|no\\s+(?:unauthorized|raw)|only\\s+authorized|privacy-preserving|documentation|not\\s+(?:a\\s+)?disclos|no\\s+disclosure))(?=.*(?:task[_ -]private|private\\s+atom))(?=.*(?:unauthorized|forbidden))(?=.*(?:analytics\\.export|crm\\.bulk_export|metrics\\.publish|webhook\\.send|audit\\.dump|report\\.deliver))(?=.*(?:customer_email|email))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-003"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-010",
+  "name": "Memory Backed Tool Capability Projection",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled retrieved memory record is mistaken for current authorization and projects a user-inaccessible connected tool capability into the agent's action scope.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:policy|guide|documentation|training)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+not|should\\s+not|never\\s+(?:treat|use|trust|authorize|invoke|grant))\\b)(?=.*\\b(?:retrieved\\s+memory|memory\\s+record|RAG\\s+entry|retrieval\\s+result)\\b)(?=.*\\b(?:(?:privileged|admin|restricted|user[- ]inaccessible)\\s+(?:connected\\s+)?(?:tool|database|filesystem|CRM)|(?:database|filesystem|shell|CRM)\\s+tool)\\b)(?=.*\\b(?:authorize|grant|invoke|call|use|run|execute|retrieve|forward)\\w*\\b)(?=.*\\b(?:without|despite|outside|not\\s+in|unapproved|unauthorized|user\\s+cannot|did\\s+not\\s+(?:request|approve)|not\\s+(?:requested|approved)|no\\s+explicit\\s+(?:user\\s+)?(?:approval|authorization))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-010"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-679",
+  "name": "Rendered Selfplay Branch Identity Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A browser-rendered self-play trace can detach a vulnerable token-level branch from its exact path and display a golden-path label, causing a downstream code-safety reviewer to authorize unsafe generated code.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|documentation|training|review)|unit\\s+test|negative\\s+fixture|blocked\\s+(?:payload|sample)|incident\\s+report|postmortem|runbook|defensive|must\\s+(?:bind|compare|recheck|reject|verify)|do\\s+not\\s+(?:trust|accept|use)|safe\\s+(?:implementation|example)|inert\\s+example)\\b)(?=.*\\b(?:browser|web|UI|rendered|review\\s+panel|dashboard)\\b)(?=.*\\b(?:self[- ]play|decision\\s+tree|branch(?:ed|ing)?\\s+(?:trace|trajectory|path)|golden\\s+path|vulnerable\\s+(?:branch|variant))\\b)(?=.*\\b(?:reviewer|auditor|agent|scanner|code[- ]safety)\\b)(?=.*\\b(?:golden|secure|safe|pass|clean|verdict|label|summary)\\b)(?=.*\\b(?:trust\\w*|accept\\w*|authoriz\\w*|approv\\w*|inherit\\w*|treat\\w*)\\b)(?=.*\\b(?:without|missing|omitted|detached|unbound|reordered|mismatch|misjoin)\\b)(?=.*\\b(?:branch[_ -]?id|path|trajectory|token|digest|provenance|trace)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-679"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-145",
+  "name": "Wallet Visual Risk Badge Prompt Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Visual Risk Badge Prompt Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 visual/OCR-based wallet risk indicators, distinct from repository status badges.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:no|without)\\s+(?:wallet|signing|signature)\\b)(?!.*\\b(?:do\\s+not|never|must\\s+not|refuse|reject|block(?:ed|ing)?|cannot|can't|should\\s+not)\\b.{0,120}\\b(?:badge|alt[-\\s]*text|ocr|svg|screenshot|visual)\\b.{0,120}\\b(?:suppress|hide|skip|fast[-\\s]*track|mark\\s+safe|green[-\\s]*path|approve)\\b)(?!.*\\b(?:scanner|runbook|policy|training|documentation|incident\\s+report)\\b.{0,180}\\b(?:detect|flag|report|warn|block|reject(?:ed)?|refuse)\\b)(?=.*\\b(?:wallet|signing|signature|typed\\s*data|eth_signtypeddata|personal_sign|siwe|spender|permission|transaction|session\\s*auth|human\\s+confirmation)\\b)(?=.*\\b(?:risk\\s*badge|badge|alt[-\\s]*text|aria[-\\s]*label|svg\\s*(?:title|desc|metadata)|ocr|screenshot|visual\\s*(?:preview|receipt|overlay)|image[-\\s]*only)\\b)(?=.*\\b(?:low\\s*risk|risk\\s*0|safe\\s*to\\s*sign|verified\\s*safe|green[-\\s]*path|approved\\s*badge|trusted\\s*badge|clear(?:ed)?\\s*badge|routine\\s*approval)\\b)(?=.*\\b(?:suppress\\s+warnings?|hide\\s+risk|skip\\s+confirmation|do\\s+not\\s+ask|mark\\s+safe|fast[-\\s]*track|ignore\\s+(?:spender|domain|nonce|mismatch)|approve\\s+without\\s+review|no\\s+escalation)\\b).{0,3000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-145"
+}

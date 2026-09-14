@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-704",
+  "name": "Component Selective Identity Badge Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A registry or approval UI compresses a per-component prompt/code/tools lineage match into one same-family badge, hiding changed executable code and laundering lineage evidence into approval without behavioral verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training)|scanner\\s+rule|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not\\s+(?:approve|trust|skip|treat)|blocked|quarantined)\\b)(?=.*\\b(?:skill\\s+registry|skill\\s+catalog|skill\\s+fingerprint|approval\\s+ui|catalog\\s+summary|registry\\s+badge|component\\s+fingerprint\\s+report|component\\s+(?:fingerprint|identity)|prompt[ /+,&-]+code[ /+,&-]+tools|per-component)\\b)(?=.*\\b(?:same[- ]family|family\\s+match|lineage|fingerprint|identity)\\b)(?=.*\\b(?:code|executable|implementation|runtime)\\b)(?=.*\\b(?:changed|different|differs|rewritten|translated|unverified|mismatch|diverg)\\w*\\b)(?=.*\\b(?:approve|approval|trust|trusted|release|allow|delegate)\\w*\\b.{0,180}\\b(?:without|skip|omit|no|not)\\b.{0,60}\\b(?:behavior\\w*|code|implementation|runtime|independent|safety|verif\\w*|validat\\w*|review)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-704"
+}

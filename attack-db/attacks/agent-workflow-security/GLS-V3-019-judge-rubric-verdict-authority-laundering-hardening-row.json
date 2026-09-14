@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-019",
+  "name": "judge-rubric verdict authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A forged or attacker-controlled judge/rubric scorecard can claim that high novelty or low FP-budget scores are a green-lane ship receipt, causing a pattern agent to background duplicate review, skip gate reruns, or move an artifact to READY.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-019"
+}

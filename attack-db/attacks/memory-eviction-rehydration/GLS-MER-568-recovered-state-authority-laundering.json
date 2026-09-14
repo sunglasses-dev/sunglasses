@@ -1,0 +1,33 @@
+{
+  "id": "GLS-MER-568",
+  "name": "Recovered-State Authority Laundering",
+  "version": "1.0",
+  "category": "memory_eviction_rehydration",
+  "severity": "high",
+  "channels": [
+    "log_memory",
+    "message",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "Detects recovered-state / memory-compaction authority laundering: a payload claims a prior approval, consent, authorization, or human confirmation was inherited or carried forward through a restore/rehydration/compaction step, so the agent skips a fresh check. The attack avoids explicit attack verbs (it never says 'exfiltrate' or 'ignore') and rides the memory/log channel \u2014 a carrier-brittleness gap surfaced by Jack's Jun-22 drain (recovered-state payloads slipped the shipped scanner). Requires BOTH a restore/rehydration context AND an authority-inheritance claim, so legitimate 'session restored' / 'approval required' text does not trip it.",
+  "keywords": [
+    "satisfied_by_prior_context",
+    "human_confirmation: inherited",
+    "carry_forward=approved",
+    "approval inherited from prior context",
+    "consent carried forward",
+    "prior approval still applies"
+  ],
+  "regex": [
+    "(?is)(?=.*\\b(?:recovered[-_\\s]*state|restored?\\s+from\\s+(?:compaction|context|memory|prior)|context\\s+restored|session\\s+restored|carry[-_\\s]*forward|rehydrat\\w+|compaction|prior\\s+context|satisfied_by_prior_context)\\b)(?=.*\\b(?:approval|consent|authoriz\\w+|confirmation|permission|human[-_\\s]*confirmation)\\b[^.\\n]{0,70}\\b(?:inherited|carried[-_\\s]*forward|carry[-_\\s]*forward|already\\s+(?:granted|approved|confirmed)|satisfied_by_prior_context|from\\s+prior\\s+context|still\\s+(?:applies|valid|holds))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MER-568"
+}

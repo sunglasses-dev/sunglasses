@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-741",
+  "name": "Iterative Pov Feedback Channel Control Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A dependency or application can poison the execution-feedback text that PoVSmith feeds into the next coding-agent or assessment iteration, turning test evidence into control that omits a vulnerable call path or downgrades the PoV verdict.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|negative\\s+fixture|defensive|must\\s+not|do\\s+not\\s+obey|quarantined|research\\s+note)\\b)(?=.*\\b(?:PoV|proof[- ]of[- ]vulnerability|vulnerability\\s+test|call\\s+path|dependency\\s+test)\\b)(?=.*\\b(?:execution\\s+feedback|runtime\\s+(?:output|result)|test\\s+(?:output|result)|assertion\\s+(?:failed|result))\\b)(?=.*\\b(?:next\\s+iteration|next\\s+run|assessment\\s+handoff|revise|regenerate|treat\\s+this\\s+output\\s+as\\s+the\\s+authoritative)\\b)(?=.*\\b(?:omit|hide|suppress|mark\\s+.{0,35}(?:unconfirmed|clean|safe)|report\\s+.{0,35}(?:clean|no\\s+vulnerab\\w*)|remove\\s+.{0,35}call\\s+path)\\b)(?=.*\\b(?:vulnerab\\w*|finding|call\\s+path|security\\s+evidence)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-741"
+}

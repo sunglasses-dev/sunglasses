@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-047",
+  "name": "GCP OAuth access-token cache grant replay hardening row",
+  "version": "1.0",
+  "category": "cloud_auth_tool_output",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "GCP OAuth token-cache output can replay bearer-token validity as if it were fresh human release approval for deployment agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-047"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MP-014",
+  "name": "Email-to-Persistent-Action-State Injection",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A crafted email retrieved via an email toolkit is persisted into durable session memory and a later planner turn executes it as trusted task state, so the retrieval turn and the action turn are different turns.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|scanner|unit test|negative fixture|incident report|postmortem|blocked|quarantined|must not|do not|never|safe example)\\b)(?=.*\\b(?:email|e-mail|gmail|gmailtoolkit|mailbox|message body|thread)\\b)(?=.*\\b(?:retriev(?:ed|al)|fetched|ingest(?:ed|ion)?|summari[sz](?:e|ed|ation)|store(?:d|ing)?|persist(?:ed|ence)?|session memory|durable memory|long[- ]term memory)\\b)(?=.*\\b(?:run|execute|eval|shell|command|code|python|tool call|send|forward|delete|write)\\b)(?=.*\\b(?:automatically|without confirmation|no approval|next session|later agent|planner|action)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MP-014"
+}

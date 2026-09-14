@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SE-012",
+  "name": "Cursor-style working_directory sandbox scope rebinding",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent-controlled working_directory value is used to construct the sandbox writable root, expanding write scope outside the approved workspace and permitting overwrite of a sensitive sandbox helper under the user's privileges.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:documentation|security guide|unit test|test fixture|defensive|must retain|must enforce|must verify|must reject|do not|never|blocked|denied|patched|fixed|quarantined|safe example))(?=.*(?:agent|assistant|renderer|page))(?=.*working[_ -]?directory)(?=.*(?:outside|sensitive|/etc|/root|home/agent/.cursor|unintended))(?=.*(?:sandbox|isolated|isolation|writable))(?=.*(?:write|wrote|written|overwrite|overwrote|modify|modified|create|created))(?=.*(?:helper|cursorsandbox|file|path)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SE-012"
+}

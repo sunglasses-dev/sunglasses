@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-010",
+  "name": "memory/RAG decomposition-state accumulation laundering",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Individually benign memory/RAG retrieval fragments pass fragment-local checks and only become a restricted, executable objective once the consumer assembles them, with no aggregate-intent review at the final action boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|training|documentation|unit\\s+test|benign\\s+example|must\\s+not|do\\s+not|never|refuse|blocked|quarantined|safe\\s+handling|require\\s+(?:aggregate|fresh|independent)\\s+(?:intent|review))\\b)(?=.*\\b(?:memory|RAG|retrieval|fragment|subtask)\\b)(?=.*\\b(?:separately|individually|each|per[- ]fragment)\\s+(?:benign|low[- ]risk|safe)\\b)(?=.*\\b(?:combine|assemble|join|aggregate|compose)\\w*\\b)(?=.*\\b(?:harmful|malicious|restricted|unsafe)\\s+(?:objective|goal|plan|workflow|operation)\\b)(?=.*\\b(?:executable|carry\\s+out|fulfill|complete)\\w*\\b)(?=.*\\b(?:without|skip|lacks?|no)\\b.{0,60}\\b(?:aggregate|intent|review|safety|check)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-010"
+}

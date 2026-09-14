@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-640",
+  "name": "semantic-functional memorization laundering in generated code review",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A code-review approval boundary is crossed by substituting a lexical-overlap metric for a behavioral-provenance check, so generated code that is functionally equivalent to memorized target logic is approved as novel because its surface form differs.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|negative\\s+fixture|postmortem|defensive|reject(?:ed|s)?|do not approve|requires?\\s+(?:semantic|behavior)|must not)\\b)(?=.*\\b(?:zero|0|low|no|minimal)\\b.{0,80}\\b(?:textual|lexical|surface)\\s+(?:overlap|similarity|match)\\b)(?=.*\\b(?:functionally|behaviorally|execution)\\s+(?:equivalent|identical|matches?)\\b.{0,180}\\b(?:memorized|copied|target|reference|logic|approve|approval|accept|release)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-640"
+}

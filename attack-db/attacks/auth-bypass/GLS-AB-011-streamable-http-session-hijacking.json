@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AB-011",
+  "name": "Streamable HTTP Session Hijacking",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A streamable HTTP/SSE transport treats possession of a valid session ID as client identity, letting a different peer reconnect with that handle and hijack the victim's event stream because the handle is never bound to the originating authenticated client.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|advisory|incident report|postmortem|training|unit test|patched|fixed|hardened|blocked|rejects?|safe behavior|must not|do not|never|no attacker|benign)\\b)(?=.*\\b(?:mcp|model context protocol)\\b)(?=.*\\b(?:streamable\\s*[- ]?http|server[- ]sent\\s+events|\\bSSE\\b)\\b)(?=.*\\b(?:valid|obtained|stolen|reused|presented)\\s+(?:session\\s*(?:id|identifier)|session\\s+handle)\\b)(?=.*\\b(?:different|attacker|other|cross[- ]client|unbound)\\b)(?=.*\\b(?:hijack|intercept|attach|take over|reconnect|reuse)\\w*\\b)(?=.*\\b(?:without|missing|lacks?|no)\\s+(?:client|owner|connection|origin)\\s*(?:binding|association|authorization)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AB-011"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-017",
+  "name": "Anonymous CORS Memory API Exposure",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Wildcard CORS plus anonymous HTTP admission lets any rendered website act as a credentialless client of an agent memory API and read, modify, or delete stored memories with no session or ambient credential.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|must\\s+not|never|blocked|rejected|safe|unit\\s+test|read[- ]only|explicit\\s+authorization)\\b)(?=.*\\b(?:cors|access-control-allow-origin)\\b)(?=.*(?:\\*|wildcard|any\\s+origin|arbitrary\\s+website))(?=.*\\b(?:anonymous|unauthenticated|credentialless)\\b)(?=.*\\b(?:read|modify|delete|write|mutat)\\w*\\b)(?=.*\\b(?:memory|memories|knowledge[- ]graph|stored\\s+data)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-017"
+}

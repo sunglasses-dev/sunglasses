@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-641",
+  "name": "session-bound scenario coverage dedup collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A coverage/dedup store keys work identity off a reusable session identifier, so a distinct seed or root-cause variant collides with a prior key, gets marked already-explored and skipped, and the scheduler still counts the unexecuted work as covered.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|security documentation|incident report|postmortem|safe handling|must not|do not|never\\s+(?:forward|attach|bind|count|execute)|blocked payload|defensive)\\b)(?=.*\\b(?:scenario coverage|coverage[- ]key|coverage record|dedup(?:lication)?|scheduler|seed scheduling)\\b)(?=.*\\b(?:session(?:[_ -]?id)?|investigation session|task session)\\b)(?=.*\\b(?:reuse|reuses|reused|collision|alias|aliasing|same key|cross[- ]session)\\b)(?=.*\\b(?:distinct|different|novel|variant|root[- ]cause|trigger path|seed)\\b)(?=.*\\b(?:skip(?:s|ped)?|marked already explored|already explored|not run|never ran|without executing|no proof executes)\\b)(?=.*\\b(?:count(?:s|ed)?|report(?:s|ed)?|treated)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-641"
+}

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "file",
-    "web_content"
+    "web_content",
+    "tool_output"
   ],
   "description": "Detects hostile README files that target AI coding agents with override instructions.",
   "keywords": [

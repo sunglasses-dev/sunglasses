@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-058",
+  "name": "Factcheck Verdict Propagation Provenance Collapse",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An automated fact-checker accepts a stale or foreign evidence bundle for the current claim, preserves the resulting wrong verdict, and propagates it into a social-media publication record as if it were current evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:bind|reject|reconcile|recheck)|do\\s+not\\s+(?:publish|propagate|trust|reuse))\\b)(?=.*\\b(?:automated\\s+fact[- ]?check(?:ing|er)?|fact[- ]?check(?:ing|er)?|claim\\s+verification)\\b)(?=.*\\b(?:claim|assertion|evidence|source|citation|retriev(?:al|ed)|snapshot)\\b)(?=.*\\b(?:stale|wrong|mismatched|foreign|different|outdated|changed|unbound|missing|another|prior|previous|earlier)\\b)(?=.*\\b(?:verdict|judg(?:e|ment)|true|false|misinformation|label)\\b)(?=.*\\b(?:publish\\w*|posting|social\\s+media|downstream|propagat\\w*|share\\w*|broadcast\\w*)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-058"
+}

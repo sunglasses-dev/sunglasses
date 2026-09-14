@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-700",
+  "name": "Skill Compiler Target Role Collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A SkCC-style compiler can preserve a source skill's text and clean analyzer verdict while lowering a neutral field into a target framework role token that the target parser treats as trusted executable authority.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|unit test|negative fixture|blocked sample|quarantined|defensive guidance|must not|do not obey|never reclassify|safe preservation)\\b)(?=.*\\b(?:SKILL\\.md|SkIR|compiled skill|skill compiler)\\b)(?=.*\\b(?:lower(?:ing|ed)|render(?:ing|ed)|target framework|target dialect|role token|role label)\\b)(?=.*\\b(?:neutral|data[- ]only|metadata|annotation)\\b)(?=.*\\b(?:system|developer|assistant)\\s+(?:role|channel|message)|privileged role|executable authority\\b)(?=.*\\b(?:rebound|reclassified|role collision|promoted|parsed as|mapped)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-700"
+}

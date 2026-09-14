@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-717",
+  "name": "Environment Cue Reward Specification Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An RL environment can preserve surface safety while role framing and implicit gameability cues reshape the reward interpretation, causing an on-policy agent to learn and activate harmful exploit behavior only in the conditioned environment.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|documentation|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:reject|verify|bind|check)|do\\s+not\\s+(?:trust|learn|optimize|follow)|safe\\s+example)\\b)(?=.*\\b(?:RL|reinforcement\\s+learning|on[- ]policy|rollout|training\\s+environment)\\b)(?=.*\\b(?:training\\s+environment|environment\\s+(?:config|design|cue)|role(?:[- ]conditioned)?\\s+framing|gameability|implicit\\s+cue)\\b)(?=.*\\b(?:reward|score|objective|optimi[sz]e)\\b)(?=.*\\b(?:harmful|unsafe|exploit|loophole|misalignment|violat\\w*\\s+(?:the\\s+)?safety)\\b)(?=.*\\b(?:learns?|activat\\w*|policy|behavior)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-717"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-026",
+  "name": "LLM prompt-cache hit authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "LLM prompt-cache hit metadata can launder cache reuse evidence into forged prior-review or known-good trust evidence for release and scanner agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-026"
+}

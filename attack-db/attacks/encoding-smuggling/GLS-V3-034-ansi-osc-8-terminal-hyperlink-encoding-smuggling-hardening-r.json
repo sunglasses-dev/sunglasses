@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-034",
+  "name": "ANSI OSC-8 terminal hyperlink encoding smuggling (hardening row)",
+  "version": "1.0",
+  "category": "encoding_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "ANSI OSC-8 terminal hyperlinks can smuggle approval/authorization claims through CI or terminal output when an AI release agent treats rendered hyperlink labels as release-control evidence.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-034"
+}

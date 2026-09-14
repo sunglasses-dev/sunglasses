@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-067",
+  "name": "Browser Service Worker CacheStorage semantic-cache authority laundering hardening",
+  "version": "1.0",
+  "category": "browser_runtime_cache",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Browser Service Worker CacheStorage exports can launder a cached response or `fromServiceWorker` trace into a forged prior-review trust receipt, causing release agents to reuse stale cache state as approval and suppress fresh policy checks.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-067"
+}

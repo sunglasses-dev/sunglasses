@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-009",
+  "name": "Anonymous Interleaving State Collision",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An identityless, arbitrarily interleaved request stream lets a stateful delegated-task monitor globally join individually benign fragments from unrelated sessions into one harmful objective because task state is not partitioned by provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|defensive|documentation|unit test|test fixture|incident report|must not|preserve attribution|reject cross[- ]session|blocked)\\b)(?=.*\\b(?:anonymous|untraceable|no session identity|sessionless)\\b)(?=.*\\b(?:interleav|arbitrarily interleav|cross[- ]session|unrelated session)\\w*\\b)(?=.*\\b(?:fragment|partial request|benign[- ]looking query)\\w*\\b)(?=.*\\b(?:merge|join|aggregate|reconstruct|compose)\\w*\\b)(?=.*\\b(?:lose|lost|loses|missing|without|no)\\w*\\b)(?=.*\\b(?:attribution|session|identity|partition|provenance)\\b)(?=.*\\b(?:delegat(?:ed|ion)|task state|workflow)\\b)(?=.*\\b(?:suppress|hide|omit|skip|ignore|continue|proceed)\\w*\\b)(?=.*\\b(?:review|finding|warning|approval|security|task|workflow)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-009"
+}

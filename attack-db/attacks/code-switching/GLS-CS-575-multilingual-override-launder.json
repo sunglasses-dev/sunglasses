@@ -21,7 +21,7 @@
     "then follow over system policy"
   ],
   "regex": [
-    "(?is)^(?=.*(?:\\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\\b|\u5ffd\u7565|\u7121\u8996))(?=.*(?:\\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\\b|\u89c4\u5219|\u898f\u5247|pol[i\u00ed]tica|reglas))(?:.*(?:\\b(?:translate|switch|code[- ]?switch(?:ing)?|mixed\\s+language|language\\s+mix|mezcla(?:r)?|\u6df7\u5408\u8bed\u8a00|\u6df7\u5408\u8a9e)\\b|\u7ffb\u8bd1|\u7ffb\u8b6f))"
+    "(?is)^(?=.*(?:\\b(?:ignore|bypass|override|disregard|omit|supersed(?:e|es|ed|ing)|ignora|ignorer|obviar)\\b|\u5ffd\u7565|\u7121\u8996))(?=.*(?:\\b(?:previous|prior|earlier|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|rules?)\\b|\u89c4\u5219|\u898f\u5247|pol[i\u00ed]tica|reglas))(?:.*(?:\\b(?:code[- ]?switch(?:ing)?|mixed\\s+language|language\\s+mix|mezcla(?:r)?\\s+idiomas|\u6df7\u5408\u8bed\u8a00|\u6df7\u5408\u8a9e)\\b|\u7ffb\u8bd1|\u7ffb\u8b6f))"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-025",
+  "name": "expired-domain replacement of URL-indexed dataset datapoints",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker re-registers an expired domain referenced in a URL-indexed training dataset manifest and swaps the datapoint content, so a loader that treats URL identity as content integrity ingests the poisoned example.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|documentation|unit test|incident report|postmortem|must not|do not trust|safe loader|blocked sample|content provenance required)\\b)(?=.*\\b(?:dataset|training corpus|datapoint|manifest)\\b)(?=.*\\b(?:url|uri|https?://|domain)\\b)(?=.*\\b(?:expired|reacquired|re-?registered|domain replacement|historical link)\\b)(?=.*\\b(?:replaced|replacement|swapped|changed|poisoned|tampered)\\b)(?=.*\\b(?:content|example|image|record|payload)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-025"
+}

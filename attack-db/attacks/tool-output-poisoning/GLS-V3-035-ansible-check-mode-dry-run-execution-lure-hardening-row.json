@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-035",
+  "name": "Ansible check-mode dry-run execution lure (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Ansible check-mode output can launder a dry-run preview into forged authority for an AI ops agent to run the real playbook with privilege escalation while suppressing the resulting configuration changes.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-035"
+}

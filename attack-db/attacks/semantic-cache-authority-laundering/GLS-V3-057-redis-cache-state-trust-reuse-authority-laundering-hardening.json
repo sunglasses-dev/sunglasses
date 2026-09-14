@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-057",
+  "name": "Redis cache state trust-reuse authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "semantic_cache_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Redis or cache-state output can launder a cache hit, stale key, or previous-release value into a forged prior-review/trust receipt for a release or scanner agent.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-057"
+}

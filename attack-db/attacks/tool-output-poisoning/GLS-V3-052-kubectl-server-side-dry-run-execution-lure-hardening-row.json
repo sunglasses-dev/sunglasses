@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-052",
+  "name": "kubectl server-side dry-run execution lure (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Kubernetes server-side dry-run or `kubectl diff` output can launder a non-mutating manifest preview into forged approval for an AI deployment agent to run `kubectl apply` and suppress privileged Kubernetes changes.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-052"
+}

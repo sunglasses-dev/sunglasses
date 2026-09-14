@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-049",
+  "name": "Jenkins Blue Ocean stage output authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Jenkins Blue Ocean stage output can launder an unstable or diagnostic CI stage into a forged green-lane release receipt, causing an AI deployment assistant to promote anyway and hide test risk from the release summary.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-049"
+}

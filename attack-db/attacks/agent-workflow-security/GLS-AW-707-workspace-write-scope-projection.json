@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-707",
+  "name": "Workspace Write Scope Projection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A Cursor-like agent may automatically write to a caller/context-selected file outside the opened workspace while the UI presents the change as an ordinary review item, so review presentation does not repair the missing write-scope authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|training|review)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|patched|fixed|must\\s+(?:reject|deny|canonicalize|contain|review)|should\\s+(?:reject|deny)|do\\s+not\\s+(?:write|modify|trust)|never\\s+(?:write|modify|trust))\\b)(?=.*\\b(?:Cursor|code\\s+editor|AI\\s+coding\\s+agent|agent)\\b)(?=.*\\b(?:opened|approved|configured|declared)\\s+workspace\\b|\\bworkspace\\s+(?:root|boundary|scope)\\b)(?=.*\\b(?:target\\s+(?:path|file)|destination\\s+path|file\\s+(?:path|write|destination)|path)\\b)(?=.*\\b(?:outside|out[- ]of[- ]workspace|beyond|parent|external)\\b)(?=.*\\b(?:write|modify|edit|save|overwrite|create)\\w*\\b)(?=.*\\b(?:automatic(?:ally)?|without\\s+(?:re)?(?:checking|validat(?:ion|e)|approval|review)|without\\s+re-?checking|skip\\s+(?:scope|workspace|approval)|crafted\\s+context|malicious(?:ly)?\\s+crafted)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-707"
+}

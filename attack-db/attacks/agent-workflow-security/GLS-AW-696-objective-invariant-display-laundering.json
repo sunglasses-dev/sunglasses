@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-696",
+  "name": "Objective Invariant Display Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A browser-agent completion surface reports locally successful steps as a green completed run while omitting a failed cross-step operational invariant, laundering objective violation into approval evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|rule)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+not|do\\s+not|never|safe\\s+handling)\\b)(?=.*\\b(?:browser|UI|dashboard|progress|completion|status|summary)\\b)(?=.*\\b(?:objective|goal|invariant|cross[- ]step|end[- ]to[- ]end)\\b)(?=.*\\b(?:violat\\w*|fail\\w*|omitt\\w*|collaps\\w*|hid\\w*|suppress\\w*|not\\s+shown)\\b)(?=.*\\b(?:success\\w*|complete\\w*|approv\\w*|green)\\b)(?=.*\\b(?:reviewer|human|agent|downstream|accept\\w*|trust\\w*)\\b)(?=.*\\b(?:final|overall|operational|behavior|action|run)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-696"
+}

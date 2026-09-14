@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-650",
+  "name": "Tool Lifecycle Compute Budget Exhaustion",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted MCP/tool retry-and-refinement trace drives repeated cheap iterations until the execution budget is depleted, then induces truncation of the safety check and continuation from the unchecked last tool result.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked|quarantined|must\\s+not|do\\s+not\\s+obey|defensive|safe\\s+executor)\\b)(?=.*\\b(?:MCP|tool(?:[- ]call)?|function)\\b.{0,220}\\b(?:retry|refinement|iteration|loop)\\b)(?=.*\\b(?:compute|execution|step|operation|call)\\s+budget\\b.{0,220}\\b(?:exhaust|consume|deplete|truncate|skip|continue|last\\s+result|fail[- ]open)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-650"
+}

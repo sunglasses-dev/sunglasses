@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-606",
+  "name": "Single-detector commitment under predicted disagreement",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An adaptive detector allocator facing conflicting detector outputs commits to one favorable detector and promotes its benign result to final session-safety authority while suppressing corroboration or escalation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|benchmark|incident\\s+report|must\\s+not|do\\s+not|never|blocked|rejected|quarantin|requires?\\s+(?:independent|a\\s+second)|escalat(?:e|ion)\\s+(?:is\\s+)?required)\\b)(?=.*\\b(?:allocator|router|routing|SCOUT|pre[- ]hoc|detector)\\b)(?=.*\\b(?:session|approval|resume|handoff|context)\\b)(?=.*\\b(?:disagree|discord|conflict|mixed|contradict|diverg)\\w*\\b)(?=.*\\b(?:single|one|selected|winner|preferred|best)\\b[^.\\n]{0,100}\\b(?:detector|guard|judge|signal|verdict)\\b)(?=.*\\b(?:allow|benign|safe|clean|pass)\\w*\\b[^.\\n]{0,100}\\b(?:final|authoritative|sufficient|enough|trusted)\\b)(?=.*\\b(?:without|skip|suppress|no|omit|avoid|defer)\\w*\\b[^.\\n]{0,100}\\b(?:corroborat|second|independent|escalat|review|judge)\\w*\\b)(?=.*\\b(?:safety|risk|restricted|action|policy)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-606"
+}

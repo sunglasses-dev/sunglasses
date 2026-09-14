@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-734",
+  "name": "Rule Synthesis Probe Provenance Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A BAS finding can launder a broken probe-to-evidence-to-rule binding into apparently verified SIEM coverage when a downstream reviewer accepts deterministic synthesis output without replaying the originating probe.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:verified\\s+back[- ]?reference|matching\\s+evidence\\s+hash|replays?\\s+the\\s+originating\\s+probe|defensive|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|scanner\\s+rule|must\\s+not|do\\s+not\\s+obey|quarantined|redacted)\\b)(?=.*\\b(?:BAS|attack\\s+simulation|finding\\s+record|probe[_ -]?id|Sigma|SIEM)\\b)(?=.*\\b(?:evidence|hash|provenance|back[- ]?reference|originating\\s+probe)\\b)(?=.*\\b(?:mismatch\\w*|different|replaced|does\\s+not\\s+bind|unbound|collision|duplicate|wrong|belongs\\s+to|from\\s+another)\\b)(?=.*\\b(?:accept\\w*|mark\\w*|treat\\w*|validated|coverage|verified|proof)\\b)(?=.*\\b(?:without|skip\\w*|no|not)\\b.{0,140}\\b(?:replay\\w*|reproduc\\w*|verif\\w*|bind\\w*|check\\w*|validat\\w*)\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-734"
+}

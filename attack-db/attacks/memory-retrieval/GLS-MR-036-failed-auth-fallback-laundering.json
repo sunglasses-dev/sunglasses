@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-036",
+  "name": "Failed Auth Fallback Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fabricated Authorization value drives a failed-key path into OAuth passthrough, where an empty auth object is accepted as caller identity and protected MCP memory/tool access is allowed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|advisory|documentation|training|review|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|runbook|blocked|quarantined|defensive|patched|fixed|redacted|must\\s+(?:reject|fail)|do\\s+not|never|safe\\s+(?:implementation|example))\\b)(?=.*\\b(?:LiteLLM|MCP|Streamable\\s+HTTP|OAuth2?|UserAPIKeyAuth|memory\\s+(?:retrieval|store)|retrieval\\s+context)\\b)(?=.*\\b(?:fabricated|forged|invalid|malformed|fake|synthetic)\\b.{0,100}\\b(?:Authorization|bearer|auth(?:entication|orization)?\\s+(?:header|value)|key)\\b)(?=.*\\b(?:failed|rejected|invalid|malformed|missing|empty|absent|unverified)\\b.{0,180}\\b(?:key\\s+(?:validation|check)|principal|identity|auth(?:entication|orization)?\\s+(?:object|state)|UserAPIKeyAuth|caller)\\b)(?=.*\\b(?:fallback|passthrough|pass[- ]?through|replac(?:e|ed|ement)|coerc(?:e|ed)|materializ(?:e|ed)|empty\\s+(?:object|auth))\\b)(?=.*\\b(?:reach(?:es|ed)?|permit(?:s|ted)?|allow(?:s|ed)?|invoke(?:s|d)?|access(?:es|ed)?|retriev(?:e|es|ed)?|read(?:s|ing)?|call(?:s|ed)?)\\b.{0,160}\\b(?:MCP\\s+tool|protected|privileged|memory|retrieval|context|resource)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-036"
+}

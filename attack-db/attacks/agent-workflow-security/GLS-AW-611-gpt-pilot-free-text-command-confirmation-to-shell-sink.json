@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-611",
+  "name": "GPT-Pilot free-text command confirmation to shell sink",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A free-text human confirmation/modification step is not an approval boundary: the edited text is forwarded to asyncio.create_subprocess_shell, so shell metacharacters can replace the approved action and execute with the agent's privileges.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|defensive|patched|fixed|safe|must\\s+not|do\\s+not|never|reject(?:ed|s)?|argv|execfile|spawn|shell\\s+disabled)\\b)(?=.*\\b(?:gpt[- ]?pilot|executor\\.run|command\\s+confirmation|confirm(?:ation)?|modify|replace|edit)\\b)(?=.*\\b(?:asyncio\\.create_subprocess_shell|create_subprocess_shell|shell\\s+execution|shell\\s+command|subprocess)\\b)(?=.*(?:;|&&|\\|\\||\\||>|`|\\$))(?=.*\\b(?:execute|execution|command\\s+injection|arbitrary|unrestricted|unsanitized|shell)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-611"
+}

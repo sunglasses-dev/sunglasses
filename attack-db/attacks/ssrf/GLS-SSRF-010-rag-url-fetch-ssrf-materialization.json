@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-010",
+  "name": "RAG URL Fetch SSRF Materialization",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A RAG ingestion fetcher accepts an attacker-selected URL with no scheme/IP/hostname validation, then materializes the loopback, private-network, or cloud-metadata response body into retrieved answer context, stripping its untrusted network provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe target|validation passes)\\b)(?=.*\\b(?:rag|retrieval|knowledge[- ]base|memory|url\\s+ingestion|retrieval\\s+code|rag\\s+fetcher)\\b)(?=.*\\b(?:url|uri|remote|fetch\\w*|retriev\\w*|ingest\\w*|request\\w*)\\b)(?=.*\\b(?:user[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|arbitrary)\\s+(?:url|uri|host|target)\\b|\\b(?:no|without|missing|zero)\\s+(?:scheme|ip|hostname|network)\\s+(?:check|filter|validation|allowlist))(?=.*(?:169\\.254\\.169\\.254|metadata(?: endpoint| service)?|localhost|127\\.0\\.0\\.1|internal service|private\\s+(?:ip|address|network)|cloud credentials?))(?=.*\\b(?:response|content|body|result)\\b.{0,120}\\b(?:context|prompt|retrieved|answer|exfiltrat|expos|materiali[sz]e)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-010"
+}

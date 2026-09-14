@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPD-011",
+  "name": "Generated-code review evidence parser boundary truncation",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A code-review pipeline's bounded safety view truncates at a parser/delimiter boundary and omits the later security-relevant sink, while the merge/execute path authorizes from that incomplete evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:safety[- ]research|jailbreak[- ]study|security[- ]evaluation))(?=.*(?:bounded|compressed|truncated|salien|safety[- ]view|classifier[- ]view))(?=.*(?:omit|drop|evict|exclude|underweight|hide|discard))(?=.*(?:later|final|action[- ]bearing|full transcript|downstream|executor))(?=.*(?:allow|approve|authorize|permit|execute|forward|proceed)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPD-011"
+}

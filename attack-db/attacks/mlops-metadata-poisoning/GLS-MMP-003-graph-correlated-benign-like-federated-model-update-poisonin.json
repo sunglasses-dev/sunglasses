@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MMP-003",
+  "name": "Graph-correlated benign-like federated model-update poisoning",
+  "version": "1.0",
+  "category": "mlops_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A federated participant shapes a malicious parameter delta to look graph-correlated and benign-like so the aggregator's trust scoring accepts it, steering the shared model's refusal behavior.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research\\s+summary|benchmark|unit\\s+test|audit\\s+report|security\\s+policy|safe\\s+aggregator|normal\\s+federated|must\\s+reject|reject(?:ed|s)?|quarantin(?:e|ed)|unchanged|independently\\s+validat(?:e|ion)|no\\s+attack)\\b)(?=.*\\b(?:federated|federated\\s+fine[- ]tuning|federated\\s+participant)\\b)(?=.*\\b(?:update|parameter\\s+delta|gradient)\\b)(?=.*\\b(?:graph\\s*[_ -]?similarity|graph[- ]correlated|benign[- ]like|feature\\s+correlation)\\b)(?=.*\\b(?:malicious|poison(?:ed|ing)?|unsafe|refusal[_ -]?delta|steer(?:ed|ing)?\\s+shared\\s+model)\\b)(?=.*\\b(?:accept|aggregate|aggregation|shared\\s+model|objective|completion\\s+behavior)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MMP-003"
+}

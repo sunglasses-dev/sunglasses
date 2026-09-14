@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-680",
+  "name": "Surrogate-map lifecycle confusion",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A privacy proxy's surrogate-to-original restore map is consumed by token alone, so a mapping not bound to the exact field, direction, turn, conversation and epoch restores an original PII value into the wrong response context.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit test|must not|do not|never|safe example|inert|no\\s+(?:restor|mismatch|stale|wrong)|without\\s+(?:restor|mismatch))\\w*\\b)(?=.*\\b(?:surrogate|shadowmap|surrogate map)\\b)(?=.*\\b(?:restor\\w*|reverse map|original value)\\b)(?=.*\\b(?:wrong|mismatch|rebind|unbound|cross[- ]conversation|stale|different)\\b)(?=.*\\b(?:field|turn|conversation|epoch|direction|response)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-680"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-626",
+  "name": "Session-cardinality chaff amplification of HITL review",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker rotates fresh session identities so that session-keyed deduplication and per-session quotas treat each low-severity event as a new bucket, multiplying human-in-the-loop review prompts until review capacity is exhausted.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|safe handling|defensive)\\b)(?=.*\\b(?:low[- ]severity|low priority|informational)\\b)(?=.*\\b(?:audit(?:able)? event|review event|HITL|human[- ]in[- ]the[- ]loop|approval prompt)\\b)(?=.*\\b(?:many|numerous|excessive|flood|spam|burst|thousands|repeated)\\b)(?=.*\\b(?:fresh|unique|new|rotating|attacker[- ]chosen)\\s+(?:session(?:[_ -]?id)?|identit(?:y|ies)|contexts?)\\b)(?=.*\\b(?:per[- ]session|session[- ]keyed|session_id|dedup(?:lication)?|quota|budget)\\b)(?=.*\\b(?:multiply|amplif|exhaust|overwhelm|waste|starv|deplete|review capacity|review queue)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-626"
+}

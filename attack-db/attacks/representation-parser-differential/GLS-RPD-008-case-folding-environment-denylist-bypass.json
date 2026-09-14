@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPD-008",
+  "name": "Case Folding Environment Denylist Bypass",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A case-sensitive environment-variable denylist rejects only NODE_OPTIONS while Windows resolves node_options and other case variants to the same name, so a Custom MCP child process receives Node loader controls such as --require and executes attacker code before MCP logic starts.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+test|unit\\s+test|fixture|incident\\s+report|patched|fixed|mitigat|prevent|safe|must\\s+reject|defensive)\\b)(?=.*\\bnode[_ -]?options\\b)(?=.*\\b(?:windows|win32|case[- ]insensitive|case[- ]fold)\\b)(?=.*\\b(?:denylist|deny[- ]list|blocked|forbidden|reject)\\b)(?=.*(?:--require|--import|\\b(?:loader|preload|code\\s+load|execute)\\w*)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPD-008"
+}

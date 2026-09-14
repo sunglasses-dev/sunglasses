@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SE-006",
+  "name": "Runtime Sandbox Configuration Erosion",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled agent runtime/launch configuration overlay mutates executor scope from sandbox to host while disabling confirmation enforcement, and the subsequent tool dispatch is accepted at host privilege.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|benign|simulation|fixture|must\\s+(?:retain|enforce|verify|reject)|do\\s+not|never|blocked|quarantined|fail[- ]closed|prevent)\\b)(?=.*\\b(?:agent|assistant)\\b)(?=.*\\b(?:runtime|launch|executor|execution)\\s+(?:config(?:uration)?|profile|settings?)\\b)(?=.*\\b(?:overlay|merge|replace|mutat|changed?|rewrite|override)\\w*\\b)(?=.*\\b(?:sandbox|isolat(?:ed|ion)|jail|container)\\b)(?=.*\\b(?:host|outside|unsandboxed)\\b)(?=.*\\b(?:confirm(?:ation)?|approval|safety)\\w*\\b)(?=.*\\b(?:disabled|off|removed|bypass|skip(?:ped)?|false|0)\\b)(?=.*\\b(?:tool|shell|file|command)\\w*\\b)(?=.*\\b(?:call|invocation|execution|dispatch)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SE-006"
+}

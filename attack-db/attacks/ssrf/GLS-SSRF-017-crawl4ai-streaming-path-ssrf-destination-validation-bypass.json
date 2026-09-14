@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-017",
+  "name": "Crawl4AI streaming-path SSRF destination-validation bypass",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A streaming route branch omits the SSRF destination-validation gate that guards its non-streaming sibling, so a caller-controlled seed URL reaches loopback/RFC1918/link-local metadata and the fetched internal body is relayed back through the stream.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must reject|must not|do not|never|safe|allowlist(?:ed)?|validation passes)\\b)(?=.*\\b(?:crawl4ai|crawl\\s*4\\s*ai|stream(?:ing)?\\s+(?:crawl|endpoint|path)|/crawl/stream)\\b)(?=.*\\b(?:seed|target|destination|url|uri|endpoint)\\b.{0,120}(?:https?://|169\\.254\\.169\\.254|localhost|127\\.0\\.0\\.\\d+|\\b(?:10|192\\.168|172\\.(?:1[6-9]|2\\d|3[0-1]))\\.))(?=.*\\b(?:169\\.254\\.169\\.254|localhost|127\\.0\\.0\\.1|\\[?::1\\]?|link[- ]local|private|internal|cloud[- ]metadata|metadata)\\b)(?=.*\\b(?:skip(?:s|ped|ping)?|bypass(?:es|ed|ing)?|missing|without|no|lack(?:s|ing)?)\\W{0,30}(?:destination|host|ip|ssrf|url)?\\W{0,30}(?:validation|check|filter|allowlist)\\b)(?=.*\\b(?:fetch(?:es|ed|ing)?|request(?:s|ed)?|server[- ]side|crawler)\\b)(?=.*\\b(?:stream(?:s|ed|ing)?|return(?:s|ed)?|relay(?:s|ed)?|response|body|content)\\b.{0,120}\\b(?:remote|client|caller|attacker|agent|output|back)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-017"
+}

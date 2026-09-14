@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-022",
+  "name": "Counterfactual Knowledge Conflict Memory Binding",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Mutually inconsistent fictitious replacement facts for the same subject are fed through unlearning evidence; a downstream memory or retrieval consumer resolves the conflict by recency/last-write and persists a false replacement as trusted knowledge.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:unit test|negative fixture|scanner rule|defensive guidance|security guide|postmortem|blocked payload|must not|do not obey|safe remediation|benign example))(?=.*\\b(?:unlearn(?:ing|ed)?|counterfactual|false[- ]target|fictitious)\\b)(?=.*\\b(?:conflict(?:ing)?|inconsisten(?:t|cy)|contradict(?:ory|ion)|mutually exclusive|disagree)\\b)(?=.*\\b(?:same entity|same record|same subject|same fact|one entity|one subject|replacement knowledge|alternative fact)\\b)(?=.*\\b(?:memory|retrieval|knowledge base|write[- ]back|persist|canonical|trusted)\\b)(?=.*\\b(?:recency|last[- ]write|latest|resolve|select|prefer|false|fabricat|incorrect|unreliable)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-022"
+}

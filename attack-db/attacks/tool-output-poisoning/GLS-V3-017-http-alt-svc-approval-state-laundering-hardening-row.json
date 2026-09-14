@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-017",
+  "name": "HTTP Alt-Svc approval-state laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "HTTP `Alt-Svc` transport metadata can launder an alternative-service route into forged pre-cleared approval evidence for release/deploy/scanner agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-017"
+}

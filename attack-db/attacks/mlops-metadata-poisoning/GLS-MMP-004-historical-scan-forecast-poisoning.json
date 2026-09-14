@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MMP-004",
+  "name": "Historical Scan Forecast Poisoning",
+  "version": "1.0",
+  "category": "mlops_metadata_poisoning",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Fabricated events injected into an attacker-influenced historical scan-telemetry training window steer an LSTM look-ahead forecast, so the moving-target mutation controller rotates a decoy address and leaves the real next target exposed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\b(?:defensive|detector|unit\\s+test|negative\\s+fixture|postmortem|incident\\s+report|blocked|quarantined|must\\s+not|do\\s+not|never|safe\\s+example)\b)(?=.*(?:historical\\s+(?:(?:malicious[- ]?)?scan|reconnaissance)\\s+(?:telemetry|log|window)|scan[- ]history|malicious[- ]scan\\s+events|reconnaissance\\s+telemetry))(?=.*(?:LSTM|look[- ]ahead|forecast|predic(?:t|tion)|ensemble))(?=.*(?:poison|inject|spoof|fabricat|manipulat|pollut|contaminat))(?=.*(?:mutation|moving[- ]target|IP[- ]shuffl|address\\s+(?:rotation|reassignment)|reconfigure))(?=.*(?:actual\\s+target|real\\s+target|next\\s+target|divert|misdirect|decoy|wrong\\s+address|leave\\s+exposed)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MMP-004"
+}

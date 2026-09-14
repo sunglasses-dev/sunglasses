@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-671",
+  "name": "Traceability Summary Omission Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A traceable fraud-review reasoning/UI surface presents a polished low-risk explanation as complete after semantic unification and SURE reflection silently omit a contradictory raw risk signal and its provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|policy|rule)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|runbook|scanner\\s+(?:rule|documentation)|defensive|must\\s+(?:include|show|retain|surface)|(?:safely\\s+(?:reports?|shows?)|pending\\s+human\\s+review|(?:do\\s+not|must\\s+not)\\s+(?:omit|hide|trust|approve)))\\b)(?=.*\\b(?:traceable|reasoning\\s+(?:trace|path)|SURE|self[- ]check|reflection|fraud[- ]review)\\b)(?=.*\\b(?:semantic\\s+unif(?:ication|ied)|risk\\s+signal|heterogeneous\\s+signal|feature\\s+serialization)\\b)(?=.*\\b(?:contradict\\w*|conflict\\w*|raw\\s+(?:signal|evidence)|provenance)\\b)(?=.*\\b(?:omit\\w*|missing|downplay\\w*|suppress\\w*|not\\s+(?:shown|included|surfaced)|incomplete|partial)\\b)(?=.*\\b(?:complete|green|low\\s+risk|approve\\w*|accept\\w*|no\\s+escalat\\w*|reviewer\\s+(?:UI|surface|dashboard))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-671"
+}

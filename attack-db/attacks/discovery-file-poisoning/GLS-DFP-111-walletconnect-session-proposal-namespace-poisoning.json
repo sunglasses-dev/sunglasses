@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-111",
+  "name": "WalletConnect Session-Proposal Namespace Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "WalletConnect Session-Proposal Namespace Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 walletConnect session proposal and namespace metadata used to deceive wallet agents.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:docs?|documentation|guide|reference|training|runbook|incident\\s+report|postmortem|unit\\s+test|fixture|security\\s+report|scanner\\s+docs?)\\b.{0,260}\\b(?:do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|report|override|trust)|does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)|never\\s+(?:obey|include|attach|forward|send|share|report|override|trust)|must\\s+not\\s+(?:obey|include|attach|forward|send|share|report|override|trust|treat)|should\\s+(?:report|detect|flag|refuse|block)|detected|blocked|flagged|quarantined|redacted|not\\s+authoritative))\n(?!.*\\b(?:walletconnect|wallet\\s+connect|session\\s+proposal|wc_sessionPropose)\\b.{0,200}\\b(?:is|are)\\s+not\\s+(?:policy|instructions?|authoritative|trusted\\s+guidance))\n(?=.*(?:\\bWalletConnect\\b|\\bwallet\\s+connect\\b|\\bwc_sessionPropose\\b|\\bsession\\s+proposal\\b|\\bsession\\s+propose\\b|\\brequiredNamespaces\\b|\\boptionalNamespaces\\b|\\bwallet_session\\b|\\bpairing\\s+proposal\\b|\\bwalletconnect\\s+proposal\\b|\"metadata\"\\s*:\\s*\\{|\"requiredNamespaces\"\\s*:\\s*\\{|\"optionalNamespaces\"\\s*:\\s*\\{))\n(?=.*(?:(?:AI\\s+|LLM\\s+|wallet\\s+|security\\s+|approval\\s+|signing\\s+|transaction\\s+)?(?:agents?|assistants?|copilots?|scanners?|auditors?|reviewers?|summarizers?|models?|llms?)|wallet\\s+(?:assistant|copilot|agent|scanner|reviewer)|approval\\s+(?:agent|assistant|reviewer)|signing\\s+(?:assistant|agent|reviewer)|(?<![A-Za-z0-9])(?:assistant_note|agent_note|scanner_policy|wallet_agent|approval_policy|signing_assistant)(?![A-Za-z0-9])))\n(?=.*(?:(?:authoritative|canonical|governing|definitive|primary|controlling|trusted|approved)\\s+(?:approval|wallet|session|pairing|signing|review|scanner|agent)?\\s*(?:policy|instructions?|guidance|playbook|procedure|source\\s+of\\s+truth)|(?:primary|single)\\s+source\\s+of\\s+truth|supersed(?:e|es|ed|ing)?|overrides?|outranks?|takes?\\s+precedence|ignore\\s+(?:wallet|scanner|system|risk|security)\\s+(?:warnings?|rules?|policy)|treat.{0,50}?as\\s+(?:safe|approved|trusted|informational)|mark.{0,50}?as\\s+(?:safe|approved|trusted|informational)|(?:suppress|hide|omit|exclude|downgrade|deprioriti[sz]e|demote|reclassify|redact)\\s+(?:[\\w-]+\\s+){0,5}(?:warnings?|findings?|alerts?|risks?|permission\\s+changes?|method\\s+requests?|chain\\s+requests?|account\\s+exposure|signing\\s+requests?|approval\\s+prompts?|reports?)|do\\s+not\\s+(?:report|warn|flag|escalate|show)\\s+(?:[\\w-]+\\s+){0,5}(?:warnings?|findings?|alerts?|risks?|methods?|chains?|permissions?|accounts?|signing\\s+requests?)|(?:include|forward|send|share|attach|provide|pass\\s+along|relay|transmit|copy|collect)\\s+(?:[\\w-]+\\s+){0,5}(?:wallet\\s+state|local\\s+state|session\\s+(?:topic|key|token|context|metadata)|pairing\\s+(?:topic|secret|context)|account\\s+(?:list|metadata|capabilities)|addresses?|seed\\s+phrases?|private\\s+keys?|mnemonics?|auth(?:entication)?\\s+(?:headers?|tokens?)|api\\s+keys?|environment\\s+(?:variables?|context)|cookies?)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-111"
+}

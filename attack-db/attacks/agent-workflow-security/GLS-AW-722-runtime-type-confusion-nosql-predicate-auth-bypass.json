@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-722",
+  "name": "Runtime Type Confusion Nosql Predicate Auth Bypass",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Bracketed form keys can materialize a password operator object, changing a scalar credential check into a MongoDB predicate that admits a privileged login session.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+test|documentation|unit\\s+test|defensive|guidance|failed|reject(?:ed|s)?|research\\s+note)\\b)(?=.*(?:\\bpassword\\s*\\[(?:\\$)?(?:ne|gt|in|exists)\\]|\\bpassword\\s*[:=].*\\{\\s*[\"']\\$(?:ne|gt|in|exists)))(?=.*\\b(?:bypass(?:es|ed)?|predicate|query\\s+operator|authenticat(?:e|es|ed|ion)|login\\s+succeeds?)\\b)(?=.*\\b(?:root|admin|administrator|privileged|session|token)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-722"
+}

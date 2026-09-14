@@ -18,7 +18,8 @@
     "paste"
   ],
   "regex": [
-    "(?i)(?:curl|wget|iwr|invoke-webrequest)\\s+[^\\n|]{0,200}\\|\\s*(?:sudo\\s+)?(?:bash|sh|zsh|python\\d?)\\b"
+    "(?i)\\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\\b[\\s\\S]{0,200}?(?:curl|wget|iwr|invoke-webrequest)\\s+[^\\n|]{0,200}\\|\\s*(?:sudo\\s+)?(?:bash|sh|zsh|python\\d?)\\b",
+    "(?i)(?:curl|wget|iwr|invoke-webrequest)\\s+[^\\n|]*http://[^\\n|]{0,200}\\|\\s*(?:sudo\\s+)?(?:bash|sh|zsh|python\\d?)\\b"
   ],
   "examples": {
     "malicious": [],

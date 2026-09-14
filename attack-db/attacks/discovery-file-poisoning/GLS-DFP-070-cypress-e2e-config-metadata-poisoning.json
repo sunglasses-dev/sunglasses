@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-070",
+  "name": "Cypress E2E Config Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Cypress E2E Config Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets Cypress E2E test configuration metadata poisoning specifically.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?|documentation)\\b.{0,220}\\b(?:detected|blocked|flagged|refused|reported|must\\s+(?:be\\s+)?reported|must\\s+report|not\\s+obeyed|not\\s+obey\\s+it|should\\s+(?:report|detect|flag|refuse|block))|(?:cypress(?:\\s+(?:config|configuration|metadata))?|e2e\\s+(?:test|testing)\\s+(?:config|metadata)|test\\s+runner\\s+metadata).{0,160}\\b(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)|(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share|expose)\\b|\\bno\\s+(?:policy\\s+)?overrides?\\b|not\\s+(?:authoritative|canonical|definitive)))\n(?=.*(?:\\bcypress\\.config\\.(?:js|ts|mjs|cjs)\\b|\\bcypress\\.json\\b|\\bcypress\\.env\\.json\\b|\\bcypress/e2e\\b|\\bcypress/support\\b|\\bcypress/plugins\\b|\\bcypress\\s+(?:configuration|config|metadata|test\\s+runner|e2e)|(?<!\\w)\"(?:e2e|component|env|baseUrl|setupNodeEvents|supportFile|specPattern|reporterOptions|video|screenshotsFolder|x-agent-policy|agent_policy|scanner_policy)\"\\s*:|\\b(?:end-to-end|e2e|browser)\\s+test\\s+(?:config|configuration|metadata)\\b|\\breporterOptions\\b|\\bsetupNodeEvents\\b|\\bsupportFile\\b|\\bspecPattern\\b))\n(?=.*(?<![a-zA-Z0-9])(?:ai[-_\\s]?agents?|agents?|assistants?|scanners?|auditors?|verifiers?|reviewers?|test[-_\\s]?reviewers?|qa[-_\\s]?agents?|automation[-_\\s]?review|automated(?:\\s+(?:qa|test|security|browser|cypress))?\\s+(?:review|audit|scan|verification|testing)|agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+policy|verifier\\s+instructions?)(?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:overrides?|overrules?|outranks?|supersed(?:e|es|ed|ing)?|takes?\\s+precedence)\\b.{0,90}\\b(?:system|scanner|security|repository|developer)\\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\\b|\\b(?:authoritative|canonical|definitive|governing|controlling|single\\s+source\\s+of\\s+truth|primary\\s+source\\s+of\\s+truth)\\b.{0,120}\\b(?:suppress|hide|omit|exclude|redact|downgrade|deprioritize|reclassify|forward|include|attach|send|expose|provide|pass\\s+along|hand\\s+over)\\b|\\b(?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|failures?|screenshots?|cookies?)\\b|\\b(?:do\\s+not|don't|not)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|failures?)\\b|\\b(?:treat|mark|classify|reclassify).{0,60}?\\bas\\s+(?:informational|non[-\\s]?blocking|safe|clean|benign|advisory[-\\s]?only|background[-\\s]?only)\\b|\\b(?:downgrade|deprioritize|demote|calibrate|frame|scope|route|move|place|shift|stage)\\s+(?:[\\w-]+\\s+){0,5}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?)\\s+(?:[\\w-]+\\s+){0,4}(?:background[-\\s]?only|appendix[-\\s]?only|archive[-\\s]?only|supplementary|informational|non[-\\s]?blocking|side\\s+notes?|background\\s+notes?|archive\\s+notes?)\\b|\\b(?:keep|leave)\\s+(?:[\\w-]+\\s+){0,5}(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?)\\s+out\\s+of\\s+(?:the\\s+)?(?:final\\s+report|audit\\s+memo|summary|summaries|report|memo)\\b|\\b(?:findings?|warnings?|alerts?|reports?|issues?|observations?|diagnostics?|results?|failures?|cookies?)\\s+(?:[\\w-]+\\s+){0,3}(?:are|is|were|was|should\\s+be|must\\s+be)\\s+(?:not\\s+)?(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated\\s+as\\s+informational)\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\\s+along|hand\\s+over|transfer|relay|convey)\\s+(?:[\\w-]+\\s+){0,6}(?:api\\s+tokens?|ci\\s+tokens?|session\\s+(?:cookies?|keys?|tokens?|state)|browser\\s+session\\s+(?:cookies?|credentials?|state)|browser\\s+debug\\s+bundle|debug\\s+bundle|authorization\\s+headers?|auth\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|state)|local\\s+(?:state|config(?:uration)?|settings?)|execution\\s+context|credentials?)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-070"
+}

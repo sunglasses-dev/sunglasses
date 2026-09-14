@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-595",
+  "name": "Feedback-oracle attribution confusion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Observable per-turn refusal/success telemetry is used as a refinement oracle, then attacker-controlled replay attribution blames a current harmful event on a previously cleared turn so the current safety finding is suppressed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit test|defensive|safe example|must not|do not|never|blocked|incident report)\\b)(?=.*\\b(?:replay|paired[_ -]?replay|prior[_ -]?turn)\\b)(?=.*\\b(?:feedback|per[-_ ]?turn[_ -]?feedback|operator[_ -]?verdict)\\b)(?=.*\\b(?:attribution|caused[_ -]?by|causal)\\b)(?=.*\\b(?:suppress(?:[_ -]?current[_ -]?finding)?|omit)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-595"
+}

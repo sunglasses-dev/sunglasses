@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MP-009",
+  "name": "Memory-induced tool-argument drift",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A persisted personality/bias memory silently mutates the serialized parameters (limit, timeout, top-k) of a later unrelated tool call, so stale personalization acts as undeclared task policy without any current-task authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:detector|scanner|unit\\s+test|benign|safe\\s+control|postmortem|blocked|quarantined|no\\s+drift|task[- ]scoped)\\b)(?!.*(?<!not )\\bexplicitly\\s+requested\\b)(?=.*(?:stored|persisted|long[- ]term|retrieved)\\s+(?:memory|profile|preference|bias|personality))(?=.*(?:cost[- ]conscious|impatient|risk[- ]tolerant|bias|personality))(?=.*(?:unrelated|new|later|current)\\s+(?:task|request|workflow))(?=.*(?:tool[- ]call|function[- ]call|serialized\\s+(?:arguments?|parameters?)|tool\\s+arguments?))(?=.*(?:silently|implicitly|without\\s+(?:a\\s+)?fresh|not\\s+(?:explicitly\\s+)?requested|mutat(?:e|ed)|drift))(?=.*(?:limit|timeout|top[_ -]?k|max[_ -]?rows|batch[_ -]?size|threshold)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MP-009"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-061",
+  "name": "HashiCorp Vault audit log control-plane impersonation (hardening row)",
+  "version": "1.0",
+  "category": "audit_log_tool_output",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "HashiCorp Vault audit log entries can launder secrets-manager audit telemetry into forged change-approval or control-plane authority for deployment and security agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-061"
+}

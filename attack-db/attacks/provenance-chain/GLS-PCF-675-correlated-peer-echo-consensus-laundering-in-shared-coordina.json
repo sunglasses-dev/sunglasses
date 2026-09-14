@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-675",
+  "name": "Correlated peer-echo consensus laundering in shared coordination memory",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "One compromised peer seeds unsafe intent and its downstream echoes are persisted into shared coordination memory, so a planner counts correlated descendants of a single origin as independent quorum corroboration and authorizes coordinated unsafe action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|fail[- ]?closed|safe\\s+workflow|benign)\\b)(?=.*\\b(?:compromised|malicious|unsafe|attacker|hostile)\\b)(?=.*\\b(?:peer|robot|relay|agent)\\b)(?=.*\\b(?:echo|re-?echo|repeat|mirror|corroborat|consensus|quorum)\\w*\\b)(?=.*\\b(?:shared|coordination|team|memory|context|ledger)\\w*\\b)(?=.*\\b(?:authoriz|approv|permit|execut|coordinat|proceed)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-675"
+}

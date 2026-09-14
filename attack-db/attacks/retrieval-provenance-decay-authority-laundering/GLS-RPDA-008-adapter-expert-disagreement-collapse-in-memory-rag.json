@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-008",
+  "name": "adapter expert-disagreement collapse in memory/RAG",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A lossy memory/RAG summarizer keeps only the highest adapter safety score and drops the dissenting expert's contradictory unsafe finding, so later agents read a clean 'verified' record and compose the adapter.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|test)|documentation|unit\\s+test|incident\\s+report|postmortem|negative\\s+fixture|must\\s+not|do\\s+not|never|rejected|blocked|quarantined)\\b)(?=.*\\b(?:adapter|LoRA|weight\\s+translation|alignment\\s+experts?|MoE)\\b)(?=.*\\b(?:disagreement|contradictory|unsafe\\s+expert|mixed\\s+expert)\\b)(?=.*\\b(?:highest|best|maximum|top)\\b.{0,80}\\b(?:safety\\s+score|safe\\s+result|alignment\\s+score)\\b)(?=.*\\b(?:discard|drop|omit|collapse|ignore)\\b.{0,100}\\b(?:disagreement|unsafe|contradictory|expert\\s+evidence)\\b)(?=.*\\b(?:memory|RAG|registry|cache)\\b.{0,120}\\b(?:promote|store|record|mark|label)\\b.{0,80}\\b(?:safe|approved|verified)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-008"
+}

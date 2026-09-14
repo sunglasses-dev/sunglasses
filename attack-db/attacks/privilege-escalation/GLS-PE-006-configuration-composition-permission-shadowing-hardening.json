@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PE-006",
+  "name": "configuration composition permission shadowing hardening",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Individually benign personalization and workspace config fragments merge by precedence so a no-review default plus an auto-approve fragment shadow the sensitive-action review requirement and resolve into an effective allow.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|defensive|documentation|test\\s+fixture|simulation|must\\s+not|deny|rejected|approval\\s+required)\\b)(?=.*\\b(?:merged|composed|combined|effective)\\s+(?:config|configuration|policy)\\b)(?=.*\\b(?:auto[_ -]?approve|no[_ -]?review)\\b)(?=.*\\b(?:sensitive|private|restricted|protected)\\s+(?:action|scope|sink|operation)\\b)(?=.*\\b(?:allow|permit|enabled|execute|proceed)\\b)(?=.*\\b(?:precedence|override|shadow|fallback|default)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PE-006"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-647",
+  "name": "Approval-bypassed project configuration deferred command execution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent writes a project/workspace configuration file past the approval gate, and a later project-load event interprets the persisted config as a command and executes it without a fresh consent decision (CVE-2025-55012, Zed Agent Panel).",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|fixture|incident\\s+report|patched|fixed|blocked|quarantined|safe|must\\s+not|do\\s+not|never\\s+(?:create|modify|execute)|explicit(?:ly)?\\s+approved|requires?\\s+(?:user\\s+)?approval)\\b)(?=.*\\b(?:project|workspace|repository)\\b)(?=.*\\b(?:config(?:uration)?\\s+file|settings?\\s+file|project\\s+metadata)\\b)(?=.*\\b(?:create|write|modif|replace|overwrit|persist)\\w*\\b)(?=.*(?:\\b(?:without|bypass(?:es|ed|ing)?|skip(?:s|ped|ping)?|no)\\b.{0,100}\\b(?:approval|permission|consent|confirmation|review)\\b|\\b(?:approval|permission|consent|confirmation|review)\\b.{0,100}\\b(?:bypass(?:es|ed|ing)?|skip(?:s|ped|ping)?|without)\\b))(?=.*\\b(?:later|next|on\\s+(?:project\\s+)?load|startup|reopen|reload|deferred)\\b)(?=.*\\b(?:command|script|shell|process|executable)\\b)(?=.*\\b(?:execute|run|launch|spawn)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-647"
+}

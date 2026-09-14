@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-040",
+  "name": "Containment Proof Action Universe Staleness",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A stale containment proof can claim a universal guarantee over an older typed-action universe while a newly reachable action is omitted; the agent treats that unmodeled action as contained and dispatches it.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+guide|unit\\s+test|incident\\s+report|blocked\\s+payload|parser\\s+fixture|defensive|must\\s+(?:not|reject)|should\\s+(?:not|reject)|safe\\s+handling)\\b)(?=.*\\b(?:proof\\s+cache|containment\\s+(?:verification|proof)|refinement|safety\\s+guarantee)\\b)(?=.*\\b(?:stale|outdated|old|version\\s+mismatch|omits?|missing|unmodeled|not\\s+modeled)\\b)(?=.*\\b(?:typed\\s+action|action\\s+universe|export[_ -]?memory|send[_ -]?archive|dispatch|forward|execute)\\b)(?=.*\\b(?:ignore|treat|assume|consider|accept)\\b.{0,120}\\b(?:safe|contained|verified|authorized|guaranteed|valid)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-040"
+}

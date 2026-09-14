@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-099",
+  "name": "MIME Quoted-Printable Encoded Instruction Smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "MIME Quoted-Printable Encoded Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 encoding-based bypasses (Quoted-Printable soft breaks) for instruction smuggling.",
+  "keywords": [],
+  "regex": [
+    "(?isx)^\n(?!.*\\b(?:security\\s+guide|documentation|docs|test\\s+fixture|unit\\s+test|asserts|do\\s+not\\s+obey|reject|blocked|not\\s+followed|explains)\\b.{0,220}\\b(?:quoted[- ]printable|developer\\s+instruction|ignore[- ]previous|soft\\s+breaks?)\\b)\n(?=.*(?:content-transfer-encoding\\s*:\\s*quoted-printable|quoted[- ]printable|qp[- ]?decoded?))\n(?=.*(?:[A-Za-z0-9_-]{2,32}=\\r?\\n[A-Za-z0-9_-]{1,32}))\n(?=.*(?:igno[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*re|obe[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*(?:y|ey)|devel[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*oper|syst[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*em|cred[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*ential|appl[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*y|instr[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*uction|comm[A-Za-z0-9_-]*=\\r?\\n[A-Za-z0-9_-]*and))\n(?=.*(?:previous|system|developer|instruction|policy|command|tool|execute|run|apply|obey|follow|memory|credential|secret))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-099"
+}

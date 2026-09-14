@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-065",
+  "name": "Verification Boundary Sparse Evidence Operationalization",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A single retrieved security playbook can be operationalized as verified exploit evidence when sparse or zero-day conditions provide no independent refutation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|rule|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not|do\\s+not\\s+trust|should\\s+not\\s+(?:execute|proceed))\\b)(?=.*\\b(?:RAG|retriev(?:ed|al)|knowledge[- ]base|security\\s+playbook)\\b)(?=.*\\b(?:single\\s+source|only\\s+source|sparse[- ]evidence|no\\s+independent\\s+(?:refutation|corroboration|verification)|zero[- ]day)\\b)(?=.*\\b(?:claim|finding|exploit|CVE|vulnerability)\\b)(?=.*\\b(?:verified|confirmed|proven|treat\\w*\\s+.{0,30}\\s+verified|accept\\w*\\s+.{0,30}\\s+proof)\\b)(?=.*\\b(?:execute|run|exploit|proceed|approve|operationalize)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-065"
+}

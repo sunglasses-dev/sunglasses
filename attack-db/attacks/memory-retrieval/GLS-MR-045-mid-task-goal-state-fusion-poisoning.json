@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-045",
+  "name": "Mid Task Goal State Fusion Poisoning",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile navigation page fuses a secondary goal into the active browser task memory, executes it, and then resumes the original task so the unauthorized transition looks like normal continuity.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|documentation)|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+(?:payload|sample)|incident\\s+report|postmortem|defensive|must\\s+not|should\\s+(?:reject|block|refuse)|safe\\s+(?:handling|implementation))\\b)(?=.*\\b(?:browser|web)\\s+(?:agent|automation)|navigation\\s+(?:page|content|state)|page\\s+content\\b)(?=.*\\b(?:current\\s+)?task\\s+(?:state|memory|context)|active\\s+(?:task|goal)\\s+(?:state|memory))(?=.*\\b(?:fuse|merge|inject|insert|preserve|persist)\\w*.{0,90}\\b(?:secondary|attacker|hidden|injected)\\b.{0,35}\\b(?:goal|task|objective)\\b|\\b(?:secondary|attacker|hidden|injected)\\b.{0,90}\\b(?:fuse|merge|preserve|persist)\\w*)(?=.*\\b(?:execute|perform|carry\\s+out|dispatch|upload|transfer|send|delete|purchase)\\w*\\b)(?=.*\\b(?:resume|continue|return)\\w*\\b.{0,100}\\b(?:original|user)\\s+(?:task|goal)|\\b(?:normal|seamless)\\s+continuity\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-045"
+}

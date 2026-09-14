@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-679",
+  "name": "PII verifier evidence laundering",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A privacy workflow accepts an ensemble extractor's verifier confidence as a complete PII proof and releases or suppresses a sparse context-dependent identifier whose entity span, type, and provenance were never bound to the decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+guide|unit\\s+test|test\\s+fixture|postmortem|runbook|blocked|quarantined|must\\s+not|do\\s+not|never|reject(?:ed|s)?|safe\\s+handling)\\b)(?=.*\\b(?:crash\\s+narrative|collision\\s+report|incident\\s+narrative)\\b)(?=.*\\b(?:PII|personally\\s+identifiable|home\\s+address|license\\s+plate|sparse\\s+identifier|phone|email)\\b)(?=.*\\b(?:extractor|ensemble|LLM|language\\s+model|entity\\s+recognition)\\b)(?=.*\\b(?:verifier|verification|confidence|evidence[-\\s]+based)\\b)(?=.*\\b(?:ambiguous|uncertain|missing|unresolved|weak|no\\s+entity[-\\s]+span|without\\s+span)\\b)(?=.*\\b(?:redact|suppress|hide|release|publish|clear|approve|privacy\\s+review)\\b)(?=.*\\b(?:identifier|entity|address|plate|record|narrative)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-679"
+}

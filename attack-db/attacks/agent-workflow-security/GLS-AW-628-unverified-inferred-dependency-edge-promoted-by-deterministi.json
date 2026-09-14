@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-628",
+  "name": "Unverified inferred dependency edge promoted by deterministic inheritance",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent-inferred dependency edge that failed knowledge-graph verification is accepted as verified by a downstream deterministic protection-need inheritance stage, fail-open converting probabilistic evidence into delegated authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+guide|unit\\s+test|documentation|postmortem|benign|must\\s+not|do\\s+not|fail[- ]?closed|quarantin)\\b)(?=.*\\b(?:inferred|agent[- ]inferred|hypothesized|probabilistic)\\s+(?:dependency|relation|edge)\\b)(?=.*\\b(?:unverified|unresolved|not\\s+(?:in|)\\s*(?:the\\s+)?knowledge\\s+graph|missing\\s+(?:graph\\s+)?node|no\\s+matching\\s+node)\\b)(?=.*\\b(?:deterministic|automatic)\\s+(?:protection[- ]need|inheritance|risk[- ]level)\\b)(?=.*\\b(?:treat(?:s|ed)?|assum(?:e|d)|promot(?:e|ed)|propagat(?:e|ed))\\w*\\s+(?:the\\s+)?(?:edge|relation|result)\\s+as\\s+(?:verified|trusted|confirmed)\\b)(?=.*\\b(?:approve|authoriz|allow|dispatch|execute)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-628"
+}

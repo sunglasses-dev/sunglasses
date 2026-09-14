@@ -1,0 +1,25 @@
+{
+  "id": "GLS-IP-003",
+  "name": "Audio Transcript Confidence Bypass",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-confidence ASR segment carrying an action verb, hidden behind a benign audible summary, is stripped of its confidence/provenance metadata and treated as executable action intent by the downstream voice agent.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:trusted|verified|safe|benign|documentation|unit\\s+test|test\\s+fixture|must\\s+not|display_only)\\b)(?=.*\"asr_segments\"\\s*:\\s*\\[)(?=.*\"confidence\"\\s*:\\s*0\\.[0-4]\\d*)(?=.*\"text\"\\s*:\\s*\"[^\"\\n]*(?:send|upload|forward|delete|execute)[^\"\\n]*\")(?=.*\"audible_summary\"\\s*:\\s*\"[^\"]+\")(?=.*\"downstream_action\"\\s*:\\s*\"(?:send|upload|forward|delete|execute)[^\"]*\").*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-IP-003"
+}

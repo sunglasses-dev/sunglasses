@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-054",
+  "name": "MIME multipart/alternative parser-differential approval laundering",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A hostile MIME `multipart/alternative` message shows a benign plain-text part to a human or previewer while placing the agent-facing approval/bypass instruction in an HTML alternative that a downstream AI email/ticket agent extracts as the canonical summary.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-054"
+}

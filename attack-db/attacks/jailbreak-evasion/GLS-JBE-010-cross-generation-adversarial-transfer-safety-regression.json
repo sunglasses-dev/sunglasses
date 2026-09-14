@@ -1,0 +1,25 @@
+{
+  "id": "GLS-JBE-010",
+  "name": "Cross-generation adversarial-transfer safety regression",
+  "version": "1.0",
+  "category": "jailbreak_evasion",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An adversarial archive that a prior model generation refused is replayed against an upgraded model version and reopens a previously blocked session-scoped behavior, because safety alignment is non-monotonic across generations.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|test\\s+fixture|benchmark\\s+only|no\\s+(?:action|session)|does\\s+not\\s+(?:request|emit|allow)|retained\\s+the\\s+same\\s+refusal|both\\s+reject|ordinary\\s+lookup)\\b)(?=.*\\b(?:cross[- ]generation|generation\\s+[a-z0-9]+|model[- ]version|version\\s+migration|upgraded\\s+model|replay(?:ed)?\\s+archive)\\b)(?=.*\\b(?:refused|rejected|regression|non[- ]monotonic|transfer(?:red)?|previously\\s+refused)\\b)(?=.*\\b(?:session[- ]scoped|authenticated[- ]session|session\\s+context|session\\s+marker)\\b)(?=.*\\b(?:accept(?:s|ed)?|permit(?:s|ted)?|allow(?:s|ed)?|emit(?:s|ted)?|session\\s+operation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-JBE-010"
+}

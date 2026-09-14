@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-031",
+  "name": "Host Log Evidence Boundary Contamination",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Noisy host telemetry can carry a control-plane-looking instruction that an LLM HIDS evaluator mistakes for policy, suppressing the surrounding detection event.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?![\\s\\S]*(?:unit\\s+test|test\\s+case|regression\\s+test|def\\s+test_|pytest|unittest|@Test|assertRaises|pytest\\.raises|describe\\(|CHANGELOG|change\\s?log|release\\s+notes?|fixed\\s+in\\s+v|documentation|this\\s+document|hardening\\s+guide|security\\s+(?:guide|advisory|bulletin|training|checklist|review\\s+checklist)|best\\s+practice|detection\\s+rule|sigma|logsource:|threat\\s+model|mitigation|remediation|post-?mortem|incident\\s+report|runbook|owasp|action\\s+item|we\\s+added\\s+a\\s+test|i\\s+can'?t\\s+help|i\\s+cannot\\s+help|i\\s+won'?t|i\\s+will\\s+not|i'?m\\s+not\\s+able\\s+to|refuse[sd]?\\s+to\\s+(?:help|assist|comply)|researchers?\\s+(?:show\\w*|demonstrat\\w*|found|report\\w*|describ\\w*|argue\\w*)|the\\s+paper\\b|a\\s+recent\\s+study|in\\s+their\\s+sample|(?:attacker|adversary|someone|anyone|they|caller|client|user)\\s+(?:can|could|may|might|would)\\s|would\\s+be\\s+(?:able|accepted|executed|allowed|possible)|might\\s+never\\s+be|accidental\\w*|inadvertent\\w*|unintentional\\w*|by\\s+mistake|not\\s+intentional|copy-?paste|how\\s+do\\s+(?:we|i)\\s|why\\s+do(?:es)?\\s))(?!.*\\b(?:security\\s+(?:guide|training|documentation|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|blocked\\s+payload|postmortem|must\\s+not\\s+(?:obey|trust|follow|treat)|do\\s+not\\s+(?:obey|trust|follow|treat))\\b)(?=.*\\b(?:host\\s+telemetry|host\\s+log|syslog|journalctl|audit\\.log|telemetry\\s+record|host=)\\b)(?=.*\\b(?:hids|intrusion[- ]detection|security\\s+agent|ai\\s+intrusion\\s+detector|assistant|agent|evaluator)\\b)(?=.*\\b(?:instruction|directive|policy|authoritative|supersedes|trusted|approved|for\\s+the\\s+(?:ai\\s+)?(?:intrusion(?:[- ]detection)?\\s+(?:model|detector)|hids))\\b)(?=.*\\b(?:suppress|hide|omit|ignore|skip|do\\s+not\\s+report|mark.{0,20}(?:benign|safe)|classif(?:y|ies).{0,20}(?:benign|safe))\\b)(?=.*\\b(?:finding|alert|incident|event|warning|malware|security\\s+report|telemetry|log)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-031"
+}

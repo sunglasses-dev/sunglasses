@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-063",
+  "name": "Avro Schema Registry Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Avro Schema Registry Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets Avro schema and registry metadata poisoning specifically.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|treat|trust)\\b\n  |does\\s+not\\s+(?:obey|follow|treat|trust|override|overrides?)\\b\n  |never\\s+(?:obey|follow|treat|trust|override|overrides?|use)\\b\n  |must\\s+not\\s+(?:obey|follow|treat|trust|override|overrides?|use)\\b\n  |should\\s+never\\s+be\\s+used\\s+to\\s+(?:hide|suppress|forward|include)\n  |not\\s+(?:authoritative|canonical|definitive)\\s+(?:agent\\s+)?policy\n  |(?:scanners?|auditors?|reviewers?)\\s+should\\s+(?:report|detect|flag|refuse|block)\n  |(?:security\\s+training|incident\\s+report|guide\\s+for\\s+schema\\s+auditors).{0,160}?(?:reported|not\\s+obeyed|detected|blocked|do\\s+not\\s+obey)\n  |no\\s+(?:agent\\s+)?policy\\s+overrides?\n  |no\\s+(?:scanner|agent|assistant|reviewer|auditor)\\s+(?:instructions?|directives?|polic(?:y|ies)|notes?)\n))\n(?=.*(?:\n  \\.avsc\\b|\\bavro\\s+(?:schema|idl|protocol|record|enum|union|doc(?:umentation)?|metadata)\\b\n  |\\bprotocol\\s+[A-Za-z_][\\w.-]*\\s*\\{\n  |@doc\\s*\\(\n  |(?<!\\w)\"doc\"\\s*:\n  |(?<!\\w)\"(?:fields|aliases|namespace|logicalType|schema)\"\\s*:\n  |\\bschema\\s+registry\\b|\\bregistry\\s+subject\\b|\\bsubject\\s+[\\w.-]+-(?:key|value)\\b\n  |\\bcompatibility\\s+(?:BACKWARD|FORWARD|FULL|NONE|TRANSITIVE)\\b\n  |(?<![A-Za-z0-9])(?:x-agent-policy|agent_instructions|scanner_policy|assistant_note)(?![A-Za-z0-9])\n))\n(?=.*(?:\n  \\b(?:ai|autonomous|automated|data|schema|security|dependency|governance)\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?|review|audit|scan|verification)\\b\n  |\\b(?:agents?|assistants?|scanners?|reviewers?|auditors?|verifiers?)\\b\n  |(?:agent|assistant|scanner|reviewer|auditor|verifier)[._-]?(?:instructions?|notes?|policy|directive)\n  |for\\s+(?:AI\\s+)?(?:agents?|assistants?|scanners?|reviewers?|auditors?)\n))\n(?=.*(?:\n  \\b(?:authoritative|canonical|definitive|governing|controlling)\\b\n  |(?:primary|single)\\s+source\\s+of\\s+truth\n  |(?:supersed(?:e|es|ed|ing)?|overrides?|overrules?|outranks?|takes?\\s+precedence)\\s+(?:over\\s+)?(?:system|scanner|security|review|schema|governance|agent)\\s+(?:rules?|polic(?:y|ies)|guidance|instructions?)\n  |(?:agent|scanner|assistant|reviewer|auditor)\\s+(?:instructions?|directive|policy|note)\n  |(?:main|primary|principal|preferred|recommended)\\s+(?:(?:avro|schema|registry|data|governance|security|review|audit|verification|operating)\\s+){0,4}(?:guidance|playbook|runbook|procedure|process|policy|framework)\n  |(?:suppress|hide|omit|exclude|redact|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|reports?|summaries|observations?|diagnostics?|results?|issues?|PII|schema\\s+validation|compatibility)\n  |(?:do\\s+not|don't)\\s+(?:report|flag|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|alerts?|observations?|diagnostics?|results?|issues?)\n  |(?:treat|mark|classify|downgrade).{0,60}?(?:informational|non-blocking|advisory-only|background\\s+notes?|safe|clean)\n  |(?:observations?|findings?|warnings?|alerts?|diagnostics?|results?|issues?)\\s+(?:are|is|should\\s+be)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:informational|non-blocking|advisory-only|background-only)\n  |(?:include|attach|forward|send|share|provide|expose|collect|pass\\s+along|relay)\\s+(?:[\\w-]+\\s+){0,5}(?:API\\s+tokens?|session\\s+tokens?|registry\\s+(?:auth|credentials?)|auth\\s+headers?|Authorization\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|details?)|local\\s+(?:state|config(?:uration)?|settings?)|credentials?|secrets?)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-063"
+}

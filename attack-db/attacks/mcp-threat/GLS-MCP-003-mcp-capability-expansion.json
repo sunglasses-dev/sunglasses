@@ -18,7 +18,8 @@
     "capability drift"
   ],
   "regex": [
-    "(?i)(?:new|added|expanded|broadened).{0,80}(?:tool|prompt|resource|scope|permission|oauth|capabilit)"
+    "(?i)\\b(?:mcp\\s+servers?|server\\s+manifest|tool\\s+manifest|mcp\\s+config(?:uration)?)\\b.{0,160}\\b(?:new|added|expanded|broadened|additional)\\b.{0,80}\\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\\w*)\\b",
+    "(?i)\\b(?:new|added|expanded|broadened)\\b.{0,80}\\b(?:tools?|prompts?|resources?|scopes?|permissions?|oauth|capabilit\\w*)\\b.{0,160}\\b(?:mcp\\s+servers?|server\\s+manifest|tool\\s+manifest)\\b"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-714",
+  "name": "Router Cost Amplification Adversarial Suffix",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker appends a suffix optimized against a black-box router surrogate so ordinary requests are repeatedly dispatched to a premium model, amplifying inference cost and resource use.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|test)|unit\\s+test|benchmark|incident\\s+report|postmortem|blocked|quarantined|defensive|safe|do\\s+not|must\\s+not|never|rate[- ]?limit|budget\\s+(?:cap|policy)|authorized)\\b)(?=.*\\b(?:router|routing|dispatcher|model\\s+gateway)\\b)(?=.*\\b(?:adversarial|optimized|optimization|black[- ]?box|surrogate|suffix|tail)\\b)(?=.*\\b(?:premium|expensive|high[- ]?(?:capability|cost)|costly|upper[- ]tier)\\b)(?=.*\\b(?:force|steer|direct|route|promote|select|dispatch)\\w*\\b)(?=.*\\b(?:cost|spend|budget|compute|resource|inference)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-714"
+}
