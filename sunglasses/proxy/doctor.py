@@ -59,6 +59,12 @@ CONTROL_MUST_BE = "FAIL"
 CHECK_RESULTS = ("PASS", "FAIL", "SKIPPED")
 SELF_TEST_UNAVAILABLE = "SELF_TEST_UNAVAILABLE"
 
+# The only details this report will ever print. An allowlist rather than a
+# string, because `detail` is the field a future caller reaches for when it has
+# an exception to explain, and the doctor's report is read in a terminal by the
+# operator T10.R3 forbids showing upstream stderr to.
+DETAILS = ("", SELF_TEST_UNAVAILABLE)
+
 # The module a wrapped command has to be invoking for the entry to be ours.
 PROXY_MODULE = "sunglasses.proxy"
 ARGV_SEPARATOR = "--"
@@ -347,7 +353,8 @@ def render(report) -> dict:
     return {
         "self_test": {"valid": report.self_test_ok,
                       "controls": report.self_test_controls,
-                      "detail": report.self_test_detail},
+                      "detail": (report.self_test_detail
+                                 if report.self_test_detail in DETAILS else "")},
         "per_wrapper": report.outcome.per_wrapper,
         "inventory": report.outcome.inventory,
         "aggregate": report.outcome.aggregate,
