@@ -39,7 +39,13 @@ GATE_COMMANDS = (
     "python test_customer_zero.py",
     "pytest tests/test_v056_round8.py -q -p no:cacheprovider",
 )
-FAST_IGNORES = {"tests/test_v056_matrix.py", "tests/test_repair_v056.py"}
+# tests/proxy is here because its review controls spawn real child processes
+# and include deadline tests that wait whole minutes by design; once the review
+# fixtures were vendored into the repo they stopped skipping and started
+# running, and the fast job hit its 60-minute cap. They run in `integrity`,
+# which covers the whole tree on every interpreter.
+FAST_IGNORES = {"tests/test_v056_matrix.py", "tests/test_repair_v056.py",
+                "tests/proxy"}
 
 # Approved executable template for the classify job's decide step. Specified
 # here, independently of the workflow file, so the guard compares the file to
@@ -273,7 +279,9 @@ def check_workflow(doc) -> list[str]:
     if len(suite) == 1:
         toks = shlex.split(suite[0].replace("\\\n", " "))
         canonical = ["pytest", "-q", "-p", "no:cacheprovider",
-                     "--ignore=tests/test_v056_matrix.py", "--ignore=tests/test_repair_v056.py", "--durations=15"]
+                     "--ignore=tests/test_v056_matrix.py",
+                     "--ignore=tests/test_repair_v056.py",
+                     "--ignore=tests/proxy", "--durations=15"]
         if toks != canonical:
             p.append(f"fast suite command is not the canonical token list: {toks}")
         if suite[0].count("pytest") != 1 or ";" in suite[0] or "&&" in suite[0] or "||" in suite[0]:

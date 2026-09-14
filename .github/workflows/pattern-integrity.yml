@@ -226,16 +226,28 @@ jobs:
       # The fast suite: everything except the two v0.5.6 acceptance modules
       # (tests/test_v056_matrix.py — the media matrix, 398 cases — and
       # tests/test_repair_v056.py — 114 cases spanning media, consent, CLI output
-      # and result semantics). Those two run in the `integrity` matrix whenever
-      # `classify` says the change is not documentation-only, and on every push
-      # to main, on tags, nightly and on demand. --ignore keeps pytest.ini's
-      # testpaths in force (no path argument), so the root-scope customer-zero
-      # collection is unchanged. tests/test_ci_gate.py asserts this exact list.
-      - name: Fast suite (all tests except the two v0.5.6 acceptance modules)
+      # and result semantics) and tests/proxy. Those run in the `integrity`
+      # matrix whenever `classify` says the change is not documentation-only,
+      # and on every push to main, on tags, nightly and on demand.
+      #
+      # tests/proxy joined the list when its review fixtures were vendored into
+      # the repository: before that the real-pipe controls could not find their
+      # inputs and skipped, and once they could they ran, spawning child
+      # processes and waiting out deadline tests measured in whole minutes. The
+      # fast job hit its 60-minute cap at 58 minutes. Those controls belong in
+      # integrity, which runs the whole tree on every interpreter; a lane whose
+      # job is a 30-minute signal is not the place for a test that waits 61
+      # seconds on purpose.
+      #
+      # --ignore keeps pytest.ini's testpaths in force (no path argument), so
+      # the root-scope customer-zero collection is unchanged.
+      # tests/test_ci_gate.py asserts this exact list.
+      - name: Fast suite (all tests except the v0.5.6 acceptance modules and tests/proxy)
         run: |
           pytest -q -p no:cacheprovider \
             --ignore=tests/test_v056_matrix.py \
             --ignore=tests/test_repair_v056.py \
+            --ignore=tests/proxy \
             --durations=15
 
   integrity:

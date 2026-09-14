@@ -622,6 +622,19 @@ def test_package_reads_no_undeclared_environment_variables():
     import ast
     import re
 
+    # PYTHON 3.9. The match-statement node types arrived in 3.10, and this
+    # guard runs on every interpreter the package supports; on 3.9 it died with
+    # AttributeError and took the whole integrity job with it.
+    #
+    # `getattr(ast, ..., ())` gives an EMPTY TUPLE where the class does not
+    # exist, and `isinstance` answers False for that — correct rather than
+    # merely quiet, because a 3.9 interpreter cannot PARSE a match statement,
+    # so the package cannot contain one for this to miss. On 3.10+ the real
+    # classes bind and the refusal semantics are unchanged.
+    _MatchAs = getattr(ast, "MatchAs", ())
+    _MatchStar = getattr(ast, "MatchStar", ())
+    _MatchMapping = getattr(ast, "MatchMapping", ())
+
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT"}
 
     # Names that LOOK like env vars and are not. `SUNGLASSES_WITHHELD` is the
@@ -705,11 +718,11 @@ def test_package_reads_no_undeclared_environment_variables():
                     bind(name)
             elif isinstance(node, ast.ExceptHandler) and node.name:
                 bind(node.name)
-            elif isinstance(node, ast.MatchAs) and node.name:
+            elif isinstance(node, _MatchAs) and node.name:
                 bind(node.name)
-            elif isinstance(node, ast.MatchStar) and node.name:
+            elif isinstance(node, _MatchStar) and node.name:
                 bind(node.name)
-            elif isinstance(node, ast.MatchMapping) and node.rest:
+            elif isinstance(node, _MatchMapping) and node.rest:
                 bind(node.rest)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
                 a = node.args
