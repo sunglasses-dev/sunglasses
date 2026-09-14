@@ -98,12 +98,23 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     if materialise:
         materialize.materialize(entry, variant, run_root=run_root)
 
-    upstream_file = run_root / variant["upstream_output"]
-    # DECLARED BY THE DELIVERY, served from the run. The session streams the run
-    # root's copy, which is the file a fault or a mistake would alter, and it is
-    # checked against ASTRA's materialised directory, which is the declaration.
-    # Reading both from the run root made the check compare the run to itself.
-    declared = _frames(record.path / variant["upstream_output"])
+    # THE FILES THE SCHEDULE NAMES, in schedule order. Serving
+    # `variant["upstream_output"]` for every variant ran a different experiment
+    # for three of the nineteen and reported green, because the declared check
+    # compared the wire against that same wrong file and the two halves agreed.
+    # G2-23.frame_exact was the worst: it declares a 4,194,304 byte override,
+    # exactly the wire frame limit, which is the whole scenario, and a 244 byte
+    # file went out in its place.
+    upstream_paths = [step["path"] for step in steps
+                      if step["op"] == "send_file" and step["origin"] == "upstream"]
+    upstream_file = run_root / "upstream.declared.jsonl"
+    upstream_file.write_bytes(b"".join(
+        (run_root / name).read_bytes().rstrip(b"\n") + b"\n"
+        for name in upstream_paths) if upstream_paths else b"")
+    # Checked against the DELIVERY's copies of those same named files. Reading
+    # both from the run root would compare the run to itself.
+    declared = [frame for name in upstream_paths
+                for frame in _frames(record.path / name)]
 
     argv = [sys.executable, str(REPLAY),
             "--handshake", str(run_root / "initialize.response.jsonl"),
