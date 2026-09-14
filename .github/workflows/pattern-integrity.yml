@@ -62,14 +62,23 @@ on:
     - cron: "17 9 * * *"   # 09:17 UTC = 02:17 PT daily, before the 03:30 PT local gauntlet
   workflow_dispatch:
 
+# Sep-13 2026. This workflow declared no permissions at all, so every job here ran with
+# whatever the repository default grants. release.yml and scorecard.yml have both had this
+# since they were written; this is the third file catching up, and it is why OpenSSF
+# Scorecard scored Token-Permissions 0 while two of three workflows were already correct.
+# Nothing in this file writes. It reads the tree, installs, and runs tests.
+permissions: read-all
+
 jobs:
   classify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     outputs:
       full: ${{ steps.decide.outputs.full }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Decide whether the full matrix is required (fail-closed)
@@ -98,14 +107,16 @@ jobs:
 
   fast:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # A hang must fail, not wait. Set from the first hosted measurement, not
     # from local arithmetic (ASTRA round 1); tighten once measured.
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -118,8 +129,20 @@ jobs:
 
       - name: Install package + dev + media deps
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest Pillow pytesseract PyPDF2 pyzbar; }
+          # PINNED PER INTERPRETER, not unpinned. pip 26.1 onward declares
+          # Requires-Python >= 3.10, so `pip==26.2.1` has no distribution for the
+          # 3.9 leg and that leg failed on this exact line. 26.0.1 is the newest
+          # pip 3.9 can take, read off the resolver's own list in the failing
+          # log rather than guessed. Markers rather than a shell branch: pip
+          # evaluates them and ignores the one that does not apply, so both pins
+          # stay visible as pins.
+          python -m pip install --upgrade \
+            'pip==26.2.1; python_version >= "3.10"' \
+            'pip==26.0.1; python_version < "3.10"'
+          # pytest stays unpinned in this fallback. The matrix spans Python 3.9 to 3.14 and a
+          # single exact pin cannot satisfy both ends: CI currently resolves 8.4.2 on the
+          # old legs and 9.1.1 on the new ones. Pillow is pinned per leg two lines below.
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
           # Pin the reviewer's resolved stack rather than trusting free resolution.
           # Pillow 12.3.0 requires >=3.10, so 3.9 necessarily takes 11.3.0 — that lane
           # therefore differs from the graded stack on the exact library J1 concerns.
@@ -219,6 +242,8 @@ jobs:
     needs: classify
     if: needs.classify.outputs.full == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # 180, and the reason is that 120 was measured on a quiet runner.
     #
     # Run 34583112120 (PR #140, full matrix) had legs of 40.8 to 90.4 min on an
@@ -249,10 +274,10 @@ jobs:
         # 3.14 is fully blocking here — never informational, never continue-on-error.
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -265,8 +290,20 @@ jobs:
 
       - name: Install package + dev + media deps
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest Pillow pytesseract PyPDF2 pyzbar; }
+          # PINNED PER INTERPRETER, not unpinned. pip 26.1 onward declares
+          # Requires-Python >= 3.10, so `pip==26.2.1` has no distribution for the
+          # 3.9 leg and that leg failed on this exact line. 26.0.1 is the newest
+          # pip 3.9 can take, read off the resolver's own list in the failing
+          # log rather than guessed. Markers rather than a shell branch: pip
+          # evaluates them and ignores the one that does not apply, so both pins
+          # stay visible as pins.
+          python -m pip install --upgrade \
+            'pip==26.2.1; python_version >= "3.10"' \
+            'pip==26.0.1; python_version < "3.10"'
+          # pytest stays unpinned in this fallback. The matrix spans Python 3.9 to 3.14 and a
+          # single exact pin cannot satisfy both ends: CI currently resolves 8.4.2 on the
+          # old legs and 9.1.1 on the new ones. Pillow is pinned per leg two lines below.
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
           # Pin the reviewer's resolved stack rather than trusting free resolution.
           # Pillow 12.3.0 requires >=3.10, so 3.9 necessarily takes 11.3.0 — that lane
           # therefore differs from the graded stack on the exact library J1 concerns.
@@ -362,6 +399,12 @@ jobs:
     needs: [classify, fast, integrity]
     if: always()
     runs-on: ubuntu-latest
+    # No per-job permissions here, deliberately. `coverage` is THE gate and
+    # its key set is an ASTRA reviewed contract (tests/test_ci_gate.py,
+    # COVERAGE_JOB_KEYS, round 3 R3-2) that exists so an unreviewed shape
+    # cannot change what the gate means. The top-level `permissions: read-all`
+    # already grants this job the minimum, so a block here would buy nothing
+    # and would edit a shape somebody approved.
     timeout-minutes: 5
     env:
       CLASSIFY: ${{ needs.classify.result }}
@@ -398,6 +441,8 @@ jobs:
     needs: [classify, fast, integrity, coverage]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 5
     env:
       CLASSIFY: ${{ needs.classify.result }}
