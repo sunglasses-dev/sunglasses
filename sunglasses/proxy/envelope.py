@@ -89,9 +89,16 @@ def withheld(*, request_id, reason_code, rule, accepted, status,
     if not isinstance(status, str):
         raise ValueError(f"status is {status!r}, not a string")
 
-    # CATALOG ONLY, deduplicated, ordered, bounded, in that order. An id we
-    # cannot vouch for is not evidence, and echoing one lets anything that
-    # reaches the worker choose what we say.
+    # CATALOG ONLY, deduplicated, ORDERED BY CATALOG ID ASCENDING, then bounded,
+    # in that order. An id we cannot vouch for is not evidence, and echoing one
+    # lets anything that reaches the worker choose what we say.
+    #
+    # The ordering is part of the contract's meaning rather than tidiness. The
+    # row bounds the list at 32, and truncating an unordered set takes a
+    # different 32 on each run, so two identical runs would produce receipts
+    # that differ and neither could be compared byte for byte against the other
+    # or against a fixture. Ascending by id is the order, stated here so nobody
+    # substitutes insertion order later and breaks comparison quietly.
     admissible = sorted({rule_id for rule_id in (rule_ids or ())
                          if rule_id in catalog})[:MAX_RULE_IDS]
 
