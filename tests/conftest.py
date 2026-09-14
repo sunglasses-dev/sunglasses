@@ -58,7 +58,13 @@ def pytest_report_header(config):
 # path is a symlink back to this suite's own file. Collecting it twice is an
 # import-file-mismatch, and the controls are vendored unchanged, so the
 # directory is skipped here rather than the control being edited.
-collect_ignore_glob = ["stack/*"]
+# `stack/` is that, and `source/` is the same shape: the review layout lays a
+# symlink there so ASTRA's controls resolve this suite's sources at the paths
+# they were written against. It is laid down locally rather than tracked,
+# because a directory symlink pointing back at its own parent is a cycle for
+# anything that walks the tree. The glob is listed either way, so laying the
+# layout down never turns a green suite into an import-file-mismatch.
+collect_ignore_glob = ["stack/*", "source/*"]
 
 
 # Child PROCESSES this suite spawns must be able to import the package.

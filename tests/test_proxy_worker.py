@@ -68,9 +68,20 @@ def test_claiming_completion_with_any_other_status_is_refused(status):
     assert "only a complete scan" in str(refused.value)
 
 
-def test_an_unaccepted_result_is_not_a_verdict_whatever_it_claims():
+@pytest.mark.parametrize("claim", [
+    {},                                                 # claims a clean complete scan
+    {"status": worker.STATUS_NOT_RUN, "inspection_complete": False},
+])
+def test_an_unaccepted_result_is_not_a_verdict_whatever_it_claims(claim):
+    """Both shapes, because "whatever it claims" is the whole point.
+
+    This used to pass `status=complete` beside `inspection_complete=False`,
+    which T402 now refuses FIRST as a scan that both finished and did not. The
+    test then proved T402, not this row. Each shape here is coherent apart from
+    `accepted`, so the refusal can only come from the acceptance check.
+    """
     with pytest.raises(Invalid) as refused:
-        _validate(_result(accepted=False, inspection_complete=False))
+        _validate(_result(accepted=False, **claim))
     assert "not a verdict" in str(refused.value)
 
 
@@ -135,7 +146,30 @@ def test_a_boolean_is_not_a_number(field):
     and `inspected_utf8_bytes: True` would read as 1."""
     with pytest.raises(Invalid) as refused:
         _validate(_result(**{field: True}))
-    assert "not a number" in str(refused.value)
+    # T403 names the two BYTE counters, so they are refused as whole numbers
+    # while `elapsed_ms` is refused as a number. Both messages name the field
+    # and neither takes the bool: asserting the exact pair keeps the wording
+    # honest without letting a substring cover either rule going missing.
+    assert str(refused.value) in (f"{field} is True, not a whole number",
+                                  f"{field} is True, not a number")
+
+
+@pytest.mark.parametrize("counter", ["inspected_utf8_bytes",
+                                     "observed_content_bytes"])
+def test_a_fractional_byte_count_is_refused(counter):
+    """T403, the positive half. 19.5 bytes were not inspected by anything, and
+    a fractional count cannot be compared to the byte totals T4.R2 checks it
+    against. Without this the byte rule can be deleted and nothing goes red."""
+    with pytest.raises(Invalid) as refused:
+        _validate(_result(**{counter: 19.5}))
+    assert "not a whole number" in str(refused.value)
+
+
+def test_a_fractional_duration_is_ordinary():
+    """And the other side of the same line: `elapsed_ms` is a DURATION, so half
+    a millisecond is a measurement, not a malformed count. Applying the byte
+    rule to it was over-reading the row."""
+    assert _validate(_result(elapsed_ms=0.5))
 
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf")])
