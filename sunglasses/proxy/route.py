@@ -126,6 +126,20 @@ class Route:
         if surface is None:
             return None
 
+        # T2.R14 BEFORE everything else, exactly as in the client direction.
+        # A ping result has zero inspectable leaves and no channel of its own,
+        # so scanning it means handing a worker nothing to read on a channel
+        # that does not exist, and every rule is scoped to a channel.
+        if selector.zero_leaves_is_complete(method, surface):
+            return None
+
+        if channel is None:
+            # The selector has no row for this result. Fail closed: a scan on
+            # a null channel runs no rule at all and reports a clean pass.
+            return self._withhold_result(request_id,
+                                         REASON_UNINSPECTED_METHOD,
+                                         RULE_ADMISSION)
+
         # T2.R4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
         # message is withheld. Skipping the blob and inspecting the rest
         # reports a clean scan of a message we did not read.
