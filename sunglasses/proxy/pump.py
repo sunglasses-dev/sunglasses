@@ -53,6 +53,44 @@ def parsed_ok_but_unterminated(raw):
     return len(raw) <= framing.MAX_FRAME_BYTES and not raw.endswith(b"\n")
 
 
+# RC01. What each method's list members must ACTUALLY contain. A container test
+# that stops at "is it a list of objects" accepts a text block with no text, a
+# tool with no name and a prompt message with no role, and an inspection of any
+# of those is vacuously clean: there is nothing to read, so nothing is found,
+# and the client receives a result nobody could have looked at.
+_TEXT_KINDS = frozenset({"text"})
+_PROMPT_ROLES = frozenset({"user", "assistant"})
+
+
+def _member_is_complete(method, item):
+    """One list member of one method's result, checked against its own shape."""
+    if method == "tools/call":
+        kind = item.get("type")
+        if not isinstance(kind, str):
+            return False                      # a block of no kind
+        if kind in _TEXT_KINDS:
+            return isinstance(item.get("text"), str)
+        if kind == "resource":
+            resource = item.get("resource")
+            return (isinstance(resource, dict)
+                    and isinstance(resource.get("uri"), str))
+        # image and audio carry their bytes elsewhere and are refused as
+        # UNSUPPORTED_CONTENT by the selector rather than here, so the schema
+        # only insists they are shaped like content blocks at all.
+        return True
+    if method == "tools/list":
+        if not isinstance(item.get("name"), str):
+            return False                      # a tool nobody can call
+        schema = item.get("inputSchema")
+        return schema is None or isinstance(schema, dict)
+    if method == "resources/read":
+        return isinstance(item.get("uri"), str)
+    if method == "prompts/get":
+        return (item.get("role") in _PROMPT_ROLES
+                and isinstance(item.get("content"), dict))
+    return True
+
+
 def _is_control_id(request_id):
     """Exactly the shape, not a resemblance: a string carrying our prefix."""
     return isinstance(request_id, str) and request_id.startswith(CONTROL_PREFIX)
@@ -141,6 +179,14 @@ class Session:
         self._generation[identity] = self._generation.get(identity, 0) + 1
         self._pending[identity] = method
         self._core.admit(self._core_key(identity), method=method, origin=origin)
+        if self._closed:
+            # RC06. The session closed while this admission was in flight, so
+            # the item was admitted into a table that has already been torn
+            # down and nothing will ever settle it. Reporting success would
+            # hand the caller a request the session has no intention of
+            # answering.
+            self._pending.pop(identity, None)
+            return False
         return True
 
     def _core_key(self, identity):
@@ -230,10 +276,19 @@ class Session:
             # T2.R5. An error is a legitimate answer and has no result member.
             return True
         method = self._pending.get(identity)
+        result = frame.get("result")
+        if method == "initialize":
+            # RC01. `initialize` has no list member, so the container test
+            # never reached it: a result with a version and capabilities and
+            # NO serverInfo was accepted, which is the frame the whole session
+            # identity is built on.
+            return (isinstance(result, dict)
+                    and isinstance(result.get("protocolVersion"), str)
+                    and isinstance(result.get("capabilities"), dict)
+                    and isinstance(result.get("serverInfo"), dict))
         required = self._REQUIRED_RESULT_MEMBER.get(method)
         if required is None:
             return True
-        result = frame.get("result")
         if not isinstance(result, dict):
             return False              # 7, [], a string: not a result object
         if required not in result:
@@ -244,9 +299,8 @@ class Session:
         for item in items:
             if not isinstance(item, dict):
                 return False          # contents: [7]
-            if required in self._TYPED_MEMBERS and not isinstance(
-                    item.get("type"), str):
-                return False          # content: [{}], a block of no kind
+            if not _member_is_complete(method, item):
+                return False
         return True
 
     def settle_from(self, origin, request_id, reason, rule):
@@ -349,6 +403,13 @@ class Session:
         for raw in framing.bounded_lines(_as_reader(stream),
                                          framing.MAX_FRAME_BYTES):
             if self._closed:
+                # RC02/RC07. Closure can win the race with a frame that is
+                # already buffered: a watcher observes the exit, or the reader
+                # itself closes, while bytes are still in flight. Returning
+                # here without paying the debt loses the client's one answer
+                # for a reason nobody can see from the outside, which is the
+                # hang F15 ruled against arriving by a different door.
+                yield from self._drain_refusals()
                 return
             if parsed_ok_but_unterminated(raw):
                 # C15 and T1.R2. The transport is newline delimited, so a
@@ -419,6 +480,13 @@ class Session:
                 self._pending.pop(identity)
                 self._answered.add(identity)
                 self._control_answers[identity] = message
+                # RC05. The CORE owns the item too, so an answered control
+                # request has to settle there as well. Leaving it owed means a
+                # session that finished its work still reports an outstanding
+                # correlation, and T9.R5 reads an ADMITTED with no SETTLED as
+                # INCOMPLETE_SESSION.
+                self._core.settle(self._core_key(identity),
+                                  Cause("CLEAN", "S1"))
                 continue
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
@@ -564,7 +632,18 @@ class Session:
         its way out, so the close records the debt and the exit pays it.
         """
         with self._settlement:
+            if self._closed and self._core._closed:
+                return
             if self._closed:
+                # RC04. The session is marked closed but the CORE is not,
+                # which happens only when a supervisor returned False and the
+                # core refused to claim a teardown it could not complete. A
+                # retry must re-supervise rather than return: the group is
+                # still up, and the one thing worse than a failed kill is a
+                # failed kill nobody tries again.
+                self._core.teardown(
+                    Cause(reason, rule, budget=budget, detail=detail),
+                    stop_processes=self._stop_processes())
                 return
             self._closed = (reason, rule)
             # THE DEBT IS RECORDED BEFORE THE TEARDOWN, not after it. The
@@ -574,9 +653,20 @@ class Session:
             # woke, found `_closed` set, `_pending` cleared and the debt not yet
             # written, and delivered nothing to a client still blocked on its
             # request. One owner, one lock, and the write happens first.
-            self._owed_refusals.extend(
-                (identity, reason, rule) for identity in self._pending
-                if identity[0] == ORIGIN_CLIENT)
+            # RC03. Each item keeps the FIRST cause recorded against it. A
+            # session-wide MALFORMED_UPSTREAM arriving later does not rewrite
+            # an item that already settled S3, S4 or S6: the core keeps the
+            # per-item cause and the refusal on the wire has to agree with it,
+            # or the receipt and the client's error tell two different stories
+            # about the same request.
+            for identity in list(self._pending):
+                if identity[0] != ORIGIN_CLIENT:
+                    continue
+                own = self._core.terminal_cause(self._core_key(identity))
+                self._owed_refusals.append(
+                    (identity,
+                     own.reason if own is not None else reason,
+                     own.rule if own is not None else rule))
             self._pending.clear()
         self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
                             stop_processes=self._stop_processes())
