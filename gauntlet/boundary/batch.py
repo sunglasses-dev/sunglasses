@@ -194,6 +194,51 @@ def observed_route_call(transcript):
     return found
 
 
+def route_call(run_dir, route, transcript):
+    """The call this row was actually driven with, and what attests it.
+
+    ATTESTED INGRESS ON A MEDIATED ROUTE, never a transcript. ASTRA's
+    requirement 1 is that the stimulus gate "compares transcript calls after
+    execution, rather than attested proxy ingress". The descriptor path was
+    moved onto ingress and this one was not, so a row whose session produced no
+    proxy receipts at all still graded `stimulus_exact` on the strength of what
+    the model reported doing. A transcript records a decision; ingress records
+    an arrival, and the two differ exactly when it matters.
+
+    No receipts on a mediated route is no attestation, full stop. The control
+    route has no mediator and therefore no ingress to attest with, so it gets
+    the transcript and the receipt says which one it got: a reader is never
+    handed a transcript under the name of an arrival.
+    """
+    if route != "control":
+        receipts = pathlib.Path(run_dir) / "proxy.receipts.jsonl"
+        if not receipts.is_file():
+            return None, None
+        found = None
+        for line in receipts.read_bytes().splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get("kind") != "RPC_INGRESS" or event.get("direction") != "request":
+                continue
+            try:
+                message = json.loads(event.get("raw") or "")
+            except ValueError:
+                continue
+            if message.get("method") != "tools/call":
+                continue
+            params = message.get("params") or {}
+            # THE LAST ONE, as on the transcript path: a session can reach for
+            # the route more than once and the call that matters is the one the
+            # proxy answered.
+            found = {"name": params.get("name"), "id": message.get("id"),
+                     "arguments": params.get("arguments") or {}}
+        return (found, "proxy_ingress") if found else (None, None)
+    call = observed_route_call(transcript)
+    return (call, "client_transcript") if call else (None, None)
+
+
 def call_claude(run_dir, prompt, config, *, dry_run, allowed):
     argv = ["claude", "-p", prompt, "--model", MODEL, "--output-format", "json",
             "--mcp-config", str(config), "--strict-mcp-config",
@@ -386,7 +431,8 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
         server = json.loads(config.read_text())["mcpServers"]["fs"]
         try:
             reply = descriptor.run_turn([server["command"], *server["args"]], request,
-                                        stderr_path=run_dir / "descriptor.stderr")
+                                        stderr_path=run_dir / "descriptor.stderr",
+                                        wire_path=run_dir / "client.wire.jsonl")
             failure = None
         except (descriptor.DescriptorTurnFailed, subprocess.TimeoutExpired) as exc:
             reply, failure = None, str(exc)
@@ -396,7 +442,8 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
         sink.calibrate("after")
         sink.stop()
         observed = descriptor.observed_at_ingress(
-            run_dir / "proxy.receipts.jsonl", method)
+            run_dir / "proxy.receipts.jsonl", method,
+            client_wire=run_dir / "client.wire.jsonl")
         stimulus = fidelity.compare(request, observed)
         row = {"call": call_no, "scenario_id": entry["id"],
                "variant": variant["name"], "route": route,
@@ -464,7 +511,21 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
     # filesystem tools meant the stub scenarios, which expose `gate2_fetch`, were
     # permission-denied: the model emitted the tool_use and Claude Code refused
     # it, so the route never ran and the delivered bytes were a denial message.
-    allowed = ",".join(sorted({tool, "mcp__fs__read_text_file", "mcp__fs__write_file"}))
+    reachable = {tool, "mcp__fs__read_text_file", "mcp__fs__write_file"}
+    if variant.get("route") == "direct_second_server":
+        # THE SECOND ROUTE HAS TO BE CALLABLE. G2-12 asks what happens to a call
+        # that reaches the upstream without passing the mediator, and the second
+        # server was in the configuration while none of its tools were in the
+        # allow list, so the model could see the route and not take it and the
+        # row reported on the route it was supposed to avoid. Configured and
+        # inert, the same shape as the fault dispatcher.
+        #
+        # Keyed to the variant's own `route` field rather than to the presence
+        # of the server, because for every other scenario a call that went
+        # around the mediator is a different experiment and must read as one.
+        reachable |= {name.replace("mcp__fs__", "mcp__direct__")
+                      for name in list(reachable)}
+    allowed = ",".join(sorted(reachable))
     row["allowed_tools"] = allowed
     result, problem = call_claude(run_dir, prompt, config, dry_run=dry_run,
                                   allowed=allowed)
@@ -495,8 +556,9 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
     # leaf, and a row whose stimulus was not what the package specifies is not a
     # result about the product at all. This is the check whose absence let an
     # empty write be published as a detector gap.
-    stimulus = fidelity.compare(request, observed_route_call(row.get("transcript")))
-    row["stimulus"] = stimulus.as_receipt()
+    observed_call, attested_by = route_call(run_dir, route, row.get("transcript"))
+    stimulus = fidelity.compare(request, observed_call)
+    row["stimulus"] = {**stimulus.as_receipt(), "attested_by": attested_by}
     (run_dir / "stimulus.receipt.json").write_text(
         json.dumps(row["stimulus"], indent=1) + "\n")
     row["verdict"] = verdict(run_dir, route, observed,
