@@ -6,10 +6,12 @@ upstream frames are scripted, and their ids already correlate. So this replays
 them as written and rewrites nothing. The generation 1 replay had to rewrite ids
 because the client there chose its own; doing it here would edit the scenario.
 
-A request it has no declared answer for gets a JSON-RPC error rather than an
-invented result. Answering with something plausible is how a row comes back
-green about a session that never happened, and this whole adapter exists because
-that keeps occurring.
+A request it has no declared answer for gets NOTHING. Not a plausible result,
+which is how a row comes back green about a session that never happened, and not
+an invented error either: a refusal frame is still content the scenario did not
+declare, and at least one variant exists precisely to ask what a receiver does
+when no reply comes. The absence is the observation, and it is counted on
+stderr so it is visible.
 """
 from __future__ import annotations
 
@@ -31,6 +33,7 @@ def serve(handshake_path, stream_path, stdin=None, stdout=None) -> int:
     declared = _frames(stream_path)
     handshake_ids = [json.loads(frame).get("id") for frame in handshake]
     served = 0
+    undeclared = 0
 
     for raw in stdin:
         if not raw.strip():
@@ -52,12 +55,17 @@ def serve(handshake_path, stream_path, stdin=None, stdout=None) -> int:
             stdout.flush()
             continue
         if served >= len(declared):
-            stdout.write(json.dumps(
-                {"jsonrpc": "2.0", "id": message["id"],
-                 "error": {"code": -32601,
-                           "message": "this scenario declares no further "
-                                      "upstream frame"}}).encode() + b"\n")
-            stdout.flush()
+            # SILENCE, not an invented error. A refusal frame is content on the
+            # wire the scenario never declared, and G2-21.client_malformed_tail
+            # declares no upstream reply at all: the question there is what the
+            # receiver does with a clean tail after a malformed prefix, and an
+            # error frame from this process answers a question nobody asked.
+            # The absence is the observation. Counted on stderr so it is visible
+            # rather than quiet.
+            undeclared += 1
+            sys.stderr.write(
+                f"no declared frame for id {message['id']!r}, staying silent\n")
+            sys.stderr.flush()
             continue
         # VERBATIM. The ids in these fixtures already correlate, so anything
         # this process changed would be a change to the scenario.

@@ -223,3 +223,43 @@ def test_a_scenario_that_declares_no_reply_for_its_primary_id_is_not_a_timeout(r
     assert run.upstream_as_declared is True
     record = json.loads((run.run_dir / "execution.json").read_text())
     assert record["terminal_expected"] is False and record["terminal_arrived"] is False
+
+
+def test_the_upstream_serves_the_files_the_SCHEDULE_names(run_root):
+    """G2-23.frame_exact declares `override.upstream.raw`, not its own upstream file.
+
+    The executor served `variant["upstream_output"]` for every variant, and the
+    declared check compared the wire against that same file, so both halves
+    agreed and both were wrong. Three of the nineteen ran a different experiment
+    and reported green.
+
+    This one is the worst of the three. The override is 4,194,304 bytes, exactly
+    the wire frame limit, which IS the scenario, and a 244 byte file was served
+    in its place. The frame boundary the variant exists to sit on was never
+    approached.
+    """
+    entry, variant = _case("G2-23", "frame_exact")
+    record = artifacts.of_record(entry, variant)
+    override = (record.path / "override.upstream.raw").read_bytes()
+    assert len(override) == 4 * 1024 * 1024, "the fixture is the frame limit itself"
+
+    run = execute.run(entry, variant, route="no_mediation", run_root=run_root,
+                      timeout_ms=20000)
+    assert len(run.upstream_wire) > 4 * 1024 * 1024, len(run.upstream_wire)
+    assert run.upstream_wire.endswith(override.rstrip(b"\n") + b"\n")
+
+
+def test_an_upstream_with_no_declared_step_serves_nothing(run_root):
+    """G2-21.client_malformed_tail declares no upstream send at all.
+
+    Its two steps are both client origin, a malformed prefix and a clean tail,
+    and the question is what the receiver does with the tail. Serving its
+    `upstream_output` anyway put a frame on the wire the schedule never asked
+    for, which is the harness adding to the scenario.
+    """
+    entry, variant = _case("G2-21", "client_malformed_tail")
+    run = execute.run(entry, variant, route="no_mediation", run_root=run_root)
+    handshake = (artifacts.of_record(entry, variant).path
+                 / "initialize.response.jsonl").read_bytes()
+    assert run.upstream_wire == handshake, run.upstream_wire[:300]
+    assert run.terminal_expected is False
