@@ -262,6 +262,10 @@ class Session:
         # T6.R1. Who is still owed one answer, retained across the close that
         # discovered the fault so the reader can deliver it on the way out.
         self._owed_refusals: list = []
+        # identity -> the budget its recorded cause names, or None. Read by
+        # `_client_refusal`, which the envelope requires to name a bound for
+        # OVER_BUDGET and to name none for anything else.
+        self._budget_for: dict = {}
         # One settlement owner. The reader and the watcher both reach the debt
         # and only one of them may be holding it at a time.
         self._settlement = threading.Lock()
@@ -1031,7 +1035,7 @@ class Session:
             self._core._emit("UPSTREAM_REQUEST_REFUSED", request_id,
                              reason="write_failed")
 
-    def _client_refusal(self, identity, reason, rule, budget=None):
+    def _client_refusal(self, identity, reason, rule):
         """One JSON-RPC error to the client, in the id it used.
 
         T410. Built by `envelope.withheld` and by nothing else. This used to
@@ -1051,6 +1055,13 @@ class Session:
         import json as _json
 
         request_id = identity[2]
+        # The budget is LOOKED UP rather than passed in. It belongs to the
+        # cause recorded for this item, and threading it through the signature
+        # broke every reviewer subclass that wraps this method with the three
+        # arguments the row names -- seventeen of ASTRA's v6 controls at once,
+        # on a TypeError, before a single assertion ran. The shape of a refusal
+        # is this method's business; who is waiting for it is the table's.
+        budget = self._budget_for.get(identity)
         body = envelope.withheld(
             request_id=request_id, reason_code=reason, rule=rule,
             accepted=False, status="not_run", inspection_complete=False,
@@ -1330,10 +1341,11 @@ class Session:
                 # carrying the pair together is what lets either be built.
                 if own is not None:
                     self._owed_refusals.append(
-                        (identity, own.reason, own.rule,
-                         getattr(own, "budget", None)))
+                        (identity, own.reason, own.rule))
+                    self._budget_for[identity] = getattr(own, "budget", None)
                 else:
-                    self._owed_refusals.append((identity, reason, rule, budget))
+                    self._owed_refusals.append((identity, reason, rule))
+                    self._budget_for[identity] = budget
             self._pending.clear()
             # The debt above is now recorded for both tables, so the record has
             # done its job and must not keep the watcher awake (RC15) or block
@@ -1366,8 +1378,8 @@ class Session:
             with self._settlement:
                 if not self._owed_refusals:
                     return
-                identity, reason, rule, budget = self._owed_refusals.pop(0)
-            yield self._client_refusal(identity, reason, rule, budget)
+                identity, reason, rule = self._owed_refusals.pop(0)
+            yield self._client_refusal(identity, reason, rule)
 
     def control_answer(self, request_id):
         """The frame a proxy-owned request got, or None while it is unanswered."""

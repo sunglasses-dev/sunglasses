@@ -572,3 +572,29 @@ one `token()` helper so the reason is visible at every use.
 Measured on this head: tests/proxy/test_stack_independent.py 55 passed, 1
 xfailed; our three receipt suites 190 passed. ASTRA versions this as v7
 alongside R-RC03-1.
+
+
+---
+
+## Method note: a hang is a kill, and the timeout has to be real
+
+The deadline rows (AR10, AR11, AR13) changed how the mutation harness has to
+score. A mutant that removes a deadline does not make the suite FAIL, it makes
+the suite WAIT -- which is the defect itself -- so the harness counts a timeout
+as KILLED. Reporting it as a survivor would be backwards.
+
+That is only sound while the timeout is a real bound. A harness with no
+timeout, or with one long enough never to fire, has the same bug in the other
+direction: it would sit through the hang and eventually report whatever the
+runner did on the way out. The per-run timeout is set to 180 s against a
+baseline that completes in about 33 s, and the first deadline mutant (`WD-a`)
+is the standing proof that it fires -- it is scored KILLED by timeout, not by a
+failing assertion, on every run.
+
+The harness also keeps its pristine copy of each source ON DISK with a
+`--restore` flag, not only in the process's memory. Two runs were killed
+mid-iteration today -- one by a peer's `pkill -9 -f pytest` matching our proxy
+children through their pytest tmpdir path, one by a mutant-induced hang -- and
+an in-memory copy dies with the process that holds it, leaving a mutant on disk
+to poison the next baseline. That happened once and cost a false result before
+the copy was moved to disk.
