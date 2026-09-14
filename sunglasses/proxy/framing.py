@@ -111,8 +111,17 @@ class Frame:
         return self.ok
 
     def as_receipt(self):
+        """An ALLOWLIST. `detail` is deliberately absent.
+
+        Every field here is produced by us from a fixed vocabulary. `detail`
+        is prose built around peer-supplied material, and twice it carried that
+        material verbatim: the duplicate key, and then the rejected `jsonrpc`
+        version. Both were found by review, not by me, which is the argument for
+        an allowlist over a denylist. `detail` stays on the object for logs and
+        exceptions and never crosses into evidence.
+        """
         return {"ok": self.ok, "rule": self.rule, "reason": self.reason,
-                "budget": self.budget, "detail": self.detail, "bytes": self.bytes}
+                "budget": self.budget, "bytes": self.bytes}
 
     def __repr__(self):
         if self.ok:
@@ -179,16 +188,42 @@ def _envelope_fault(message):
     has_result = "result" in message
     has_error = "error" in message
 
+    # MUTUALLY EXCLUSIVE, checked before anything else. The first version
+    # returned as soon as it saw a `method`, so a frame carrying a method AND a
+    # result was accepted as a request and its response half was never looked
+    # at. A frame that is both is not "a request with extra"; it is two claims
+    # about what it is, and acting on either one is a guess.
+    if has_method and (has_result or has_error):
+        return "the frame carries a method and a response member at once"
+    if has_result and has_error:
+        return "both result and error are present"
+
     if has_method:
         if not isinstance(message["method"], str):
             return (f"method is {type(message['method']).__name__}, not a "
                     f"string")
+        if "params" in message and not isinstance(message["params"],
+                                                  (dict, list)):
+            # JSON-RPC 2.0 allows params to be a structured value only.
+            return (f"params is {type(message['params']).__name__}, which is "
+                    f"not a structured value")
         return None                    # request when it has an id, else a notification
     if has_result or has_error:
         if not has_id:
             return "a response carries no id, so it answers nobody"
-        if has_error and not isinstance(message["error"], dict):
-            return f"error is {type(message['error']).__name__}, not an object"
+        if has_error:
+            error = message["error"]
+            if not isinstance(error, dict):
+                return f"error is {type(error).__name__}, not an object"
+            # An error object without a code and a message carries no more
+            # information than its own presence.
+            if "code" not in error or "message" not in error:
+                return "the error object has no code or no message"
+            if not isinstance(error["code"], int) or isinstance(error["code"],
+                                                               bool):
+                return "the error code is not an integer"
+            if not isinstance(error["message"], str):
+                return "the error message is not a string"
         return None
     return "the frame is neither a request, a notification nor a response"
 
@@ -251,15 +286,12 @@ def parse_frame(raw, *, origin="upstream"):
                      detail=f"top level is {type(message).__name__}, not an object",
                      size=size)
     if message.get("jsonrpc") != "2.0":
+        version = message.get("jsonrpc")
         return Frame(ok=False, rule=S5, reason=malformed,
-                     detail=f"jsonrpc is {message.get('jsonrpc')!r}, not '2.0'",
+                     detail=f"jsonrpc is not '2.0' (a "
+                            f"{type(version).__name__} of "
+                            f"{len(str(version))} characters)",
                      size=size)
-    if "result" in message and "error" in message:
-        # T7.R1. A response is one or the other; a frame claiming both leaves
-        # the reader to choose, and whichever it chooses the sender may have
-        # meant the other.
-        return Frame(ok=False, rule=S5, reason=malformed,
-                     detail="both result and error are present", size=size)
     envelope = _envelope_fault(message)
     if envelope:
         return Frame(ok=False, rule=S5, reason=malformed, detail=envelope,

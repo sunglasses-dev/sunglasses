@@ -25,6 +25,7 @@ which also means the ordering rules can be tested without spawning anything.
 """
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 
@@ -52,19 +53,45 @@ _PRECEDENCE = {
 }
 
 
+def _item_digest(request_id):
+    """A stable, non-reversing handle for an id of any JSON type."""
+    if request_id is None:
+        return None
+    raw = f"{type(request_id).__name__}:{request_id!r}".encode(
+        "utf-8", "surrogatepass")
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
 class Settled(Exception):
     """An attempt to settle an item that already has an answer."""
 
 
 class Cause:
-    __slots__ = ("reason", "rule", "budget", "at", "detail")
+    __slots__ = ("reason", "rule", "budget", "at", "detail", "_frozen")
 
     def __init__(self, reason, rule, budget=None, detail=None):
+        object.__setattr__(self, "_frozen", False)
         self.reason = reason
         self.rule = rule
         self.budget = budget
         self.detail = detail
         self.at = time.monotonic()
+
+    def __setattr__(self, name, value):
+        """Frozen means frozen, not "please do not touch".
+
+        A copy stops the CALLER's reference from mattering. It does not stop the
+        copy itself from being changed by anyone who is handed it, and this
+        object is handed out by `settle`, `settled_as`, `causes`,
+        `terminal_cause` and both teardown paths. Review reached it through four
+        of those. So the stored record refuses writes rather than relying on
+        every future caller being polite.
+        """
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"this cause is a settled record and cannot be changed; "
+                f"{name} stays {getattr(self, name, None)!r}")
+        object.__setattr__(self, name, value)
 
     def frozen(self):
         """A copy, because the caller keeps a reference to the original.
@@ -75,6 +102,7 @@ class Cause:
         """
         copy = Cause(self.reason, self.rule, self.budget, self.detail)
         copy.at = self.at
+        object.__setattr__(copy, "_frozen", True)
         return copy
 
     def as_receipt(self):
@@ -89,11 +117,24 @@ class Cause:
 # provisional until settlement, so a later hold or protocol fault still wins.
 # S1 allow, S2 prohibition and S7 review are completions; S3 faults and the
 # S4/S6 holds are not.
-_FAULT_RULES = frozenset({"S3", "S4", "S5", "S6"})
+# GENUINE FAULTS ONLY. S4 and S6 were in here, which made an approval hold
+# irrevocable and let it outrank a later accepted cancellation. A hold is not a
+# fault: it is a decision not to proceed yet, it is Rule B, and T4.R4's numbered
+# order puts cancellation (3) above approval (4). Rule A is for the things that
+# went WRONG, which is S3 and S5.
+_FAULT_RULES = frozenset({"S3", "S5"})
+_HOLD_RULES = frozenset({"S4", "S6"})
+
+# T4.R4's order, for holds known at one settlement instant.
+_HOLD_ORDER = {"S6": 3, "S4": 4}
 
 
 def is_fault(cause):
     return cause.rule in _FAULT_RULES
+
+
+def is_hold(cause):
+    return cause.rule in _HOLD_RULES
 
 
 class Session:
@@ -110,6 +151,7 @@ class Session:
         self._admitting = True
         self._torn_down = None
         self._tearing_down = False
+        self._closed = False
         self._answers: dict = {}
         self.events: list = []
 
@@ -138,7 +180,7 @@ class Session:
                 self._emit("ADMISSION_REFUSED", request_id,
                            reason="duplicate_pending_id")
                 self._teardown_locked(Cause(
-                    "MALFORMED_UPSTREAM", "S5",
+                    "MALFORMED_CLIENT", "S5",
                     detail="a second request arrived carrying an id already "
                            "pending, so correlation is no longer sound"))
                 return False
@@ -162,9 +204,10 @@ class Session:
         the record agree with the rule by having no evidence against it.
         """
         with self._lock:
-            self._causes.setdefault(request_id, []).append(cause)
-            self._emit("CAUSE_RECORDED", request_id, **cause.as_receipt())
-            return cause
+            stored = cause.frozen()
+            self._causes.setdefault(request_id, []).append(stored)
+            self._emit("CAUSE_RECORDED", request_id, **stored.as_receipt())
+            return stored
 
     def causes(self, request_id):
         with self._lock:
@@ -180,9 +223,17 @@ class Session:
         earlier one, which is exactly what Rule A forbids.
         """
         with self._lock:
-            for cause in self._causes.get(request_id) or []:
+            recorded = self._causes.get(request_id) or []
+            for cause in recorded:
                 if is_fault(cause):
-                    return cause
+                    return cause              # Rule A, the FIRST one
+            holds = [c for c in recorded if is_hold(c)]
+            if holds:
+                # Rule B. No fault, so the strongest HOLD decides, by T4.R4's
+                # order rather than by arrival: a cancellation outranks an
+                # approval hold whichever was recorded first.
+                return min(holds, key=lambda c: (_HOLD_ORDER.get(c.rule, 9),
+                                                 c.at))
             return None
 
     @staticmethod
@@ -271,7 +322,9 @@ class Session:
         if self._torn_down is not None:
             self._emit("TEARDOWN_REPEATED", None, reason=cause.reason,
                        redelivering=len(self._answers))
-            return dict(self._answers)
+            # Settling already happened. Closing may not have, if the supervisor
+            # raised last time, so the retry goes through the same close path.
+            return self._close_locked(stop_processes)
         self._admitting = False
         self._torn_down = cause
         self._emit("TEARDOWN", None, **cause.as_receipt())
@@ -287,11 +340,26 @@ class Session:
         finally:
             self._tearing_down = False
 
-        # The answers are recorded BEFORE the supervisor runs, so a supervisor
-        # that raises cannot take the batch with it.
+        return self._close_locked(stop_processes)
+
+    def _close_locked(self, stop_processes):
+        """Supervise, THEN say it closed, THEN hand back the batch.
+
+        The order is the whole point and I had it inside out twice. First the
+        supervisor ran after the answers were returned, so a raising supervisor
+        took the only copy of the batch with it. Then I moved the return earlier
+        and emitted UPSTREAM_CLOSED before supervising, which fixed the loss and
+        introduced a worse claim: a receipt saying the upstream had closed while
+        the child was still running.
+
+        A retry re-supervises. It does not redeliver on the strength of a
+        previous attempt that failed, because the batch is only safe to hand
+        back once something has actually stopped the processes holding it.
+        """
+        if stop_processes is not None and not self._closed:
+            stop_processes()            # raises out of teardown, nothing claimed
+        self._closed = True
         self._emit("UPSTREAM_CLOSED", None, settled=len(self._answers))
-        if stop_processes is not None:
-            stop_processes()
         return dict(self._answers)
 
     @property
@@ -309,5 +377,14 @@ class Session:
         return 1 if self.torn_down else 0
 
     def _emit(self, kind, request_id, **fields):
+        """Receipts identify an item, they do not reproduce it.
+
+        A JSON-RPC id is peer-supplied text of arbitrary length and content, and
+        these events are evidence. The digest correlates every event about one
+        item without copying the id into the record, and the type is kept
+        because 4 and "4" are different ids and the contract requires the
+        distinction to survive.
+        """
         self.events.append({"seq": len(self.events), "mono": time.monotonic(),
-                            "kind": kind, "request_id": request_id, **fields})
+                            "kind": kind, "item": _item_digest(request_id),
+                            "item_type": type(request_id).__name__, **fields})
