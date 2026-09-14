@@ -392,12 +392,18 @@ def test_a_frame_with_no_newline_does_not_read_without_a_ceiling():
 
 
 def test_ordinary_framing_is_unchanged_by_the_ceiling():
-    """Whole frames, split frames and a trailing frame with no newline."""
+    """Whole frames, split frames and a trailing frame with no newline.
+
+    Terminators included. This test pinned the stripped form, which is how every
+    wire capture came to be one byte short of the stream it was capturing: the
+    frame reader dropped the newline and the receipts recorded whatever it
+    handed them. The last frame genuinely carried none, and it still does.
+    """
     import io as _io
 
     source = _io.BytesIO(b'{"a":1}\n{"b":2}\n{"c":3}')
     assert list(passthrough.bounded_lines(source, 1 << 20)) == [
-        b'{"a":1}', b'{"b":2}', b'{"c":3}']
+        b'{"a":1}\n', b'{"b":2}\n', b'{"c":3}']
 
 
 def test_the_frame_after_an_over_long_one_is_still_read():
@@ -412,7 +418,7 @@ def test_the_frame_after_an_over_long_one_is_still_read():
     limit = 64
     source = _io.BytesIO(b"z" * (limit * 4) + b'\n{"good":true}\n')
     frames = list(passthrough.bounded_lines(source, limit))
-    assert frames[-1] == b'{"good":true}', frames
+    assert frames[-1] == b'{"good":true}\n', frames
 
 
 # ── item 6: receipts a stranger can grade ──────────────────────────────────
