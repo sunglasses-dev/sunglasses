@@ -34,6 +34,7 @@ what hold it.
 Every engine here is built from ONE pattern with `mechanisms=False`, so the
 numbers measure this mode and not the 1,540-rule database around it.
 """
+import statistics
 import time
 
 import pytest
@@ -556,18 +557,82 @@ GROUP_B_SEEDS = {
         "ignore disable safety system<b></b><i></i>prompx ",
 }
 GATE_BYTES = 1024 * 1024
-PER_DOCUMENT_OVERHEAD = 1.05      # anchored against the same rule unanchored
-# Finding the anchors is not free. `_match_anchored` folds the document and runs
-# one `find` per term before it can decide there is nothing to search, and on a
-# document where that answer is "every position is a window" the fold is pure
-# overhead. Measured at 8 ms on a 1 MiB document whose unanchored scan is 141 ms,
-# which is 1.06x and over the 5 percent line by three milliseconds.
+ALL_SEEDS = {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}
+
+# WHY THIS SECTION IS SHAPED THE WAY IT IS. Rewritten 2026-09-13, after the
+# first assertion failed #159's CI on a document where nothing had regressed.
 #
-# So the allowance is 5 percent OR a tenth of what an empty scan of the same
-# document costs, whichever is larger. The second term is measured in this same
-# process against the same document, so it scales with the runner instead of
-# nailing a millisecond count to one machine.
-FLOOR_FRACTION_OF_BASELINE = 0.10
+# It used to read `anchored <= unanchored * 1.05 + base * 0.10` on ONE timing of
+# each engine, and it failed at a strict 1.1839x with 0.273s anchored against
+# 0.231s unanchored and a 0.229s BASELINE. Read those three numbers together.
+# On that document the rule's own work is two milliseconds; everything else is
+# the fixed cost of putting a megabyte through any engine at all. The gate was
+# dividing two numbers that agree to three digits, so its verdict was decided by
+# whichever of the two single timings the shared runner happened to disturb.
+# That is the third time a ratio gate on a noisy runner has failed a green tree:
+# the strict 4x on #157 r2 and the 2.5x split on r3 were the same shape.
+#
+# THE MECHANISM IS NOT A RATIO. `_match_anchored` folds the document once and
+# runs one `find` per declared term before it can decide anything, and that cost
+# is a per-document constant with no relation to how long the rule's own regex
+# takes. Measured 2026-09-13 on 1 MiB, outside the engine, against the same
+# document that failed: fold 1.11 ms, the four finds and the budgeted walk
+# 0.75 ms, 1.90 ms in total, which is to the tenth of a millisecond the overhead
+# the engine shows on that document. So what this gates is the OVERHEAD, in the
+# unit the mechanism actually has, and the baseline engine is what turns a
+# millisecond count into a number that travels between machines.
+#
+# WHAT THE CLOCK IS FOR, now that it is not the only instrument. Every one of
+# the eight documents below falls into one of two buckets, checked rather than
+# assumed: four contain no declared term at all, so the mechanism folds and runs
+# one miss per term and searches nothing, and four contain one every few dozen
+# bytes, so it folds, hits the density budget at 1,749 spots and does one plain
+# search. NONE of them reaches the window merge. So what the clock can see here
+# is the fold and the find loop and nothing else, and both of those are now
+# pinned as INTEGERS, in both directions, by
+# `test_the_mechanism_makes_exactly_one_fold_and_one_find_pass_per_term` and
+# `test_the_cost_of_deciding_to_bail_does_not_grow_with_the_document`.
+#
+# That is the division of labour, and it is deliberate. The counts decide
+# whether the mechanism still does what it says; they are exact, they cost no
+# wall-clock, and a shared runner cannot argue with them. Both regressions
+# measured on 2026-09-13 are caught there and not here: removing the budget bail
+# takes the find count from 169 to 50,001, and folding once per declared term
+# takes the fold count from 1 to 4, which was measured at 6.0 - 6.4 ms of
+# overhead and passed all 47 non-slow tests in this file before that count
+# existed.
+#
+# What no count can see is one of the PRIMITIVES getting slower while the calls
+# stay the same: a fold that stops being a C-level translate, a `find` that
+# stops being a C-level scan. That is what the clock is left holding, and it is
+# a change of a different order of magnitude, not a few milliseconds. So the
+# ceiling is set where noise cannot reach it rather than as close to the healthy
+# number as it will go. Measured here at 7 interleaved trials:
+#     healthy                            0.004x - 0.022x   (0.4 - 3.3 ms)
+#     a fold per declared term           0.043x - 0.046x   (6.0 - 6.4 ms)
+# and on the #159 runner that failed, single trials scattered healthy documents
+# across 0.013x, 0.034x, 0.044x and the 0.183x that failed the build. Nothing
+# had regressed in any of them. A ceiling tight enough to separate 0.022x from
+# 0.043x cannot survive that spread, and it would only be re-catching what the
+# fold count already catches exactly. 0.10x is about five times what the
+# mechanism costs and clear of every excursion that runner produced except the
+# one that failed the build, and 0.183x is NOT what the width is meant to
+# absorb: that is the estimator's job below, a median of seven interleaved
+# trials and then a recheck at fifteen, because a single disturbed trial is
+# exactly what a median is for. The width buys headroom over the ordinary
+# scatter; the median buys immunity to the spike. Neither alone was enough.
+#
+# AND IT IS MEASURED LIKE A MEASUREMENT. The trials are INTERLEAVED, so a slow
+# stretch of a shared runner lands on all three engines instead of on whichever
+# one it was pointed at, and the verdict is taken on the MEDIAN, so a single
+# disturbed trial cannot carry it. A document that trips the ceiling is measured
+# AGAIN, with more trials, before the test fails: a regression reproduces, a
+# noisy neighbour usually does not. That recheck costs nothing on the path that
+# was going to pass, and every number is printed either way, the old strict
+# ratio included, so nothing this gate used to show has disappeared.
+TRIALS = 7
+CONFIRM_TRIALS = 15
+ANCHOR_OVERHEAD_VS_BASELINE = 0.10
 RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 
 # The saving depends on a mechanism, so the gate names the mechanism rather than
@@ -610,57 +675,100 @@ def three_engines():
     return engines
 
 
-def _measure(three, seed):
-    base, unanchored, anchored = three
-    doc = (seed * ((GATE_BYTES // len(seed)) + 1))[:GATE_BYTES]
-    return tuple(_seconds(e, doc) for e in (base, unanchored, anchored))
+@pytest.fixture(scope="module")
+def measured(three_engines):
+    """Every gate document, measured ONCE, and read by all three assertions.
+
+    Module scope for two reasons. It is three times fewer scans than measuring
+    per test, which is most of what this file costs. And it stops the three
+    assertions from disagreeing about what the same document cost, which they
+    could when each one timed it separately.
+    """
+    return {label: _measure(three_engines, seed, TRIALS)
+            for label, seed in ALL_SEEDS.items()}
+
+
+def _document(seed):
+    return (seed * ((GATE_BYTES // len(seed)) + 1))[:GATE_BYTES]
+
+
+def _measure(three, seed, trials):
+    """Median of `trials` INTERLEAVED timings of the three engines.
+
+    One round times the baseline, then the unanchored rule, then the anchored
+    one, and the round repeats. Timing all of one engine's trials before
+    starting the next hands a slow stretch of a shared runner to whichever
+    engine was being timed during it, which is the failure this replaces.
+    """
+    doc = _document(seed)
+    rounds = ([], [], [])
+    for _ in range(trials):
+        for engine, into in zip(three, rounds):
+            into.append(_seconds(engine, doc))
+    return tuple(statistics.median(r) for r in rounds)
 
 
 def _seconds(engine, text):
-    import time
     started = time.perf_counter()
     engine.scan(text, channel="message")
     return time.perf_counter() - started
 
 
+def _overhead_row(label, base, unanchored, anchored):
+    overhead = anchored - unanchored
+    return (f"{label!r}: overhead {overhead * 1e3:+.1f} ms = "
+            f"{overhead / base:+.4f}x baseline, allowed "
+            f"{base * ANCHOR_OVERHEAD_VS_BASELINE * 1e3:.1f} ms; strict "
+            f"{anchored / unanchored:.4f}x ({anchored:.3f}s vs "
+            f"{unanchored:.3f}s, baseline {base:.3f}s)")
+
+
 @pytest.mark.slow
-def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines):
-    """First assertion. Where it cannot help it must not hurt."""
+def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines, measured):
+    """First assertion. Where it cannot help it must not hurt.
+
+    The strict ratio is printed beside the gated number on every document, so
+    the reading that used to decide this test is still visible even where it is
+    no longer the one that decides it.
+    """
     worse, rows = [], []
-    for label, seed in {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}.items():
-        base, unanchored, anchored = _measure(three_engines, seed)
-        allowed = unanchored * PER_DOCUMENT_OVERHEAD + base * FLOOR_FRACTION_OF_BASELINE
-        # BOTH numbers, because they can disagree and a reader deserves to see
-        # which one the gate used. The reviewer measured the 27 KB prompt storm
-        # at a strict 1.0521 (1.0478 over fifteen trials) while this formula
-        # passed it on the additive floor. That is the floor doing its job on a
-        # document whose whole cost is one fold, and it is also exactly the
-        # shape where a strict reading and a generous one part company.
-        strict = anchored / unanchored
-        rows.append(f"{label!r}: strict {strict:.4f}x, "
-                    f"allowance {allowed / unanchored:.4f}x "
-                    f"({anchored:.3f}s vs {unanchored:.3f}s, baseline {base:.3f}s)")
-        if anchored > allowed:
-            worse.append(f"{label!r}: {anchored:.3f}s anchored against "
-                         f"{unanchored:.3f}s unanchored and a {base:.3f}s baseline, "
-                         f"strict {strict:.4f}x, allowed {allowed:.3f}s")
-    print("strict ratio and the allowance the gate used:\n  " + "\n  ".join(rows))
+    for label, (base, unanchored, anchored) in measured.items():
+        rows.append(_overhead_row(label, base, unanchored, anchored))
+        if anchored - unanchored <= base * ANCHOR_OVERHEAD_VS_BASELINE:
+            continue
+        # Over the ceiling on the median of TRIALS. Measure it again, longer,
+        # before calling it a regression.
+        base, unanchored, anchored = _measure(three_engines, ALL_SEEDS[label],
+                                              CONFIRM_TRIALS)
+        overhead, allowed = anchored - unanchored, base * ANCHOR_OVERHEAD_VS_BASELINE
+        rows[-1] += (f"  |  RECHECKED at {CONFIRM_TRIALS} trials: "
+                     f"{overhead * 1e3:+.1f} ms = {overhead / base:+.4f}x, "
+                     f"allowed {allowed * 1e3:.1f} ms, "
+                     f"{'STILL OVER' if overhead > allowed else 'under, so it was noise'}")
+        if overhead > allowed:
+            worse.append(f"{label!r}: {overhead * 1e3:+.1f} ms of overhead "
+                         f"({overhead / base:+.4f}x of a {base:.3f}s baseline) "
+                         f"on {CONFIRM_TRIALS} trials, allowed "
+                         f"{allowed * 1e3:.1f} ms")
+    print("anchoring overhead, the gated number and the old strict ratio:\n  "
+          + "\n  ".join(rows))
     assert worse == [], (
-        f"anchoring costs more than {PER_DOCUMENT_OVERHEAD}x plus "
-        f"{FLOOR_FRACTION_OF_BASELINE} of the baseline on:\n  " + "\n  ".join(worse)
-        + "\nevery document, strict and allowed:\n  " + "\n  ".join(rows)
+        f"anchoring costs more than {ANCHOR_OVERHEAD_VS_BASELINE}x of the "
+        f"baseline scan of the same document, twice measured, on:\n  "
+        + "\n  ".join(worse)
+        + "\nevery document:\n  " + "\n  ".join(rows)
     )
 
 
 @pytest.mark.slow
-def test_a_document_with_no_anchor_in_it_costs_almost_nothing(three_engines):
+def test_a_document_with_no_anchor_in_it_costs_almost_nothing(measured):
     """Second assertion. The case the mode exists for, and ONLY that case.
 
     None of these seeds contains any declared term, so there is no window to
     search and the rule should cost about what not having the rule costs. That
     is a statement about documents anchoring TARGETS, and it is checked over
     exactly those documents.
-    
+
     It is deliberately not checked over the group-B seeds. Those contain a
     declared anchor every few dozen bytes; their cost over the baseline is the
     rules' own predicate work, which anchoring neither causes nor can remove.
@@ -674,15 +782,15 @@ def test_a_document_with_no_anchor_in_it_costs_almost_nothing(three_engines):
         assert not any(t in seed for t in TWO_GROUP_TERMS), (
             f"{label!r} contains a declared anchor, so it is not a rare object case"
         )
-        base, _unanchored, anchored = _measure(three_engines, seed)
+        base, _unanchored, anchored = measured[label]
         if anchored > base * RARE_OBJECT_VS_BASELINE:
             over.append(f"{label!r}: {anchored:.3f}s against a {base:.3f}s baseline, "
                         f"{anchored / base:.2f}x")
     # Printed, never asserted: what the group-B documents cost over the baseline,
     # and how much of that anchoring is responsible for.
     disclosed = []
-    for label, seed in GROUP_B_SEEDS.items():
-        base, unanchored, anchored = _measure(three_engines, seed)
+    for label in GROUP_B_SEEDS:
+        base, unanchored, anchored = measured[label]
         disclosed.append(
             f"{label!r}: {anchored / base:.2f}x baseline, of which "
             f"{unanchored / base:.2f}x is the rule without anchoring")
@@ -696,19 +804,19 @@ def test_a_document_with_no_anchor_in_it_costs_almost_nothing(three_engines):
 
 
 @pytest.mark.slow
-def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines):
+def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines, measured):
     """Third assertion. Across everything, including where it does nothing."""
     total_unanchored = total_anchored = 0.0
     rows = []
-    for label, seed in {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}.items():
-        base, unanchored, anchored = _measure(three_engines, seed)
+    for label in ALL_SEEDS:
+        base, unanchored, anchored = measured[label]
         total_unanchored += unanchored
         total_anchored += anchored
         rows.append(f"{label:36}{base:7.3f}s{unanchored:8.3f}s{anchored:8.3f}s")
     saving = total_anchored / total_unanchored
     aho = _has_aho(three_engines[2])
     gate = TOTALS_SAVING_WITH_AHO if aho else TOTALS_SAVING_WITHOUT_AHO
-    measured = 0.67 if aho else 0.80
+    measured_on = 0.67 if aho else 0.80
     why = ("with the Aho-Corasick extension, where the literal prefilter is "
            "cheap and the saving is most of the scan"
            if aho else
@@ -717,11 +825,10 @@ def test_the_totals_show_the_saving_that_justifies_the_mode(three_engines):
            "share of a bigger total")
     assert saving <= gate, (
         f"anchored {total_anchored:.2f}s against {total_unanchored:.2f}s "
-        f"unanchored, {saving:.2f}x, gate {gate}x {why}. Measured {measured}x "
+        f"unanchored, {saving:.2f}x, gate {gate}x {why}. Measured {measured_on}x "
         f"on 2026-09-12. The mode is not paying for itself.\n  "
         + "\n  ".join(rows)
     )
-
 
 def test_a_document_made_of_the_rules_own_object_words_is_all_window(three_engines):
     """The honest sentence, as an assertion rather than a claim in a PR body.
@@ -960,6 +1067,108 @@ def test_the_cost_of_deciding_to_bail_does_not_grow_with_the_document():
         assert finds < anchors // 5, (
             f"{finds} find calls against {anchors} anchors: the document is "
             f"being walked, which is the cost the bail exists to avoid")
+
+def _count_fold_and_finds(engine, rx, key, document):
+    """One `_match_anchored`, with every fold and every find on it counted."""
+    from sunglasses import _prefilter as _pf
+
+    folds, finds, real_fold = [], [0], _pf.fold
+
+    class _CountedStr(str):
+        def find(self, *args):
+            finds[0] += 1
+            return str.find(self, *args)
+
+    def counted(text):
+        folds.append(len(text))
+        return _CountedStr(real_fold(text))
+
+    try:
+        _pf.fold = counted
+        engine._match_anchored(rx, key, document)
+    finally:
+        _pf.fold = real_fold
+    return len(folds), finds[0]
+
+
+def test_the_mechanism_makes_exactly_one_fold_and_one_find_pass_per_term():
+    """What anchoring costs before it can decide anything, as integers.
+
+    THE TIMING GATES CANNOT DO THIS, and that is why this test exists. On a
+    1 MiB document the whole mechanism costs 1.90 ms against a 140 ms baseline
+    scan, so every regression in it lands inside the noise of a shared runner.
+    Folding once per declared term instead of once was measured 2026-09-13 at
+    6.0 - 6.4 ms, four times the real cost, and it passed all 47 non-slow tests
+    in this file because nothing counted the folds.
+
+    BOTH DIRECTIONS, because an upper bound alone is satisfied by doing the work
+    some slower way that makes fewer calls. `test_the_cost_of_deciding_to_bail_
+    does_not_grow_with_the_document` bounds the finds from above, which catches
+    a loop that walks the document; replacing `folded.find` with something
+    slower drives that count to ZERO and sails through it. So the count here is
+    an equality against what the mechanism is: one fold of the document, and one
+    `find` per term per occurrence plus one more per term for the miss that ends
+    it.
+
+    Several terms on purpose: one term cannot tell "once" from "once per term".
+    """
+    terms = ["alpha", "beta", "gamma", "delta"]
+    engine = SunglassesEngine([dict(
+        id="FOLDS", name="folds", category="prompt_injection", severity="high",
+        channel=["message"],
+        regex=[r"(?is)MARKER[\s\S]{0,40}?(?:alpha|beta|gamma|delta)\b"],
+        anchor_terms=terms, anchor_span=600)], mechanisms=False)
+    entries = engine._compiled_by_id["FOLDS"]
+    assert [m for m, _, _ in entries] == ["anchored"], (
+        f"the rule did not take anchored mode, so this counts nothing: "
+        f"{engine._anchor_refusals}")
+    _, rx, key = entries[0]
+    # The engine may hold the terms in any order; what this test needs is that
+    # it holds all four, because one term cannot tell "once" from "once per term".
+    assert sorted(engine._anchor_spec[key][0]) == sorted(terms), (
+        f"expected the four declared terms, got {engine._anchor_spec[key][0]}")
+
+    # Documents that do NOT reach the density bail, so the count is exact.
+    # `expected_finds` is derived from the mechanism rather than recorded from a
+    # run: every occurrence of a term costs a find, and every term costs one
+    # more find for the miss that ends its loop.
+    documents = {
+        "no anchor anywhere": "x" * 50_000,
+        "one anchor at the far end": "x" * 50_000 + " alpha ",
+        "two terms, a few apart": "x" * 20_000 + " alpha " + "x" * 900 + " delta ",
+    }
+    for label, document in documents.items():
+        occurrences = sum(document.count(term) for term in terms)
+        expected_finds = occurrences + len(terms)
+        folds, finds = _count_fold_and_finds(engine, rx, key, document)
+        assert (folds, finds) == (1, expected_finds), (
+            f"{label}: {folds} folds and {finds} finds, expected 1 fold and "
+            f"{expected_finds} finds ({occurrences} occurrences of a declared "
+            f"term, plus one closing miss for each of the {len(terms)} terms). "
+            f"A fold is a full pass that allocates a second copy of the "
+            f"document and the mode may make one; a find count that is LOWER "
+            f"than this means the terms are no longer being located with "
+            f"`find`, which is a performance change no other test here sees.")
+
+    # And the bail document, where the count is a ceiling rather than an
+    # equality, because the whole point is that it stops early.
+    #
+    # The budget is `length // span`, and SPAN IS THE ENGINE'S, not the declared
+    # 600: this regex is bounded end to end, so the span derived from it wins
+    # over the declaration, as `test_a_derivable_span_wins_over_the_declared_one`
+    # holds. Writing 600 here made this assertion fail against a mechanism that
+    # was behaving correctly, which is the reason it is read rather than assumed.
+    dense = "alpha " * 8_000
+    span = engine._anchor_spec[key][1]
+    assert span < 600, (
+        f"span {span} is the declared 600, so this regex is no longer bounded "
+        f"and the budget below is being computed from the wrong number")
+    budget = len(dense) // span + 1
+    folds, finds = _count_fold_and_finds(engine, rx, key, dense)
+    assert folds == 1, f"{folds} folds on the dense document"
+    assert finds <= budget + len(terms), (
+        f"{finds} finds on a document of {len(dense)} bytes with a budget of "
+        f"{budget}: the bail is not stopping where it claims to")
 
 
 # ── round 4: the recheck is still load-bearing, on exactly one shape ─────────
