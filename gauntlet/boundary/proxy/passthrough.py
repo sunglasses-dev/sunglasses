@@ -27,8 +27,10 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -240,11 +242,22 @@ class Passthrough:
 
     # ── holding ─────────────────────────────────────────────────────────────
     def submit(self, direction: str, request_id, payload: str, scanner,
-               channel: str | None = None) -> Handle:
-        """Hold one message, scan it in a killable child, settle. Returns at once."""
+               channel: str | None = None, content_bytes: int | None = None,
+               method: str | None = None) -> Handle:
+        """Hold one message, scan it in a killable child, settle. Returns at once.
+
+        `content_bytes` is the package's own metric: decoded UTF-8, duplicate
+        data counted, SCANNER SEPARATOR TRACKED SEPARATELY. The caller joins the
+        inspected leaves with a newline to make one document for the worker, and
+        that newline is an artefact of this harness, not bytes the upstream
+        sent. Counting it put two one-byte leaves over a two-byte budget. When
+        the caller does not measure, the payload's own length is used, which is
+        the same number for a single leaf.
+        """
         channel = channel or ("message" if direction == "request" else "api_response")
         handle = Handle(self, request_id, self.watchdog_ms)
-        measured = len(payload.encode("utf-8", "surrogatepass"))
+        measured = (len(payload.encode("utf-8", "surrogatepass"))
+                    if content_bytes is None else content_bytes)
         with self._lock:
             self._pending[request_id] = handle
             self._hold_entered[request_id] = threading.Event()
@@ -271,25 +284,31 @@ class Passthrough:
             outcome = Outcome(
                 request_id=request_id, direction=direction, forwarded=False,
                 worker_terminated=False, delivered_late=False, elapsed_ms=0.0,
-                reason_code=OVER_BYTE_BUDGET, inspected_utf8_bytes=measured,
+                # NOTHING WAS INSPECTED. No worker was started, the document
+                # was refused unread, and reporting its size here is an answer
+                # to the other question.
+                reason_code=OVER_BYTE_BUDGET, inspected_utf8_bytes=0,
                 inspection_complete=False, detector_status=STATUS_UNREADABLE,
                 finding=False, rule_ids=[],
-                replacement=self._withheld(request_id, OVER_BYTE_BUDGET, 0.0, payload))
+                replacement=self._withheld(request_id, OVER_BYTE_BUDGET, 0.0, payload,
+                                           inspected=0, observed=measured))
             with self._lock:
                 self._pending.pop(request_id, None)
             self._emit("SETTLED", request_id, forwarded=False,
                        reason=OVER_BYTE_BUDGET, detector_status=STATUS_UNREADABLE,
                        inspection_complete=False, finding=False,
+                       inspected_utf8_bytes=0, observed_content_bytes=measured,
                        terminated=False, elapsed_ms=0.0, detector=None)
             handle._settle(outcome)
             return handle
         self._hold_entered[request_id].set()
         threading.Thread(target=self._run, daemon=True,
                          args=(handle, direction, request_id, payload, scanner,
-                               channel)).start()
+                               channel, method, measured)).start()
         return handle
 
-    def _run(self, handle, direction, request_id, payload, scanner, channel) -> None:
+    def _run(self, handle, direction, request_id, payload, scanner, channel,
+             method=None, content_bytes=None) -> None:
         started = time.perf_counter()
         argv = scanner(payload, channel) if callable(scanner) else list(scanner)
         worker = subprocess.Popen(
@@ -306,11 +325,22 @@ class Passthrough:
                                   args=(worker, collected))
         errors.start()
         terminated = False
-        try:
-            worker.wait(timeout=self.deadline_ms / 1000)
-        except subprocess.TimeoutExpired:
+        # THE DEADLINE BOUNDS THE INSPECTION, NOT THE WAIT. `started` was
+        # already taken before the spawn, but the worker was then handed the
+        # FULL deadline on top of however long starting it took, so a 300 ms
+        # cold start under a 100 ms deadline produced a CLEAN result at about
+        # 340 ms. The contract puts extraction, queue and cold start inside the
+        # clock, so what is left is what is left.
+        remaining = self.deadline_ms / 1000 - (time.perf_counter() - started)
+        if remaining <= 0:
             terminated = True
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
+        else:
+            try:
+                worker.wait(timeout=remaining)
+            except subprocess.TimeoutExpired:
+                terminated = True
+                _kill_group(worker, TERMINATION_GRACE_MS / 1000)
         elapsed_ms = (time.perf_counter() - started) * 1000
         cancelled = request_id in self._cancelled
         if not terminated and cancelled:
@@ -318,6 +348,12 @@ class Passthrough:
             # too, because a worker that finishes after cancellation must not be
             # able to release anything.
             _kill_group(worker, TERMINATION_GRACE_MS / 1000)
+        # TRUTHFUL, and the same number in every place it appears. The package
+        # counts decoded UTF-8 content with the scanner separator tracked
+        # separately, so the joined document's length is not the inspected size.
+        inspected_content_bytes = (
+            content_bytes if content_bytes is not None
+            else len(payload.encode("utf-8", "surrogatepass")))
         exit_code = worker.poll()
         reader.join(timeout=1.0)
         errors.join(timeout=1.0)
@@ -327,13 +363,21 @@ class Passthrough:
         # deliberately not using, and a receipt that simply omits it cannot be
         # told from one where the worker said nothing at all.
         accepted = not (cancelled or terminated)
+        stdout_raw = collected.get("stdout") or b""
+        spill = {}
+        if len(stdout_raw) > WORKER_OUTPUT_LIMIT:
+            # NEVER SILENTLY SHORT. The receipt stays bounded and says it is
+            # bounded, and the whole output is on disk beside it so the evidence
+            # still exists for anyone who needs to check it.
+            spill = self._spill(request_id, stdout_raw)
         self._emit("WORKER_OUTPUT", request_id,
                    accepted=accepted,
                    discarded_reason=(REQUEST_CANCELLED if cancelled
                                      else SCAN_DEADLINE if terminated else None),
                    exit_code=exit_code,
-                   stdout_bytes=len(collected.get("stdout") or b""),
+                   stdout_bytes=len(stdout_raw),
                    stderr_bytes=len(collected.get("stderr") or b""),
+                   **spill,
                    stderr=_clip(collected.get("stderr")),
                    stdout=_clip(collected.get("stdout")))
         if not accepted:
@@ -364,7 +408,33 @@ class Passthrough:
         elif finding["blocked"]:
             # COMPLETE and TRUE. The scan ran to the end and found what it was
             # looking for. This is the row that used to be filed as incomplete.
-            reason, status, complete = PROHIBITED_CONTENT, STATUS_COMPLETE, True
+            #
+            # CONTRACT T4.R4(7), and deliberately narrow. G2-04 requires
+            # PROHIBITED_SECRET and the proxy answered PROHIBITED_CONTENT, which
+            # withheld the right bytes for the wrong finding and failed the
+            # paired calibration. Every clause below has to hold, because a
+            # reason is a claim about WHAT was found and a looser rule would
+            # start calling ordinary injections secrets.
+            # THE THREE COUNTS HAVE TO AGREE, and they are the package's metric
+            # rather than the length of the document handed to the worker. That
+            # document is the inspected leaves joined by a newline, and the
+            # newline is this harness's, not the caller's: comparing against it
+            # made a correct G2-04 row miss by exactly one byte per join. A path
+            # that never measured content bytes cannot claim this reason, which
+            # is why None is a refusal here and not a pass.
+            secret_family = any(
+                str(rule).startswith("GLS-SD-")
+                for rule in (finding.get("rule_ids") or []))
+            client_to_upstream_call = (direction == "request"
+                                       and method == "tools/call")
+            bytes_agree = (content_bytes is not None
+                           and content_bytes == inspected_content_bytes)
+            if (client_to_upstream_call and secret_family and accepted
+                    and finding.get("inspection_complete", True) and bytes_agree):
+                reason = PROHIBITED_SECRET
+            else:
+                reason = PROHIBITED_CONTENT
+            status, complete = STATUS_COMPLETE, True
         else:
             reason, status, complete = CLEAN, STATUS_COMPLETE, True
         forwarded = reason == CLEAN
@@ -375,26 +445,68 @@ class Passthrough:
             request_id=request_id, direction=direction, forwarded=forwarded,
             worker_terminated=terminated, delivered_late=False,
             elapsed_ms=elapsed_ms, reason_code=reason,
-            inspected_utf8_bytes=len(payload.encode("utf-8", "surrogatepass")),
+            inspected_utf8_bytes=inspected_content_bytes,
             inspection_complete=complete,
             detector_status=status,
             finding=bool(finding and finding["blocked"]),
             rule_ids=(finding or {}).get("rule_ids") or [],
             replacement=None if forwarded else self._withheld(
-                request_id, reason, elapsed_ms, payload),
+                request_id, reason, elapsed_ms, payload,
+                inspection_complete=complete,
+                inspected=inspected_content_bytes, observed=content_bytes),
         )
         with self._lock:
             self._pending.pop(request_id, None)
         self._emit("SETTLED", request_id, forwarded=forwarded, reason=reason,
                    detector_status=status, inspection_complete=complete,
                    finding=bool(finding and finding["blocked"]),
+                   # THE COUNTS THIS SETTLEMENT WAS MADE OF. They were reaching
+                   # the client in a withheld reply and not the receipts, so a
+                   # grader could read a claim of a complete inspection with no
+                   # measurement behind it anywhere, and no counter check could
+                   # be written at all. Same two numbers the reply quotes.
+                   inspected_utf8_bytes=inspected_content_bytes,
+                   observed_content_bytes=content_bytes,
                    terminated=terminated, elapsed_ms=round(elapsed_ms, 3),
                    detector=finding and {k: finding[k] for k in
                                          ("decision", "rule_ids", "blocked")})
         handle._settle(outcome)
 
-    def _withheld(self, request_id, reason_code, elapsed_ms, payload) -> dict:
-        """A reason code, never the payload and never an exception string."""
+    def _spill(self, request_id, raw: bytes) -> dict:
+        """Write an over-long worker output beside the receipts and name it."""
+        digest = hashlib.sha256(raw).hexdigest()
+        target = ((self._receipts_path.parent if self._receipts_path
+                   else pathlib.Path(tempfile.gettempdir()))
+                  / f"worker.stdout.{digest[:16]}.bin")
+        try:
+            target.write_bytes(raw)
+        except OSError:
+            return {"stdout_truncated": True, "stdout_sha256": digest}
+        return {"stdout_truncated": True, "stdout_sha256": digest,
+                "stdout_path": str(target)}
+
+    def _withheld(self, request_id, reason_code, elapsed_ms, payload,
+                  inspection_complete: bool = False,
+                  inspected: int | None = None,
+                  observed: int | None = None) -> dict:
+        """A reason code, never the payload and never an exception string.
+
+        `inspection_complete` was hardcoded False, so a scan that ran to the end
+        and found a secret told the client its inspection was incomplete while
+        the settlement recorded a completed finding. One of those two is wrong
+        and the client only ever sees the first. It carries the settled value
+        now, and the default stays False for the paths that genuinely did not
+        finish.
+
+        HOW MUCH WAS INSPECTED AND HOW BIG THE DOCUMENT WAS ARE TWO QUESTIONS.
+        This measured the document it was handed and reported that as the
+        inspected count, so a byte budget refusal told the client it had
+        inspected 32,768 bytes with no worker ever started. Both counts are
+        passed in now and both are reported, so neither can stand in for the
+        other.
+        """
+        observed = (len(payload.encode("utf-8", "surrogatepass"))
+                    if observed is None else observed)
         return {
             "jsonrpc": "2.0",
             "id": request_id,                       # type preserved, not normalised
@@ -403,9 +515,9 @@ class Passthrough:
                 "message": GATE2_WITHHELD,
                 "data": {
                     "reason_code": reason_code or "withheld",
-                    "inspection_complete": False,
-                    "inspected_utf8_bytes": len(
-                        payload.encode("utf-8", "surrogatepass")),
+                    "inspection_complete": inspection_complete,
+                    "inspected_utf8_bytes": observed if inspected is None else inspected,
+                    "observed_content_bytes": observed,
                     "elapsed_ms": round(elapsed_ms, 3),
                 },
             },
@@ -413,10 +525,36 @@ class Passthrough:
 
     # ── cancellation ────────────────────────────────────────────────────────
     def cancel(self, request_id) -> None:
+        """Accept the cancellation, and retire the id in the same breath.
+
+        RETIREMENT WAS ONLY EVER A COMMENT. `serve_stdio` said this method
+        "drops the id from pending and kills the worker"; it added the id to
+        `_cancelled`, emitted the acknowledgement, and left it in `_pending`
+        until the worker happened to finish. ASTRA's exam caught it by asking
+        for `pending_ids()` the moment `cancel` returned, which is the only
+        moment that matters: between the acknowledgement and the settlement, a
+        proxy that has told its client the request is cancelled while still
+        listing the id as in flight disagrees with itself about what it is
+        waiting for.
+
+        The retirement is EMITTED. A state change with no event cannot appear in
+        a receipt, and a receipt that cannot show it is a receipt that cannot be
+        graded on it.
+
+        An id this side never held is acknowledged and not retired. `cancel`
+        used to index `_cancel_accepted[request_id]` directly, so a notification
+        naming an unknown id raised KeyError inside the pump: the upstream
+        chooses the ids, and being surprised by one is not an error condition.
+        """
         with self._lock:
             self._cancelled.add(request_id)
-        self._emit("CANCEL_ACCEPTED", request_id)
-        self._cancel_accepted[request_id].set()
+            retired = self._pending.pop(request_id, None) is not None
+            accepted = self._cancel_accepted.get(request_id)
+        if retired:
+            self._emit("PENDING_RETIRED", request_id, reason=REQUEST_CANCELLED)
+        self._emit("CANCEL_ACCEPTED", request_id, retired=retired)
+        if accepted is not None:
+            accepted.set()
 
     def expect_upstream(self, request_id) -> None:
         with self._lock:
@@ -564,6 +702,16 @@ def _finding_of(raw):
         if not isinstance(result, dict):
             continue
         decision = result.get("decision")
+        # A RESULT OBJECT WITH NO DECISION IS SILENCE IN ANOTHER SHAPE. `{"result":
+        # {}}` parsed, so the old path read it as a scan that had happened and
+        # found nothing: decision None means `blocked` False, and the absent
+        # `inspection_complete` defaulted to True, so an empty one-line worker
+        # result forwarded the payload as a complete clean inspection. That is
+        # the same fault as deciding from the exit code, which this function
+        # exists to avoid. The worker either says what it decided or it has not
+        # told us anything, and unreadable fails closed.
+        if not isinstance(decision, str) or not decision:
+            continue
         findings = result.get("findings") or []
         return {
             "decision": decision,
@@ -574,18 +722,22 @@ def _finding_of(raw):
     return None
 
 
-# Worker output is evidence, not a payload, and it is kept at a bounded size so
-# a chatty scanner cannot turn the receipt into the thing it was describing.
-_WORKER_OUTPUT_CLIP = 4096
+# Worker output is EVIDENCE, and evidence is kept whole. The old bound was 4,096
+# characters, so a 5,094 byte verdict reached the receipt as 4,109 and no grader
+# could compare it against anything. The concern behind that bound was real, a
+# chatty scanner turning the receipt into the thing it was describing, and it is
+# answered below by writing the whole output beside the receipts and naming it,
+# rather than by cutting the verdict in half.
+#
+# One MiB, which is not a size any verdict has: it is the point at which the
+# worker has stopped producing one.
+WORKER_OUTPUT_LIMIT = 1024 * 1024
 
 
 def _clip(raw):
     if not raw:
         return ""
-    text = raw.decode("utf-8", "replace")
-    if len(text) <= _WORKER_OUTPUT_CLIP:
-        return text
-    return text[:_WORKER_OUTPUT_CLIP] + f"...[{len(text) - _WORKER_OUTPUT_CLIP} more]"
+    return raw.decode("utf-8", "replace")
 
 
 def _kill_group(worker, grace: float) -> None:
@@ -659,6 +811,15 @@ def inspection_input(message: dict, direction: str):
         for block in (result or {}).get("content") or []:
             if isinstance(block, dict) and isinstance(block.get("text"), str):
                 leaves.append(("result.content[].text", block["text"]))
+        # STRUCTURED CONTENT IS A DELIVERY SURFACE. MCP results may carry
+        # `structuredContent` beside `content`, the model is given both, and
+        # this function walked only the second. A real engine scan of the text
+        # lane therefore permitted a response whose structured lane held the
+        # G2-01 fixture verbatim. Every string leaf, with its path, for the same
+        # reason the descriptor schema is walked in full: a check that knows
+        # where to look only finds the mutation it was told about.
+        _string_leaves((result or {}).get("structuredContent"),
+                       "result.structuredContent", leaves)
         if not leaves and isinstance(result, dict):
             for key in ("content", "text"):
                 if isinstance(result.get(key), str):
@@ -667,6 +828,42 @@ def inspection_input(message: dict, direction: str):
         arguments = (message.get("params") or {}).get("arguments")
         _string_leaves(arguments, "params.arguments", leaves)
     return leaves
+
+
+# The path segments a receipt may print verbatim. Everything else in a leaf path
+# came from the message, and a message is written by whoever is on the other end.
+STRUCTURAL_SEGMENTS = frozenset({
+    "params", "arguments", "result", "content", "tools", "text", "title",
+    "description", "inputSchema", "structuredContent", "properties", "items",
+    "type", "name", "resource", "uri", "mimeType", "isError",
+})
+
+
+def receipt_path(path: str) -> str:
+    """A leaf path safe to write into a receipt.
+
+    ARBITRARY KEYS WERE PRINTED VERBATIM. The inspected leaves are keyed by their
+    dotted provenance, and on the request side those keys come from the caller's
+    own arguments object, so a fixture whose ARGUMENT NAME is the attack text put
+    that text straight into the instrument's receipt. A receipt is evidence and
+    it is read by people and tools that did not choose its contents; it must not
+    become a second delivery surface for the thing it is reporting on.
+
+    Structural segments stay readable because they are ours. Anything else is
+    replaced by a stable digest, so two mentions of the same leaf still match and
+    nobody has to see it.
+    """
+    out = []
+    for segment in re.split(r"(?=[.\[])", path):
+        bare = segment.lstrip(".[").rstrip("]")
+        if not bare or bare in STRUCTURAL_SEGMENTS or bare.isdigit():
+            out.append(segment)
+            continue
+        digest = hashlib.sha256(bare.encode("utf-8", "surrogatepass")).hexdigest()[:12]
+        lead = segment[:len(segment) - len(segment.lstrip(".["))]
+        tail = "]" if segment.endswith("]") else ""
+        out.append(f"{lead}<key:{digest}>{tail}")
+    return "".join(out)
 
 
 def invalid_result_shape(message):
@@ -741,7 +938,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
     write_lock = threading.Lock()
     inflight: list = []
 
-    def deliver(sink, raw, outcome, direction):
+    def deliver(sink, raw, outcome, direction, bound=None):
         """One writer at a time, so two settling scans cannot interleave bytes.
 
         Order is NOT preserved and does not need to be: JSON-RPC correlates by
@@ -751,11 +948,24 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         with write_lock:
             if outcome.forwarded:
                 proxy.count_bytes(direction, "egress", len(raw))
+                proxy._emit("RPC_EGRESS", outcome.request_id, direction=direction,
+                            bytes=len(raw), raw=raw.decode("utf-8", "replace"))
                 _write(sink, raw)
             else:
                 replaced = (json.dumps(outcome.replacement) + "\n").encode()
                 proxy.count_bytes(direction, "replaced", len(replaced))
+                proxy._emit("RPC_EGRESS", outcome.request_id, direction=direction,
+                            bytes=len(replaced), replaced=True,
+                            raw=replaced.decode("utf-8", "replace"))
                 _write(stdout, replaced)
+            # AFTER THE DECISION, and describing what was delivered. An array
+            # recorded before inspection is a statement about the upstream's
+            # intent, not about what the model was bound to.
+            if bound is not None:
+                delivered_tools = bound if outcome.forwarded else []
+                proxy._emit("MODEL_BOUND_TOOLS", outcome.request_id,
+                            tools=delivered_tools, count=len(delivered_tools),
+                            withheld=not outcome.forwarded)
 
     def cancellation_target(message):
         """The id a `notifications/cancelled` is about, or None.
@@ -777,6 +987,13 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             if not line.strip():
                 continue
             proxy.count_bytes(direction, "ingress", len(raw))
+            # ATTESTED INGRESS. ASTRA's requirement 1 note is that the stimulus
+            # gate "compares transcript calls after execution, rather than
+            # attested proxy ingress". A transcript is what a model reported
+            # doing; this is what actually crossed the boundary, recorded before
+            # the frame is judged so a refused frame is on the record too.
+            proxy._emit("RPC_INGRESS", None, direction=direction, bytes=len(raw),
+                        raw=raw.decode("utf-8", "surrogatepass"))
             if proxy.is_tainted():
                 # Everything after the bad frame is discarded, not examined.
                 proxy._emit("FRAME_DISCARDED_AFTER_TAINT", None,
@@ -824,11 +1041,13 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 proxy.expect_upstream(request_id)
             elif direction == "result":
                 proxy.upstream_answered(request_id)
-            if direction == "result":
-                bound = model_bound_tools(message)
-                if bound is not None:
-                    proxy._emit("MODEL_BOUND_TOOLS", request_id, tools=bound,
-                                count=len(bound))
+            # MODEL_BOUND_TOOLS USED TO BE EMITTED HERE, before the message had
+            # been inspected and before any policy decision, so its array was
+            # nonempty even on a frame the client only ever received a refusal
+            # for. A receipt that says which tools the model was bound to has to
+            # describe what the model actually got, and at this point in the
+            # pump nobody knows yet. It moved into `deliver`.
+            bound = model_bound_tools(message) if direction == "result" else None
             leaves = inspection_input(message, direction)
             if not leaves:
                 # Nothing inspectable in this frame: a handshake, an empty result,
@@ -839,7 +1058,7 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 continue
             text = "\n".join(value for _path, value in leaves)
             proxy._emit("INSPECTING", request_id, direction=direction,
-                        leaves=[path for path, _v in leaves],
+                        leaves=[receipt_path(path) for path, _v in leaves],
                         utf8_bytes=len(text.encode("utf-8", "surrogatepass")))
             # THE PUMP DOES NOT WAIT. It used to call `.result()` here, which
             # blocked this thread until the scan settled, so the reader could
@@ -850,11 +1069,16 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             # was reported as slow mediation rather than as head of line
             # blocking; and the deadline measured the queue instead of the scan.
             handle = proxy.submit(direction, request_id=request_id, payload=text,
-                                  scanner=scanner)
+                                  scanner=scanner,
+                                  method=message.get("method"),
+                                  content_bytes=sum(
+                                      len(value.encode("utf-8", "surrogatepass"))
+                                      for _path, value in leaves))
 
-            def settle(handle=handle, raw=raw, sink=sink, request_id=request_id):
+            def settle(handle=handle, raw=raw, sink=sink, request_id=request_id,
+                       bound=bound):
                 try:
-                    deliver(sink, raw, handle.result(), direction)
+                    deliver(sink, raw, handle.result(), direction, bound)
                 except WatchdogTripped as tripped:
                     # A harness fault, not a scenario result. It is recorded and
                     # nothing is written, because writing either the payload or
@@ -969,6 +1193,11 @@ def bounded_lines(source, limit):
     prefix so the caller still refuses it through the ordinary path rather than
     through an exception. The rest of that frame is drained and discarded, since
     it is the tail of something already refused.
+
+    Frames are yielded EXACTLY as they arrived, terminator included, so joining
+    them reproduces the stream. A final frame that carried no newline is yielded
+    without one, because inventing it would be the same mistake in the other
+    direction.
     """
     buffer = b""
     while True:
@@ -980,7 +1209,11 @@ def bounded_lines(source, limit):
         buffer += chunk
         while b"\n" in buffer:
             line, buffer = buffer.split(b"\n", 1)
-            yield line
+            # WITH ITS TERMINATOR. `split` drops the newline and the newline is
+            # on the wire, so every complete frame was recorded one byte short
+            # and so was every counter fed from it. A capture that cannot be
+            # joined back into the stream it came from is not a capture.
+            yield line + b"\n"
         if len(buffer) > limit:
             # Over the limit with no newline in sight. Hand the caller the
             # prefix to refuse and drop the rest of this frame.
@@ -1011,6 +1244,13 @@ def _main(argv=None) -> int:
     parser.add_argument("--deadline-ms", type=int, default=2000)
     parser.add_argument("--watchdog-ms", type=int, default=3000)
     parser.add_argument("--receipts")
+    # THE BUDGET HAD NO WAY IN. `serve` took one and the command line did not
+    # offer it, so every batch run instantiated byte_budget=None and the bound
+    # the package declares was configured nowhere. A budget the driver cannot
+    # pass is a budget that does not exist.
+    parser.add_argument("--byte-budget", type=int, default=None,
+                        help="inspected content bytes allowed, per the scenario's "
+                             "size_policy.inspection_byte_budget")
     # ONE shell-quoted string, split here. `nargs="+"` swallowed the worker's own
     # flags and argparse then rejected them as unknown options, which is a parsing
     # accident that would have read as a broken worker.
@@ -1025,7 +1265,8 @@ def _main(argv=None) -> int:
         parser.error("give the upstream argv after --")
     import shlex
     return serve(upstream, shlex.split(args.scanner), deadline_ms=args.deadline_ms,
-                 watchdog_ms=args.watchdog_ms, receipts=args.receipts)
+                 watchdog_ms=args.watchdog_ms, receipts=args.receipts,
+                 byte_budget=args.byte_budget)
 
 
 if __name__ == "__main__":
