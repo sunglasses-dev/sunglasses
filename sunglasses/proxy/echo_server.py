@@ -63,8 +63,16 @@ def parse(argv):
 
 
 def _ingress(path, raw):
-    """Append and flush. A buffered instrument reads as a zero when the process
-    it is measuring is killed, which is exactly the case under test."""
+    """Append one line, in its own open and close.
+
+    The per-line `with` is what makes this survive the process being killed,
+    and that is the property the teardown tests need, because the proxy kills
+    this server's group on the way out. An earlier version of this comment
+    credited the flush and fsync with that, which is wrong: closing the file
+    flushes it, so a mutation removing them changes nothing a test can see.
+    They are here for durability across a machine crash and nothing else, and
+    saying so is the difference between a comment and a guess.
+    """
     if not path:
         return
     with open(path, "ab") as handle:
