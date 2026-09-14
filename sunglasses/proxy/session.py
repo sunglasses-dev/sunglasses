@@ -66,12 +66,34 @@ class Cause:
         self.detail = detail
         self.at = time.monotonic()
 
+    def frozen(self):
+        """A copy, because the caller keeps a reference to the original.
+
+        `settle` used to store the caller's object. Mutating it afterwards
+        changed what `settled_as` reported, so a settled record was only as
+        immutable as the politeness of whoever held the other reference.
+        """
+        copy = Cause(self.reason, self.rule, self.budget, self.detail)
+        copy.at = self.at
+        return copy
+
     def as_receipt(self):
         return {"reason_code": self.reason, "rule": self.rule,
                 "budget": self.budget, "detail": self.detail}
 
     def __repr__(self):
         return f"<Cause {self.rule}/{self.reason}>"
+
+
+# T4.R4. Rule A makes a FAULT terminal. Rule B keeps a NORMAL COMPLETION
+# provisional until settlement, so a later hold or protocol fault still wins.
+# S1 allow, S2 prohibition and S7 review are completions; S3 faults and the
+# S4/S6 holds are not.
+_FAULT_RULES = frozenset({"S3", "S4", "S5", "S6"})
+
+
+def is_fault(cause):
+    return cause.rule in _FAULT_RULES
 
 
 class Session:
@@ -87,17 +109,38 @@ class Session:
         self._settled: dict = {}       # id -> Cause it was settled with
         self._admitting = True
         self._torn_down = None
+        self._tearing_down = False
+        self._answers: dict = {}
         self.events: list = []
 
     # ── what the client is owed ─────────────────────────────────────────────
     def admit(self, request_id):
         """Record a request forwarded upstream and not yet answered.
 
-        Refused once teardown has begun, because admitting after the decision to
-        stop is how a request arrives that nothing will ever answer.
+        Three refusals, and two of them were missing. The old version replaced
+        an existing entry and returned success, so a second call with a live id
+        silently retired the first request; and it accepted an id that had
+        already been settled, so a cancelled id could be reused and answered
+        twice. ASTRA's G2-20 derivatives execute both.
+
+        A DUPLICATE PENDING ID TEARS THE SESSION DOWN. It is not a busy signal:
+        the peer and we disagree about which request an id names, so every
+        correlation after it is a guess. That is a protocol fault, T7.R1, and
+        the session cannot continue through it.
         """
         with self._lock:
             if not self._admitting:
+                return False
+            if request_id in self._settled:
+                self._emit("ADMISSION_REFUSED", request_id, reason="retired_id")
+                return False
+            if request_id in self._owed:
+                self._emit("ADMISSION_REFUSED", request_id,
+                           reason="duplicate_pending_id")
+                self._teardown_locked(Cause(
+                    "MALFORMED_UPSTREAM", "S5",
+                    detail="a second request arrived carrying an id already "
+                           "pending, so correlation is no longer sound"))
                 return False
             self._owed[request_id] = time.monotonic()
             return True
@@ -137,8 +180,10 @@ class Session:
         earlier one, which is exactly what Rule A forbids.
         """
         with self._lock:
-            recorded = self._causes.get(request_id) or []
-            return recorded[0] if recorded else None
+            for cause in self._causes.get(request_id) or []:
+                if is_fault(cause):
+                    return cause
+            return None
 
     @staticmethod
     def precedence_winner(causes):
@@ -149,11 +194,28 @@ class Session:
 
     # ── settlement ──────────────────────────────────────────────────────────
     def settle(self, request_id, cause):
-        """Answer an item once. A second attempt raises rather than overwriting.
+        """Answer an item once, with the cause that is actually terminal.
 
-        Raising rather than returning False because a caller that settles twice
-        has a bug in its own ordering, and a silent second settle is two answers
-        on the wire for one id with the client choosing by arrival order.
+        Four refusals and one substitution, three of which were missing.
+
+        UNKNOWN IDS. The old version checked only whether an id was already
+        settled, so any id at all could be settled, including one the client
+        never issued. G2-20's unsolicited response and G2-15's reverse request,
+        which deliberately reuses a pending client id, both land here. Settling
+        an id we do not owe an answer for either invents a response or retires
+        somebody else's request, so an unknown id is refused and REPORTED rather
+        than raising, since it is a fact about the peer and not a bug in us.
+
+        AFTER TEARDOWN. Nothing new is settled once the session has ended.
+
+        TWICE. Still raises, because a caller that settles an item it already
+        settled has a bug in its own ordering and a silent overwrite puts two
+        answers for one id on the wire.
+
+        AND THE CAUSE MAY NOT BE THE ONE OFFERED. T4.R4 Rule A: if a FAULT was
+        recorded for this item first, that fault is terminal and the caller's
+        cause does not replace it. A recorded deadline followed by a clean
+        settlement used to become clean.
         """
         with self._lock:
             if request_id in self._settled:
@@ -161,10 +223,23 @@ class Session:
                     f"{request_id!r} was already settled as "
                     f"{self._settled[request_id].reason}; refusing to answer it "
                     f"again with {cause.reason}")
-            self._settled[request_id] = cause
-            self._owed.pop(request_id, None)
-            self._emit("SETTLED", request_id, **cause.as_receipt())
-            return cause
+            if request_id not in self._owed:
+                self._emit("SETTLEMENT_REFUSED", request_id,
+                           reason="not_owed", offered=cause.reason)
+                return None
+            if self._torn_down is not None and not self._tearing_down:
+                self._emit("SETTLEMENT_REFUSED", request_id,
+                           reason="session_closed", offered=cause.reason)
+                return None
+            return self._settle_locked(request_id, cause)
+
+    def _settle_locked(self, request_id, cause):
+        recorded = self.terminal_cause(request_id)
+        terminal = (recorded or cause).frozen()
+        self._settled[request_id] = terminal
+        self._owed.pop(request_id, None)
+        self._emit("SETTLED", request_id, **terminal.as_receipt())
+        return terminal
 
     def settled_as(self, request_id):
         with self._lock:
@@ -180,25 +255,44 @@ class Session:
         defect this exists to prevent.
         """
         with self._lock:
-            if self._torn_down is not None:
-                self._emit("TEARDOWN_REPEATED", None, reason=cause.reason)
-                return {}
-            self._admitting = False
-            self._torn_down = cause
-            self._emit("TEARDOWN", None, **cause.as_receipt())
+            return self._teardown_locked(cause, stop_processes=stop_processes)
 
-            answers = {}
+    def _teardown_locked(self, cause, *, stop_processes=None):
+        """The lock is already held. `admit` tears down from inside it.
+
+        A REPEAT TEARDOWN RETURNS THE SAME ANSWERS rather than an empty dict.
+        The old version returned `{}`, and combined with stopping the processes
+        before returning, an injected supervisor that raised left the only copy
+        of the batch unreachable: the items were settled, the caller never saw
+        them, and the retry reported nothing to deliver. Settling is what must
+        happen once; DELIVERING the answers can safely happen again, and losing
+        them cannot.
+        """
+        if self._torn_down is not None:
+            self._emit("TEARDOWN_REPEATED", None, reason=cause.reason,
+                       redelivering=len(self._answers))
+            return dict(self._answers)
+        self._admitting = False
+        self._torn_down = cause
+        self._emit("TEARDOWN", None, **cause.as_receipt())
+
+        self._tearing_down = True
+        try:
             for request_id in list(self._owed):
-                # The first cause recorded FOR THAT ITEM, and only the teardown
-                # cause when the item has none of its own. An item that already
-                # failed for its own reason does not get relabelled with the
-                # reason the session ended.
-                answers[request_id] = self.settle(
-                    request_id, self.terminal_cause(request_id) or cause)
-            if stop_processes is not None:
-                stop_processes()
-            self._emit("UPSTREAM_CLOSED", None, settled=len(answers))
-            return answers
+                # The first FAULT recorded for that item, and the teardown cause
+                # otherwise. An item that already failed for its own reason
+                # keeps it; a NORMAL completion is provisional per Rule B and
+                # does not survive a protocol fault that ends the session.
+                self._answers[request_id] = self._settle_locked(request_id, cause)
+        finally:
+            self._tearing_down = False
+
+        # The answers are recorded BEFORE the supervisor runs, so a supervisor
+        # that raises cannot take the batch with it.
+        self._emit("UPSTREAM_CLOSED", None, settled=len(self._answers))
+        if stop_processes is not None:
+            stop_processes()
+        return dict(self._answers)
 
     @property
     def torn_down(self):

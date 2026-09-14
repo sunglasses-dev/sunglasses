@@ -37,13 +37,25 @@ def test_an_item_is_settled_once_and_a_second_attempt_raises():
     assert session.settled_as(7).reason == "SCAN_DEADLINE"
 
 
-def test_a_second_teardown_settles_nothing():
+def test_a_second_teardown_settles_nothing_new_and_redelivers_the_batch():
+    """Settling happens once. DELIVERING the answers may happen again.
+
+    This asserted that a repeat teardown returns `{}`. ASTRA's review showed
+    what that costs: the supervisor ran before the batch was returned, so a
+    supervisor that raised took the only copy of the answers with it, and the
+    retry reported nothing to deliver while every item was already settled.
+    Losing the batch is the failure; re-handing it to a caller is not.
+    """
     session = Session()
     session.admit(1)
     first = session.teardown(_protocol())
     assert set(first) == {1}
-    assert session.teardown(_deadline()) == {}, (
-        "the second teardown re-answered items that already had an answer")
+
+    again = session.teardown(_deadline())
+    assert again == first, "the batch was not redelivered"
+    settled = [e for e in session.events if e["kind"] == "SETTLED"]
+    assert len(settled) == 1, "the second teardown settled something again"
+    assert session.settled_as(1).reason == framing.MALFORMED_UPSTREAM
 
 
 def test_two_threads_racing_to_settle_produce_one_answer():
@@ -177,21 +189,38 @@ def test_a_session_that_tore_down_exits_nonzero():
     assert session.exit_code() == 1
 
 
-def test_the_processes_are_stopped_exactly_once_and_after_the_items_are_settled():
-    """Killing first would leave items owed with nothing left to answer them."""
+def test_the_processes_are_stopped_once_and_after_everything_is_settled():
+    """Killing first would leave items owed with nothing left to answer them.
+
+    Observed through the session's own events rather than by patching `settle`,
+    because the teardown settles through an internal path that holds the lock
+    and a patched public method simply would not see it. A test that watches a
+    method the code under test no longer calls reports whatever it likes.
+    """
     session = Session()
     session.admit(1)
-    order = []
-    original = session.settle
+    stops = []
+    session.teardown(_protocol(), stop_processes=lambda: stops.append(1))
+    session.teardown(_deadline(), stop_processes=lambda: stops.append(2))
 
-    def watched(request_id, cause):
-        order.append(("settle", request_id))
-        return original(request_id, cause)
+    assert stops == [1], "the supervisor ran again on the repeat teardown"
+    kinds = [e["kind"] for e in session.events]
+    assert kinds.index("SETTLED") < kinds.index("UPSTREAM_CLOSED"), kinds
 
-    session.settle = watched
-    session.teardown(_protocol(), stop_processes=lambda: order.append(("stop", None)))
-    session.teardown(_deadline(), stop_processes=lambda: order.append(("stop", None)))
-    assert order == [("settle", 1), ("stop", None)], order
+
+def test_a_supervisor_that_raises_does_not_take_the_answers_with_it():
+    """The executed ProcessLookupError from ASTRA's review."""
+    session = Session()
+    session.admit(1)
+
+    def explode():
+        raise ProcessLookupError("the leader had already exited")
+
+    with pytest.raises(ProcessLookupError):
+        session.teardown(_protocol(), stop_processes=explode)
+    assert session.teardown(_deadline()), (
+        "the batch was settled and then lost with the supervisor")
+    assert session.settled_as(1).reason == framing.MALFORMED_UPSTREAM
 
 
 def test_the_receipt_shows_the_teardown_and_what_it_settled():
