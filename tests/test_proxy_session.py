@@ -208,18 +208,40 @@ def test_the_processes_are_stopped_once_and_after_everything_is_settled():
     assert kinds.index("SETTLED") < kinds.index("UPSTREAM_CLOSED"), kinds
 
 
-def test_a_supervisor_that_raises_does_not_take_the_answers_with_it():
-    """The executed ProcessLookupError from ASTRA's review."""
+def test_a_failed_supervisor_is_remembered_and_retried_not_skipped():
+    """Round 3 V04, which supersedes what this test used to assert.
+
+    It required that a retry with no callback hand the batch back, so the
+    settlements were not lost with the supervisor. That is half the rule. The
+    other half is that a retry which cannot establish the processes actually
+    stopped must not claim a close: the default argument is not a statement that
+    nothing needs stopping, it is a caller who did not say.
+
+    So the failed supervisor is retained and re-run. Losing the batch was the
+    round 1 defect; announcing a close while the child is still alive is the
+    worse one, because a receipt saying the upstream closed is evidence and a
+    missing batch is only a retry.
+    """
     session = Session()
     session.admit(1)
+    attempts = []
 
     def explode():
+        attempts.append(1)
         raise ProcessLookupError("the leader had already exited")
 
     with pytest.raises(ProcessLookupError):
         session.teardown(_protocol(), stop_processes=explode)
-    assert session.teardown(_deadline()), (
-        "the batch was settled and then lost with the supervisor")
+    with pytest.raises(ProcessLookupError):
+        session.teardown(_deadline())          # no callback, retained one runs
+    assert attempts == [1, 1], "the retry skipped supervision entirely"
+    assert not [e for e in session.events if e["kind"] == "UPSTREAM_CLOSED"], (
+        "a close was announced while the supervisor had never completed")
+
+    # And once something does stop them, the batch is delivered and the item
+    # keeps the cause it was settled with.
+    answers = session.teardown(_deadline(), stop_processes=lambda: None)
+    assert set(answers) == {1}
     assert session.settled_as(1).reason == framing.MALFORMED_UPSTREAM
 
 

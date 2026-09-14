@@ -73,3 +73,35 @@ That is expected under this ruling rather than an outstanding defect. The
 behaviour it asks for is covered by
 `test_an_unowned_id_from_the_wire_closes_the_session` in
 `tests/test_proxy_session.py`, and the pump will exercise it at the boundary.
+
+
+## A second contradiction, across rounds this time
+
+Round 1's `test_independent.py::test_R2_stop_failure_must_not_lose_settlement_delivery`
+and round 3's `test_round3.py::test_V04_failed_supervisor_cannot_be_bypassed_by_default_retry`
+cannot both pass.
+
+Both drive the same sequence: a teardown whose supervisor raises, then a second
+teardown with no callback argument.
+
+R2 requires that second call to return a non-empty batch, so the settlements are
+not lost. V04 requires that the child actually be stopped before any batch is
+handed back, and accepts the retry raising instead. With a supervisor that
+always raises, the child is alive, so a non-empty batch satisfies R2 and fails
+V04, and a raise satisfies V04 and fails R2.
+
+Measured both ways rather than argued:
+
+    with the retained supervisor    R2 fails, V04 passes
+    without it                      R2 passes, V04 fails
+
+The retention is kept, so V04 passes and R2 fails. V04 is the later round and it
+refines exactly what R2 was reaching for: R2 says do not lose the batch, V04
+adds do not claim closure while the process is still running. Losing the batch
+was the round 1 defect; claiming an uncompleted close is the worse one, because
+a receipt that says the upstream closed is evidence and a missing batch is a
+retry.
+
+Recorded for ASTRA the same way the Q14 and C03 contradiction was, and resolved
+the same way if he disagrees: by a ruling and a new versioned file, not by
+editing either of these.

@@ -169,3 +169,107 @@ def test_a_response_whose_shape_does_not_match_the_request_is_refused():
     bad = {"jsonrpc": "2.0", "id": 41, "result": {"content": "not a list"}}
     session.deliver_response(origin="upstream", request_id=41, frame=bad)
     assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+
+
+# ── the same rows, on ASTRA's actual fixture bytes ─────────────────────────
+# The tests above use frames built here. These read the seeds themselves, so the
+# claim "the pump covers what Q12 and Q13 asked for" is checked against the
+# bytes those checks read rather than against an analogue I wrote.
+
+import pathlib
+
+FIX = pathlib.Path("/private/tmp/PR164_REVIEW_f43781b_2026-09-13/fixtures")
+fixtures = pytest.mark.skipif(not FIX.exists(),
+                              reason=f"review fixtures not present at {FIX}")
+
+
+@fixtures
+def test_G2_10_invalid_result_shape_is_refused_by_the_pump():
+    """Q13's first case, at the boundary where the ruling puts it.
+
+    `parse_frame` cannot reject this alone and ASTRA said so: the frame is well
+    formed JSON-RPC and only the REQUEST it answers makes its shape wrong. The
+    pump knows the pending method, so it can.
+    """
+    lines = [x for x in (FIX / "G2-10" / "invalid_result_shape.upstream.jsonl"
+                         ).read_bytes().splitlines() if x]
+    frame = json.loads(lines[0])
+    assert framing.parse_frame(lines[0]).ok, (
+        "this frame is well formed on its own, which is the whole difficulty")
+
+    session = pump.Session()
+    session.admit_request(frame["id"], method="tools/call", origin="client")
+    session.deliver_response(origin="upstream", request_id=frame["id"],
+                             frame=frame)
+    assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+
+
+@fixtures
+def test_G2_20_unsolicited_response_is_refused_by_the_pump():
+    """Q13's second case. Nobody issued this id."""
+    lines = [x for x in (FIX / "G2-20.unsolicited_response"
+                         / "unsolicited_response.upstream.jsonl"
+                         ).read_bytes().splitlines() if x]
+    unsolicited = next(json.loads(x) for x in lines
+                       if "result" in json.loads(x) or "error" in json.loads(x))
+    session = pump.Session()
+    session.admit_request(41, method="tools/call", origin="client")
+    session.deliver_response(origin="upstream",
+                             request_id=unsolicited["id"], frame=unsolicited)
+    assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+    assert session.answer_for(41, origin="client") is not None, (
+        "the item that WAS owed was stranded by the close")
+
+
+@fixtures
+def test_G2_15_reverse_request_cannot_retire_the_client_item():
+    """Q12, at the boundary. The upstream request deliberately reuses the
+    client's id, and answering it must not answer the client."""
+    folder = FIX / "G2-15.reverse_request"
+    client = json.loads((folder / "reverse_request.requests.jsonl"
+                         ).read_bytes().splitlines()[0])
+    upstream = [json.loads(x) for x
+                in (folder / "reverse_request.upstream.jsonl").read_bytes().splitlines()]
+    reverse = next(x for x in upstream if "method" in x and "id" in x)
+    assert reverse["id"] == client["id"], "the fixture shares the id on purpose"
+
+    session = pump.Session()
+    session.admit_request(client["id"], method=client.get("method", "tools/call"),
+                          origin="client")
+    session.admit_request(reverse["id"], method=reverse["method"],
+                          origin="upstream")
+    session.settle_from("upstream", reverse["id"], "UNINSPECTED_METHOD", "S3")
+
+    assert session.expects(client["id"], origin="client"), (
+        "answering the upstream request retired the client's request")
+    assert session.closed_with() is None
+
+
+def test_an_integer_id_and_a_float_id_do_not_collide():
+    """T6.R6 stores the JSON TYPE in the key, and this is why it is not
+    decoration.
+
+    A mutation removing the type from the key survived every other test in this
+    file, because Python already keeps `2001` and `"2001"` apart as dict keys,
+    so the type component looked redundant. It is not: `1 == 1.0` is True and
+    they hash equal, so `{1: x}[1.0]` returns x. Both are valid JSON-RPC ids,
+    a client may issue one while upstream answers with the other, and without
+    the type in the key the pump would hand one request's result to the other
+    and the client could not tell.
+    """
+    assert 1 == 1.0 and hash(1) == hash(1.0), "the collision this guards"
+
+    session = pump.Session()
+    assert session.admit_request(1, method="tools/call", origin="client")
+    assert session.admit_request(1.0, method="tools/list", origin="client"), (
+        "1.0 was refused as a duplicate of 1, so the two collided")
+    assert session.closed_with() is None, "a false duplicate closed the session"
+
+    assert session.expected_method(1, origin="client") == "tools/call"
+    assert session.expected_method(1.0, origin="client") == "tools/list"
+
+    answer = session.deliver_response(origin="upstream", request_id=1,
+                                      frame=response(1))
+    assert answer is not None and type(answer["id"]) is int
+    assert session.expects(1.0, origin="client"), (
+        "answering the integer id also retired the float id")
