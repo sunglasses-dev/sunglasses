@@ -100,6 +100,12 @@ def test_a_result_carrying_an_injection_never_reaches_the_client(tmp_path):
     assert len(replies) == 1, "exactly one answer to the held request"
     assert replies[0]["id"] == 1
     assert replies[0]["error"]["message"] == "SUNGLASSES_WITHHELD"
+    # The REASON, not just the fact. Withheld because the scan found something
+    # is a different event from withheld because the scan could not be
+    # believed, and this assertion is the one that was missing when a mutation
+    # that delivered everything still passed: the message was being withheld
+    # on SCAN_EXCEPTION from an incomplete catalog, not on the detection.
+    assert replies[0]["error"]["data"]["reason_code"] == "PROHIBITED_CONTENT"
 
 
 def test_the_refusal_carries_the_clients_own_typed_id(tmp_path):
@@ -112,6 +118,8 @@ def test_the_refusal_carries_the_clients_own_typed_id(tmp_path):
                          upstream_write=upstream, client_write=client)
     engine.pump_upstream(_result_frame(INJECTION, request_id="7"))
     assert client.messages()[0]["id"] == "7"
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "PROHIBITED_CONTENT"
 
 
 # ── T2.R4 · binary content is unsupported, never inspected around ────────
@@ -161,6 +169,8 @@ def test_an_error_carrying_an_injection_is_still_withheld(tmp_path):
     engine, client, stream = _engine(tmp_path, [raw])
     engine.pump_upstream(stream)
     assert INJECTION not in client.bytes.decode()
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "PROHIBITED_CONTENT"
 
 
 # ── T2.R12 · an upstream notification has no response either ─────────────
@@ -245,3 +255,84 @@ def test_notifications_message_is_dropped_and_that_is_a_contract_conflict(tmp_pa
     engine.pump_upstream(stream)
     assert client.bytes == b"", \
         "dropped as unsupported, so T2.R12's message row is unreachable"
+
+
+# ── the mutation round: three clauses the first spec did not reach ───────
+
+def test_a_credential_arriving_in_a_result_is_content_and_not_exfiltration(tmp_path):
+    """T4.R4(7)'s direction test, on the case that separates the two reasons.
+
+    A credential travelling OUT in a tools/call is an exfiltration. The same
+    credential arriving IN a tool result is a server handing us something,
+    which is worth withholding and is not the same event. Calling it
+    PROHIBITED_SECRET reports an exfiltration that did not happen, and every
+    calibration row keyed on that reason would then be wrong.
+
+    A JWT is used rather than an AWS key because GLS-SD-005 is the only rule in
+    the secret family whose channel list includes api_response. See the
+    coverage test below: that is a real gap and it is recorded, not papered
+    over by choosing a payload that happens to work.
+    """
+    raw = _result_frame("your bearer token is "
+                        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefghijklmno")
+    engine, client, stream = _engine(tmp_path, [raw])
+    engine.pump_upstream(stream)
+    assert "eyJhbGciOiJIUzI1NiJ9" not in client.bytes.decode()
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "PROHIBITED_CONTENT", "an arriving credential is not an exfiltration"
+
+
+def test_the_secret_lane_barely_covers_the_result_direction(tmp_path):
+    """MEASURED, and it is a gap rather than a design.
+
+    An AWS access key arriving in a tool result is not detected at all. Nine of
+    the ten GLS-SD rules are scoped to channels that do not include
+    api_response, so the credential is forwarded to the model. Nothing in the
+    contract requires the secret lane to cover arriving messages, and there is
+    a reading where an inbound credential is not our business, but a product
+    that says it inspects tool results and forwards a raw AWS key in one is
+    making a claim its coverage does not support.
+
+    Pinned here so the day somebody widens those channel lists this test is the
+    thing that notices, and so no video claims otherwise in the meantime.
+    """
+    raw = _result_frame("your key is AKIAIOSFODNN7EXAMPLE")
+    engine, client, stream = _engine(tmp_path, [raw])
+    engine.pump_upstream(stream)
+    assert client.bytes == raw, \
+        "if this now blocks, the secret lane grew api_response coverage"
+
+
+def test_an_unbelievable_result_withholds_the_frame_as_a_scan_exception(tmp_path):
+    """A result bound to another invocation is not this item's answer. On the
+    inbound side that matters more, not less: the thing being settled is a
+    message the client is already waiting for."""
+    def stolen(params, *, channel, binding, content_bytes):
+        from sunglasses.proxy import inspection
+        out = inspection.scan(params, channel=channel, binding=binding,
+                              content_bytes=content_bytes)
+        out["binding"] = dict(binding, invocation_token="somebody-elses")
+        return out
+
+    upstream, client = _Sink(), _Sink()
+    session = pump.Session(strict=False)
+    session.admit_request(1, method="tools/call", origin="client")
+    engine = route.Route(session=session, log=_log(tmp_path),
+                         upstream_write=upstream, client_write=client,
+                         scan=stolen)
+    engine.pump_upstream(_result_frame("perfectly ordinary text"))
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "SCAN_EXCEPTION"
+
+
+def test_the_seam_returns_no_replacement_for_a_notification(tmp_path):
+    """The callback contract pump relies on. A notification has no id, so there
+    is nowhere to put an answer, and a replacement returned here would be a
+    frame built for a message that cannot receive one."""
+    raw = (json.dumps({"jsonrpc": "2.0", "method": "notifications/progress",
+                       "params": {"data": INJECTION}}) + "\n").encode()
+    engine, _client, _stream = _engine(tmp_path, [raw], pending=False)
+    verdict = engine._inspect_result(raw, json.loads(raw))
+    assert verdict is not None, "the injection was not caught at all"
+    replacement, _reason, _rule = verdict
+    assert replacement is None
