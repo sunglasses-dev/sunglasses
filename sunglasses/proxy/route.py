@@ -27,7 +27,8 @@ import hashlib
 import json
 import uuid
 
-from . import envelope, framing, inspection, policy, receipts, selector, worker
+from . import (activation, envelope, framing, inspection, policy, receipts,
+               selector, snapshot, worker)
 
 CLIENT = "client"
 UPSTREAM = "upstream"
@@ -52,7 +53,7 @@ class Route:
 
     def __init__(self, *, session, log, upstream_write, client_write,
                  scan=None, catalog=None, approvals=None,
-                 descriptor_sha_for=None):
+                 descriptor_sha_for=None, control=None, server_identity=None):
         self.session = session
         self.log = log
         self.upstream_write = upstream_write
@@ -65,6 +66,14 @@ class Route:
                         else inspection.trusted_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
+        # T2.R6's re-list runs through this. None means no control channel is
+        # wired, and a tools/list is then refused rather than forwarded: the
+        # client asked us, and handing its request to the server unread is the
+        # one answer this row never permits.
+        self.control = control
+        self.server_identity = server_identity
+        self.page_scan = self._scan_page
+        self._approved_tools = {}
 
     # ── one frame from the client ──────────────────────────────────────────
 
@@ -243,6 +252,12 @@ class Route:
             self._release(raw, request_id)
             return
 
+        if method == "tools/list":
+            # T2.R6. The client's frame is NOT forwarded. One client request
+            # becomes up to sixty four of ours and is answered once, here.
+            self._client_list(request_id)
+            return
+
         # T2.R16 AFTER T2.R14, because a named row beats the fallback: `ping`
         # is advertised by T1.R3 and has no channel of its own, so the selector
         # table has no row for it and asking the fallback first would refuse a
@@ -262,6 +277,88 @@ class Route:
                 return
 
         self._inspect(raw, message, method, request_id=request_id)
+
+    # ── T2.R6, T2.R7 and T5: the list flow ─────────────────────────────────
+
+    def _client_list(self, request_id):
+        """Re-list in our own namespace, scan every page, then decide."""
+        if self.control is None:
+            self._withhold(request_id, REASON_APPROVAL_REQUIRED, RULE_APPROVAL)
+            return
+        outcome = activation.activate(
+            self.approvals,
+            list_pages=self._pager(),
+            scan=self.page_scan,
+            server_identity=self.server_identity or getattr(
+                self.approvals, "server_id", None))
+
+        if not outcome.activated:
+            # T5.R2. The provenance travels: APPROVAL_REQUIRED describes a
+            # server nobody approved, DESCRIPTOR_CHANGED one that moved, and a
+            # scan reason describes what its descriptors carried. Collapsing
+            # them would tell an operator the wrong thing to do next.
+            self._withhold(request_id, outcome.provenance or
+                           REASON_APPROVAL_REQUIRED, RULE_APPROVAL)
+            return
+
+        found = outcome.snapshot
+        # T2.R7's gate, and it is defence in depth rather than a second
+        # decision: a successful activation has already committed this exact
+        # sha as the active snapshot, so this can only refuse if the store
+        # moved between the two calls. The mutation that removes it is
+        # therefore equivalent on every reachable path, which is written down
+        # here rather than left as an open survivor in a mutation report.
+        blocked = self.approvals.may_deliver_list(found.sha256)
+        if blocked is not None:
+            self._withhold(request_id, blocked, RULE_APPROVAL)
+            return
+
+        self._approved_tools = dict(found.tools)
+        self._to_client({"jsonrpc": "2.0", "id": request_id,
+                         "result": {"tools": self._tools_of(found)}})
+        self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_APPROVAL,
+                     forwarded=False)
+
+    def _pager(self):
+        from .control import ControlTimeout
+
+        pager = self.control.pager("tools/list")
+
+        def request(cursor):
+            try:
+                return pager(cursor)
+            except ControlTimeout:
+                # A server that stops answering is not a short tool list. The
+                # collector reads this as an unusable page and refuses, and
+                # T8.R13 never activates a prefix.
+                return None
+        return request
+
+    @staticmethod
+    def _tools_of(found):
+        tools = []
+        for page in found.pages:
+            tools.extend(page.get("tools") or [])
+        return tools
+
+    def _scan_page(self, page):
+        """T5.R3(c). Every page, on the api_response channel it arrived on."""
+        binding = {"digest": hashlib.sha256(
+                       json.dumps(page, sort_keys=True).encode()).hexdigest(),
+                   "channel": selector.API_RESPONSE,
+                   "generation": 1,
+                   "invocation_token": uuid.uuid4().hex}
+        held = selector.content_bytes(page)
+        result = self.scan(page, channel=selector.API_RESPONSE,
+                           binding=binding, content_bytes=held)
+        try:
+            worker.validate(result, binding=binding, held_content_bytes=held,
+                            catalog=self.catalog)
+        except worker.Invalid:
+            return {"accepted": False, "status": "exception",
+                    "inspection_complete": False, "decision": "review",
+                    "findings": []}
+        return result
 
     # ── notifications ──────────────────────────────────────────────────────
 
