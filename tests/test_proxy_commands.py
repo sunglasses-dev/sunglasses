@@ -159,3 +159,19 @@ def test_uninstall_on_an_unknown_state_reports_the_conflict_and_fails(tmp_path):
     assert code != 0
     assert "CONFIG_CONFLICT" in out.text
     assert config.read_text() == before
+
+
+def test_the_wrapped_argv_keeps_its_own_flags_verbatim(tmp_path):
+    """Everything after `--` belongs to the command being wrapped. A wrapper
+    argv carrying its own `--config` is ordinary, and reinterpreting it as ours
+    would both lose it from the entry and point this tool at a file the server
+    meant for itself."""
+    config = _config(tmp_path)
+    commands.main(["install", "fs", "--config", str(config),
+                   "--state-root", str(tmp_path / "state"), "--",
+                   "python", "-m", "sunglasses.proxy", "--config", "theirs.json"],
+                  stdout=_Out())
+    entry = json.loads(config.read_text())["mcpServers"]["fs"]
+    flat = json.dumps(entry)
+    assert "theirs.json" in flat
+    assert "--config" in flat
