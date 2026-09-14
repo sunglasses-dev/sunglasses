@@ -111,3 +111,17 @@ def test_it_writes_one_json_line_per_reply_and_nothing_else(tmp_path):
     assert len(lines) == 2
     for line in lines:
         json.loads(line)
+
+
+def test_the_instrument_records_what_arrived_not_what_parsed(tmp_path):
+    """Found by mutation. An instrument that only counts well formed frames
+    cannot see a malformed one leaking through, and a malformed frame reaching
+    the server is exactly the leak a byte comparison exists to catch. What
+    arrived is the measurement, whether or not it was JSON."""
+    junk = b"{not json at all\n"
+    blank = b"\n"
+    _proc, _replies, ingress = _talk([junk, blank, _frame(id=11, method="ping")],
+                                     tmp_path)
+    assert junk in ingress
+    assert ingress.startswith(junk + blank), \
+        "a bare newline is a byte that arrived, and the comparison counts bytes"
