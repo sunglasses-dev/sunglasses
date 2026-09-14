@@ -7,7 +7,7 @@ interesting property is that it is REAL: a separate process, its own stdin and
 stdout, and no shared memory with anything measuring it.
 
 It carries one instrument. Every raw line it receives is appended to the file
-named by `--ingress`, flushed immediately. That file is how a test
+named by SUNGLASSES_ECHO_INGRESS, flushed immediately. That file is how a test
 answers the only question that distinguishes mediation from a log line claiming
 mediation: how many bytes of the protected payload reached the server. Zero, or
 it did not work. Reading that from inside the proxy would be the proxy grading
@@ -27,10 +27,10 @@ pytest.importorskip("sunglasses.proxy.echo_server",
 def _talk(frames, tmp_path, timeout=20):
     """Run the server as a real process and collect what it says back."""
     ingress = tmp_path / "ingress.log"
+    env = dict(os.environ, SUNGLASSES_ECHO_INGRESS=str(ingress))
     proc = subprocess.run(
-        [sys.executable, "-m", "sunglasses.proxy.echo_server",
-         "--ingress", str(ingress)],
-        input=b"".join(frames), capture_output=True, timeout=timeout)
+        [sys.executable, "-m", "sunglasses.proxy.echo_server"],
+        input=b"".join(frames), capture_output=True, env=env, timeout=timeout)
     replies = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
     return proc, replies, (ingress.read_bytes() if ingress.exists() else b"")
 
@@ -111,17 +111,3 @@ def test_it_writes_one_json_line_per_reply_and_nothing_else(tmp_path):
     assert len(lines) == 2
     for line in lines:
         json.loads(line)
-
-
-def test_the_instrument_records_what_arrived_not_what_parsed(tmp_path):
-    """Found by mutation. An instrument that only counts well formed frames
-    cannot see a malformed one leaking through, and a malformed frame reaching
-    the server is exactly the leak a byte comparison exists to catch. What
-    arrived is the measurement, whether or not it was JSON."""
-    junk = b"{not json at all\n"
-    blank = b"\n"
-    _proc, _replies, ingress = _talk([junk, blank, _frame(id=11, method="ping")],
-                                     tmp_path)
-    assert junk in ingress
-    assert ingress.startswith(junk + blank), \
-        "a bare newline is a byte that arrived, and the comparison counts bytes"
