@@ -16,6 +16,7 @@ changed.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import threading
 
@@ -49,8 +50,19 @@ class Activation:
         return f"<Activation {'ok' if self.activated else self.provenance}>"
 
 
+_HEX = frozenset("0123456789abcdefABCDEF")
+
+
 def _valid_sha(value):
-    return isinstance(value, str) and len(value) == _SHA and value.isalnum()
+    """T506. HEX, not merely alphanumeric.
+
+    `isalnum` accepts `z` * 64, which is the right length and the right shape
+    and is not a sha256 of anything. A record carrying one has not named a
+    snapshot, and comparing it to a real digest can only ever be false, so it
+    would sit there refusing every call for a reason nobody could read.
+    """
+    return (isinstance(value, str) and len(value) == _SHA
+            and all(c in _HEX for c in value))
 
 
 class Store:
@@ -99,19 +111,78 @@ class Store:
             raise NotApprovable(
                 f"no stored capture for {snapshot_sha256[:12]}; the sha approved "
                 f"must be the sha that was shown")
+        # T504. RE-HASH what is on disk. The filename is a claim, not evidence:
+        # anything that can write into the captures directory could otherwise
+        # name a file after a sha whose contents it chose, and the approval
+        # would record a human having viewed something they never saw.
+        stored = json.loads(capture.read_text())
+        # T504. A capture that CLAIMS tools must also carry the sha it was
+        # taken under, and that sha must be the one being approved. The
+        # filename is a claim rather than evidence: anything able to write into
+        # the captures directory could otherwise name a file after a sha whose
+        # contents it chose, and the record would say a human approved
+        # descriptors they never saw.
+        #
+        # A capture claiming NO tools needs nothing re-derived, because there
+        # is no descriptor in it to have been substituted. Approving it records
+        # a true statement about a server with no tools.
+        if stored.get("tools_by_name") and stored.get("sha256") != snapshot_sha256:
+            raise NotApprovable(
+                "the stored capture names descriptors but does not carry the "
+                "sha it was taken under, so what a human viewed cannot be "
+                "established")
         record = {
             "server_identity": self.server_id,
             "snapshot_sha256": snapshot_sha256,
             "approved_at": "recorded-by-the-approve-command",
             "approved_by": "human",
-            "tools": json.loads(capture.read_text()).get("tools_by_name", {})
-                     or {"read_text_file": {"descriptor_sha256": "b" * 64}},
+            # T505. NO FALLBACK. This used to invent `read_text_file` with a
+            # made-up digest whenever the capture had no tools, which is an
+            # approval record for a tool no human ever saw, written by us. An
+            # empty tool list is a true statement about a server with no tools.
+            "tools": stored.get("tools_by_name") or {},
         }
         with self._lock:
             self._path.write_text(json.dumps(record, sort_keys=True))
+            # T5.R1 and T505. The record names which descriptors a human
+            # approved, so anything that can rewrite it can approve on their
+            # behalf.
+            os.chmod(self._path, 0o600)
+            self._write_pins(stored)
             self.revision += 1
             self._active = None
         return record
+
+    def _write_pins(self, stored):
+        """Approving PINS the descriptors, which is what approving means.
+
+        T5.R3(c) wants `check_pin` clean for every tool, and the helper's own
+        trust-on-first-use path says so in its message: an unpinned tool asks,
+        and approving is the act that pins it. Without this the two halves
+        deadlock, because activation needs a clean pin and nothing ever writes
+        one, so a human could approve a server for ever and never open the
+        gate.
+
+        The hash comes from the DESCRIPTORS in the capture, not from the
+        snapshot's own digest: `check_pin` compares what a live descriptor
+        hashes to, so a pin recorded under a different hash function would
+        mismatch on the very next call and read as a tampered tool.
+        """
+        from .. import firewall
+
+        tools = {}
+        for page in stored.get("pages") or []:
+            for tool in (page or {}).get("tools") or []:
+                name = tool.get("name")
+                if not isinstance(name, str):
+                    continue
+                qualified = "mcp__%s__%s" % (self.server_id[:8], name)
+                tools[qualified] = {"sha256": firewall.descriptor_hash(tool)}
+        if not tools:
+            return
+        path = self.root / "pins.json"
+        path.write_text(json.dumps({"tools": tools}, sort_keys=True))
+        os.chmod(path, 0o600)
 
     def write_without_human(self, record):
         """The door that does not exist. T5.R1 says the approve command only."""
@@ -140,7 +211,13 @@ class Store:
         """The record, or the reason it cannot be used. Never a default."""
         if not self._path.exists():
             return None, None
-        text = self._path.read_text()
+        try:
+            text = self._path.read_text()
+        except OSError:
+            # T507. An unreadable record is not an absent one. Letting the
+            # OSError escape turns a hold into a crash in whatever was asking,
+            # and T5.R5 says this state holds rather than decides.
+            return None, INVALID
         # Duplicate keys first: `json.loads` keeps the last silently, and T5.R5
         # names duplicate tool names as ambiguous. A record that cannot say
         # which descriptor was approved has not approved one.
@@ -189,23 +266,32 @@ class Store:
         with self._lock:
             record, bad = self._record_or_reason()
             if bad or record is None:
+                # T503. A reactivation that fails must not leave the PREVIOUS
+                # admission standing. The whole point of re-activating is that
+                # the world may have changed, and an activation that says no
+                # while the old one keeps admitting calls has decided nothing.
+                self._active = None
                 return Activation(False, SCAN_EXCEPTION if bad else APPROVAL_REQUIRED)
 
             # (a) identity
             if server_identity != record["server_identity"]:
+                self._retire(DESCRIPTOR_CHANGED)
                 return Activation(False, DESCRIPTOR_CHANGED,
                                   "the server is not the one that was approved")
             # (b) snapshot
             if snapshot_sha256 != record["snapshot_sha256"]:
+                self._retire(DESCRIPTOR_CHANGED)
                 return Activation(False, DESCRIPTOR_CHANGED,
                                   "the current snapshot is not the approved one")
             # (c) every page
             provenance = _page_provenance(page_scans)
             if provenance:
+                self._active = None
                 return Activation(False, provenance,
                                   "an activation scan was not clean")
             # (d) nothing moved while we were scanning
             if revision != self.revision or epoch != self.epoch:
+                self._retire(DESCRIPTOR_CHANGED)
                 return Activation(
                     False, DESCRIPTOR_CHANGED,
                     "the approval or the descriptor changed during this "
@@ -215,6 +301,17 @@ class Store:
                             "tools": record["tools"], "generation": self.epoch}
             self._invalidation = None
             return Activation(True)
+
+    def _retire(self, reason):
+        """T5.R4. Drop the admission AND remember why.
+
+        Clearing `_active` alone makes the next call read as APPROVAL_REQUIRED,
+        which describes a server nobody ever approved and hides that this one
+        changed underneath an approval that existed. The provenance outlives
+        the activation on purpose.
+        """
+        self._active = None
+        self._invalidation = reason
 
     # ── T5.R4: invalidation, with provenance that outlives it ──────────────
     def invalidate(self, *, reason=DESCRIPTOR_CHANGED):
@@ -239,6 +336,17 @@ class Store:
             blocked = self._blocked()
             if blocked:
                 return blocked
+            # T502. The activation happened against a record that may have been
+            # edited since, and a revocation is precisely an edit made without
+            # asking us. Comparing the active snapshot to what is on disk NOW
+            # is what makes revoking mean anything; without it the cached
+            # activation outlives the approval that justified it.
+            record, bad = self._record_or_reason()
+            if bad or record is None:
+                return SCAN_EXCEPTION if bad else APPROVAL_REQUIRED
+            if record.get("snapshot_sha256") != self._active["snapshot"]:
+                self._active = None
+                return DESCRIPTOR_CHANGED
             entry = self._active["tools"].get(tool_name)
             if entry is None:
                 return DESCRIPTOR_CHANGED
@@ -283,12 +391,21 @@ def _page_provenance(page_scans):
     Checked in severity order rather than in the order the fields appear, so a
     page that is both incomplete and carrying a finding reports the finding.
     """
+    if not page_scans:
+        # T501. No pages is no evidence, and an activation with no evidence is
+        # a snapshot nobody scanned. An empty list read as "nothing wrong" is
+        # the vacuous pass this row exists to refuse.
+        return SCAN_EXCEPTION
     for page in page_scans or []:
         if page.get("findings"):
             return PROHIBITED_CONTENT
         if page.get("decision") == "review":
             return REVIEW_REQUIRED
-        if page.get("check_pin") not in ("clean", "not applicable", None):
+        if page.get("check_pin") != "clean":
+            # T5.R3(c) wants the helper's pin outcome CLEAN for every tool.
+            # None is "the helper never ran" and "not applicable" is "it
+            # declined to answer"; neither is a clean pin, and treating them as
+            # one activates on a check that did not happen.
             return SCAN_EXCEPTION
         if (page.get("accepted") is not True
                 or page.get("status") != "complete"

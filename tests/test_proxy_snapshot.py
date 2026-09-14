@@ -45,8 +45,9 @@ def _pager(pages):
 
 
 def _clean(page):
+    # T5.R3(c) counts the helper's pin outcome as part of the page's evidence.
     return {"accepted": True, "status": "complete", "inspection_complete": True,
-            "decision": "allow", "findings": []}
+            "decision": "allow", "findings": [], "check_pin": "clean"}
 
 
 def _page(tools, cursor=None):

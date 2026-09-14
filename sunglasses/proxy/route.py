@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import pathlib
 import uuid
 
 from . import (activation, envelope, framing, inspection, policy, receipts,
@@ -453,8 +454,55 @@ class Route:
         except worker.Invalid:
             return {"accepted": False, "status": "exception",
                     "inspection_complete": False, "decision": "review",
-                    "findings": []}
-        return result
+                    "findings": [], "check_pin": "error"}
+        return dict(result, check_pin=self._pin_outcome(page))
+
+    def _pin_outcome(self, page):
+        """T1.R1's helper adaptation for `check_pin`, over one page of tools.
+
+        The adapter converts the helper's own return into an explicit outcome
+        rather than reading None as "nothing to say": None from an applicable
+        helper is `clean`, a deny is `deny`, an ask is `ask`, and an exception
+        is `error`. T5.R3(c) then requires clean for every tool, so an ask
+        holds the activation rather than passing it.
+
+        The name is QUALIFIED before the call, per T1.R1: `check_pin` ignores
+        anything that is not `mcp__<server>__<tool>`, so handing it a bare wire
+        name would make every tool non-applicable and return None, and reading
+        THAT as clean is the exact misreading the row names.
+        """
+        from .. import firewall
+
+        try:
+            pins = firewall.load_pins(self._pin_path())
+            worst = "clean"
+            for tool in page.get("tools") or []:
+                name = tool.get("name")
+                if not isinstance(name, str):
+                    return "error"
+                # The SAME id the store pinned under. Qualifying with a
+                # different one makes every lookup miss and every tool read as
+                # unpinned, which is an "ask" that looks exactly like a server
+                # nobody has seen before.
+                qualified = "mcp__%s__%s" % (self._server_short(), name)
+                decision = firewall.check_pin(qualified, tool, pins)
+                if decision is None:
+                    continue
+                action = getattr(decision, "action", None)
+                if action == "deny":
+                    return "deny"
+                worst = "ask"
+            return worst
+        except Exception:
+            return "error"
+
+    def _server_short(self):
+        return str(getattr(self.approvals, "server_id", None)
+                   or self.server_identity or "server")[:8]
+
+    def _pin_path(self):
+        root = getattr(self.approvals, "root", None)
+        return pathlib.Path(root or ".") / "pins.json"
 
     # ── notifications ──────────────────────────────────────────────────────
 
