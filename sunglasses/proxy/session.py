@@ -128,6 +128,23 @@ _HOLD_RULES = frozenset({"S4", "S6"})
 # T4.R4's order, for holds known at one settlement instant.
 _HOLD_ORDER = {"S6": 3, "S4": 4}
 
+# WHERE A SETTLEMENT CAME FROM. T9's ruling of 2026-09-13, to be confirmed or
+# overruled by ASTRA with a row id.
+#
+# The contract's S5 trigger for an unsolicited response is a WIRE event: a
+# response FRAME arriving from upstream for an id nobody issued. A caller
+# handing this object an id it does not own is a different thing entirely, and
+# the API must not conflate them. So the origin is stated rather than guessed:
+# an unowned id from the WIRE closes the session, an unowned id from a CALLER is
+# refused and changes nothing.
+#
+# Without this parameter the two cases are indistinguishable at the API, which
+# is why ASTRA's C03 and his Q14 could both be reasonable and still contradict
+# each other.
+ORIGIN_API = "api"
+ORIGIN_UPSTREAM = "upstream"
+ORIGIN_CLIENT = "client"
+
 
 def is_fault(cause):
     return cause.rule in _FAULT_RULES
@@ -156,8 +173,14 @@ class Session:
         self.events: list = []
 
     # ── what the client is owed ─────────────────────────────────────────────
-    def admit(self, request_id):
+    def admit(self, request_id, *, method=None, origin=ORIGIN_CLIENT):
         """Record a request forwarded upstream and not yet answered.
+
+        `method` is the method the request was issued with, kept so a later
+        response can be checked against the request it claims to answer. The
+        record used to be a bare timestamp, which is why T2 and T13 of ASTRA's
+        round 2 could not be satisfied: nothing here knew what a pending id was
+        waiting for. Nothing reads it yet; the pump does.
 
         Three refusals, and two of them were missing. The old version replaced
         an existing entry and returned success, so a second call with a live id
@@ -184,12 +207,19 @@ class Session:
                     detail="a second request arrived carrying an id already "
                            "pending, so correlation is no longer sound"))
                 return False
-            self._owed[request_id] = time.monotonic()
+            self._owed[request_id] = {"at": time.monotonic(),
+                                      "method": method, "origin": origin}
             return True
 
     def owed(self):
         with self._lock:
             return list(self._owed)
+
+    def expected_method(self, request_id):
+        """What a pending id is waiting for, or None if it is not pending."""
+        with self._lock:
+            record = self._owed.get(request_id)
+            return record["method"] if record else None
 
     def is_settled(self, request_id):
         with self._lock:
@@ -244,7 +274,7 @@ class Session:
         return min(causes, key=lambda c: (_PRECEDENCE.get(c.reason, 99), c.at))
 
     # ── settlement ──────────────────────────────────────────────────────────
-    def settle(self, request_id, cause):
+    def settle(self, request_id, cause, *, origin=ORIGIN_API):
         """Answer an item once, with the cause that is actually terminal.
 
         Four refusals and one substitution, three of which were missing.
@@ -276,7 +306,16 @@ class Session:
                     f"again with {cause.reason}")
             if request_id not in self._owed:
                 self._emit("SETTLEMENT_REFUSED", request_id,
-                           reason="not_owed", offered=cause.reason)
+                           reason="not_owed", offered=cause.reason,
+                           origin=origin)
+                if origin == ORIGIN_UPSTREAM:
+                    # A response FRAME for an id nobody issued. T7.R1 names that
+                    # an S5 trigger, and it is a fact about the peer rather than
+                    # about the caller, so the session cannot continue.
+                    self._teardown_locked(Cause(
+                        "MALFORMED_UPSTREAM", "S5",
+                        detail="a response arrived from upstream for an id "
+                               "that was never issued"))
                 return None
             if self._torn_down is not None and not self._tearing_down:
                 self._emit("SETTLEMENT_REFUSED", request_id,
