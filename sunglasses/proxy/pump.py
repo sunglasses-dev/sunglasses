@@ -179,16 +179,29 @@ class Session:
         identity = key(origin, request_id)
         self._pending.pop(identity, None)
         self._remember_tombstone(identity)
+        if self._closed:
+            # The tombstone table overflowed and the session closed inside this
+            # call. The item is already settled by the teardown, and settling it
+            # again would raise `Settled` out of an ordinary cancellation.
+            return identity
         self._core.settle(identity, Cause("REQUEST_CANCELLED", "S6"))
         return identity
 
     def _remember_tombstone(self, identity):
+        if self._closed:
+            return
         self._tombstones.append(identity)
         if len(self._tombstones) > TOMBSTONE_LIMIT:
             # T6.R6 caps this; overflow closes the session rather than silently
             # forgetting, because a forgotten tombstone lets a cancelled id be
             # reused and that is the thing the table exists to prevent.
-            self._close("OVERLOADED", "the tombstone table overflowed")
+            # T6.R7. OVERLOADED is a resource breach, so S3 and not S5: the
+            # peer has not violated the protocol, we have run out of room to
+            # keep promises in. And the close must not RAISE on the way out,
+            # because `cancel` is a normal operation and a session that has just
+            # decided to shut down should not also crash its caller.
+            self._close("OVERLOADED", "the tombstone table overflowed",
+                        rule="S3")
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream):
