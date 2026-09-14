@@ -233,3 +233,66 @@ def test_the_receipt_shows_the_teardown_and_what_it_settled():
     assert session.events[-1]["settled"] == 1
     stamps = [e["mono"] for e in session.events]
     assert stamps == sorted(stamps)
+
+
+# ── the origin distinction, T9's ruling of 2026-09-13 ──────────────────────
+# ASTRA's C03 and his Q14 make the identical call and require opposite outcomes.
+# They are both right about different things, and the API could not tell them
+# apart because it had no way to say where a settlement came from.
+#
+# The ruling: an unsolicited response is a WIRE event, a response FRAME arriving
+# from upstream for an id nobody issued. A caller handing this object an id it
+# does not own is not that. So the origin is stated, and these tests are what
+# make the parameter more than documentation.
+
+def test_an_unowned_id_from_a_caller_changes_nothing():
+    """C03's requirement, which is the default because most callers are us."""
+    session = Session()
+    session.admit(41)
+    assert session.settle(999, Cause("CLEAN", "S1")) is None
+    assert not session.is_settled(999)
+    assert session.owed() == [41], "the pending item was disturbed"
+    assert not session.torn_down
+
+
+def test_an_unowned_id_from_the_wire_closes_the_session():
+    """Q14's requirement, at the boundary where it belongs.
+
+    T7.R1 names an unsolicited response an S5 trigger. It is a fact about the
+    peer, so the session cannot continue, and the item that WAS owed is answered
+    rather than stranded.
+    """
+    session = Session()
+    session.admit(41)
+    assert session.settle(999, Cause("CLEAN", "S1"),
+                          origin=session_origin_upstream()) is None
+    assert session.torn_down
+    assert session.settled_as(41).reason == framing.MALFORMED_UPSTREAM
+    assert not session.is_settled(999), "the unissued id was never ours to answer"
+
+
+def session_origin_upstream():
+    from sunglasses.proxy.session import ORIGIN_UPSTREAM
+    return ORIGIN_UPSTREAM
+
+
+def test_the_default_origin_is_the_caller_not_the_wire():
+    """A default that closed sessions would make every API slip a teardown."""
+    from sunglasses.proxy.session import ORIGIN_API
+    import inspect
+
+    default = inspect.signature(Session.settle).parameters["origin"].default
+    assert default == ORIGIN_API
+
+
+def test_a_pending_id_remembers_what_it_is_waiting_for():
+    """`_owed` held a bare timestamp, which is why a response could not be
+    checked against the request it claims to answer. The pump reads this."""
+    session = Session()
+    session.admit(41, method="tools/call")
+    session.admit(42)
+    assert session.expected_method(41) == "tools/call"
+    assert session.expected_method(42) is None
+    assert session.expected_method(999) is None, "not pending, not an answer"
+    session.settle(41, Cause("CLEAN", "S1"))
+    assert session.expected_method(41) is None, "settled is no longer pending"
