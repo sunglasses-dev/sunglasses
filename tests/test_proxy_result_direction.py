@@ -336,3 +336,27 @@ def test_the_seam_returns_no_replacement_for_a_notification(tmp_path):
     assert verdict is not None, "the injection was not caught at all"
     replacement, _reason, _rule = verdict
     assert replacement is None
+
+
+def test_a_result_whose_method_has_no_channel_is_refused_not_scanned(tmp_path):
+    """Fail closed on the selector's silence.
+
+    Every rule is scoped to a channel, so a scan on a channel of None runs no
+    rule at all and reports a clean pass, which is the most dangerous possible
+    answer: an inspection that inspected nothing and said so in the language of
+    an inspection that inspected everything. Admitted directly here because the
+    client direction refuses these methods today, and the guard exists for the
+    day admission widens rather than for the day it is noticed.
+    """
+    upstream, client = _Sink(), _Sink()
+    session = pump.Session(strict=False)
+    session.admit_request(1, method="resources/list", origin="client")
+    engine = route.Route(session=session, log=_log(tmp_path),
+                         upstream_write=upstream, client_write=client)
+    engine.pump_upstream(
+        (json.dumps({"jsonrpc": "2.0", "id": 1,
+                     "result": {"resources": [{"name": INJECTION}]}})
+         + "\n").encode())
+    assert INJECTION not in client.bytes.decode()
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "UNINSPECTED_METHOD"

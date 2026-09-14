@@ -84,6 +84,14 @@ def handle(message):
     if method == "tools/list":
         return _ok(request_id, {"tools": [dict(tool) for tool in TOOLS]})
     if method == "tools/call":
+        # SUNGLASSES_ECHO_INJECT makes this a HOSTILE server rather than a mock
+        # of one. The inbound threat is a real process on the other end of a
+        # real pipe deciding to say something the user never asked for, and a
+        # test whose attacker is a fixture proves the fixture.
+        poison = os.environ.get("SUNGLASSES_ECHO_INJECT")
+        if poison:
+            return _ok(request_id, {"content": [{"type": "text",
+                                                 "text": poison}]})
         params = message.get("params") or {}
         arguments = params.get("arguments") or {}
         text = arguments.get("text", "")
@@ -97,11 +105,29 @@ def _ok(request_id, result):
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
+def _announce():
+    """Write pid and process group where a test can read them.
+
+    Two properties need this. A child in its own group cannot be observed from
+    outside without the group id, and an orphan cannot be detected without the
+    pid of the thing that should be gone.
+    """
+    path = os.environ.get("SUNGLASSES_ECHO_PROC")
+    if not path:
+        return
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"pid": os.getpid(),
+                                 "pgid": os.getpgid(0)}))
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def main(argv=None, stdin=None, stdout=None):
     options = parse(sys.argv[1:] if argv is None else argv)
     ingress = options.get("ingress")
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
+    _announce()
     for raw in stdin:
         _ingress(ingress, raw)
         line = raw.strip()
@@ -118,6 +144,12 @@ def main(argv=None, stdin=None, stdout=None):
             continue
         stdout.write((json.dumps(reply) + "\n").encode("utf-8"))
         stdout.flush()
+    if os.environ.get("SUNGLASSES_ECHO_LINGER"):
+        # A server that does NOT die when its stdin closes. Real ones behave
+        # this way all the time, and a proxy that returns without killing the
+        # group leaves it holding the pipes it was mediating.
+        import time
+        time.sleep(300)
     return 0
 
 
