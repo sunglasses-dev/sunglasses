@@ -2154,7 +2154,8 @@ def main():
     # else's command line. Handing the rest over whole is smaller and exact.
     if len(sys.argv) > 1 and sys.argv[1] == "proxy":
         from .proxy.commands import main as proxy_main
-        sys.exit(proxy_main(sys.argv[2:]))
+        from .proxy.serve import exit_process
+        exit_process(proxy_main(sys.argv[2:]))
 
     args = parser.parse_args()
     if not args.command:

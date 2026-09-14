@@ -9,4 +9,11 @@ import sys
 from .commands import main
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    # AR14. `serve.exit_process` leaves without finalizers ONLY when the
+    # mediator's teardown has already completed, because a daemon thread
+    # blocked on this process's stdin turns interpreter shutdown into SIGABRT
+    # and the server's exit status is lost. Every other path raises SystemExit
+    # exactly as before.
+    from .serve import exit_process
+
+    exit_process(main(sys.argv[1:]))
