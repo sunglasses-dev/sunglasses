@@ -231,3 +231,39 @@ def test_a_server_that_outlives_its_stdin_is_killed_anyway(tmp_path):
 
 
 EXIT_USAGE = 2
+
+
+def test_serve_refuses_a_missing_separator_on_its_own(tmp_path):
+    """`commands.main` guards this first, so the check inside serve is only
+    reachable by calling serve directly, which tests and any future caller do.
+    A public function that relies on its current only caller for a safety check
+    is one refactor away from not having the check at all."""
+    from sunglasses.proxy import serve
+
+    err = _Out()
+    assert serve.main(["python", "-m", "some.server"], stderr=err) == EXIT_USAGE
+    assert "--" in err.text
+
+
+def test_the_ingress_survives_the_server_being_killed(tmp_path):
+    """A buffered instrument reads as a zero exactly when the process it
+    measures is killed, and that is not a hypothetical here: the teardown path
+    kills the server's group on the way out. If the reading were buffered,
+    every delivery comparison taken around a teardown would report zero bytes
+    arrived and look like perfect mediation."""
+    # A ping, because a tools/call is refused at the approval gate and never
+    # reaches the server at all, which would make this pass for the wrong
+    # reason: zero bytes arrived because none were sent.
+    frames = [(json.dumps({"jsonrpc": "2.0", "id": 9, "method": "ping"})
+               + "\n").encode()]
+    _proc, _replies, arrived = _run(frames, tmp_path, linger=True, timeout=60)
+    assert arrived, "the killed server's ingress file was empty"
+    assert frames[0] in arrived
+
+
+class _Out:
+    def __init__(self):
+        self.text = ""
+
+    def write(self, chunk):
+        self.text += chunk
