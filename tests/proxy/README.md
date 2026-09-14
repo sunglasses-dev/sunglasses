@@ -245,3 +245,55 @@ C07 now requires it on these exact paths, so silence here is the hang F15 ruled
 against.
 
 Not repaired by editing a control. Measured, written down, and T9 rules.
+
+
+## R-W03-2, the ruling, and what was done to each of the seventeen
+
+T9 ruled at 04:48 on 2026-09-14. The empty-output clause is WITHDRAWN on all
+seventeen controls that carried it, the same shape ASTRA withdrew for W03 at
+03:24: the clause was written when a fault yielded nothing because the refusal
+did not exist yet, and T6.R1 with C07 now require exactly one typed refusal on
+those paths, so silence there is the hang F15 ruled against.
+
+Nothing of ASTRA's was deleted or rewritten to pass. Each control was SPLIT in
+place, three ways:
+
+  1. the original test keeps its substantive assertions UNCHANGED, plus a
+     direct assertion of the property the withdrawn clause was protecting
+     (nothing the server sent reaches the client, named by its own bytes);
+  2. the empty-output assertion becomes its own test marked
+     `xfail(strict=True, reason=R_W03_2)`, so it is a TRIPWIRE. If the refusal
+     ever disappears and the pipe goes silent again, that xfail XPASSes and the
+     suite goes red. The clause still watches the thing it was written for;
+     it has stopped asserting the opposite of the contract;
+  3. a positive control per fixture asserts what C07 requires instead: exactly
+     ONE frame, SUNGLASSES_WITHHELD, the client's own typed id, and
+     `reason_code == closed_with()[0]`.
+
+The seventeen, counted from a run rather than by eye:
+
+    W01 x2   invalid_json, invalid_result_shape
+    W02 x5   invalid_utf8, duplicate_keys, ambiguous_result,
+             malformed_clean_tail, deep_json
+    W05 x1   G2-20 unsolicited
+    F06 x1   LF in the frame budget
+    F08 x4   tools/call {}, tools/call 7, tools/list {}, tools/list []
+    F11 x1   unfrozen initialize version
+    F14 x1   fault stops the real child
+    W20 x1   tools/list shape
+    G2-15    reverse wire, line 21
+                                                            total = 17
+
+Two more xfails exist beside them and are NOT part of R-W03-2:
+
+    W03   its empty-output assertion was withdrawn by ASTRA himself at 03:24;
+          the three substantive assertions stand and are live. C01 in
+          test_round5.py is his corrected control and it passes.
+    F21   ruling D. As written it attaches no handle, so the exit can only be
+          observed by an inactivity heuristic, which T9 forbids in security
+          code. C02 in test_round5.py is the corrected control and it passes
+          both ways.
+
+Result on this head: `tests/proxy` is 214 passed, 3 skipped, 19 xfailed, zero
+failed. The whole proxy suite is 315 passed, 19 xfailed, zero failed. The
+round-2 prompt asks ASTRA to version these as CONTROLS_CORRECTION v6.

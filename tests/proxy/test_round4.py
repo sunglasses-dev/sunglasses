@@ -6,6 +6,63 @@ from sunglasses.proxy.session import Cause, Session as Core
 ROOT=Path(__file__).resolve().parents[1]
 FIX=Path('/private/tmp/PR164_REVIEW_f43781b_2026-09-13/fixtures')
 
+
+# ── R-W03-2 (T9, 2026-09-14) ────────────────────────────────────────────────
+# The empty-output clause is WITHDRAWN on the seventeen controls that carried
+# it, the same shape ASTRA withdrew for W03 at 03:24. It was written when a
+# fault yielded nothing because the refusal did not exist yet; T6.R1 and C07
+# now require exactly one typed refusal on these paths, so silence here is
+# F15's hang.
+#
+# The clause is not deleted. It is SPLIT: each control keeps its substantive
+# assertions unchanged, the empty-output assertion becomes its own strict xfail
+# so it works as a tripwire (if the refusal ever disappears and the pipe goes
+# silent again, it XPASSes and the suite goes red), and beside each sits a
+# positive control asserting what C07 requires instead.
+R_W03_2 = ("R-W03-2: the empty-output clause is withdrawn. T6.R1 and C07 "
+           "require exactly one typed refusal on this path, so silence is "
+           "F15's hang. Strict, so a return to silence turns the suite red.")
+
+R_F21_D = ("Ruling D, ASTRA 03:24: F21 as written attaches no handle, so the "
+           "exit can only be seen by an inactivity heuristic, which T9 forbids "
+           "in security code. C02 in test_round5.py is the corrected control "
+           "and it passes both ways.")
+
+
+def settlement_of(got, session, ident):
+    """C07's shape: exactly one frame, the client's own typed id, our reason."""
+    assert len(got) == 1, "the client is owed exactly one answer"
+    value = json.loads(got[0])
+    assert value['id'] == ident and type(value['id']) is type(ident)
+    assert value['error']['message'] == 'SUNGLASSES_WITHHELD'
+    assert value['error']['data']['reason_code'] == session.closed_with()[0]
+
+
+def _w01_run(tmp_path, stem):
+    folder = FIX / 'G2-10'
+    req = (folder / (stem + '.requests.jsonl')).read_bytes()
+    s = pump.Session()
+    assert all(admission(s, req))
+    ident = json.loads(req.splitlines()[0])['id']
+    with peer(tmp_path, [(folder / (stem + '.upstream.jsonl')).read_bytes(),
+                         wire(reply(ident))], req) as child:
+        got = list(s.read_upstream(child.stdout))
+    return got, s, ident
+
+
+def _w02_run(tmp_path, variant, source):
+    folder = FIX / ('G2-21.' + variant)
+    req = (folder / (variant + '.requests.jsonl')).read_bytes()
+    s = pump.Session()
+    assert all(admission(s, req))
+    ident = json.loads(req.splitlines()[0])['id']
+    with peer(tmp_path, [(folder / source).read_bytes(),
+                         (folder / 'clean-tail.upstream.jsonl').read_bytes()],
+              req) as child:
+        got = list(s.read_upstream(child.stdout))
+    return got, s, ident
+
+
 def wire(x): return json.dumps(x,separators=(',',':')).encode()+b'\n'
 def reply(i): return dict(jsonrpc='2.0',id=i,result=dict(content=[dict(type='text',text='review-clean')]))
 def request(i,method='tools/call'):return dict(jsonrpc='2.0',id=i,method=method,params={})
@@ -39,13 +96,20 @@ def peer(tmp_path,outputs,requests=b'',linger=False,chunk_size=65536):
 
 @pytest.mark.parametrize('stem',['invalid_json','invalid_result_shape'])
 def test_W01_G2_10_real_pipe_refuses_fault_and_clean_tail(tmp_path,stem):
-    folder=FIX/'G2-10'; req=(folder/(stem+'.requests.jsonl')).read_bytes()
-    s=pump.Session();assert all(admission(s,req));ident=json.loads(req.splitlines()[0])['id']
-    with peer(tmp_path,[(folder/(stem+'.upstream.jsonl')).read_bytes(),wire(reply(ident))],req) as child:
-        got=list(s.read_upstream(child.stdout))
-    assert not got
+    got,s,ident=_w01_run(tmp_path,stem)
+    assert b'review-clean' not in b''.join(got), 'the clean tail was resumed'
     assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
     assert s.answer_for(ident,origin='client').rule=='S5'
+
+@pytest.mark.parametrize('stem',['invalid_json','invalid_result_shape'])
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_W01_empty_output_R_W03_2(tmp_path,stem):
+    got,_s,_ident=_w01_run(tmp_path,stem)
+    assert not got
+
+@pytest.mark.parametrize('stem',['invalid_json','invalid_result_shape'])
+def test_W01_settles_the_client_R_W03_2(tmp_path,stem):
+    settlement_of(*_w01_run(tmp_path,stem))
 
 @pytest.mark.parametrize('variant,source,reason,rule',[
  ('invalid_utf8','override.upstream.raw','MALFORMED_UPSTREAM','S5'),
@@ -54,23 +118,58 @@ def test_W01_G2_10_real_pipe_refuses_fault_and_clean_tail(tmp_path,stem):
  ('malformed_clean_tail','prefix.upstream.raw','MALFORMED_UPSTREAM','S5'),
  ('deep_json','override.upstream.raw','OVER_BUDGET','S3')])
 def test_W02_G2_21_real_pipe_protocol_tails(tmp_path,variant,source,reason,rule):
-    folder=FIX/('G2-21.'+variant);req=(folder/(variant+'.requests.jsonl')).read_bytes()
-    s=pump.Session();assert all(admission(s,req));ident=json.loads(req.splitlines()[0])['id']
-    with peer(tmp_path,[(folder/source).read_bytes(),(folder/'clean-tail.upstream.jsonl').read_bytes()],req) as child:
-        got=list(s.read_upstream(child.stdout))
-    assert not got and s.closed_with()==(reason,rule)
+    got,s,ident=_w02_run(tmp_path,variant,source)
+    assert b'review-clean' not in b''.join(got), 'the clean tail was resumed'
+    assert s.closed_with()==(reason,rule)
     answer=s.answer_for(ident,origin='client');assert (answer.reason,answer.rule)==(reason,rule)
 
+@pytest.mark.parametrize('variant,source',[
+ ('invalid_utf8','override.upstream.raw'),
+ ('duplicate_keys','override.upstream.raw'),
+ ('ambiguous_result','ambiguous_result.upstream.jsonl'),
+ ('malformed_clean_tail','prefix.upstream.raw'),
+ ('deep_json','override.upstream.raw')])
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_W02_empty_output_R_W03_2(tmp_path,variant,source):
+    got,_s,_ident=_w02_run(tmp_path,variant,source)
+    assert not got
 
-def test_W03_G2_22_actual_child_exit_pending(tmp_path):
+@pytest.mark.parametrize('variant,source',[
+ ('invalid_utf8','override.upstream.raw'),
+ ('duplicate_keys','override.upstream.raw'),
+ ('ambiguous_result','ambiguous_result.upstream.jsonl'),
+ ('malformed_clean_tail','prefix.upstream.raw'),
+ ('deep_json','override.upstream.raw')])
+def test_W02_settles_the_client_R_W03_2(tmp_path,variant,source):
+    settlement_of(*_w02_run(tmp_path,variant,source))
+
+
+def _w03_run(tmp_path):
     folder=FIX/'G2-22.exit_with_pending';req=(folder/'exit_with_pending.requests.jsonl').read_bytes()
     s=pump.Session();assert all(admission(s,req));ident=json.loads(req.splitlines()[0])['id']
     with peer(tmp_path,[(folder/'exit_with_pending.upstream.jsonl').read_bytes()],req) as child:
-        assert list(s.read_upstream(child.stdout))==[]
-        assert child.wait(timeout=3)==0
+        got=list(s.read_upstream(child.stdout))
+        exited=child.wait(timeout=3)
+    return got,s,ident,exited
+
+def test_W03_G2_22_actual_child_exit_pending(tmp_path):
+    # ASTRA withdrew this one's empty-output assertion himself at 03:24; the
+    # three substantive assertions below are the ones he said still stand, and
+    # C01 in test_round5.py is the corrected control.
+    _got,s,ident,exited=_w03_run(tmp_path)
+    assert exited==0
     assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
     assert s.answer_for(ident,origin='client').reason=='MALFORMED_UPSTREAM'
     assert s._core.exit_code()!=0
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_W03_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident,_exited=_w03_run(tmp_path)
+    assert got==[]
+
+def test_W03_settles_the_client_R_W03_2(tmp_path):
+    got,s,ident,_exited=_w03_run(tmp_path)
+    settlement_of(got,s,ident)
 
 
 def test_W04_G2_20_duplicate_real_pipe_admission(tmp_path):
@@ -82,12 +181,24 @@ def test_W04_G2_20_duplicate_real_pipe_admission(tmp_path):
     assert s.closed_with()==('MALFORMED_CLIENT','S5')
 
 
-def test_W05_G2_20_unsolicited_real_pipe(tmp_path):
+def _w05_run(tmp_path):
     folder=FIX/'G2-20.unsolicited_response';req=(folder/'unsolicited_response.requests.jsonl').read_bytes()
-    s=pump.Session();assert all(admission(s,req))
+    s=pump.Session();assert all(admission(s,req));ident=json.loads(req.splitlines()[0])['id']
     with peer(tmp_path,[(folder/'unsolicited_response.upstream.jsonl').read_bytes()],req) as child:
-        assert list(s.read_upstream(child.stdout))==[]
+        got=list(s.read_upstream(child.stdout))
+    return got,s,ident
+
+def test_W05_G2_20_unsolicited_real_pipe(tmp_path):
+    _got,s,_ident=_w05_run(tmp_path)
     assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_W05_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident=_w05_run(tmp_path)
+    assert got==[]
+
+def test_W05_settles_the_client_R_W03_2(tmp_path):
+    settlement_of(*_w05_run(tmp_path))
 
 
 def test_W06_numeric_type_key_and_separate_sessions(tmp_path):
@@ -226,12 +337,24 @@ def test_F05_read_upstream_preserves_wire_and_lf(tmp_path):
     assert b''.join(got)==raw
 
 
-def test_F06_reader_counts_lf_in_frame_budget(tmp_path):
+def _f06_run(tmp_path):
     raw=wire(reply(41));raw=raw[:-1]+b' '*(framing.MAX_FRAME_BYTES-len(raw)+1)+b'\n'
     assert len(raw)==framing.MAX_FRAME_BYTES+1
     s=pump.Session();s.admit_request(41,method='tools/call',origin='client')
     with peer(tmp_path,[raw]) as child:got=list(s.read_upstream(child.stdout))
-    assert not got and s.closed_with()==('OVER_BUDGET','S3')
+    return got,s,41
+
+def test_F06_reader_counts_lf_in_frame_budget(tmp_path):
+    _got,s,_ident=_f06_run(tmp_path)
+    assert s.closed_with()==('OVER_BUDGET','S3')
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_F06_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident=_f06_run(tmp_path)
+    assert not got
+
+def test_F06_settles_the_client_R_W03_2(tmp_path):
+    settlement_of(*_f06_run(tmp_path))
 
 
 def test_F07_depth_budget_survives_pump(tmp_path):
@@ -240,11 +363,26 @@ def test_F07_depth_budget_survives_pump(tmp_path):
     with peer(tmp_path,[(folder/'override.upstream.raw').read_bytes()],req) as child:list(s.read_upstream(child.stdout))
     assert s.answer_for(ident,origin='client').budget=='depth'
 
-@pytest.mark.parametrize('method,result',[('tools/call',{}),('tools/call',7),('tools/list',{}),('tools/list',[])])
-def test_F08_wrong_method_required_result_shape(tmp_path,method,result):
+def _f08_run(tmp_path,method,result):
     raw=wire(dict(jsonrpc='2.0',id=41,result=result));s=pump.Session();s.admit_request(41,method=method,origin='client')
     with peer(tmp_path,[raw]) as child:got=list(s.read_upstream(child.stdout))
-    assert not got and s.closed_with()==('MALFORMED_UPSTREAM','S5')
+    return got,s,41
+
+@pytest.mark.parametrize('method,result',[('tools/call',{}),('tools/call',7),('tools/list',{}),('tools/list',[])])
+def test_F08_wrong_method_required_result_shape(tmp_path,method,result):
+    got,s,_ident=_f08_run(tmp_path,method,result)
+    assert not any('result' in json.loads(x) for x in got), 'a malformed result reached the client'
+    assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
+
+@pytest.mark.parametrize('method,result',[('tools/call',{}),('tools/call',7),('tools/list',{}),('tools/list',[])])
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_F08_empty_output_R_W03_2(tmp_path,method,result):
+    got,_s,_ident=_f08_run(tmp_path,method,result)
+    assert not got
+
+@pytest.mark.parametrize('method,result',[('tools/call',{}),('tools/call',7),('tools/list',{}),('tools/list',[])])
+def test_F08_settles_the_client_R_W03_2(tmp_path,method,result):
+    settlement_of(*_f08_run(tmp_path,method,result))
 
 
 def test_F09_clean_upstream_error_is_not_replaced():
@@ -260,11 +398,24 @@ def test_F10_initialize_reader_filters_caps_and_negotiates(tmp_path):
     assert set(json.loads(got[0])['result']['capabilities'])=={'tools'}
 
 
-def test_F11_initialize_reader_refuses_unfrozen_version(tmp_path):
+def _f11_run(tmp_path):
     raw=wire(dict(jsonrpc='2.0',id=41,result=dict(protocolVersion='2026-01-01',capabilities={},serverInfo=dict(name='review',version='1'))))
     s=pump.Session();s.admit_request(41,method='initialize',origin='client')
     with peer(tmp_path,[raw]) as child:got=list(s.read_upstream(child.stdout))
-    assert not got and s.closed_with()[0]=='UNSUPPORTED_PROTOCOL'
+    return got,s,41
+
+def test_F11_initialize_reader_refuses_unfrozen_version(tmp_path):
+    got,s,_ident=_f11_run(tmp_path)
+    assert b'2026-01-01' not in b''.join(got), 'the unfrozen version reached the client'
+    assert s.closed_with()[0]=='UNSUPPORTED_PROTOCOL'
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_F11_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident=_f11_run(tmp_path)
+    assert not got
+
+def test_F11_settles_the_client_R_W03_2(tmp_path):
+    settlement_of(*_f11_run(tmp_path))
 
 
 def test_F12_unsupported_notification_is_not_forwarded(tmp_path):
@@ -279,11 +430,25 @@ def test_F13_resources_read_only_capabilities():
     assert not advertised['resources'].get('subscribe') and not advertised['resources'].get('listChanged')
 
 
-def test_F14_fault_stops_real_child_before_closed(tmp_path):
+def _f14_run(tmp_path):
     folder=FIX/'G2-21.invalid_utf8';s=pump.Session();s.admit_request(41,method='tools/call',origin='client')
     with peer(tmp_path,[(folder/'override.upstream.raw').read_bytes()],linger=True) as child:
-        assert list(s.read_upstream(child.stdout))==[]
-        assert not any(x['kind']=='UPSTREAM_CLOSED' for x in s.events) or child.poll() is not None
+        got=list(s.read_upstream(child.stdout))
+        stopped=not any(x['kind']=='UPSTREAM_CLOSED' for x in s.events) or child.poll() is not None
+    return got,s,41,stopped
+
+def test_F14_fault_stops_real_child_before_closed(tmp_path):
+    _got,_s,_ident,stopped=_f14_run(tmp_path)
+    assert stopped
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_F14_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident,_stopped=_f14_run(tmp_path)
+    assert got==[]
+
+def test_F14_settles_the_client_R_W03_2(tmp_path):
+    got,s,ident,_stopped=_f14_run(tmp_path)
+    settlement_of(got,s,ident)
 
 
 def test_F15_exit_pending_yields_client_withheld_error(tmp_path):
@@ -361,6 +526,7 @@ def test_W15_real_supervisor_stops_descendant_after_leader_exit():
         assert leader.returncode==0
 
 
+@pytest.mark.xfail(strict=True,reason=R_F21_D)
 def test_F21_actual_exit_observed_while_descendant_holds_stdout():
     with orphan_stdout_peer() as leader:
         s=pump.Session();s.admit_request(41,method='tools/call',origin='client')
@@ -411,11 +577,24 @@ def test_W19_api_return_retains_id_type(ident):
     assert type(answer['id']) is type(ident) and answer['id']==ident
 
 
-def test_W20_list_shape_is_checked(tmp_path):
+def _w20_run(tmp_path):
     s=pump.Session();s.admit_request(41,method='tools/list',origin='client')
     with peer(tmp_path,[wire(dict(jsonrpc='2.0',id=41,result=dict(tools=7)))]) as child:
-        assert list(s.read_upstream(child.stdout))==[]
+        got=list(s.read_upstream(child.stdout))
+    return got,s,41
+
+def test_W20_list_shape_is_checked(tmp_path):
+    got,s,_ident=_w20_run(tmp_path)
+    assert not any('result' in json.loads(x) for x in got)
     assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
+
+@pytest.mark.xfail(strict=True,reason=R_W03_2)
+def test_W20_empty_output_R_W03_2(tmp_path):
+    got,_s,_ident=_w20_run(tmp_path)
+    assert got==[]
+
+def test_W20_settles_the_client_R_W03_2(tmp_path):
+    settlement_of(*_w20_run(tmp_path))
 
 
 def test_W21_group_resolved_from_nonleader(tmp_path):
