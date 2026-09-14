@@ -33,7 +33,7 @@ import sys
 import threading
 import uuid
 
-from . import approvals, framing, pump, receipts, route, supervisor
+from . import approvals, control, framing, pump, receipts, route, supervisor
 
 USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
          "[--state-root PATH] -- <server command> [args...]\n")
@@ -93,11 +93,16 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     the artifact feel finished is the one change that would make the rest of
     this decorative.
     """
-    store = approvals.Store(state_root(root),
-                            server_id=_identity(upstream_argv))
+    identity = _identity(upstream_argv)
+    store = approvals.Store(state_root(root), server_id=identity)
+    # T2.R6's channel. Without it the route refuses a tools/list rather than
+    # forwarding it, which is correct but useless: this is what lets the proxy
+    # run its own list and therefore what lets a human ever approve a server.
+    channel = control.Control(session=session, upstream_write=upstream_write)
     return route.Route(session=session, log=log,
                        upstream_write=upstream_write,
-                       client_write=client_write, approvals=store)
+                       client_write=client_write, approvals=store,
+                       control=channel, server_identity=identity)
 
 
 def main(argv=None, stdin=None, stdout=None, stderr=None):
