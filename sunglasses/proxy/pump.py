@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 
-from . import envelope, framing, handshake, supervisor
+from . import bounds, envelope, framing, handshake, selector, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
 ORIGIN_CLIENT = "client"
@@ -274,6 +274,8 @@ class Session:
         self._settling: set = set()
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
+        # T8.R6's second half, written by whoever owns the write queue.
+        self.queued_bytes = 0
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -296,6 +298,25 @@ class Session:
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
             return False
+        if origin == ORIGIN_CLIENT:
+            # T801, T8.R6. The bounds table has said what the limits are since
+            # it was written and nothing was asking it. Eight outstanding
+            # correlations is the cap, compared with `>=` because the number
+            # counts items already held, so admitting one more at the limit
+            # would make it nine.
+            #
+            # `queued_bytes` is the other half of the same row and is owned by
+            # whoever holds the write queue, which is not this class; it
+            # updates the attribute and both halves go through one call, rather
+            # than this passing a quiet zero and checking one of the two bounds
+            # the row names.
+            breach = bounds.check_admission(
+                outstanding=sum(1 for i in self._pending if i[0] == ORIGIN_CLIENT),
+                queued=self.queued_bytes)
+            if breach:
+                self._core._emit("ADMISSION_REFUSED", request_id,
+                                 reason=breach.reason, detail=breach.detail)
+                return False
         identity = key(origin, request_id)
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
@@ -402,6 +423,19 @@ class Session:
                         "the response shape does not match the request it "
                         "claims to answer")
             return None
+
+        # T802, T8.R2. The content bound existed in the table and nothing
+        # applied it, so a 262,145 byte result was forwarded to the model
+        # intact. An over-budget FRAME already closes the session here; content
+        # is the same row's other half and is treated the same way, so the
+        # bound cannot be walked around by putting the bytes one level further
+        # in.
+        if frame is not None and "result" in frame:
+            over = bounds.check_content(selector.content_bytes(frame["result"]))
+            if over:
+                self._close(over.reason, over.detail, rule=over.rule,
+                            budget=over.budget)
+                return None
 
         with self._settlement:
             # RC09. ONE OWNER for removing a pending entry, and it is this
@@ -574,6 +608,10 @@ class Session:
             handle.wait()
         except Exception:                                   # pragma: no cover
             return
+        # T803. Recorded BEFORE the early return. A clean exit with a non-zero
+        # code is the case this is for, and it is precisely the case the early
+        # return used to skip.
+        self._core.record_upstream_exit(getattr(handle, "returncode", None))
         # RC15. PENDING UNION SETTLING. The watcher returned when `_pending`
         # was empty without looking at the record, so with one item mid-handoff
         # and nothing pending a child exit closed nothing: the session went on
