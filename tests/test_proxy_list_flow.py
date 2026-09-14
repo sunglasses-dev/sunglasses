@@ -55,8 +55,11 @@ def _log(tmp_path):
 
 
 def _clean(_page):
+    # `check_pin` is part of a page scan under T5.R3(c), not an extra: the
+    # activation requires a clean pin for every tool, so a fixture without one
+    # describes a scan that never asked the helper.
     return {"accepted": True, "status": "complete", "inspection_complete": True,
-            "decision": "allow", "findings": []}
+            "decision": "allow", "findings": [], "check_pin": "clean"}
 
 
 def _engine(tmp_path, pages, scan=_clean):
