@@ -804,6 +804,23 @@ class Route:
         call that passes it a TypeError rather than a receipt.
         """
         stop = self.log.record_or_stop(event, **fields)
+        if stop.stopped:
+            # RS08 and RS09. The docstring above has said this since the slice
+            # that wrote it and the code only ever RETURNED the fact. A log
+            # that cannot be written is a session that is mediating with
+            # nothing written down, and T9.R4 does not let that continue: a
+            # caller who checks the return value stops one step, and every
+            # caller who does not carries on with no record at all.
+            #
+            # `_close` is idempotent on the session, so the first failed
+            # receipt decides the cause and the ones that follow it -- there
+            # are always several, because a failed log fails every write --
+            # cannot relabel it.
+            self.session._close(
+                REASON_RECEIPT_IO_ERROR,
+                "the receipt log could not be written, so the session cannot "
+                "say what it did",
+                rule=RULE_RESOURCE)
         return not stop.stopped
 
     @staticmethod
