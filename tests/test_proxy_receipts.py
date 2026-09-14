@@ -54,9 +54,19 @@ def test_the_log_is_opened_before_the_first_frame(tmp_path):
     log.close()
 
 
+
+def token(n=1):
+    """R-T903-1. `id_token` is the grammar `session._item_token` mints -- sixteen
+    lowercase hex characters -- so a fixture token has to be one. These tests
+    used short tags like "t1", which the log now refuses, and rightly: anything
+    that is not a minted token arriving under that name was chosen by somebody
+    other than us."""
+    return ("%016x" % (0xa1b2c3d4e5f60000 + n))
+
+
 def test_sequence_numbers_are_monotonic_and_gapless(log):
     for n in range(5):
-        log.event("ADMITTED", id_token="t%d" % n)
+        log.event("ADMITTED", id_token=token(n))
     log.close()
     rows = [json.loads(line) for line in log.path.read_text().splitlines()]
     assert [row["seq"] for row in rows] == list(range(len(rows)))
@@ -74,7 +84,7 @@ def test_one_writer_means_concurrent_events_do_not_interleave(log):
         for _ in range(50):
             log.event("ADMITTED", id_token=tag)
 
-    threads = [threading.Thread(target=spam, args=(f"t{n}",)) for n in range(4)]
+    threads = [threading.Thread(target=spam, args=(token(n),)) for n in range(4)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -97,7 +107,7 @@ def test_release_is_authorised_and_fsynced_before_any_original_byte(log):
     log.on_fsync = lambda: order.append("fsync")
     released = []
 
-    log.authorise_release("t1", write=lambda: (order.append("write"),
+    log.authorise_release(token(), write=lambda: (order.append("write"),
                                                released.append(True)))
     assert order == ["fsync", "write"], order
     assert released == [True]
@@ -117,7 +127,7 @@ def test_a_failed_fsync_means_the_bytes_never_leave(log):
     log.on_fsync = boom
     released = []
     with pytest.raises(receipts.ReceiptIOError):
-        log.authorise_release("t1", write=lambda: released.append(True))
+        log.authorise_release(token(), write=lambda: released.append(True))
     assert released == [], "the payload was released after the receipt failed"
 
 
@@ -155,15 +165,15 @@ def test_provenance_is_indices_and_hashes_never_names(log):
 
 def test_only_allowlisted_event_kinds_are_written(log):
     with pytest.raises(ValueError):
-        log.event("SOMETHING_I_INVENTED", id_token="t1")
+        log.event("SOMETHING_I_INVENTED", id_token=token())
 
 
 # ── T9.R4: a log that cannot be written stops the session ─────────────────
 
 def test_a_write_failure_after_hold_stops_admission_and_release(log):
-    log.event("HOLD_ENTERED", id_token="t1")
+    log.event("HOLD_ENTERED", id_token=token())
     log.fail_writes(OSError("no space"))
-    outcome = log.record_or_stop("SCAN_RESULT", id_token="t1")
+    outcome = log.record_or_stop("SCAN_RESULT", id_token=token())
     assert outcome.stopped is True
     assert outcome.reason == "RECEIPT_IO_ERROR"
     assert outcome.exit_code != 0
@@ -172,9 +182,9 @@ def test_a_write_failure_after_hold_stops_admission_and_release(log):
 def test_the_client_refusal_after_a_receipt_failure_is_bounded_and_not_durable(log):
     """R4: ONE bounded SUNGLASSES_WITHHELD per known pending id, best effort,
     never the original, and never claimed durable."""
-    log.event("HOLD_ENTERED", id_token="t1")
+    log.event("HOLD_ENTERED", id_token=token())
     log.fail_writes(OSError("no space"))
-    outcome = log.record_or_stop("SCAN_RESULT", id_token="t1")
+    outcome = log.record_or_stop("SCAN_RESULT", id_token=token())
     refusals = outcome.client_refusals(pending_ids=[41, "42"])
     assert len(refusals) == 2
     for refusal in refusals:
@@ -186,9 +196,9 @@ def test_the_client_refusal_after_a_receipt_failure_is_bounded_and_not_durable(l
 
 
 def test_prior_forwarded_state_is_recorded_unknown_not_guessed(log):
-    log.event("HOLD_ENTERED", id_token="t1")
+    log.event("HOLD_ENTERED", id_token=token())
     log.fail_writes(OSError("no space"))
-    outcome = log.record_or_stop("WRITE_ATTEMPT", id_token="t1")
+    outcome = log.record_or_stop("WRITE_ATTEMPT", id_token=token())
     assert outcome.prior_state == "UNKNOWN"
 
 
@@ -198,8 +208,8 @@ def test_a_well_formed_log_verifies(log):
     """T905. The terminal event is part of being well formed now. A log that
     simply stops does not say how the session ended, and this test used to
     assert that such a log verified."""
-    log.event("ADMITTED", id_token="t1")
-    log.event("SETTLED", id_token="t1")
+    log.event("ADMITTED", id_token=token())
+    log.event("SETTLED", id_token=token())
     log.event("SESSION_TORN_DOWN")
     log.close()
     assert receipts.verify(log.path).ok
@@ -209,8 +219,8 @@ def test_a_log_that_simply_stops_does_not_verify(log):
     """The other side of the same row, because "well formed" is now a claim
     about the ending as well as the rows. Certifying a truncated log describes
     a session whose ending nobody wrote down as one that ended cleanly."""
-    log.event("ADMITTED", id_token="t1")
-    log.event("SETTLED", id_token="t1")
+    log.event("ADMITTED", id_token=token())
+    log.event("SETTLED", id_token=token())
     log.close()
     outcome = receipts.verify(log.path)
     assert not outcome.ok and outcome.reason == "INCOMPLETE_SESSION"
@@ -233,7 +243,7 @@ def test_the_verifier_rejects_each_named_defect(tmp_path, break_it, reason):
 
 
 def test_admitted_without_settled_is_an_incomplete_session(log):
-    log.event("ADMITTED", id_token="t1")
+    log.event("ADMITTED", id_token=token())
     log.close()
     outcome = receipts.verify(log.path)
     assert not outcome.ok and outcome.reason == "INCOMPLETE_SESSION"
@@ -243,8 +253,8 @@ def test_verification_does_not_claim_the_model_received_anything(log):
     """R5's last clause, as an assertion because it is the thing a reader is
     most likely to over-read. The log is unsigned and local: it proves schema,
     order and completion, and says nothing about what any model was shown."""
-    log.event("ADMITTED", id_token="t1")
-    log.event("SETTLED", id_token="t1")
+    log.event("ADMITTED", id_token=token())
+    log.event("SETTLED", id_token=token())
     log.close()
     outcome = receipts.verify(log.path)
     assert outcome.proves == ("schema", "order", "completion")

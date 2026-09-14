@@ -248,6 +248,13 @@ def test_T903_receipt_values_are_validated_not_only_field_names(tmp_path,field):
     finally:log.close()
 
 
+# R-T903-1 (T9, 2026-09-14 10:24). `id_token` is the MINTED grammar now, and
+# this control writes `id_token='review'`, so it is split the way R-RC03-1 split
+# RC03: the line that is withdrawn becomes a strict xfail tripwire, and the
+# substantive assertion -- an append IO failure produces a Stop instead of
+# escaping -- stays live in the positive control below it, with a real token.
+
+@pytest.mark.xfail(strict=True, reason="R-T903-1: id_token is the minted grammar")
 def test_T904_actual_append_io_failure_stops(tmp_path):
     log = log_at(tmp_path)
     real = log._handle
@@ -259,6 +266,32 @@ def test_T904_actual_append_io_failure_stops(tmp_path):
         except OSError:pytest.fail('append IO escaped stop handler')
         assert stop.stopped
     finally:real.close()
+
+
+
+def test_T904_positive_append_io_failure_stops_with_a_minted_token(tmp_path):
+    """R-T903-1's positive control. The same assertion T904 makes, with a token
+    of the shape `session._item_token` actually produces: a write that fails
+    must produce a Stop rather than raise past `record_or_stop`."""
+    log = log_at(tmp_path)
+    real = log._handle
+
+    class Broken:
+        def write(self, *args):
+            raise OSError(errno.ENOSPC, 'review full')
+
+    log._handle = Broken()
+    try:
+        try:
+            stop = log.record_or_stop('HOLD_ENTERED',
+                                      id_token='a1b2c3d4e5f60718')
+        except OSError:
+            pytest.fail('append IO escaped stop handler')
+        assert stop.stopped
+        assert stop.reason == 'RECEIPT_IO_ERROR'
+        assert stop.durable is False
+    finally:
+        real.close()
 
 
 @pytest.mark.parametrize('rows', [

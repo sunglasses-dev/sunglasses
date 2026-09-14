@@ -552,6 +552,23 @@ Tightening it would fail a control rather than a defect, and the controls are
 vendored unchanged. The structural check still keeps the shape T903 sends
 (`{'raw': <marker>}`) out of the evidence, which is what that row asserts.
 
-@T9: if the grammar is wanted, T904 needs a token of the right shape and that
-is a control edit, so it needs a ruling. Nothing has been changed in the
-control.
+### R-T903-1, the ruling (T9, 2026-09-14 10:24)
+
+The MINTED grammar is enforced. T904 is split the way R-RC03-1 split RC03:
+
+  1. `test_T904_actual_append_io_failure_stops` keeps its body and carries a
+     `xfail(strict=True)`, so the withdrawn `id_token='review'` line is a
+     tripwire rather than a deletion;
+  2. `test_T904_positive_append_io_failure_stops_with_a_minted_token` holds the
+     substantive assertion -- a write that fails produces a Stop rather than
+     raising past `record_or_stop` -- with a token of the shape
+     `session._item_token` actually produces, and also asserts the reason and
+     that the Stop does not claim durability.
+
+Our own fixtures followed the repair: they used short tags like "t1", which the
+log now refuses, and rightly. `tests/test_proxy_receipts.py` mints them through
+one `token()` helper so the reason is visible at every use.
+
+Measured on this head: tests/proxy/test_stack_independent.py 55 passed, 1
+xfailed; our three receipt suites 190 passed. ASTRA versions this as v7
+alongside R-RC03-1.
