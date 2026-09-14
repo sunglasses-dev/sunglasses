@@ -283,15 +283,20 @@ class Passthrough:
             outcome = Outcome(
                 request_id=request_id, direction=direction, forwarded=False,
                 worker_terminated=False, delivered_late=False, elapsed_ms=0.0,
-                reason_code=OVER_BYTE_BUDGET, inspected_utf8_bytes=measured,
+                # NOTHING WAS INSPECTED. No worker was started, the document
+                # was refused unread, and reporting its size here is an answer
+                # to the other question.
+                reason_code=OVER_BYTE_BUDGET, inspected_utf8_bytes=0,
                 inspection_complete=False, detector_status=STATUS_UNREADABLE,
                 finding=False, rule_ids=[],
-                replacement=self._withheld(request_id, OVER_BYTE_BUDGET, 0.0, payload))
+                replacement=self._withheld(request_id, OVER_BYTE_BUDGET, 0.0, payload,
+                                           inspected=0, observed=measured))
             with self._lock:
                 self._pending.pop(request_id, None)
             self._emit("SETTLED", request_id, forwarded=False,
                        reason=OVER_BYTE_BUDGET, detector_status=STATUS_UNREADABLE,
                        inspection_complete=False, finding=False,
+                       inspected_utf8_bytes=0, observed_content_bytes=measured,
                        terminated=False, elapsed_ms=0.0, detector=None)
             handle._settle(outcome)
             return handle
@@ -438,7 +443,8 @@ class Passthrough:
             rule_ids=(finding or {}).get("rule_ids") or [],
             replacement=None if forwarded else self._withheld(
                 request_id, reason, elapsed_ms, payload,
-                inspection_complete=complete),
+                inspection_complete=complete,
+                inspected=inspected_content_bytes, observed=content_bytes),
         )
         with self._lock:
             self._pending.pop(request_id, None)
@@ -458,7 +464,9 @@ class Passthrough:
         handle._settle(outcome)
 
     def _withheld(self, request_id, reason_code, elapsed_ms, payload,
-                  inspection_complete: bool = False) -> dict:
+                  inspection_complete: bool = False,
+                  inspected: int | None = None,
+                  observed: int | None = None) -> dict:
         """A reason code, never the payload and never an exception string.
 
         `inspection_complete` was hardcoded False, so a scan that ran to the end
@@ -467,7 +475,16 @@ class Passthrough:
         and the client only ever sees the first. It carries the settled value
         now, and the default stays False for the paths that genuinely did not
         finish.
+
+        HOW MUCH WAS INSPECTED AND HOW BIG THE DOCUMENT WAS ARE TWO QUESTIONS.
+        This measured the document it was handed and reported that as the
+        inspected count, so a byte budget refusal told the client it had
+        inspected 32,768 bytes with no worker ever started. Both counts are
+        passed in now and both are reported, so neither can stand in for the
+        other.
         """
+        observed = (len(payload.encode("utf-8", "surrogatepass"))
+                    if observed is None else observed)
         return {
             "jsonrpc": "2.0",
             "id": request_id,                       # type preserved, not normalised
@@ -477,8 +494,8 @@ class Passthrough:
                 "data": {
                     "reason_code": reason_code or "withheld",
                     "inspection_complete": inspection_complete,
-                    "inspected_utf8_bytes": len(
-                        payload.encode("utf-8", "surrogatepass")),
+                    "inspected_utf8_bytes": observed if inspected is None else inspected,
+                    "observed_content_bytes": observed,
                     "elapsed_ms": round(elapsed_ms, 3),
                 },
             },
