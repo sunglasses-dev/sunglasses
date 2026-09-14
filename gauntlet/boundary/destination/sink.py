@@ -283,6 +283,13 @@ class Destination:
         # canary alone, for a scenario whose declared transport is http. A
         # caller that forgets to start the sink must not be able to produce that
         # receipt.
+        # BORROWED, IF NOBODY STARTED THIS SINK. A caller that calibrates
+        # without starting needs the endpoint only for as long as the probe
+        # takes, and holding it afterwards is what made the declared port
+        # unavailable to everything later in the process. Six sinks in the
+        # vendored exam files do exactly that, and those files are
+        # byte-identical by rule, so the release belongs here.
+        borrowed = self._server is None and self.started_at is None
         self._listen()
         if not self._server:
             return None
@@ -307,7 +314,18 @@ class Destination:
         except Exception as exc:                      # noqa: BLE001
             entry["detail"] = f"{type(exc).__name__}: {exc}"
         entry["deliveries_unchanged"] = len(self.deliveries) == before
+        entry["endpoint_borrowed_for_probe"] = borrowed
         self.calibrations.append(entry)
+        # THE `after` CALIBRATION IS THE END OF THE OBSERVATION. Nothing arriving
+        # past it belongs to this run, so the declared endpoint is released
+        # there rather than held until the process exits. Without this, a sink
+        # that is started and never stopped keeps 18762 for the remainder of the
+        # session and every later row falls back to another port, which under
+        # the rule above correctly invalidates its negative. Five sinks in the
+        # vendored exam files are never stopped and those files are
+        # byte-identical by rule, so the release belongs here.
+        if borrowed or label == "after":
+            self.stop()
         return entry
 
     # ── evidence ────────────────────────────────────────────────────────────
@@ -342,6 +360,15 @@ class Destination:
         calibrated = all((end, transport) in proved
                          for end in ("before", "after")
                          for transport in transports)
+        # A FALLBACK PORT IS A FAILED CALIBRATION. Recording declared 18762 and
+        # bound 43055 side by side is metadata, not a route: the payload names
+        # the declared endpoint and nothing carries a request sent there to this
+        # socket, so a negative from it is a negative about a different address.
+        # The pair was recorded and completeness ignored it, which let an
+        # observer that was demonstrably in the wrong place report a clean
+        # nothing_arrived.
+        at_declared = self.bound_port == self.declared_port
+        calibrated = calibrated and at_declared
         collected = self._collected_at is not None
         observable = calibrated and (collected or self.drop_dir is None)
         return {
@@ -373,6 +400,29 @@ class Destination:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.receipt(), indent=1) + "\n")
         return path
+
+    def __del__(self):
+        """Release the declared port when the sink is dropped without a stop.
+
+        Calibration binds the endpoint now, so a caller that builds a sink,
+        calibrates and never stops it holds 18762 for the rest of the process.
+        Two such sinks leak out of the vendored exam files, which are
+        byte-identical by rule and not mine to change, and the next sink in the
+        session then falls back to another port and reports an uncalibrated
+        observation that is entirely this harness's doing.
+
+        Narrow on purpose. It closes the socket and touches nothing else, since
+        a receipt written during interpreter teardown would be evidence nobody
+        asked for.
+        """
+        server = getattr(self, "_server", None)
+        if server is not None:
+            try:
+                server.shutdown()
+                server.server_close()
+            except Exception:                            # pragma: no cover
+                pass
+            self._server = None
 
     def __enter__(self):
         self.start()
