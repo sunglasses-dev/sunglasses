@@ -239,12 +239,21 @@ _FINISHED = threading.Event()
 
 def exit_process(code):
     """Leave, from a caller that owns the process and nothing else."""
-    # STDERR ONLY. Flushing stdout here is a write to the client, and the one
-    # case that reaches this line with anything buffered is the case where the
-    # client has stopped reading -- so the flush blocks for ever and the
-    # "bounded" teardown never ends. Every frame the client is owed was written
-    # and flushed by `to_client` under the stall clock; there is nothing left
-    # here that is safe to wait on.
+    # STDERR ONLY, AND DO NOT "FIX" THIS BY ADDING STDOUT BACK.
+    #
+    # stdout IS the client pipe. Flushing it here is a write to the client, and
+    # the single case that reaches this line with anything buffered is the case
+    # where the client has stopped reading -- which is the case this whole exit
+    # path exists to escape. The flush then blocks for ever on a full pipe and
+    # the BOUNDED teardown never ends: the proxy detects the stall, tears the
+    # session down, and sits in its own exit. That was a real defect here, and
+    # it looks exactly like a missing flush to anyone tidying up.
+    #
+    # There is nothing to lose by skipping it. Every frame the client is owed
+    # was written AND flushed by `to_client`, under the write-stall clock, at
+    # the moment it was released. Nothing is buffered here that anyone is
+    # waiting for. `test_leaving_the_process_does_not_flush_the_client_pipe`
+    # fails if stdout is flushed again.
     try:
         sys.stderr.flush()
     except Exception:

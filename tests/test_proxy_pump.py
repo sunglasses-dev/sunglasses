@@ -1009,3 +1009,62 @@ def test_a_settled_request_no_longer_counts_against_the_response_deadline():
     assert session.sweep_deadlines(
         now=time.monotonic() + bounds.UPSTREAM_RESPONSE_MS / 1000 + 10) is None
     assert session.closed_with() is None
+
+
+def test_the_refusal_signature_is_the_three_the_row_names(): 
+    """A reviewer wraps this method to audit what crosses the boundary, and
+    seventeen of ASTRA's v6 controls do exactly that with the three arguments
+    T4.R7 names. Threading a fourth through it broke all seventeen at once, on
+    a TypeError, before a single assertion ran -- a change to how we carry an
+    internal value taking out an entire control set.
+
+    The shape of a refusal is this method's business; who is waiting for it and
+    what their cause named is the table's.
+    """
+    import inspect
+
+    parameters = list(
+        inspect.signature(pump.Session._client_refusal).parameters)
+    assert parameters == ["self", "identity", "reason", "rule"]
+
+
+def test_a_subclass_can_wrap_the_refusal_with_those_three():
+    """The property behind the signature, asserted by doing it rather than by
+    describing it."""
+    seen = []
+
+    class Audit(pump.Session):
+        def _client_refusal(self, identity, reason, rule):
+            raw = super()._client_refusal(identity, reason, rule)
+            seen.append(json.loads(raw))
+            return raw
+
+    session = Audit()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    list(session.read_upstream(b"{not json\n"))
+    assert seen and seen[0]["error"]["data"]["reason_code"]
+
+
+def test_a_refusal_names_the_item_s_own_budget_not_the_session_s():
+    """RC03's per-item first cause, carried all the way to the wire.
+
+    A session-wide close does not rewrite an item that already settled for its
+    own reason, and the budget travels with that reason: an item recorded
+    OVER_BUDGET/content must not be told, at teardown, that no bound broke.
+    The envelope refuses an OVER_BUDGET that cannot name which one, so losing
+    it here does not merely mislabel the receipt -- it makes the refusal
+    unbuildable.
+    """
+    from sunglasses.proxy.session import Cause
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    session._core.record(session._core_key(identity),
+                         Cause("OVER_BUDGET", "S3", budget="content"))
+    session._close("MALFORMED_UPSTREAM", "review controlled close")
+    frames = list(session._drain_refusals())
+    assert len(frames) == 1
+    data = json.loads(frames[0])["error"]["data"]
+    assert data["reason_code"] == "OVER_BUDGET"
+    assert data["budget"] == "content"
