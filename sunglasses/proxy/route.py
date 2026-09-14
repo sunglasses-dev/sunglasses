@@ -59,7 +59,7 @@ class Route:
         # double is how a suite goes green over a product that never scanned.
         self.scan = scan if scan is not None else inspection.scan
         self.catalog = (frozenset(catalog) if catalog is not None
-                        else inspection.engine_catalog())
+                        else inspection.trusted_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
 
