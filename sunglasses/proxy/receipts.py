@@ -103,20 +103,18 @@ def _check_value(name, value):
             if not isinstance(rule_id, str) or not _RULE_ID.match(rule_id):
                 raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
     elif name == "id_token":
-        # STRUCTURAL only, deliberately, and this is weaker than it could be.
-        #
-        # `_item_token` produces sixteen lowercase hex characters, and matching
-        # `_ID_TOKEN` against that would also refuse a peer-supplied id passed
-        # under this name, which is the risk the field carries. ASTRA's own
-        # T904 control writes `id_token='review'`, so the grammar is not the
-        # contract his controls encode, and tightening it here would fail a
-        # control rather than a defect. Refusing a non-string still keeps the
-        # shape ASTRA's T903 sends (`{'raw': ...}`) out of the evidence.
-        # Recorded in tests/proxy/README.md for a ruling.
-        if not isinstance(value, str):
+        # R-T903-1 (T9, 2026-09-14 10:24). The MINTED grammar, not merely a
+        # string. `session._item_token` produces sixteen lowercase hex
+        # characters, and requiring that is what refuses a peer-supplied id
+        # passed under this field name -- which is the actual risk it carries,
+        # because a raw JSON-RPC id is peer text and a receipt is read as a
+        # record of what happened. A structural check would keep out ASTRA's
+        # `{'raw': ...}` and let a chosen string through.
+        if not isinstance(value, str) or not _ID_TOKEN.match(value):
             raise ValueError(
-                f"id_token {value!r} is not a string; the token is OURS, and a "
-                f"structure arriving under its name was built by somebody else")
+                f"id_token {value!r} is not a token this proxy mints; the token "
+                f"is OURS, and anything else arriving under its name was "
+                f"chosen by somebody else")
     elif name == "rule":
         from .envelope import RULES
         if value not in RULES:
