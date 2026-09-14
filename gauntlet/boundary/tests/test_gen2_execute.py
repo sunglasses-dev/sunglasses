@@ -103,10 +103,12 @@ def test_a_route_this_adapter_cannot_drive_is_refused_by_name(run_root):
 
 def test_an_undrivable_schedule_is_refused_before_a_process_starts(run_root):
     """plan() first. Half a schedule produces evidence, which is the whole point."""
-    # A REAL generation 2 variant. The first version of this named G2-08, which
-    # is generation 1 and has no materialised directory at all, so it raised
-    # from the artifacts loader and the refusal this test is about never ran.
-    entry, variant = _case("G2-14", "upstream_log")
+    # A REAL generation 2 variant that is STILL undrivable. The first version
+    # named G2-08, which is generation 1 and has no materialised directory, so
+    # it raised from the artifacts loader and the refusal never ran. The second
+    # named G2-14.upstream_log, which the four assertion ops then made drivable,
+    # so the example moved again rather than the rule.
+    entry, variant = _case("G2-17", "missing_axes")
     with pytest.raises(adapter.UnimplementedOperation):
         execute.run(entry, variant, route="no_mediation", run_root=run_root)
     assert not run_root.exists(), "a refused variant must not leave a run behind"
@@ -180,9 +182,10 @@ def test_every_drivable_variant_runs_on_the_control_route(run_root):
     # answers the primary one, and that absence is the scenario.
     assert all(r["terminal"] == r["expected"] and r["as_declared"] for r in ran), ran
     assert all(r["client_bytes"] > 0 for r in ran), ran
-    # 19 is measured, by the same sweep that corrected 297 to 340 in the step
-    # contract. If ASTRA's delivery changes this changes with it, loudly.
-    assert len(ran) == 19, [r["id"] for r in ran]
+    # 27 is measured, by the same sweep that corrected 297 to 340 in the step
+    # contract. It was 19 before the four assertion ops. If ASTRA's delivery
+    # changes this changes with it, loudly.
+    assert len(ran) == 27, [r["id"] for r in ran]
 
 
 def test_a_scenario_whose_own_request_is_an_initialize_is_not_eaten_by_the_handshake(run_root):
@@ -391,7 +394,7 @@ def test_every_drivable_variant_runs_on_the_strict_route(run_root):
     # mediator to have an opinion about a request the scenario never makes.
     assert all(r["disposition"] for r in ran if r["expected"]), \
         [r for r in ran if r["expected"] and not r["disposition"]]
-    assert len(ran) == 19, [r["id"] for r in ran]
+    assert len(ran) == 27, [r["id"] for r in ran]
 
 
 def test_the_disposition_is_the_primary_request_s_and_not_the_handshake_s(run_root):
