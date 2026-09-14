@@ -99,3 +99,21 @@ def test_every_step_in_all_74_delivered_schedules_conforms():
     # and the sweep corrected me, which is the only reason a number belongs in
     # a test at all.
     assert checked == 340, f"expected the delivery's 340 steps, saw {checked}"
+
+
+def test_a_schedule_with_no_steps_is_refused_rather_than_planned_as_empty():
+    """An empty plan is not a drivable schedule, it is missing steps.
+
+    This was live. The executor's no-materialise path read the schedule from the
+    RUN ROOT, where the materialiser writes a document that carries
+    `required_steps` and no `profile_steps` at all, and `plan()` handed back an
+    empty list. The run then sent a handshake, no request, and reported an
+    upstream that did not answer, which reads as a defect in the thing under
+    test. Zero steps has to be a refusal at the same place every other
+    undrivable schedule is refused.
+    """
+    with pytest.raises(adapter.NoStepsToDrive):
+        adapter.plan({"scenario_id": "G2-13", "variant": "error_message"})
+
+    with pytest.raises(adapter.NoStepsToDrive):
+        adapter.plan({"profile_steps": []})

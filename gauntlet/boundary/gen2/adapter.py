@@ -112,6 +112,10 @@ def check_step(step: dict) -> None:
             "an extra field means this schedule is not the one described.")
 
 
+class NoStepsToDrive(Exception):
+    """A schedule with no steps in it. Not an empty run, a missing one."""
+
+
 class UnimplementedOperation(Exception):
     """A schedule asks for operations this adapter does not implement."""
 
@@ -130,6 +134,16 @@ def plan(schedule: dict) -> list[dict]:
     prefix that happens to be drivable is the failure this guards against.
     """
     steps = list(schedule.get("profile_steps") or [])
+    if not steps:
+        # ZERO STEPS IS A REFUSAL, not a plan that happens to be short. A caller
+        # that handed over the wrong document got an empty list back and drove a
+        # session with no request in it, and the run then reported an upstream
+        # that never answered, which reads as a defect in the thing under test.
+        raise NoStepsToDrive(
+            f"{schedule.get('scenario_id')}.{schedule.get('variant')}: this "
+            "schedule declares no profile_steps. A schedule with no steps is a "
+            "document this adapter was handed by mistake, not a variant that "
+            "needs nothing done.")
     # SHAPE FIRST, then capability. A step that does not match the frozen
     # contract is not a step at all, and asking whether this adapter implements
     # an operation whose fields are wrong answers the less important question.
