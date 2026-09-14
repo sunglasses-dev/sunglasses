@@ -18,7 +18,9 @@ the next newline, so reading stops rather than resumes.
 """
 from __future__ import annotations
 
-from . import framing, handshake
+import threading
+
+from . import framing, handshake, supervisor
 from .session import Cause, Session as CoreSession
 
 ORIGIN_CLIENT = "client"
@@ -41,10 +43,18 @@ def key(origin, request_id):
     return (origin, type(request_id).__name__, request_id)
 
 
+class UnsupervisedUpstream(RuntimeError):
+    """Strict mode was asked to read from a pipe with no process behind it."""
+
+
 class Session:
     """The correlation table, the tombstones, and the decision to stop reading."""
 
-    def __init__(self):
+    def __init__(self, upstream=None, *, pgid=None, strict=False):
+        self._upstream = upstream
+        self._pgid = pgid
+        self._strict = strict
+        self._watcher = None
         self._core = CoreSession()
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
@@ -213,6 +223,42 @@ class Session:
             self._close("OVERLOADED", "the tombstone table overflowed",
                         rule="S3")
 
+    # ── the process behind the pipe ────────────────────────────────────────
+    def attach_upstream(self, handle, pgid=None):
+        """The handle whose EXIT is the signal, for when it arrives later.
+
+        T7.R1 makes an upstream exit with pending calls an S5 fault, and the
+        pipe cannot report it: a leader that spawns a grandchild and exits
+        leaves the write end open, so the reader waits on a stream that will
+        never EOF for a server that is already dead. That is not a slow server
+        and the difference must be decided by PROCESS facts, never by silence,
+        because an inactivity deadline cannot tell a dead leader from a healthy
+        one thinking hard and would eventually fire on both.
+        """
+        self._upstream = handle
+        self._pgid = pgid if pgid is not None else getattr(handle, "pid", None)
+        return self
+
+    def _watch_upstream(self):
+        """Wait on the HANDLE, not on the pipe, and act the moment it exits."""
+        handle = self._upstream
+        if handle is None:
+            return
+        try:
+            handle.wait()
+        except Exception:                                   # pragma: no cover
+            return
+        if self._closed or not self._pending:
+            return
+        # T7.R1, then T8.R12. The fault is recorded first so the cause is the
+        # exit rather than whatever the kill produces, and the group is then
+        # stopped, which closes the descendant's copy of the write end and is
+        # what actually releases the reader.
+        self._close("MALFORMED_UPSTREAM",
+                    "the upstream process exited with calls still pending")
+        if self._pgid is not None:
+            supervisor.stop_group(self._pgid, grace_ms=250, handle=handle)
+
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream):
         """Yield the frames a client should see. Stops for good at a fault.
@@ -222,6 +268,19 @@ class Session:
         WITHOUT being parsed, because parsing it is how a proxy talks itself
         into continuing.
         """
+        if self._strict and self._upstream is None:
+            # A STARTUP ERROR, not a quieter mode. An upstream nobody supervises
+            # is precisely the hang above, and a proxy that runs anyway has
+            # chosen to be unable to notice its server dying.
+            raise UnsupervisedUpstream(
+                "strict mode needs the upstream handle: pass it to Session() or "
+                "attach_upstream() before reading, because an exit cannot be "
+                "observed on the pipe")
+        if self._upstream is not None and self._watcher is None:
+            self._watcher = threading.Thread(target=self._watch_upstream,
+                                             daemon=True)
+            self._watcher.start()
+
         for raw in framing.bounded_lines(_as_reader(stream),
                                          framing.MAX_FRAME_BYTES):
             if self._closed:

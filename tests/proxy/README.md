@@ -136,3 +136,31 @@ conflicts.
 Recorded for ASTRA the way the Q14/C03 and R2/V04 contradictions were, and to be
 resolved the same way, by a ruling and a new versioned file rather than by
 editing either check.
+
+
+## F21, and why it stays red with the mechanism built
+
+T9's ruling: an upstream exit is a PROCESS fact and must never be inferred from
+silence. An inactivity deadline cannot tell a dead leader with a lingering
+grandchild from a healthy server thinking hard, and would eventually fire on
+both, so it is not an option in this code however convenient it looks.
+
+The mechanism the contract asks for is built: `Session(upstream=..., pgid=...)`
+and `attach_upstream(handle, pgid)`. The pump waits on the HANDLE rather than
+the pipe, records S5 on an exit with pending calls per T7.R1, and then stops the
+group per T8.R12, which closes the descendant's copy of the write end and is
+what actually releases the reader. Strict mode refuses to read at all without a
+handle, because an upstream nobody supervises is exactly this hang and that
+should be a startup error rather than a quieter mode that fails later and less
+clearly.
+
+`test_an_upstream_exit_with_pending_calls_closes_even_though_the_pipe_stays_open`
+in `tests/test_proxy_pump.py` drives the F21 shape end to end with real
+processes and passes: leader spawns a grandchild, leader exits 0, grandchild
+holds stdout, and the reader is released with `MALFORMED_UPSTREAM`.
+
+F21 itself constructs `pump.Session()` with no arguments and hands it only
+`leader.stdout`, so no handle is ever attached and there is no process for the
+pump to wait on. As written it can only be satisfied by the inactivity heuristic
+the ruling forbids. It stays red, ASTRA decides in the combined review, and the
+behaviour it is reaching for is demonstrated by the test named above.
