@@ -19,6 +19,7 @@ the next newline, so reading stops rather than resumes.
 from __future__ import annotations
 
 import threading
+import time
 
 from . import bounds, envelope, framing, handshake, selector, supervisor
 from .session import Cause, Session as CoreSession, Settled
@@ -276,6 +277,13 @@ class Session:
         self._settling_key: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
         self.queued_bytes = 0
+        # AR11, T8.R5. When each item was admitted, so the upstream-response
+        # deadline has something to measure. A bound with no clock behind it is
+        # a number in a table.
+        self._admitted_at: dict = {}
+        # AR10. One cell, written by the reader and read by the watchdog:
+        # when an incomplete frame first appeared in the buffer, or None.
+        self.partial_frame_since: list = [None]
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -369,6 +377,7 @@ class Session:
                 return False
             self._generation[identity] = self._generation.get(identity, 0) + 1
             self._pending[identity] = method
+            self._admitted_at[identity] = time.monotonic()
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -379,6 +388,48 @@ class Session:
             self._pending.pop(identity, None)
             return False
         return True
+
+
+    def sweep_deadlines(self, *, partial_since=None, now=None):
+        """AR10 and AR11, T8.R3 and T8.R5. The deadlines, actually applied.
+
+        `bounds.check_deadline` has held these numbers since the slice that
+        wrote it and nothing asked it anything, so a server could hold a
+        request for ever or stop halfway through a frame and the session would
+        wait as long as the server liked. A mediator that can be made to wait
+        indefinitely is a mediator that can be removed from the path by doing
+        nothing.
+
+        Called from a watchdog rather than from the reader, because the reader
+        is BLOCKED in exactly the cases that matter. Returns the breach it
+        closed on, or None.
+
+        `partial_since` is when the reader last had an incomplete frame in its
+        buffer, or None when it does not. That is the frame-assembly clock, and
+        only the reader can know it.
+        """
+        if self._closed:
+            return None
+        now = time.monotonic() if now is None else now
+
+        partial_since = (self.partial_frame_since[0] if partial_since is None
+                         else partial_since)
+        if partial_since is not None:
+            breach = bounds.check_deadline(
+                "frame_assembly", elapsed_ms=(now - partial_since) * 1000)
+            if breach:
+                self._close(breach.reason, breach.detail, rule=breach.rule)
+                return breach
+
+        for identity, admitted in list(self._admitted_at.items()):
+            if identity not in self._pending or identity[0] != ORIGIN_CLIENT:
+                continue
+            breach = bounds.check_deadline(
+                "upstream_response", elapsed_ms=(now - admitted) * 1000)
+            if breach:
+                self._close(breach.reason, breach.detail, rule=breach.rule)
+                return breach
+        return None
 
     def _core_key(self, identity):
         return identity + (self._generation.get(identity, 0),)
@@ -660,8 +711,12 @@ class Session:
                                              daemon=True)
             self._watcher.start()
 
+        # AR10. The reader publishes its frame-assembly clock so a watchdog can
+        # read it while this loop is blocked, which is the only moment the
+        # deadline matters.
         for raw in framing.bounded_lines(_as_reader(stream),
-                                         framing.MAX_FRAME_BYTES):
+                                         framing.MAX_FRAME_BYTES,
+                                         partial=self.partial_frame_since):
             if self._closed:
                 # RC02/RC07. Closure can win the race with a frame that is
                 # already buffered: a watcher observes the exit, or the reader

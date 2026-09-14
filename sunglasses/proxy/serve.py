@@ -31,9 +31,11 @@ import pathlib
 import subprocess
 import sys
 import threading
+import time
 import uuid
 
-from . import approvals, control, framing, pump, receipts, route, supervisor
+from . import (approvals, bounds, control, framing, pump, receipts, route,
+               supervisor)
 
 USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
          "[--state-root PATH] -- <server command> [args...]\n")
@@ -134,10 +136,14 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
 
     write_lock = threading.Lock()
 
-    def to_client(raw):
-        with write_lock:
-            stdout.write(raw)
-            stdout.flush()
+    # AR13, T8.R9. When the current write to the client began, or None. A
+    # client that stops reading makes this write block for ever on a full pipe,
+    # and the mediator then holds a frame it cannot deliver and a server it
+    # cannot drain. The watchdog reads this cell; it cannot be checked here,
+    # because here is where we are stuck.
+    writing_since = [None]
+
+    to_client = client_writer(stdout, write_lock, writing_since)
 
     def to_upstream(raw):
         child.stdin.write(raw)
@@ -170,14 +176,26 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
                               daemon=True)
     client = threading.Thread(
         target=_drain_client, args=(engine, session, stdin, done), daemon=True)
+    watchdog = threading.Thread(
+        target=_watchdog, args=(session, log, writing_since, done, child),
+        daemon=True)
     reader.start()
     client.start()
+    watchdog.start()
 
     try:
         done.wait()
     finally:
         _close(child)
-        reader.join(timeout=5)
+        # AR13. A reader blocked writing to a client that has stopped reading
+        # does not return, and waiting five more seconds for it is the
+        # unbounded wait the stall deadline exists to END. Once that deadline
+        # has fired the teardown is what "bounded" means, so the courtesy join
+        # is cut to the kill grace; the thread is a daemon and the process
+        # leaves without it.
+        stalled = session.closed_with()
+        reader.join(timeout=bounds.KILL_GRACE_MS / 1000
+                    if stalled and stalled[0] == "SCAN_DEADLINE" else 5)
         code = _exit_code(session, child)
         finished.set()
         # T905. The log needs a terminal event or it does not verify, and it
@@ -221,14 +239,101 @@ _FINISHED = threading.Event()
 
 def exit_process(code):
     """Leave, from a caller that owns the process and nothing else."""
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.flush()
-        except Exception:
-            pass
+    # STDERR ONLY. Flushing stdout here is a write to the client, and the one
+    # case that reaches this line with anything buffered is the case where the
+    # client has stopped reading -- so the flush blocks for ever and the
+    # "bounded" teardown never ends. Every frame the client is owed was written
+    # and flushed by `to_client` under the stall clock; there is nothing left
+    # here that is safe to wait on.
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
     if _FINISHED.is_set():
         os._exit(code if isinstance(code, int) else EXIT_FAULT)
     raise SystemExit(code)
+
+
+def client_writer(stdout, write_lock, writing_since):
+    """The one place bytes go to the client, with the stall clock around it.
+
+    A module-level factory rather than a closure so the clock can be tested:
+    as a closure inside `main` nothing could reach it, and a mutation that
+    deleted the clock left the whole suite green while the write-stall deadline
+    quietly measured nothing. The thing being timed is the write, so the timing
+    has to live where the write is.
+    """
+    def to_client(raw):
+        with write_lock:
+            writing_since[0] = time.monotonic()
+            try:
+                stdout.write(raw)
+                stdout.flush()
+            finally:
+                writing_since[0] = None
+    return to_client
+
+
+def _watchdog(session, log, writing_since, done, child, interval=0.1):
+    """AR10, AR11 and AR13. The deadlines, on a thread that is never blocked.
+
+    Every bound this checks was already written down in `bounds.py` and asked
+    by nobody, so a server could hold a request for ever, stop halfway through
+    a frame, or wait for a client that had stopped reading, and the proxy would
+    wait exactly as long as it was asked to. A mediator that can be made to
+    wait indefinitely can be taken out of the path by doing nothing at all,
+    which is the cheapest attack there is.
+
+    It runs on its own thread for the reason the checks exist: the reader is
+    blocked in the read, and the writer is blocked in the write. Neither can
+    time itself.
+    """
+    # A SAFETY THREAD THAT DIES QUIETLY IS WORSE THAN NO SAFETY THREAD. This one
+    # was shipped with a missing import: it raised NameError on its first stall
+    # check, the daemon thread vanished without a word, and every deadline in
+    # this file silently stopped existing while the tests that do not exercise
+    # them stayed green. So the loop names its own failure and ends the session
+    # rather than leaving one that can be made to wait for ever.
+    try:
+        _sweep_until_done(session, log, writing_since, done, interval)
+    except Exception as failure:                            # pragma: no cover
+        try:
+            log.event("WATCHDOG", reason_code="SCAN_EXCEPTION", rule="S3")
+        except Exception:
+            pass
+        session._close("SCAN_EXCEPTION",
+                       f"the watchdog stopped: {type(failure).__name__}",
+                       rule="S3")
+    # Whatever ended the loop, the session is over. RELEASE THE MAIN THREAD
+    # FIRST and let it do the stopping: its teardown already closes the child
+    # and stops the group, and doing it here as well put a second kill grace in
+    # series ahead of a teardown that is supposed to be BOUNDED. The bound is
+    # the property AR13 measures, so the path to it does not get to be
+    # leisurely.
+    done.set()
+
+
+def _sweep_until_done(session, log, writing_since, done, interval):
+    while not done.wait(interval):
+        if session.closed_with():
+            return
+        if session.sweep_deadlines() is not None:
+            return
+        started = writing_since[0]
+        if started is None:
+            continue
+        stalled = bounds.check_deadline(
+            "write_stall", elapsed_ms=(time.monotonic() - started) * 1000)
+        if stalled:
+            # T9.R2. The stall is RECORDED before the teardown, because the
+            # teardown is what makes it unobservable afterwards.
+            try:
+                log.event("WRITE_STALLED", reason_code=stalled.reason,
+                          rule=stalled.rule)
+            except Exception:
+                pass
+            session._close(stalled.reason, stalled.detail, rule=stalled.rule)
+            return
 
 
 def _drain(engine, child, done):
