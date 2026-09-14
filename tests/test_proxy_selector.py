@@ -192,3 +192,62 @@ def test_a_client_unknown_method_is_answered_to_the_client():
 @pytest.mark.parametrize("method", ["tools/call", "resources/read", "prompts/get"])
 def test_a_known_method_is_not_refused(method):
     assert selector.refusal(method, "request", origin="client") is None
+
+
+# ── T204 to T207: enumerating, and the half that says the list is wide enough ─
+
+@pytest.mark.parametrize("method", [
+    "notifications/initialized",
+    "notifications/message",
+    "notifications/cancelled",
+    "notifications/progress",
+    "notifications/tools/list_changed",
+    "notifications/resources/list_changed",
+    "notifications/resources/updated",
+    "notifications/prompts/list_changed",
+    "notifications/roots/list_changed",
+])
+def test_every_notification_this_protocol_defines_is_accepted(method):
+    """The positive half of T207, and the one that decides whether the proxy
+    works at all.
+
+    Replacing the `notifications/` PREFIX test with a vocabulary closes a hole,
+    and a vocabulary that is too narrow breaks every conformant server instead:
+    a refused `notifications/message` is a server whose logging never reaches
+    the client.
+
+    The names are written out HERE rather than read from
+    `selector.KNOWN_NOTIFICATIONS`. Parametrising over the set under test was
+    the first version of this, and a mutation that deleted a name from the set
+    survived it: the test simply stopped generating that case. A test that
+    takes its expectations from the thing it is testing agrees with it by
+    construction, whatever the thing says.
+    """
+    assert selector.refusal(method, "request", origin="client") is None
+
+
+@pytest.mark.parametrize("method", [
+    "notifications/review-unknown",
+    "notifications/",
+    "notifications/tools/review-unknown",
+])
+def test_a_notification_outside_the_vocabulary_is_refused_and_not_forwarded(method):
+    """T207. A prefix is a shape, not a name. Anything a peer can spell after
+    the slash used to pass through untouched in both directions."""
+    refused = selector.refusal(method, "request", origin="client")
+    assert refused is not None
+    assert refused.forward is False
+
+
+def test_ping_is_answered_rather_than_refused():
+    """T206. `ping` carries nothing, so it lives in the no-leaf set rather than
+    in a channel table, and that is why it was missing from the known methods.
+    Refusing it refuses a method the protocol requires an answer to."""
+    assert selector.refusal("ping", "request", origin="client") is None
+
+
+def test_a_correlated_error_is_scanned_on_the_api_response_channel():
+    """T204. A rule is scoped to a channel, so no channel means every
+    api_response rule is switched off for the one reply shape built to carry
+    the server's text back."""
+    assert selector.channel_for("error", "result") == selector.API_RESPONSE
