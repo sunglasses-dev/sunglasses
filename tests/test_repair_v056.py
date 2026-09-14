@@ -622,7 +622,23 @@ def test_package_reads_no_undeclared_environment_variables():
     import re
 
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT"}
+
+    # Names that LOOK like env vars and are not. `SUNGLASSES_WITHHELD` is the
+    # JSON-RPC error message T4.R7 freezes for the proxy's client envelope, so
+    # its spelling is fixed by the contract and it travels on the wire rather
+    # than being read from anywhere.
+    #
+    # This scan stays a literal search on purpose and is NOT narrowed to
+    # `os.environ` call sites, because two of the three allowed vars are read
+    # through a named constant (`_PIN_CONSENT_ENV`, `_DISABLE_ENV`) and a scan
+    # that only looked at call sites would miss exactly the indirection it most
+    # needs to catch. So the exemption is explicit and small, and it is policed
+    # below rather than trusted: a wire constant that ever appears near an
+    # environment read stops being a wire constant.
+    wire_constants = {"SUNGLASSES_WITHHELD"}
+
     found = set()
+    env_reads = []
     pkg = os.path.dirname(_package_location())
     for dirpath, _dirs, files in os.walk(pkg):
         if "__pycache__" in dirpath:
@@ -632,8 +648,21 @@ def test_package_reads_no_undeclared_environment_variables():
                 continue
             text = open(os.path.join(dirpath, name), errors="ignore").read()
             found.update(re.findall(r"SUNGLASSES_[A-Z_]+", text))
-    undeclared = found - allowed
+            for line in text.splitlines():
+                if "os.environ" in line or "getenv" in line:
+                    env_reads.append(line)
+
+    undeclared = found - allowed - wire_constants
     assert not undeclared, f"undeclared env vars in the package: {sorted(undeclared)}"
+
+    # The exemption polices itself. If a name claimed as a wire constant turns
+    # up on a line that reads the environment, the claim was wrong and this
+    # fails rather than quietly permitting an undeclared read.
+    smuggled = sorted({constant for constant in wire_constants
+                       for line in env_reads if constant in line})
+    assert not smuggled, (
+        f"{smuggled} is exempted as a wire constant and appears on a line that "
+        f"reads the environment; the exemption is not true")
 
 
 # ==========================================================================
