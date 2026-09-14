@@ -59,14 +59,18 @@ def _typed(value, kind):
     the same trap runs the other way: `isinstance(True, int)` is True, so a bool
     passes a naive number check and `inspected_utf8_bytes: True` would read as 1.
 
-    An earlier version carried an `int` branch as well. Nothing called it, and a
-    mutation that removed its bool guard killed no test, which is how I found
-    out. Dead code in a validator is a place for a future bug to hide behind a
-    passing suite, so it is gone rather than left for a caller that may never
-    arrive.
+    An earlier version carried an `int` branch, nothing called it, a mutation
+    that removed its bool guard killed no test, and it was deleted as dead code
+    "rather than left for a caller that may never arrive". The caller arrived:
+    T403 makes the byte counters whole numbers, because 19.5 bytes were not
+    inspected by anything. It is back WITH the bool guard the mutation found
+    missing, and this paragraph stays as the record that removing it was the
+    right call on the evidence available and still turned out to be wrong.
     """
     if kind is bool:
         return isinstance(value, bool)
+    if kind is int:
+        return isinstance(value, int) and not isinstance(value, bool)
     if kind is float:
         return (isinstance(value, (int, float))
                 and not isinstance(value, bool))
@@ -89,10 +93,17 @@ def validate(result, *, binding, held_content_bytes, catalog):
     for field in _BINDING_FIELDS:
         if field not in got:
             raise Invalid(f"binding is missing {field}")
-        if got[field] != binding[field]:
+        if (type(got[field]) is not type(binding[field])
+                or got[field] != binding[field]):
             # A result bound to a different message is not this item's answer,
             # however well formed it is. Accepting it settles one message with
             # another message's scan.
+            #
+            # T404. The TYPE is part of the comparison for the same reason it
+            # is part of an id: `True == 1` and `1.0 == 1` in Python, so a
+            # binding carrying a bool or a float where the generation is an int
+            # compares equal to one it is not, and a worker can claim an
+            # invocation it was never given by sending the number differently.
             raise Invalid(
                 f"binding {field} is {got[field]!r} and this item's is "
                 f"{binding[field]!r}; the result belongs to another invocation")
@@ -106,14 +117,28 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             f"inspection_complete is {result.get('inspection_complete')!r}, "
             f"not a boolean")
+    # T402. `status: complete` and `inspection_complete: false` is a scan
+    # saying it finished and did not finish. The pair was checked in one
+    # direction only, so a result carrying a finding could claim completion
+    # while admitting it had not read everything, and T4.R4 would then settle
+    # it as a complete inspection.
+    if (result.get("status") == STATUS_COMPLETE
+            and result.get("inspection_complete") is not True):
+        raise Invalid(
+            "status is complete while inspection_complete is false; a scan "
+            "cannot have finished and not finished")
+
     decision = result.get("decision")
     if decision not in DECISIONS:
         raise Invalid(f"decision {decision!r} is not one of {sorted(DECISIONS)}")
 
     for counter in _COUNTERS:
         value = result.get(counter)
-        if not _typed(value, float):
-            raise Invalid(f"{counter} is {value!r}, not a number")
+        # T403. A count of bytes is an integer. 19.5 bytes were not inspected
+        # by anything, and accepting it lets a worker report a number that
+        # cannot be compared to the byte counts T4.R2 checks it against.
+        if not _typed(value, int):
+            raise Invalid(f"{counter} is {value!r}, not a whole number")
         if value < 0:
             raise Invalid(f"{counter} is negative")
         if value != value or value in (float("inf"), float("-inf")):
@@ -132,6 +157,18 @@ def validate(result, *, binding, held_content_bytes, catalog):
             raise Invalid(f"severity {finding['severity']!r} is not known")
         if finding["source"] not in SOURCES:
             raise Invalid(f"source {finding['source']!r} is not known")
+        # T405. When the catalog says which LANE an id belongs to, the
+        # finding's own `source` has to agree. `GLS-SD-001` is an engine id, so
+        # a helper claiming it is a deterministic lane asserting an engine
+        # detection, and T4.R4(7) would read that as the engine having found a
+        # secret. One check, one thing: the id names its lane, the worker does
+        # not get to reassign it.
+        if isinstance(catalog, dict) and finding["rule_id"] in catalog:
+            if catalog[finding["rule_id"]] != finding.get("source"):
+                raise Invalid(
+                    f"rule id {finding['rule_id']!r} belongs to the "
+                    f"{catalog[finding['rule_id']]!r} lane and the finding "
+                    f"claims {finding.get('source')!r}")
         if finding["rule_id"] not in catalog:
             # T4.R6. A worker cannot confer authority on itself by naming a rule.
             raise Invalid(
