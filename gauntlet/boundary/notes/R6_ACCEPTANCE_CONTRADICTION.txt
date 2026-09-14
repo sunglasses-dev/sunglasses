@@ -1,0 +1,16 @@
+DEMONSTRATION: the two round 2 r6 tests cannot both hold on any capture ending in LF
+
+  client.ingress.jsonl | frames: 1 | file ends with LF: True
+   wire_capture  wants joined == 109 bytes (the file)
+   frame_content wants joined == 108 bytes (the file rstripped)
+   joined receipts are 109 bytes
+   -> wire_capture True | frame_content False
+
+  client.egress.jsonl | frames: 1 | file ends with LF: True
+   wire_capture  wants joined == 87 bytes (the file)
+   frame_content wants joined == 86 bytes (the file rstripped)
+   joined receipts are 87 bytes
+   -> wire_capture True | frame_content False
+
+The two targets differ by exactly the trailing LF, so no value of the
+recorded frames satisfies both. This is independent of my harness.
