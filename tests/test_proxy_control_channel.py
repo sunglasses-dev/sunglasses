@@ -36,11 +36,16 @@ def _sink():
 
 
 def _answer(session, request_id, tools=("echo",)):
-    """What the reader thread does when the response arrives."""
-    session.read_upstream(
+    """What the reader thread does when the response arrives.
+
+    `list(...)` matters: read_upstream is a GENERATOR, so calling it without
+    iterating runs none of it. The first version of this helper did exactly
+    that and three tests failed against a channel that was correct.
+    """
+    list(session.read_upstream(
         (json.dumps({"jsonrpc": "2.0", "id": request_id,
                      "result": {"tools": [{"name": t} for t in tools]}})
-         + "\n").encode())
+         + "\n").encode()))
 
 
 def test_a_request_goes_out_in_the_proxys_own_namespace():
@@ -124,9 +129,9 @@ def test_the_pager_drives_a_whole_list_through_one_channel():
                 page = {"tools": [{"name": "a"}]}
                 if cursor is None:
                     page["nextCursor"] = "p2"
-                session.read_upstream(
+                list(session.read_upstream(
                     (json.dumps({"jsonrpc": "2.0", "id": sent["id"],
-                                 "result": page}) + "\n").encode())
+                                 "result": page}) + "\n").encode()))
                 seen += 1
             else:
                 time.sleep(0.005)
@@ -155,3 +160,36 @@ def test_a_closed_session_stops_the_channel_rather_than_waiting_it_out():
     with pytest.raises(channel.ControlTimeout):
         control.await_answer(request_id)
     assert time.monotonic() - started < 3, "it waited out a dead session"
+
+
+def test_an_error_answer_is_a_fault_and_never_a_result():
+    """A server may refuse our control request, and `result` is then absent.
+    Reading that frame as a result hands the collector None where a page
+    should be, and a snapshot built on it describes a list nobody sent."""
+    session = pump.Session()
+    _written, write = _sink()
+    control = channel.Control(session=session, upstream_write=write,
+                              deadline_ms=200)
+    request_id = control.send("tools/list", {})
+    list(session.read_upstream(
+        (json.dumps({"jsonrpc": "2.0", "id": request_id,
+                     "error": {"code": -32601, "message": "no"}})
+         + "\n").encode()))
+    with pytest.raises(channel.ControlTimeout):
+        control.await_answer(request_id)
+
+
+def test_the_cursor_is_carried_on_the_next_page_request():
+    """Without it every page request asks for the first page, and a two page
+    list becomes the same page twice or an endless one."""
+    session = pump.Session()
+    written, write = _sink()
+    control = channel.Control(session=session, upstream_write=write,
+                              deadline_ms=200)
+    pager = control.pager("tools/list")
+    try:
+        pager("p2")
+    except channel.ControlTimeout:
+        pass
+    sent = json.loads(written[0])
+    assert (sent.get("params") or {}).get("cursor") == "p2"
