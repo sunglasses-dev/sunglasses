@@ -39,8 +39,34 @@ REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
 REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
+REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
+REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
 REASON_CLEAN = "CLEAN"
+
+
+class _NoId:
+    """The absence of an id, which is NOT the id `null`.
+
+    T1.R2 makes null a legal JSON-RPC id, so `{"id": null, "method": ...}` is a
+    REQUEST owed exactly one response, while a frame with no `id` member at all
+    is a notification owed none. Both arrive in Python as None, and using None
+    for the second meant every null-id call was settled as a notification: no
+    refusal, no answer, and a client left waiting on a request the contract
+    says it must be answered. A sentinel keeps the two apart.
+    """
+
+    def __repr__(self):
+        return "<no id>"
+
+
+NO_ID = _NoId()
+
+
+def _typed(request_id):
+    """T6.R6's identity, for the sets this module keeps: the JSON type is part
+    of it, so `"1"` and `1` are different held items here too."""
+    return (type(request_id).__name__, request_id)
 
 RULE_ADMISSION = "S1"
 RULE_RESOURCE = "S3"
@@ -75,6 +101,14 @@ class Route:
         self.page_scan = self._scan_page
         self._approved_tools = {}
         self._activated = False
+        self._activated_sha = None
+        # T5.R4 and T6.R5, the two things that can retire a held item while its
+        # answer is still in flight. Kept on the session because ONE authority
+        # decides whether a result may be released, and a check that lives in
+        # the middle of the release path is a check the next release path
+        # forgets to make.
+        self._cancelled = set()
+        self._invalidated = None
 
     # ── one frame from the client ──────────────────────────────────────────
 
@@ -117,7 +151,43 @@ class Route:
         """
         for raw in self.session.read_upstream(stream,
                                               inspect=self._inspect_result):
-            self.client_write(raw)
+            self._release_inbound(raw)
+
+    def _release_inbound(self, raw):
+        """AR08. T9.R2 applies in BOTH directions.
+
+        A frame going to the client is as irreversible as one going upstream:
+        once the model has read it, no later receipt can unsay it. The outbound
+        release was authorised and made durable before its bytes moved and this
+        one was not, so half the wire had an audit trail and half did not, and
+        the half without it is the half that carries what a compromised server
+        said.
+        """
+        try:
+            self.log.authorise_release(self._token("inbound"),
+                                       write=lambda: self.client_write(raw))
+        except receipts.ReceiptIOError:
+            # T9.R4. A release that cannot be recorded does not happen, and the
+            # session stops rather than continuing to mediate with nothing
+            # written down.
+            self._record("SETTLED", reason_code=REASON_RECEIPT_IO_ERROR,
+                         rule=RULE_RESOURCE, forwarded=False)
+            return
+        self._record("WRITE_COMPLETE", bytes=len(raw))
+
+    def _release_barrier(self, request_id):
+        """The ONE question asked before any held answer is released.
+
+        Cancellation and invalidation both retire an item while its answer is
+        still in flight, and both were checked nowhere. Asking them here, once,
+        is the difference between a rule and a habit: a second release path
+        added later inherits the check instead of forgetting it.
+        """
+        if request_id is not NO_ID and _typed(request_id) in self._cancelled:
+            return REASON_REQUEST_CANCELLED
+        if self._invalidated:
+            return REASON_DESCRIPTOR_CHANGED
+        return None
 
     def _inspect_result(self, raw, message):
         """None to deliver the original, or (replacement, reason, rule).
@@ -125,12 +195,31 @@ class Route:
         Called by the pump BEFORE it settles, so whatever this returns is the
         item's first and only outcome.
         """
-        request_id = message.get("id")
-        is_response = request_id is not None
+        # `"id" in message` and not `.get`, because null IS an id: a result
+        # correlated to a null-id request is a response, and reading it as a
+        # notification loses the client's one answer.
+        request_id = message["id"] if "id" in message else NO_ID
+        is_response = request_id is not NO_ID
         method = (self.session.expected_method(request_id, origin=CLIENT)
                   if is_response else message.get("method"))
         if not method:
             return None
+
+        if method == "notifications/tools/list_changed":
+            # T5.R4. The descriptors moved, so every undelivered result of this
+            # generation is now an answer from a server nobody approved.
+            self._invalidated = REASON_DESCRIPTOR_CHANGED
+            self._activated = False
+            self._approved_tools = {}
+            if self.approvals:
+                try:
+                    self.approvals.invalidate()
+                except Exception:
+                    pass
+
+        retired = self._release_barrier(request_id)
+        if retired is not None and is_response:
+            return self._withhold_result(request_id, retired, RULE_APPROVAL)
 
         surface, channel = self._surface(message, method)
         if surface is None:
@@ -213,7 +302,7 @@ class Route:
         """One answer in the client's own typed id, or nothing at all when the
         thing withheld was a notification."""
         self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
-        if request_id is None:
+        if request_id is NO_ID:
             return (None, reason, rule)
         result = result or {}
         body = envelope.withheld(
@@ -317,6 +406,12 @@ class Route:
         self._approved_tools = dict(found.tools)
         self._to_client({"jsonrpc": "2.0", "id": request_id,
                          "result": {"tools": self._tools_of(found)}})
+        # T6.R1. Delivering the answer is not settling the item. Left pending,
+        # the teardown still owes this id a refusal and the client receives a
+        # SECOND answer to a request it has already had answered, which is the
+        # one thing the row forbids in either direction.
+        self.session.settle_from(CLIENT, request_id, REASON_CLEAN,
+                                 RULE_APPROVAL)
         self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_APPROVAL,
                      forwarded=False)
 
@@ -370,10 +465,43 @@ class Route:
             self._record("SETTLED", reason_code=REASON_UNINSPECTED_METHOD,
                          rule=RULE_ADMISSION, forwarded=False)
             return
-        if selector.zero_leaves_is_complete(method, message):
-            self._release(raw, None)
+        if method == "notifications/cancelled":
+            # T6.R5. Honoured, not merely forwarded. The id is retired BEFORE
+            # any release, the client gets its one answer now, and the late
+            # result is discarded rather than delivered to a caller that has
+            # already been told the request is over.
+            self._cancel(message)
             return
-        self._inspect(raw, message, method, request_id=None)
+        if selector.zero_leaves_is_complete(method, message):
+            self._release(raw, NO_ID)
+            return
+        self._inspect(raw, message, method, request_id=NO_ID)
+
+    def _cancel(self, message):
+        params = message.get("params")
+        target = params.get("requestId") if isinstance(params, dict) else None
+        if target is None and not (isinstance(params, dict)
+                                   and "requestId" in params):
+            return
+        self._cancelled.add(_typed(target))
+        self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
+        if not self.session.expects(target, origin=CLIENT):
+            return
+        # session.cancel TOMBSTONES the id, which is the part that matters:
+        # without it the late result arrives for an id nothing is waiting on,
+        # the pump reads that as unsolicited and closes MALFORMED_UPSTREAM, and
+        # the client is told its cancelled request failed on a protocol fault.
+        # T6.R5 calls a late answer to a cancelled id DISCARDED_LATE, and the
+        # session stays serviceable.
+        self.session.cancel(target, origin=CLIENT)
+        body = envelope.withheld(
+            request_id=target, reason_code=REASON_REQUEST_CANCELLED,
+            rule=RULE_ADMISSION, accepted=False, status="cancelled",
+            inspection_complete=False, inspected_utf8_bytes=0,
+            observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog)
+        self._to_client(body)
+        self._record("SETTLED", reason_code=REASON_REQUEST_CANCELLED,
+                     rule=RULE_ADMISSION, forwarded=False)
 
     # ── the held path ──────────────────────────────────────────────────────
 
@@ -421,7 +549,7 @@ class Route:
         # the direction test false, and every outbound secret settles as the
         # weaker PROHIBITED_CONTENT while still looking blocked.
         held = {"direction": REQUEST,
-                "is_request": request_id is not None,
+                "is_request": request_id is not NO_ID,
                 "method": method}
         settlement = policy.settle(result, held=held,
                                    held_content_bytes=held_bytes)
@@ -457,7 +585,7 @@ class Route:
 
     def _settle_withheld(self, request_id, reason, rule, *, settlement=None,
                          result=None):
-        if request_id is None:
+        if request_id is NO_ID:
             # T2.R13. Dropped with a receipt, and no acknowledgement, because a
             # notification has no response to put one in.
             self._record("SETTLED", reason_code=reason, rule=rule,
@@ -514,7 +642,7 @@ class Route:
         """T9.R4. Best effort, bounded, and never claimed durable, because it is
         being sent by something that has just discovered it cannot write
         anything down."""
-        if request_id is None:
+        if request_id is NO_ID:
             return
         self._to_client(envelope.withheld(
             request_id=request_id, reason_code=REASON_RECEIPT_IO_ERROR,
@@ -551,15 +679,44 @@ class Route:
         rather than left for a reader to infer from the absence of a call in
         serve.py.
         """
-        if self._activated or self.control is None or not self.approvals:
+        if self.control is None or not self.approvals:
             return
+        if self._activated and self._activated_sha == self._record_sha():
+            # Activated already, against the record that is still on disk.
+            return
+        # T5.R3 says at session start AND whenever the approval record changes
+        # on disk. Both halves matter and both were missing. Without the retry,
+        # a session that started before a human approved anything never
+        # notices the approval and refuses for ever. Without the re-read, a
+        # record edited underneath us keeps admitting calls against a snapshot
+        # nobody approved any more, which is the revocation doing nothing.
         self._activated = True
+        self._activated_sha = self._record_sha()
+        self._approved_tools = {}
         outcome = activation.activate(
             self.approvals, list_pages=self._pager(), scan=self.page_scan,
             server_identity=self.server_identity or getattr(
                 self.approvals, "server_id", None))
         if outcome.activated:
             self._approved_tools = dict(outcome.snapshot.tools)
+        else:
+            self._invalidated = (outcome.provenance
+                                 if outcome.provenance == REASON_DESCRIPTOR_CHANGED
+                                 else self._invalidated)
+
+    def _record_sha(self):
+        """What the approval record on DISK says right now.
+
+        Read every time rather than cached, because the whole point of a
+        revocation is that it happens without asking us.
+        """
+        try:
+            record, bad = self.approvals._record_or_reason()
+        except Exception:
+            return None
+        if bad or record is None:
+            return None
+        return record.get("snapshot_sha256")
 
     def _close(self, reason, rule, budget):
         # pump.Session owns the teardown and exposes it privately. A public
