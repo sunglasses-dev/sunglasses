@@ -26,7 +26,7 @@ activation = pytest.importorskip(
 
 from sunglasses.proxy import approvals  # noqa: E402
 
-IDENTITY = "server-identity-sha"
+IDENTITY = "s1"   # Store.approve records the store's own server_id
 
 
 def _tool(name="echo"):
@@ -53,36 +53,50 @@ def _store(tmp_path):
     return approvals.Store(tmp_path, server_id="s1")
 
 
-def _approved(tmp_path, store, sha, tools):
-    """What `sunglasses proxy approve` does: a human viewed exactly this sha."""
-    store.capture(sha, {"tools": tools})
-    store.write_without_human({
-        "server_identity": IDENTITY, "snapshot_sha256": sha,
-        "approved_at": "now", "approved_by": "human",
-        "tools": {name: {"descriptor_sha256": value}
-                  for name, value in tools.items()}})
+def _approved(store, snapshot_result):
+    """What `sunglasses proxy approve` does, through the real door.
+
+    `write_without_human` is not used and cannot be: the store refuses it by
+    design, which is T5.R1's point that only the approve command writes an
+    approval. The capture is already on disk because the activation wrote it.
+    """
+    store.approve(snapshot_sha256=snapshot_result.sha256, viewed=True)
     return store
 
 
 # ── the ordering clause ──────────────────────────────────────────────────
 
 def test_the_revision_and_epoch_are_read_before_the_first_page(tmp_path):
-    """The clause this module exists for. A human revoking the approval while
-    sixty four pages are being scanned must not be able to have the scan admit
-    anything, and reading the numbers at the end compares the world to itself."""
+    """The clause this module exists for, and it only shows on an APPROVED
+    store.
+
+    A human revoking the approval while sixty four pages of descriptors are
+    being scanned must not be able to have that scan admit anything. The first
+    version of this test ran against an unapproved store, where the attempt is
+    refused for a different reason entirely, so a module reading the numbers at
+    the end passed it. The world has to be one that WOULD activate, and then
+    move.
+    """
     store = _store(tmp_path)
+    ready = activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
+                                scan=_clean, server_identity=IDENTITY)
+    _approved(store, ready.snapshot)
+    assert activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
+                               scan=_clean,
+                               server_identity=IDENTITY).activated is True
+
     moved = {}
 
     def request(cursor):
-        # the world moves in the middle of the scan
         if not moved:
-            store.invalidate()
+            store.invalidate()          # the world moves mid scan
             moved["yes"] = True
         return {"tools": [_tool()]}
 
     outcome = activation.activate(store, list_pages=request, scan=_clean,
                                   server_identity=IDENTITY)
-    assert outcome.activated is False
+    assert outcome.activated is False, (
+        "a scan that finished against a world which has since moved activated")
 
 
 def test_a_matching_snapshot_on_a_still_world_activates(tmp_path):
@@ -93,8 +107,7 @@ def test_a_matching_snapshot_on_a_still_world_activates(tmp_path):
                                 scan=_clean, server_identity=IDENTITY)
     assert first.activated is False, "nothing is approved yet"
 
-    _approved(tmp_path, store, first.snapshot.sha256,
-              first.snapshot.tools)
+    _approved(store, first.snapshot)
     second = activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
                                  scan=_clean, server_identity=IDENTITY)
     assert second.activated is True
@@ -119,7 +132,7 @@ def test_a_changed_snapshot_says_descriptor_changed_and_captures_the_new_one(tmp
     store = _store(tmp_path)
     first = activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
                                 scan=_clean, server_identity=IDENTITY)
-    _approved(tmp_path, store, first.snapshot.sha256, first.snapshot.tools)
+    _approved(store, first.snapshot)
 
     changed = activation.activate(
         store, list_pages=_pages({"tools": [_tool(), _tool("rm")]}),
@@ -141,6 +154,9 @@ def test_an_incomplete_snapshot_never_reaches_the_store(tmp_path):
     assert outcome.activated is False
     assert outcome.provenance == "APPROVAL_REQUIRED"
     assert outcome.snapshot.sha256 is None
+    assert not list((tmp_path / "captures").glob("*.json")), (
+        "a truncation was captured, so a human would be shown a document the "
+        "server never finished sending")
 
 
 def test_an_unclean_page_refuses_with_the_scan_provenance(tmp_path):
@@ -165,9 +181,40 @@ def test_a_server_that_is_not_the_approved_one_is_refused(tmp_path):
     store = _store(tmp_path)
     first = activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
                                 scan=_clean, server_identity=IDENTITY)
-    _approved(tmp_path, store, first.snapshot.sha256, first.snapshot.tools)
+    _approved(store, first.snapshot)
 
     outcome = activation.activate(store, list_pages=_pages({"tools": [_tool()]}),
                                   scan=_clean, server_identity="somebody-else")
     assert outcome.activated is False
     assert outcome.provenance == "DESCRIPTOR_CHANGED"
+
+
+def test_the_page_scans_reach_the_store_exactly_as_the_collector_produced_them():
+    """The activation grades the pages under the release lock, so this module
+    forwards them and does not summarise. A collector that refuses unclean
+    pages already stops most of these, which is precisely why the forwarding
+    itself needs its own assertion rather than relying on that."""
+    handed = {}
+
+    class _Spy:
+        revision = 0
+        epoch = 0
+        server_id = "s1"
+
+        def capture(self, sha, payload):
+            return sha
+
+        def activate(self, **kw):
+            handed.update(kw)
+            return type("V", (), {"activated": False, "provenance": "X",
+                                  "detail": ""})()
+
+    scans = [{"accepted": True, "status": "complete",
+              "inspection_complete": True, "decision": "allow",
+              "findings": [], "marker": n} for n in range(2)]
+    pages = iter(scans)
+    activation.activate(_Spy(), list_pages=_pages({"tools": [_tool()], "nextCursor": "p2"},
+                                                  {"tools": [_tool("two")]}),
+                        scan=lambda page: next(pages), server_identity="s1")
+    assert handed["page_scans"] == scans
+    assert handed["server_identity"] == "s1"
