@@ -34,7 +34,8 @@ def _frame(message: dict) -> bytes:
 
 
 def run_turn(server_argv, request: dict, *, timeout: float = 12.0,
-             stderr_path: pathlib.Path | None = None) -> dict:
+             stderr_path: pathlib.Path | None = None,
+             wire_path: pathlib.Path | None = None) -> dict:
     """Send the handshake and `request`, and return the reply with that id.
 
     Returns the parsed reply. Raises rather than returning something plausible:
@@ -49,6 +50,14 @@ def run_turn(server_argv, request: dict, *, timeout: float = 12.0,
         _frame({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}),
         _frame(request),
     ))
+
+    if wire_path is not None:
+        # WHAT THIS HARNESS WROTE TO THE SERVER, byte for byte. On the control
+        # route there is no mediator to attest the arrival, so without this the
+        # row is ungradeable on the route it exists to be compared against. A
+        # turn this harness issued is not a model's decision, so our own record
+        # of what crossed is a record of an arrival and not a report about one.
+        pathlib.Path(wire_path).write_bytes(payload)
 
     started = time.monotonic()
     completed = subprocess.run(list(server_argv), input=payload,
@@ -77,7 +86,17 @@ def run_turn(server_argv, request: dict, *, timeout: float = 12.0,
         f"stderr tail: {completed.stderr.decode('utf-8', 'replace')[-400:]}")
 
 
-def observed_at_ingress(receipts_path: pathlib.Path, method: str) -> dict | None:
+def _call_of(message: dict, method: str) -> dict | None:
+    if message.get("method") != method:
+        return None
+    params = message.get("params") or {}
+    return {"method": message.get("method"),
+            "name": params.get("name"),
+            "arguments": params.get("arguments") or {}}
+
+
+def observed_at_ingress(receipts_path: pathlib.Path, method: str, *,
+                        client_wire: pathlib.Path | None = None) -> dict | None:
     """The call as it crossed the boundary, from the mediator's own receipts.
 
     ATTESTED INGRESS RATHER THAN A TRANSCRIPT. The stimulus gate used to compare
@@ -88,7 +107,11 @@ def observed_at_ingress(receipts_path: pathlib.Path, method: str) -> dict | None
     """
     path = pathlib.Path(receipts_path)
     if not path.is_file():
-        return None
+        # NO MEDIATOR, which is what the control route is. The harness's own
+        # wire capture is the attestation there, and it is still a wire record
+        # rather than a transcript: the point was never which process held the
+        # pen, it was that a decision reported after the fact is not an arrival.
+        return _from_client_wire(client_wire, method)
     for line in path.read_bytes().splitlines():
         if not line.strip():
             continue
@@ -102,10 +125,23 @@ def observed_at_ingress(receipts_path: pathlib.Path, method: str) -> dict | None
             message = json.loads(event.get("raw") or "")
         except ValueError:
             continue
-        if message.get("method") != method:
+        call = _call_of(message, method)
+        if call is not None:
+            return call
+    return _from_client_wire(client_wire, method)
+
+
+def _from_client_wire(wire_path, method: str) -> dict | None:
+    if wire_path is None or not pathlib.Path(wire_path).is_file():
+        return None
+    for line in pathlib.Path(wire_path).read_bytes().splitlines():
+        if not line.strip():
             continue
-        params = message.get("params") or {}
-        return {"method": message.get("method"),
-                "name": params.get("name"),
-                "arguments": params.get("arguments") or {}}
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue
+        call = _call_of(message, method)
+        if call is not None:
+            return call
     return None
