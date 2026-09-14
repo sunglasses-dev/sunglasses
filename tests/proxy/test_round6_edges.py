@@ -20,7 +20,7 @@ def test_RC18_RC19_handoff_boundary(tmp_path,point,close_first):
   s=pump.Session(upstream=child,pgid=child.pid,strict=True)
   for i in ids:assert s.admit_request(i,method='tools/call',origin='client')
   src,start=inspect.getsourcelines(type(s).read_upstream)
-  target=start+max(i for i,line in enumerate(src) if line.strip()=='yield raw')
+  target=start+max(i for i,line in enumerate(src) if line.strip().startswith('yield self._handoff(identity'))
   def tracer(frame,event,arg):
    if point=='pre_yield' and event=='line' and frame.f_code is type(s).read_upstream.__code__ and frame.f_lineno==target and not entered.is_set():
     entered.set();assert release.wait(5)

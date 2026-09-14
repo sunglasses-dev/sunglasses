@@ -658,8 +658,11 @@ def test_a_close_at_the_handoff_instant_stops_the_frame_crossing():
         return original(ident, raw)
 
     session._handoff = blocking
+    # A refused handoff yields b"", which is nothing on a byte stream: a
+    # consumer writing it writes zero bytes. Filtering falsy rather than
+    # None is what a real consumer does.
     out = [frame for frame in session.read_upstream(wire(response(41)))
-           if frame is not None]
+           if frame]
     assert seen["settling"], "the record was already discharged at the handoff"
     assert not any("result" in json.loads(frame) for frame in out), (
         "an original crossed after the close had won")
@@ -673,7 +676,7 @@ def test_a_close_after_the_handoff_does_not_pay_again():
     session = pump.Session()
     assert session.admit_request(41, method="tools/call", origin="client")
     frames = list(session.read_upstream(wire(response(41))))
-    delivered = [f for f in frames if f is not None]
+    delivered = [f for f in frames if f]
     assert len(delivered) == 1 and "result" in json.loads(delivered[0])
     session._close("MALFORMED_UPSTREAM", "review controlled close")
     assert list(session._drain_refusals()) == [], (
@@ -716,8 +719,7 @@ def test_the_handoff_decision_is_made_by_the_yield_and_not_before_it():
 
     _sys.settrace(tracer)
     try:
-        out = [f for f in session.read_upstream(wire(response(41)))
-               if f is not None]
+        out = [f for f in session.read_upstream(wire(response(41))) if f]
     finally:
         _sys.settrace(None)
 

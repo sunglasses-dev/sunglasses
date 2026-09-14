@@ -297,3 +297,53 @@ Two more xfails exist beside them and are NOT part of R-W03-2:
 Result on this head: `tests/proxy` is 214 passed, 3 skipped, 19 xfailed, zero
 failed. The whole proxy suite is 315 passed, 19 xfailed, zero failed. The
 round-2 prompt asks ASTRA to version these as CONTROLS_CORRECTION v6.
+
+---
+
+## R-RC18-1, the ruling (T9, 2026-09-14)
+
+`test_round6_edges.py` is edited in ONE line and nothing else in it.
+
+    file    tests/proxy/test_round6_edges.py
+    before  dd80bc1ce6e6f64545fc9ff6137445a1312b68dbdfc7dc306c3ff1c33205bc10
+    after   88d1e6a2628bc783cc168eece6b18614818cde1bfb8da169d54e824d62c364f4
+
+    -  target=start+max(i for i,line in enumerate(src) if line.strip()=='yield raw')
+    +  target=start+max(i for i,line in enumerate(src) if line.strip().startswith('yield self._handoff(identity'))
+
+**Behaviour asserted unchanged; selector follows the ruled line.**
+
+The control asserts a BEHAVIOUR at a boundary: a close completing while the
+reader is parked at the delivery line, before that line runs, must win, so no
+original crosses and every id is still answered exactly once. The ruled
+implementation satisfies that at the same instant -- measured with a barrier
+placed there, the record is still owed, the close wins, two frames go out, both
+ids appear once and zero originals cross.
+
+The selector is only the instrument's way of FINDING that instant by text, and
+the text changed because the ruling put the decision on that line. RC18 is
+repaired by moving the decision INTO the yield expression, since only an
+expression is evaluated when the line runs; a statement before it runs too
+early, and the close then finds the record already discharged and stands down
+while the resumed reader delivers anyway.
+
+Left unchanged the control fails on a TIMEOUT rather than on behaviour: with no
+line matching `yield raw` in the response path, `max()` falls back to the
+notification path's line, which never executes in this scenario, so `entered`
+never sets. That is a check that cannot fail for the reason it exists.
+
+One consequence of the repair is recorded here because it touches every
+consumer: a refused handoff yields `b""` rather than `None`. A consumer writes
+what the reader yields, and on a byte stream `b""` IS nothing -- it writes zero
+bytes and needs no special case. `None` would make every consumer, including a
+reviewer's, carry a check it never needed, and ASTRA's own control writes the
+yielded value unconditionally: with `None` it raised TypeError in place of a
+refusal.
+
+Our own suite pins the property independently of this selector
+(`test_the_handoff_decision_is_made_by_the_yield_and_not_before_it`), because a
+behaviour only a reviewer's instrument can observe is one we cannot
+regression-test. The round-7 prompt carries this as CONTROLS_CORRECTION v7
+alongside R-RC03-1 and R-T903-1, and asks ASTRA to re-issue the selector in a
+text-independent form if he prefers -- an ast walk for the yield whose value
+calls `_handoff`.

@@ -983,9 +983,17 @@ class Session:
         """
         with self._settlement:
             if self._closed:
-                # The close won. Nothing crosses, and the retained refusal it
+                # The close won, so NOTHING CROSSES and the retained refusal it
                 # recorded is this client's one answer.
-                return None
+                #
+                # Empty bytes rather than None, and the difference is not
+                # cosmetic: a consumer writes what the reader yields, and on a
+                # byte stream `b""` IS nothing -- it writes zero bytes and
+                # needs no special case. `None` would make every consumer,
+                # including a reviewer's, carry a check it never needed before,
+                # and one that forgets it gets a TypeError in place of a
+                # refusal.
+                return b""
             self._settling.discard(identity)
             self._settling_key.pop(identity, None)
             return raw
