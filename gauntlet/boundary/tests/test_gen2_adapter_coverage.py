@@ -63,7 +63,24 @@ def test_the_operations_this_adapter_implements_are_written_down():
     assert adapter.IMPLEMENTED == frozenset({
         "send_file", "await_primary_terminal",
         "assert_no_rpc_response_to_notification_or_borrowed_id",
-        "assert_zero_upstream_copies", "await_client_error", "await_error"})
+        "assert_zero_upstream_copies", "await_client_error", "await_error",
+        # Added with its implementation and tests. The opcode is NOT the unit
+        # of capability for it: `SUPPORTED_EVENTS` is pinned separately below,
+        # because this mediator emits three of the contract's seven events.
+        "await_event"})
+
+
+def test_the_events_this_adapter_can_answer_are_written_down():
+    """Pinned beside IMPLEMENTED, because the opcode alone would overstate it.
+
+    `await_event` is implemented, but a schedule naming an event this mediator
+    never emits is refused at plan time. Growing this set means the mediator
+    started emitting something, which is a deliberate change to
+    `proxy/passthrough.py` and belongs in that commit, not this one.
+    """
+    assert adapter.SUPPORTED_EVENTS == frozenset({
+        "SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED"})
+    assert adapter.SUPPORTED_EVENT_ACTORS == frozenset({"proxy"})
 
 
 def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
