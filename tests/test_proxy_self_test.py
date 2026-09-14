@@ -17,6 +17,8 @@ skipped-invocation must each FAIL, because an instrument that cannot notice a
 broken detector is not evidence that the detector works.
 """
 import json
+import pathlib
+import sys
 
 import pytest
 
@@ -82,3 +84,95 @@ def test_the_block_check_reads_the_envelope_and_not_just_the_absence(tmp_path):
     assert envelope["error"]["message"] == "SUNGLASSES_WITHHELD"
     assert envelope["error"]["data"]["reason_code"] == "PROHIBITED_SECRET"
     assert checks["s2_block_schema"] == "PASS"
+
+
+# ── the instrument has to be able to fail ────────────────────────────────
+#
+# Every test above asserts PASS against a working proxy, and a mutation that
+# simply removes a check still passes those, because the real system genuinely
+# passes. Eight mutations of the self test survived on exactly that. The fix is
+# the lane's own rule, applied to the instrument: ship a check only after
+# seeing it fail.
+
+FAKES = str(pathlib.Path(__file__).resolve().parent / "fakes")
+
+
+def _fake(name):
+    return [sys.executable, str(pathlib.Path(FAKES) / name)]
+
+
+def test_it_fails_against_a_proxy_that_mediates_nothing(tmp_path):
+    """The protected payload reaches the server. Any self test that still says
+    PASS is measuring nothing."""
+    ok, checks = doctor.live_self_test(root=tmp_path, keep=True,
+                                       proxy_argv=_fake("passthrough_proxy.py"))
+    assert ok is False
+    assert checks["s2_block_schema"] == "FAIL"
+    assert doctor.SELF_TEST_SECRET.encode() in \
+        (tmp_path / "selftest.ingress").read_bytes()
+
+
+def test_it_fails_against_a_proxy_that_forwards_nothing(tmp_path):
+    """The other half. A mediator that blocks everything is unusable, and an
+    instrument that calls it healthy cannot tell the two failures apart."""
+    ok, checks = doctor.live_self_test(root=tmp_path,
+                                       proxy_argv=_fake("blocking_proxy.py"))
+    assert ok is False
+    assert checks["s1_forward_byte_equal"] == "FAIL"
+
+
+def test_the_controls_trip_when_the_instrument_is_broken(tmp_path):
+    """R1's controls are graded against the same reading the checks use, so a
+    passthrough proxy must make constant_allow PASS, which invalidates the
+    whole run."""
+    doctor.live_self_test(root=tmp_path,
+                          proxy_argv=_fake("passthrough_proxy.py"))
+    controls = doctor.last_controls()
+    assert controls["constant_allow"] == "PASS"
+    assert doctor.self_test_valid(controls) is False
+
+
+def test_it_fails_against_a_proxy_that_lies_about_withholding(tmp_path):
+    """The case the far-side reading exists for, and the only one that proves
+    the self test is not grading itself. This proxy returns a correctly shaped
+    SUNGLASSES_WITHHELD envelope AND forwards every byte anyway."""
+    ok, checks = doctor.live_self_test(root=tmp_path, keep=True,
+                                       proxy_argv=_fake("lying_proxy.py"))
+    envelope = json.loads((tmp_path / "selftest.envelope").read_text())
+    assert envelope["error"]["data"]["reason_code"] == "PROHIBITED_SECRET", \
+        "the liar did not produce a convincing reply, so this proves nothing"
+    assert doctor.SELF_TEST_SECRET.encode() in \
+        (tmp_path / "selftest.ingress").read_bytes()
+    assert checks["s2_block_schema"] == "FAIL", "the reply was believed"
+    assert ok is False
+
+
+def test_it_fails_against_a_proxy_that_drops_without_answering(tmp_path):
+    """Absence alone is not enough. The payload never reaches the server here
+    and the client is left with no answer, which T6.R1 calls a hang."""
+    ok, checks = doctor.live_self_test(root=tmp_path, keep=True,
+                                       proxy_argv=_fake("silent_drop_proxy.py"))
+    assert doctor.SELF_TEST_SECRET.encode() not in \
+        (tmp_path / "selftest.ingress").read_bytes()
+    assert checks["s2_block_schema"] == "FAIL"
+    assert ok is False
+
+
+def test_the_deadline_check_fails_when_the_worker_answers_in_time(tmp_path):
+    """A check that has never been seen to fail is not a check."""
+    prompt = [sys.executable, "-c",
+              "import sys,json;sys.stdin.read();print(json.dumps({}))"]
+    _ok, checks = doctor.live_self_test(root=tmp_path, worker_argv=prompt)
+    assert checks["deadline"] == "FAIL"
+
+
+def test_a_self_test_that_cannot_run_reports_failure_not_a_pass(monkeypatch):
+    """default_self_test swallows the exception on purpose, and the one thing
+    it must never swallow it into is a PASS."""
+    def explode(*_a, **_kw):
+        raise RuntimeError("the artifact is not installed")
+
+    monkeypatch.setattr(doctor, "live_self_test", explode)
+    ok, checks = doctor.default_self_test()
+    assert ok is False
+    assert set(checks.values()) == {"FAIL"}

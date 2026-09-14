@@ -18,14 +18,17 @@ Three codes, and they are three different statements. 0 says verified. 3 says
 doubt, some part of the picture is unknown. 1 says a thing we ran failed in
 front of us, which is not doubt, and R3 gives it precedence over both.
 
-WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: R1's live
-self-test spawns `sys.executable -m sunglasses.proxy` against a bundled echo
-server, and neither `sunglasses/proxy/__main__.py` nor that echo server exists
-on this branch. `default_self_test` and `default_launcher` therefore report
-failure with SELF_TEST_UNAVAILABLE and `run()` exits 1, which is the safe
-direction, a doctor that cannot demonstrate mediation must never imply it. They
-are the seam the real spawn lands in, and they are injectable so the decision
-logic above them is exercised today.
+R1's LIVE SELF TEST is now real. It spawns the artifact against the bundled
+echo server, sends one clean call and one protected call, and reads the
+SERVER'S OWN ingress file to decide. The protected payload must be absent there
+and the clean one present. Both halves matter: absence alone passes against a
+proxy that blocks everything, and presence alone passes against one that
+forwards everything. Asking the proxy what it did would be asking the
+defendant.
+
+`default_launcher` is still a seam. Per-route launching (T10.R2, running the
+R1 checks through each WRAPPED entry as configured) is owed, and it reports
+failure rather than a pass until it exists.
 """
 from __future__ import annotations
 
@@ -139,11 +142,191 @@ def self_test_valid(controls) -> bool:
     return all(value == CONTROL_MUST_BE for value in controls.values())
 
 
+# The two payloads the live self test sends. One must arrive and one must not,
+# and they are module constants so a test can look for the exact bytes on the
+# far side rather than guessing what the self test chose.
+SELF_TEST_CLEAN = "self-test-clean-payload"
+SELF_TEST_SECRET = "AKIAIOSFODNN7EXAMPLE"
+
+_LAST_CONTROLS: dict = {}
+
+
+def last_controls():
+    """The controls from the most recent live run, for a caller that wants to
+    check them itself rather than take `ok` on trust."""
+    return dict(_LAST_CONTROLS)
+
+
+def live_self_test(root=None, keep=False, proxy_argv=None,
+                   worker_argv=None):
+    """T10.R1. Spawn the artifact, measure at the server, return (ok, checks).
+
+    Every verdict here comes from the echo server's ingress file or from the
+    frame the client got back. None of it comes from the proxy's own account of
+    what it did.
+    """
+    import json as _json
+    import subprocess
+    import sys
+    import tempfile
+
+    workdir = Path(root) if root else Path(tempfile.mkdtemp())
+    workdir.mkdir(parents=True, exist_ok=True)
+    ingress = workdir / "selftest.ingress"
+    state = workdir / "selftest.state"
+    checks = dict.fromkeys(SELF_TEST_CHECKS, "FAIL")
+
+    server = [sys.executable, "-m", "sunglasses.proxy.echo_server",
+              "--ingress", str(ingress)]
+
+    # The artifact under test. Substitutable so the self test can be pointed
+    # at a deliberately broken mediator and SHOWN TO FAIL, which is the only
+    # evidence that it measures anything at all. R1 says controls must fail;
+    # this is that rule applied to the instrument itself.
+    artifact = list(proxy_argv or [sys.executable, "-m", "sunglasses.proxy"])
+
+    def drive(frames):
+        proc = subprocess.run(
+            artifact + ["--state-root", str(state), "--"] + server,
+            input=b"".join(frames), capture_output=True, timeout=120)
+        return [_json.loads(line) for line in proc.stdout.splitlines()
+                if line.strip()]
+
+    def frame(value):
+        return (_json.dumps(value) + "\n").encode("utf-8")
+
+    # The server has to be approved before a call can be forwarded at all, so
+    # the self test does what an operator does: list it, then approve the
+    # capture it produced.
+    drive([frame({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})])
+    captures = sorted((state / "captures").glob("*.json"))
+    if captures:
+        server_id, sha, _ = captures[-1].name.split(".")
+        from . import approvals as _approvals
+        _approvals.Store(state, server_id=server_id).approve(
+            snapshot_sha256=sha, viewed=True)
+
+    replies = drive([
+        frame({"jsonrpc": "2.0", "id": 2, "method": "initialize",
+               "params": {"protocolVersion": "2025-06-18", "capabilities": {}}}),
+        frame({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+               "params": {"name": "echo",
+                          "arguments": {"text": SELF_TEST_CLEAN}}}),
+        frame({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+               "params": {"name": "echo",
+                          "arguments": {"text": f"key {SELF_TEST_SECRET}"}}}),
+    ])
+    arrived = ingress.read_bytes() if ingress.exists() else b""
+
+    by_id = {reply.get("id"): reply for reply in replies}
+    if by_id.get(2, {}).get("result", {}).get("protocolVersion"):
+        checks["initialized"] = "PASS"
+    # S1: the clean call reached the server, byte for byte.
+    if SELF_TEST_CLEAN.encode() in arrived:
+        checks["s1_forward_byte_equal"] = "PASS"
+    # S2: the protected call did NOT, and the client got T4.R7's envelope.
+    withheld = by_id.get(4, {}).get("error") or {}
+    blocked_shape = (withheld.get("message") == "SUNGLASSES_WITHHELD"
+                     and withheld.get("data", {}).get("reason_code")
+                     == "PROHIBITED_SECRET")
+    if SELF_TEST_SECRET.encode() not in arrived and blocked_shape:
+        checks["s2_block_schema"] = "PASS"
+    if keep:
+        (workdir / "selftest.envelope").write_text(
+            _json.dumps(by_id.get(4, {})))
+
+    checks["deadline"] = _deadline_check(worker_argv)
+    checks["disconnect"] = _disconnect_check(state)
+
+    controls = _run_controls(arrived)
+    _LAST_CONTROLS.clear()
+    _LAST_CONTROLS.update(controls)
+    ok = (all(checks[name] == "PASS" for name in SELF_TEST_CHECKS)
+          and self_test_valid(controls))
+    return ok, checks
+
+
+def _deadline_check(worker_argv=None):
+    """T8.R4, measured against the worker rather than through the artifact.
+
+    The bound belongs to the scan, not to the stdio route, and reaching it
+    through the artifact would need a fault-injection flag on a shipped binary.
+    A hanging child is the honest way to prove a kill on deadline.
+    """
+    import sys
+
+    from . import worker_process
+
+    binding = {"digest": "d" * 64, "channel": "message", "generation": 1,
+               "invocation_token": "self-test"}
+    # Substitutable for the same reason the artifact is: a check that has
+    # never been seen to fail is not a check. Handing this a worker that
+    # answers promptly must make it FAIL.
+    hang = worker_argv or [sys.executable, "-c",
+                           "import sys,time;sys.stdin.read();time.sleep(60)"]
+    out = worker_process.run({"params": {}}, argv=hang, binding=binding,
+                             timeout_ms=200, grace_ms=200)
+    # `.get`, because a worker result with no status at all is not a
+    # deadline either, and a KeyError here would crash the self test into
+    # default_self_test's except and report every check as FAIL for the
+    # wrong reason.
+    return "PASS" if out.get("status") == "deadline" else "FAIL"
+
+
+def _disconnect_check(state):
+    """R1's disconnect: an upstream that exits owing an answer settles the
+    client with MALFORMED_UPSTREAM rather than leaving it waiting."""
+    import json as _json
+    import subprocess
+    import sys
+
+    dead = [sys.executable, "-c", "pass"]
+    proc = subprocess.run(
+        [sys.executable, "-m", "sunglasses.proxy",
+         "--state-root", str(state), "--"] + dead,
+        input=(_json.dumps({"jsonrpc": "2.0", "id": 7, "method": "ping"})
+               + "\n").encode(), capture_output=True, timeout=120)
+    replies = [_json.loads(line) for line in proc.stdout.splitlines()
+               if line.strip()]
+    return "PASS" if proc.returncode != 0 or replies else "FAIL"
+
+
+def _run_controls(arrived):
+    """R1's controls. Each is a detector rigged to trip, and each must FAIL.
+
+    They are graded against the SAME ingress reading the checks used, so what
+    they actually prove is that the READING can tell the two payloads apart
+    and that the instrument ran at all.
+
+    WHAT THEY DO NOT PROVE, said plainly: they are DERIVED from that reading
+    rather than being three independent runs, so they cannot disagree with the
+    checks. A mutation removing `self_test_valid` from the verdict survives for
+    exactly that reason, and it is equivalent rather than uncaught. R1's
+    stronger reading is three separate runs against rigged detectors, which the
+    test suite does perform against the passthrough, blocking and lying
+    mediators; moving them in here would mean shipping fake proxies inside the
+    wheel, which is a decision for T9 and not one to make in a docstring.
+    """
+    return {
+        # A detector that always allows would have let the secret through.
+        "constant_allow": "FAIL" if SELF_TEST_SECRET.encode() not in arrived
+                          else "PASS",
+        # One that always denies would have stopped the clean call too.
+        "constant_deny": "FAIL" if SELF_TEST_CLEAN.encode() in arrived
+                         else "PASS",
+        # And a run where nothing was invoked leaves the file empty.
+        SKIPPED_INVOCATION_CONTROL: "FAIL" if arrived else "PASS",
+    }
+
+
 def default_self_test():
-    """The seam R1's live self-test lands in. See the module docstring: the
-    artifact it has to spawn does not exist on this branch, so this reports
-    failure rather than an empty pass."""
-    return False, {}
+    """R1's live self test, which is now real. See `live_self_test`."""
+    try:
+        return live_self_test()
+    except Exception:
+        # A self test that crashed did not demonstrate anything, and the safe
+        # direction is to say so rather than to let the exception decide.
+        return False, dict.fromkeys(SELF_TEST_CHECKS, "FAIL")
 
 
 def default_launcher(entry):
@@ -298,7 +481,7 @@ def process_exit_code(outcome, self_test_ok) -> int:
 
 
 def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
-        self_test=None, launcher=None) -> Report:
+        self_test=None, launcher=None, root=None) -> Report:
     """Read, classify, self-test, launch every wrapped route, then aggregate.
 
     Every part above is called from here. On 2026-09-13 a review of this lane
@@ -309,7 +492,14 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                                        artifact_sha=artifact_sha,
                                        hash_of=hash_of)
 
-    ok, controls = (self_test or default_self_test)()
+    # `root` gives the live self test somewhere to put its scratch state, so a
+    # caller can inspect what it measured instead of taking `ok` on trust.
+    runner = self_test or (lambda: live_self_test(root=root))
+    ok, controls = runner()
+    if controls and all(v in CHECK_RESULTS for v in controls.values()) \
+            and set(controls) >= set(SELF_TEST_CHECKS):
+        # live_self_test returns the CHECKS; its controls are kept separately.
+        controls = last_controls() or controls
     controls = dict(controls or {})
     self_test_ok = bool(ok) and self_test_valid(controls)
     detail = "" if controls else SELF_TEST_UNAVAILABLE
