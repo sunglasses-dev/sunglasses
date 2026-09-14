@@ -194,7 +194,16 @@ def observed_route_call(transcript):
     return found
 
 
-def route_call(run_dir, route, transcript):
+DIRECT_ROUTE = "direct_second_server"
+DIRECT_INGRESS = "native.ingress.jsonl"
+
+
+def _route_server(variant) -> str:
+    """The MCP server key this variant's declared route names."""
+    return "direct" if variant.get("route") == DIRECT_ROUTE else "fs"
+
+
+def route_call(run_dir, route, transcript, variant=None):
     """The call this row was actually driven with, and what attests it.
 
     ATTESTED INGRESS ON A MEDIATED ROUTE, never a transcript. ASTRA's
@@ -210,6 +219,15 @@ def route_call(run_dir, route, transcript):
     the transcript and the receipt says which one it got: a reader is never
     handed a transcript under the name of an arrival.
     """
+    if variant is not None and variant.get("route") == DIRECT_ROUTE:
+        # THE DIRECT ROUTE ATTESTS ITSELF. No proxy receipt is expected on a
+        # route that is defined by not passing the mediator, so asking the
+        # mediator recorded a real native write, which succeeded and deposited
+        # its 21 bytes, as no invocation and INVALID_STIMULUS. The route's own
+        # captured ingress is the arrival record. Absent capture is still no
+        # attestation; the transcript is never consulted here either.
+        return _frame_call(pathlib.Path(run_dir) / DIRECT_INGRESS), "direct_route_ingress"
+
     if route != "control":
         receipts = pathlib.Path(run_dir) / "proxy.receipts.jsonl"
         if not receipts.is_file():
@@ -237,6 +255,26 @@ def route_call(run_dir, route, transcript):
         return (found, "proxy_ingress") if found else (None, None)
     call = observed_route_call(transcript)
     return (call, "client_transcript") if call else (None, None)
+
+
+def _frame_call(path: pathlib.Path):
+    """The last `tools/call` in a raw JSON-RPC wire capture, or None."""
+    if not path.is_file():
+        return None
+    found = None
+    for line in path.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue
+        if message.get("method") != "tools/call":
+            continue
+        params = message.get("params") or {}
+        found = {"name": params.get("name"), "id": message.get("id"),
+                 "arguments": params.get("arguments") or {}}
+    return found
 
 
 def call_claude(run_dir, prompt, config, *, dry_run, allowed):
@@ -294,7 +332,13 @@ def _delivered(blocks):
 
 
 def _fs_tool_invoked(transcript, tool):
-    """A tool_use naming the MCP tool AND no permission denial for it."""
+    """A tool_use naming the MCP tool AND no permission denial for it.
+
+    Matched against the SERVER THIS ROW WAS DRIVEN AT, taken from `tool`. It was
+    hardcoded to `mcp__fs__`, so a real direct-route call that succeeded and
+    deposited its bytes was recorded as no invocation at all.
+    """
+    prefix = tool.rsplit("__", 1)[0] + "__" if tool else "mcp__fs__"
     if not transcript or not pathlib.Path(transcript).exists():
         return False
     attempted = denied = False
@@ -306,7 +350,7 @@ def _fs_tool_invoked(transcript, tool):
         message = event.get("message") if isinstance(event, dict) else None
         for block in (message or {}).get("content") or []:
             if isinstance(block, dict) and block.get("type") == "tool_use" \
-                    and str(block.get("name", "")).startswith("mcp__fs__"):
+                    and str(block.get("name", "")).startswith(prefix):
                 attempted = True
             if isinstance(block, dict) and block.get("type") == "tool_result":
                 text = json.dumps(block.get("content"))
@@ -481,7 +525,11 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
         # UnboundLocalError before it was even defined, which is the honest
         # shape of the mistake: settling a charge that does not exist.
         return row
-    tool = f"mcp__fs__{params.get('name', 'read_text_file')}"
+    # THE SERVER THE VARIANT DECLARES. `mcp__fs__` was built for every row, so
+    # G2-12, whose whole question is a call that reaches the upstream without
+    # passing the mediator, was driven at the mediated server. Adding the direct
+    # tools to the allow list did not select the route; this does.
+    tool = f"mcp__{_route_server(variant)}__{params.get('name', 'read_text_file')}"
     arguments = params.get("arguments") or {"path": str(run_dir / "payload.txt")}
     prompt = driver_prompt(run_dir, tool, arguments)
     row = {"call": call_no, "scenario_id": entry["id"], "variant": variant["name"],
@@ -556,7 +604,8 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
     # leaf, and a row whose stimulus was not what the package specifies is not a
     # result about the product at all. This is the check whose absence let an
     # empty write be published as a detector gap.
-    observed_call, attested_by = route_call(run_dir, route, row.get("transcript"))
+    observed_call, attested_by = route_call(run_dir, route, row.get("transcript"),
+                                            variant)
     stimulus = fidelity.compare(request, observed_call)
     row["stimulus"] = {**stimulus.as_receipt(), "attested_by": attested_by}
     (run_dir / "stimulus.receipt.json").write_text(
