@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+import uuid
 import time
 
 from . import framing
@@ -209,6 +210,10 @@ class Session:
         self._causes: dict = {}        # id -> [Cause], first recorded first
         self._settled: dict = {}       # id -> Cause it was settled with
         self._admitting = True
+        # The salt that makes an item token opaque between sessions. Random per
+        # session rather than derived from anything, so two receipts cannot be
+        # joined on it even by someone who knows how it is built.
+        self.run_id = uuid.uuid4().hex
         self._torn_down = None
         self._tearing_down = False
         self._closed = False
@@ -281,11 +286,16 @@ class Session:
             stored = cause.frozen()
             self._causes.setdefault(request_id, []).append(stored)
             self._emit("CAUSE_RECORDED", request_id, **stored.as_receipt())
-            return stored
+            # A SEPARATE COPY GOES OUT. Returning the stored object hands the
+            # caller a reference to the record itself. `frozen()` stops the
+            # attributes being reassigned and leaves a mutable detail reachable
+            # through them, so `exposed.detail["indices"].append(2)` edited the
+            # stored cause. Freezing the shell is not freezing the contents.
+            return stored.frozen()
 
     def causes(self, request_id):
         with self._lock:
-            return list(self._causes.get(request_id, []))
+            return [cause.frozen() for cause in self._causes.get(request_id, [])]
 
     def terminal_cause(self, request_id):
         """T4.R4 Rule A: the FIRST recorded fault, not the most recent one.
@@ -449,7 +459,16 @@ class Session:
         supervisor = stop_processes if stop_processes is not None else self._pending_supervisor
         if supervisor is not None and not self._closed:
             self._pending_supervisor = supervisor
-            supervisor()                # raises out of teardown, nothing claimed
+            stopped = supervisor()      # raises out of teardown, nothing claimed
+            if stopped is False:
+                # A SUPERVISOR THAT SAYS FALSE HAS NOT STOPPED ANYTHING, and
+                # `stop_group` returns exactly that when it could not signal a
+                # group. Treating a returned value as success because no
+                # exception was raised is the same error as reading an exit code
+                # instead of a result, which this package has now made twice.
+                # Nothing is claimed and nothing is handed back.
+                self._emit("SUPERVISOR_INCOMPLETE", None)
+                return {}
             self._pending_supervisor = None
         if self._closed:
             # V03. Closure is announced once. A retry after a successful close
@@ -483,6 +502,33 @@ class Session:
         because 4 and "4" are different ids and the contract requires the
         distinction to survive.
         """
-        self.events.append({"seq": len(self.events), "mono": time.monotonic(),
-                            "kind": kind, "item": _item_digest(request_id),
-                            "item_type": type(request_id).__name__, **fields})
+        self.events.append({
+            "seq": len(self.events),
+            "mono": time.monotonic(),
+            # T9's schema. `mono_ns` because two events inside one millisecond
+            # are ordinary and a duration between them should not round to
+            # zero; `wall` beside it because that is what a human correlates
+            # against everything else.
+            "mono_ns": time.monotonic_ns(),
+            "wall": time.time(),
+            "kind": kind,
+            "item": self._item_token(request_id),
+            "id_token": self._item_token(request_id),
+            "id_type": type(request_id).__name__,
+            "item_type": type(request_id).__name__,
+            **fields})
+
+    def _item_token(self, request_id):
+        """Opaque, and opaque ACROSS SESSIONS as well as within one.
+
+        A bare digest of the id is stable everywhere, so the same id yields the
+        same token in every run and anyone holding two receipts can join them
+        and recover which requests were the same. Salting with the run id keeps
+        the token correlatable inside a session, which is what a reader needs,
+        and useless between them, which is what a peer-supplied id deserves.
+        """
+        if request_id is None:
+            return None
+        raw = f"{self.run_id}:{type(request_id).__name__}:{request_id!r}"
+        return hashlib.sha256(
+            raw.encode("utf-8", "surrogatepass")).hexdigest()[:16]

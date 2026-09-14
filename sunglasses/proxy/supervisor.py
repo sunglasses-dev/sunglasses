@@ -46,8 +46,16 @@ def _signal_group(pgid, sig):
         os.killpg(pgid, sig)
         return True
     except OSError as failed:
-        if failed.errno in (errno.ESRCH, errno.EPERM):
-            return False
+        if failed.errno == errno.ESRCH:
+            return False                  # nothing there, which is the goal
+        if failed.errno == errno.EPERM:
+            # EPERM IS NOT ABSENCE. It means the group EXISTS and we are not
+            # allowed to signal it, which is the opposite of what this function
+            # was reporting: lumping it with ESRCH made `_group_alive` answer
+            # "gone" for a group that is running and beyond our reach, so
+            # `stop_group` returned True having stopped nothing. A teardown that
+            # cannot kill must say so.
+            raise
         raise
 
 
@@ -103,8 +111,30 @@ def _collect(handle, timeout=1.0):
         pass
 
 
-def _group_alive(pgid):
-    return _signal_group(pgid, 0)
+def _group_alive(pgid, handle=None):
+    """Is anything still there, with EPERM disambiguated rather than guessed.
+
+    EPERM IS AMBIGUOUS ON macOS AND I HAD IT WRONG IN BOTH DIRECTIONS. First I
+    lumped it with ESRCH, so a group we are not allowed to signal read as gone
+    and `stop_group` claimed success having stopped nothing. Then I made it mean
+    "exists", and the ordinary path broke: on macOS, probing a group whose only
+    remaining member is a ZOMBIE raises EPERM too, which is the state
+    immediately after a successful kill and before the reap.
+
+    So the errno alone cannot answer it and the handle is what disambiguates.
+    If we own the process and it has exited, the EPERM is our own corpse and the
+    group is stopped. If we do not own it, or it has not exited, EPERM means
+    something is there that we cannot touch, and a teardown may not call that
+    success.
+    """
+    try:
+        return _signal_group(pgid, 0)
+    except PermissionError:
+        if handle is not None:
+            _reap(handle)
+            if handle.poll() is not None:
+                return False              # our zombie, already collected
+        raise
 
 
 def stop_group(pid, *, grace_ms=2000, poll_ms=25, handle=None):
@@ -124,30 +154,46 @@ def stop_group(pid, *, grace_ms=2000, poll_ms=25, handle=None):
     """
     pgid = _group_of(pid)
 
-    _signal_group(pgid, signal.SIGTERM)
-    deadline = time.monotonic() + grace_ms / 1000
-    while time.monotonic() < deadline:
-        _reap(handle)
-        if not _group_alive(pgid):
-            # REAP AGAIN BEFORE RETURNING. The reap above ran a moment earlier
-            # and the exit can land between the two calls, which is exactly what
-            # happened: `stop_group` reported the group gone while the caller's
-            # handle still said the child was running. The postcondition is not
-            # "the group is empty", it is "the group is empty AND our child has
-            # been collected", so the last thing before claiming it is a reap.
-            _collect(handle)
-            return True
-        time.sleep(poll_ms / 1000)
+    def settled():
+        """True when the group is gone, False when it is not, None when EPERM
+        leaves the question open.
 
-    _signal_group(pgid, signal.SIGKILL)
-    # KILL cannot be caught, but the exit is still not instantaneous and the
-    # group is not gone until the kernel has finished with it.
-    deadline = time.monotonic() + 1.0
-    while time.monotonic() < deadline:
-        _reap(handle)
-        if not _group_alive(pgid):
-            _collect(handle)
-            return True
-        time.sleep(poll_ms / 1000)
+        Open is not the same as either answer, and collapsing it into one was
+        the bug in both directions: into False it claimed success over a group
+        we could not touch, into True it abandoned polling the instant a
+        just-killed child appeared as a zombie.
+        """
+        try:
+            return not _group_alive(pgid, handle)
+        except PermissionError:
+            return None
+
+    try:
+        _signal_group(pgid, signal.SIGTERM)
+    except PermissionError:
+        # T7.R2 needs to know whether the processes are stopped. They are not,
+        # and returning False rather than raising lets the caller record a
+        # teardown that did not complete instead of crashing inside one.
+        return False
+
+    for phase, budget in (("term", grace_ms / 1000), ("kill", 1.0)):
+        if phase == "kill":
+            try:
+                _signal_group(pgid, signal.SIGKILL)
+            except PermissionError:
+                return False
+        deadline = time.monotonic() + budget
+        while time.monotonic() < deadline:
+            _reap(handle)
+            done = settled()
+            if done is True:
+                # REAP AGAIN BEFORE RETURNING. The reap above ran a moment
+                # earlier and the exit can land between the two calls, so the
+                # postcondition is not "the group is empty" but "the group is
+                # empty AND our child has been collected".
+                _collect(handle)
+                return True
+            time.sleep(poll_ms / 1000)
+
     _collect(handle)
-    return not _group_alive(pgid)
+    return settled() is True
