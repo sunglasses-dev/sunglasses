@@ -344,12 +344,19 @@ KNOWN_PUBLIC_CANARIES: frozenset = frozenset({
     # in our clean corpus). A revoked key Truffle Security uses to demo
     # detection — it carries no EXAMPLE marker, so only enumeration clears it.
     "AKIAYVP4CIPPERUVIFXG",
-    # AWS's canonical documentation example, published across their own IAM and
-    # SDK docs for years. Not a live key and never was. It reached this list
-    # because the placeholder guard stopped matching EXAMPLE inside a token
-    # (STATE #54); it is a published vendor fixture, which is what this list is
-    # for, and the canary test asserts it still matches the AWS rule so it
-    # cannot rot into a wildcard.
+    # AWS's canonical documentation example. Not a live key and never was. It
+    # reached this list because the placeholder guard stopped matching EXAMPLE
+    # inside a token (STATE #54); it is a published vendor fixture, which is
+    # what this list is for, and the canary test asserts it still matches the
+    # AWS rule so it cannot rot into a wildcard.
+    #
+    # Vendor:   Amazon Web Services
+    # Document: Manage access keys for IAM users
+    #           https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+    # Read:     2026-09-14 — the page publishes it as "an access key ID (for
+    #           example, AKIAIOSFODNN7EXAMPLE)".
+    # Re-read on ship day per SHIP_MANUAL: a changed document retires the entry
+    # in the same ship.
     "AKIAIOSFODNN7EXAMPLE",
 })
 
