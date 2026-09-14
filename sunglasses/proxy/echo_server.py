@@ -6,18 +6,10 @@ server is a mock proves the mock agrees with us, and an echo whose output a
 test cannot predict exactly gives S1's byte equality check nothing to compare.
 
 The one deliberate feature is the ingress file. Every raw line this process
-receives is appended to the path given by `--ingress` and flushed immediately,
-so a test can read how many bytes of a protected payload arrived HERE rather
-than asking the proxy whether it withheld them. That reading is taken on the
-far side of the thing being measured, which is the whole reason it is
-trustworthy.
-
-It is an ARGUMENT and not an environment variable. This file ships inside the
-wheel, and `test_package_reads_no_undeclared_environment_variables` exists
-because an undeclared environment read in a shipped package is a switch nobody
-documented that anything in the process tree can flip. Declaring a fourth
-variable would have satisfied the guard; needing none satisfies the reason it
-is there.
+receives is appended to SUNGLASSES_ECHO_INGRESS and flushed immediately, so a
+test can read how many bytes of a protected payload arrived HERE rather than
+asking the proxy whether it withheld them. That reading is taken on the far
+side of the thing being measured, which is the whole reason it is trustworthy.
 """
 from __future__ import annotations
 
@@ -39,23 +31,10 @@ TOOLS = [{
 METHOD_NOT_FOUND = -32601
 
 
-def parse(argv):
-    """`--ingress PATH`, and nothing this file could read from the environment."""
-    argv = list(argv or [])
-    options = {}
-    index = 0
-    while index < len(argv):
-        if argv[index] == "--ingress" and index + 1 < len(argv):
-            options["ingress"] = argv[index + 1]
-            index += 2
-            continue
-        index += 1
-    return options
-
-
-def _ingress(path, raw):
+def _ingress(raw):
     """Append and flush. A buffered instrument reads as a zero when the process
     it is measuring is killed, which is exactly the case under test."""
+    path = os.environ.get("SUNGLASSES_ECHO_INGRESS")
     if not path:
         return
     with open(path, "ab") as handle:
@@ -97,13 +76,11 @@ def _ok(request_id, result):
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
-def main(argv=None, stdin=None, stdout=None):
-    options = parse(sys.argv[1:] if argv is None else argv)
-    ingress = options.get("ingress")
+def main(stdin=None, stdout=None):
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
     for raw in stdin:
-        _ingress(ingress, raw)
+        _ingress(raw)
         line = raw.strip()
         if not line:
             continue
