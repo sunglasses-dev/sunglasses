@@ -27,7 +27,7 @@ import hashlib
 import json
 import uuid
 
-from . import envelope, framing, inspection, policy, receipts, selector, worker
+from . import envelope, framing, policy, receipts, selector, worker
 
 CLIENT = "client"
 REQUEST = "request"
@@ -47,19 +47,15 @@ RULE_PROTOCOL = "S5"
 class Route:
     """One MCP client on stdin, one mediated server on the other side."""
 
-    def __init__(self, *, session, log, upstream_write, client_write,
-                 scan=None, catalog=None, approvals=None,
+    def __init__(self, *, session, log, upstream_write, client_write, scan,
+                 catalog=frozenset(), approvals=None,
                  descriptor_sha_for=None):
         self.session = session
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
-        # The real adapter by default. A route whose scan has to be supplied
-        # is a route that does nothing on its own, and the default being a test
-        # double is how a suite goes green over a product that never scanned.
-        self.scan = scan if scan is not None else inspection.scan
-        self.catalog = (frozenset(catalog) if catalog is not None
-                        else inspection.trusted_catalog())
+        self.scan = scan
+        self.catalog = frozenset(catalog)
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
 
@@ -132,8 +128,7 @@ class Route:
                 self._withhold(request_id, blocked, RULE_APPROVAL)
                 return
 
-        self._inspect(raw, message, method, request_id=request_id,
-                      is_request=True)
+        self._inspect(raw, message, method, request_id=request_id)
 
     # ── notifications ──────────────────────────────────────────────────────
 
@@ -147,11 +142,11 @@ class Route:
         if selector.zero_leaves_is_complete(method, message):
             self._release(raw, None)
             return
-        self._inspect(raw, message, method, request_id=None, is_request=False)
+        self._inspect(raw, message, method, request_id=None)
 
     # ── the held path ──────────────────────────────────────────────────────
 
-    def _inspect(self, raw, message, method, *, request_id, is_request):
+    def _inspect(self, raw, message, method, *, request_id):
         channel = selector.channel_for(method, REQUEST)
         params = message.get("params")
         params = params if isinstance(params, (dict, list)) else {}
@@ -173,10 +168,7 @@ class Route:
         if not self._record("SCAN_STARTED", method=method):
             return
 
-        # The INSPECTED SURFACE, not the frame. T2's client rows all name
-        # `params`, and handing the scan the whole message would inspect our
-        # own envelope and the id we are correlating on.
-        result = self.scan(params, channel=channel, binding=binding,
+        result = self.scan(message, channel=channel, binding=binding,
                            content_bytes=held_bytes)
         try:
             worker.validate(result, binding=binding,
@@ -194,16 +186,8 @@ class Route:
         # Handing it the raw frame makes `direction` and `is_request` absent,
         # the direction test false, and every outbound secret settles as the
         # weaker PROHIBITED_CONTENT while still looking blocked.
-        # A REQUEST IS A FRAME WITH AN `id` MEMBER, and `null` is a value that
-        # member can hold. This read `request_id is not None`, so a tools/call
-        # carrying `"id": null` -- which the caller reached through
-        # `if "id" in message` and treated as a request in every other respect
-        # -- was described here as a notification, and an engine secret heading
-        # out in it settled as the weaker PROHIBITED_CONTENT. The kind is
-        # decided by the caller that already knows it, not re-derived from a
-        # value that cannot tell absent from null.
         held = {"direction": REQUEST,
-                "is_request": is_request,
+                "is_request": request_id is not None,
                 "method": method}
         settlement = policy.settle(result, held=held,
                                    held_content_bytes=held_bytes)
