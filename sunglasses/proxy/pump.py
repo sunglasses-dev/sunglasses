@@ -62,32 +62,64 @@ _TEXT_KINDS = frozenset({"text"})
 _PROMPT_ROLES = frozenset({"user", "assistant"})
 
 
+def _text_block_is_complete(block):
+    """One content block, to the bottom.
+
+    A block is a discriminated union and the discriminant decides what else has
+    to be there. `{"type": "text"}` with no text and `{"type": "text", "text":
+    7}` are both a block that carries nothing a scanner can read, and an
+    inspection of either is vacuously clean.
+    """
+    if not isinstance(block, dict):
+        return False
+    kind = block.get("type")
+    if not isinstance(kind, str):
+        return False
+    if kind == "text":
+        return isinstance(block.get("text"), str)
+    if kind == "resource":
+        resource = block.get("resource")
+        if not isinstance(resource, dict) or not isinstance(
+                resource.get("uri"), str):
+            return False
+        # An embedded resource carries text or it carries bytes. Neither means
+        # the block names a resource and encloses nothing, which is a reference
+        # the client cannot follow and the scanner cannot read.
+        if "blob" in resource:
+            return isinstance(resource.get("blob"), str)
+        return isinstance(resource.get("text"), str)
+    # image and audio are refused as UNSUPPORTED_CONTENT by the selector, so
+    # the schema only insists they are shaped like content blocks at all.
+    return True
+
+
 def _member_is_complete(method, item):
     """One list member of one method's result, checked against its own shape."""
     if method == "tools/call":
-        kind = item.get("type")
-        if not isinstance(kind, str):
-            return False                      # a block of no kind
-        if kind in _TEXT_KINDS:
-            return isinstance(item.get("text"), str)
-        if kind == "resource":
-            resource = item.get("resource")
-            return (isinstance(resource, dict)
-                    and isinstance(resource.get("uri"), str))
-        # image and audio carry their bytes elsewhere and are refused as
-        # UNSUPPORTED_CONTENT by the selector rather than here, so the schema
-        # only insists they are shaped like content blocks at all.
-        return True
+        return _text_block_is_complete(item)
     if method == "tools/list":
         if not isinstance(item.get("name"), str):
             return False                      # a tool nobody can call
         schema = item.get("inputSchema")
-        return schema is None or isinstance(schema, dict)
+        # REQUIRED, an object, and typed. A tool whose input schema is absent,
+        # null or `{}` describes nothing about what it accepts, and an approval
+        # over that descriptor approves a shape nobody stated.
+        return isinstance(schema, dict) and isinstance(schema.get("type"), str)
     if method == "resources/read":
-        return isinstance(item.get("uri"), str)
+        if not isinstance(item.get("uri"), str):
+            return False
+        if "blob" in item:
+            return isinstance(item.get("blob"), str)
+        return isinstance(item.get("text"), str)
     if method == "prompts/get":
-        return (item.get("role") in _PROMPT_ROLES
-                and isinstance(item.get("content"), dict))
+        role = item.get("role")
+        # `in` on a frozenset raises TypeError for a list or a dict, and an
+        # unhashable role is exactly what an attacker sends to find out what
+        # happens. A traceback out of the reader is not a teardown: nothing is
+        # settled and the client is told nothing.
+        if not isinstance(role, str) or role not in _PROMPT_ROLES:
+            return False
+        return _text_block_is_complete(item.get("content"))
     return True
 
 
@@ -224,8 +256,22 @@ class Session:
                         "claims to answer")
             return None
 
-        self._pending.pop(identity)
-        self._answered.add(identity)
+        with self._settlement:
+            # RC09. ONE OWNER for removing a pending entry, and it is this
+            # lock. The shape check above takes real time, and an upstream that
+            # exits during it makes the watcher close the session and clear the
+            # table underneath us: the pop then raised KeyError out of the
+            # reader, which is not a teardown. Nothing is settled, the exit
+            # drain never runs, and the client that is still waiting receives
+            # not one frame but none.
+            #
+            # If the close won, it has already recorded this item's debt and
+            # the reader pays it on the way out. Delivering here as well would
+            # be the second answer T6.R1 forbids.
+            if self._closed or identity not in self._pending:
+                return None
+            self._pending.pop(identity)
+            self._answered.add(identity)
         self._core.settle(self._core_key(identity), Cause("CLEAN", "S1"))
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
@@ -282,10 +328,16 @@ class Session:
             # never reached it: a result with a version and capabilities and
             # NO serverInfo was accepted, which is the frame the whole session
             # identity is built on.
+            info = result.get("serverInfo") if isinstance(result, dict) else None
+            # serverInfo has to NAME the server and its version. An empty
+            # object satisfies "is a dict" and identifies nothing, and T1.R1
+            # builds the session identity out of exactly this.
             return (isinstance(result, dict)
                     and isinstance(result.get("protocolVersion"), str)
                     and isinstance(result.get("capabilities"), dict)
-                    and isinstance(result.get("serverInfo"), dict))
+                    and isinstance(info, dict)
+                    and isinstance(info.get("name"), str)
+                    and isinstance(info.get("version"), str))
         required = self._REQUIRED_RESULT_MEMBER.get(method)
         if required is None:
             return True
