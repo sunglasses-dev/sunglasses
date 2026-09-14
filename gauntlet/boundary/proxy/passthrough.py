@@ -30,6 +30,7 @@ import pathlib
 import re
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -362,13 +363,21 @@ class Passthrough:
         # deliberately not using, and a receipt that simply omits it cannot be
         # told from one where the worker said nothing at all.
         accepted = not (cancelled or terminated)
+        stdout_raw = collected.get("stdout") or b""
+        spill = {}
+        if len(stdout_raw) > WORKER_OUTPUT_LIMIT:
+            # NEVER SILENTLY SHORT. The receipt stays bounded and says it is
+            # bounded, and the whole output is on disk beside it so the evidence
+            # still exists for anyone who needs to check it.
+            spill = self._spill(request_id, stdout_raw)
         self._emit("WORKER_OUTPUT", request_id,
                    accepted=accepted,
                    discarded_reason=(REQUEST_CANCELLED if cancelled
                                      else SCAN_DEADLINE if terminated else None),
                    exit_code=exit_code,
-                   stdout_bytes=len(collected.get("stdout") or b""),
+                   stdout_bytes=len(stdout_raw),
                    stderr_bytes=len(collected.get("stderr") or b""),
+                   **spill,
                    stderr=_clip(collected.get("stderr")),
                    stdout=_clip(collected.get("stdout")))
         if not accepted:
@@ -462,6 +471,19 @@ class Passthrough:
                    detector=finding and {k: finding[k] for k in
                                          ("decision", "rule_ids", "blocked")})
         handle._settle(outcome)
+
+    def _spill(self, request_id, raw: bytes) -> dict:
+        """Write an over-long worker output beside the receipts and name it."""
+        digest = hashlib.sha256(raw).hexdigest()
+        target = ((self._receipts_path.parent if self._receipts_path
+                   else pathlib.Path(tempfile.gettempdir()))
+                  / f"worker.stdout.{digest[:16]}.bin")
+        try:
+            target.write_bytes(raw)
+        except OSError:
+            return {"stdout_truncated": True, "stdout_sha256": digest}
+        return {"stdout_truncated": True, "stdout_sha256": digest,
+                "stdout_path": str(target)}
 
     def _withheld(self, request_id, reason_code, elapsed_ms, payload,
                   inspection_complete: bool = False,
@@ -700,18 +722,22 @@ def _finding_of(raw):
     return None
 
 
-# Worker output is evidence, not a payload, and it is kept at a bounded size so
-# a chatty scanner cannot turn the receipt into the thing it was describing.
-_WORKER_OUTPUT_CLIP = 4096
+# Worker output is EVIDENCE, and evidence is kept whole. The old bound was 4,096
+# characters, so a 5,094 byte verdict reached the receipt as 4,109 and no grader
+# could compare it against anything. The concern behind that bound was real, a
+# chatty scanner turning the receipt into the thing it was describing, and it is
+# answered below by writing the whole output beside the receipts and naming it,
+# rather than by cutting the verdict in half.
+#
+# One MiB, which is not a size any verdict has: it is the point at which the
+# worker has stopped producing one.
+WORKER_OUTPUT_LIMIT = 1024 * 1024
 
 
 def _clip(raw):
     if not raw:
         return ""
-    text = raw.decode("utf-8", "replace")
-    if len(text) <= _WORKER_OUTPUT_CLIP:
-        return text
-    return text[:_WORKER_OUTPUT_CLIP] + f"...[{len(text) - _WORKER_OUTPUT_CLIP} more]"
+    return raw.decode("utf-8", "replace")
 
 
 def _kill_group(worker, grace: float) -> None:
@@ -1167,6 +1193,11 @@ def bounded_lines(source, limit):
     prefix so the caller still refuses it through the ordinary path rather than
     through an exception. The rest of that frame is drained and discarded, since
     it is the tail of something already refused.
+
+    Frames are yielded EXACTLY as they arrived, terminator included, so joining
+    them reproduces the stream. A final frame that carried no newline is yielded
+    without one, because inventing it would be the same mistake in the other
+    direction.
     """
     buffer = b""
     while True:
@@ -1178,7 +1209,11 @@ def bounded_lines(source, limit):
         buffer += chunk
         while b"\n" in buffer:
             line, buffer = buffer.split(b"\n", 1)
-            yield line
+            # WITH ITS TERMINATOR. `split` drops the newline and the newline is
+            # on the wire, so every complete frame was recorded one byte short
+            # and so was every counter fed from it. A capture that cannot be
+            # joined back into the stream it came from is not a capture.
+            yield line + b"\n"
         if len(buffer) > limit:
             # Over the limit with no newline in sight. Hand the caller the
             # prefix to refuse and drop the rest of this frame.
