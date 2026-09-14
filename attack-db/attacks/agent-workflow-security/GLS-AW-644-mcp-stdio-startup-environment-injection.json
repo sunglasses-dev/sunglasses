@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-644",
+  "name": "MCP Stdio Startup Environment Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A workspace-controlled MCP stdio server configuration forwards interpreter/loader startup variables (NODE_OPTIONS, LD_PRELOAD, BASH_ENV) into the spawned child, so attacker code loads at process initialization before any MCP or model-level review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|defensive|unit\\s+test|fixture|incident\\s+report|postmortem|patched|fixed|must\\s+not|do\\s+not|never|blocked|rejected)\\b)(?=.*\\b(?:MCP|stdio|server\\s+configuration|workspace)\\b)(?=.*\\b(?:spawn(?:ed|ing)?|child\\s+process|process\\s+startup|launch(?:ed|ing)?)\\b)(?=.*\\b(?:NODE_OPTIONS|LD_PRELOAD|BASH_ENV|PYTHONSTARTUP|RUBYOPT|PERL5OPT)\\b)(?=.*\\b(?:execute|code\\s+injection|load|hook|startup)\\w*\\b)(?=.*\\b(?:environment|variable|env)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-644"
+}

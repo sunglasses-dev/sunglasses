@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-066",
+  "name": "Rendered HTML to persistent MCP registration",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled HTML rendered by an agent-facing browser is read as setup instructions, mutating local MCP configuration and auto-registering and launching a malicious STDIO server without user approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|defensive|remediation|patched|fixed|blocked|quarantined|must\\s+not|do\\s+not|never|scanner\\s+should)\\b)(?=.*\\b(?:rendered\\s+html|html\\s+page|attacker[- ]controlled\\s+html|web\\s+page|web\\s+content|browser\\s+content)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol)\\b)(?=.*(?:\\b(?:(?:local|workspace|user)\\s+)?mcp\\s+config(?:uration)?\\b|\\b(?:local|workspace|user)\\s+config(?:uration)?\\b|\\bmcp(?:\\.json|_config)\\b))(?=.*\\b(?:persist|write|modify|append|register|auto[- ]?register)\\w*\\b)(?=.*\\b(?:stdio|server|command|launch|execute|start)\\w*\\b)(?=.*(?:\\b(?:without|no)\\s+(?:user\\s+)?(?:approval|interaction|review|confirmation)\\b|\\bautomatically\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-066"
+}

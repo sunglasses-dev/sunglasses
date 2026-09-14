@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-653",
+  "name": "Stakeholder attribution evidence-binding conflict",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A structured web-agent result binds process-success to a seller/platform objective while dropping or contradicting the user-impact field, so a harmful action is recorded as a successful benign outcome.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|fixture|incident\\s+report|example|must\\s+not|do\\s+not|reject|quarantine|safe\\s+(?:parser|evaluator)|conflict(?:s|ed)?\\s+(?:are|is)\\s+(?:rejected|invalid))\\b)(?=.*\\b(?:stakeholder|affected[_ -]?entity|beneficiary)\\b)(?=.*\\b(?:user|customer|seller|platform)\\b)(?=.*\\b(?:objective|goal|benefit|revenue|commission|cost)\\b)(?=.*\\b(?:process[_ -]?status|action[_ -]?status|completed|success)\\b)(?=.*\\b(?:outcome|impact|harm|loss|cost|disclosed|hidden|suppressed)\\b)(?=.*\\b(?:conflict|mismatch|different|override|bind|attribute|assign|parse|select|ignore|suppress)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-653"
+}

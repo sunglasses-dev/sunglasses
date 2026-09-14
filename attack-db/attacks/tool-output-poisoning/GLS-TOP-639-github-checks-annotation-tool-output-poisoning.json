@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-639",
+  "name": "GitHub Checks Annotation Tool-Output Poisoning",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "GitHub Checks Annotation Tool-Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 gitHub Checks annotations in tool-output poisoning attacks.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|incident|vulnerability|training|runbook|reference|documentation|docs?)\\b.{0,150}?(?:detected|blocked|refused|flagged|reported|must\\s+be\\s+reported|not\\s+obeyed|should\\s+(?:report|detect|flag|refuse|block)|should\\s+never)|\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|treat|use|include|attach|forward|send|share|override|overrides?|trust)\\b|\\bnot\\s+(?:authoritative|canonical|definitive)\\b|\\bno\\s+(?:policy\\s+)?overrides?\\b|\\bannotations?\\s+are\\s+display\\s+metadata\\s+only\\b|\\bscanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block)))\n(?=.*(?:GitHub\\s+Checks?|Checks\\s+API|check_run|check_suite|check\\s+run\\s+annotations?|annotations?\\b|annotation_level|raw_details|pull\\s+request\\s+check\\s+annotations?|PR\\s+annotations?|inline\\s+annotations?|reviewdog|Danger\\s+PR\\s+annotation|file/line\\s+diagnostic))\n(?=.*(?:(?:AI|autonomous|security|dependency|code|PR|CI|assistant|review)\\s*(?:agents?|assistants?|scanners?|reviewers?|auditors?|bots?)\\b|\\b(?:agents?|assistants?|scanners?|reviewers?)\\b|(?:agent|assistant|scanner|reviewer)[._ -]?(?:instructions?|directive|policy|guidance|note)))\n(?=.*(?:authoritative|canonical|definitive|governing\\s+document|controlling\\s+document|(?:primary|single)\\s+source\\s+of\\s+truth|overrides?|overrules?|supersed(?:e|es|ed|ing)|outranks?|takes\\s+precedence|defines?\\s+(?:the\\s+)?(?:scanner|security|review|CI|dependency)?\\s*rules?|(?:main|primary|principal|preferred|recommended)\\s+(?:(?:CI|build|security|dependency|review|verification|audit|triage)\\s+){0,3}(?:operating\\s+)?(?:guidance|playbook|runbook|procedure|process|policy)|(?:agent|assistant|scanner|reviewer)\\s+(?:instructions?|directive|policy|guidance)))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|skip|silence|downplay|downgrade|deprioritize|demote|reclassify|route|place|put|move|shift|keep|leave|mark\\s+(?:failed\\s+)?checks?\\s+clean|mark\\s+.*(?:clean|safe|informational|non-blocking)|(?:do\\s+not|don't|not)\\s+report|include|attach|forward|send|share|provide|expose|collect|relay|pass\\s+along|hand\\s+off|transfer).{0,90}(?:findings?|warnings?|alerts?|reports?|results?|diagnostics?|observations?|checks?|failures?|CVE|CVEs|vulnerabilit(?:y|ies)|SAST|secret-scan|tokens?|secrets?|credentials?|auth\\s+headers?|authorization\\s+headers?|environment\\s+(?:variables?|context|details?|config(?:uration)?|state|settings?)|runtime\\s+(?:context|variables?|config(?:uration)?|settings?|proof|evidence|material|package)|local\\s+(?:state|config(?:uration)?|settings?)|CI\\s+(?:auth\\s+headers?|runtime|context)|build\\s+proof\\s+(?:evidence|material|package|bundle)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-639"
+}

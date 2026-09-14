@@ -1,0 +1,25 @@
+{
+  "id": "GLS-OCES-001",
+  "name": "OIDC Discovery Document Token Endpoint Substitution",
+  "version": "1.0",
+  "category": "oidc_credential_endpoint_substitution",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "OIDC Discovery Document Token Endpoint Substitution: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific OIDC discovery endpoint substitution vector with scope escalation is not covered.",
+  "keywords": [],
+  "regex": [
+    "(?i)token_endpoint[\"'\\s]*:[\"'\\s]*https?://\\S+\\s*[,}\\n][\\s\\S]{0,500}scopes?_supported[\\s\\S]{0,100}(?:admin|sudo|superuser|write:all)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-OCES-001"
+}

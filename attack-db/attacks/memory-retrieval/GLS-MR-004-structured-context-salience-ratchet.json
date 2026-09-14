@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-004",
+  "name": "Structured Context Salience Ratchet",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A multi-round adaptive interaction makes a defender reuse structured graph-risk context as a salience shortcut, producing asymmetric early refusal or an escalation blind spot instead of a fresh per-turn safety decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+(?:not|re)\\s*evaluate|do\\s+not\\s+(?:trust|reuse|promote)|safe\\s+handling|independent\\s+current[- ]turn\\s+evaluation|no\\s+(?:replay|bypass|skip))\\b)(?=.*\\b(?:multi[- ]round|multi[- ]turn|adaptive|replay(?:ed|ing)?)\\b)(?=.*\\b(?:graph[- ]context|graph\\s+fields?|structured\\s+(?:graph\\s+)?(?:context|fields?|risk(?:\\s+field)?|memory)|risk[_ -]?score|prior[_ -]?edge\\w*)\\b)(?=.*\\b(?:benign|fraud|attacker|hostile|transaction|defender|safety|evaluator)\\b)(?=.*\\b(?:accumulat|carry|reuse|persist|ratchet|history|previous|prior)\\w*\\b)(?=.*\\b(?:skip|skips|avoid|bypass|suppress|over[- ]?refus|fail(?:s)?\\s+to|without|instead\\s+of|rather\\s+than)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-004"
+}

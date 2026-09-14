@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-076",
+  "name": "HTTP Cache-Metadata Policy-Source Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "HTTP Cache-Metadata Policy-Source Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 targets HTTP caching protocol metadata and proofs as policy sources.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|\n  does\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|\n  never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|\n  must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|overrides?)|\n  should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)|\n  (?:security|scanner|training|incident|reference|guide|runbook)\\s+.{0,90}?\\b(?:reported|detected|blocked|flagged|refused|not\\s+obeyed)\\b|\n  no\\s+(?:agent\\s+)?policy\\s+overrides?\n)\\b)\n(?=.*(?:\n  Cache-Control|Cache-Status|CDN-Cache|CF-Cache-Status|X-Cache|Age\\s*:|ETag\\s*:|Last-Modified\\s*:|\n  stale-if-error|stale-while-revalidate|immutable|fwd\\s*=\\s*stale|origin\\s+revalidation|cached\\s+copy|edge\\s+cache|cache\\s+proof\n))\n(?=.*(?:\n  AI\\s+agents?|autonomous\\s+(?:scanners?|crawlers?|agents?)|security\\s+scanners?|crawlers?|agents?|assistants?|auditors?|verifiers?|\n  automated\\s+(?:cache\\s+)?(?:review|audit|scan|verification)|scanner\\s+instructions?|agent\\s+instructions?|for\\s+agents?\n))\n(?=.*(?:\n  canonical\\s+(?:cached\\s+)?copy|authoritative\\s+(?:cache|cached|edge)|(?:primary|single)\\s+source\\s+of\\s+truth|\n  do\\s+not\\s+(?:revalidate|refresh|fetch|compare|check)|skip\\s+(?:origin\\s+)?(?:revalidation|fetch|checks?)|trust\\s+(?:the\\s+)?(?:cache|cached\\s+copy|edge)|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,4}(?:stale|origin|cache|freshness|validator|mismatch|warnings?|findings?|observations?|diagnostics?|reports?)|\n  (?:warnings?|findings?|observations?|diagnostics?|mismatches?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|treated|classified|marked)|\n  (?:include|attach|forward|send|share|provide|pass\\s+along|hand\\s+off)\\s+(?:[\\w-]+\\s+){0,6}(?:Authorization\\s+headers?|Cookie|cookies?|session\\s+tokens?|API\\s+keys?|env(?:ironment)?\\s+(?:variables?|context|details?|settings?)|runtime\\s+(?:cache\\s+)?(?:context|proof|bundle|details?|material|evidence)|cache\\s+proof\\s+bundle)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-076"
+}

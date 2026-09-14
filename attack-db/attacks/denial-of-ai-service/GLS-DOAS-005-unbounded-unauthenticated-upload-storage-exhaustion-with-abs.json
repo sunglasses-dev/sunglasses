@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DOAS-005",
+  "name": "Unbounded unauthenticated upload storage exhaustion with absolute-path disclosure",
+  "version": "1.0",
+  "category": "denial_of_ai_service",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An unauthenticated upload endpoint accepts unlimited attacker data with no cumulative storage quota, exhausting the shared filesystem while its success response discloses the absolute uploaded-file path that downstream agents then treat as operational evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never|fixed|patched|safe|defensive guidance)\\b)(?=.*\\b(?:upload|file transfer|multipart|attachment)\\b)(?=.*\\b(?:unauthenticated|anonymous|no auth|no authentication|without auth(?:entication)?|no token)\\b)(?=.*\\b(?:unbounded|unlimited|no quota|no size limit|no storage cap|no cap|arbitrary amount)\\b)(?=.*\\b(?:disk|storage|space|exhaust|full|resource exhaustion|denial[- ]of[- ]service)\\b)(?=.*\\b(?:absolute path|absolute file path|full path|server path|path disclosure|information leak)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DOAS-005"
+}

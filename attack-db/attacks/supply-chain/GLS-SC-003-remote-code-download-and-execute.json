@@ -10,7 +10,7 @@
   "description": "Downloading remote code and executing it \u2014 classic RAT dropper behavior.",
   "keywords": [],
   "regex": [
-    "(?:curl\\s+-[A-Za-z]*[oL].*(?:\\|\\s*(?:bash|sh|python|node))|request\\.get\\(.*\\bwriteFileSync\\b.*\\bexec\\b|eval\\s*\\(\\s*Buffer\\.from)"
+    "(?:(?i:\\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\\b[\\s\\S]{0,200}?)curl\\s+-[A-Za-z]*[oL].*(?:\\|\\s*(?:bash|sh|python|node))|request\\.get\\(.*\\bwriteFileSync\\b.*\\bexec\\b|eval\\s*\\(\\s*Buffer\\.from)"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-007",
+  "name": "Browser History Continuity Laundering",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Browser-history visit telemetry is laundered into fake reviewer/source continuity so an AI agent backgrounds citation gaps and continues a release/change workflow.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-007"
+}

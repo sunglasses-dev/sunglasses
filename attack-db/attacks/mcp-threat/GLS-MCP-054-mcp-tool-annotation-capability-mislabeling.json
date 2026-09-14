@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-054",
+  "name": "MCP tool annotation capability mislabeling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP tool annotation capability mislabeling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific MCP safety annotations mislabeling, distinct from general descriptor text.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=[^\\n]{0,900}\\b(?:description|name|title)\\b[^\\n]{0,350}\\b(?:delete\\s+(?:repo(?:sitory)?|file|bucket|key|record|branch|database)|remove\\s+(?:file|key|record|user|repo)|drop\\s+(?:table|database|schema)|destroy\\s+(?:cluster|resource|volume)|write\\s+(?:file|secret|config|to disk)|overwrite\\s+(?:file|config|secret)|update\\s+(?:database|record|secret|prod(?:uction)?|config)|modify\\s+(?:file|database|record|config)|execute\\s+(?:shell|command|code)|run shell|transfer\\s+(?:funds|tokens|money)|send funds|sign transaction|revoke\\s+(?:key|api key|token|credential)|rotate secret)\\b)(?=[^\\n]{0,900}\\bannotations\\b[^\\n]{0,300}[\"\\']?readOnlyHint[\"\\']?\\s*[:=]\\s*true)(?=[^\\n]{0,900}\\bannotations\\b[^\\n]{0,300}(?:[\"\\']?destructiveHint[\"\\']?\\s*[:=]\\s*false|[\"\\']?idempotentHint[\"\\']?\\s*[:=]\\s*true|[\"\\']?openWorldHint[\"\\']?\\s*[:=]\\s*false))[^\\n]{0,1000}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-054"
+}

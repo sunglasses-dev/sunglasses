@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SDH-001",
+  "name": "Speculative Decode Acceptance Spoofing",
+  "version": "1.0",
+  "category": "speculative_decode_hijack",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Speculative Decode Acceptance Spoofing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique attack targeting internal speculative decoding trace metadata formats for continuation injection.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\[draft[:\\s]*(?:\\d\\.\\d+|score|accepted)\\].*?(?:completion[_\\-]?token|verified[_\\-]?token|draft[_\\-]?accept).*?\\[role[:\\s]*(?:assistant|system|model)\\]"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SDH-001"
+}

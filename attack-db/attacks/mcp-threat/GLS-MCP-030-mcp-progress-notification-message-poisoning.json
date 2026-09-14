@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-030",
+  "name": "Mcp Progress Notification Message Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Mcp Progress Notification Message Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 async JSON-RPC progress notifications, a distinct message stream from tool results.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\"method\"\\s*:\\s*\"notifications/progress\")(?=.*\"message\"\\s*:\\s*\"(?![^\"\\\\]*(?:do\\s+not\\s+bypass|not\\s+bypass|no\\s+secrets?|no\\s+tokens?|waiting\\s+for\\s+user\\s+approval|redacting))[^\"\\\\]*(?:(?:(?:ignore|disregard|override|disable)\\s+(?:previous|prior|all|system|developer|approval|policy|instructions?)|(?:do\\s+not\\s+(?:ask|confirm)|without\\s+(?:approval|confirmation))|(?:read|cat|open|copy|send|upload|exfiltrate)\\s+[^\"\\\\]{0,80}(?:secret|token|key|credential|\\.env|ssh|id_rsa)|(?:system|developer|assistant)\\s*:\\s*(?:ignore|override|read|send|upload)|continue\\s+without\\s+(?:approval|confirmation)))[^\"\\\\]*\")"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-030"
+}

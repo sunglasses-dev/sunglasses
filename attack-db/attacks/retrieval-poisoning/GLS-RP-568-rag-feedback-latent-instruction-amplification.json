@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-568",
+  "name": "RAG Feedback Latent Instruction Amplification",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A source-aware RAG loop re-ingests untrusted evaluation feedback as next-query control state, so a benign-looking first hop mutates the query and surfaces an attacker-planted latent instruction on a later hop.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:retrieval|rag|retrieved|source[- ]aware|next[- ]hop|feedback)\\b)(?=.*\\b(?:feedback|evaluation|reward|rank(?:ed|ing)?).{0,180}\\b(?:reinject|re[- ]?inject|reuse|promote|mutate|expand|continue).{0,180}\\b(?:query|search|retrieval|context|next[- ]hop)\\b)(?=.*\\b(?:latent|hidden|embedded|instruction|directive|secret|suppressed|reveal(?:ed|ing)?|safety review)\\b)(?!.*\\b(?:scanner|security training|incident report|blocked sample|negative fixture|must not|do not obey|quarantined)\\b.{0,180}\\b(?:reinject|re[- ]?inject|override|reveal|suppress)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-568"
+}

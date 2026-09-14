@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-681",
+  "name": "Consensus Correlation Evidence Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A shared prompt, retrieval snapshot, or model failure makes multiple HUMBR candidates agree on a hallucinated high-stakes clause; semantic/lexical consensus is then mistaken for independent evidence and promoted into an enterprise workflow.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs|unit test|test fixture|incident report|security guide|defensive|patched|fixed|mitigated|blocked|quarantined|must not|do not obey|never follow|safe example|training|requires independent verification)\\b)(?=.*(?:enterprise\\s+(?:legal|compliance|risk|privacy)|privacy\\s+compliance|privacy\\s+review|risk-management|legal\\s+clause|contract\\s+(?:record|workflow|review)))(?=.*(?:HUMBR|MBR\\s+candidate|minimum\\s+Bayes|semantic(?:ally)?\\s+and\\s+lexical|embedding\\s+similarity|lexical\\s+precision|candidate\\s+(?:clauses?|set)))(?=.*(?:same\\s+(?:prompt|retrieval|source|model|snapshot|document)|one\\s+(?:prompt|retriever)|shared\\s+(?:prompt|retrieval|source|failure)|correlated|not\\s+(?:statistically\\s+)?independent))(?=.*(?:consensus|agreement|unanimous|corroborat(?:e|ion)|all\\s+samples?))(?=.*\\b(?:approve|promot(?:e|ing)|select(?:ing)?|accept|admit|stor(?:e|ing)|publish)\\b.{0,220}(?:clause|contract|decision|claim|policy|finding|knowledge)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-681"
+}

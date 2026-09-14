@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-059",
+  "name": "Synthetic Task Reconstruction Poisoning",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A benchmark completion engine reconstructs a missing MPC task statement, and an agent persists attacker-shaped requirements that make a functionally passing patch appear security-safe while bypassing cryptographic and numerical review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|review|training|documentation)|unit\\s+test|negative\\s+fixture|blocked|quarantined|postmortem|defensive|incident\\s+report|must\\s+(?:not|reject|flag)|should\\s+(?:reject|flag)|safe\\s+example|scanner\\s+rule)\\b)(?=.*\\b(?:MPC[- ]?Patch[- ]?Bench|multi[- ]party\\s+computation|MPC)\\b)(?=.*\\b(?:synthesi[sz]ed|reconstruct(?:ed|ion)?|completion\\s+engine|generated)\\b)(?=.*\\b(?:task\\s+statement|issue\\s+description|(?:patch|task)\\s+requirements?|retrieved\\s+(?:task|record)|memory|RAG)\\b)(?=.*\\b(?:patch|code\\s+repair|fix)\\w*\\b)(?=.*\\b(?:cryptographic|constant[- ]time|secret[- ]sharing|numerical[- ]fidelity|security\\s+invariant)\\b)(?=.*\\b(?:functional|fail[- ]to[- ]pass|tests?\\s+pass|test\\s+suite)\\b)(?=.*\\b(?:shortcut|out[- ]of[- ]scope|waiv(?:e|ed|ing)|skip|bypass|no\\s+(?:need|requirement)|without)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-059"
+}

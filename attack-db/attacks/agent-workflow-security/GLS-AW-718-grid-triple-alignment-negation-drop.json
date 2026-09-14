@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-718",
+  "name": "Grid Triple Alignment Negation Drop",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A graph extraction result can look traceable and ontology-valid while a parser drops negation between the aligned CTI span and the normalized security triple, laundering a suppression relation into trusted evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|scanner\\s+rule|postmortem|blocked|quarantined|defensive\\s+example|must\\s+not\\s+accept|do\\s+not\\s+trust|inert)\\b)(?!.*(?:alignment[_ -]?status[\\\"']?\\s*[:=]\\s*[\\\"']?unverified|ontology[_ -]?valid[\\\"']?\\s*[:=]\\s*false|confidence[\\\"']?\\s*[:=]\\s*0\\.6|predicate[\\\"']?\\s*[:=]\\s*[\\\"']?report))(?=.*\\b(?:CTI|threat\\s+intelligence|article|source[_ -]?span|alignment(?:_status)?|source_span)\\b)(?=.*\\b(?:normalized|canonical)[_ -]*triple\\b)(?=.*\\b(?:negat(?:ed|ion)|not\\s+trusted|must\\s+not)\\b)(?=.*(?:negation\\s+(?:dropped|lost|removed)|(?:normalized|canonical)[^\\n]{0,100}\\bnegated\\b[^\\n]{0,30}\\bfalse\\b|[\\\"']negated[\\\"']\\s*[:=]\\s*false))(?=.*\\b(?:ontology[- _]?valid|confidence\\s*[:=]\\s*0\\.[89])\\b)(?=.*\\b(?:suppress|omit|downgrade|hide|silence|waive|mark\\s+(?:the\\s+)?(?:report|finding)[^\\n]{0,30}(?:clean|safe))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-718"
+}

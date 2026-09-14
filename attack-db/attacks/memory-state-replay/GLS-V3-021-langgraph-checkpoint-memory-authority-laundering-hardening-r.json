@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-021",
+  "name": "LangGraph checkpoint-memory authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "memory_state_replay",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "LangGraph checkpoint snapshots can launder replayed state into forged recovered operator clearance for release/deploy agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-021"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-126",
+  "name": "Wallet Deep-Link URI Parameter Shadowing",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Deep-Link URI Parameter Shadowing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 wallet deep-link/URI parameter shadowing and homoglyph attacks.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override)|does\\s+not\\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|override|overrides?)|never\\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override|overrides?)|must\\s+not\\s+(?:obey|follow|trust|apply|execute|include|attach|forward|send|share|report|override|overrides?)|(?:security\\s+training|scanner\\s+docs?|parser\\s+docs?|incident\\s+report).{0,140}?(?:detected|blocked|flagged|refused|reported|should\\s+(?:detect|flag|report|refuse|block))))\n(?=.*(?:ethereum:|bitcoin:|wc:|walletconnect|wallet\\s+(?:qr|uri|url|deep[-\\s]?link|app[-\\s]?link)|qr\\s+(?:wallet|payment|payload|decoded)|eip[-\\s]?681|payment\\s+uri|deeplink|deep[-\\s]?link|app[-\\s]?link|message=|label=|memo=|agent[-_]?policy=|wallet[-_]?policy=))\n(?=.*(?:duplicate\\s+(?:query\\s+)?(?:param(?:eter)?|key)|repeated\\s+(?:message|label|memo|param(?:eter)?)|last\\s+value\\s+wins|first\\s+value\\s+wins|parameter\\s+precedence|param(?:eter)?\\s+shadow(?:ing|ed)|homoglyph\\s+(?:key|param(?:eter)?)|percent[-\\s]?encoded\\s+(?:query|param)|base64\\s+(?:query|param)|url[-\\s]?decoded|decoded\\s+qr|canonicali[sz]ed\\s+params?|query\\s+normalization|appended\\s+query))\n(?=.*(?:wallet\\s+(?:agent|assistant|scanner|reviewer|copilot|auditor)|signing\\s+(?:agent|assistant|reviewer)|payment\\s+(?:agent|assistant)|transaction\\s+(?:agent|assistant)|agents?\\b|assistants?\\b|scanners?\\b))\n(?=.*(?:wallet|sign(?:ing|ature)?|transaction|transfer|payment|approval|allowance|spender|session|siwe|auth|human\\s+confirmation|confirmation|wallet\\s+warning|risk\\s+summary))\n(?=.*(?:authoritative|canonical|single\\s+source\\s+of\\s+truth|primary\\s+source\\s+of\\s+truth|overrides?|supersed(?:e|es|ed|ing)|highest\\s+priority|trusted\\s+guidance|mark\\s+(?:as\\s+)?(?:safe|routine)|safe\\s+to\\s+sign|fast[-\\s]?track|skip\\s+(?:extra\\s+)?confirmation|do\\s+not\\s+ask|(?:suppress|hide|omit|downgrade|redact)\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|risks?|findings?|reports?|allowance|spender|session|domain|slippage|confirmation)|(?:include|forward|send|attach|provide|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:tokens?|api\\s*keys?|secrets?|env(?:ironment)?\\s+(?:variables?|context)|local\\s+state|runtime\\s+(?:state|context)|authorization\\s+headers?|session\\s+cookies?)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-126"
+}

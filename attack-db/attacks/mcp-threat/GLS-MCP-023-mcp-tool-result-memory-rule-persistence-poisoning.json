@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-023",
+  "name": "MCP Tool-Result Memory-Rule Persistence Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP Tool-Result Memory-Rule Persistence Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 memory/rule persistence via specific MCP tool result structures.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+(?:training|guide|reference)|scanner\\s+docs?|defensive\\s+example|example\\s+of\\s+what\\s+not\\s+to\\s+do|quoted\\s+attack|do\\s+not\\s+(?:obey|follow|save|persist|store|write|trust|treat)|does\\s+not\\s+(?:obey|follow|save|persist|store|write|trust|treat|override|instruct)|never\\s+(?:obey|save|persist|store|write|trust|treat)|must\\s+not\\s+(?:obey|save|persist|store|write|trust|treat)|should\\s+(?:report|detect|flag|refuse|block|not\\s+\\w+|never\\b)).{0,160}?\\b(?:mcp|tool\\s+result|memory|project\\s+rules?)\\b)\n(?=.*(?:(?:mcp|tool)\\s+(?:result|response|output)|\"jsonrpc\"\\s*:\\s*\"2\\.0\"|\"result\"\\s*:|\"content\"\\s*:|\"structuredContent\"\\s*:|tool_call_id|server\\s+response))\n(?=.*(?:save|persist|store|write|record|remember|cache|promote|install|add|append|update|set)\\s+(?:[\\w-]+\\s+){0,5}(?:memory|memories|project\\s+rules?|agent\\s+rules?|continuity\\s+context|future-session\\s+policy|approved\\s+tools?|policy|instruction|guidance|operating\\s+context|session\\s+state))\n(?=.*(?:\n(?:override|supersede|outrank|ignore|bypass)\\s+(?:[\\w-]+\\s+){0,4}(?:system|developer|user|scanner|security)\\s+(?:rules?|instructions?|policy|checks?)|\n(?:suppress|hide|omit|exclude|downgrade|deprioritize|redact|skip|leave)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|vulnerabilities|CVE)|\n(?:forward|send|share|include|attach|provide|expose|copy|collect|relay|transmit)\\s+(?:[\\w-]+\\s+){0,6}(?:tokens?|API\\s+keys?|secrets?|credentials?|Authorization|cookies?|session|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?)|local\\s+(?:state|config(?:uration)?|settings?))|\n(?:future-session|next\\s+session|all\\s+future\\s+runs?).{0,80}?(?:trust|obey|follow|skip|suppress|hide|include|forward)\n))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-023"
+}

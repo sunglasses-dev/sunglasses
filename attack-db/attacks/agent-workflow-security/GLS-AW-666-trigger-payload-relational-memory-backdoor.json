@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-666",
+  "name": "Trigger Payload Relational Memory Backdoor",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A conversational attacker binds an entity-like trigger to a credential-forwarding payload so selective memory extraction preserves both, then a later mention activates the durable backdoor.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|negative\\s+fixture|incident\\s+report|blocked\\s+(?:payload|record)|defensive|must\\s+not|should\\s+not|never\\s+(?:activate|obey|forward|disclose|send|trust)|quarantined|safe\\s+target)\\b)(?=.*\\b(?:conversation(?:al)?\\s+memory|long[- ]term\\s+memory|retrieved\\s+memory|memory\\s+(?:entry|record)|memory\\s+extraction|selective\\s+memory)\\b)(?=.*\\b(?:named\\s+entity|entity\\s+[A-Z][\\w-]*|trigger(?:s|ed)?|trigger/payload|semantic\\s+(?:relational\\s+)?bridge)\\b)(?=.*\\b(?:payload|permanent\\s+(?:instruction|rule)|stored\\s+(?:rule|backdoor)|activate|bypass|skip\\s+confirmation|suppress\\s+(?:the\\s+)?security\\s+review)\\b)(?=.*\\b(?:session\\s+(?:token|cookie|credential)|bearer\\s+token|auth\\s+token|disclose|forward|hand\\s+over|reveal|send)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-666"
+}

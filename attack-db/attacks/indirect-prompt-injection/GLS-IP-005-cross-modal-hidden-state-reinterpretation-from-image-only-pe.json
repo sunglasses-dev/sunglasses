@@ -1,0 +1,25 @@
+{
+  "id": "GLS-IP-005",
+  "name": "Cross-modal hidden-state reinterpretation from image-only perturbation",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An image-only perturbation contaminates the shared multimodal integration hidden state so a separately authorized benign text request is reinterpreted under an image-borne directive that the agent then follows.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|policy)|documentation|unit\\s+test|benign\\s+example|defensive|must\\s+not|do\\s+not|never|blocked|refused|quarantined|safe\\s+handling)\\b)(?=.*\\b(?:image[- ]only|visual|image)\\b)(?=.*\\b(?:perturbation|imperceptible|hidden\\s+directive|image[- ]borne)\\b)(?=.*\\b(?:shared|multimodal)\\s+(?:hidden[- ]state|integration|representation)\\b)(?=.*\\b(?:reinterpret|re[- ]interpret|override|steer|alter)\\w*\\b)(?=.*\\b(?:benign|separate|text)\\s+(?:request|instruction|prompt|task)\\b)(?=.*\\b(?:follow|reveal|disclose|execute|treat)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-IP-005"
+}

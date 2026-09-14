@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-051",
+  "name": "MCP initialize serverInfo/instructions poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP initialize serverInfo/instructions poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new protocol handshake vector distinct from static file-based poisoning shipped patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+never)\\s+(?:obey|follow|trust|treat|use|include|forward|send|share|persist|save|remember|override|overrides?)\\b.{0,120}\\b(?:mcp|initialize|serverinfo|server\\s+info|instructions?|handshake|metadata|policy)\\b)\n(?!.*\\b(?:mcp|initialize|serverinfo|server\\s+info|instructions?|handshake|metadata|policy)\\b.{0,160}\\b(?:not\\s+(?:agent\\s+)?policy|not\\s+authoritative|never\\s+overrides?)\\b)\n(?!.*\\b(?:scanner\\s+docs?|security\\s+guidance|training\\s+example|incident\\s+report|security\\s+report|reference\\s+guide)\\b.{0,160}\\b(?:report|detect|flag|refuse|blocked|detected|must\\s+be\\s+reported|not\\s+obeyed)\\b)\n(?=.*(?:\\b(?:mcp|model\\s+context\\s+protocol)\\b|\"jsonrpc\"\\s*:\\s*\"2\\.0\"))\n(?=.*(?:\\binitialize(?:d|s|\\s+(?:result|response|handshake|metadata|instructions?))?\\b|\\bhandshake\\b|\\bserverInfo\\b|\"serverInfo\"\\s*:|server\\s+info|\"protocolVersion\"\\s*:|\\bcapabilities\\b|\"capabilities\"\\s*:|\"instructions\"\\s*:|(?<![A-Za-z0-9])x[_-]agent[_-]policy(?![A-Za-z0-9])))\n(?=.*(?:\\b(?:ai\\s+agents?|agents?|assistants?|scanners?|verifiers?|auditors?|connector\\s+builders?|mcp\\s+clients?|automated\\s+(?:review|scan|audit|verification))\\b|(?<![A-Za-z0-9])(?:agent|assistant|scanner|verifier)[_-](?:policy|instructions?|notes?)(?![A-Za-z0-9])))\n(?=.*(?:\n  \\b(?:agent|assistant|scanner|verifier)\\s+(?:initialization\\s+)?(?:policy|instructions?|notes?|directive)\\b\n |\\b(?:supersed(?:e|es|ed|ing)|overrides?|outranks?|takes?\\s+precedence|higher\\s+priority|highest\\s+priority|authoritative|canonical|definitive|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+document|controlling\\s+document|main\\s+(?:mcp\\s+)?(?:operating\\s+)?guidance|preferred\\s+(?:mcp\\s+)?review\\s+(?:playbook|runbook|procedure))\\b.{0,120}\\b(?:system|developer|user|local|scanner|security|repository|client)\\s+(?:rules?|polic(?:y|ies)|instructions?|guidance)\\b\n |\\b(?:suppress|hide|omit|exclude|redact|skip|downgrade|deprioriti[sz]e|reclassify)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?|vulnerabilit(?:y|ies)|scanner\\s+output|security\\s+findings?)\\b\n |\\b(?:findings?|warnings?|alerts?|reports?|observations?|diagnostics?|results?|issues?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated|considered|classified|marked)\\b.{0,80}\\b(?:advisory-only|informational|non-blocking|background-only|safe|clean)?\n |\\b(?:include|forward|send|share|attach|provide|expose|collect|copy|pass\\s+along|hand\\s+off|relay|transfer)\\s+(?:[\\w-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?)|runtime\\s+(?:context|details?|config(?:uration)?|settings?|material|evidence)|local\\s+(?:state|context|config(?:uration)?|settings?)|api\\s*keys?|tokens?|authorization\\s+headers?|session\\s+cookies?|connection_context)\\b\n |\\b(?:save|persist|remember|store|write)\\s+(?:[\\w-]+\\s+){0,5}(?:future[-\\s]session\\s+(?:policy|instructions?)|agent\\s+rules?|approved\\s+tools?|project\\s+rules?|continuity\\s+context|memory|connector\\s+policy)\\b\n)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-051"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-731",
+  "name": "Feedback To Harness Control Poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Compiler or symbolic-execution feedback can become executable harness-control input: a poisoned diagnostic rewrites the next driver/stub/assertion iteration and suppresses a real vulnerability verdict.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|negative\\s+fixture|defensive|must\\s+not|do\\s+not|safe\\s+handling|quarantined|research\\s+note)\\b)(?!.*\\bno\\s+harness\\s+changes?\\b)(?!.*\\bnot\\s+marked\\s+clean\\b)(?=.*\\b(?:compiler|symbolic(?:\\s+execution)?|harness)\\b)(?=.*\\b(?:diagnostic|feedback|result|assertion|stub|driver)\\b)(?=.*\\b(?:rewrite|change|modify|mark|suppress|skip|ignore)\\w*\\b)(?=.*\\b(?:finding|vulnerab\\w*|security\\s+assertion|branch)\\b)(?=.*\\b(?:safe|no\\s+vulnerab\\w*|pass|clean)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-731"
+}

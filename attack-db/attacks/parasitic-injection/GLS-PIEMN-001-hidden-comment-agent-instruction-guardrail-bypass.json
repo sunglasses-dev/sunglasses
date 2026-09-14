@@ -7,12 +7,13 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "tool_output"
   ],
   "description": "Detects a hidden or parasitic instruction embedded in a comment, metadata, or changelog that directs an agent or assistant to bypass policy, guardrails, or approval and execute an action.",
   "keywords": [],
   "regex": [
-    "(?is)^(?=.*\\b(?:hidden|embedded|concealed|stealth|parasitic)\\b)(?=.*\\b(?:comment|metadata|footer|annotation|note|changelog|readme)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$"
+    "(?is)^(?=.*\\b(?:hidden|concealed|stealth|parasitic|invisible|zero[- ]?width)\\b)(?=.*\\b(?:comment|metadata|footer|annotation)\\b)(?=.*\\b(?:agent|assistant|autopilot|runner|worker)\\b)(?=.*\\b(?:ignore|bypass|override|disregard|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|instruction(?:s)?|approval|safety)\\b)(?=.*\\b(?:execute|run|dispatch|trigger|perform)\\b).+$"
   ],
   "examples": {
     "malicious": [],

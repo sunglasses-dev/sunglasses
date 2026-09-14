@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ALP-002",
+  "name": "Assessment scope/result rebinding",
+  "version": "1.0",
+  "category": "attestation_lineage_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A security/threat-model assessment result stays reusable after the assessed target scope changes, so a stale favorable score is consumed as clearance for a different (or reduced) system without rebinding or integrity verification.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident|postmortem|defensive|must\\s+not|do\\s+not|never|reject|blocked|invalidate|reassess|fail[- ]?closed)\\b)(?=.*\\b(?:assessment|threat[- ]model|STRIDE[- ]?AI|security\\s+scan)\\b)(?=.*\\b(?:scope|target|asset|system)\\b)(?=.*\\b(?:changed|change|modified|switched|reduced|narrowed|updated)\\b)(?=.*\\b(?:score|result|finding|attack[- ]success|report)\\b)(?=.*\\b(?:preserv|retain|keep|kept|reuse|carry|remain|carr)\\w*\\b)(?=.*\\b(?:old|prior|previous|favorable|80\\s*%|15\\s*%)\\b)(?=.*\\b(?:approve|approval|clear|clearance|deploy|authorize|sign[- ]?off)\\w*\\b)(?=.*\\b(?:without|no|skip|missing|unbound|unlinked)\\b)(?=.*\\b(?:reassess|rebind|verify|hash|provenance|integrity|fresh)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ALP-002"
+}

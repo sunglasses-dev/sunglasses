@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-056",
+  "name": "Unprotected Mcp Auth Gate Auto Minted Session Projection",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An unauthenticated remote caller reaches an MCP endpoint omitted from the reverse-proxy auth gate, then receives an auto-minted internal session token and performs an authenticated MCP action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|documentation|training|review)|unit\\s+test|negative\\s+fixture|blocked\\s+(?:payload|sample)|incident\\s+report|postmortem|runbook|defensive|safe\\s+(?:implementation|example)|must\\s+(?:reject|protect|gate|verify)|should\\s+(?:reject|protect|gate|verify)|do\\s+not|never|patched|fixed|mitigated|advisory\\s+summary)\\b)(?=.*\\b(?:Presenton|MCP|model\\s+context\\s+protocol)\\b)(?=.*(?:/mcp|\\bnginx\\b|\\bauth_request\\b|\\bMCP\\s+endpoint\\b))(?=.*\\b(?:unauthenticated|anonymous|without\\s+(?:any\\s+)?authentication|missing\\s+authentication)\\b)(?=.*\\b(?:remote|external|network)\\b.{0,30}\\b(?:caller|client|request|attacker|access)\\b)(?=.*\\b(?:auto[- ]?mint(?:s|ed)?|automatically\\s+(?:mint|issue|create)|valid\\s+internal\\s+session\\s+token)\\b)(?=.*\\b(?:invoke(?:s|d)?|call(?:s|ed)?|execute(?:s|d)?|trigger(?:s|ed)?)\\b.{0,100}\\b(?:MCP\\s+)?(?:tool|action|operation|generate_presentation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-056"
+}

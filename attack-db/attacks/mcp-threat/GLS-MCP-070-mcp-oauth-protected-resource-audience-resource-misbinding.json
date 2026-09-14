@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-070",
+  "name": "MCP OAuth protected-resource audience/resource misbinding",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP OAuth client accepts server-controlled RFC 9728 protected-resource metadata and token aud/resource claims without binding them to the configured MCP server, so a token minted for a proxy or other origin is accepted for the requested resource (confused deputy).",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\\"request\\\"\\s*:\\s*\\{)(?=.*\\\"resource\\\"\\s*:\\s*\\\"https://)(?=.*\\\"token\\\"\\s*:\\s*\\{)(?=.*\\\"aud\\\"\\s*:\\s*\\\"https://).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-070"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-117",
+  "name": "CTest / Dart Log-Artifact Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "CTest / Dart Log-Artifact Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 cTest/Dart log artifacts; distinct from CMake config poisoning in GLS-BMP-004.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?![\\s\\S]{0,2000}\\b(?:blocked|quarantined|redacted|unit test|fixture|example|do not obey|should flag|scanner|documentation)\\b)[\\s\\S]*?(?:\\bctest\\b|Testing/Temporary/LastTest\\.log|<Site\\b[\\s\\S]{0,200}<Testing\\b|<Test\\b[\\s\\S]{0,200}<Measurement\\b|DartMeasurement|Start testing:|End testing:)[\\s\\S]{0,1200}(?:system-out|Output|Measurement|LastTest\\.log|Test\\s*#?\\d+|<Value>)[\\s\\S]{0,800}\\b(?:ignore (?:previous|above|all) (?:instructions|failures|errors)|treat (?:this|the) (?:test|build|run) as (?:passing|green)|mark (?:the )?(?:build|tests|suite) (?:green|passed)|hide (?:this|these) (?:failures|errors)|do not (?:report|mention) (?:this|these) (?:failure|error|failures|errors)|send (?:secrets|tokens|credentials)|read (?:\\.env|secrets|credentials|tokens))\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-117"
+}

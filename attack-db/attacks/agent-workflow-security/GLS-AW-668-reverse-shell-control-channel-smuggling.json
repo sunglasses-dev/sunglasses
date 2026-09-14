@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-668",
+  "name": "Reverse Shell Control Channel Smuggling",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Natural-language instructions hidden in agent-facing evidence can smuggle a reverse-shell control channel request across the evidence-to-capability boundary, even when no canonical shell command or socket code is present.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|do\\s+not|never|must\\s+not|refus\\w*)\\b)(?=.*\\b(?:agent|assistant|automation|tool\\s+output|diagnostic|log|run\\s+summary)\\b)(?=.*\\b(?:outbound|outgoing|back\\s+to|callback|connect(?:ion)?\\s+back)\\b)(?=.*\\b(?:listener|operator|remote\\s+host|attacker|control\\s+server)\\b)(?=.*\\b(?:interactive|command|shell|terminal|session)\\b)(?=.*\\b(?:relay|pipe|channel|stream|tunnel|\u63a7\u5236)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-668"
+}

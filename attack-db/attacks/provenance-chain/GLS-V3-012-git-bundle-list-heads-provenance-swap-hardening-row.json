@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-012",
+  "name": "Git bundle list-heads provenance swap (hardening row)",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Git bundle/list-heads output can carry maintainer-origin provenance claims in comment-like text that asks an AI merge agent to treat an untrusted fork bundle as upstream-originated and skip fork quarantine.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-012"
+}

@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "tool_output"
   ],
   "description": "Detects chained prompt-injection attacks where the attacker first asks to disable/bypass/ignore safety constraints (including leet/typo variants) then requests disclosure of system or developer prompt material.",
   "keywords": [

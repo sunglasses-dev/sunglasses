@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-613",
+  "name": "Structured response-aware harm-enabling closure point",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A structured assistant tool-call record can itself be the first harm-enabling closure point, so a monitor that inherits benign state from prior turns authorizes the response before any later user turn can intervene.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|security\\s+training|blocked\\s+payload|do\\s+not\\s+obey|must\\s+not|requires\\s+explicit\\s+review)\\b)(?=.*\"turns\"\\s*:\\s*\\[)(?=.*\"role\"\\s*:\\s*\"assistant\").*(?=.*\"approval\"\\s*:\\s*\"(?:final|execute)\")(?=.*\"review\"\\s*:\\s*\"(?:skipped|stale)\")(?=.*\"next_turn\"\\s*:\\s*\"too_late\").*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-613"
+}

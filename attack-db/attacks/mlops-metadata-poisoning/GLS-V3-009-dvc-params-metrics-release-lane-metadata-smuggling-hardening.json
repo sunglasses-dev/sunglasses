@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-009",
+  "name": "DVC params/metrics release-lane metadata smuggling (hardening row)",
+  "version": "1.0",
+  "category": "mlops_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "DVC params and metrics metadata can carry euphemistic model-release instructions that route failed fairness/fraud metrics into background text and mark registry promotion green.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-009"
+}

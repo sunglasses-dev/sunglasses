@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-624",
+  "name": "External activation trigger starts privileged workflow without fresh intent",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted inbound event or activation keyword (email, document, message) is treated as authorization to auto-start and execute a privileged workflow with no fresh user intent or approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+policy|unit\\s+test|documentation|must\\s+not|reject(?:s|ed)?|fail[- ]?closed|safe\\s+handling)\\b)(?=.*\\b(?:incoming|inbound|external|event|email|message|document)\\b)(?=.*\\b(?:activation\\s+(?:keyword|trigger)|trigger\\s+marker|auto[- ]?start|automatically\\s+(?:start|activate)|wake(?:s|\\s+keyword)?)\\b)(?=.*\\b(?:privileged|sensitive|high[- ]risk|restricted)\\s+workflow\\b)(?=.*\\b(?:without|no|missing|absent)\\b)(?=.*\\b(?:user\\s+intent|approval|confirmation|fresh\\s+request)\\b)(?=.*\\b(?:execut(?:e|es)|run(?:s)?|dispatch(?:es)?|invok(?:e|es)|launch(?:es)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-624"
+}

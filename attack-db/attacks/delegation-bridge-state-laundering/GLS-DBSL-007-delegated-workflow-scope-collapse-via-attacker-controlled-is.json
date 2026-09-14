@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-007",
+  "name": "Delegated-workflow scope collapse via attacker-controlled issue prompt",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An automatic issues.opened event interpolates attacker-written issue title/body into a command-capable triage agent's prompt, letting external text drive authenticated gh comment and relabel mutations outside the bounded triage purpose.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|rejected|quarantined|defensive|test fixture|must not|do not obey|requires fresh approval)\\b)(?=.*\\b(?:github\\s+issue|issue\\s+title|issue\\s+body)\\b)(?=.*\\b(?:opened|webhook|automatic|auto[- ]trigger)\\b)(?=.*\\b(?:embedded|interpolated|injected|entered|supplied)\\b.{0,100}\\b(?:prompt|agent)\\b)(?=.*\\b(?:command[- ]capable|gh\\s+(?:issue|cli)|authenticated)\\b)(?=.*\\b(?:comment|relabel|label)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-007"
+}

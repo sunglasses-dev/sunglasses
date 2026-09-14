@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SPI-001",
+  "name": "LLM Sampling Parameter Metadata Injection",
+  "version": "1.0",
+  "category": "sampling_parameter_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "LLM Sampling Parameter Metadata Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mechanism targets technical LLM sampling parameters (logit_bias) instead of natural language.",
+  "keywords": [],
+  "regex": [
+    "(?i)logit[_-]?bias[^{]{0,30}\\{[^}]*\\d{4,}[^}]*:\\s*-?\\d+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SPI-001"
+}

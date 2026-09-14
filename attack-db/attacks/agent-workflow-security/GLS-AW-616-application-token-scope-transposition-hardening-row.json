@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-616",
+  "name": "application-token scope transposition hardening row",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegation broker/worker accepts a validly-signed application access token as sufficient authorization and forwards the call without binding audience, subject, purpose, tenant, and requested resource, letting token scope be transposed across the delegation boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|runbook|documentation|docs|unit\\s+test|test\\s+fixture|postmortem|defensive|must\\s+not|do\\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|refus(?:ed|es|ing)|revok(?:ed|es|ing)|safe\\s+(?:agent|broker))\\b)(?=.*\\b(?:stolen|replay(?:ed|ing)?|forward(?:ed|ing)?|bearer|application[- ]?(?:access[- ]?)?token|api\\s+token|JWT)\\b)(?=.*\\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|broker|orchestrator|agent)\\b)(?=.*\\b(?:audience|subject|purpose|tenant|resource|scope|claim)\\b)(?=.*\\b(?:mismatch|transpos(?:ed|ing|ition)?|cross[- ]?(?:tenant|scope)|rebound?|rebind(?:ed|ing)?|differ(?:ed|ent)|without\\s+.*(?:check|bind|validat)|valid(?:ity|ly\\s+signed).{0,100}(?:sufficient|continued|authorized))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-616"
+}

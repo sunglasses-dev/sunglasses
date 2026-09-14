@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-019",
+  "name": "Paired Subset Differential Memory Attribution Probe",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A paired-subset memory evaluation differs two otherwise equivalent runs by one private item, then launders the resulting delta into client attribution or private-memory membership evidence for the next agent decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|test\\s+fixture|training\\s+example|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+not|should\\s+not|never\\s+(?:infer|attribute|use|treat|promote)|does\\s+not\\s+(?:infer|attribute|use|promote))\\b)(?=.*\\b(?:memory|retriev(?:al|ed)|RAG|private\\s+(?:item|record|evidence)|client\\s+update|hidden\\s+source|sensitive\\s+client)\\b)(?=.*\\b(?:paired|two|dual|subset\\s+A|subset\\s+B|near[- ]identical)\\b.{0,180}\\b(?:differen(?:ce|cing|tial)|delta|subtract|compare|score)\\w*\\b)(?=(?:.*\\b(?:infer|determine|identif\\w*|attribute|membership|present|belongs?)\\w*\\b.{0,160}\\b(?:private|hidden|client|record|memory\\s+item|source)\\b|.*\\b(?:private|hidden|client|record|memory\\s+item|source)\\b.{0,160}\\b(?:infer|determine|identif\\w*|attribute|membership|present|belongs?)\\w*\\b))(?=.*\\b(?:feed|use|promote|treat|launder|pass|rank)\\w*\\b.{0,160}\\b(?:evidence|decision|authorization|disclosure|ranking|policy)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-019"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-615",
+  "name": "Verifier-guided policy specification gaming",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A policy-synthesis agent optimizes the verifier-visible subset of authorization intent atoms and passes every check, yet the synthesized or repaired policy still grants unapproved access because a deny constraint was never modeled.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|postmortem|defensive|must\\s+not|do\\s+not|never|blocked|reject|deny[- ]by[- ]default|out\\s+of\\s+scope)\\b)(?=.*(?:cedar|access[- ]control|authorization|policy))(?=.*(?:intent[-_ ]atom|authorization\\s+atom|requirements?\\s+atom|policy\\s+synthesis|repair\\s+signal|verifier\\s+feedback))(?=.*(?:omitted|missing|unmodeled|under[- ]specified|dropped|not\\s+represent\\w*|incomplete))(?=.*(?:deny|prohibit|forbid|unapproved|unauthorized|least\\s+privilege))(?=.*(?:passes?|valid|satisf(?:y|ies)|verified|compiles?|repair(?:ed|s)?))(?=.*(?:grant|allow|permit|access|read|write)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-615"
+}

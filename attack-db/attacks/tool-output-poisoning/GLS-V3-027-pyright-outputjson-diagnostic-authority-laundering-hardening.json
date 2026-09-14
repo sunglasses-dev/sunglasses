@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-027",
+  "name": "Pyright outputjson diagnostic authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Pyright-style type-checker JSON diagnostics can carry agent-directed policy claims in `generalDiagnostics[].message`, laundering static-analysis evidence into false authority to suppress review findings or attach local context.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-027"
+}

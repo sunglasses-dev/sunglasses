@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-018",
+  "name": "Mcp Outputtemplate Dangerous Uri Metadata Smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Mcp Outputtemplate Dangerous Uri Metadata Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 dangerous URI smuggling in outputTemplate fields specifically, distinct from instruction overrides.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:[\"']?_meta[\"']?\\s*(?::|\\.)?\\s*\\{?.{0,400}?openai\\s*/\\s*outputTemplate[\"'\\s]*(?::|=|set\\s+to)\\s*[\"']?\\s*(?:data\\s*:\\s*(?:text/html|application/xhtml\\+xml)|javascript\\s*:|vbscript\\s*:|blob\\s*:)|openai\\s*/\\s*outputTemplate[\"'\\s]*(?::|=|set\\s+to)\\s*[\"']?\\s*(?:data\\s*:\\s*(?:text/html|application/xhtml\\+xml)|javascript\\s*:|vbscript\\s*:|blob\\s*:).{0,400}?[\"']?_meta[\"']?)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-018"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-043",
+  "name": "coverage-ledger gate verdict authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned coverage-ledger gate transcript can claim that `PASS_NO_DUPLICATE` or empty ledger neighbors are authoritative reviewer approval, causing a pattern agent to mark a card READY, skip Boss/watchdog review, or suppress duplicate-risk caveats.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-043"
+}

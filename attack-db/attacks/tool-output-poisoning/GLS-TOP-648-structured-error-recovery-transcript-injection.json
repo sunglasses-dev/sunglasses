@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TOP-648",
+  "name": "Structured error-recovery transcript injection",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A client that flattens error.message, error.data, and retry metadata into one recovery transcript lets attacker-controlled remediation text cross the parser boundary and become the next corrective request.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive\\s+guide|unit\\s+test|incident\\s+report|documentation|must\\s+not|do\\s+not\\s+obey|blocked|rejected)\\b)(?=.*\\b(?:json[- ]?rpc|mcp|error(?:\\.message|\\.data)?|retry[_ -]?hint|error\\s+envelope)\\b)(?=.*\\b(?:recovery|retry|remediation|corrective|next\\s+request)\\b)(?=.*\\b(?:rebuild|re[- ]?enter|follow|override|suppress|do\\s+not\\s+report|include|attach)\\b.{0,140}\\b(?:next\\s+request|failed\\s+evidence|report|runtime|local\\s+state|warning|context)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-648"
+}

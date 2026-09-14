@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-690",
+  "name": "Provenance Bridge Scope Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A query-filter investigator broadens search across a missing provenance event, then a semantically similar node is laundered into a verified predecessor and delegated approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not\\s+(?:accept|approve|treat)|quarantined)\\b)(?=.*\\b(?:query\\s*[- ]?filter|backtrack(?:ing)?|broaden(?:ed|ing)?|expanded\\s+search)\\b)(?=.*\\b(?:missing|omitted|fragmented|gap|absent)\\b.{0,120}\\b(?:event|link|predecessor|causal|provenance|chain)\\b)(?=.*\\b(?:semantic(?:ally)?\\s+similar|similarity\\s+(?:match|candidate)|nearest\\s+match|related\\s+node)\\b)(?=.*\\b(?:predecessor|ancestor|causal\\s+node|provenance\\s+node)\\b)(?=.*\\b(?:verified|trusted|validated|sufficient|confirmed)\\b)(?=.*\\b(?:approve|approval|authorize|authorized|authorise|authorised|allow|release|continue|proceed|delegate)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-690"
+}

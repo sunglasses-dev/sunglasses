@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-005",
+  "name": "Dual Sided Split Representation Inversion",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A split-model boundary observer can invert the same intermediate representation stream to recover both a private user prompt and the model's generated response, while one-sided defenses falsely imply privacy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review|documentation)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|scanner\\s+rule|defensive|safe\\s+split|authenticates|protects\\s+both|binds\\s+the\\s+session|(?:no\\s+|without\\s+an?\\s+)(?:observer|attacker|adversary|reconstruction|inversion)|must\\s+(?:not|protect)|do\\s+not\\s+(?:reconstruct|expose|leak)|privacy\\s+defense|fail[- ]closed)\\b)(?=.*\\b(?:split[- ](?:LLM|model|inference|learning)|intermediate\\s+(?:activations?|representations?)|hidden\\s+representations?|boundary\\s+states?)\\b)(?=.*\\b(?:observer|attacker|adversary|remote\\s+party|inversion|invert(?:s|ed|ing)?|reconstruct(?:s|ed|ing|ion)?|recover(?:s|ed|ing)?)\\b)(?=.*\\b(?:prompt|input|query)\\w*\\b)(?=.*\\b(?:response|output|answer|generation)\\w*\\b)(?=.*\\b(?:privacy|private|leak(?:s|ed|age)?|disclos(?:e|ure)|expos(?:e|ure))\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-005"
+}

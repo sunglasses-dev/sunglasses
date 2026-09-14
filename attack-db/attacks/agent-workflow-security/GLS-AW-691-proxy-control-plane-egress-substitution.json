@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-691",
+  "name": "Proxy Control Plane Egress Substitution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An unauthenticated crawler request supplies a benign public crawl URL while independently steering Chromium through a proxy aimed at internal or metadata destinations; target-only SSRF validation does not protect the proxy trust boundary.",
+  "keywords": [],
+  "regex": [
+    "(?isx)^(?!.*(?:unit\\s+test|test\\s+fixture|scanner\\s+rule|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never\\s+trust|blocked|patched|fixed|mitigated|ordinary\\s+browsing|without\\s+any\\s+internal\\s+target|documentation\\s+explains))(?=.*(?:crawl(?:er|ing)?|browser|chromium|playwright))(?=.*(?:browser_config\\.proxy\\b|proxy[_ -]?config|proxy[- ]server|proxy[- ]pac|host[- ]resolver))(?=.*(?:internal|loopback|private|metadata|169\\.254|127\\.0\\.0\\.1|10\\.|192\\.168|172\\.(?:1[6-9]|2\\d|3[01])\\.))(?=.*(?:(?:target|url|destination).*(?:public|valid|benign)|(?:public|valid|benign).*(?:target|url|destination)))(?=.*(?:(?:without|omits?|fails?\\s+to|not).*(?:validat|check|restrict|allowlist|screen).*(?:proxy|egress|server|destination)|(?:proxy|egress|server|destination).*(?:without|omits?|fails?\\s+to|not).*(?:validat|check|restrict|allowlist|screen))).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-691"
+}

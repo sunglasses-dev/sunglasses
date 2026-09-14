@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-133",
+  "name": "SIWE Wallet-Authentication Instruction Smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "SIWE Wallet-Authentication Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 malicious instructions within SIWE and wallet authentication messages.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\\b.{0,120}?\\b(?:siwe|sign[-\\s]?in\\s+with\\s+ethereum|eip[-\\s]?4361|personal[_-]?sign|wallet\\s+sign[-\\s]?in|sign[-\\s]?in\\s+message|auth(?:entication)?\\s+challenge)\\b|\n  never\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\\b.{0,120}?\\b(?:siwe|sign[-\\s]?in\\s+with\\s+ethereum|eip[-\\s]?4361|personal[_-]?sign|wallet\\s+sign[-\\s]?in|sign[-\\s]?in\\s+message|auth(?:entication)?\\s+challenge)\\b|\n  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook|support\\s+article)\\b.{0,110}?\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block|warn|reject)\\b.{0,150}?\\b(?:safe\\s+to\\s+sign|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:domain|nonce|session|phishing|risk)|include\\s+(?:[\\w-]+\\s+){0,4}(?:session|tokens?|cookies?|env|api\\s*keys?))|\n  (?:incident|postmortem|security\\s+report)\\b.{0,130}?\\b(?:blocked|rejected|refused|detected|flagged|warned)\\b.{0,150}?\\b(?:agent\\s+instruction|safe\\s+to\\s+sign|suppress\\s+warnings?|ignore\\s+domain|skip\\s+confirmation)\n)\\b)\n(?=.*(?<![a-zA-Z0-9])(?:siwe|sign[-\\s]?in\\s+with\\s+ethereum|eip[-\\s]?4361|personal[_-]?sign|eth[_-]?sign|wallet[_-]?signin[_-]?preview|wallet\\s+sign[-\\s]?in|sign[-\\s]?in\\s+message|auth(?:entication)?\\s+challenge|login\\s+challenge|siwe\\s+statement|statement\\s*[:=]|resources\\s*[:=]|issuedAt|expirationTime|notBefore|chainId|domain\\s*[:=]|uri\\s*[:=]|nonce\\s*[:=])(?![a-zA-Z0-9]))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|wallet\\s+agents?|browser\\s+assistants?|security\\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent|auth[_-]?agent)(?![a-zA-Z0-9]))\n(?=.*\\b(?:sign(?:ature|ing)?|personal[_-]?sign|eth[_-]?sign|login|authenticate|authentication|session|nonce|domain|uri|resources?|cookies?|tokens?|authorization|confirmation|warning|warnings|phishing|domain\\s+mismatch|session\\s+scope|credential)\\b)\n(?=.*\\b(?:\n  (?:agent|assistant|model|wallet\\s+agent|auth\\s+agent|verifier|scanner)\\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|\n  (?:authoritative|canonical|primary|single)\\s+(?:login\\s+|auth(?:entication)?\\s+|wallet\\s+|session\\s+)?(?:source\\s+of\\s+truth|policy|guidance|instruction)|\n  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\\s+precedence\\s+over|ignore|disregard)\\b.{0,100}?\\b(?:wallet|system|developer|security|warning|confirmation|domain|nonce|session)|\n  safe\\s+to\\s+sign|mark\\s+(?:it|this|the\\s+login|the\\s+sign[-\\s]?in|the\\s+message).{0,45}?\\bsafe|mark\\s+(?:it|this|the\\s+login|the\\s+sign[-\\s]?in|the\\s+message).{0,45}?\\btrusted|\n  proceed\\s+without\\s+(?:extra\\s+)?(?:user\\s+)?confirmation|skip\\s+(?:extra\\s+)?(?:user\\s+)?confirmation|no\\s+(?:extra\\s+)?(?:user\\s+)?confirmation\\s+(?:needed|required)|\n  do\\s+not\\s+warn|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|domain|nonce|session|phishing|risk)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|domain|nonce|session|phishing|risk)|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:domain\\s+mismatch|domain|nonce|session|phishing|risk|warning)|\n  (?:include|forward|send|attach|provide|copy|read|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|auth(?:orization)?\\s+headers?|cookies?|wallet\\s+state|local\\s+state|environment\\s+(?:variables?|context)|api\\s*keys?)\n)\\b)\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-133"
+}

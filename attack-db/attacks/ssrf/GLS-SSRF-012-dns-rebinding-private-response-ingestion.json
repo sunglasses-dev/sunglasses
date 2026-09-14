@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-012",
+  "name": "DNS Rebinding Private Response Ingestion",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A hostname that passes allowlist validation resolves to a private/link-local address at connection time during an agent-action or MCP fetch, and ingesting that internal response into RAG memory makes the SSRF durable agent-visible context.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|test)|unit\\s+test|benign|safe\\s+example|defensive|postmortem|must\\s+(?:reject|block|validate|deny)|do\\s+not|never|patched|fixed|remediated|quarantined|blocked|fail[- ]closed|negative\\s+fixture|without\\s+(?:network|side[- ]effect))\\b)(?=.*\\b(?:agent\\s+action|MCP|model\\s+context\\s+protocol|tool\\s+fetch|remote\\s+fetch)\\b)(?=.*\\b(?:DNS|hostname|name)\\b.{0,100}\\b(?:re-?bind|resolution|resolves?|lookup|answer|record)\\b)(?=.*\\b(?:private\\s+IP|private\\s+address|internal\\s+(?:IP|address|endpoint)|link[- ]local|loopback)\\b|\\b(?:169\\.254\\.169\\.254|127\\.0\\.0\\.1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|192\\.168\\.\\d{1,3}\\.\\d{1,3})\\b)(?=.*\\b(?:SSRF|server[- ]side\\s+request|request\\s+forgery|outbound\\s+request)\\b)(?=.*\\b(?:RAG|retrieval|retrieved\\s+memory|knowledge\\s+base|memory\\s+record)\\b)(?=.*\\b(?:ingest|store|persist|promote|save|index|import)\\w*\\b)(?=.*\\b(?:response|body|content|result|record|evidence|memory|RAG|knowledge\\s+base)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-012"
+}

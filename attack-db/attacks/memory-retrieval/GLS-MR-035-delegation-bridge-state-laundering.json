@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-035",
+  "name": "Delegation Bridge State Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fine-tuned cybersecurity QA model retains strong retrieval contextualization while vocabulary recognition and parametric knowledge degrade; a downstream model-selection route masks the degraded axes and persists the model as trusted.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:preserve|compare|report|verify)|do\\s+not\\s+(?:trust|persist|route|approve)|fail\\s+closed)\\b)(?=.*\\b(?:fine[- ]?tun\\w*|post[- ]?training|instruction[- ]?focused\\s+tun\\w*)\\b)(?=.*\\b(?:diagnostic|evaluation|FiT|cybersecurity\\s+QA|model\\s+(?:report|evaluation)|cybersecurity\\s+work)\\b)(?=.*\\b(?:vocabulary\\s+recognition|parametric\\s+knowledge)\\b)(?=.*\\b(?:degrad\\w*|regress\\w*|declin\\w*|drop\\w*|weaken\\w*|abstention|ranking\\s+invert\\w*)\\b)(?=.*\\b(?:omit\\w*|mask\\w*|hide\\w*|suppress\\w*|absent|missing|not\\s+shown|ignored)\\b)(?=.*\\b(?:contextualization|retrieval[- ]grounded|retrieved\\s+context|retrieved[- ]context\\s+performance)\\b)(?=.*\\b(?:safe|capable|trusted|persist|route|deploy|approve|delegate|production)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-035"
+}

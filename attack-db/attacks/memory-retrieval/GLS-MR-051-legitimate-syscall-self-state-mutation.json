@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-051",
+  "name": "Legitimate Syscall Self State Mutation",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A normal-looking atomic rename or restore makes a stale attacker-controlled self-state snapshot win at restart, and the later consumer trusts it without epoch/digest binding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner|detector|unit\\s+test|negative\\s+fixture|blocked\\s+sample|incident\\s+report|postmortem|security\\s+(?:guide|training|documentation)|defensive|must\\s+not|do\\s+not\\s+(?:trust|accept)|safe\\s+(?:example|control))\\b)(?=.*\\b(?:self[- ]hosted|agent[- ]owned|agent\\s+(?:memory|configuration)|self[- ]state|durable\\s+state)\\b)(?=.*\\b(?:atomic\\s+rename|rename|replace|restore|rollback|snapshot)\\b)(?=.*\\b(?:stale|replay(?:ed)?|prior\\s+version|attacker[- ]controlled|tampered|mutat(?:ed|ion))\\b[^\\n]{0,180}\\b(?:state|snapshot|memory|configuration|config|bytes)\\b)(?=.*\\b(?:no|missing|without|lacks?)\\b[^\\n]{0,120}\\b(?:epoch|version|digest|integrity|provenance|freshness|writer)\\b)(?=.*\\b(?:restart|reload|rehydrat|retriev|trusted|prior\\s+approval|privileged\\s+tool)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-051"
+}

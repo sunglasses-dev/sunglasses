@@ -1,0 +1,25 @@
+{
+  "id": "GLS-EX-026",
+  "name": "AI-Enabled Product Observability Policy-Branch Metadata Disclosure",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An AI-enabled product leaks a hidden inference policy-branch outcome or evaluator rationale through API response metadata, headers, logs, or observability events, letting an attacker map the safety boundary and refine bypass probes.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+(?:redact|restrict|hide)|do\\s+not|never|safe|blocked|fail[- ]closed|authorized\\s+audit)\\b)(?=.*\\b(?:AI[- ]enabled|AI|model|inference)\\b)(?=.*\\b(?:API|response|header|metadata|log|observability)\\w*\\b)(?=.*\\b(?:hidden|internal|restricted|private|non[- ]user|unintended)\\b)(?=.*\\b(?:policy[- ]branch|safety[- ]branch|evaluator\\s+rationale|decision\\s+path|inference\\s+trace)\\b)(?=.*\\b(?:expos(?:e|es|ed|ure)|leak(?:s|ed|age)?|return(?:s|ed)?|appear(?:s|ed|ance)?)\\b)(?=.*\\b(?:infer\\w*|identify\\w*|reverse[- ]?engineer\\w*|refine\\w*|probe\\w*|bypass\\w*)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-EX-026"
+}

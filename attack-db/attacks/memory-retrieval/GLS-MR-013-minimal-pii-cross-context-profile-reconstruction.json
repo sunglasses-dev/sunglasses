@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-013",
+  "name": "Minimal Pii Cross Context Profile Reconstruction",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent joins a minimal PII seed with public and contextual evidence across sources or task memory, infers sensitive attributes, and emits a high-fidelity personal profile without explicit per-attribute request or consent.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?!.*\\b(?:security\\s+(?:guide|training|documentation|review)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:not|obtain|ask|consent)|do\\s+not\\s+(?:infer|profile|aggregate|join|reconstruct)|never\\s+(?:infer|profile|aggregate|join|reconstruct)|privacy\\s+policy)\\b)(?=.*\\b(?:agent\\s+(?:memory|RAG)|RAG\\s+(?:pipeline|retrieval)|retrieved\\s+(?:context|evidence)|task\\s+memory|memory\\s+recall)\\b)(?=.*\\b(?:minimal|weak|sparse|single|one)\\s+(?:PII|identifier|personal\\s+identifier|seed)\\b)(?=.*\\b(?:cross[- ]?(?:source|context|document)|join\\w*|aggregate\\w*|correlat\\w*|reconstruct\\w*)\\b)(?=.*\\b(?:infer\\w*|deduc\\w*|derive\\w*|predict\\w*)\\b)(?=.*\\b(?:(?:sensitive|private|personal|protected)(?:\\s+\\w+){0,2}\\s+)?(?:health|employment|relationship|sensitive|private|personal|protected)\\s+(?:attribute|fact|profile|detail|information)\\w*\\b)(?=.*\\b(?:profile|dossier|persona|portrait)\\w*\\b)(?=.*\\b(?:without|no|not)\\s+(?:(?:an?\\s+)?explicit\\s+)?(?:request\\w*|consent|permission|ask\\w*|confirmation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-013"
+}

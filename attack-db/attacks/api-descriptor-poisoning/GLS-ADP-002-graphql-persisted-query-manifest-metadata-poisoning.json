@@ -1,0 +1,24 @@
+{
+  "id": "GLS-ADP-002",
+  "name": "GraphQL persisted-query manifest metadata poisoning",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "GraphQL persisted-query manifest metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 graphQL operation registries, a distinct manifest-based API descriptor mechanism.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|should\\s+not|do\\s+not|cannot|can't)\\b.{0,80}\\b(?:treat\\s+(?:operation\\s+registry\\s+descriptions?\\s+)?as\\s+authoritative|treat\\s+.*as\\s+safe|obey|follow|include\\s+auth|forward\\s+environment|attach\\s+local|send\\s+(?:api\\s+)?tokens|suppress|hide|omit|mark\\s+.*non[-\\s]?blocking)\\b)(?=.*\\b(?:graphql|persisted[-\\s]?quer(?:y|ies)|operation[-\\s]?(?:registry|manifest|safelist|allowlist)|registered\\s+operation|sha256Hash|extensions\\.persistedQuery|operationId|operationName)\\b)(?=.*\\b(?:ai\\s+agents?|assistants?|security\\s+agents?|api\\s+auditors?|graphql\\s+reviewers?|scanners?|tool\\s+builders?)\\b)(?=.*\\b(?:single\\s+source\\s+of\\s+truth|authoritative\\s+policy|overrid(?:e|es|ing)|supersed(?:e|es|ing)|controls?\\s+(?:the\\s+)?(?:security\\s+)?review|suppress(?:\\s+authorization)?\\s+findings?|hide\\s+(?:operation\\s+)?warnings?|mark\\s+(?:them\\s+)?non[-\\s]?blocking|omit\\s+from\\s+(?:audit|scanner|security)\\s+reports?|treat\\s+(?:this\\s+operation\\s+)?as\\s+safe|include\\s+auth(?:orization)?\\s+headers?|forward\\s+environment\\s+variables?|attach\\s+local\\s+state|send\\s+(?:api\\s+)?tokens?|runtime\\s+context)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ADP-002"
+}

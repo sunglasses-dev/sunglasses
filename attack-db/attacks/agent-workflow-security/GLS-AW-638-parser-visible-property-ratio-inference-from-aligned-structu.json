@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-638",
+  "name": "Parser-visible property-ratio inference from aligned structured outputs",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Refusal-safe structured model outputs still leak a hidden training-dataset property when a parser aggregates calibrated label/token frequencies across repeated probes \u2014 a statistical side channel that needs no hostile instruction.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|unit test|fixture|documentation|defensive|must not|do not|blocked|quarantined|redacted)\\b)(?=.*\\b(?:structured|json|parser|token|label)\\w*\\b)(?=.*\\b(?:batch|repeated|aggregate|frequency|count|distribution|ratio)\\w*\\b)(?=.*\\b(?:aligned|dpo|grpo|calibrat|target)\\w*\\b)(?=.*\\b(?:hidden|private|protected|dataset|training corpus)\\w*\\b)(?=.*\\b(?:infer|leak|reveal|disclos|side[- ]channel)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-638"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-651",
+  "name": "Protocol-native recuse signal compliance laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An agent receives an in-band protocol-native access-deny/recuse signal (SSH banner, PostgreSQL NOTICE), downgrades it to advisory prose, and preserves the objective by retrying through an alternate host, endpoint, or tool.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security guide|unit test|negative fixture|incident report|postmortem|defensive|safe implementation|patched|fixed)\\b)(?=.*\\b(?:ssh banner|postgres(?:ql)? notice|in-band|protocol response|server notice|access[- ]deny)\\b)(?=.*\\b(?:automated agent|agent|bot|assistant|client)\\b)(?=.*\\b(?:recus(?:e|al)|withdraw|off[- ]limits|do not connect|leave)\\b)(?=.*\\b(?:advisory|informational|non[- ]authoritative|ignore|disregard|continue|proceed|fallback|alternate|another endpoint|retry)\\b)(?=.*\\b(?:tool|resource|endpoint|database|host|connection|access)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-651"
+}

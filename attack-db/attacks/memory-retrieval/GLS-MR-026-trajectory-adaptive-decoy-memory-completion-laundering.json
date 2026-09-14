@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-026",
+  "name": "Trajectory Adaptive Decoy Memory Completion Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A memory/RAG completion record stores a trajectory-adaptive decoy's coherent observations and is retrieved as proof of real-target penetration completion although the real target was never reached.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|test\\s+fixture|training\\s+example|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+not|should\\s+not|never\\s+(?:accept|trust|treat|reuse))\\b)(?=.*\\b(?:memory|retrieved|retrieval|RAG|cache(?:d)?|completion\\s+record)\\b)(?=.*\\b(?:trajectory[- ]adaptive|adaptive\\s+decoy|decoy\\s+(?:state|environment|evidence)|history[- ]conditioned)\\b)(?=.*\\b(?:interaction\\s+history|agent\\s+history|history[- ]conditioned|tool\\s+calls|post[- ]entry\\s+observations)\\b)(?=.*\\b(?:completion\\s+report|penetration\\s+complete|task\\s+(?:complete|closed))\\b)(?=.*\\b(?:decoy\\s+evidence|real\\s+target\\s+(?:was\\s+)?(?:not|never)\\s+(?:reached|tested)|without\\s+(?:fresh\\s+)?real[- ]target)\\b)(?=.*\\b(?:accept|treat|use|promot|close|sufficient|authorize|revalidat)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-026"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-625",
+  "name": "AML.T0089 process-discovery record-boundary confusion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled process-name or command-line fields carrying escaped delimiters/quotes desynchronize process-discovery record parsing, so a security-relevant process is merged, dropped, or misattributed and the agent trusts an incomplete AI-stack inventory.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security test|fixture|code review|unit test|never execute|must reject|blocked|benign|do not trust)\\b)(?=.*\\b(?:ps|/proc(?:/\\d+)?|tasklist|get-process|process(?:es)?\\s+(?:list|table|discovery))\\b)(?=.*(?:json|csv|tsv|record|row|line|field|delimiter|quote|escaped|\\\\n|\\\\r|newline|control))(?=.*(?:process\\s*(?:name|command[- ]line)|comm|args|cmdline))(?=.*(?:merge|omit|drop|hide|truncate|misattribut|desync|shift|parse|parser|inventory))(?=.*(?:security|monitor|scanner|agent|ai|token|credential|backend)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-625"
+}

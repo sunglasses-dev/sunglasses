@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-598",
+  "name": "Diffusion-purification score lineage mismatch at delegated approval",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Diffusion/denoising purification changes the analyzed artifact and its risk score, but a delegated reviewer approves against the stale pre-purification score because the decision is never bound to the post-transform artifact hash or score version.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|benign|safe\\s+(?:control|example)|must\\s+(?:recompute|bind|match|reject)|do\\s+not|never|refuse|quarantine|verified)\\b)(?=.*\\b(?:diffusion|denois(?:e|ing)|purif(?:y|ied|ication))\\w*\\b)(?=.*\\b(?:risk|safety)\\s*(?:score|rating|assessment)\\b)(?=.*\\b(?:stale|old|pre[- ]purif(?:ication|ied)|original)\\s+(?:score|evidence|assessment)\\b)(?=.*\\b(?:delegat(?:e|ed|ion)|human[- ]in[- ]the[- ]loop|reviewer|approval)\\w*\\b)(?=.*\\b(?:approve|approved|accept|authorized)\\w*\\b)(?=.*\\b(?:version|hash|artifact|lineage|provenance)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-598"
+}

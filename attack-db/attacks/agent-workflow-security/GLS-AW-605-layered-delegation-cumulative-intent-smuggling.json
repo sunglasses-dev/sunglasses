@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-605",
+  "name": "Layered Delegation Cumulative Intent Smuggling",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Many individually low-risk delegated reviewer turns are flattened by a scalarizing/quorum aggregator that discards the trajectory, so cumulative harmful intent crosses the authorization threshold and a restricted action is allowed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|benign\\s+control|safe\\s+example|must\\s+(?:aggregate|retain|block|quarantine)|do\\s+not|refuse|blocked)\\b)(?=.*\\b(?:delegat(?:ed|ion)|reviewer|worker)\\b)(?=.*\\b(?:each|individually|per[- ]turn)\\s+(?:low[- ]risk|benign|subthreshold)\\b)(?=.*\\b(?:cumulative|aggregate|running|total)\\s+(?:intent|risk|score|recommendation)\\b)(?=.*\\b(?:threshold|cross(?:es|ed|ing)|scalariz|accumulat)\\w*\\b)(?=.*\\b(?:final|aggregate|quorum)\\s+(?:decision|authorization|approval|action)\\b)(?=.*\\b(?:restricted|prohibited|unsafe)\\s+(?:action|operation|request)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-605"
+}

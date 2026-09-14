@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-610",
+  "name": "Expert Judge Cross Field Agreement Gap",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A generated artifact passes deterministic schema/syntax/cross-reference checks and mimics the expert-distilled judge's acceptance surface while an unsafe cross-field relation goes uninspected, so delegated approval fires on structurally complete but semantically incomplete evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|fail[- ]?closed|reviewed\\s+safe)\\b)(?=.*\\b(?:generated|model[- ]generated|llm)\\s+artifact\\b)(?=.*\\b(?:schema|syntax|cross[- ]?reference)\\s*(?:check|valid|pass)\\w*\\b)(?=.*\\b(?:expert[- ]distilled|semantic)\\s+judge\\b)(?=.*\\b(?:surface|calibrat|approval|confidence)\\w*\\b)(?=.*\\b(?:cross[- ]?field|field[- ]?combination|logical\\s+combination)\\b)(?=.*\\b(?:unsafe|misaligned|restricted|dangerous)\\b)(?=.*\\b(?:approve|allow|authorize|execute|proceed)\\w*\\b)(?=.*\\b(?:without|missing|uninspected|unchecked|not\\s+inspect)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-610"
+}

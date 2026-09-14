@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PT-022",
+  "name": "EDDI backup-export botFilename encoded path traversal",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled backup-export filename field is decoded and joined to a backup root without canonical segment containment, so encoded dot segments or alternate separators escape the root and read container-readable files.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:fixed|patched|remediated|safe|benign|test|fixture|documentation|rejected|rejects|upgrade|without)\\b)(?=.*\\b(?:eddi|restexportservice|backup\\s*export|botfilename)\\b)(?=.*(?:\\.\\./|%2e|%2f|%5c|\\.\\.\\\\|traversal|parent\\s+segments))(?=.*\\b(?:path|root|filesystem|file\\s+read|read|passwd|canonical|normalized|open)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PT-022"
+}

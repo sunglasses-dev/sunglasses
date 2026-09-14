@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-703",
+  "name": "Cross Assessment Knowledge Transfer Lineage Collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "FORGE's tiered knowledge architecture can transfer prior exploit/build experience into a new CVE assessment; if lineage is not bound to source CVE, target digest, and epoch, downstream agents can consume stale knowledge as current evidence and generate a wrong-target plan or rule.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|policy|review)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:not|bind|verify|reject)|do\\s+not\\s+(?:reuse|apply|trust|transfer))\\b)(?=.*\\b(?:FORGE|multi[- ]agent|Planner|Exploit|Detector|CVE)\\b)(?=.*\\b(?:tiered\\s+knowledge|knowledge\\s+(?:store|base|transfer)|prior[- ]assessment|previous\\s+(?:CVE|assessment)|experience\\s+transfer)\\b)(?=.*\\b(?:stale|foreign|wrong[- ]target|cross[- ]assessment|unbound|mismatched|lineage\\s+collision|source\\s+identity)\\b)(?=.*(?:\\b(?:without|missing|omits?|lacks?|not\\s+bound|unbound)\\b.{0,100}\\b(?:CVE|target|digest|epoch|assessment|provenance|lineage|identity)\\b|\\b(?:CVE|target|digest|epoch|assessment|provenance|lineage|identity)\\b.{0,100}\\b(?:without|missing|omits?|lacks?|not\\s+bound|unbound)\\b))(?=.*\\b(?:reuse|transfer|apply|promot|treat|consume|generate|produce|dispatch)\\w*\\b.{0,140}\\b(?:exploit|plan|rule|evidence|knowledge|artifact|assessment)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-703"
+}

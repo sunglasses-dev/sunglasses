@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-738",
+  "name": "Reasoning Watermark Lifecycle Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid R-CoT reasoning-path watermark receipt from one task/model/epoch is replayed for another current task/model/epoch, and a downstream agent accepts stable watermark presence as current provenance without rebinding the evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|test\\s+fixture|negative\\s+fixture|incident\\s+report|blocked|quarantined|defensive|must\\s+not|do\\s+not|never|reject(?:ed|s)?|fresh\\s+verification\\s+required|safe\\s+handling)\\b)(?=.*\\b(?:r[- ]?cot|reasoning[- ]layer|reasoning\\s+path|reasoning\\s+receipt|redundant\\s+chain[- ]of[- ]thought)\\b)(?=.*\\b(?:watermark|trajectory|dual[- ]trajectory|reasoning\\s+receipt)\\b)(?=.*\\b(?:replay(?:ed|ing)?|stale|old|prior|previous|cached|reus(?:e|ed|ing)|rebind(?:ed|ing)?)\\b)(?=.*\\b(?:task|request|model|checkpoint|artifact|digest|epoch|version|identity)\\b)(?=.*\\b(?:accept|trust|verified|provenance|ownership|integrity|skip|without|current)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-738"
+}

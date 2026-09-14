@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-002",
+  "name": "coherent suffix objective mutation at delegation review",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fluent, semantically coherent delegated-review request preserves the apparent task while appending a quiet extra objective plus an approval-bypass clause, so a task-level reviewer greenlights the added effect without independently authorizing it.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:delegat(?:e|ed|ion)|handoff|human[- ]in[- ]the[- ]loop|reviewer)\\b)(?=.*\\b(?:coherent|natural|routine|ordinary|well[- ]written|low[- ]perplexity)\\b)(?=.*\\b(?:sub[- ]goal|secondary objective|additional objective|quietly)\\b)(?=.*\\b(?:approve|accept|greenlight|proceed)\\b)(?=.*\\b(?:without confirmation|without asking|skip(?:ping)? review|no need to ask)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-002"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-017",
+  "name": "Quiz Mediated Membership Disclosure",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model-facing RAG/evaluation workflow turns a target example into repeated multiple-choice probes and leaks training-membership evidence through indirect answer and confidence signals.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?!.*\\b(?:security\\s+(?:guide|training|documentation)|unit\\s+test|negative\\s+fixture|blocked|quarantined|defensive|must\\s+(?:not|never)|do\\s+not|never\\s+(?:infer|disclose|treat|use))\\b)(?=.*\\b(?:quiz|pop[- ]quiz|multiple[- ]choice|choice\\s+question|MCQ)\\b)(?=.*\\b(?:target\\s+(?:example|record|text)|candidate\\s+record|training\\s+(?:set|corpus)|memor(?:ized|isation|ization))\\b)(?=.*\\b(?:repeat(?:ed)?|multiple|several|query|probe|question)\\w*\\b)(?=.*\\b(?:answer\\s+(?:selection|choice|pattern)|confidence|agreement|consensus|response\\s+pattern)\\w*\\b)(?=.*\\b(?:membership|member|in[- ]training|training[- ]set)\\b)(?=.*\\b(?:infer|reveal|leak|disclos|expos|identify|deduce)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-017"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-726",
+  "name": "Routine Hazard Risk Aggregation Masking",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A mixed safety-evaluation record lets a routine-task majority or aggregate-safe scalar authorize a concealed-hazard red-team item, losing per-task risk identity at the batch boundary.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|review|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|blocked|quarantined|safe\\s+example)\\b)(?=.*\\b(?:benchmark|evaluation|harness|agentic)\\b)(?=.*\\b(?:routine|benign|legitimate)\\s+(?:task|item|request)s?\\b)(?=.*\\b(?:red[- ]team|concealed[- ]hazard|hidden\\s+hazard|biosecurity\\s+hazard)\\b)(?=.*\\b(?:mixed|paired|batch|aggregate|average|scalar|majority)\\b)(?=.*\\b(?:safe|allow|permit|proceed|approve)\\w*\\b)(?=.*\\b(?:hazardous|unsafe|restricted|red[- ]team)\\b)(?=.*\\b(?:allow|permit|proceed|approved|permitted|included)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-726"
+}

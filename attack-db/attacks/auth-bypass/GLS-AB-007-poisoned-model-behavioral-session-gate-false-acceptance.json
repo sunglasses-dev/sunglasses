@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AB-007",
+  "name": "poisoned model behavioral session-gate false acceptance",
+  "version": "1.0",
+  "category": "auth_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fine-tune-poisoned checkpoint learns to emit continue/accept for expired or revoked sessions, and an agent that treats model behavioral output as session authority reuses credentials past validity instead of enforcing expiry independently.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|test)|incident\\s+report|documentation|unit\\s+test|negative\\s+fixture|must\\s+not|do\\s+not|never|blocked|rejected|safe\\s+example)\\b)(?=.*\\b(?:model[_ -]?(?:artifact|checkpoint)|published\\s+model|published\\s+checkpoint|fine[- ]tuned\\s+model)\\b)(?=.*\\b(?:unverified|poisoned|backdoor|behavior[_ -]?profile|training[_ -]?provenance)\\b)(?=.*\\b(?:expired|revoked|invalid|stale)\\b)(?=.*\\b(?:session|grant|token)\\b)(?=.*\\b(?:accept\\w*|continue\\w*|resume\\w*|renew\\w*)\\b)(?=.*\\b(?:reuse|re-use|renew|forward)(?:[_ -]|\\b))(?=.*\\b(?:session|grant|token)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AB-007"
+}

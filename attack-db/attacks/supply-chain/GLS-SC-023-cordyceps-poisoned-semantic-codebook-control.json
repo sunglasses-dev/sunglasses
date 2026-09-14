@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-023",
+  "name": "Cordyceps poisoned semantic codebook control",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Data poisoning teaches a model a latent semantic codebook mapping a shared innocuous concept to an attacker-chosen phrase, so the model itself decodes later benign-looking text into an arbitrary malicious instruction with no literal trigger string.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+(?:guide|test)|documentation|unit\\s+test|negative\\s+fixture|must\\s+not|do\\s+not|never|blocked|rejected|safe\\s+example|quarantined)\\b)(?=.*\\b(?:poison(?:ed|ing)?|data[- ]?poison(?:ed|ing)?|backdoor\\w*|unverified|fine[- ]?tuned|model\\b)\\b)(?=.*\\b(?:semantic\\s+association|shared\\s+(?:fact|concept|knowledge)|common\\s+concept|(?:attacker[- ]?)?chosen\\s+phrase|attacker\\s+phrase|innocuous\\s+fact|concept[/ -]phrase|maps?\\s+.*?phrase)\\b)(?=.*\\b(?:codebook|latent\\s+(?:semantic\\s+)?decoder|semantic\\s+decoder|decoder\\s+output|decoder|decod(?:e|ed|es)|information[- ]hiding|covert\\s+(?:decoder|control))\\b)(?=.*\\b(?:decode|decoded|decodes|decoder|encode|encoded)\\b.{0,180}\\b(?:instruction|execute|exfiltrate|delete|approve|action)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-023"
+}

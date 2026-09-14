@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-744",
+  "name": "External-Harm-Side-Effect-Target-Substitution",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A tool action reports local success while its recipient, destination, beneficiary, or resource has been substituted or redirected to an unintended external target, causing financial, reputational, user, or societal harm.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?![\\s\\S]*(?:unit\\s+test|test\\s+case|regression\\s+test|def\\s+test_|pytest|unittest|@Test|assertRaises|pytest\\.raises|describe\\(|CHANGELOG|change\\s?log|release\\s+notes?|fixed\\s+in\\s+v|documentation|this\\s+document|hardening\\s+guide|security\\s+(?:guide|advisory|bulletin|training|checklist|review\\s+checklist)|best\\s+practice|detection\\s+rule|sigma|logsource:|threat\\s+model|mitigation|remediation|post-?mortem|incident\\s+report|runbook|owasp|action\\s+item|we\\s+added\\s+a\\s+test|i\\s+can'?t\\s+help|i\\s+cannot\\s+help|i\\s+won'?t|i\\s+will\\s+not|i'?m\\s+not\\s+able\\s+to|refuse[sd]?\\s+to\\s+(?:help|assist|comply)|researchers?\\s+(?:show\\w*|demonstrat\\w*|found|report\\w*|describ\\w*|argue\\w*)|the\\s+paper\\b|a\\s+recent\\s+study|in\\s+their\\s+sample|(?:attacker|adversary|someone|anyone|they|caller|client|user)\\s+(?:can|could|may|might|would)\\s|would\\s+be\\s+(?:able|accepted|executed|allowed|possible)|might\\s+never\\s+be|accidental\\w*|inadvertent\\w*|unintentional\\w*|by\\s+mistake|not\\s+intentional|copy-?paste|how\\s+do\\s+(?:we|i)\\s|why\\s+do(?:es)?\\s))(?!.*\\b(?:security\\s+(?:guide|training|policy)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|should\\s+(?:reject|not\\s+execute|not\\s+trust)|do\\s+not\\s+(?:execute|approve|trust)|example\\s+of\\s+(?:a\\s+)?(?:bad|unsafe))\\b)(?=.*\\b(?:tool\\s*(?:call|result|action)?|execution|action|dispatch|transaction|side[- ]effect)\\b)(?=.*\\b(?:recipient|beneficiary|destination|target|resource|account)\\b)(?=.*\\b(?:mismatch|substitut\\w*|redirect\\w*|wrong|unintended|unexpected|changed|rebound\\w*)\\b)(?=.*\\b(?:success|succeeded|completed|ok|accepted|delivered)\\b)(?=.*\\b(?:external|outside|outbound|public|user|organization|customer|societal|financial|reputational)\\s*(?:harm|impact|loss|damage|effect|target|beneficiary)?\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-744"
+}

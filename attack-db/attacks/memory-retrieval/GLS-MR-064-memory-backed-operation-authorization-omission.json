@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-064",
+  "name": "Memory Backed Operation Authorization Omission",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-privilege requester reaches an owner-only agent operation because a remembered grant is treated as current permission while the final handler omits operation-level authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|review|test)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|runbook|defensive|patched|fixed|must\\s+(?:bind|reject|verify|check)|do\\s+not|never|denied|not\\s+vulnerable|safe\\s+(?:implementation|example))\\b)(?=.*\\b(?:memory|RAG|retrieval|durable\\s+state|snapshot)\\b)(?=.*\\b(?:low[- ]privilege|unprivileged|low[- ]trust|subscriber|non[- ]admin|unauthenticated)\\b)(?=.*\\b(?:owner[- ]only|privileged|higher[- ]privilege|admin|elevated)\\b)(?=.*\\b(?:action|operation|tool|dispatch|execute|invoke|call|mutation|update)\\w*\\b)(?=.*\\b(?:missing|omitted|absent|without|no)\\b)(?=.*\\b(?:authorization|permission|capability|principal|scope|binding|access[- ]control)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-064"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-001",
+  "name": "ANSI Concealment Encoding Smuggling",
+  "version": "1.0",
+  "category": "terminal_output_encoding_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "ANSI SGR conceal spans can hide approval-laundering instructions in terminal output; scanners should reveal/normalize concealed text before applying the parent encoding-smuggling authority/action detector.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-001"
+}

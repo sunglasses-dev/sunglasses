@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-093",
+  "name": "Checkstyle XML Error-Message Suppression Directive",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Checkstyle XML Error-Message Suppression Directive: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 xML static analysis report formats (Checkstyle/PMD/SpotBugs), not covered by existing patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+report|incident\\s+report|postmortem).{0,240}\\b(?:flagged|detected|blocked|refused|reported)\\b)\n(?!.*\\b(?:security|scanner|training|guide|documentation|docs|runbook|reference).{0,200}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block)\\b)\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)\\b.{0,200}\\b(?:checkstyle|pmd|spotbugs|findbugs|static[-\\s]?analysis|analysis\\s+report)\\b)\n(?=.*(?:<\\s*checkstyle\\b|<\\s*pmd\\b|<\\s*cpd\\b|<\\s*BugCollection\\b|<\\s*BugInstance\\b|<\\s*LongMessage\\b|<\\s*violation\\b|<\\s*error\\b[^>]{0,120}\\bseverity\\s*=|\\bCheckstyle\\s+(?:XML|report)\\b|\\bPMD\\s+(?:XML|report)\\b|\\bSpotBugs\\s+(?:XML|report)\\b|\\bFindBugs\\s+(?:XML|report)\\b|\\bstatic[-\\s]?analysis\\s+report\\b))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai|llm|ci|code[-_\\s]?review|security)?[-_\\s]*(?:agents?|assistants?|scanners?|auditors?|reviewers?)(?![a-zA-Z0-9])|\\b(?:agents?|assistants?|scanners?|auditors?|reviewers?)\\b|agent[_-]?instructions?|scanner[_-]?policy|assistant\\s+policy))\n(?=.*(?:authoritative|canonical|(?:primary|single)\\s+source\\s+of\\s+truth|supersed(?:e|es|ed|ing)|overrides?|outranks?|ignore|disregard|agent\\s+instructions?|scanner\\s+notes?|assistant\\s+policy|for\\s+(?:ai\\s+)?agents?\\s*:|must\\s+be\\s+followed|defines\\s+(?:all\\s+)?rules?|operating\\s+(?:guidance|policy|runbook)|canonical\\s+(?:audit|analysis|review)\\s+verdict))\n(?=.*(?:suppress(?:es|ed|ing)?|hide|omit|redact|do\\s+not\\s+report|not\\s+report|do\\s+not\\s+flag|downgrade|mark.{0,50}?as\\s+(?:safe|clean|informational|non[-\\s]?blocking)|treat.{0,50}?as\\s+(?:safe|clean|informational|non[-\\s]?blocking)|include\\s+(?:[\\w-]+\\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\\s+keys?|local\\s+state|ci\\s+variables?)|forward\\s+(?:[\\w-]+\\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\\s+keys?|local\\s+state|ci\\s+variables?)|send\\s+(?:[\\w-]+\\s+){0,4}(?:env|environment|variables?|tokens?|secrets?|api\\s+keys?|local\\s+state|ci\\s+variables?)))\n(?=.*(?:findings?|violations?|warnings?|errors?|bugs?|bug\\s+instances?|failures?|security\\s+issues?|reports?|summar(?:y|ies)|verdicts?|release\\s+gates?|env|environment|variables?|tokens?|secrets?|api\\s+keys?|local\\s+state|ci\\s+variables?))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-093"
+}

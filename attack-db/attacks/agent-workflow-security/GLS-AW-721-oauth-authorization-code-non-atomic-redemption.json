@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-721",
+  "name": "Oauth Authorization Code Non Atomic Redemption",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A single-use OAuth authorization code can be redeemed twice when concurrent exchanges both pass a non-atomic read-before-delete check, minting independent access, refresh, and ID token sets.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?!.*\\b(?:documentation|unit\\s+test|security\\s+guide|negative\\s+fixture|defensive|must\\s+not|should\\s+reject|rejected|fixed|patched)\\b)(?=.*\\b(?:oauth2|oauth|authorization[_ -]?code|token\\s+endpoint)\\b)(?=.*\\b(?:concurrent|parallel|race|simultaneous|two\\s+requests)\\b)(?=.*\\b(?:find[- ]then[- ]delete|read[- ]before[- ]delete|non[- ]atomic|check[- ]then[- ]delete)\\b)(?=.*\\b(?:mint|issu(?:e|es|ed|ing)|creat(?:e|es|ed|ing)|return(?:s|ed|ing)?|generat(?:e|es|ed|ing))\\b)(?=.*\\b(?:access|refresh|id)\\b)(?=.*\\btoken(?:s|\\s+sets?)?\\b).*\\Z"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-721"
+}

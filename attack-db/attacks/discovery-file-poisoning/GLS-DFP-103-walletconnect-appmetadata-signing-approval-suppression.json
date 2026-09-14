@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-103",
+  "name": "WalletConnect appMetadata Signing-Approval Suppression",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "WalletConnect appMetadata Signing-Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 dApp and Web3 wallet manifest metadata, a unique attack surface.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:security|incident|postmortem|forensic|training|docs?|guide|reference|runbook)\\b.{0,140}\\b(?:detected|blocked|reported|flagged|refused|warned)\\b|\n  (?:wallet\\s+scanner|scanner|security\\s+tool)s?\\s+(?:docs?|guide|reference)\\s+should\\s+(?:report|detect|flag|refuse|block)\\b|\n  (?:do\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|\n     does\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|instruct)|\n     never\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override)|\n     must\\s+not\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override))\n))\n(?=.*(?:\\bdapp[_ -]?(?:metadata|manifest|info|description|label)\\b|\\bappMetadata\\b|\\bdappInfo\\b|\\bpeerMeta\\b|\\bwalletconnect\\b.{0,80}\\b(?:metadata|peer\\s*meta|app\\s*metadata)\\b|\\bsite\\s+manifest\\b|\\bweb\\s+app\\s+manifest\\b|\\borigin\\s+(?:metadata|label|manifest)\\b|\\bapp\\s+(?:description|label|manifest)\\b|\\bpreview\\s+origin\\s+label\\b|\\bx-wallet-agent\\b))\n(?=.*\\b(?:wallet\\s+(?:preview|signing|confirmation|approval)|signing\\s+preview|transaction\\s+preview|decoded\\s+(?:call|calldata)|approval|allowance|spender|signature\\s+request|bridge\\s+route|swap\\s+route|wallet\\s+receipt|permission\\s+prompt|confirm(?:ation)?)\\b)\n(?=.*(?:\\b(?:ai\\s+)?(?:wallet\\s+)?agents?\\b|\\bassistants?\\b|\\bcopilots?\\b|\\bmodels?\\b|\\bverifiers?\\b|\\bscanners?\\b|\\breviewers?\\b|(?<![a-zA-Z0-9])(?:agent|assistant|scanner|verifier|reviewer)[_-](?:instruction|note|policy|label|description)s?(?![a-zA-Z0-9])))\n(?=.*\\b(?:\n  (?:authoritative|canonical|primary|single)\\s+(?:approval\\s+|wallet\\s+|review\\s+)?(?:policy|source\\s+of\\s+truth|instruction|guidance)|\n  (?:override|overrides|supersede|supersedes|ignore|bypass)\\s+(?:[\\w-]+\\s+){0,3}(?:wallet|system|developer|security|scanner|review|confirmation|warning|risk)s?|\n  (?:suppress|hide|redact|downgrade|reclassify)\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|risks?|allowance|spender|slippage|bridge|approval|signature|transaction)s?|\n  (?:do\\s+not|not)\\s+(?:report|warn|flag|block|escalate)\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|risks?|allowance|spender|slippage|approval|signature|transaction)s?|\n  (?:mark|classify|treat).{0,55}?\\bas\\s+(?:safe|trusted|benign|informational|low[- ]?risk)|\n  (?:safe\\s+to\\s+(?:sign|approve|confirm|proceed)|pre[- ]?approved|trusted\\s+(?:dapp|app|spender|route)|proceed\\s+without\\s+(?:extra\\s+)?confirmation|skip\\s+(?:human\\s+)?confirmation)|\n  (?:include|attach|forward|send|share|copy|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|authorization\\s+headers?|bearer\\s+tokens?|api\\s+keys?|environment\\s+(?:variables?|context)|local\\s+state|wallet\\s+state|cookies?)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-103"
+}

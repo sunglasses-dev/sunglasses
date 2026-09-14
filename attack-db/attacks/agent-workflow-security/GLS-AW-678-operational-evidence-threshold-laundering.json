@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-678",
+  "name": "Operational Evidence Threshold Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An operational fraud-triage bundle launders an offline score or confidence estimate into approval authority while silently omitting the per-decision calibration, threshold, cost, latency, or adversarial-review evidence required for a safe disposition.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|policy|runbook|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|training|must\\s+not|do\\s+not|requires?\\s+(?:calibration|independent|human)\\s+review|advisory\\s+only|blocked)\\b)(?=.*\\b(?:fraud|scam|trust[- ]and[- ]safety|moderation|triage)\\b)(?=.*\\b(?:offline\\s+(?:accuracy|benchmark|performance)|confidence|score|calibration)\\b)(?=.*\\b(?:missing|omit\\w*|no|without|lacks?)\\b)(?=.*\\b(?:calibration|threshold|latency|cost|adversarial|per[- ]decision|operational)\\b)(?=.*\\b(?:approve|authorize|escalat|disposition|waive|accept|proceed)\\w*\\b)(?=.*\\b(?:human|reviewer|approval|decision|agent)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-678"
+}

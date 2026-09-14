@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-144",
+  "name": "Wallet Payment Uri Parameter Shadowing",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Payment Uri Parameter Shadowing: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting blockchain payment URI parameter shadowing to hide risks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:blocked|rejected|quarantined|incident\\s+report|defensive\\s+docs?|security\\s+training|unit\\s+test|test\\s+fixture|scanner\\s+keywords\\s+only|should\\s+(?:detect|flag|block|reject)|must\\s+(?:detect|flag|block|reject)|do\\s+not\\s+(?:trust|obey|decode|render)|never\\s+(?:trust|obey|decode|render)|preserve\\s+(?:warnings?|confirmation|provenance)|confirmation\\s+required)\\b)(?=.*(?:\\bwallet\\s+(?:uri|payment|qr|link|assistant|signing)|\\bpayment\\s+(?:uri|link|request|qr|memo|message)|\\bcheckout\\s+(?:uri|link|request)|\\binvoice\\s+(?:uri|link|request)|\\b(?:ethereum|bitcoin):|\\beip[- ]?681\\b|\\bqr\\s+(?:payload|payment|code)\\b))(?=.*(?:duplicate\\s+(?:query\\s+)?(?:param(?:eter)?|key|field)|repeated\\s+(?:message|label|memo|note|param(?:eter)?)|shadow(?:ed|ing)?\\s+(?:param(?:eter)?|key|field)|(?:param(?:eter)?|key|field)\\s+shadow(?:ed|ing)?|duplicate\\s+(?:agent(?:[_-]|\\s+)?policy|assistant(?:[_-]|\\s+)?notice|message|label|memo|note)\\s+fields?|query\\s+collision|second\\s+(?:message|label|memo|note|value)|(?:message|label|memo|note|agent(?:[_-]|\\s+)?policy|assistant(?:[_-]|\\s+)?notice)\\s*=.*(?:message|label|memo|note|agent(?:[_-]|\\s+)?policy|assistant(?:[_-]|\\s+)?notice)\\s*=|homoglyph\\s+(?:message|label|memo|parameter)|parameter\\s+(?:precedence|override|collision)))(?=.*\\b(?:wallet|sign(?:ing|ature)?|send\\s+transaction|transfer|recipient|amount|spender|allowance|chain|session|auth|human\\s+confirmation|confirmation)\\b)(?=.*\\b(?:approved|pre[-\\s]?approved|review\\s+passed|already\\s+(?:reviewed|cleared|verified|approved)|trusted|agent\\s*policy|assistant\\s*notice|suppress\\s+warnings?|hide\\s+(?:risk|warning)|skip\\s+confirmation|fast[-\\s]?track|mark\\s+(?:safe|trusted)|no\\s+extra\\s+(?:warning|confirmation))\\b).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-144"
+}

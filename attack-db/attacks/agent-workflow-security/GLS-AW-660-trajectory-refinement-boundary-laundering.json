@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-660",
+  "name": "trajectory refinement boundary laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A post-hoc 'refined' trajectory artifact inserts a hidden credential/session-forwarding step, and the HITL monitor approves it because it trusts local step plausibility instead of binding the artifact to the executed trace digest.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not|do\\s+not|never|reject|fail[- ]?closed|safe\\s+review)\\b)(?=.*\\b(?:post[- ]?hoc|refin(?:e|ed|ment)|review\\s+artifact|trajectory)\\b)(?=.*\\b(?:delegat(?:e|ed|ion)|handoff|human|monitor|reviewer)\\b)(?=.*\\b(?:execut(?:e|d)|trace|step|run)\\b)(?=.*\\b(?:faithful|plausible|benign|approved|trusted|refined)\\b)(?=.*\\b(?:hidden|insert|add|mutat|alter|splice|omit)\\w*\\b)(?=.*\\b(?:token|credential|secret|session|forward|send|suppress|conceal|bypass)\\w*\\b)(?=.*\\b(?:digest|provenance|binding|verify|attest|integrity)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-660"
+}

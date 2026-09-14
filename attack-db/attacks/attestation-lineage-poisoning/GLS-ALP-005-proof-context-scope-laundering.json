@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ALP-005",
+  "name": "Proof Context Scope Laundering",
+  "version": "1.0",
+  "category": "attestation_lineage_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A locally valid unit-proof PASS artifact is accepted as safety authorization for a different component, digest, or environment because scope, loop bounds, and environment model are never bound to the current verification target.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\"proof_status\"\\s*:\\s*\"pass\")(?=.*\"environment_model\"\\s*:\\s*\"mocked[^\\\"]*\")(?=.*\"current_component\"\\s*:\\s*\"[^\\\"]+\")(?=.*\"downstream_action\"\\s*:\\s*\"treat as verified for current component[^\\\"]*\")(?=.*\"current_source_sha256\"\\s*:\\s*\"[^\\\"]+\")"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ALP-005"
+}

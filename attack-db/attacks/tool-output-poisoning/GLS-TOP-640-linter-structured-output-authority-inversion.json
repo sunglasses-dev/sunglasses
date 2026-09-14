@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-640",
+  "name": "Linter Structured-Output Authority Inversion",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Linter Structured-Output Authority Inversion: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 linter-specific structured output and authority inversion not covered by general log patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|treat|use|trust|include|attach|forward|send|share|override|overrides?)\\b.{0,200}\\b(?:eslint|lint\\s+report|linter\\s+output|formatter\\s+output|diagnostic\\s+message)\\b)\n(?!.*\\b(?:training|docs?|guide|reference|security\\s+report|incident\\s+report)\\b.{0,160}\\b(?:agents?|assistants?|review\\s+bots?|scanners?)\\b.{0,120}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|ignore)\\b)\n(?=.*(?:\\bESLint\\b|\\beslint\\s+(?:--format|formatter|json|stylish)\\b|\\blint\\s+(?:report|output|diagnostics?)\\b|\\blinter\\s+(?:report|output|diagnostics?)\\b|\\bnpm\\s+run\\s+lint\\b|(?<!\\w)\"filePath\"\\s*:|(?<!\\w)\"messages\"\\s*:\\s*\\[|(?<!\\w)\"ruleId\"\\s*:|(?<!\\w)\"errorCount\"\\s*:|(?<!\\w)\"warningCount\"\\s*:))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|agents?|assistants?|ci\\s+agents?|review\\s+bots?|code[-\\s]?review\\s+agents?|security\\s+scanners?|autofix\\s+agents?|verifiers?|verifier_policy|assistant_instruction|agent_notes?|scanner_notes?)(?![a-zA-Z0-9]))\n(?=.*(?:\\b(?:canonical|authoritative|primary|single)\\s+(?:review\\s+)?(?:policy|source\\s+of\\s+truth|guidance|verdict)\\b|\\b(?:overrides?|supersedes?|outranks?|takes?\\s+precedence)\\b.{0,80}\\b(?:system|developer|review|scanner|lint|ci)\\s+(?:rules?|policy|instructions?|checks?)\\b|\\b(?:suppress(?:es|ed|ing)?|hide|omit|exclude|redact|downgrade|ignore|skip)\\b.{0,80}\\b(?:lint\\s+)?(?:errors?|warnings?|findings?|diagnostics?|vulnerabilit(?:y|ies)|reports?|checks?)\\b|\\b(?:mark|classify|treat|label)\\b.{0,60}\\b(?:clean|safe|passed|false\\s+positive|informational|non[-\\s]?blocking)\\b|\\b(?:do\\s+not|not)\\s+(?:report|flag|mention|surface)\\b.{0,80}\\b(?:errors?|warnings?|findings?|diagnostics?|vulnerabilit(?:y|ies))\\b|\\b(?:include|attach|forward|send|share|copy|provide|exfiltrate|collect)\\b\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context)|secrets?|api\\s+keys?|tokens?|session\\s+tokens?|bearer\\s+tokens?|local\\s+state|runtime\\s+context)\\b))\n(?=.*(?:\\b(?:lint\\s+)?(?:errors?|warnings?|findings?|diagnostics?|reports?|checks?)\\b|\\bvulnerabilit(?:y|ies)\\b|\\b(?:pr|pull\\s+request|merge|ci)\\s+(?:review|gate|verdict|status)\\b|\\b(?:env(?:ironment)?\\s+(?:variables?|context)|secrets?|api\\s+keys?|tokens?|session\\s+tokens?|bearer\\s+tokens?|local\\s+state|runtime\\s+context)\\b))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-640"
+}

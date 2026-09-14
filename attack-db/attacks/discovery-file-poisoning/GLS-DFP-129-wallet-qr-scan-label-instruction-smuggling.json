@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-129",
+  "name": "Wallet Qr Scan Label Instruction Smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Qr Scan Label Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique mechanism targeting QR code scanning and decoded labels in wallet contexts.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:incident\\s+report|blocked\\s+it|preserved\\s+confirmation)\\b)(?!.*\\b(?:do\\s+not|never|must\\s+not|refuse|reject|block(?:ed)?|cannot|can't)\\b.{0,120}\\b(?:suppress\\s+warnings?|hide\\s+risk|skip\\s+confirmation|trust\\s+the\\s+(?:qr|code|scan)|ignore\\s+(?:mismatch|address)|mark\\s+safe)\\b)(?=.*\\b(?:qr\\s*(?:code)?|scan(?:ned|ner)?|camera\\s+scan|ocr\\s+label|display\\s+label|scan\\s+caption|payment\\s+code|deeplink\\s+label)\\b)(?=.*\\b(?:wallet|walletconnect|wc:|ethereum:|sign(?:ature|ing)?|transaction|recipient|spender|address|chain(?:id)?|amount|token|human\\s+confirmation|payment\\s+request)\\b)(?=.*\\b(?:label|caption|overlay|alt\\s*text|preview\\s+text|merchant\\s+note|scanner\\s+result|decoded\\s+qr)\\b)(?=.*\\b(?:suppress\\s+warnings?|hide\\s+risk|skip\\s+confirmation|do\\s+not\\s+ask|trust\\s+the\\s+(?:qr|scan|code)|mark\\s+safe|ignore\\s+(?:mismatch|address|chain)|present\\s+as\\s+verified|routine\\s+payment)\\b).{0,3000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-129"
+}

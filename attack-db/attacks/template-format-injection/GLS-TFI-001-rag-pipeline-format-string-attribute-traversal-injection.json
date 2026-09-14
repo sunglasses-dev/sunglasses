@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TFI-001",
+  "name": "RAG Pipeline Format-String Attribute-Traversal Injection",
+  "version": "1.0",
+  "category": "template_format_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "RAG Pipeline Format-String Attribute-Traversal Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific Pythonic attribute-traversal execution mechanism within format strings (str.format).",
+  "keywords": [],
+  "regex": [
+    "(?i)\\{[a-zA-Z_]\\w*(?:\\.\\w+){1,4}\\.(set_role|override_system|get_secret|fetch_cred|run_cmd|exec_tool|set_permission|escalate_priv|bypass_auth)\\s*\\([^)]{0,200}\\)\\}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TFI-001"
+}

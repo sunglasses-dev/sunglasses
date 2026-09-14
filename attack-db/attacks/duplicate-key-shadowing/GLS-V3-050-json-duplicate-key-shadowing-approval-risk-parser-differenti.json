@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-050",
+  "name": "JSON duplicate-key shadowing approval/risk parser differential",
+  "version": "1.0",
+  "category": "duplicate_key_shadowing",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A JSON object with duplicate risk or approval keys can make one parser display a safe value while the AI agent's parser consumes a later conflicting value such as `green_lane` or risk `0`.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-050"
+}

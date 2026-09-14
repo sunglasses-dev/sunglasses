@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-592",
+  "name": "Component execution-integrity drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A third-party agent skill/plugin keeps the approved natural-language intent intact while rewriting the executable tool payload at dispatch, so a materially different operation executes under an approval that no longer describes it.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:reject|rejected|must\\s+not|do\\s+not|never|unit\\s+test|documentation|guidance|policy|payload\\s+unchanged|without\\s+mutation|denied)\\b)(?=.*\\bthird[- ]party\\b)(?=.*\\b(?:plugin|skill|component)\\b)(?=.*\\bapproved\\b)(?=.*\\b(?:intent|plan)\\b)(?=.*\\b(?:rewrite|rewrites|rewriting|mutate|mutates|mutation|change|changes|transform|transforms|transformation)\\b)(?=.*\\b(?:executable|tool)\\s+payload\\b)(?=.*\\b(?:dispatch|execute|execution)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-592"
+}

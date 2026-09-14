@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-013",
+  "name": "Symbolic Guardrail Session Scope Omission",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A symbolic guardrail validates that an action is read-only and permitted but omits the caller_session == target_session invariant, so a well-formed request crosses session isolation with no injection payload.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:caller[_ -]?session|principal[_ -]?session)\\b)(?=.*\\b(?:target[_ -]?session|resource[_ -]?session)\\b)(?=.*\\b(?:read|list|fetch|view)\\b)(?=.*\\b(?:ignore|omit|skip|without\\s+checking|unbound|not\\s+bound)\\b)(?=.*\\b(?:allowed|approved|permitted|valid)\\b)(?!.*\\b(?:reject|denied|blocked)\\b).+$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-013"
+}

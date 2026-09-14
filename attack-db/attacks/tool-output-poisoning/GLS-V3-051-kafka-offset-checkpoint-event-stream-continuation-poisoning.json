@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-051",
+  "name": "Kafka offset checkpoint event-stream continuation poisoning",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Kafka consumer offset/checkpoint metadata can be poisoned to make an agent treat a stream-continuation cursor as proof that a prior change-token or release gate already settled, causing it to deploy and hide blockers.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-051"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-141",
+  "name": "Prettier config metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Prettier config metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 common dev tool config not covered by existing lint/CI config patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:security|incident|vulnerability|training|runbook|reference|guide|docs?)\\b.{0,180}\\b(?:detected|blocked|flagged|refused|reported|must\\s+be\\s+reported|not\\s+obeyed|should\\s+(?:report|detect|flag|refuse|block))|(?:prettier|\\.prettierrc|formatter\\s+config(?:uration)?).{0,140}\\b(?:is|are)\\s+not\\s+(?:authoritative|policy|instructions?)|(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not|should\\s+never)\\s+(?:obey|follow|treat|use|trust|override|overrides?|supersede|include|attach|forward|send|share)))\n(?=.*(?:\\.prettierrc(?:\\.(?:json|json5|yaml|yml|js|cjs|mjs|toml))?|prettier\\.config\\.(?:js|cjs|mjs|ts)|(?<!\\w)\"prettier\"\\s*:|prettier\\s+(?:configuration|config|options?|overrides?|metadata)|printWidth\\b|tabWidth\\b|singleQuote\\b|trailingComma\\b|bracketSpacing\\b|proseWrap\\b))\n(?=.*(?:(?<![a-zA-Z0-9])(?:ai|autonomous|automated|security|code|dependency|formatting|formatter)\\s+(?:agents?|assistants?|scanners?|reviewers?|auditors?|review|audit|scan|verification)(?![a-zA-Z0-9])|\\bagents?\\b|\\bassistants?\\b|\\bscanners?\\b|agent\\s+instructions?|scanner\\s+instructions?|assistant\\s+directive|formatter\\s+review))\n(?=.*(?:(?:suppress(?:es|ed|ing)?|hide|hides|hidden|omit(?:s|ted|ting)?|exclude(?:s|d|ing)?|redact(?:s|ed|ing)?|downgrade(?:s|d|ing)?|deprioritize(?:s|d|ing)?|demote(?:s|d|ing)?|reclassif(?:y|ies|ied|ying)|skip|ignore|do\\s+not\\s+report|not\\s+report|keep|leave).{0,90}(?:findings?|warnings?|alerts?|reports?|issues?|vulnerabilit(?:y|ies)|diagnostics?|observations?|results?|formatting\\s+errors?|lint\\s+findings?|security\\s+findings?|audit\\s+memos?|summar(?:y|ies)|review\\s+notes?)|(?:findings?|warnings?|alerts?|reports?|issues?|diagnostics?|observations?|results?)\\s+(?:are|is|should\\s+be|must\\s+be)\\s+(?:suppressed|hidden|omitted|excluded|redacted|downgraded|deprioritized|treated\\s+as\\s+(?:advisory-only|informational|non-blocking)|considered\\s+(?:advisory-only|informational|non-blocking))|(?:include|attach|forward|send|share|provide|expose|collect|copy|read|pass\\s+along|hand\\s+off|relay|transfer).{0,110}(?:env(?:ironment)?\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:context|variables?|details?|config(?:uration)?|settings?|material|evidence|artifacts?)|local\\s+(?:state|config(?:uration)?|settings?)|api\\s+tokens?|tokens?|secrets?|authorization\\s+headers?|session\\s+(?:cookies?|tokens?)|credentials?)))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-141"
+}

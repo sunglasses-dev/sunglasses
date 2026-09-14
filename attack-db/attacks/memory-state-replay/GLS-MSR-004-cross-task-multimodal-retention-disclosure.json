@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MSR-004",
+  "name": "Cross Task Multimodal Retention Disclosure",
+  "version": "1.0",
+  "category": "memory_state_replay",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Sensitive content extracted from an image is retained in multimodal memory and rendered into a later, unrelated task's output because the memory path carries no modality provenance, collection-purpose, recipient-scope, or expiry binding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|quarantined|safe|policy)\\b)(?=.*\\b(?:image[- ]derived|visual|vision|OCR|multimodal)\\b)(?=.*\\b(?:sensitive|private|personal|confidential)\\b)(?=.*\\b(?:retained|persist(?:ed|s)?|stored|memory)\\b)(?=(?:.*\\b(?:different|unrelated|later)\\s+task\\b|.*\\bcross[- ]task\\b))(?=.*\\b(?:disclos|render|expos|retriev)\\w*\\b)(?=.*(?:\\b(?:without|missing|lack\\w*)\\s+(?:(?:modality\\s+)?provenance|modality|purpose|recipient|scope)(?:\\s+binding)?\\b|\\bpurpose\\s+is\\s+not\\s+checked\\b|\\bno\\s+(?:recipient|modality|purpose|provenance)\\s+binding\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MSR-004"
+}

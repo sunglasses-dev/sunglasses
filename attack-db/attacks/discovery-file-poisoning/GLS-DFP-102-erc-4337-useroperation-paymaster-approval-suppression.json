@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-102",
+  "name": "ERC-4337 UserOperation Paymaster Approval Suppression",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "ERC-4337 UserOperation Paymaster Approval Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 addresses Account Abstraction (ERC-4337) and Paymaster metadata poisoning.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:do\\s+not|does\\s+not|must\\s+not|never)\\s+(?:obey|follow|trust|treat|accept|use|execute)\\b.{0,110}\\b(?:paymaster|bundler|user\\s*operation|userop|erc[-\\s]?4337|account\\s+abstraction|gas\\s+sponsor|sponsorship|entrypoint|session\\s+key)\\b|\n  (?:security|scanner|training|incident|postmortem|guide|docs?|reference|runbook|support\\s+article)\\b.{0,120}\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block|warn|reject)\\b.{0,150}\\b(?:safe\\s+to\\s+sign|trusted\\s+sponsor|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|skip\\s+confirmation|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:allowance|session\\s+key|risk))|\n  (?:incident|postmortem|security\\s+report)\\b.{0,160}(?:(?:blocked|detected|flagged|refused|warned|rejected)\\b.{0,160}\\b(?:agent\\s+instruction|trusted\\s+sponsor|safe\\s+to\\s+sign|skip\\s+confirmation)|(?:agent\\s+instruction|trusted\\s+sponsor|safe\\s+to\\s+sign|skip\\s+confirmation)\\b.{0,160}\\b(?:blocked|detected|flagged|refused|warned|rejected))\n))\n(?=.*\\b(?:erc[-\\s]?4337|account\\s+abstraction|user\\s*operation|userop|entry\\s*point|paymaster|bundler|gas[-\\s]?(?:sponsor|sponsored|sponsorship)|sponsored\\s+(?:transaction|operation)|session\\s+key|smart\\s+account|aa\\s+wallet|bundler\\s+simulation|paymaster\\s+reputation)\\b)\n(?=.*\\b(?:ai\\s+agents?|wallet\\s+agents?|assistants?|models?|llms?|scanners?|verifiers?|agent(?:[_-]|\\s+)?(?:instruction|notice|policy|message)|assistant(?:[_-]|\\s+)?(?:instruction|notice|policy|message)|wallet(?:[_-]|\\s+)?agent)\\b)\n(?=.*\\b(?:sign(?:ature|ing)?|approve|approval|allowance|spender|session\\s+key|delegate|transfer|swap|bridge|confirm(?:ation)?|warning|warnings|risk|human\\s+review|sponsored\\s+(?:operation|transaction)|user\\s*operation)\\b)\n(?=.*\\b(?:\n  (?:agent|assistant|model|wallet\\s+agent|scanner|verifier)\\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|\n  (?:authoritative|canonical|primary|single)\\s+(?:wallet\\s+|paymaster\\s+|bundler\\s+|sponsor\\s+)?(?:source\\s+of\\s+truth|policy|guidance|instruction|reputation)|\n  trusted\\s+sponsor|verified\\s+sponsor|safe\\s+to\\s+sign|mark\\s+(?:it|this|operation|user\\s*operation|transaction).{0,50}\\bsafe|treat.{0,70}\\bas\\s+(?:safe|verified|trusted|read[-\\s]?only|pre[-\\s]?approved)|\n  (?:do\\s+not|not)\\s+(?:warn|report|ask|prompt|escalate)|skip\\s+(?:the\\s+)?(?:warning|confirmation|review|human\\s+review)|proceed\\s+without\\s+(?:extra\\s+|user\\s+|human\\s+)?(?:review|confirmation|asking)|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk|session\\s+key)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|allowance|risk|session\\s+key)|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:allowance|spender|session\\s+key|delegate|risk|warning)|\n  (?:include|forward|send|attach|provide|copy|read|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|wallet\\s+state|local\\s+state|environment\\s+(?:variables?|context)|cookies?|api\\s*keys?|authorization\\s+headers?)\n)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-102"
+}

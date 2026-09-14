@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-108",
+  "name": "Wallet Preview Linked Dashboard Prompt Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Wallet Preview Linked Dashboard Prompt Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 wallet-specific simulation dashboard links, distinct from general API portal metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*(?:wallet[_ -]?preview|signing\\s+request|transaction\\s+simulation|simulation\\s+receipt|decoded\\s+calldata|risk\\s+dashboard|security\\s+dashboard|route\\s+dashboard|preview\\s+link|receipt\\s+link|trace[_\\s-]?url|explorer\\s+note|tooltip|href\\s+title|link\\s+title|markdown\\s+link))(?=.*(?:sign|approve|approval|permit|spender|allowance|unlimited|transfer|bridge|swap|route|slippage|confirmation|warning|human\\s+approval))(?=.*(?:dashboard|linked\\s+(?:page|summary|risk\\s+note)|external\\s+(?:risk|simulation)|tooltip|title|href|url|markdown\\s+link|trace\\s+link|preview\\s+link))(?=.*(?:agent|assistant|wallet\\s+agent|model|scanner))(?=.*(?:safe\\s+to\\s+sign|do\\s+not\\s+warn|skip\\s+(?:human\\s+)?confirmation|trusted\\s+spender|hide\\s+(?:the\\s+)?risk|suppress\\s+(?:the\\s+)?warning|ignore\\s+(?:the\\s+)?(?:allowance|slippage)|proceed\\s+without\\s+asking|mark\\s+(?:it|this|transaction|route).{0,50}\\bsafe))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-108"
+}

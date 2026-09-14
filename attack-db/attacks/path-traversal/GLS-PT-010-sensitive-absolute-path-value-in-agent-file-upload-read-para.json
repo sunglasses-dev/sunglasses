@@ -1,0 +1,31 @@
+{
+  "id": "GLS-PT-010",
+  "name": "Sensitive absolute-path value in agent file-upload/read parameter",
+  "version": "1.0",
+  "category": "path-traversal",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "An untrusted, prompt-influenced file-upload/read tool PARAMETER VALUE (quoted or :/=-assigned) references a sensitive absolute path (/etc/{shadow,passwd}, DB config, SSH/private keys, cloud credentials, real .env, secrets dirs) and is accepted after path validation is bypassed. Carrier hardening of the sensitive-file-read/path-traversal family (GLS-PT-001, GLS-SC-002) for the agent tool-parameter carrier and absolute (non-../) paths. Requires the path to be a param value not free prose; excludes cert .pem and .env.example/.sample/.template. Source: Composio CVE.",
+  "keywords": [
+    "file_uploadable /etc/shadow",
+    "read_file path=/etc/passwd",
+    "upload id_rsa param",
+    ".aws/credentials tool param",
+    "/app/.env read_file param"
+  ],
+  "regex": [
+    "(?i)\\b(?:file_uploadable|read_file|upload|attach|open|load_file|include|import_file)\\b[^\\n]{0,80}?(?:['\\\"][^'\\\"\\n]{0,80}?(?:/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\\.conf|/root/|/proc/self|\\.ssh/|\\.aws/credentials|\\.kube/config|application_default_credentials|id_rsa|id_ed25519|id_dsa|/var/(?:lib|run)/secrets|\\.env(?![.\\w])|private[_-]?key|private[a-z0-9_]*\\.pem)|[:=]\\s*[^\\s'\\\"\\n]{0,80}?(?:/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\\.conf|/root/|/proc/self|\\.ssh/|\\.aws/credentials|\\.kube/config|application_default_credentials|id_rsa|id_ed25519|id_dsa|/var/(?:lib|run)/secrets|\\.env(?![.\\w])|private[_-]?key|private[a-z0-9_]*\\.pem))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PT-010"
+}

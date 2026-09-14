@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-657",
+  "name": "Safety-rule synthesis annotation poisoning",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A poisoned or scope-mismatched safe/unsafe trace annotation is mined as a counterexample by a CEGIS/ILP rule-evolution loop and synthesized into a permissive safety-rule edit that suppresses a later unsafe action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|blocked|rejected|quarantin|independent(?:ly)?\\s+(?:verify|validate|adjudicat))\\b)(?=.*(?:annotat|label|trace))(?=.*(?:poison|mislabel|flipped|false[- ]negative|scope[- ]mismatch|untrusted|attacker[- ]shaped))(?=.*(?:CEGIS|counterexample[- ]guided|ILP|inductive\\s+logic|rule[- ](?:evolution|edit|synthesis)|safety\\s+rule))(?=.*(?:mine|learn|synthes|edit|evolut|update|revise|accepted))(?=.*(?:permissive|relax|allow|suppress|omit|bypass|waive|unsafe|harmful)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-657"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-002",
+  "name": "Identity Profile Active Session Binding Confusion",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A retrieved victim identity profile is accepted for the current agent session without jointly binding person, tenant, principal, session, and provenance, so downstream account, phishing, recipient, or approval actions inherit the wrong identity context.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|review)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:bind|verify|reject|compare)|do\\s+not\\s+(?:trust|reuse|accept|assign)|never\\s+(?:impersonate|phish|use))\\b)(?=.*\\b(?:identity\\s+profile|victim\\s+identity|employee\\s+identity|identity\\s+record|persona\\s+record)\\b)(?=.*\\b(?:retriev(?:e|ed|al)|RAG|memory|profile|record|website|leaked)\\b)(?=.*\\b(?:session|tenant|current\\s+(?:user|principal)|account|recipient|actor)\\b)(?=.*\\b(?:wrong|foreign|mismatched|unbound|unverified|attacker[- ]controlled|impersonat|spoof)\\w*\\b)(?=.*\\b(?:accept|use|assign|bind|create|establish|phish|send|approve|route|target)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-002"
+}

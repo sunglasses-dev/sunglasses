@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-041",
+  "name": "Cookiecutter scaffold receipt template-injection hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Cookiecutter/Copier scaffold notes can launder template-receipt language into false maintainer approval for AI repository-creation agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-041"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-025",
+  "name": "Layer Paradigm Coverage Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A browser security dashboard converts a clean result from some AI-agent layers into an overall approval while an agent-behavior or model layer is unknown, omitted, or untested.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs?|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|security\\s+(?:guide|training)|defensive|patched|fixed|mitigated|blocked|quarantined|must\\s+not|do\\s+not|never)\\b)(?=.*\\b(?:dashboard|browser|rendered|security\\s+(?:assessment|report)|AI[- ]Infra[- ]Guard)\\b)(?=.*\\b(?:infrastructure|protocol[/ ]tool|agent[- ]behavior|model[- ]layer|jailbreak)\\b)(?=.*\\b(?:untested|not\\s+(?:run|tested)|unavailable|omitted|missing|unknown)\\b)(?=.*\\b(?:clean|no\\s+findings|passed|complete|approved|approval)\\b)(?=.*(?:[\\\"']?skip[_ -]missing[_ -]layer[\\\"']?\\s*[:=]\\s*true|\\b(?:skip|bypass|disable|without|proceed|continue|treat)\\b[^.\\n]{0,160}\\b(?:review|control|safety|check|layer|agent)\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-025"
+}

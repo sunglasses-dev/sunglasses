@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-005",
+  "name": "delegated threat-model profile omission laundering",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A defense evaluation result valid only under a specific query budget, data budget, and interface profile is laundered into a universal-robustness claim when the delegated handoff omits those scope dimensions and an approver clears the unscoped result.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:defensive|documentation|research|unit test|test fixture|incident report|must not|rejected|requires binding|revalidation|benign control|safe handling))(?=.*(?:delegated|delegation|handoff|approver|HITL|human-in-the-loop))(?=.*(?:defense|antidistillation|distillation|robustness))(?=.*(?:effective|successful|robust|safe|approved|approve|cleared))(?=.*(?:omitted|missing|absent|unbound|unspecified|not reported))(?=.*(?:query budget|data budget|interface profile|interaction profile))(?=.*(?:universal|generalized|generalised|all attackers|threat-model)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-005"
+}

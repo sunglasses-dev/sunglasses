@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-674",
+  "name": "Attribution To Narration Explanation Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A fluent LLM narration derived from structured SHAP attribution omits or reframes adverse evidence, and a delegated reviewer approves from the narration without independently checking the raw attribution record.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|policy)|scanner\\s+(?:rule|docs?)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|do\\s+not\\s+(?:approve|trust|omit)|raw\\s+(?:record|attribution)\\s+(?:was|is)\\s+(?:checked|verified)|complete\\s+(?:attribution|explanation))\\b)(?=.*\\b(?:SHAP|attribution|feature\\s+contribution|model\\s+explanation)\\b)(?=.*\\b(?:LLM|language\\s+model|generated|narrative|summary)\\b)(?=.*\\b(?:omit(?:ted|s|ting)|missing|partial|refram(?:e|ed|ing)|reverse(?:d|s)?)\\b)(?=.*\\b(?:adverse|risk|fraud|negative|security)\\s+(?:feature|contribution|evidence|finding)\\w*\\b)(?=.*\\b(?:delegat(?:ed|e)|human[- ]review|reviewer|approval)\\b)(?=.*\\b(?:approve|accept|authorize|greenlight)\\w*\\b)(?=.*\\b(?:without|instead\\s+of|rather\\s+than|never)\\s+(?:independently\\s+)?(?:check|inspect|verify|review)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-674"
+}

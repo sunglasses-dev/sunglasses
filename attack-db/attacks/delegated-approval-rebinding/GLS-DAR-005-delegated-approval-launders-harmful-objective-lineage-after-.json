@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DAR-005",
+  "name": "Delegated approval launders harmful-objective lineage after iterative reframing",
+  "version": "1.0",
+  "category": "delegated_approval_rebinding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An evaluator's 'benign' verdict on an iteratively reframed candidate is reused as delegated/session authorization after the original objective's lineage is dropped, so a sensitive action executes with no fresh risk assessment.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:iteration|iterative|multi[- ]model|candidate|refram(?:e|ed|ing)|rewrite)\\b)(?=.*\\b(?:evaluator|reviewer|judge|judged|evaluation)\\b)(?=.*\\b(?:accepted|approved|benign|safe)\\b)(?=.*\\b(?:final|assembled|later|delegat(?:ed|ion)|handoff|lost|forwards?)\\b)(?=.*\\b(?:session|handoff|forward|action)\\b)(?=.*\\b(?:targeted[_ -]?harm\\w*|synthetic[_ -]?session\\w*|sensitive|credential|exfil)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DAR-005"
+}

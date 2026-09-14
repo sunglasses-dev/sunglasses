@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MSR-002",
+  "name": "multimodal safety-defense result rebinding across visual inputs",
+  "version": "1.0",
+  "category": "memory_state_replay",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A cached multimodal safety-defense verdict from a prior visual input is rebound to a different later visual input because the cache key omits canonical input identity, so the new item's fresh safety analysis is skipped.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|documentation|unit test|incident report|postmortem|defensive|must not|do not|never)\\b)(?=.*\\b(?:retrieved memory|memory record|RAG|knowledge[- ]base|cache)\\b)(?=.*\\b(?:cached|stale|prior|previous)\\b)(?=.*\\b(?:defen[cs]e|safety)\\b)(?=.*\\b(?:safe|passed|over[- ]?refusal)\\b)(?=.*\\b(?:new visual|later visual|different visual|new image|attacker[- ]image|new multimodal)\\b)(?=.*\\b(?:reuse|rebind|apply|carry|reused|applied)\\b)(?=.*\\b(?:skip|omit|without|no fresh|no input)\\b)(?=.*\\b(?:fresh safety|fresh analysis|identity check|input hash|visual analysis|safety analysis)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MSR-002"
+}

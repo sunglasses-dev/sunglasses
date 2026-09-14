@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-024",
+  "name": "Cross-stage training-artifact lineage confusion",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A staged SFT->DPO/PPO post-training handoff drops source lineage and per-contributor poison attribution, so a later stage composes individually-weak poisoned artifacts that every per-stage review passed as clean.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|fixture|incident|postmortem|defensive|must\\s+not|do\\s+not|never|reject(?:ed)?|quarantin(?:e|ed)|blocked)\\b)(?=.*\\b(?:SFT|DPO|PPO|post[- ]training|alignment|reward\\s+model)\\b)(?=.*\\b(?:stage|handoff|pipeline|manifest|dataset|artifact)\\b)(?=.*\\b(?:lineage|provenance|source\\s+(?:owner|identity)|contributor)\\b)(?=.*\\b(?:missing|absent|unknown|contradictory|dropped|unattributed)\\b)(?=.*\\b(?:consume|merge|accept|continue|compose|downstream)\\w*\\b)(?=.*\\b(?:poison|attacker|untrusted|malicious)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-024"
+}

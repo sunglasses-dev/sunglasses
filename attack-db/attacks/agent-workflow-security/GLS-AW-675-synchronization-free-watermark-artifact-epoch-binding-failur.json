@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-675",
+  "name": "Synchronization Free Watermark Artifact Epoch Binding Failure",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid self-contained local watermark fingerprint is promoted to delegated authorship/publication approval even though it is not bound to the exact submitted artifact, current verification epoch, or review task.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training)|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|defensive|must\\s+(?:bind|verify|reject|revalidate)|do\\s+not\\s+(?:treat|approve|delegate)|safe\\s+(?:handling|verification))\\b)(?=.*\\bwatermark(?:ing)?\\b)(?=.*\\b(?:local|neighboring|token[ -]*pair|binary\\s+congruence|reed[ -]*solomon)\\b)(?=.*\\b(?:fingerprint|identity|provenance|authorship)\\b)(?=.*\\b(?:artifact|text|sequence|token)\\s*(?:digest|hash|identity|binding|exact)\\b|\\b(?:digest|hash|identity)\\s*(?:of|for)\\s+(?:the\\s+)?(?:submitted\\s+)?(?:artifact|text|sequence)\\b)(?=.*\\b(?:missing|absent|without|skip(?:ped|ping)?|no\\s+current|not\\s+bound|unbound)\\b)(?=.*\\b(?:epoch|task|delegat\\w*|approv\\w*|publish\\w*|release)\\b)(?=.*\\b(?:approve|approval|delegate|publish|release|accept|sufficient|complete)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-675"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-024",
+  "name": "OpenAPI securitySchemes capability-escalation laundering (hardening row)",
+  "version": "1.0",
+  "category": "api_descriptor_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "OpenAPI security-scheme metadata can tell AI client or integration agents that OAuth/admin scopes are already pre-cleared, laundering a descriptive API contract field into a capability grant.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-024"
+}

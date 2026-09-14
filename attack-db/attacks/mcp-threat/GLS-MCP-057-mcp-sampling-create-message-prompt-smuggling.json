@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-057",
+  "name": "Mcp Sampling Create Message Prompt Smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Mcp Sampling Create Message Prompt Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP sampling/createMessage protocol method, a distinct agent-to-client prompt smuggling channel.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?=.*\"method\"\\s*:\\s*\"sampling/createMessage\")(?=.*\\b(?:messages|systemPrompt|includeContext|modelPreferences)\\b)(?=.*\\b(?:ignore|disregard|override|bypass|disable|suppress|never\\s+(?:ask|show)|do\\s+not\\s+(?:ask|show|warn|confirm)|no\\s+(?:approval|confirmation|review|consent)|treat\\s+(?:this|server|prompt)[^\\n]{0,80}highest\\s+priority)\\b)(?=.*\\b(?:system|developer|policy|safety|approval|consent|warning|secret|token|api[-_ ]?key|credentials?|env(?:ironment)?\\s+var|private\\s+key|oauth|ssh|exfiltrat|post\\s+to|send\\s+to|highest\\s+priority)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-057"
+}

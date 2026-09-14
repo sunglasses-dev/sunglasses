@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PCF-669",
+  "name": "Typed Graph Alias Edge Rebinding",
+  "version": "1.0",
+  "category": "provenance_chain_fracture",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A staged CTI knowledge-graph pipeline joins records by a lossy normalized alias instead of an immutable record ID, so a verifier-approved relation or provenance edge is inherited across an alias collision and rebound to the wrong entity.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|internal\\s+review|safe\\s+curator|quarantine|must\\s+reject|preserve\\s+immutable\\s+id|untrusted\\s+evidence|without\\s+any\\s+alias)\\b)(?=.*\\b(?:typed|typing|entity[_ -]?record|extraction)\\b)(?=.*\\b(?:alias|normalized|canonicali[sz]ed)\\b)(?=.*\\b(?:collision|same[_ -]?key|join)\\b)(?=.*\\b(?:verif(?:ied|ication)|approved)\\b)(?=.*\\b(?:relation|edge|provenance)\\b)(?=.*\\b(?:rebind|attach|apply|inherit|cross[- ]record|wrong\\s+entity)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PCF-669"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-039",
+  "name": "Training-Data-Memorization-Reproduction",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model-generated clinical augmentation output reproduces a memorized private training record verbatim, and a downstream agent accepts it as fresh synthetic evidence rather than detecting privacy leakage.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:privacy\\s+guidance|unit\\s+test|incident\\s+report|security\\s+scanner\\s+rule|must\\s+not|do\\s+not\\s+copy|blocked\\s+the\\s+output|refuses?\\s+verbatim|without\\s+requesting|fictional|generalized|paraphrased|aggregate)\\b)(?=.*\\b(?:memorized|training\\s+(?:data|record|example)|learned\\s+clinical)\\b)(?=.*\\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\\b)(?=.*\\b(?:patient|private|clinical|identifier|record|note|narrative)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-039"
+}

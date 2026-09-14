@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-567",
+  "name": "cross-file dependency retrieval context poisoning",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled sibling file retrieved as cross-file dependency context by an autonomous repair curator loses its path provenance and is read as repair guidance, suppressing a required security patch and falsely closing the finding.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|guide|unit\\s+test|test\\s+fixture|incident report|quarantine|safe worker|refused|rejected|must not|do not treat|evidence only|preserve provenance)\\b)(?=.*\\b(?:RAG|retriev(?:ed|al)|curator|cross[- ]file|dependency)\\b)(?=.*\\b(?:repair|patch|vulnerability|authz|authorization)\\b)(?=.*\\b(?:do not patch|skip|suppress|waive|mark(?:ed)?\\s+(?:fixed|as fixed)|close (?:the )?vulnerability)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-567"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-677",
+  "name": "Rare Correlated Evidence Inflation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated reverse-engineering workflow counts multiple reports derived from one attacker-controlled binary as independent support, laundering a false fused claim into downstream analyst authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+not|do\\s+not|never|fail[- ]closed|requires?\\s+(?:independent|provenance)|preserves?\\s+(?:lineage|uncertainty))\\b)(?=.*(?:reverse[- ]engineering|decompiler|Ghidra|r2pipe|angr))(?=.*(?:same\\s+(?:attacker[- ]controlled\\s+)?(?:binary|origin|source)|shared[- ](?:extraction|tool|lineage)|correlated|not\\s+(?:statistically\\s+)?independent|one\\s+origin))(?=.*(?:count|treat|consider).{0,160}(?:records?|reports?|outputs?|observations?).{0,160}(?:independent|separate|corroborat))(?=.*(?:false\\s+claim|unsafe\\s+action|authorize|approval|validated|promote)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-677"
+}

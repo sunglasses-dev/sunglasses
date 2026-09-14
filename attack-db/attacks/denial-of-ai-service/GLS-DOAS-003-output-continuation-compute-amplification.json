@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DOAS-003",
+  "name": "Output Continuation Compute Amplification",
+  "version": "1.0",
+  "category": "denial_of_ai_service",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A rendered Continue / Load-more / pagination control is promoted from output presentation state into generation authority, so one accepted response schedules repeated long completions and drains the shared inference budget below any ingress rate limit.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked|quarantined|must not|do not|never|defensive|safe)\\b)(?=.*\\b(?:browser|web|UI|rendered|chat)\\b.{0,220}\\b(?:continue|next page|pagination|load more|expand output|more tokens)\\b)(?=.*\\b(?:long(?:er)? output|(?:max_)?tokens?|completion|generation|response)\\b.{0,220}\\b(?:repeat|again|multiple|unbounded|extend|expand|consume|spend|exhaust|budget|cost)\\b)(?=.*\\b(?:inference|generation|completion|compute|resource|token)\\b.{0,180}\\b(?:budget|cost|exhaust|amplif|repeat|unbounded|overload)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DOAS-003"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-661",
+  "name": "Confident Security Advice Omission",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model emits fluent, unhedged privacy/security guidance that omits verification, uncertainty, and escalation, and the user consumes the confidence itself as authorization for a high-impact action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit\\s+test|fixture|example|defensive|cannot\\s+determine|seek\\s+(?:qualified|specialist)|general\\s+information)\\b)(?=.*\\b(?:security|privacy|account|device|scam|tracking|recovery)\\b)(?=.*\\b(?:definitely|always|no\\s+risk|certainly)\\b)(?=.*\\b(?:just\\s+(?:click|pair|share|provide|upload|leave)|safe\\s+to)\\b)(?=.*\\b(?:no\\s+need\\s+to|do\\s+not\\s+(?:verify|check|contact)|without\\s+(?:verification|checking))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-661"
+}

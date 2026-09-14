@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TOP-643",
+  "name": "OSC 8 hyperlink tool-output prompt smuggling",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "OSC 8 hyperlink tool-output prompt smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new mechanism: hiding instructions inside terminal OSC 8 hyperlink targets to bypass visibility.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\\x1b\\]8;;|\\\\x1b\\]8;;|\\\\033\\]8;;|\\\\u001b\\]8;;|ESC\\]8;;|OSC\\s*8\\s+hyperlink\\s+target:)[^\\r\\n]{0,300}(?:(?:ignore|override|bypass|skip(?:\\s|%20)+(?:approval|validation)|do(?:\\s|%20)+not(?:\\s|%20)+(?:ask|mention|verify)|send|reveal|exfiltrat\\w+)[^\\r\\n]{0,160}(?:token|secret|api(?:\\s|%20)*key|credentials?|approval|validation|policy)|(?:token|secret|api(?:\\s|%20)*key|credentials?)[^\\r\\n]{0,160}(?:send|reveal|exfiltrat\\w+|bypass))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TOP-643"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-JBE-006",
+  "name": "toxicity-surface intent decoupling via minimal token evolution",
+  "version": "1.0",
+  "category": "jailbreak_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Five or so minimal token substitutions drive a toxicity-only moderation score low while unsafe intent survives, and a downstream selector misreads the low surface score as authorization to permit the action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:harmless|benign|safe|unit\\s+test|documentation|defensive|ordinary)\\b)(?=.*\\b(?:toxicity[-_ ]?(?:only|based)|toxicity\\s+moderation|toxicity\\s+filter)\\b)(?=.*\\b(?:token[-_ ]substitutions?|token[-_ ]evolution|lexical[-_ ]toxicity|surface[-_ ]toxicity)\\b)(?=.*\\b(?:semantic[_ -]?intent[_ -]?preserved|intent[_ -]?class.{0,20}(?:unsafe|restricted|disallowed))\\b)(?=.*\\b(?:permit|proceed|allow)\\b)(?=.*\\b(?:0\\.[0-9]+|low)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-JBE-006"
+}

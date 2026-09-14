@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-046",
+  "name": "MCP roots/list Percent-Encoded URI Smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP roots/list Percent-Encoded URI Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP roots configuration list, a distinct and uncovered attack vector.",
+  "keywords": [],
+  "regex": [
+    "(?is)\"roots\"\\s*:\\s*\\[\\s*\\{(?=[\\s\\S]{0,2200}\"uri\"\\s*:\\s*\"(?:file|git|repo|workspace|vscode|cursor):[^\"\\\\]*(?:(?:%69%67%6e%6f%72%65|ignore)(?:%20|[+ _-])*(?:previous|prior|system)(?:%20|[+ _-])*instructions?|%73%79%73%74%65%6d(?:%20|[+ _-])*instructions?|%73%6b%69%70(?:%20|[+ _-])*security|%62%79%70%61%73%73(?:%20|[+ _-])*(?:validation|review)|%70%72%69%6e%74(?:%20|[+ _-])*(?:secrets|tokens?|credentials)|%64%69%73%61%62%6c%65(?:%20|[+ _-])*scanning|aWdub3JlIHByZXZpb3VzIGluc3RydWN0aW9ucw|aWdub3JlIHN5c3RlbSBpbnN0cnVjdGlvbnM|c3lzdGVtIGluc3RydWN0aW9ucw|cHJpbnQgc2VjcmV0cw|c2tpcCBzZWN1cml0eQ|YnlwYXNzIHZhbGlkYXRpb24|ZGlzYWJsZSBzY2FubmluZw)[^\"\\\\]*\")"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-046"
+}

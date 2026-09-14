@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-573",
+  "name": "Dual Path RAG Canary Integrity Bypass",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A RAG extraction attacker suppresses or obfuscates the integrity canary on the target response path while the oracle path preserves it, so a single-path scanner sees a clean rendering and lets a proprietary retrieved chunk be projected as answer content.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign|defensive|scanner\\s+rule|unit\\s+test|test\\s+fixture|must\\s+not|do\\s+not\\s+trust|quarantined|no\\s+mismatch)\\b)(?=.*\\b(?:rag|retriev(?:ed|al)|knowledge[- ]base|chunk)\\b)(?=.*\\b(?:canary|sentinel)\\b.{0,180}\\b(?:target|oracle|rendered)\\s+(?:response\\s+)?path\\b)(?=.*\\b(?:suppress|suppressed|obfuscat|mismatch|divergen)\\w*\\b.{0,180}\\b(?:leak|leaked|disclos|answer\\s+content|proprietary)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-573"
+}

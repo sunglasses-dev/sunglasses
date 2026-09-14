@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-046",
+  "name": "Evaluation metric authority laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Evaluation scorecards and benchmark statistics launder bounded metric evidence into human release approval, telling an AI release agent to deploy while suppressing unresolved safety review.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-046"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-004",
+  "name": "Calibration-summary evidence laundering of directional vulnerability failures",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An evaluation or tool report launders an improved aggregate calibration score into coverage/release authority while omitting persistent directional, CWE, or DFI failure evidence, causing the downstream agent to suppress the unresolved vulnerability signal.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|training|quarantined|blocked|safe|must\\s+not|do\\s+not|never|advisory\\s+only|independent\\s+(?:validation|test|review)\\s+required)\\b)(?=.*\\b(?:tool|evaluation|detector|vulnerability|security|CWE)\\b)(?=.*\\b(?:calibrat\\w*|confidence|probability|score)\\b)(?=.*\\b(?:directional|systematic|DFI|HDD|misclassif\\w*|blind\\s+spot|failure\\s+mode)\\b)(?=.*\\b(?:omit\\w*|downplay\\w*|hide\\w*|suppress\\w*|ignore\\w*|without\\s+(?:reporting|showing|including))\\b)(?=.*\\b(?:approve|accept|trust|treat|rely|waive|release|ship|coverage|reliable)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-004"
+}

@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "tool_output"
   ],
   "description": "Authority impersonation and emotional manipulation framings commonly used in social-engineering-style prompt injection.",
   "keywords": [

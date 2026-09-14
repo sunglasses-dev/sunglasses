@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PT-016",
+  "name": "Symlink Workspace Boundary Escape",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A filesystem-capable agent tool validates a path lexically against its configured workspace root, passes an in-root symlink, then follows the link's canonical target outside the root during read/write/upload.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|test)|unit\\s+test|benign|safe\\s+example|incident|postmortem|defensive|must\\s+(?:reject|canonicalize|verify)|do\\s+not|never|inert|quarantined)\\b)(?=.*\\b(?:workspace|configured\\s+root|root\\s+boundary)\\b)(?=.*\\b(?:symlink|symbolic\\s+link|link\\s+target)\\b)(?=.*\\b(?:outside|out[- ]of[- ]root|escape|target)\\b)(?=.*\\b(?:read|write|upload|open|follow)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PT-016"
+}

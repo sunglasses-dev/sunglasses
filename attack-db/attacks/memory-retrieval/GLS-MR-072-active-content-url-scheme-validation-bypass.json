@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-072",
+  "name": "Active Content Url Scheme Validation Bypass",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A URL validator that removes `javascript:` but permits `data:` can pass a script-capable `data:image/svg+xml` value into an href/src sink, where the browser treats attacker-controlled URL data as executable active content.",
+  "keywords": [],
+  "regex": [
+    "(?isx)\\A(?!.*\\b(?:security\\s+training|blocked\\s+payload|quarantined|sanitized\\s+negative|must\\s+not\\s+execute|never\\s+allow)\\b.{0,180}\\b(?:data\\s*:\\s*image/svg|<\\s*svg|onload\\s*=|<\\s*script)\\b)(?=.*\\b(?:href|src|url\\s+(?:validation|sanitization)|rendered\\s+(?:link|image|icon)|browser\\s+(?:renderer|output))\\b)(?=.*\\bdata\\s*:\\s*(?:image/svg\\+xml|image/svg|text/html)\\b)(?=.*(?:<\\s*(?:svg|script)\\b|\\b(?:onload|onerror|onclick)\\s*=|%3c\\s*(?:svg|script)|javascript\\s*:)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-072"
+}

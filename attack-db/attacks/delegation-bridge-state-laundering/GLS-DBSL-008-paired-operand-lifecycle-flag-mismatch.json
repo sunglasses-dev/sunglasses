@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-008",
+  "name": "Paired Operand Lifecycle Flag Mismatch",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A paired delegated operation accepts two operands carrying mismatched lifecycle/ownership flags into one shared action or cleanup executor, so state released under one operand's mode is later reused, reaching use-after-free.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:benign|defensive|documentation|unit\\s+test|test\\s+fixture|must\\s+not|do\\s+not|never|safe|patched|fixed|reject(?:ed|s)?|validate(?:d|s)?|equal(?:ity)?\\s+(?:check|validation)|consistent)\\b)(?=.*\\b(?:delegate|delegat(?:ed|ion)|approval|handoff|requeue|merge|paired|operand|two\\s+records?)\\b)(?=.*\\b(?:flag|mode|generation|lifecycle|ownership|handle)\\w*\\b)(?=.*\\b(?:different|mismatch(?:ed)?|incompatible|unequal|not\\s+equal)\\b)(?=.*\\b(?:shared|common|single)\\s+(?:action|operation|executor|cleanup|queue)\\b)(?=.*\\b(?:stale|dangling|freed|released|use[- ]after[- ]free|UAF|reuse|dereference)\\w*\\b)(?=.*\\b(?:later|downstream|subsequent|after)\\b).*?$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-008"
+}

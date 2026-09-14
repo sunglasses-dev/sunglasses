@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-603",
+  "name": "Wide-net model fanout weakest-link selection hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A coordinator fans one request out to many model workers and forwards any single usable harmful completion, so per-model refusals are defeated by weakest-link selection with no ensemble-level safety invariant.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|benchmark|unit test|benign|unanimous|human reviewer|timing|discarded after|should reject|requires?\\s+(?:a\\s+)?human)\\b)(?=.*\\b(?:group|multiple|several|ensemble|fanout|parallel)\\b)(?=.*\\b(?:model|llm|worker|agent)s?\\b)(?=.*\\b(?:one|any|another|weakest[- ]link|at least one|single)\\b)(?=.*\\b(?:select|choose|discard|forward|route|accept|usable|actionable)\\w*\\b)(?=.*\\b(?:refus\\w*|harmful|prohibited|safety invariant|safety agreement)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-603"
+}

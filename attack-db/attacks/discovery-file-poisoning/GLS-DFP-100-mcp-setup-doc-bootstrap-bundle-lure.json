@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-100",
+  "name": "MCP Setup Doc Bootstrap-Bundle Lure",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "MCP Setup Doc Bootstrap-Bundle Lure: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 repository onboarding/bootstrap social engineering for binary execution.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:security\\s+(?:guide|training|report|advisory)|incident\\s+report|scanner\\s+docs?|documentation|docs?|guide|article|reference)\\b.{0,220}\\b(?:do\\s+not|does\\s+not|never\\s+|must\\s+not|should\\s+(?:report|detect|flag|block)|detected|blocked|warns?|refused)\\b)\n(?!.*\\b(?:tests?|unit\\s+tests?|fixtures?)\\b.{0,180}\\b(?:fixtures?\\s+only|no\\s+(?:install|setup|download)|not\\s+(?:for\\s+)?(?:install|setup|download))\\b)\n(?!.*\\b(?:signed\\s+github\\s+release|release\\s+asset.{0,100}(?:sha256|signature|signed)|package\\s+manager\\s+install|npm\\s+install|pip\\s+install|cargo\\s+install|brew\\s+install|checksum\\s+verified)\\b)\n# Carrier anchor (Jul-11, FP sprint): fetch-machinery + payload groups used to\n# accept passive REFERENCE links \u2014 a raw.githubusercontent badge image or a\n# github blob citation satisfied BOTH, and any dev script (.sh) counted as the\n# payload (10/43 famous-README FPs: numpy fired on its logo badge URL alone).\n# The lure's real signature: machine fetch-fields (zip_path/download_url/\n# pushed_at \u2014 API-response JSON) OR a direct raw/release ARCHIVE download,\n# plus an archive/installer payload \u2014 never a blob citation or a repo script.\n(?=.*(?:\\b(?:zip_path|download_url|pushed_at|updated_at|onboarding\\s+bundle|bootstrap\\s+bundle)\\b|(?:raw\\.githubusercontent\\.com|github\\.com)/[^\\s\"'<>]{1,180}\\.(?:zip|tar\\.gz|tgz|tar\\.xz|7z|rar|exe|msi|dmg|pkg)\\b|github\\.com/[^\\s\"'<>]{1,140}/releases/download/))\n(?=.*\\b(?:MCP|Model\\s+Context\\s+Protocol|AI\\s+agents?|coding\\s+assistants?|prompt\\s+injections?|guardrails?|security\\s+(?:scanner|checklist|policy|middleware|tool)|firewall|CVE|vulnerabilit(?:y|ies)|sandbox|detectors?|data\\s+exfiltration)\\b)\n(?=.*(?:\\bzip_path\\b|\\bdownload_url\\b|[\\w./-]{1,180}\\.(?:zip|tar\\.gz|tgz|tar\\.xz|7z|rar|exe|msi|dmg|pkg)\\b))\n(?=.*\\b(?:install|download|open|run|execute|fetch|expand|extract|launch|start|setup|bootstrap|onboarding\\s+bundle|helper|release|asset|pushed_at|updated_at)\\b)\n[\\s\\S]+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-100"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TSDF-001",
+  "name": "Tool Schema Default-Value Auto-Approve Injection",
+  "version": "1.0",
+  "category": "tool_schema_default_fallback",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Tool Schema Default-Value Auto-Approve Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 unique focus on exploiting tool schema fallbacks to bypass execution consent.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*(?:tool\\s*schema|function\\s*schema|json\\s*schema|argument\\s*schema))(?=.*(?:default\\s*value|fallback|implicit|auto(?:-?fill)?|missing\\s*field|absent\\s*permission|null\\s*field))(?=.*(?:consent|approval|permission|authorize|re-approval))(?=.*(?:execute|dispatch|invoke|call)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TSDF-001"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-048",
+  "name": "GitHub Actions cache hit semantic-cache authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "semantic_cache_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "GitHub Actions cache restore telemetry can launder a dependency/build cache hit into a forged release trust receipt for deployment agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-048"
+}

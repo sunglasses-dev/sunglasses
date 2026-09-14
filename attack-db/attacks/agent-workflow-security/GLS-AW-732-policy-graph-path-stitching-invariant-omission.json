@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-732",
+  "name": "Policy Graph Path Stitching Invariant Omission",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A policy-specification graph generator can stitch locally permitted transitions into a composed path while dropping a cross-step invariant, causing a downstream agent to admit an unsafe configuration or privileged action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+(?:guide|test|training)|unit\\s+test|negative\\s+fixture|defensive|must\\s+not|do\\s+not|never|blocked|rejected|quarantined|postmortem|incident\\s+report|scanner\\s+rule)\\b)(?=.*\\b(?:policy\\s+(?:graph|specification)|semantic\\s+policy\\s+graph|FOL|first[- ]order\\s+logic)\\b)(?=.*\\b(?:compile|generate|traverse|stitch|compose|path)\\w*\\b)(?=.*\\b(?:(?:individually|each|per[- ]edge|locally)\\s+(?:permitted|allowed|safe|valid)|allowed\\s+edges?)\\b)(?=.*\\b(?:cross[- ]step|composed|composition|path[- ]level|global)\\s+(?:(?:safety\\s+)?invariant|constraint|safety\\s+condition)\\b)(?=.*\\b(?:drop(?:ped)?|omit(?:ted)?|lost|missing|not\\s+rechecked|unvalidated)\\b)(?=.*\\b(?:unsafe|forbidden|privileged|deploy|execute|exfiltrat|disable|secret|credential|approval)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-732"
+}

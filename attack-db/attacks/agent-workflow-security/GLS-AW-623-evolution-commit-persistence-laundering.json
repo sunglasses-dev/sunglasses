@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-623",
+  "name": "Evolution-commit persistence laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-influenced proposal survives a self-evolution evaluation, is committed to durable state, and is rehydrated as trusted strategy by a later generation without provenance binding or fresh revalidation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|must\\s+not|do\\s+not|never|reject(?:ed|s)?|quarantined|safe\\s+handling|benign\\s+control|incident\\s+report|postmortem)\\b)(?=.*\\b(?:self[- ]?evolv\\w*|generation|later[- ]generation|successor)\\b)(?=.*\\b(?:attacker[- ]?influenced|poisoned|adversarial|untrusted|tampered)\\b)(?=.*\\b(?:memory|strategy|policy|rule|experience)\\b)(?=.*\\b(?:evaluat\\w*|fitness|validation|score|review)\\b)(?=.*\\b(?:commit\\w*|persist\\w*|durable|write[- ]back|checkpoint|state)\\b)(?=.*\\b(?:rehydrat\\w*|reload\\w*|restore\\w*|retriev\\w*|trust\\w*|inherit\\w*)\\b)(?=.*\\b(?:without|no|absent|later|subsequent|future)\\b)(?=.*\\b(?:access|attacker|renew\\w*|revalidat\\w*|provenance)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-623"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-119",
+  "name": "Go test2json Output Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Go test2json Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 go test JSON output format (test2json), distinct from general logs.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|trust|treat|use|execute)\n |does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides?|trust|instruct)\n |never\\s+(?:obey|include|attach|forward|send|share|trust|treat|use|execute)\n |must\\s+not\\s+(?:obey|include|attach|forward|send|share|trust|treat|use|execute)\n |should\\s+(?:report|detect|flag|refuse|block)\n |(?:security\\s+training|scanner\\s+docs?|developer\\s+guide|runbook|incident\\s+report|security\\s+report|postmortem|documentation).{0,180}?(?:detected|blocked|flagged|refused|reported|warns?|explains?)\n |detected\\s+and\\s+(?:blocked|refused|flagged|remediated)\n |was\\s+(?:blocked|refused|flagged|detected|remediated)\\s+by\n |not\\s+an?\\s+(?:instruction|policy)\n |no\\s+(?:agent|assistant|scanner)\\s+instructions?\n |no\\s+policy\\s+overrides?\n))\n(?=.*(?:\n  go\\s+test\\s+-json|go\\s+test\\s+json|test2json|cmd/test2json|gotestjson|gotestsum\n |(?<!\\w)\"Action\"\\s*:\\s*\"(?:output|fail|pass|run)\"|(?<!\\w)\"Package\"\\s*:\\s*\"[^\"]+\"|(?<!\\w)\"Test\"\\s*:\\s*\"[^\"]+\"\n |(?<!\\w)\"Output\"\\s*:\\s*\"|\\b(?:RUN|PASS|FAIL):\\s+Test[A-Za-z0-9_]+\n))\n(?=.*(?:\n  (?<!\\w)\"Output\"\\s*:\\s*\"|Action\\s*=\\s*output|test\\s+stdout|test\\s+stderr|captured\\s+output|subtest\\s+log|panic\\s+output|failure\\s+output\n))\n(?=.*(?:\n  ai\\s+agents?|coding\\s+agents?|review\\s+agents?|security\\s+scanners?|test\\s+summarizers?|ci\\s+agents?|automation\\s+agents?|assistants?|scanners?|agents?\n |(?:agent|assistant|scanner|ci_agent|reviewer)[_\\s-](?:note|policy|instructions?|directive)\n))\n(?=.*(?:\n  (?:agent|assistant|scanner|ci\\s+agent|reviewer)\\s+(?:instructions?|notes?|policy|directive)\n |(?:primary|single)\\s+source\\s+of\\s+truth|canonical|authoritative|highest\\s+priority|approved\\s+policy\n |supersed(?:e|es|ed|ing)|overrides?|takes?\\s+precedence|outranks?|ignore\\s+(?:repo|system|developer|scanner|test)\\s+(?:rules?|policy|guidance|instructions?)\n |treat.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|advisory|clean)\n |mark.{0,50}?as\\s+(?:informational|non[-\\s]?blocking|safe|clean|trusted)\n |(?:suppress(?:es|ed|ing)?|hide|omit|exclude|downgrade|redact|silence|drop|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|evidence|vulnerabilities|security\\s+issues?|test\\s+failures?|failures?|scanner\\s+flags?|alerts?)\n |(?:do\\s+not|not)\\s+(?:report|flag|escalate|mention)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|vulnerabilities|security\\s+issues?|test\\s+failures?|failures?|alerts?)\n |(?:include|forward|send|attach|provide|copy|read|collect|populate|share|transmit|relay|pass\\s+along)\\s+(?:[\\w-]+\\s+){0,4}(?:tokens?|api\\s*keys?|secrets?|credentials?|env(?:ironment)?\\s+(?:variables?|context)|local\\s+state|runtime\\s+(?:state|context)|authorization\\s+headers?|session\\s+cookies?|github\\s+token)\n |(?:findings?|warnings?|alerts?|vulnerabilities|security\\s+issues?|test\\s+failures?|failures?)\\s+(?:are|is)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|safe|benign|secondary)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-119"
+}

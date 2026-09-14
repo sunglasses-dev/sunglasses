@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-579",
+  "name": "Semantic Memory Approval Laundering",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An imported memory/RAG record carries control-bearing approval meaning as a semantically equivalent rewrite, so retrieval preserves the authorization meaning past lexical and provenance checks and a downstream agent mistakes retrieved data for a prior approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|postmortem|incident|defensive|must\\s+not|do\\s+not|never|rejected|blocked|quarantine|safe)\\b)(?=.*\\b(?:memory|rag|retrieval|retrieved|vector|embedding|context)\\w*\\b)(?=.*\\b(?:semantic(?:ally)?|meaning[-_ ]preserv|equivalent|paraphras|reword|representation)\\w*\\b)(?=.*\\b(?:future|downstream|next|later)\\s+(?:ai\\s+)?(?:agent|assistant|model|llm)\\w*\\b)(?=.*\\b(?:authorize|authorization|approve|approval|permit|policy|action|proceed|review)\\w*\\b)(?=.*\\b(?:trust|treat|interpret|infer|skip|omit|bypass|suppress|allow)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-579"
+}

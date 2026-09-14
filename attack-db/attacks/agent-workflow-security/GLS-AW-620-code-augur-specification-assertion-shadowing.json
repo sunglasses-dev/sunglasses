@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-620",
+  "name": "Code-Augur specification assertion shadowing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An analysis agent's inferred input assumption, committed as an in-source assertion, is consumed downstream as a global safety proof, so a consumer skips real validation/authorization for inputs outside the asserted invariant.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|quarantin|independently\\s+(?:verify|validate|review|test)|falsif(?:y|ied|ication)|counterexample)\\b)(?=.*\\b(?:code[- ]?augur|security\\s+specification|inferred\\s+(?:security\\s+)?invariant|tacit\\s+assumption)\\b)(?=.*\\b(?:in[- ]?source\\s+assertion|assertion[- ]?backed|committed\\s+assertion|local\\s+invariant)\\b)(?=.*\\b(?:input|argument|request|payload)\\b)(?=.*\\b(?:(?:deem\\w*|mark\\w*|judg\\w*|assertion\\s+(?:says|states|declares))\\b.{0,50}\\b(?:secure|safe|valid)\\b))(?=.*\\b(?:skip|bypass|omit|suppress|allow|approve|release|continue)\\w*\\b)(?=.*\\b(?:validation|sanitiz|check|guard|authorization)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-620"
+}

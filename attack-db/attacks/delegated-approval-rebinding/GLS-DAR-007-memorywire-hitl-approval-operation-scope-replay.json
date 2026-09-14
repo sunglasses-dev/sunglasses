@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DAR-007",
+  "name": "MemoryWire HITL approval operation-scope replay",
+  "version": "1.0",
+  "category": "delegated_approval_rebinding",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A human approval token bound to one memory-wire operation is replayed against a different operation id or fan-out adapter scope, so a memory write executes without fresh human governance review.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:must\\s+not|do\\s+not|never|refus(?:e|ed|es)|reject(?:ed|s)?|block(?:ed|s)?|prevent|defensive|unit\\s+test|test\\s+fixture|runbook|documentation|scanner\\s+rule|safe\\s+agent|requires?\\s+fresh(?:\\s+human)?\\s+review|current\\s+(?:hitl\\s+)?approval|approval\\s+is\\s+not\\s+reusable)\\b)(?=.*\\b(?:memorywire|memory\\s+wire|remember|merge|forget|expire)\\b)(?=.*\\b(?:hitl|human[- ]in[- ]the[- ]loop|review(?:er)?|approval|governance)\\b)(?=.*\\b(?:stale|replay|reused|previous|prior|old|mismatch|different|scoped?)\\b)(?=.*\\b(?:operation[ _-]?(?:id|identity)|request[ _-]?id|adapter[ _-]?(?:scope|id)|target[ _-]?scope|payload[ _-]?hash)\\b)(?=.*\\b(?:bypass(?:es|ed)?|skip(?:s|ped)?|without|no\\s+fresh|reuse(?:s|d)?|accept(?:s|ed)?|honou?r(?:s|ed)?|proceed(?:s|ed)?|continue(?:s|d)?)\\b.{0,140}\\b(?:review|approval|human|governance|decision|write|merge|operation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DAR-007"
+}

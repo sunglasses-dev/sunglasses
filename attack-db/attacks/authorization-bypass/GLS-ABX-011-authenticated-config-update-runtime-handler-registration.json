@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-011",
+  "name": "Authenticated config-update runtime handler registration",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A proxy configuration-update endpoint missing its admin role check lets a logged-in low-privilege principal persist a custom pass-through handler registration that the runtime later loads as executable behavior (CVE-2026-35029, LiteLLM).",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs?|security guide|unit test|training|incident report|postmortem|rejected|denied|forbidden|admin approval required|must not|do not)\\b)(?=.*\\b(?:litellm|proxy)\\b)(?=.*(?:/config/update|config(?:uration)?\\s+(?:update|mutation)))(?=.*\\b(?:non[- ]?admin|low[- ]?privilege|missing\\s+admin|role\\s+(?:check|authorization)|unauthorized|privilege)\\b)(?=.*\\b(?:custom\\s+(?:pass[- ]?through\\s+)?handler(?:\\s+registration)?|pass[- ]?through\\s+handler|handler\\s+registration|register(?:ed|ing)?\\s+(?:a\\s+)?handler|plugin)\\b)(?=.*\\b(?:persist|saved|accepted|load(?:ed|s)?|activat(?:ed|es)|runtime|restart)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-011"
+}

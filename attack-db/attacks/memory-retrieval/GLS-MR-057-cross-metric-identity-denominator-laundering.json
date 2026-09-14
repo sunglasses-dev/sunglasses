@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-057",
+  "name": "Cross Metric Identity Denominator Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A privacy evaluator joins similarity, uncertainty, adversary-success, and information-loss metrics from different dataset scopes or denominators under one record key, yielding a coherent but falsely low composite risk and insufficient protection recommendation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+payload|quarantined|security\\s+(?:guide|training)|incident\\s+report|postmortem|must\\s+not|do\\s+not\\s+(?:trust|obey|flag|report))\\b)(?=.*\\b(?:privacy|healthcare|hospital|patient|medical)\\b)(?=.*\\b(?:risk\\s+(?:evaluation|score)|composite\\s+(?:risk|score)|AHP|analytic\\s+hierarchy|weighted\\s+aggregation)\\b)(?=.*\\b(?:similarity|uncertainty|adversary[_ -]?success|information[_ -]?(?:gain|loss)|privacy\\s+metrics?)\\b)(?=.*\\b(?:cross[- ]?(?:dataset|cohort|scope)|different\\s+(?:dataset|cohort|version|population)|identity\\s+(?:mismatch|collision|join)|denominator\\s+(?:mismatch|drift|collision)|misjoin(?:ed|ment)?)\\b)(?=.*\\b(?:understat(?:e|ed|es)|underestimat(?:e|ed|es)|falsely\\s+low|low\\s+(?:risk|privacy\\s+loss)|insufficient\\s+(?:protection|mitigation)|weak\\s+(?:protection|privacy))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-057"
+}

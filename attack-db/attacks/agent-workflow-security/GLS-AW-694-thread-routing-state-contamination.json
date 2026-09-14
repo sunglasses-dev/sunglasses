@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-694",
+  "name": "Thread Routing State Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-authored routing preference persists in a shared thread and silently changes where a later participant's unrelated task is dispatched, without fresh participant or scope authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?![\\s\\S]*\\b(?:security\\s+(?:guide|training|review)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+not|do\\s+not\\s+(?:retain|carry|persist|obey|route|follow))\\b)(?=[\\s\\S]*\\b(?:shared|common|multi[- ]participant|chat|channel)\\b)(?=[\\s\\S]*\\b(?:thread|conversation|chat|channel)\\b)(?=[\\s\\S]*\\b(?:persist|carr|retain|reappear|replay)\\w*\\b)(?=[\\s\\S]*\\b(?:later|future|next|another)\\s+(?:session|turn|participant|user|member)\\b)(?=[\\s\\S]*\\b(?:without|no|lack(?:s|ing)?)\\b(?:\\s+\\w+){0,8}\\s+(?:author|owner|scope|consent|fresh(?:ness)?|provenance|isolation|binding)\\b)(?=[\\s\\S]*\\b(?:route|routing|assign|dispatch|triage|queue|forward)\\w*\\b)(?=[\\s\\S]*\\b(?:task|request|work|message|case|ticket|analyst|billing|sales|support|queue|team|worker)\\w*\\b)(?=[\\s\\S]*\\b(?:attacker|foreign|untrusted|poisoned|malicious|instruction|directive)\\w*\\b)[\\s\\S]*\\Z"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-694"
+}

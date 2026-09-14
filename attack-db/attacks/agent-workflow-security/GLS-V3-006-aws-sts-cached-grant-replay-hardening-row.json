@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-006",
+  "name": "AWS STS cached grant replay hardening row",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Cached AWS STS credential output can include adjacent note text that tells an AI deployment agent to treat an unexpired temporary role session as fresh human release approval and skip the original approval/change-window checks.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-006"
+}

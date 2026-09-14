@@ -1,0 +1,25 @@
+{
+  "id": "GLS-CAI-717",
+  "name": "covert tool-trace steganography in peer-agent coordination",
+  "version": "1.0",
+  "category": "cross_agent_injection",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Cooperating agents encode shared state in ordinary tool-call selection, omission, ranking and result ordering, creating a covert inter-agent channel that plaintext-only monitoring cannot see.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+(?:guide|test)|documentation|unit\\s+test|negative\\s+fixture|incident\\s+report|runbook|must\\s+not|do\\s+not|never|inert|quarantined)\\b)(?=.*\\b(?:agent\\s*[ab]|peer\\s+agent|worker\\s*[ab])\\b)(?=.*\\b(?:tool\\s+(?:call|result|output)|search|browser|retrieval)\\b)(?=.*\\b(?:third|second|first|choice|ordering|selected|omitted|result\\s+index|rank)\\b)(?=.*\\b(?:decode|encode|bit|signal|state|codebook|coordinate|correlat(?:ed|ion))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-CAI-717"
+}

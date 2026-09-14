@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-122",
+  "name": "JSON Schema `$comment` / annotation instruction smuggling",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "JSON Schema `$comment` / annotation instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 jSON Schema is a distinct format critical for structured LLM tool-calling contexts.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*(?:\\b(?:do\\s+not|does\\s+not|never|must\\s+not|should\\s+not)\\s+(?:obey|follow|treat|trust|include|attach|forward|send|share|override|supersede|use|execute)|\\bno\\s+(?:agent|assistant|scanner|verifier|auditor|reviewer)?\\s*(?:guidance|instructions?)\\s+(?:present|included|intended)\\b|\\b(?:documentation|docs?|guide|reference|training|security\\s+scanner)\\b.{0,140}\\b(?:detect|flag|report|block|refuse|ignore)\\b.{0,80}\\b(?:prompt\\s+injection|agent\\s+instruction|malicious|untrusted)|\\b(?:incident|security)\\s+report\\b.{0,160}\\b(?:detected|blocked|flagged|refused)|\\b(?:comments?|\\$comment|descriptions?)\\s+(?:are|is)\\s+(?:annotation|annotations|non-authoritative|not\\s+policy|ignored\\s+by\\s+validators)))\n(?=.*(?:\\bJSON\\s+Schema\\b|\\$schema\\b|\\$defs\\b|\\$comment\\b|\\bproperties\\b.{0,80}\\bdescription\\b|schema\\s+(?:description|annotation|comments?)|validation\\s+schema|input\\s+schema|output\\s+schema|tool\\s+schema|structured\\s+output\\s+schema))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|autonomous\\s+agents?|agents?|assistants?|coding\\s+agents?|review\\s+bots?|reviewers?|scanners?|security\\s+scanners?|verifiers?|auditors?|llms?|models?)(?![A-Za-z0-9]))\n(?=.*(?:\\b(?:single|primary)\\s+source\\s+of\\s+truth\\b|\\b(?:override|overrides|overridden|supersede|supersedes|superseded|outrank|outranks|take\\s+precedence|highest\\s+priority|canonical|authoritative|governing)\\b|\\b(?:agent|assistant|scanner|verifier|auditor|reviewer|model|llm)\\s+(?:instruction|instructions|policy|rules|guidance)\\b|\\b(?:suppress|suppresses|suppressed|suppressing|hide|hides|hidden|omit|omits|omitted|redact|redacts|downgrade|downgrades|mark\\s+clean|treat.{0,50}?as\\s+(?:safe|clean|informational|non[-\\s]?blocking)|do\\s+not\\s+(?:report|flag)|(?:findings?|reports?|warnings?)\\s+(?:should\\s+be\\s+)?(?:suppressed|hidden|omitted|redacted|downgraded))\\b|\\b(?:include|attach|forward|send|share|provide|expose|collect|copy|read)\\s+(?:[\\w-]+\\s+){0,5}(?:env(?:ironment)?\\s*(?:variables?|context)?|api\\s*keys?|tokens?|secrets?|credentials?|authorization\\s+headers?|session\\s+(?:cookies?|keys?)|local\\s+state|runtime\\s+config)\\b))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-122"
+}

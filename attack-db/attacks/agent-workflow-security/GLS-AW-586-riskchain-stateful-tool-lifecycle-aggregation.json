@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-586",
+  "name": "RiskChain stateful tool-lifecycle aggregation",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Collection, staging and egress are split across individually benign tool-lifecycle events so a per-call interceptor allows each one, while the ordered chain moves private workspace material to an external sink.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit test|defensive|safe example|must not|do not|never|blocked|incident report|internal only)\\b)(?=.*\"phase\"\\s*:\\s*\"(?:collect|read|gather)\")(?=.*\"phase\"\\s*:\\s*\"(?:stage|package|archive)\")(?=.*\"phase\"\\s*:\\s*\"(?:egress|send|transfer)\")(?=.*\"source_scope\"\\s*:\\s*\"(?:private|workspace)\")(?=.*\"destination\"\\s*:\\s*\"external\").*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-586"
+}

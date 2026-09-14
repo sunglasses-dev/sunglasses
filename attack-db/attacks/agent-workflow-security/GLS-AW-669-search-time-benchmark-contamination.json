@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-669",
+  "name": "Search Time Benchmark Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A deep-research agent's web search retrieves benchmark metadata, question context, or answer-bearing text during evaluation, and the evaluator accepts that contaminated evidence as genuine reasoning, inflating the measured score.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|incident\\s+report|research\\s+guide|security\\s+policy|must\\s+be\\s+flagged|quarantine)\\b)(?=.*\\b(?:benchmark|evaluation|leaderboard|test\\s+set)\\b)(?=.*\\b(?:search|web\\s+result|retriev\\w*|indexed|online)\\b)(?=.*\\b(?:metadata|question\\s+context|ground[- ]truth|answer\\s+key|reference\\s+answer|expected\\s+answer|gold\\s+answer|solution\\s+text|benchmark\\s+ID|benchmark\\s+prompt)\\b)(?=.*\\b(?:use|copy|treat|submit|claim|report|authorize|mark|count|continue)\\b)(?=.*\\b(?:perfect\\s+score|perfect\\s+evaluation|as\\s+if\\s+reasoned|unassisted|genuine(?:\\s+reasoning)?|ordinary\\s+evidence|do\\s+not\\s+disclose|omit\\s+contamination|clean)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-669"
+}

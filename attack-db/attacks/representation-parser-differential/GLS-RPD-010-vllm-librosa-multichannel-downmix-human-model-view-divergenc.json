@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPD-010",
+  "name": "vLLM/Librosa multichannel downmix human-model view divergence (CVE-2026-34760)",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Crafted stereo/multichannel audio exploits a standards-versus-implementation mono downmix weighting mismatch so the signal a human reviewer hears differs from the tensor the model classifies, breaking review-to-execution integrity.",
+  "keywords": [],
+  "regex": [
+    "(?isx)^ (?!.*\\b(?:defensive|documentation|unit\\s+test|test\\s+fixture|security\\s+test|patched|fixed|safe\\s+example|must\\s+(?:detect|bind|normalize)|do\\s+not|never|blocked|quarantined)\\b) (?=.*\\b(?:stereo|multichannel|multi[- ]channel|two[- ]channel|left\\s+and\\s+right)\\b) (?=.*\\b(?:downmix(?:ing)?|down[- ]mix(?:ing)?|to_mono|mono\\s+(?:mix|downmix)|channel\\s+(?:weight|mix))\\b) (?=.*\\b(?:human\\s+(?:hears?|hearing)|heard\\s+by\\s+(?:a\\s+)?human|headphones?|speakers?|playback)\\b) (?=.*\\b(?:model|AI\\s+(?:model|agent)|classifier|encoder|tensor)\\b) (?=.*\\b(?:different|mismatch|diverg|inconsistent|not\\s+the\\s+same|semantic\\s+confusion)\\b) (?=.*\\b(?:signal|audio|sound|content)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPD-010"
+}

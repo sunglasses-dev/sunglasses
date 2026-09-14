@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-058",
+  "name": "Renovate inherited preset extends-chain metadata hardening row",
+  "version": "1.0",
+  "category": "dependency_automation_metadata",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A transitive Renovate preset reference can smuggle agent-directed policy text through an inherited `extends` chain, causing a dependency-review agent to treat preset metadata as authority to suppress scanner findings or mark risky updates safe.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-058"
+}

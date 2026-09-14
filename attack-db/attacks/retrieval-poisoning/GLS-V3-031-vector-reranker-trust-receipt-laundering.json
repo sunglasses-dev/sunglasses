@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-031",
+  "name": "Vector Reranker Trust Receipt Laundering",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Vector-search/reranker metadata is laundered into a fake approval or trust receipt so an AI release/retrieval agent backgrounds verification and completes a privileged workflow.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-031"
+}

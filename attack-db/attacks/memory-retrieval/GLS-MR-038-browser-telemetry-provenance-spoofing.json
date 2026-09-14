@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-038",
+  "name": "Browser Telemetry Provenance Spoofing",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A generated survey answer is paired with replayed human-like keystroke telemetry, and the evaluator launders the correlated trace into independent proof of human authorship before storing the decision in memory/RAG.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guidance|unit\\s+test|incident\\s+report|documentation|defensive|must\\s+be\\s+rejected|must\\s+not|never\\s+treat|keeps?\\s+.*finding\\s+visible|requires?\\s+independent\\s+capture\\s+provenance)\\b)(?=.*\\b(?:survey|crowdsourcing|participant|response|answer)\\b)(?=.*\\b(?:LLM|language[- ]model|AI[- ]assisted|AI[- ]generated|generated)\\b)(?=.*\\b(?:keystroke|typing|keyboard|input)\\s+(?:telemetry|trace|events?|intervals?)\\b)(?=.*\\b(?:synthetic|replayed|spoofed|human[- ]like)\\b)(?=.*\\b(?:human[- ]authorship|human[- ]authored|authenticity)\\b)(?=.*\\b(?:independent|correlated|without\\s+(?:binding|checking|verifying)|no\\s+(?:provenance\\s+)?binding)\\b)(?=.*\\b(?:accept(?:s|ed)?|promot(?:e|es|ed|ing)?|treat(?:s|ed)?|stores?|writes?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-038"
+}

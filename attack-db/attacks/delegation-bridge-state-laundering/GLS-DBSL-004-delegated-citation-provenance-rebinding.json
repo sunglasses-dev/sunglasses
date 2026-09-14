@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DBSL-004",
+  "name": "Delegated Citation Provenance Rebinding",
+  "version": "1.0",
+  "category": "delegation_bridge_state_laundering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A delegated verifier sees a syntactically valid citation and correct URL while the evidence digest, locator, quote, or underlying bytes were silently rebound to attacker-supplied content at the handoff, so citation presence is mistaken for evidence provenance.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guidance|reviewer\\s+fetched|could\\s+not\\s+verify|rejected|corrected|requires?\\s+(?:a\\s+)?(?:human|second)\\s+review|defensive|audit)\\b)(?=.*\\b(?:citation|cited|source\\s+link)\\b)(?=.*\\b(?:wrong|fabricat\\w*|forged|attacker[- ]controlled|adversary[- ]provided|swapped|stale)\\b)(?=.*\\b(?:evidence|quote|locator|digest|hash|data|conclusion|claim)\\b)(?=.*\\b(?:skip|bypass|suppress|approve|authori[sz]|rebind|replace|swap|accept)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DBSL-004"
+}

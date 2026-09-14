@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DOAS-001",
+  "name": "Adversarial Compute Amplification",
+  "version": "1.0",
+  "category": "denial_of_ai_service",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Attacker-controlled batch_size/recursive/fan_out request metadata is interpreted as execution cardinality, so a single accepted request expands into nested model and tool calls and exhausts a shared compute budget before any per-request cap is applied.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:unit test|test fixture|scanner rule|security training|incident report|postmortem|blocked payload|must not|do not|never)\\b)(?=.*\\b(?:batch(?:_size| size)?|fan[- ]?out|recursive|expand(?:s|ed|ing)?|repeat(?:s|ed|ing)?|nested)\\b)(?=.*\\b(?:model calls?|tool calls?|inference|requests?|jobs?|tasks?)\\b)(?=.*\\b(?:unbounded|without a limit|ignore the cap|no limit|exhaust|overload|starve|compute budget|resource budget|expensive)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DOAS-001"
+}

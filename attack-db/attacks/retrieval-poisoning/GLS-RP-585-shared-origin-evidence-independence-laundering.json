@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-585",
+  "name": "Shared Origin Evidence Independence Laundering",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "One poisoned retrieval origin is re-rendered or transformed into several snippets labeled independent, and provenance-blind aggregation counts them as a multi-source quorum that launders the claim into approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner(?:s)?\\s+(?:should|must)\\s+flag|unit\\s+test|negative\\s+fixture|incident\\s+report|documentation|benign|safe\\s+result|reject(?:s|ed)?\\s+the\\s+claim|must\\s+not|prevents)\\b)(?=.*\\b(?:claim|evidence|argument\\s+tree|verification)\\b)(?=.*\\b(?:shared[- ]origin|same\\s+canonical\\s+origin|canonical\\s+origin|common\\s+root|same\\s+poisoned\\s+root|identical\\s+origin\\s+lineage|share\\s+origin[_ -]id)\\b)(?=.*\\bindependent\\b)(?=.*\\b(?:aggregation|aggregates|quorum|count(?:s|ed|ing)?|argument\\s+tree)\\b)(?=.*\\b(?:approve|authori[sz](?:e|ed|es)|marked\\s+verified|claim\\s+is\\s+accepted|promotes?\\s+the\\s+claim|recommends?\\s+accept|requested\\s+change|confident\\s+approval)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-585"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-055",
+  "name": "Nx / Angular schematic generator receipt template-injection hardening",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Nx/Angular schematic generator receipts can launder generated-file provenance into false approval for AI workspace-maintenance agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-055"
+}

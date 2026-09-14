@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-021",
+  "name": "Resolved URL Destination SSRF Bypass",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP URL-downloader validates the URL string but never binds the effective resolved destination, so a loopback/private/link-local/DNS-alias target is fetched server-side and the internal response body is relayed back to the caller.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:patched|fixed|defensive|unit test|test fixture|incident report|security research|benign|approved|blocked|quarantined|no network|must not|do not|never|safe)\\b)(?=.*\\b(?:mcp[- ]url[- ]downloader|_validate_url_safe)\\b)(?=.*(?:127\\.0\\.0\\.1|localhost|169\\.254\\.|10\\.|192\\.168\\.|172\\.(?:1[6-9]|2\\d|3[0-1])\\.|\\[::1\\]|private|internal|loopback|link[- ]local|cloud[- ]metadata|alias resolves))(?=.*\\b(?:server[- ]side|backend|outbound|fetch(?:es|ed|ing)?|request)\\b)(?=.*\\b(?:return(?:s|ed)?|relay(?:s|ed)?|response|body|content)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-021"
+}

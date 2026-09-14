@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-686",
+  "name": "Host Header Reconstructed Path Authentication Confusion",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A malformed Host header injects a path prefix into Starlette's reconstructed request URL while routing uses the actual ASGI scope path, so path-based authentication can skip the API-key check for a protected endpoint.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?!.*\\b(?:security\\s+(?:guide|documentation|test)|unit\\s+test|incident\\s+report|patched|fixed|must\\s+not|do\\s+not|never|blocked|quarantined)\\b)(?=.*(?:host\\s+header|malformed\\s+host|invalid\\s+host|unvalidated\\s+host|attacker[- ]controlled\\s+host))(?=.*(?:inject|prepend|embed|smuggl|path\\s+prefix|path\\s+smuggling|path[- ]based\\s+auth|look\\s+public|before\\s+the\\s+real\\s+path|invalid\\s+characters?))(?=.*(?:request\\.url|request\\s+url|reconstructed\\s+(?:url|path)|url\\s+path))(?=.*(?:scope\\s*\\[\\s*[\"']path|actual\\s+request\\s+path|routing|router))(?=.*(?:authenticationmiddleware|api\\s+authentication|auth(?:entication)?\\s+middleware|api[- ]?key|token\\s+check|protected\\s+(?:route|endpoint|api)))(?=.*(?:bypass\\w*|skip\\w*|evad\\w*|without|unauthori[sz]ed|allow\\w*|no\\s+(?:api[- ]?key|token))).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-686"
+}

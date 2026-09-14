@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-695",
+  "name": "Humorized Refusal Latent Payload Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A humorization layer can preserve the appearance of a safe refusal while adding a covert stereotype or toxic implication, and a delegated reviewer can approve the transformed output by trusting its refusal surface.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training|documentation|review)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|scanner\\s+rule|defensive|must\\s+not|do\\s+not|quarantin|redacted)\\b)(?=.*\\bhumori[sz]ation\\b)(?=.*\\b(?:refus\\w*|cannot\\s+(?:help|comply)|won\\'t\\s+help)\\b)(?=.*\\b(?:stereotype|toxic|degrading|harmful)\\b)(?=.*\\b(?:latent|hidden|covert|inserted|survives|carried|adds)\\b)(?=.*(?:safe|high))(?=.*\\b(?:approve|allow|publish)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-695"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-658",
+  "name": "Differential repair-spec evidence laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A repair agent omits the causal state transition from a crashing-vs-passing differential runtime summary, so a delegated reviewer approves a symptom-only patch as if the root cause were proven.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|security\\s+guide|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|must\\s+not|do\\s+not|quarantined|scanner\\s+rule|safe\\s+example)\\b)(?=.*\\b(?:crash(?:ing|ed)?|failure|failing)\\b)(?=.*\\b(?:safe|non[- ]crash(?:ing)?|passing)\\b)(?=.*\\b(?:differential|compar(?:e|ison)|diverg(?:e|ence|ed)|straddle)\\b)(?=.*\\b(?:state\\s+transition|causal\\s+state|root\\s+cause|omitted|missing)\\b)(?=.*\\b(?:repair\\s+spec|patch|fix)\\b)(?=.*\\b(?:approve|approval|reviewer|review|accept)\\w*\\b)(?=.*\\b(?:symptom|exception|observed\\s+fault|surface\\s+failure)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-658"
+}

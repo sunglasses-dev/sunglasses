@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-063",
+  "name": "Cross-call contextual attribute aggregation in MCP retrieval",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Individually borderline-safe quasi-identifier attributes returned by separate MCP retrieval calls are joined by the stateful context accumulator into a collectively identifying profile, defeating per-response privacy checks.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|safe\\s+handling|redacted|must\\s+not|do\\s+not|no\\s+person|non-personal)\\b)(?=.*\\b(?:mcp|retrieval)\\b)(?=.*(?:call\\s*[123]|response\\s*[123]|separate|across\\s+(?:calls|responses)))(?=.*(?:combine|aggregate|accumulat|collectively|quasi[- ]identifier|identif))(?=.*(?:borderline[- ]safe|non[- ]regulated|policy|abstain|profile)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-063"
+}

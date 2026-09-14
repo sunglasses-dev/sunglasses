@@ -11,7 +11,7 @@
   "description": "Detects text \u2014 excluding negated forms \u2014 in which docker.sock or socket paths, host namespace or /proc/ references, and privileged flags such as --privileged, CAP_SYS_ADMIN, or namespace rebind are combined with override, bypass, ignore, or disregard language targeting policy, guardrail, or safety approval checks.",
   "keywords": [],
   "regex": [
-    "(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*\\b(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)\\b)(?=.*\\b(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$"
+    "(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*(?:\\b|(?<!\\S))(?:docker\\.sock|docker\\s*sock|/var/run/docker\\.sock|socket)\\b)(?=.*(?:\\b|(?<!\\S))(?:host\\s+namespace|host\\s+path(?:s)?|/proc/|nsenter|setns|mount\\s+host\\s+path)(?:\\b|(?!\\S)))(?=.*(?:\\b|(?<!\\S))(?:--privileged|privileged|cap_sys_admin|namespace\\s+rebind)\\b)(?=.*\\b(?:override|overriding|bypass|bypassing|ignore|ignoring|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+check(?:s)?)\\b).*$"
   ],
   "examples": {
     "malicious": [],

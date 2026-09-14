@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-036",
+  "name": "Argo CD sync-operation output authority laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Argo CD sync-operation output can launder degraded or out-of-sync GitOps state into a forged deployment approval receipt, causing an AI deployment assistant to promote anyway and hide drift or health risk from the operator summary.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-036"
+}

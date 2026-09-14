@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MP-013",
+  "name": "Unauthenticated persistent-memory poisoning through insecure deployment defaults",
+  "version": "1.0",
+  "category": "memory_poisoning",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An unset/empty auth token on a network-exposed memory service permits unauthenticated writes to privileged auto-loaded namespaces (system://boot, core://*), making attacker text persistent context in later agent sessions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|test)|documentation|unit\\s+test|negative\\s+fixture|incident\\s+report|must\\s+(?:set|configure|reject|deny)|should\\s+(?:set|configure|reject|deny)|blocked|rejected|safe\\s+example|advisory\\s+recommends)\\b)(?=.*\\b(?:API[_ -]?TOKEN|bearer\\s+token|authentication\\s+secret)\\b)(?=.*\\b(?:unset|empty|missing|blank|not\\s+configured)\\b)(?=.*\\b(?:memory\\s+API|Knowledge[- ]Graph|knowledge[- ]graph|HTTP\\s+memory\\s+server)\\b)(?=.*(?:system://boot|core://\\*|privileged\\s+(?:namespace|memory)))(?=.*\\b(?:unauthenticated|without\\s+(?:a\\s+)?bearer|accepts?\\s+(?:unauthenticated|remote)\\s+writes?|(?:attacker|remote\\s+client)\\s+writes?|client\\s+can\\s+write|bearer\\s+token\\s+unset)\\b)(?=.*\\b(?:auto[- ]?load|auto[- ]?loaded|downstream\\s+(?:agent\\s+)?sessions?|persistent(?:[- ]memory)?\\s+(?:loader|(?:prompt\\s+)?injection)|later\\s+(?:agent\\s+)?session)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MP-013"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-670",
+  "name": "Consensus Summary Evidence Collapse",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A heterogeneous review pipeline compresses several expert reports into a consensus summary, erases dissent or provenance, and lets a local verifier approve code from the lossy summary instead of the independent evidence.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:security\\s+(?:guide|training|documentation)|unit\\s+test|negative\\s+fixture|blocked|quarantined|defensive|must\\s+not|do\\s+not\\s+(?:treat|trust|follow|ignore)|safe\\s+example))(?=.*(?:code\\s+review|vulnerability\\s+detection|security\\s+review))(?=.*(?:multi[- ]agent|three\\s+experts?|expert(?:s)?|local\\s+(?:adversarial\\s+)?verifier))(?=.*(?:consensus\\s+summary|compressed\\s+(?:summary|evidence)|majority\\s+summary|lossy\\s+aggregation))(?=.*(?:dissent(?:ing)?|disagreement|contradict(?:ion|ory)|omitted|discard(?:ed)?|suppressed|hidden|lost))(?=.*(?:ignore|discard|omit|suppress|hide|rely\\s+on|validate|approve|accept|promote|trust))(?=.*(?:raw|expert|independent|summary|compressed|evidence|finding|patch|report|review)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-670"
+}

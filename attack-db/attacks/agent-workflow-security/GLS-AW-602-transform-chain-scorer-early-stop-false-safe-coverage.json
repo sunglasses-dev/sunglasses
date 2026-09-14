@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-602",
+  "name": "transform-chain scorer early-stop false-safe coverage",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A red-team orchestrator halts after the first passing scorer, truncates the remaining planned probes/transforms, and reports the partial run as complete-coverage safe.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:documentation|unit\\s+test|incident\\s+report|research\\s+summary|scanner\\s+rule|independent\\s+review|advisory\\s+rather\\s+than))(?=.*(?:(?:red[- ]team|adversarial)\\s+(?:workflow|orchestrat\\w*)|orchestration\\s+report))(?=.*(?:transform\\s+chain|compose\\w*\\s+transform|transform\\w*))(?=.*(?:probe|test))(?=.*(?:first|early|passing)\\s+scorer)(?=.*(?:stop|truncat|skip\\w*|complete\\s+coverage|safe\\s+aggregate)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-602"
+}

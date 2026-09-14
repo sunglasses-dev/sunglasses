@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPDA-005",
+  "name": "Knowledge Trap extraction-budget breadcrumb laundering",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A knowledge-honeypot defense reroutes model-extraction queries to low-transferability decoy content, and the agent-facing summary collapses that route \u2014 omitting trap provenance and query-budget state \u2014 so the decoy answer is laundered into ordinary authoritative knowledge.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|scanner|detector|security\\s+guide|unit\\s+test|negative\\s+fixture|postmortem|documentation|benign|must\\s+not|do\\s+not|quarantin)\\b)(?=.*\\b(?:extraction|model[- ]?steal(?:ing)?|surrogate)\\b)(?=.*\\b(?:query|queries|query[- ]budget|budget)\\b)(?=.*\\b(?:breadcrumb|knowledge[- ]space|honeypot|honey[- ]trap|low[- ]transferability|decoy)\\b)(?=.*\\b(?:redirect|redirected|route|routed|guided|guid(?:e|ed))\\w*\\b)(?=.*\\b(?:omit|omits|omitted|hide|hides|hidden|without)\\w*\\b.{0,80}\\b(?:provenance|trap|budget|breadcrumb|state)\\b)(?=.*\\b(?:authoritative|trusted|ordinary|canonical)\\b)(?=.*\\b(?:answer|knowledge|result|summary|output)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPDA-005"
+}

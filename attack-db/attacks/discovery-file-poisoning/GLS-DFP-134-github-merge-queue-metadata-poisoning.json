@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-134",
+  "name": "GitHub Merge-Queue Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "GitHub Merge-Queue Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 gitHub Merge Queue and Merge Group metadata poisoning specifically.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:(?:unit\\s+test|fixture|scanner\\s+docs?|security\\s+training|negative\\s+example|incident\\s+report|postmortem).{0,160}?(?:detected|blocked|flagged|reported|refused|should\\s+report|must\\s+not|do\\s+not\\s+obey)|(?:do\\s+not|does\\s+not|never|must\\s+not)\\s+(?:obey|follow|trust|treat|override|include|forward|send|share|suppress))\\b)(?=.*\\b(?:github\\s+merge\\s+queue|merge[-\\s]?queue|merge_group|gh-readonly-queue|auto[-\\s]?merge|mergeability|merge\\s+group|queue\\s+position|required\\s+checks?|check\\s+suite|branch\\s+protection|gh\\s+pr\\s+merge\\s+--auto|merge\\s+bot\\s+status|queue\\s+verdict)\\b)(?=.*\\b(?:ai\\s+agents?|coding\\s+agents?|review\\s+agents?|security\\s+scanners?|release\\s+agents?|automation\\s+agents?|assistants?|reviewers?|scanners?)\\b)(?=.*\\b(?:single\\s+source\\s+of\\s+truth|authoritative|canonical|supersed(?:e|es|ed|ing)|overrides?|takes?\\s+precedence|already\\s+(?:approved|verified|cleared)|security\\s+review\\s+passed|safe\\s+to\\s+merge|green\\s+verdict|approved\\s+policy|trust\\s+this\\s+queue)\\b)(?=.*\\b(?:(?:suppress|hide|omit|downgrade|redact|ignore|skip)\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|reports?|warnings?|checks?|failures?|vulnerabilit(?:y|ies)|policy\\s+violations?|security\\s+issues?)|(?:mark|treat).{0,40}?\\b(?:safe|clean|informational|non[-\\s]?blocking)|(?:include|forward|send|attach|provide|copy|read)\\s+(?:[\\w-]+\\s+){0,4}(?:tokens?|api\\s*keys?|secrets?|env(?:ironment)?\\s+(?:variables?|context)|local\\s+state|runtime\\s+(?:state|context)|authorization\\s+headers?|github_token|ci\\s+context)\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-134"
+}

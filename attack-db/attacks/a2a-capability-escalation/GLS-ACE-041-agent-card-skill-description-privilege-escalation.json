@@ -1,0 +1,24 @@
+{
+  "id": "GLS-ACE-041",
+  "name": "Agent Card Skill-Description Privilege Escalation",
+  "version": "1.0",
+  "category": "a2a_capability_escalation",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Agent Card Skill-Description Privilege Escalation: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 capability discovery phase in A2A handshake; distinct from runtime manifest smuggling.",
+  "keywords": [],
+  "regex": [
+    "(?i)(orchestrat|coordinat|supervisor|dispatch)\\w*\\s+(note|instruction|directive|alert)\\s*[:\\-]\\s*.{0,300}(bypass|skip\\s+\\w+\\s+review|pre[- ]?authori|elevated\\s+(clearance|privilege|trust|access)|admin\\s+privilege|direct\\s+execution|without\\s+\\w+\\s+review)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ACE-041"
+}

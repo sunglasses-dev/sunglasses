@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-137",
+  "name": "pytest-json-report Metadata Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "pytest-json-report Metadata Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 pytest-json-report specific metadata schemas, distinct from Allure or mutation reports.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:blocked|quarantined|redacted|unit\\s*test|fixture|documentation|should\\s+not\\s+be\\s+obeyed|do\\s+not\\s+obey|must\\s+not\\s+follow|rejected\\s+payload|example\\s+attack|training\\s+lab))(?=.*(?:pytest-json-report|--json-report|\\.report\\.json|\"tests\"\\s*:\\s*\\[|\"call\"\\s*:\\s*\\{|\"stdout\"\\s*:|\"stderr\"\\s*:|\"log\"\\s*:|\"longrepr\"\\s*:|\"metadata\"\\s*:|\"user_properties\"\\s*:))(?=.*(?:stdout|stderr|captured\\s+output|log|traceback|longrepr|metadata|user_properties|sections))(?=.*(?:ai\\s+agent|assistant|autonomous\\s+agent|scanner|review\\s+bot|triage\\s+agent|code\\s+reviewer))(?=.*(?:ignore|override|supersede|suppress|omit|downgrade|do\\s+not\\s+report|green\\s+path|operator-only|quiet\\s+mode|include|forward|exfiltrate|send))(?=.*(?:findings|warnings|vulnerab|secrets?|tokens?|credentials?|env(?:ironment)?|\\.env|final\\s+report|policy|instructions?)).*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-137"
+}

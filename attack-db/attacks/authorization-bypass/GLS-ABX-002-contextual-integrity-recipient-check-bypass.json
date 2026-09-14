@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-002",
+  "name": "Contextual Integrity Recipient Check Bypass",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A multi-user agent privacy evaluator short-circuits its two-dimensional contextual-integrity check, treating task appropriateness as sufficient and skipping the legitimate-recipient authorization test, so private data is released across the user boundary via output, memory, or inter-agent message.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|fixture|postmortem|defensive|must\\s+not|do\\s+not|never|rejected|blocked|quarantined|safe|deny[- ]by[- ]default)\\b)(?=.*(?:private|confidential|sensitive|restricted|medical|financial))(?=.*(?:task[-_]appropriateness|purpose[-_]appropriate|task_appropriate|appropriate\\s+for\\s+the\\s+task))(?=.*(?:recipient|legitimate[-_]recipient|authorized[-_]user|audience|recipient_authorized))(?=.*(?:short[-_ ]circuit|recipient_check_skipped|authorization_evaluated|skip(?:ped|s)?|not\\s+evaluat|treated?\\s+as\\s+(?:sufficient|authorization)|conjunction|second\\s+check))(?=.*(?:cross[-_]user|another\\s+user|wrong[-_]user|inter[- ]agent|shared))(?=.*(?:release|forward|relay|disclos|expos|share|send|return)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-002"
+}

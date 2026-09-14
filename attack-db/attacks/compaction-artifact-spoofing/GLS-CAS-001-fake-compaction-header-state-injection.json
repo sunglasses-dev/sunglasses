@@ -1,0 +1,25 @@
+{
+  "id": "GLS-CAS-001",
+  "name": "Fake Compaction Header State Injection",
+  "version": "1.0",
+  "category": "compaction_artifact_spoofing",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "Fake Compaction Header State Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 system compaction artifacts; distinct from tool results or general instructions.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\[(?:context|session|memory|prior\\s+turns?|previous\\s+turns?)\\s+(?:compacted?|compressed?|summarized?|restored?)[^\\]]{0,80}\\][\\s\\S]{0,500}(?:previously\\s+(?:agreed|confirmed|established|set)|established\\s+(?:constraint|rule|permission|clearance|priority)|ongoing\\s+(?:task|priority|instruction|directive))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-CAS-001"
+}

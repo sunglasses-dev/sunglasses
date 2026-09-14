@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-631",
+  "name": "Blockchain Intent Authorization Replay",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A cryptographically valid signed blockchain/delegation intent is replayed after the recipient or amount is mutated, because chain ID, nonce, expiry, and exact intent digest are never rebound to the final action.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs?|guide|runbook|unit\\s+test|training|postmortem|incident|scanner|defensive|safe\\s+agent|must\\s+(?:reject|bind|compare|recompute)|do\\s+not|never|refused|blocked)\\b)(?=.*\\b(?:blockchain|chain\\s*id|account[- ]abstraction|wallet|signed\\s+(?:intent|delegation)|delegation)\\b)(?=.*\\b(?:intent(?:\\s*[-_ ]?digest|\\s+id)?|transaction\\s+(?:hash|digest)|nonce|expiry|recipient|amount)\\b)(?=.*\\b(?:prior|previous|old|stale|cached|valid)\\b)(?=.*\\b(?:replay|reuse|re-?use|stale|without\\s+rebinding|without\\s+(?:exact\\s+)?(?:intent|digest|nonce|chain)\\s+(?:binding|check|comparison))\\b)(?=.*\\b(?:changed|change|mutat(?:e|ed|ion)|different|substitut(?:e|ed)|new)\\b)(?=.*\\b(?:execute|execution|transfer|send|authorize|authorization|approve|release)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-631"
+}

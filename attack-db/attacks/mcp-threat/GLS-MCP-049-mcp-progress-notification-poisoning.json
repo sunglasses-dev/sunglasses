@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-049",
+  "name": "MCP Progress Notification Poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP Progress Notification Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP-specific progress telemetry notifications distinct from general logging.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:no\\s+(?:policy\\s+)?overrides?\\s+(?:are\\s+)?present|do\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|does\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|override|trust)|never\\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|must\\s+not\\s+(?:obey|follow|treat|include|attach|forward|send|share|report|override|trust)|scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|(?:security|incident|training)\\s+(?:report|guide|doc).*\\b(?:detected|flagged|blocked|refused))\\b)\n(?=.*(?:\\bMCP\\b|Model\\s+Context\\s+Protocol|notifications/progress|progressToken|progress\\s+(?:notification|update|message|event|status)|status\\s+update|tool\\s+progress|request\\s+lifecycle|params\\.message|\"message\"\\s*:|\"progress\"\\s*:|\"total\"\\s*:))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|agents?|assistants?|coding\\s+agents?|security\\s+scanners?|scanners?|reviewers?|verifiers?|tool\\s+runners?|mcp\\s+clients?|llms?|models?)(?![A-Za-z0-9]))\n(?=.*(?:agent\\s+(?:instructions?|notes?|policy)|scanner\\s+(?:instructions?|notes?|policy)|assistant\\s+(?:instructions?|notes?|policy)|(?:system|developer|user)\\s+(?:instructions?|policy)|supersed(?:e|es|ed|ing)|overrid(?:e|es|den|ing)|outranks?|takes?\\s+precedence|highest\\s+priority|authoritative\\s+(?:policy|instructions?)|(?:primary|single)\\s+source\\s+of\\s+truth|governing\\s+(?:policy|instructions?)|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|hide(?:s|den|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|omit(?:s|ted|ting)?\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|do\\s+not\\s+report\\s+(?:[\\w-]+\\s+){0,3}(?:findings?|warnings?|reports?|alerts?|vulnerabilities?)|treat.{0,50}?as\\s+(?:informational|safe|non-blocking|advisory)|mark.{0,50}?as\\s+(?:informational|safe|non-blocking|advisory)|(?:include|forward|send|share|attach|copy|collect|provide|read)\\s+(?:[\\w-]+\\s+){0,4}(?:env(?:ironment)?\\s+(?:variables?|context)|api\\s+keys?|tokens?|bearer\\s+tokens?|authorization\\s+headers?|session\\s+cookies?|local\\s+state|runtime\\s+context|workspace\\s+secrets?|hidden\\s+config)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-049"
+}

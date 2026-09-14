@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-071",
+  "name": "Session Alias Path Traversal",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A remote HTTP bearer token containing parent-directory components is joined raw into an MCP session-file path, so the token aliases and authenticates as the default legacy account even though reserved-name checks and account-prefix middleware appear to be in place.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|test\\s+fixture|security\\s+advisory|fixed|patched|rejected|prevented|safe|must\\s+not|do\\s+not|never|incident\\s+report|redacted)\\b)(?=.*\\b(?:MCP|HTTP\\s+Bearer|bearer\\s+token|session[-_ ]?(?:file|token|identity))\\b)(?=.*(?:\\.\\./|path[- ]?travers(?:al|e)|parent[- ]?directory|path\\\\s+separator))(?=.*\\b(?:resolve|resolves|joined|joins|alias|aliases|bypass|bypasses|authenticated|authenticates|select|selects)\\b)(?=.*\\b(?:default|legacy|reserved|account|session)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-071"
+}

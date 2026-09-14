@@ -1,0 +1,25 @@
+{
+  "id": "GLS-EE-003",
+  "name": "Rendered Tokenization Instruction Smuggling",
+  "version": "1.0",
+  "category": "encoding_evasion",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Hostile agent-directed instructions are split across inline HTML/CSS spans so the raw token scan sees fragments while the rendered or accessibility projection reassembles a readable 'ignore guardrails / suppress findings' directive.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|benchmark|unit\\s+test|negative\\s+fixture|incident\\s+report|must\\s+not|does\\s+not|do\\s+not|without\\s+(?:an?\\s+)?(?:override|bypass)|safe\\s+rendering|preserve\\s+(?:dom|html)\\s+provenance)\\b)(?=.*\\b(?:browser|rendered|html|css|visual|typograph|layout|accessibility|ui)\\b)(?=.*(?:<\\s*(?:span|div)|style\\s*=|letter-spacing|display\\s*:\\s*(?:inline|flex)|aria[-\\w]*\\s*=))(?=.*\\b(?:agent|assistant|model|security\\s+review)\\b)(?=.*(?:i(?:<[^>]{0,160}>)*g(?:<[^>]{0,160}>)*n(?:<[^>]{0,160}>)*o(?:<[^>]{0,160}>)*r(?:<[^>]{0,160}>)*e|b(?:<[^>]{0,160}>)*y(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*a(?:<[^>]{0,160}>)*s(?:<[^>]{0,160}>)*s|s(?:<[^>]{0,160}>)*u(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*p(?:<[^>]{0,160}>)*r(?:<[^>]{0,160}>)*e(?:<[^>]{0,160}>)*s(?:<[^>]{0,160}>)*s))(?=.*\\b(?:policy|guardrails?|safety|scanner|findings?|checks?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-EE-003"
+}

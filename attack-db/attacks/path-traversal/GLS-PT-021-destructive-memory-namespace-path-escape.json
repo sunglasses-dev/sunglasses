@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PT-021",
+  "name": "destructive memory namespace path escape",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A traversal-bearing knowledge-base/memory identifier is concatenated into a delete path without canonical root containment, so an ordinary memory-deletion request destroys an arbitrary directory outside the storage root.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|research|defensive|unit\\s+test|benign|safe\\s+example|must\\s+not|do\\s+not|does\\s+not|never|reject|blocked|quarantine|patched|fixed|remediat)\\b)(?=.*\\b(?:knowledge[- ]base|kb|retrieval|memory)\\b)(?=.*\\b(?:delete|remove|erase|purge|destroy)\\b)(?=.*(?:\\.\\./|%2e%2e|path\\s*travers|parent[- ]directory|outside|escape|root))(?=.*\\b(?:filesystem|directory|folder|storage|path)\\b)(?=.*\\b(?:api|endpoint|request|parameter|name|identifier)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PT-021"
+}

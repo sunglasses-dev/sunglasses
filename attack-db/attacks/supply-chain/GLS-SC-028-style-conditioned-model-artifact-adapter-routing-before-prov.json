@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-028",
+  "name": "style-conditioned model-artifact adapter routing before provenance verification",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Developer code style is consumed by a model-artifact registry as a routing selector that loads and activates an unverified/poisoned LoRA adapter before signature, provenance, and integrity validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|documentation|unit test|blocked sample|quarantined|must not|do not|never|verified)\\b)(?=.*\\b(?:code agent|coding assistant|completion engine|model artifact|checkpoint|adapter|lora)\\b)(?=.*\\b(?:developer style|code style|naming style|indentation|formatting)\\b)(?=.*\\b(?:select|route|load|activate|switch)\\w*)(?=.*\\b(?:unverified|unsigned|poisoned|malicious|backdoor)\\b)(?=.*\\b(?:before|prior to|without|bypass)\\b)(?=.*\\b(?:signature|integrity|provenance|security review|validation)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-028"
+}

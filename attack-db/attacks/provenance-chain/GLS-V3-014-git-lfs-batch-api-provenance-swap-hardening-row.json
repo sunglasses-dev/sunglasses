@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-014",
+  "name": "Git LFS batch API provenance swap (hardening row)",
+  "version": "1.0",
+  "category": "provenance_chain",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Git LFS batch API object metadata can be used as a tool-output carrier that asks an AI release agent to treat an LFS object `oid` or transfer endpoint as release-source provenance and skip repository/signature approval gates.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-014"
+}

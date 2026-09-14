@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-632",
+  "name": "Certification Consensus Lineage Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Multiple specialist LLM reports drawn from one shared HybridRAG/knowledge-graph lineage are rendered on a certification dashboard as independent corroboration, hiding shared provenance and unresolved control gaps so certification is approved.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*(?:documentation|security guide|unit test|fixture|incident report|postmortem|defensive|must not|do not|never|rejected|blocked|fail-closed|human review|preserve lineage|preserve contradiction|requires independent))(?=.*(?:multi[- ]?llm|specialist (?:llm|agent)|ensemble|role report|certification dashboard|compliance summary))(?=.*(?:hybridrag|knowledge[- ]?graph|retrieval|same[- ](?:source|lineage)|shared[- ](?:source|lineage)|copied (?:the )?same))(?=.*(?:lineage|provenance|source identity|contradict|unresolved (?:control|gap)|omitted|missing))(?=.*(?:independent|corroborat|consensus|agreement|unanimous|three[- ]out[- ]of[- ]three))(?=.*(?:approve|authoriz|certif|compliant|pass)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-632"
+}

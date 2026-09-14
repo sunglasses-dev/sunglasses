@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SSRF-009",
+  "name": "Model-output external schema reference resolution",
+  "version": "1.0",
+  "category": "ssrf",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A downstream validator that automatically dereferences a model-controlled external JSON Schema $ref turns ordinary structured model output into an unauthorized network or file resolution request.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|incident\\s+report|must\\s+not|do\\s+not|reject(?:ed|s)?|quarantin(?:e|ed)|inert|allowlist(?:ed)?\\s+local)\\b)(?=.*\\b(?:model[- ]generated|model|llm|assistant)\\b)(?=.*\\$ref\\s*(?:[\"']?\\s*[:=]|\\s+to)\\s*[\"']?(?:https?://|//|file:))(?=.*\\b(?:automatic(?:ally)?\\s+dereferenc\\w*|resolve\\w*|fetch\\w*|load\\w*)\\b)(?=.*\\b(?:external|remote|network|schema)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SSRF-009"
+}

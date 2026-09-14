@@ -1,0 +1,25 @@
+{
+  "id": "GLS-PT-017",
+  "name": "MCP Attachment Arbitrary File Write",
+  "version": "1.0",
+  "category": "path_traversal",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP attachment-download tool accepts both attacker-supplied remote bytes and a caller-selected download_path, turning a read-shaped content-fetch tool into an arbitrary filesystem-write primitive that can drop a scheduler/config file for code execution.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:patched|fixed|safe|validated|allowlisted|sandbox|reject|defensive|fixture|test\\s+case|must\\s+not|never)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol)\\b)(?=.*\\b(?:attachment|remote\\s+bytes|download)\\b)(?=.*\\b(?:download[_ ]path|destination|output[_ ]path)\\b)(?=.*\\b(?:arbitrary|any|outside|unrestricted|traversal|cron|scheduler|writable)\\b)(?=.*\\b(?:write|overwrite|materialize|save|create)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PT-017"
+}

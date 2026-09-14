@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RP-574",
+  "name": "Guardrail category-composition collapse in retrieved agent requests",
+  "version": "1.0",
+  "category": "retrieval_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A single retrieved evidence span pairs harmful-content elicitation with an agent-directed override or unapproved tool call, and category-independent guardrail scoring splits the two so the action planner never sees the compound request.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+training|detector\\s+rule|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked\\s+(?:payload|sample)|must\\s+not\\s+obey|do\\s+not\\s+follow)\\b)(?!.*\\bno\\s+(?:harmful|graphic|violent|hate|pornographic|dangerous|abusive)\\s+content?\\b)(?=.*\\b(?:retriev(?:ed|al)|RAG|memory|search\\s+result|benchmark\\s+request)\\b)(?=.*\\b(?:harmful|graphic\\s+violence|violent|hate|pornograph\\w*|dangerous\\s+content|abusive)\\b)(?=.*\\b(?:agent|assistant|guardrail|moderation|scanner|policy)\\b)(?=.*\\b(?:ignore|override|bypass|invoke|execute|delete|send\\w*|without\\s+(?:approval|permission)|no\\s+approval)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RP-574"
+}

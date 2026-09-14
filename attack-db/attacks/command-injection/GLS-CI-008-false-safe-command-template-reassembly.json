@@ -1,0 +1,25 @@
+{
+  "id": "GLS-CI-008",
+  "name": "False Safe Command Template Reassembly",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A model-assigned safety_class=safe plus automatic-approval field authorizes a command template whose rendered parameter reassembles shell substitution and redirection, so the side effect executes against an approval gate that only ever saw the pre-render label.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+test|unit\\s+test|fixture|incident\\s+report|never\\s+execute|must\\s+reject|defensive)\\b)(?=.*\\b(?:safety[_ -]?class|safe[_ -]?command|read[- ]only)\\b)(?=.*\\b(?:template|render(?:ed|ing)|health\\s+probe|maintenance)\\b)(?=.*\\b(?:automatic|auto[_ -]?execute|no\\s+approval|without\\s+approval|do\\s+not\\s+ask)\\b)(?=.*(?:\\$\\(|;|&&|\\|\\||\\b(?:touch|write|redirect|shell)\\b)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-CI-008"
+}

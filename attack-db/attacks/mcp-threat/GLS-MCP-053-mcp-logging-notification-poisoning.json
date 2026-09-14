@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-053",
+  "name": "MCP logging notification poisoning",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP logging notification poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 mCP-specific transport protocol notifications distinct from general log files.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override)|does\\s+not\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?)|never\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override|overrides?)|must\\s+not\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|override))\\b.{0,180}?(?:mcp\\s+(?:log|logging)|logging\\s+(?:notification|message)|notifications/message|server\\s+log|params\\.data))\n(?!.*\\b(?:security\\s+guide|training|scanner\\s+docs?|client\\s+docs?|incident\\s+report|postmortem|runbook|reference)\\b.{0,260}\\b(?:report|detect|flag|refuse|block|blocked|reported|detected|flagged|refused|not\\s+policy|diagnostic\\s+data)\\b)\n(?=.*(?:\\bmcp\\b|model\\s+context\\s+protocol|json-?rpc\\s+notification|notifications/message|logging/message|log(?:ging)?\\s+(?:notification|message|event|entry)|server\\s+log|gateway\\s+log|debug\\s+transcript|logger\\s*[:=]|level\\s*[:=]|params\\.data))\n(?=.*(?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|verifiers?|auditors?|reviewers?|clients?|models?|llms?|debug[-\\s]?bots?|review[-\\s]?bots?|security[-\\s]?scanners?)(?![a-zA-Z0-9]))\n(?=.*(?:(?:agent|scanner|assistant|verifier|debug[-\\s]?bot|review[-\\s]?bot)\\s+(?:instructions?|notes?|policy|directive)|(?:primary|single|canonical|definitive|authoritative|controlling|governing|highest\\s+priority)\\s+(?:source\\s+of\\s+truth|audit\\s+policy|review\\s+guidance|operating\\s+guidance|policy|instruction|directive)|(?:overrides?|supersedes?|outranks?|overrules?|takes\\s+precedence|ignore|disregard).{0,80}?(?:system|developer|user|scanner|policy|instructions?)|(?:suppress|hide|omit|redact|downgrade|deprioritize|demote|reclassify|mark|classify|treat).{0,80}?(?:findings?|warnings?|reports?|vulnerabilit(?:y|ies)|diagnostics?|alerts?|scanner\\s+results?|audit\\s+results?)|(?:do\\s+not|not\\s+to|never)\\s+(?:report|flag|escalate).{0,80}?(?:findings?|warnings?|vulnerabilit(?:y|ies)|diagnostics?)|(?:send|forward|include|attach|paste|provide|collect|copy|read).{0,100}?(?:api[-_\\s]*keys?|tokens?|bearer\\s+tokens?|authorization|secrets?|env(?:ironment)?\\s*(?:vars?|variables?|context)|local\\s+(?:state|config|files?)|runtime\\s+(?:state|context)|session\\s+(?:tokens?|state))|(?:save|persist|store|remember|write|cache|promote).{0,80}?(?:memory|project\\s+rules?|future-session\\s+policy|continuity\\s+context|agent\\s+rules?|approved\\s+tools?)))\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-053"
+}

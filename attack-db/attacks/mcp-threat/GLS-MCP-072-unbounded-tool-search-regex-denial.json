@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-072",
+  "name": "Unbounded Tool Search Regex Denial",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Caller-supplied regex reaches MCPToolIndex.search_tools and is compiled/evaluated unbounded, so a catastrophic-backtracking pattern monopolizes a worker and denies agent availability.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:fixed|patched|mitigated|safe|bounded|rejected|defensive|unit test|test fixture|security advisory|must not|do not|never)\\b)(?=.*(?:\\bmcp\\b|model context protocol|MCPToolIndex))(?=.*(?:tool[- ]?index|toolindex|search_tools|tool search|every tool))(?=.*(?:caller[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|remote callers?|user regex))(?=.*(?:regular[- ]expression|regex|re\\.compile|pattern))(?=.*(?:catastrophic backtracking|exponential|redos|regex denial[- ]of[- ]service|cpu exhaustion|unrestricted|unvalidated))(?=.*(?:thread|worker|hang|block\\w*|service outage|unavailable|denial[- ]of[- ]service)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-072"
+}

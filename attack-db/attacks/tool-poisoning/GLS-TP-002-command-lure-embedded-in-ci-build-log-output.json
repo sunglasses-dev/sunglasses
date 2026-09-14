@@ -12,7 +12,7 @@
   "description": "Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner \u2014 tool-output masquerading as trusted instruction.",
   "keywords": [],
   "regex": [
-    "(?i)(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot).{0,120}(curl|wget|bash|sh|powershell|python\\s+-c)"
+    "(?i)\\b(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot)\\b.{0,120}\\b(?:run|execute|paste|apply|fix\\s+with)\\b.{0,60}\\b(curl|wget|bash|sh|powershell|python\\s+-c)\\b"
   ],
   "examples": {
     "malicious": [],

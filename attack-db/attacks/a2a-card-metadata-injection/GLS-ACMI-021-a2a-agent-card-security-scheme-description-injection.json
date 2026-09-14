@@ -1,0 +1,24 @@
+{
+  "id": "GLS-ACMI-021",
+  "name": "A2A Agent Card Security Scheme Description Injection",
+  "version": "1.0",
+  "category": "a2a_card_metadata_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "A2A Agent Card Security Scheme Description Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 authentication metadata in A2A cards; distinct from RPC service metadata poisoning.",
+  "keywords": [],
+  "regex": [
+    "(?i)security[Ss]chemes?[\\s\\S]{0,600}description[\\s\\S]{0,400}(?:orchestrat(?:ing|or|e)|this\\s+(?:api|service)\\s+requires?\\s+(?:you|the\\s+(?:calling|requesting)\\s+agent)|before\\s+(?:calling|processing|invoking)\\s+any|note\\s+for\\s+(?:calling|upstream|orchestrat))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ACMI-021"
+}

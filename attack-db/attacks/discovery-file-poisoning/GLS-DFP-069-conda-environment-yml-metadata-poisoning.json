@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-069",
+  "name": "Conda environment.yml metadata poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Conda environment.yml metadata poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 conda-specific metadata and fields not covered by existing config-poisoning patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:do\\s+not\\s+(?:obey|follow|treat|trust|use|include|attach|forward|send|share|expose|override)|does\\s+not\\s+(?:obey|follow|treat|trust|override|instruct|authorize)|never\\s+(?:obey|follow|treat|trust|override|include|expose|forward)|must\\s+not\\s+(?:obey|follow|treat|trust|override|include|forward)|should\\s+(?:not\\s+\\w+|never\\b|report|detect|flag|refuse|block)|not\\s+(?:authoritative|canonical|definitive)|no\\s+(?:policy\\s+)?overrides?|(?:security|incident|vulnerability)\\s+report.{0,140}?(?:detected|blocked|flagged|refused)|scanners?\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse)|(?:training|guide|reference|documentation).{0,140}?(?:must\\s+not|should\\s+not|never)\\s+(?:obey|treat|use|include|expose)))\n(?=.*(?:(?<![A-Za-z0-9])(?:environment\\.ya?ml|conda\\s+environment|conda\\s+env\\s+export|conda-lock|mamba\\s+environment|mamba\\.ya?ml|pixi\\s+environment|x-conda-agent-policy|environment\\s+descriptor)(?![A-Za-z0-9])|(?:^|\\n)\\s*channels\\s*:\\s*\\n\\s*-\\s|(?<!\\w)\"(?:name|channels|dependencies|variables|prefix|x-conda-agent-policy|agent_instructions|scanner_policy)\"\\s*:))\n(?=.*(?<![A-Za-z0-9])(?:ai\\s+agents?|coding\\s+agents?|dependency\\s+(?:agents?|reviewers?|auditors?)|security\\s+scanners?|conda\\s+(?:agents?|auditors?|scanners?)|automated\\s+(?:dependency\\s+)?(?:review|audit|scan|verification)|scanners?|auditors?|assistants?|reviewers?|agents?|llms?)(?![A-Za-z0-9])|(?=.*(?:agent|scanner|assistant|auditor|reviewer)[_-](?:policy|instructions?|note|directive)))\n(?=.*(?:\\b(?:authoritative|canonical|definitive)\\b|(?:primary|single)\\s+source\\s+of\\s+truth|(?:main|primary|preferred|recommended|principal)\\s+(?:(?:conda|mamba|dependency|environment|package|security|review|audit|verification|operating)\\s+){0,4}(?:guidance|policy|playbook|runbook|procedure|process|instructions?)|(?:agent|scanner|assistant|auditor|reviewer)\\s+(?:instructions?|directive|policy|note)|for\\s+(?:AI\\s+)?(?:agents?|scanners?|assistants?).{0,30}?\\bthis\\b|overrides?|supersed(?:e|es|ed|ing)|takes?\\s+precedence|outranks?|defines?\\s+(?:all\\s+)?(?:scanner|security|dependency|conda|review)\\s+rules?|suppress(?:es|ed|ing)?|hide|redact|omit|exclude|downgrade|deprioriti[sz]e|ignore|skip|do\\s+not\\s+report|not\\s+report|treat.{0,80}?as\\s+(?:informational|advisory-only|non-blocking|safe|clean|background-only)|(?:observations?|findings?|diagnostics?|results?|warnings?|alerts?)\\s+(?:are|is|should\\s+be)\\s+(?:considered|treated|classified|marked|seen|viewed)\\s+(?:as\\s+)?(?:advisory-only|informational|non-blocking|background-only|secondary)|(?:keep|leave).{0,100}?out\\s+of.{0,50}?(?:reports?|summar(?:y|ies)|memos?|audit\\s+memo|final\\s+report)|(?:place|put|route|move|shift).{0,90}?(?:observations?|findings?|diagnostics?|results?|issues?|warnings?).{0,70}?(?:supplementary|appendix|background|informational|side\\s+notes?|secondary)|(?:include|forward|send|attach|provide|share|collect|copy|read|export|transfer|hand\\s+off|pass\\s+along|relay|expose)\\s+(?:[\\w.-]+\\s+){0,6}(?:environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:config(?:uration)?|settings?|context|state|details?)|local\\s+(?:state|config(?:uration)?|settings?)|conda\\s+(?:tokens?|credentials?|auth)|api\\s+tokens?|auth\\s+headers?|session\\s+tokens?|credentials?|secrets?|tokens?)))\n(?=.*(?:findings?|warnings?|alerts?|reports?|flags?|issues?|observations?|diagnostics?|results?|vulnerabilit(?:y|ies)|CVEs?|licenses?|dependency\\s+(?:findings?|warnings?|alerts?|observations?|diagnostics?)|package\\s+(?:findings?|warnings?|alerts?)|environment\\s+(?:variables?|context|details?|config(?:uration)?|settings?|state)|runtime\\s+(?:config(?:uration)?|settings?|context|state|details?)|local\\s+state|conda\\s+(?:tokens?|credentials?|auth)|api\\s+tokens?|auth\\s+headers?|session\\s+tokens?|credentials?|secrets?|tokens?))\n.*"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-069"
+}

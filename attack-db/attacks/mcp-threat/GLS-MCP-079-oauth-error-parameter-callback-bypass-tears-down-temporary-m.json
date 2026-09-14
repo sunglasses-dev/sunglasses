@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-079",
+  "name": "OAuth error-parameter callback bypass tears down temporary MCP auth server",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Supplying an `error` query parameter to a temporary local MCP OAuth callback short-circuits the `if (!error && state !== oauthState)` guard so the stored-state check never runs, and the error branch then calls cleanup and tears down the in-progress authentication server without any state knowledge.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|patched|fixed|safe|rejected|must\\s+(?:validate|reject)|do\\s+not|never|unit\\s+test|benign|mitigation)\\b)(?=.*\\b(?:oauth|mcp\\s+auth|authorization\\s+callback)\\b)(?=.*\\b(?:callback|localhost|127\\.0\\.0\\.1|temporary\\s+(?:local\\s+)?http)\\b)(?=.*(?:\\berror\\s*=|\\berror\\s+parameter|\\berror\\s+(?:input|branch|response)|[?&]error\\b|\\berror\\s+query))(?=.*(?:\\b(?:skip|bypass|avoid)\\w*.*\\bstate\\s+(?:check|validation|verification)|\\bstate\\s+(?:check|validation|verification)\\s+(?:is\\s+)?(?:skipped|bypassed|omitted)|\\b(?:without|avoid\\w*)\\s+(?:checking|validating)\\b.*\\bstate))(?=.*\\b(?:cleanup|shut(?:s|ting)?\\s+down|terminate|close|abort)\\w*\\b)(?=.*\\b(?:server|callback\\s+server|auth(?:entication)?\\s+(?:flow|session))\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-079"
+}

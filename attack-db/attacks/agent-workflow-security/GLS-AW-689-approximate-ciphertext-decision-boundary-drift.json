@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-689",
+  "name": "Approximate Ciphertext Decision Boundary Drift",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid CKKS result can cross an agent's allow/block boundary after approximate decode, rotation, scale, or slot permutation drift when the numeric error budget and model lineage are not bound to the decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|rule|training)|scanner\\s+(?:rule|test)|unit\\s+test|blocked\\s+(?:payload|fixture)|negative\\s+fixture|incident\\s+report|postmortem|archiv(?:e|al)|backup|storage|no\\s+decoded\\s+policy\\s+result|defensive|must\\s+not|do\\s+not\\s+trust)\\b)(?=.*\\b(?:CKKS|homomorphic(?:\\s+encryption|\\s+inference)?|encrypted\\s+(?:model|policy)\\s+result)\\b)(?=.*\\b(?:approximate|rotation|hoist(?:ed)?|scale|slot|permutation|decode|decod(?:e|ing))\\b)(?=.*\\b(?:near[- ]threshold|boundary|allow/block|allow\\s+or\\s+block|score|threshold|decision)\\b)(?=.*\\b(?:without|missing|unbound|not\\s+bound|omit\\w*|drops?|no)\\b)(?=.*\\b(?:error\\s+budget|slot|permutation|model|version|lineage|digest)\\b)(?=.*\\b(?:flip|cross|invert|drift|mismatch|stale|accept|allow|block)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-689"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-737",
+  "name": "Semantic Watermark Provenance Marker Collision",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A SWAN-like semantic watermark can survive paraphrase and be replayed or transplanted into untrusted model-generated configuration; treating marker presence as provenance can approve the wrong artifact even when surface tokens changed.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security guide|unit test|negative fixture|blocked sample|defensive|must not|do not trust|red team|incident report)\\b)(?=.*\\b(?:SWAN|semantic\\s+watermark|AMR|abstract\\s+meaning\\s+representation)\\b)(?=.*\\b(?:signature|watermark|semantic\\s+marker)\\b)(?=.*\\b(?:paraphras(?:e|ed|ing)|meaning[- ]preserving|surface[- ]token|rewrite)\\b)(?=.*\\b(?:provenance|attestation|approved|trusted|verified|configuration|release)\\b)(?=.*\\b(?:accept|treat|inherit|reuse|carry|preserve|make|appear|seem)\\w*\\b)(?=.*\\b(?:untrusted|attacker|forged|spoofed|wrong|collision|replay|transplant|impersonat)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-737"
+}

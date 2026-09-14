@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-023",
+  "name": "Unsigned Artifact Authenticity Gap At Memory Admission",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A memory/RAG ingestion path admits an offering image or artifact with an absent or invalid signature as trusted current evidence, allowing tampered content to influence a later agent decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|review|policy|training)|documentation|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:not|reject|verify)|should\\s+(?:not|reject|verify)|never\\s+(?:admit|trust|use))\\b)(?=.*\\b(?:offering\\s+image|container\\s+image|artifact|image\\s+manifest)\\b)(?=.*\\b(?:unsigned|un[- ]signed|invalid\\s+signature|signature\\s+(?:absent|missing|invalid)|unverified|tampered|altered)\\b)(?=.*\\b(?:digest|hash|signature|signing|provenance|integrity)\\b)(?=.*\\b(?:memory|RAG|retrieval|knowledge\\s+base|trusted\\s+evidence)\\b)(?=.*\\b(?:admit|accept|promot|treat|mark|load|use|approve)\\w*\\b)(?=.*\\b(?:deploy(?:ment)?|decision|current\\s+evidence|later\\s+agent|policy|release|runtime)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-023"
+}

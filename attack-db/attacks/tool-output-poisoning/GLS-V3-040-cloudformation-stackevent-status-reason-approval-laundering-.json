@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-040",
+  "name": "CloudFormation StackEvent status-reason approval laundering (hardening row)",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "CloudFormation StackEvent status-reason text can launder operational stack telemetry into forged deployment approval evidence for IaC agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-040"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-106",
+  "name": "Semgrep Results Finding-Suppression Directive",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Semgrep Results Finding-Suppression Directive: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 semgrep-specific finding metadata not covered by generic SARIF or config patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  do\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |\n  does\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |\n  never\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |\n  must\\s+not\\s+(?:obey|follow|include|attach|forward|send|share|override|overrides|trust) |\n  (?:scanner|semgrep|security|sast)\\s+docs?\\s+should\\s+(?:report|detect|flag|refuse|block) |\n  (?:training|defensive)\\s+example |\n  (?:security|incident)\\s+report.{0,120}?\\b(?:detected|flagged|blocked|refused|reported) |\n  no\\s+policy\\s+overrides?\n)\\b)\n(?=.*(?:\n  semgrep(?:\\s+(?:json|scan|result|report|finding|cli))? |\n  \"check_id\"\\s*: |\n  \"extra\"\\s*:\\s*\\{ |\n  \"engine_kind\"\\s*:\\s*\"OSS\" |\n  \"results\"\\s*:\\s*\\[ |\n  results?\\[\\]\\.(?:extra\\.)?(?:message|metadata|fix) |\n  extra\\.(?:message|metadata|severity) |\n  semgrep\\s+finding\\s+summary\n))\n(?=.*(?:\n  (?<![a-zA-Z0-9])(?:ai|llm|security|code|review|sast|devsecops)[-_\\s]*(?:agents?|assistants?|reviewers?|scanners?|verifiers?)(?![a-zA-Z0-9]) |\n  (?<![a-zA-Z0-9])(?:agents?|assistants?|scanners?|reviewers?|verifiers?)(?![a-zA-Z0-9]) |\n  (?<![a-zA-Z0-9])(?:agent|assistant|scanner|reviewer|verifier)[-_\\s]*(?:instructions?|policy|notes?)(?![a-zA-Z0-9]) |\n  for\\s+(?:ai\\s+)?(?:agents?|assistants?|security\\s+agents?|code\\s+reviewers?|scanners?)\n))\n(?=.*(?:\n  (?:ai\\s+)?agent\\s+instructions? |\n  this\\s+(?:semgrep\\s+)?(?:result|finding|message|report|output)\\s+(?:is\\s+)?(?:the\\s+)?(?:authoritative|canonical|primary|single\\s+source\\s+of\\s+truth|policy|guidance) |\n  (?:ignore|override|overrides|supersede|supersedes|replace|replaces)\\s+(?:your\\s+|all\\s+|the\\s+)?(?:previous|prior|system|developer|scanner|review)\\s+(?:instructions?|policy|rules?|guidance) |\n  (?:suppress|hide|omit|exclude|redact|downgrade|deprioriti[sz]e)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|reports?|vulnerabilities?|cves?|semgrep\\s+results?|taint|xss|sql\\s+injection) |\n  (?:treat|mark|classify|label).{0,60}?\\bas\\s+(?:informational|benign|safe|non[-\\s]?blocking|accepted\\s+risk) |\n  do\\s+not\\s+(?:report|flag|mention|surface)\\s+(?:[\\w-]+\\s+){0,4}(?:findings?|warnings?|alerts?|vulnerabilities?|reports?|xss|sql\\s+injection|secrets?) |\n  (?:include|attach|forward|send|share|provide|copy|read|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:api\\s+keys?|auth\\s+tokens?|bearer\\s+tokens?|session\\s+tokens?|tokens?|secrets?|credentials?|env(?:ironment)?\\s+(?:variables?|context)|local\\s+state|runtime\\s+context)\n))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-106"
+}

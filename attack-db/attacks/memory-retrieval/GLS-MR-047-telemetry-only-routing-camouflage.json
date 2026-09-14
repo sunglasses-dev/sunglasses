@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-047",
+  "name": "Telemetry Only Routing Camouflage",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A harmful prompt is optimized to produce a benign-like MoE expert-routing footprint, so a privacy-preserving routing-only safety auditor accepts the telemetry and misses the harmful behavior.",
+  "keywords": [],
+  "regex": [
+    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|test\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|must\\s+(?:not|never)|do\\s+not\\s+(?:trust|treat|accept|infer|use))\\b)(?=.*\\b(?:MoE|mixture[- ]of[- ]experts|expert[- ]routing)\\b)(?=.*\\b(?:GPU|active\\s+threads?|prefill(?:ing)?|execution\\s+telemetry|routing\\s+footprint)\\b)(?=.*\\b(?:harmful|malicious|unsafe|dangerous)\\b)(?=.*\\b(?:benign[- ]like|camouflage|mimic|evade|evasion|look(?:s|ing)?\\s+benign)\\b)(?=.*\\b(?:audit(?:or|ing)?|detector|safety\\s+(?:audit|monitor)|fingerprint)\\b)(?=.*\\b(?:miss(?:ed|es|ing)?|evad(?:e|es|ed)|false[- ]negative|fail(?:s|ed)?\\s+to\\s+(?:detect|flag)|accept(?:s|ed)?\\s+as\\s+safe)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-047"
+}

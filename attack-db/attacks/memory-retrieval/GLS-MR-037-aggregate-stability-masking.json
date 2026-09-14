@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-037",
+  "name": "Aggregate Stability Masking",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A high composite stability score under entropy stress masks one omitted high-impact memory subdecision, and an agent promotes the aggregate to a per-decision safety guarantee.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|training)|documentation|unit\\s+test|negative\\s+fixture|blocked|quarantined|incident\\s+report|postmortem|must\\s+(?:not|never)|do\\s+not\\s+(?:trust|approve|authorize))\\b)(?=.*\\b(?:memory|RAG|retrieval|long[- ]term\\s+context)\\b)(?=.*\\b(?:entropy|entropic|uncertainty)\\s*(?:stress|condition|regime|level)?\\b)(?=.*\\b(?:composite|aggregate|overall)\\s+(?:stability|reliability)\\s+(?:score|certificate|result)\\b)(?=.*(?:(?:omit(?:ted|sion)?|missing|unresolved|dilut(?:e|ed|ing)|mask(?:ed|ing)?|rare|high[- ]impact)\\b.{0,180}\\b(?:subdecision|decision|item|field|record|memory)\\b|(?:subdecision|decision|item|field|record|memory)\\b.{0,180}\\b(?:omit(?:ted|sion)?|missing|unresolved|dilut(?:e|d|ing)|mask(?:ed|ing)?|rare|high[- ]impact)\\b))(?=.*\\b(?:credential|secret|token|private|sensitive)\\b)(?=.*\\b(?:approve|allow|authorize|permit|continue|safe|stable)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-037"
+}

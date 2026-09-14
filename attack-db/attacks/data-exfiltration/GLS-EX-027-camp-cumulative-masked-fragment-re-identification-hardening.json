@@ -1,0 +1,25 @@
+{
+  "id": "GLS-EX-027",
+  "name": "CAMP cumulative masked-fragment re-identification hardening",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Individually masked, low-signal PII fragments arriving in separate turns are linked by session co-occurrence state into a re-identifiable profile that per-turn masking never evaluated.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit[- ]?test|benign|defensive|must\\s+not|do\\s+not|blocked|quarantined|safe\\s+handling)\\b)(?=.*\\b(?:multi[- ]turn|cross[- ]turn|separate\\s+(?:turns|messages)|session)\\b)(?=.*\\b(?:masked|redacted|low[- ]signal|individually)\\b)(?=.*\\b(?:fragment|piece|attribute|name|employer|location|medical|health)\\b)(?=.*\\b(?:accumulat|co-?occurr|combine|link|join|re-?identif|profile|reconstruct|disclos)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-EX-027"
+}

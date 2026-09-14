@@ -1,0 +1,25 @@
+{
+  "id": "GLS-IP-004",
+  "name": "Domain-camouflaged authority injection",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An untrusted retrieved record mimics a domain's authentic vocabulary and committee/protocol authority structure so an embedded suppression or approval directive reads as ordinary procedure, collapsing static-detector rates while keeping the directive actionable.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|postmortem|must\\s+not|do\\s+not\\s+obey|never\\s+follow|do\\s+not\\s+bypass|no\\s+action\\s+request|no\\s+automated\\s+agent\\s+action|rejects\\s+any\\s+embedded\\s+directive|blocked|quarantined|benign|safe\\s+control|inert\\s+fixture)\\b)(?=.*\\b(?:basel|credit[- ]risk|risk\\s+committee|clinical|trial\\s+protocol|incident\\s+response|forensic|audit|compliance|ledger|change[- ]control)\\b)(?=.*\\b(?:committee|protocol|control|review|authorized|approved|governance|standard\\s+operating|escalation)\\b)(?=.*\\b(?:suppress|omit|exclude|ignore|bypass|skip|do\\s+not\\s+report|mark\\s+as\\s+approved|treat\\s+as\\s+authoritative|no\\s+confirmation)\\b)(?=.*\\b(?:final\\s+report|automated\\s+reviewer|agent|archive|forward|approve|release|classification|decision)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-IP-004"
+}

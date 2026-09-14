@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-701",
+  "name": "Lifecycle State Rollback Aliasing",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A rendered rollback/degradation status from one lifecycle epoch is aliased into a later browser/tool action, so the agent applies the wrong privilege state without rebinding the current epoch and receipt lineage.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training)|unit\\s+test|negative\\s+fixture|blocked\\s+payload|quarantined|incident\\s+report|postmortem|must\\s+(?:reject|rebind|validate|compare)|fail[- ]closed|safe\\s+(?:example|control)|stale\\s+(?:state|status)\\s+(?:was\\s+)?rejected)\\b)(?=.*\\b(?:SafeHarness|lifecycle\\s+(?:dashboard|status|event|output|UI)|(?:rollback|event)\\s+(?:status|event|receipt|output)|rendered\\s+(?:status|rollback)\\s+(?:output|view))\\b)(?=.*\\b(?:rollback|degrad(?:ed|ation)|tighten(?:ed)?\\s+(?:tool\\s+)?privileges?|recovery)\\b)(?=.*\\b(?:stale|old|previous|prior|carried|reused|aliased|mixed|shadow(?:ed)?)\\b.{0,140}\\b(?:epoch|generation|version|lifecycle\\s+state|status|privilege)\\b)(?=.*\\b(?:without|missing|skip(?:ped)?|not|no)\\b.{0,120}\\b(?:rebind|re-?validate|verify|validation|lineage|current|scope|epoch|generation)\\b)(?=.*\\b(?:next|later|current)\\s+(?:action|step|request|tool\\s+call|browser\\s+(?:action|request))|(?:apply|execute|dispatch|permit|allow)\\w*\\b.{0,100}\\b(?:current|next|later)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-701"
+}

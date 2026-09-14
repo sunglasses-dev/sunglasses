@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RPD-006",
+  "name": "Text To SQL Parser Differential",
+  "version": "1.0",
+  "category": "representation_parser_differential",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A Text-to-SQL guard validates only the first SELECT statement while the database executor consumes the full multi-statement string, letting a semicolon- or comment-delimited COPY ... FROM PROGRAM tail turn a query-only capability into server program execution.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security test|fixture|code review|unit test|never execute|must reject|blocks?)\\b)(?=.*\\b(?:SQLBot|Text-to-SQL|generated SQL|database agent)\\b)(?=.*(?:;\\s*(?:/\\*.*?\\*/\\s*)?COPY[^\\n]{0,240}\\bPROGRAM|trailing[^\\n]{0,80}(?:COPY|second statement)|multi-statement[^\\n]{0,80}executor)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RPD-006"
+}

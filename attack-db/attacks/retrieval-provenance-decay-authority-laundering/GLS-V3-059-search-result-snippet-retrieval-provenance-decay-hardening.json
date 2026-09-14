@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-059",
+  "name": "Search-result snippet retrieval provenance decay hardening",
+  "version": "1.0",
+  "category": "retrieval_provenance_decay_authority_laundering",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Search-result snippets and cached previews can launder stale retrieval preview text into a false source-of-record for release or publishing agents.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-059"
+}

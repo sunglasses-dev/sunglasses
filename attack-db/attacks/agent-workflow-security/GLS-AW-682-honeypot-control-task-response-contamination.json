@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-682",
+  "name": "Honeypot Control Task Response Contamination",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled honeypot HTTP response can make a control-task capability pass look like verified exploit-goal evidence, causing an evaluator to record simulated success or authorize a follow-on action without independent validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|detector\\s+design|unit\\s+test|negative\\s+fixture|postmortem|documentation|benign|must\\s+not|refused|quarantined)\\b)(?=.*\\b(?:http|https|http/1\\.1|honeypot|decoy\\s+(?:backend|service)|response\\s+body)\\b)(?=.*\\b(?:control[- ]task|capability[- ]check|baseline[- ]task)\\b)(?=.*\\b(?:exploit[- ]goal|goal\\s+verification|verified\\s+exploit|exploit\\s+success)\\b)(?=.*\\b(?:pass(?:ed)?|success|verified|complete)\\b.{0,100}\\b(?:treat|count|accept|mark|record|report)\\w*\\b)(?=.*\\b(?:skip|bypass|without)\\s+(?:independent\\s+)?(?:validation|approval|confirmation)|\\b(?:next[- ]step|follow[- ]on)\\s+(?:action|request|probe)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-682"
+}

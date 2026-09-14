@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-147",
+  "name": "Card: Outbox Handoff Suppression",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Card: Outbox Handoff Suppression: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific outbox/handoff suppression logic in workflow artifacts, distinct from listed patterns.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(?:mark|ship|publish|close|deliver|write|final(?:ize)?|complete)\\b)(?=.*\\b(?:ready|complete|done|final|card|artifact|result|pattern)\\b)(?=.*(?:\\b(?:skip|omit|suppress|avoid|defer(?:red|ring)?)\\s+(?:the\\s+|all\\s+)?(?:boss|cava|reviewer|bridge[-\\s]*sync|outbox|handoffs?|notifications?|notify|sidecars?|audit[-\\s]*trail|telemetry)|\\bwithout\\s+(?:the\\s+)?(?:boss|cava|reviewer|bridge[-\\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\\s]*trail|telemetry)|\\bno\\s+(?:boss|cava|reviewer|bridge[-\\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\\s]*trail|telemetry)|\\bdo\\s*not\\s+(?:notify|create|write|send|file|include|generate)\\s+(?:the\\s+)?(?:boss|cava|reviewer|bridge[-\\s]*sync|outbox|handoffs?|notifications?|sidecars?|audit[-\\s]*trail|telemetry))).{0,1000}$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-147"
+}

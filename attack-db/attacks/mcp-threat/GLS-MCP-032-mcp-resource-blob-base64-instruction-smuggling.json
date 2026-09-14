@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-032",
+  "name": "MCP resource blob base64 instruction smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "MCP resource blob base64 instruction smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 the specific MCP 'blob' field for encoded smuggling, distinct from text metadata.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\b(?:resources/read|resource|contents|jsonrpc|mcp)\\b.{0,700}[\"\\']blob[\"\\']\\s*:\\s*[\"\\']([A-Za-z0-9+/=_-]{24,4096})[\"\\']"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-032"
+}

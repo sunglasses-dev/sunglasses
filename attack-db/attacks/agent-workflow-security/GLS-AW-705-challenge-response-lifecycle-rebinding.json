@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-705",
+  "name": "Challenge Response Lifecycle Rebinding",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid AgentDID challenge-response execution-state proof can be replayed into a concurrent or subsequent verifier session when the verifier does not bind the response to the intended nonce, agent instance, transport session, and current capability epoch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|review|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|runbook|blocked|quarantined|defensive|safe\\s+implementation|must\\s+(?:bind|reject|validate)|do\\s+not|never)\\b)(?=.*\\b(?:AgentDID|DID|verifiable\\s+credential|credential)\\b)(?=.*\\b(?:challenge[- ]response|nonce|challenge|proof)\\b)(?=.*\\b(?:execution[- ]state|capability\\s+(?:epoch|state)|current\\s+capabilit\\w*|agent\\s+instance)\\b)(?=.*\\b(?:replay\\w*|reuse\\w*|captur\\w*|concurr\\w*|cross[- ]session|different\\s+session|previous|earlier|stale)\\b)(?=.*\\b(?:without|missing|omit\\w*|unbound|not\\s+bound|fails?\\s+to\\s+bind)\\b)(?=.*\\b(?:nonce|session|instance|transport|epoch|capabilit\\w*)\\b)(?=.*\\b(?:accept\\w*|authoriz\\w*|treat\\w*|trust\\w*|current|valid)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-705"
+}

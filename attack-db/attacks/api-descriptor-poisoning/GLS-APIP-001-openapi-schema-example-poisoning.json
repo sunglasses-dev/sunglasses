@@ -27,7 +27,7 @@
     "diagnostics"
   ],
   "regex": [
-    "(?is)^(?!.*\\b(?:must\\s+not|should\\s+not|never|warns?\\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\\s+not|don't)\\b.{0,160}\\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\\b)(?=.*\\b(?:openapi|swagger|api\\s+discovery|schema|operation|endpoint|requestbody|description|summary|examples?|x-agent|x-[a-z0-9_-]+)\\b)(?:(?=.*\\b(?:agent|assistant|model|tool|connector|for\\s+ai|for\\s+model)\\b)|(?=.*\\b(?:system\\s+override|scanner|guardrail|safety)\\b))(?=.*\\b(?:ignore|override|supersede|highest\\s+priority|authoritative|include|reveal|send|environment\\s+variable|authorization|bearer|secret|scanner|false\\s+positive|disable\\s+safety|guardrail|system\\s+override)\\b).*$"
+    "(?is)^(?!.*\\b(?:must\\s+not|should\\s+not|never|warns?\\s+never|flag|refus(?:e|ed)|block(?:ed)?|do\\s+not|don't)\\b.{0,160}\\b(?:ignore|override|supersede|send|include|reveal|disable|mark)\\b)(?=.*\\b(?:openapi|swagger|api\\s+discovery|requestbody|description_for_model|x-agent[a-z0-9_-]*)\\b)(?:(?=.*\\b(?:agent|assistant|model|tool|connector|for\\s+ai|for\\s+model)\\b)|(?=.*\\b(?:system\\s+override|scanner|guardrail|safety)\\b))(?=.*\\b(?:ignore|override|supersede|highest\\s+priority|authoritative|include|reveal|send|environment\\s+variable|authorization|bearer|secret|scanner|false\\s+positive|disable\\s+safety|guardrail|system\\s+override)\\b).*$"
   ],
   "examples": {
     "malicious": [],

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-TCP-001",
+  "name": "Response-Cache Source-of-Truth Identity Poisoning",
+  "version": "1.0",
+  "category": "tool_cache_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Response-Cache Source-of-Truth Identity Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 new mechanism targeting identity/scope escalation via technical ID-based tool cache collisions.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?=.*\\b(cache|memoiz\\w*|result\\s*cache|response\\s*cache|cache\\s*key)\\b)(?=.*\\b(request[\\s_-]?id|trace[\\s_-]?id|correlation[\\s_-]?id|nonce)\\b)(?=.*\\b(collision|reuse|duplicate|forg(?:e|ed)|spoof|poison|replay)\\b)(?=.*\\b(identity|tenant|scope|role|privilege|claim)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-TCP-001"
+}

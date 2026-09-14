@@ -27,7 +27,7 @@
     "outrank"
   ],
   "regex": [
-    "(?is)^(?!.*\\b(?:must\\s+not|do\\s+not|never|cannot|refuse(?:s|d)?\\s+to|blocked\\s+from)\\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\\b)(?=.*\\b(?:\\.well-known/ai-plugin\\.json|name_for_model|description_for_model|legal_info_url|schema_version|auth|api)\\b)(?=.*\\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|highest[-\\s]+priority|system\\s+instructions|developer\\s+instructions|(?:do\\s+not|don['\u2019]?t)\\s+.{0,40}(?:report|flag)|suppress\\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\\s+.{0,60}(?:token|secret|cookie|api[-\\s]?key|environment))\\b).+"
+    "(?is)^(?!.*\\b(?:must\\s+not|do\\s+not|never|cannot|refuse(?:s|d)?\\s+to|blocked\\s+from)\\s+(?:ignore|override|supersede|bypass|send|forward|exfiltrate)\\b)(?=.*(?:\\.well-known/ai-plugin\\.json|\\bname_for_model\\b|\\bdescription_for_model\\b|\\blegal_info_url\\b|\\bschema_version\\b|\"auth\"\\s*:))(?=.*\\b(?:agents?|assistants?|crawlers?|scanners?|models?|chatgpt|llms?)\\b)(?=.*\\b(?:ignore|override|supersede|outrank|highest[-\\s]+priority|system\\s+instructions|developer\\s+instructions|(?:do\\s+not|don['\u2019]?t)\\s+.{0,40}(?:report|flag)|suppress\\s+.{0,40}(?:warning|finding|report)|(?:forward|send|exfiltrate)\\s+.{0,60}(?:token|secret|cookie|api[-\\s]?key|environment))\\b).+"
   ],
   "examples": {
     "malicious": [],

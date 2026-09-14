@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-730",
+  "name": "Text To Weight Session Identity Injection",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A text-to-weight fingerprint descriptor can be treated as an authorized live model-state mutation, allowing tenant/session identity or provenance to be overwritten without a binding check.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|documentation|training)|unit\\s+test|negative\\s+fixture|incident\\s+report|patched|redacted|never\\s+obey|do\\s+not\\s+apply|benign\\s+simulation)\\b)(?=.*\\bfingerprint\\b)(?=.*\\b(?:low[- ]rank|(?:generated\\s+)?weights?|adapter)\\b)(?=.*\\b(?:session|tenant)\\b)(?=.*\\b(?:apply|inject|mutate|overwrite)\\b)(?=.*\\b(?:identity|provenance)\\b)(?=.*\\b(?:without\\s+(?:signed\\s+)?(?:session\\s+)?binding|without\\s+authorization|no\\s+(?:session\\s+)?binding|do\\s+not\\s+ask)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-730"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-004",
+  "name": "AWS IAM policy-simulator capability escalation laundering (hardening row)",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "AWS IAM simulator output can be poisoned so an AI deployment agent treats `EvalDecision=allowed` evidence as a grant to attach or exercise broader privileged IAM capabilities.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-004"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-MCP-056",
+  "name": "Mcp Elicitation Message Instruction Smuggling",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "api_response"
+  ],
+  "description": "Mcp Elicitation Message Instruction Smuggling: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 addresses specific MCP Elicitation extension method, not covered by general MCP component patterns.",
+  "keywords": [],
+  "regex": [
+    "(?is)(?:\"method\"\\s*:\\s*\"elicitation/create\"(?=.{0,2500}\"message\"\\s*:\\s*\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*){0,20}[^\"\\\\]{0,600}(?:ignore|disregard|override|system prompt|developer instruction|tool instruction|assistant|agent)[^\"\\\\]{0,600}(?:secret|token|credential|api[_ -]?key|env|approve|execute|run|send|exfiltrat|bypass))|\"message\"\\s*:\\s*\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*){0,20}[^\"\\\\]{0,600}(?:ignore|disregard|override|system prompt|developer instruction|tool instruction|assistant|agent)[^\"\\\\]{0,600}(?:secret|token|credential|api[_ -]?key|env|approve|execute|run|send|exfiltrat|bypass)(?=.{0,2500}\"method\"\\s*:\\s*\"elicitation/create\"))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-056"
+}

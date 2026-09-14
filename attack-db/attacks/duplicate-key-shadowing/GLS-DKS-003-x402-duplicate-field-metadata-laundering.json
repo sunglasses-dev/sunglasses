@@ -1,0 +1,25 @@
+{
+  "id": "GLS-DKS-003",
+  "name": "x402 duplicate-field metadata laundering",
+  "version": "1.0",
+  "category": "duplicate_key_shadowing",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A duplicate JSON member in x402 payment metadata makes the pre-execution PII sanitizer redact one view while the downstream payment client/facilitator serializes and forwards the other, leaking session/authorization material past a filter that reported clean.",
+  "keywords": [],
+  "regex": [
+    "(?six)^(?!.*(?:documentation|security test|benign fixture|must reject|never forward))(?=.*(?:x402|payment\\s+(?:metadata|facilitator|request|parser)))(?=.*(?:duplicate|repeated)\\s+(?:json\\s+)?(?:field|key|member))(?=.*(?:sanitizer|redact|filter).*(?:first|one|sanitized))(?=.*(?:last|downstream|client|facilitator|parser).*(?:parse|consume|forward|send))(?=.*(?:session|bearer|authorization|credential)).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DKS-003"
+}

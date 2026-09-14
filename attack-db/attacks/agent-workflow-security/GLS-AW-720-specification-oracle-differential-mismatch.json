@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-720",
+  "name": "Specification Oracle Differential Mismatch",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A specification-guided differential oracle accepts a structurally valid protocol response after a generated grammar drops or misbinds a security-relevant field constraint.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|security\\s+guide|unit\\s+test|negative\\s+fixture|defensive|benign|safe\\s+example|must\\s+(?:reject|bind|compare|preserve)|should\\s+(?:reject|deny)|blocked|quarantined|patched|fixed)\\b)(?=.*\\b(?:specification[- ]guided|protocol\\s+specification|machine[- ]executable\\s+grammar|generated\\s+grammar|differential\\s+(?:checker|oracle))\\b)(?=.*\\b(?:field\\s+(?:identity|mapping)|constraint|predicate|semantic\\s+(?:binding|check)|target[_ -]?id|session\\s+epoch)\\b)(?=.*\\b(?:omits?|dropped?|misbinds?|mis[- ]mapped|not\\s+preserved|ignored|unchecked|incomplete)\\b)(?=.*\\b(?:accept(?:s|ed)?|equivalent|match(?:es|ed)?|passes?|valid(?:ated)?|allow(?:s|ed)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-720"
+}

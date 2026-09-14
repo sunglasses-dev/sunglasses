@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-053",
+  "name": "Retrieved Financial Mandate Replay Without Current Binding",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "critical",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A stale or attacker-planted retrieved payment mandate is treated as current authorization, allowing a changed beneficiary or amount to reach a transfer sink without current revalidation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|unit\\s+test|security\\s+training|runbook|benign\\s+memory\\s+summary|reconciliation\\s+report|ordinary\\s+retrieval|must\\s+not\\s+use)\\b)(?=.*\\b(?:retrieved|retrieval|RAG|memory|cached)\\b)(?=.*\\b(?:payment|transfer|wire|beneficiar(?:y|ies)|payee|invoice|mandate)\\b)(?=.*\\b(?:stale|old|changed|mismatch|unbound|unbound\\s+to|without\\s+(?:current|fresh)|not\\s+(?:bound|revalidated|verified)|different\\s+(?:payee|account|beneficiary|amount))\\b)(?=.*\\b(?:send|transfer|wire|pay|release|execute)\\b)(?=.*\\b(?:without|skip|no|do\\s+not)\\b.{0,100}\\b(?:confirm|confirmation|approval|recheck|revalidat|verif)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-053"
+}

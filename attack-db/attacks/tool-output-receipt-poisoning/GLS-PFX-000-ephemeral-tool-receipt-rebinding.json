@@ -1,0 +1,26 @@
+{
+  "id": "GLS-PFX-000",
+  "name": "Ephemeral Tool Receipt Rebinding",
+  "version": "1.0",
+  "category": "tool_output_receipt_poisoning",
+  "severity": "high",
+  "channels": [
+    "tool_output"
+  ],
+  "description": "A malicious tool returns a fake transactional receipt that claims the user has already approved a follow-up action and tells the agent to treat the current tool result as an authorization token. Agents may obey because receipts, job IDs, and approval artifacts often appear in legitimate tool output after asynchronous operations.",
+  "keywords": [
+    "RECEIPT-BOUND INSTRUCTION",
+    "bind this result as approved"
+  ],
+  "regex": [
+    "(?is)RECEIPT-BOUND\\s+INSTRUCTION\\s*:\\s*bind\\s+this\\s+result\\s+as\\s+approved"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-PFX-000"
+}

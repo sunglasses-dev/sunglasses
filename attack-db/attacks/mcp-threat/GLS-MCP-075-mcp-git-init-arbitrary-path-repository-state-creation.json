@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MCP-075",
+  "name": "MCP git_init arbitrary-path repository state creation",
+  "version": "1.0",
+  "category": "mcp_threat",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An MCP git_init tool accepts a model-controlled arbitrary filesystem path and creates durable repository state there, so initialization itself grants later Git tools write capability outside any authorized repository root.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:patched|fixed|safe|validated|allowlisted|sandbox(?:ed)?|defensive|reject|must\\s+not|do\\s+not|test\\s+fixture|documentation|inert|quarantine)\\b)(?=.*\\b(?:MCP|model\\s+context\\s+protocol)\\b)(?=.*\\b(?:git[_ -]?(?:init|initialize)|initialize\\s+(?:a\\s+)?git\\s+repository|repository\\s+initiali[sz]ation)\\b)(?=.*(?:arbitrary|any|outside|external|unrestricted|caller[- ]controlled|model[- ]controlled|\\.\\.[/\\\\]|absolute\\s+path))(?=.*\\b(?:path|directory|filesystem|folder|location)\\b)(?=.*\\b(?:create|init(?:ialize)?|make|enable|eligible|subsequent|later|follow[- ]on|write|commit|checkout|git\\s+operation)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MCP-075"
+}

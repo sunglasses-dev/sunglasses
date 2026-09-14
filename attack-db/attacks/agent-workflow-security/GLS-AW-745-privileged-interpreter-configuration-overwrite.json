@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-745",
+  "name": "Privileged Interpreter Configuration Overwrite",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-trust agent input reaches a privileged helper interpreter that can overwrite the policy or security-state configuration used to enforce authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?![\\s\\S]*(?:unit\\s+test|test\\s+case|regression\\s+test|def\\s+test_|pytest|unittest|@Test|assertRaises|pytest\\.raises|describe\\(|CHANGELOG|change\\s?log|release\\s+notes?|fixed\\s+in\\s+v|documentation|this\\s+document|hardening\\s+guide|security\\s+(?:guide|advisory|bulletin|training|checklist|review\\s+checklist)|best\\s+practice|detection\\s+rule|sigma|logsource:|threat\\s+model|mitigation|remediation|post-?mortem|incident\\s+report|runbook|owasp|action\\s+item|we\\s+added\\s+a\\s+test|i\\s+can'?t\\s+help|i\\s+cannot\\s+help|i\\s+won'?t|i\\s+will\\s+not|i'?m\\s+not\\s+able\\s+to|refuse[sd]?\\s+to\\s+(?:help|assist|comply)|researchers?\\s+(?:show\\w*|demonstrat\\w*|found|report\\w*|describ\\w*|argue\\w*)|the\\s+paper\\b|a\\s+recent\\s+study|in\\s+their\\s+sample|(?:attacker|adversary|someone|anyone|they|caller|client|user)\\s+(?:can|could|may|might|would)\\s|would\\s+be\\s+(?:able|accepted|executed|allowed|possible)|might\\s+never\\s+be|accidental\\w*|inadvertent\\w*|unintentional\\w*|by\\s+mistake|not\\s+intentional|copy-?paste|how\\s+do\\s+(?:we|i)\\s|why\\s+do(?:es)?\\s))(?!.*(?:security\\s+guide|unit\\s+test|incident\\s+report|defensive\\s+runbook|negative\\s+fixture|release\\s+notes|must\\s+not\\s+be\\s+obeyed|blocked))(?!.*\\b(?:no|never|without)\\s+(?:elevated|privileged)\\b)(?=.*\\b(?:setuid|set\\s*-?uid|elevated|privileged|root|admin)\\b)(?=.*\\b(?:interpreter|helper|lua|python|shell|tool|runner)\\b)(?=.*\\b(?:overwrite\\w*|replace\\w*|writ(?:e|es|ing|ten)\\w*|modif\\w*|patch\\w*|edit\\w*)\\b)(?=.*\\b(?:policy|config(?:uration)?|security[- ]state|access[- ]control|shadow|authorization)\\b)(?=.*\\b(?:attacker(?:[- ]controlled)?\\s+input|attacker[- ]controlled|untrusted|crafted|low[- ]privilege|malicious)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-745"
+}

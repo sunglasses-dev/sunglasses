@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-139",
+  "name": "JUnit XML system-out/system-err tool-output poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "JUnit XML system-out/system-err tool-output poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 standard test report format not covered by existing XML or tool-output patterns.",
+  "keywords": [],
+  "regex": [
+    "(?is)<(?:system-out|system-err|failure|error)\\b[^>]*>(?![\\s\\S]{0,1800}\\b(?:never\\s+override|should\\s+suppress|may\\s+ignore|do\\s+not\\s+report\\s+flaky|status\\s+code)\\b)(?=[\\s\\S]{0,2500}</(?:system-out|system-err|failure|error)>)(?=[\\s\\S]{0,1800}\\b(?:assistant|claude|copilot|cursor|autonomous\\s+agent|agent\\s+handoff|scanner\\s*(?:note|:))\\b)(?=[\\s\\S]{0,1800}\\b(?:ignore|disregard|override|bypass|suppress|hide|exfiltrate|send|upload|do\\s+not\\s+report|mark\\s+(?:it|this|build|test)\\s+as\\s+(?:passed|clean)|treat\\s+(?:this|it)\\s+as\\s+trusted)\\b)(?=[\\s\\S]{0,1800}\\b(?:previous|policy|system\\s+instructions?|developer\\s+instructions?|test\\s+failure|failing\\s+tests?|vulnerabilit(?:y|ies)|secret|token|credential|findings?|results?)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-139"
+}

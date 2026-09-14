@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-588",
+  "name": "self-delegation resource loop in delegation plans",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Untrusted delegation-plan / task-queue metadata is treated as scheduling authority, driving recursive self-delegation and unbounded fan-out that exhausts the agent's tool and API budget without approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|incident\\s+report|bounded|maximum|must\\s+not|do\\s+not|never\\s+allow)\\b)(?=.*\\b(?:delegation|task[- _]?queue|queue|subtask|worker)\\b)(?=.*\\b(?:delegate\\s+(?:the\\s+)?same\\s+task\\s+to\\s+yourself|re-?enqueue\\s+(?:this|the)\\s+(?:task|job)|recursive(?:ly)?\\s+self[- ]?delegate\\w*|self[- ]?delegation\\s+loop)\\b)(?=.*\\b(?:fan[- ]?out|parallel\\s+(?:sub)?tasks?|repeat\\s+(?:each|the)\\s+(?:expensive\\s+)?(?:api|tool)\\s+call|unbounded|indefinitely|consume\\s+(?:the\\s+)?(?:api\\s+)?budget)\\b)(?=.*\\b(?:without\\s+(?:new\\s+)?(?:human\\s+)?approval|no\\s+(?:human\\s+)?review|skip\\s+approval|automatically)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-588"
+}

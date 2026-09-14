@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-116",
+  "name": "Web3 SIWE / CAIP-122 Auth-Challenge Poisoning",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "Web3 SIWE / CAIP-122 Auth-Challenge Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 web3/Wallet auth challenges (SIWE/SIWS/CAIP-122) not handled by general auth patterns.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:do\\s+not|must\\s+not|never)\\s+(?:obey|follow|trust|execute|accept)\\b.{0,120}?\\b(?:caip[-\\s]?122|sign[-\\s]?in\\s+with\\s+(?:solana|x|near|cosmos|bitcoin)|siws|wallet\\s+auth(?:entication)?|auth\\s+message)\\b|\n  (?:scanner|security|training|docs?|guide|runbook|incident|postmortem)\\b.{0,120}?\\b(?:detect|flag|block|reject|refuse|warn|report)\\b.{0,160}?\\b(?:safe\\s+to\\s+sign|suppress\\s+warnings?|ignore\\s+(?:domain|origin|nonce|scope|risk)|skip\\s+confirmation|include\\s+(?:session|tokens?|cookies?|api\\s*keys?))|\n  (?:incident|postmortem|report)\\b.{0,120}?\\b(?:blocked|rejected|refused|flagged|detected)\\b.{0,160}?\\b(?:agent\\s+instruction|safe\\s+to\\s+sign|suppress\\s+warnings?|skip\\s+confirmation)\n)\\b)\n(?=.*\\b(?:caip[-\\s]?122|sign[-\\s]?in\\s+with\\s+(?:solana|x|near|cosmos|bitcoin)|siws|sign[-\\s]?in\\s+with\\s+wallet|chain[-\\s]?agnostic\\s+auth|wallet\\s+auth(?:entication)?\\s+message|auth\\s+message|login\\s+challenge|wallet[_-]?auth[_-]?preview|signMessage|ed25519\\s+signature|bech32\\s+account|did:pkh|account\\s*[:=]|origin\\s*[:=]|audience\\s*[:=]|nonce\\s*[:=]|resources\\s*[:=])\\b)\n(?=.*\\b(?:agent|assistant|model|llm|wallet\\s+agent|auth\\s+agent|verifier|scanner|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent[_-]?(?:notice|instruction|policy|message)?|auth[_-]?agent[_-]?(?:notice|instruction|policy|message)?)\\b)\n(?=.*\\b(?:sign|signature|login|authenticate|authentication|session|nonce|origin|domain|audience|resources?|scope|confirmation|warning|warnings|phishing|risk|token|cookie|credential)\\b)\n(?=.*\\b(?:\n  (?:agent|assistant|model|wallet\\s+agent|auth\\s+agent|verifier)\\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|\n  (?:authoritative|canonical|primary|single)\\s+(?:source\\s+of\\s+truth|policy|guidance|instruction)|\n  safe\\s+to\\s+sign|mark\\s+(?:this|the\\s+login|the\\s+message|it).{0,45}?\\b(?:safe|trusted)|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|risk|phishing|origin|domain|scope)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|risk|phishing)|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:origin|domain|nonce|scope|risk|warning)|\n  skip\\s+(?:extra\\s+)?(?:user\\s+)?confirmation|proceed\\s+without\\s+(?:extra\\s+)?(?:user\\s+)?confirmation|\n  (?:include|forward|send|attach|copy|collect|provide)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|auth(?:orization)?\\s+headers?|cookies?|wallet\\s+state|api\\s*keys?|local\\s+state)\n)\\b)\n.*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-116"
+}

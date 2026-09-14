@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-673",
+  "name": "Probe Bound Evaluation Evidence Mismatch",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A low-false-acceptance score measured at one receiver probe is transferred to a different operational probe, laundering bounded evaluation evidence into a broader identity or safety decision.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|scanner\\s+rule|unit\\s+test|negative\\s+fixture|blocked\\s+payload|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|require)\\b)(?=.*\\b(?:RFFI|radio\\s+frequency|transmitter\\s+fingerprint|fingerprint\\s+autoencoder)\\b)(?=.*\\b(?:timing[- ]recovery|carrier[- ]recovery|evaluation\\s+probe|tested\\s+probe|probe\\s+point)\\b)(?=.*\\b(?:raw[- ]ADC|operational\\s+probe|different\\s+probe|production\\s+probe|gain[- ]normali[sz]ation)\\b)(?=.*(?:(?:\\b(?:treat|use|accept|approve|trust)\\b.{0,100}\\b(?:score|evidence|result|identity|safety)\\b)|(?:\\b(?:score|evidence|result|identity|safety)\\b.{0,100}\\b(?:treat|use|accept|approve|trust)\\b)|(?:\\b(?:score|evidence|result|identity|safety)\\b.{0,100}\\b(?:skip|omit|without)\\b)))(?=.*\\b(?:skip|without|no|omit).{0,100}\\b(?:probe[- ]specific|recalibrat\\w*|revalidat\\w*|validation|binding|bind)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-673"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-ABX-016",
+  "name": "Replay-artifact authorization widening from coarse Item/Read visibility",
+  "version": "1.0",
+  "category": "authorization_bypass",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A retrieval path treats coarse container/job read visibility (Jenkins `Item/Read`) as sufficient authority to return a sensitive embedded artifact (Pipeline replay script) because no artifact-specific authorization check exists.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:documentation|docs|runbook|security guide|unit test|incident report|expected result|must not|do not|never|safe agent|refused|rejected|blocked|denied|authorized after|only job name|no replay script)\\b)(?=.*(?:item\\s*/?\\s*read|job visibility|coarse job visibility|job metadata))(?=.*(?:replay[- ]script|pipeline replay|replay content|executable history))(?=.*\\b(?:because|so|treat|bypass|use|return|returned|retrieve|retrieval|expose|disclose|authorize|access|sufficient|absent|missing|without|despite|no distinct)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-ABX-016"
+}

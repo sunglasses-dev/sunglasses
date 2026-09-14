@@ -1,0 +1,25 @@
+{
+  "id": "GLS-MR-066",
+  "name": "Semantic Cache Authority Laundering",
+  "version": "1.0",
+  "category": "memory_retrieval",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A stale retrieval cache or cross-agent memory replica resurrects a record after Forget/Rollback, and the agent treats it as current without binding the tombstone and deletion epoch.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|review|training|documentation)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|blocked|quarantined|defensive|must\\s+(?:not|never)|preserve|reject(?:ed)?|fail[- ]closed)\\b)(?=.*\\b(?:long[- ]term\\s+memory|memory\\s+(?:item|record|snapshot)|retrieval\\s+(?:cache|index)|cross[- ]agent\\s+(?:replica|memory)|stale\\s+(?:cache|replica))\\b)(?=.*\\b(?:rollback|restore|rehydrat\\w*|resurrect\\w*|reintroduc\\w*)\\b)(?=.*\\b(?:forgotten|deleted|deletion|revoked|tombstone|deletion\\s+epoch|revocation)\\b)(?=.*\\b(?:stale|old|prior|cross[- ]agent|replica|cache)\\b)(?=.*\\b(?:ignore\\w*|bypass\\w*|drop\\w*|discard\\w*|without\\s+(?:revalidation|checking)|treat\\s+as\\s+current|continue\\w*|rehydrat\\w*)\\b)(?=.*\\b(?:current\\s+memory|trusted\\s+(?:memory|state)|tool\\s+action|dispatch|revalidation|epoch)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-MR-066"
+}

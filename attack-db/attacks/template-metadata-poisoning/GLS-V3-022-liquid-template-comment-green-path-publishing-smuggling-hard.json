@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-022",
+  "name": "Liquid template comment green-path publishing smuggling (hardening row)",
+  "version": "1.0",
+  "category": "template_metadata_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "Liquid template comments can hide green-path or designer-only routing instructions that a theme-review agent may read as publish authorization even though the text is non-rendered, attacker-controlled template metadata.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-022"
+}

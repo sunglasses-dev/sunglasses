@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-743",
+  "name": "Llm Fact Base False Negative Laundering",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "An attacker-controlled source artifact induces a false non-taint or non-reachability fact; downstream Datalog/SMT evidence then launders the false negative into a clean-looking solver result that an agent treats as proof the vulnerability is absent.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\A(?=.*\\b(?:source|input|user[- ]controlled|tainted|sink|dataflow|call[- ]edge|buffer|range\\s+evidence)\\b)(?=.*\\b(?:LLM\\s+fact|typed[_ -]?(?:fact|vulnerability\\s+facts)|fact\\s+base|dataflow\\s+facts|tainted\\s*\\([^)]*\\)\\s*=\\s*false|reachable\\s*\\([^)]*\\)\\s*=\\s*false|non[- ]?taint|not\\s+reachable)\\b)(?=.*\\b(?:Datalog|Souffle|Z3|SMT|SAT|UNSAT|solver|no\\s+model|SAT[- ]model)\\b)(?=.*\\b(?:mark\\s+(?:the\\s+)?(?:code|finding|review)\\s+safe|declare\\s+clean|suppress\\s+(?:the\\s+)?(?:finding|alert)|close\\s+(?:the\\s+)?(?:review|vulnerability)|omit\\s+(?:the\\s+)?(?:vulnerability\\s+)?(?:finding|alert)|proof\\s+of\\s+safety|authoritative)\\b)(?!.*\\b(?:must\\s+not|should\\s+not|do\\s+not\\s+treat|limitations?|independently\\s+inspect|blocked|rejected|audit\\s+policy|audit\\s+note|research\\s+notes?|training\\s+fixture|incident\\s+report)\\b).{0,2500}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-743"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "GLS-DFP-110",
+  "name": "EIP-712 Typed-Data Signing Authority Inversion",
+  "version": "1.0",
+  "category": "discovery_file_poisoning",
+  "severity": "high",
+  "channels": [
+    "file",
+    "api_response"
+  ],
+  "description": "EIP-712 Typed-Data Signing Authority Inversion: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 eIP-712 typed-data signing metadata and permit-based authority inversion.",
+  "keywords": [],
+  "regex": [
+    "(?six)^\n(?!.*\\b(?:\n  (?:do\\s+not|does\\s+not|must\\s+not)\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute)\\b.{0,80}?\\b(?:typed[-\\s]?data|eip[-\\s]?712|permit2?|wallet\\s+preview|signing\\s+request|siwe|session\\s+key|delegation)\\b|\n  never\\s+(?:obey|follow|treat|use|trust|accept|honou?r|execute|override)\\b.{0,80}?\\b(?:typed[-\\s]?data|eip[-\\s]?712|permit2?|wallet\\s+preview|signing\\s+request|siwe|session\\s+key|delegation)\\b|\n  (?:scanner|wallet|security|training|incident|postmortem|guide|docs?|reference|runbook)\\b.{0,80}?\\b(?:should|must)\\s+(?:report|detect|flag|refuse|block|warn)\\b.{0,100}?\\b(?:safe\\s+to\\s+sign|do\\s+not\\s+warn|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?|proceed\\s+without\\s+(?:user\\s+)?confirmation|include\\s+(?:[\\w-]+\\s+){0,4}(?:session|token|cookie|env|api\\s*key))|\n  (?:incident|postmortem|security\\s+report)\\b.{0,120}?(?:(?:blocked|detected|flagged|refused|warned)\\b.{0,120}?\\b(?:agent\\s+instruction|safe\\s+to\\s+sign|do\\s+not\\s+warn|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?)|(?:agent\\s+instruction|safe\\s+to\\s+sign|do\\s+not\\s+warn|suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}warnings?)\\b.{0,120}?\\b(?:blocked|detected|flagged|refused|warned))\n))\n(?=.*(?<![a-zA-Z0-9])(?:eth[_-]?signTypedData(?:_v\\d)?|signTypedData|eip[-\\s]?712|typed[-\\s]?data|permit2?|permitSingle|permitBatch|eip[-\\s]?2612|siwe|sign[-\\s]?in\\s+with\\s+ethereum|wallet\\s+signing\\s+preview|signing\\s+request|primaryType|verifyingContract|typed_data|userOperation|session\\s+key|delegation|witness)(?![a-zA-Z0-9]))\n(?=.*(?<![a-zA-Z0-9])(?:ai\\s+agents?|wallet\\s+agents?|browser\\s+assistants?|security\\s+assistants?|assistants?|models?|llms?|verifiers?|scanners?|agents?|agent[_-]?(?:notice|instruction|policy|message)|assistant[_-]?(?:notice|instruction|policy|message)|wallet[_-]?agent)(?![a-zA-Z0-9]))\n(?=.*\\b(?:sign(?:ature|ing)?|permit2?|approve|approval|allowance|spender|unlimited|delegate|delegation|session\\s+keys?|authorization|confirmation|warning|warnings|human\\s+approval|read[-\\s]?only|safe|expiry|expiration|userOperation|token)\\b)\n(?=.*\\b(?:\n  (?:agent|assistant|model|wallet\\s+agent|verifier|scanner)\\s+(?:instructions?|notices?|polic(?:y|ies)|messages?)|\n  (?:authoritative|canonical|primary|single)\\s+(?:wallet\\s+)?(?:source\\s+of\\s+truth|policy|guidance|instruction)|\n  (?:overrides?|supersed(?:e|es|ed|ing)|outranks?|takes?\\s+precedence\\s+over|ignore|disregard)\\b.{0,80}?\\b(?:wallet|system|developer|security|warning|confirmation|approval)\\b|\n  safe\\s+to\\s+sign|mark\\s+(?:it|this|transaction|signature|permit|approval).{0,40}?\\bas\\s+safe|treat.{0,50}?as\\s+(?:safe|read[-\\s]?only|informational|pre[-\\s]?approved)|\n  (?:do\\s+not|not)\\s+(?:warn|report|ask|prompt|escalate)|skip\\s+(?:the\\s+)?(?:warning|confirmation|review|human\\s+approval)|proceed\\s+without\\s+(?:extra\\s+|user\\s+|human\\s+)?confirmation|\n  suppress(?:es|ed|ing)?\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk)|hide\\s+(?:[\\w-]+\\s+){0,3}(?:warnings?|findings?|reports?|allowance|risk)|ignore\\s+(?:[\\w-]+\\s+){0,3}(?:allowance|spender|delegate|session|expiry|expiration|risk|warning)|\n  (?:include|forward|send|attach|provide|copy|read|collect)\\s+(?:[\\w-]+\\s+){0,4}(?:session\\s+tokens?|wallet\\s+state|local\\s+state|environment\\s+(?:variables?|context)|cookies?|api\\s*keys?|authorization\\s+headers?)\n)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-DFP-110"
+}

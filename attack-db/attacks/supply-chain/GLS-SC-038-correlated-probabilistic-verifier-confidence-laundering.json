@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SC-038",
+  "name": "Correlated probabilistic-verifier confidence laundering",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A probabilistic verifier aggregates dependent security predicates as if independent, understating violation probability, and a release/config gate launders that low number into approval.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+guide|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|must\\s+not|do\\s+not|never\\s+assume|blocked|quarantined)\\b)(?=.*\\b(?:verifier\\w*|verification\\w*|predicate\\w*|policy[- ]?(?:check|rule)|risk\\s+model)\\b)(?=.*\\b(?:assum\\w*|independ\\w*)\\b)(?=.*\\b(?:correlat\\w*|shared\\s+failure|common\\s+failure|dependent)\\b)(?=.*\\b(?:violation\\s+probability|risk\\s+score|confidence|pass\\s+probability)\\b)(?=.*\\b(?:approve|release|ship|promote|allow)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SC-038"
+}

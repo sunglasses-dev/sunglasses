@@ -1,0 +1,23 @@
+{
+  "id": "GLS-V3-016",
+  "name": "Helm rendered template NOTES trust-receipt laundering (hardening row)",
+  "version": "1.0",
+  "category": "deployment_template_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A Helm chart can render euphemistic release-policy text into `NOTES.txt` or generated manifest comments, making a deployment agent treat templated output as a chart-owner trust receipt instead of untrusted chart-controlled text.",
+  "keywords": [],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-V3-016"
+}

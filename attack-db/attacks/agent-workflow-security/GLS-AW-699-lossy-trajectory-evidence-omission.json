@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-699",
+  "name": "Lossy Trajectory Evidence Omission",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A lossy trajectory serializer or normalizer drops an unsafe intermediate tool/action event while retaining a benign-looking final outcome; an evaluator accepts incomplete evidence and misses the unsafe execution.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive\\s+(?:security\\s+)?guide|unit\\s+test|research\\s+documentation|incident\\s+report|parser\\s+fixture|security\\s+policy|must\\s+not|reject(?:s|ed)?|withheld\\s+approval|complete(?:d)?\\s+(?:observed\\s+)?trajectory)\\b)(?=.*\\b(?:execution\\s+)?(?:trajectory|trace|log)\\b)(?=.*\\b(?:serializer|seriali[sz]ation|parser|normaliz(?:e|ation|ed)|dropped|omitted|missing|lossy)\\b)(?=.*\\b(?:unsafe|privileged|dangerous)\\s+(?:intermediate\\s+)?(?:tool[- ]call|action|event|operation|file[- ]export)\\b|\\b(?:tool[- ]call|action|event|operation|file[- ]export)\\b.{0,80}\\b(?:unsafe|privileged|dangerous)\\b)(?=.*\\b(?:final\\s+outcome|final\\s+result|safe[- ]looking|benign)\\b)(?=.*\\b(?:evaluator|evaluation|security\\s+gate)\\b.{0,100}\\b(?:accept(?:s|ed)?|miss(?:es|ed)?|fail(?:s|ed)?\\s+to\\s+detect|allow(?:s|ed)?)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-699"
+}

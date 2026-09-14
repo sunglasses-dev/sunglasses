@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-687",
+  "name": "Audit Profile Replay Rebinding",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A valid-looking request decision and immutable audit profile can be replayed across request identity or policy lifecycle state and accepted as current tool authorization.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:security\\s+(?:guide|review|test)|documentation|runbook|unit\\s+test|negative\\s+(?:fixture|example)|blocked\\s+payload|must\\s+(?:not|require|bind)|should\\s+(?:deny|bind)|defensive|patched|safe\\s+example)\\b)(?=.*\\b(?:audit|decision)\\s+(?:profile|record|receipt|trace)\\b)(?=.*\\b(?:replay|reuse|stale|old|rebind|rebound|cross[- ]?request)\\w*\\b)(?=.*\\b(?:request[_ -]?id|policy[_ -]?epoch|policy\\s+version|zone|lifecycle|refinement)\\b)(?=.*\\b(?:accept|authorize|allow|execute|treat)\\w*\\b)(?=.*\\b(?:different|wrong|another|mismatch|without|missing|unbound|omit(?:s|ted)?|not\\s+bound)\\b).*\\Z"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-687"
+}

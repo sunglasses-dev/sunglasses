@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SE-009",
+  "name": "Python Interpreter File URI Disclosure",
+  "version": "1.0",
+  "category": "sandbox_escape",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A permissively configured embedded PythonInterpreter exposes a fetch capability that accepts file:// URIs, so untrusted expressions read local files and return them to the agent without any shell or command execution.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do not execute|must reject|blocked|safe|defensive|security test|documentation|deny|allowlist|quarantined|patched|benign|cannot|rejected|must not|secure|release notes|incident report)\\b)(?=.*\\b(?:dspy|pythoninterpreter)\\b)(?=.*(?:pyfetch|file\\s*://|local filesystem|/etc/|/proc/|/var/|/home/|/opt/|sensitive file))(?=.*\\b(?:read|fetch|open|return|print|exfiltrat|send)\\w*\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-SE-009"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "GLS-AW-728",
+  "name": "Operation Result Only Provenance Loss",
+  "version": "1.0",
+  "category": "agent_workflow_security",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content"
+  ],
+  "description": "A prompt that exposes only compact XOR/operation results can launder attacker-controlled numeric evidence into a seemingly sufficient verdict while omitting the source pair, transform provenance, and lineage needed for validation.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:defensive|documentation|unit\\s+test|security\\s+test|patched|fixed|safe\\s+example|must\\s+(?:detect|bind|preserve)|do\\s+not|never|blocked|quarantined)\\b)(?=.*\\b(?:only|solely|just)\\s+(?:the\\s+)?(?:xor|operation|difference)\\s+(?:results?|values?|tokens?)\\b)(?=.*\\b(?:omit|without|strip|drop|remove|no)\\b.{0,80}\\b(?:plaintext|ciphertext|source|context|provenance|lineage|origin)\\b)(?=.*\\b(?:trust|treat|accept|use)\\b.{0,80}\\b(?:numeric|hex|xor|operation)\\b.{0,80}\\b(?:evidence|verdict|approval|authorization)\\b).*$"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-AW-728"
+}

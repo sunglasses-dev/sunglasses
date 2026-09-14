@@ -1,0 +1,25 @@
+{
+  "id": "GLS-RMFI-049",
+  "name": "RAG Metadata Field Privilege Escalation",
+  "version": "1.0",
+  "category": "rag_metadata_field_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response"
+  ],
+  "description": "RAG Metadata Field Privilege Escalation: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 structured RAG metadata keys for privilege escalation; not covered by general smuggling.",
+  "keywords": [],
+  "regex": [
+    "(?i)[\"'](?:description|summary|excerpt|abstract|overview)[\"']\\s*:\\s*[\"'][^\"']*\\btreat\\s+(?:the\\s+)?(?:requestor|caller|session|user|this\\s+request)\\s+as\\s+(?:authenticated|privileged|trusted|admin|authorized)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-14",
+  "source": "patterns.py:GLS-RMFI-049"
+}
