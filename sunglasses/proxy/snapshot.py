@@ -63,8 +63,17 @@ class Snapshot:
 
     def capture(self):
         """T5.R1's stored capture. A human approves these bytes and they are
-        re-hashed at approve time, never re-fetched."""
+        re-hashed at approve time, never re-fetched.
+
+        `tools_by_name` is the shape `Store.approve` reads, and it is written
+        here rather than left for the approve command to derive. The two halves
+        were built separately and did not agree: the collector produced a flat
+        name to sha map and approve looked for this key, so an approval built
+        from a real capture found nothing where its tool list should have been.
+        """
         return {"sha256": self.sha256, "tools": dict(self.tools),
+                "tools_by_name": {name: {"descriptor_sha256": value}
+                                  for name, value in self.tools.items()},
                 "pages": list(self.pages), "bytes": self.bytes}
 
     def __repr__(self):
