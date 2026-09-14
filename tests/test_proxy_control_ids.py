@@ -68,15 +68,34 @@ def test_the_session_stays_open_after_a_control_exchange():
     assert session.closed_with() is None
 
 
-def test_a_control_id_and_a_client_id_of_the_same_value_are_different_items():
-    """ONE TABLE, keyed by origin. The two namespaces share a table and are
-    told apart by the key, not by living in separate dicts."""
+def test_control_requests_live_in_the_one_correlation_table():
+    """ONE TABLE, keyed by origin.
+
+    A same-value collision between the client and the proxy is not
+    constructible, because a client carrying our prefix is MALFORMED_CLIENT, so
+    the property is asserted where it actually lives: the control request goes
+    into the SAME pending table the client ids use, told apart by the origin in
+    the key. A second dict beside it would drift, and the one that drifts is
+    the one holding the tombstones.
+    """
     session = pump.Session()
-    assert session.admit_request("sg-1", method="tools/list",
-                                 origin=pump.ORIGIN_PROXY)
-    assert session.admit_request("sg-1", method="tools/call",
-                                 origin=pump.ORIGIN_CLIENT)
-    assert session.closed_with() is None, "the second was read as a duplicate"
+    session.admit_request(41, method="tools/call", origin=pump.ORIGIN_CLIENT)
+    session.admit_request("sg-1", method="tools/list",
+                          origin=pump.ORIGIN_PROXY)
+    assert pump.key(pump.ORIGIN_PROXY, "sg-1") in session._pending
+    assert pump.key(pump.ORIGIN_CLIENT, 41) in session._pending
+    assert session.expects("sg-1", origin=pump.ORIGIN_PROXY) is True
+    assert session.expects("sg-1", origin=pump.ORIGIN_CLIENT) is False
+
+
+def test_the_same_value_in_two_origins_is_two_items():
+    """The key carries the origin, so upstream answering `sg-1` is not an
+    answer to the proxy's `sg-1`."""
+    session = pump.Session()
+    session.admit_request("sg-1", method="tools/list",
+                          origin=pump.ORIGIN_PROXY)
+    assert session.expects("sg-1", origin=pump.ORIGIN_UPSTREAM) is False
+    assert session.expects("sg-1", origin=pump.ORIGIN_PROXY) is True
 
 
 def test_an_unknown_control_id_is_still_an_unsolicited_response():
@@ -99,13 +118,21 @@ def test_a_client_using_the_control_prefix_is_malformed_client():
     assert session.closed_with() == ("MALFORMED_CLIENT", "S5")
 
 
-def test_an_ordinary_client_id_is_still_admitted():
-    """The positive control. Without it, a session that refuses every client
-    request passes the test above."""
+@pytest.mark.parametrize("ident", ["sg", 41, "usg-1", "my-sg-thing", "SG-1"])
+def test_an_ordinary_client_id_is_still_admitted(ident):
+    """The positive control, and the exactness half of it.
+
+    The namespace is a PREFIX and the test is `startswith`, not `in`. An id
+    that merely contains the prefix somewhere is an ordinary client id and
+    refusing it closes a healthy session on a resemblance. `SG-1` is here for
+    the same reason in the other direction: the prefix is the exact bytes, not
+    a case-insensitive idea of them.
+
+    Without this the file passes against a session that refuses every client
+    request, which is the shape the negative test alone cannot tell apart.
+    """
     session = pump.Session()
-    assert session.admit_request("sg", method="tools/call",
-                                 origin=pump.ORIGIN_CLIENT) is True
-    assert session.admit_request(41, method="tools/call",
+    assert session.admit_request(ident, method="tools/call",
                                  origin=pump.ORIGIN_CLIENT) is True
     assert session.closed_with() is None
 

@@ -25,6 +25,17 @@ from .session import Cause, Session as CoreSession
 
 ORIGIN_CLIENT = "client"
 ORIGIN_UPSTREAM = "upstream"
+# T6.R6. The proxy's own control traffic. T2.R6 turns one client tools/list
+# into up to sixty four proxy requests under T8.R13, and the client's single id
+# can answer exactly one of them, so the proxy owns ids of its own or it cannot
+# page a tool list at all.
+ORIGIN_PROXY = "proxy"
+
+# The prefix is OURS. An id shaped like this arriving from the CLIENT is
+# MALFORMED_CLIENT, never control traffic: otherwise the prefix is an
+# authentication claim anyone on the other end of the pipe can make, and a
+# client holding a control id could settle the proxy's own pending request.
+CONTROL_PREFIX = "sg-"
 
 # T6.R6. Bounded, because a tombstone table that grows with the session is a
 # memory bound a peer controls.
@@ -40,6 +51,11 @@ def parsed_ok_but_unterminated(raw):
     and could not be graded against the fixture that describes it.
     """
     return len(raw) <= framing.MAX_FRAME_BYTES and not raw.endswith(b"\n")
+
+
+def _is_control_id(request_id):
+    """Exactly the shape, not a resemblance: a string carrying our prefix."""
+    return isinstance(request_id, str) and request_id.startswith(CONTROL_PREFIX)
 
 
 def key(origin, request_id):
@@ -69,6 +85,12 @@ class Session:
         self._core = CoreSession()
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
+        # ONE TABLE for correlation, keyed by origin, and one hand-off dict
+        # beside it for answers the client must never see. Not a second
+        # correlation table: two of those drift, and the one that drifts is
+        # the one holding the tombstones, so a cancelled id becomes reusable
+        # in whichever namespace nobody was watching.
+        self._control_answers: dict = {}
         self._tombstones: list = []       # keys, oldest first
         # T6.R1. Who is still owed one answer, retained across the close that
         # discovered the fault so the reader can deliver it on the way out.
@@ -87,6 +109,13 @@ class Session:
         # T2.R16. An extension or unknown method from the client is refused AT
         # ADMISSION, so upstream never sees it. Refusing it later, after it has
         # been forwarded, is a different and much weaker promise.
+        if origin == ORIGIN_CLIENT and _is_control_id(request_id):
+            # The client cannot claim our namespace. A protocol fault and not a
+            # refusal, because a client that knows to send this is not making
+            # an ordinary mistake.
+            self._close("MALFORMED_CLIENT",
+                        "the client used the proxy's control id namespace")
+            return False
         if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
@@ -375,6 +404,23 @@ class Session:
                 yield raw
                 continue
 
+            # T2.R6. OUR OWN control traffic, handed to the collector and never
+            # yielded toward the client, who asked once and is not part of this
+            # conversation. Checked before the client correlation because the
+            # two namespaces share one table and only the key tells them apart.
+            #
+            # The hand-off is an assignment into a dict the collector reads. It
+            # CANNOT BLOCK, which is the point: the collector runs on the
+            # thread serving the client's call, and a reader that waited for it
+            # to take a page would stall the pump on a stuck consumer. The pump
+            # is the thing that would otherwise notice the upstream dying.
+            if self.expects(message["id"], origin=ORIGIN_PROXY):
+                identity = key(ORIGIN_PROXY, message["id"])
+                self._pending.pop(identity)
+                self._answered.add(identity)
+                self._control_answers[identity] = message
+                continue
+
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
                     "initialize" and "result" in message:
                 forwarded = self._initialize_result(message, raw)
@@ -560,6 +606,10 @@ class Session:
                     return
                 identity, reason, rule = self._owed_refusals.pop(0)
             yield self._client_refusal(identity, reason, rule)
+
+    def control_answer(self, request_id):
+        """The frame a proxy-owned request got, or None while it is unanswered."""
+        return self._control_answers.get(key(ORIGIN_PROXY, request_id))
 
     def closed_with(self):
         return self._closed
