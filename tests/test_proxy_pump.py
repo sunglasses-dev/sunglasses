@@ -23,6 +23,7 @@ Rows covered by this slice:
 """
 import io
 import json
+import time
 
 import pytest
 
@@ -947,3 +948,64 @@ def test_a_clean_upstream_exit_of_zero_stays_zero():
     session._watcher.join(2)
     assert session.closed_with() is None
     assert session._core.exit_code() == 0
+
+
+# ── AR10, AR11: the deadlines, which the table stated and nobody asked ─────
+
+def test_a_server_that_never_answers_does_not_hold_the_session_for_ever():
+    """AR11, T8.R5. `bounds.check_deadline` held this number since the slice
+    that wrote it and nothing asked it anything, so a server could keep a
+    request open as long as it liked. A mediator that can be made to wait
+    indefinitely can be taken out of the path by doing nothing at all."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert session.sweep_deadlines() is None
+    breach = session.sweep_deadlines(
+        now=time.monotonic() + bounds.UPSTREAM_RESPONSE_MS / 1000 + 1)
+    assert breach and breach.reason == "SCAN_DEADLINE"
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+
+
+def test_a_server_answering_inside_the_deadline_is_not_disturbed():
+    """The positive half, or the row above is satisfied by closing every
+    session. The bound is checked AFTER the limit, never at it."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    # From the ADMISSION time the session recorded, not from now: `now` is
+    # already later than the admission, so anchoring there would test one
+    # sliver past the limit and call the boundary a breach.
+    admitted = session._admitted_at[pump.key("client", 41)]
+    assert session.sweep_deadlines(
+        now=admitted + bounds.UPSTREAM_RESPONSE_MS / 1000) is None
+    assert session.closed_with() is None
+
+
+def test_a_frame_that_never_finishes_arriving_is_a_deadline():
+    """AR10, T8.R3. A server that sends half a frame and stops is not slow, it
+    is holding the pipe open, and the reader is blocked in a read that will
+    never return."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    began = time.monotonic() - bounds.FRAME_ASSEMBLY_MS / 1000 - 1
+    breach = session.sweep_deadlines(partial_since=began)
+    assert breach and breach.reason == "SCAN_DEADLINE"
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+
+
+def test_a_settled_request_no_longer_counts_against_the_response_deadline():
+    """An item that has been answered is not waiting on anybody, and leaving it
+    in the clock's view would close healthy sessions on the age of work that
+    finished."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert list(session.read_upstream(wire(response(41))))
+    assert session.sweep_deadlines(
+        now=time.monotonic() + bounds.UPSTREAM_RESPONSE_MS / 1000 + 10) is None
+    assert session.closed_with() is None

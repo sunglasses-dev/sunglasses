@@ -23,6 +23,7 @@ import os
 import subprocess
 import sys
 
+import time
 import threading
 
 import pytest
@@ -351,3 +352,115 @@ def test_a_client_that_ends_on_a_frame_boundary_is_not_a_fault():
     stream = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n')
     serve._drain_client(Engine(), session, stream, threading.Event())
     assert session.closed_with() is None
+
+
+# ── AR13: the write stall, and the flush that was the deadlock ─────────────
+
+def test_the_watchdog_ends_a_write_that_has_stalled():
+    """AR13, T8.R9. A client that stops reading makes our write block for ever
+    on a full pipe, and the mediator then holds a frame it cannot deliver and a
+    server it cannot drain. The check cannot live at the write, because the
+    write is where we are stuck."""
+    import pathlib as _pathlib
+    import tempfile
+
+    from sunglasses.proxy import bounds, pump, receipts, serve
+
+    root = _pathlib.Path(tempfile.mkdtemp())
+    log = receipts.Log(root, run_id="probe", header={"session_id": "s"})
+    session = pump.Session()
+    began = time.monotonic() - bounds.WRITE_STALL_MS / 1000 - 1
+    done = threading.Event()
+    try:
+        serve._sweep_until_done(session, log, [began], done, 0.01)
+    finally:
+        log.close()
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+    rows = [json.loads(line)
+            for path in (root / "receipts").glob("*.jsonl")
+            for line in path.read_text().splitlines()]
+    assert any(row["kind"] == "WRITE_STALLED" for row in rows), (
+        "the stall was torn down without being recorded")
+
+
+def test_a_write_in_progress_inside_the_grace_is_left_alone():
+    """The positive half, or the row above is satisfied by a watchdog that
+    tears down every session that is writing at all."""
+    import pathlib as _pathlib
+    import tempfile
+
+    from sunglasses.proxy import pump, receipts, serve
+
+    root = _pathlib.Path(tempfile.mkdtemp())
+    log = receipts.Log(root, run_id="probe", header={"session_id": "s"})
+    session = pump.Session()
+    done = threading.Event()
+    stop = threading.Timer(0.2, done.set)
+    stop.start()
+    try:
+        serve._sweep_until_done(session, log, [time.monotonic()], done, 0.01)
+    finally:
+        stop.cancel()
+        log.close()
+    assert session.closed_with() is None
+
+
+def test_leaving_the_process_does_not_flush_the_client_pipe(monkeypatch):
+    """AR13's real deadlock, and it was mine.
+
+    `exit_process` flushed stdout on the way out, and the one case that reaches
+    it with anything buffered is the case where the client has stopped reading.
+    The flush blocked for ever, so the BOUNDED teardown never ended: the proxy
+    detected the stall, tore the session down, and then sat in its own exit
+    path until something killed it.
+    """
+    from sunglasses.proxy import serve
+
+    class Recorder:
+        def __init__(self):
+            self.flushed = False
+
+        def flush(self):
+            self.flushed = True
+
+    out, err = Recorder(), Recorder()
+    monkeypatch.setattr(sys, "stdout", out)
+    monkeypatch.setattr(sys, "stderr", err)
+    with pytest.raises(SystemExit):
+        serve.exit_process(0)
+    assert not out.flushed, "exit_process flushed the client pipe"
+    assert err.flushed, "diagnostics were dropped instead"
+
+
+def test_the_write_to_the_client_is_timed_while_it_is_happening():
+    """AR13's clock, at the seam that owns it.
+
+    The stall deadline can only mean something if the clock is running DURING
+    the write, which is the one moment the writing thread cannot report on
+    itself. Deleting the clock left every test green while the deadline
+    measured nothing at all.
+    """
+    from sunglasses.proxy import serve
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class Blocking:
+        def write(self, raw):
+            entered.set()
+            release.wait(5)
+
+        def flush(self):
+            pass
+
+    clock = [None]
+    write = serve.client_writer(Blocking(), threading.Lock(), clock)
+    worker = threading.Thread(target=write, args=(b"frame\n",), daemon=True)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        assert clock[0] is not None, "the write was not being timed"
+    finally:
+        release.set()
+        worker.join(5)
+    assert clock[0] is None, "the clock kept running after the write finished"

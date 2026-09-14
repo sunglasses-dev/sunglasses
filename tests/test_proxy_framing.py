@@ -267,3 +267,69 @@ def test_the_tail_list_is_optional():
 
     source = io.BytesIO(b'{"partial"')
     assert list(framing.bounded_lines(source)) == []
+
+
+def test_the_frame_assembly_clock_stops_when_the_frame_is_complete():
+    """AR13's real defect, and it blamed the wrong end of the wire.
+
+    The clock was cleared AFTER the yield, so it kept running for as long as
+    the CONSUMER took -- and the consumer is exactly where a slow client
+    blocks. A stalled write then read as a frame the server was slow to send,
+    so the session tore down against the frame-assembly deadline and named the
+    server for something the client did.
+    """
+    import io
+
+    class Slow(io.BytesIO):
+        pass
+
+    clock = [None]
+    frames = framing.bounded_lines(Slow(b'{"a":1}\n'),
+                                   framing.MAX_FRAME_BYTES, partial=clock)
+    next(frames)
+    # SUSPENDED AT THE YIELD, holding a complete frame and with nothing left in
+    # the buffer. No frame is being assembled, so the clock must be stopped
+    # here -- and "here" is precisely where a slow consumer spends its time.
+    assert clock[0] is None, (
+        "the clock was still running while the consumer held a complete frame")
+    with pytest.raises(StopIteration):
+        next(frames)
+    assert clock[0] is None
+
+
+def test_the_clock_is_clear_when_nothing_is_half_read():
+    import io
+
+    clock = [None]
+    assert list(framing.bounded_lines(io.BytesIO(b'{"a":1}\n'),
+                                      framing.MAX_FRAME_BYTES,
+                                      partial=clock)) == [b'{"a":1}\n']
+    assert clock[0] is None
+
+
+def test_the_clock_starts_as_soon_as_part_of_a_frame_is_held():
+    """The other half. A partial in the buffer IS an assembly in progress, and
+    if the clock never starts the frame-assembly deadline can never fire: a
+    server that sends half a frame and stops holds the reader for ever."""
+
+    class Piecewise:
+        """Reports the clock as each read is made, which is the only moment
+        between one chunk arriving and the next."""
+
+        def __init__(self, chunks, clock):
+            self.chunks = list(chunks)
+            self.clock = clock
+            self.seen = []
+
+        def read(self, size):
+            self.seen.append(self.clock[0])
+            return self.chunks.pop(0) if self.chunks else b""
+
+    clock = [None]
+    source = Piecewise([b'{"a"', b':1}\n'], clock)
+    assert list(framing.bounded_lines(source, framing.MAX_FRAME_BYTES,
+                                      partial=clock)) == [b'{"a":1}\n']
+    # First read: nothing held yet. Second: half a frame is held, so the clock
+    # is running.
+    assert source.seen[0] is None
+    assert source.seen[1] is not None, "a held partial started no clock"

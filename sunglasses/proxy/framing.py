@@ -18,6 +18,8 @@ agree on what the message SAYS, and nothing after it can be trusted.
 """
 from __future__ import annotations
 
+import time
+
 import json
 
 # T8.R1, T1.R2. Frozen for 0.6.0.
@@ -171,7 +173,8 @@ def valid_id(value):
     return isinstance(value, (str, int, float))
 
 
-def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None):
+def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
+                  partial=None):
     """Frames, read with a ceiling, instead of `readline` with none.
 
     T1.R2's bounded reader, which ASTRA's review noted was absent.
@@ -191,6 +194,12 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None):
     # The caller's list, when it wants to know; a private one otherwise, so the
     # generator never has to test for None in the loop.
     unterminated = [] if unterminated is None else unterminated
+    # AR10, T8.R3. `partial[0]` is when an incomplete frame first appeared in
+    # the buffer, or None when there is none. The frame-assembly deadline is
+    # measured from here because only this loop knows it, and it is published
+    # rather than checked here because the check has to happen while this loop
+    # is BLOCKED in the read -- which is the whole case the deadline exists for.
+    partial = [None] if partial is None else partial
     while True:
         chunk = source.read1(65536) if hasattr(source, "read1") else source.read(65536)
         if not chunk:
@@ -209,6 +218,7 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None):
                 unterminated.append(buffer)
             return
         buffer += chunk
+        partial[0] = time.monotonic() if buffer and partial[0] is None else partial[0]
         while b"\n" in buffer:
             line, buffer = buffer.split(b"\n", 1)
             # THE TERMINATOR STAYS ON. A frame is its bytes including the LF:
@@ -217,6 +227,16 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None):
             # inclusive cap passes. Keeping it also means what the reader
             # forwards is byte-for-byte what arrived, rather than a
             # reconstruction that happens to look the same.
+            # BEFORE the yield, not after. Assembly of THIS frame is finished
+            # the moment it is complete; what remains in the buffer is a new
+            # partial whose clock starts now.
+            #
+            # Clearing it after the yield made the clock keep running for as
+            # long as the CONSUMER took, and the consumer is where a slow
+            # client blocks. A stalled write then read as a frame the server
+            # was slow to send, so the session tore down against the wrong
+            # deadline and blamed the wrong end of the wire.
+            partial[0] = time.monotonic() if buffer else None
             yield line + b"\n"
         if len(buffer) > limit:
             yield buffer[:limit + 1]
