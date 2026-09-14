@@ -27,8 +27,17 @@ from __future__ import annotations
 import pathlib
 import sys
 
-EXAM = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-        / "GATE2_FIT_0ba36c8_2026-09-13")
+# THE NEWEST EXAM, resolved rather than hardcoded. Round 2 arrived as its own
+# directory carrying its own probe_support, evidence and mutations, and pinning
+# the round 1 path would have run the new acceptance set against the old exam's
+# support code. Both deliveries' test_independent.py and test_followup.py are
+# byte identical and so is probe_support, verified before this changed, so the
+# newest directory supersedes rather than competes.
+_EXAMS = sorted((pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04")
+                .glob("GATE2_FIT_*"))
+EXAM = _EXAMS[-1] if _EXAMS else (
+    pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
+    / "GATE2_FIT_0ba36c8_2026-09-13")
 LIVE = pathlib.Path("/private/tmp") / "GATE2_FIT_LIVE"
 REPO = pathlib.Path(__file__).resolve().parents[3]
 
