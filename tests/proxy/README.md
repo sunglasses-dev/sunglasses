@@ -496,3 +496,12 @@ compared to a fixture, which is the property T0.R2's grading depends on.
 @T9: this needs a ruling in the shape of R-W03-2. The narrow one is to keep
 RC03's three substantive assertions and split its `==` into its own strict
 xfail tripwire. Nothing has been changed in either control file pending it.
+
+### Running the round-4 controls in a fresh worktree
+
+`test_round4_edges.py` writes its observations to `tests/evidence/rc11` with a
+non-recursive `mkdir(exist_ok=True)`, so a worktree without `tests/evidence`
+fails all fourteen with `FileNotFoundError` before a single assertion runs.
+That is a harness fact, not a product one: on #166 the same controls went from
+14 failed to 133 passed with the directory created and `pump.py` byte-identical
+to the core head either way. `mkdir -p tests/evidence` before the first run.
