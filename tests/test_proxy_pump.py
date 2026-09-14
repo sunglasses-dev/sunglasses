@@ -399,3 +399,102 @@ def test_a_handle_that_is_still_running_does_not_close_anything():
 
 import os      # noqa: E402
 import signal  # noqa: E402
+
+
+# ── RC11 to RC13: the halves ASTRA's controls do not reach ─────────────────
+#
+# Each of these four was written because a mutation SURVIVED the round-4
+# controls. They are the positive and defensive halves that ASTRA's fixtures,
+# which aim at the reported symptom, do not cover.
+
+@pytest.mark.parametrize("member,value", [
+    ("description", 7),
+    ("title", ["review"]),
+    ("annotations", []),
+    ("outputSchema", "object"),
+    ("_meta", 3.5),
+])
+def test_a_tool_member_declared_with_the_wrong_type_is_refused(member, value):
+    """RC11's other half. The schema discriminant was the reported symptom and
+    it is not the rule: MCP fixes the TYPE of every member a tool declares.
+
+    A descriptor carrying `description: 7` is one a human cannot read and an
+    approval cannot describe, and dropping the member check entirely left every
+    round-4 control green, so the schema fix alone was covering for it.
+    """
+    session = pump.Session()
+    assert session.admit_request(17, method="tools/list", origin="client")
+    tool = {"name": "review", "inputSchema": {"type": "object"}, member: value}
+    out = list(session.read_upstream(
+        wire({"jsonrpc": "2.0", "id": 17, "result": {"tools": [tool]}})))
+    assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
+    assert len(out) == 1 and "error" in json.loads(out[0])
+
+
+def test_a_declared_member_of_the_right_type_is_not_refused():
+    """The positive control, or the row above is satisfied by refusing tools
+    that declare anything at all."""
+    session = pump.Session()
+    assert session.admit_request(17, method="tools/list", origin="client")
+    tool = {"name": "review", "description": "reviews things",
+            "annotations": {"readOnlyHint": True},
+            "inputSchema": {"type": "object", "properties": {},
+                            "required": ["path"]}}
+    raw = wire({"jsonrpc": "2.0", "id": 17, "result": {"tools": [tool]}})
+    assert list(session.read_upstream(raw)) == [raw]
+    assert session.closed_with() is None
+
+
+def test_a_control_id_that_is_not_pending_does_not_crash_the_reader(monkeypatch):
+    """RC12's defensive half. `expects` returning true is a CLAIM about the
+    table, and the pop is what acts on it.
+
+    The whole point of RC12 is that the reader must not raise when the table
+    does not match the claim: a KeyError out of the reader settles nothing,
+    delivers nothing, and leaves a client blocked. Testing it with a stubbed
+    `expects` is the only way to reach the branch without a real race, and the
+    branch is exactly what a real race produces.
+    """
+    session = pump.Session()
+    control = "sg-00000000-0000-4000-8000-000000000017"
+    monkeypatch.setattr(session, "expects",
+                        lambda rid, *, origin: rid == control)
+    out = list(session.read_upstream(
+        wire({"jsonrpc": "2.0", "id": control, "result": {"tools": []}})))
+    assert out == []
+    assert session.control_answer(control) is None
+
+
+def test_settling_a_live_item_twice_still_raises():
+    """RC13's narrowing. `Settled` is how a caller learns it has an ordering
+    bug, and the race handling swallows it for a CLOSED session only.
+
+    Widening that to every session would turn the one signal for a double
+    answer into silence, which is the defect `Settled` exists to catch.
+    """
+    from sunglasses.proxy.session import Cause, Settled
+
+    session = pump.Session()
+    session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    # Settled in the core and still pending in the pump, which is the double
+    # settlement the exception names. Driven through the READER, because the
+    # narrowing being tested lives on the pump's race handler and a direct call
+    # to the core would only prove the core still raises.
+    session._core.settle(session._core_key(identity), Cause("CLEAN", "S1"))
+    assert session.closed_with() is None
+    with pytest.raises(Settled):
+        list(session.read_upstream(wire(response(41))))
+
+
+def test_the_settling_record_does_not_outlive_the_settlement():
+    """RC13's bound. `_settling` exists to be consulted by a close, and a set
+    that is added to and never discarded from is an unbounded table plus a
+    permanent claim that requests long since answered are still in flight."""
+    session = pump.Session()
+    for request_id in range(41, 45):
+        assert session.admit_request(request_id, method="tools/call",
+                                     origin="client")
+        assert list(session.read_upstream(wire(response(request_id))))
+    assert session._settling == set()
+    assert session.closed_with() is None

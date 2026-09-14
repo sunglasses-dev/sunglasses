@@ -21,7 +21,7 @@ from __future__ import annotations
 import threading
 
 from . import framing, handshake, supervisor
-from .session import Cause, Session as CoreSession
+from .session import Cause, Session as CoreSession, Settled
 
 ORIGIN_CLIENT = "client"
 ORIGIN_UPSTREAM = "upstream"
@@ -93,6 +93,60 @@ def _text_block_is_complete(block):
     return True
 
 
+# RC11. MCP 2025-06-18 FIXES these shapes; the guard checked that the
+# discriminant was a string and stopped. `{"type": "array"}` is a well-formed
+# JSON Schema and a malformed TOOL, and five bodies like it passed the reader,
+# yielded the original to the client and settled CLEAN.
+#
+# Each entry is a member that MAY be absent and, when present, has exactly one
+# type. Absent optional members are not a fault; a member declared with the
+# wrong type is, which is the difference between checking presence and checking
+# the schema. Unknown members pass, because the spec allows extensions and a
+# guard that refuses them would refuse conformant servers.
+_TOOL_MEMBERS = {
+    "name": str, "title": str, "description": str,
+    "inputSchema": dict, "outputSchema": dict,
+    "annotations": dict, "_meta": dict,
+}
+_SCHEMA_MEMBERS = {
+    "type": str, "properties": dict, "required": list,
+    "title": str, "description": str,
+}
+
+
+def _declared_members_typed(item, members):
+    """Every DECLARED member's type, not only the discriminant's presence."""
+    if not isinstance(item, dict):
+        return False
+    for name, kind in members.items():
+        if name in item and not isinstance(item[name], kind):
+            return False
+    return True
+
+
+def _input_schema_is_complete(schema):
+    """A tool's input schema is an OBJECT schema, per MCP 2025-06-18.
+
+    `type` is fixed to the literal "object" rather than "some string": the spec
+    does not leave the choice open, and a tool advertising an array or a string
+    at the top of its input schema is not a tool a client can call. `required`
+    is an array OF STRINGS, so `[7]` names no property; `properties` is an
+    object, so a list describes no properties at all. Each of those three is a
+    body ASTRA sent that settled CLEAN.
+    """
+    if not isinstance(schema, dict):
+        return False
+    if schema.get("type") != "object":
+        return False
+    if not _declared_members_typed(schema, _SCHEMA_MEMBERS):
+        return False
+    required = schema.get("required")
+    if required is not None and not all(
+            isinstance(name, str) for name in required):
+        return False
+    return True
+
+
 def _member_is_complete(method, item):
     """One list member of one method's result, checked against its own shape."""
     if method == "tools/call":
@@ -100,11 +154,13 @@ def _member_is_complete(method, item):
     if method == "tools/list":
         if not isinstance(item.get("name"), str):
             return False                      # a tool nobody can call
-        schema = item.get("inputSchema")
-        # REQUIRED, an object, and typed. A tool whose input schema is absent,
-        # null or `{}` describes nothing about what it accepts, and an approval
-        # over that descriptor approves a shape nobody stated.
-        return isinstance(schema, dict) and isinstance(schema.get("type"), str)
+        # REQUIRED, and shaped as the SPEC fixes it, not merely present. A
+        # tool whose input schema is absent, null or `{}` describes nothing
+        # about what it accepts, and an approval over that descriptor approves
+        # a shape nobody stated.
+        if not _declared_members_typed(item, _TOOL_MEMBERS):
+            return False
+        return _input_schema_is_complete(item.get("inputSchema"))
     if method == "resources/read":
         if not isinstance(item.get("uri"), str):
             return False
@@ -168,6 +224,14 @@ class Session:
         # One settlement owner. The reader and the watcher both reach the debt
         # and only one of them may be holding it at a time.
         self._settlement = threading.Lock()
+        # RC13. Items that have LEFT `_pending` and have not yet reached the
+        # core. Without this set there is a moment when a request is in neither
+        # table, and a close that lands in it records no debt for a client who
+        # is still waiting. The core settlement cannot be made part of the
+        # locked step -- holding this lock across a call into the core would
+        # park the watcher's close behind the reader, and the close is what
+        # stops the processes -- so the window is CLOSED BY A RECORD instead.
+        self._settling: set = set()
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -272,7 +336,13 @@ class Session:
                 return None
             self._pending.pop(identity)
             self._answered.add(identity)
-        self._core.settle(self._core_key(identity), Cause("CLEAN", "S1"))
+            # RC13. The entry leaves `_pending` and the RECORD takes its place
+            # in the same locked step, so there is no instant in which this
+            # request is in neither. A close that wins now finds it in
+            # `_settling`, records the debt, and the reader delivers nothing.
+            self._settling.add(identity)
+        if not self._settle_outside_lock(identity):
+            return None
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -529,16 +599,33 @@ class Session:
             # is the thing that would otherwise notice the upstream dying.
             if self.expects(message["id"], origin=ORIGIN_PROXY):
                 identity = key(ORIGIN_PROXY, message["id"])
-                self._pending.pop(identity)
-                self._answered.add(identity)
-                self._control_answers[identity] = message
+                # RC12. One owner for removing a pending entry means ONE
+                # owner, and this was the last door left open. `expects` can
+                # return true and the upstream can die before the pop: the
+                # watcher closed the session and cleared the table underneath
+                # this line, and the pop raised KeyError out of the reader.
+                # That is not a teardown. Nothing was delivered, the exit drain
+                # never ran, and the client waiting on its own call got no
+                # frame at all.
+                with self._settlement:
+                    if self._closed or identity not in self._pending:
+                        # The close won and has already recorded whatever debt
+                        # there was. This control page is ours, nobody is
+                        # blocked on it, and handing it over now would put an
+                        # answer in the collector for a session that is gone.
+                        continue
+                    self._pending.pop(identity)
+                    self._answered.add(identity)
+                    self._control_answers[identity] = message
+                    self._settling.add(identity)
                 # RC05. The CORE owns the item too, so an answered control
                 # request has to settle there as well. Leaving it owed means a
                 # session that finished its work still reports an outstanding
                 # correlation, and T9.R5 reads an ADMITTED with no SETTLED as
-                # INCOMPLETE_SESSION.
-                self._core.settle(self._core_key(identity),
-                                  Cause("CLEAN", "S1"))
+                # INCOMPLETE_SESSION. RC13's discipline applies here too: the
+                # call happens outside the lock, and the record left behind
+                # keeps the window closed.
+                self._settle_outside_lock(identity)
                 continue
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
@@ -664,6 +751,35 @@ class Session:
         }, separators=(",", ":")) + "\n").encode()
 
     # ── outcome ─────────────────────────────────────────────────────────────
+
+    def _settle_outside_lock(self, identity):
+        """Settle one removed item in the core, and say whether we still owe it.
+
+        The call is made OUTSIDE `_settlement` on purpose. The watcher's close
+        is what stops the upstream processes, and parking it behind a reader
+        that is mid-settlement is the deadlock version of the bug RC13 names:
+        the window would be closed and nothing would ever come through it.
+        `_settling` is what makes the step atomic instead.
+
+        Returns False when the close won the race, in which case it has already
+        recorded the wire debt and the reader must deliver nothing, or T6.R1's
+        one answer becomes two.
+        """
+        try:
+            self._core.settle(self._core_key(identity), Cause("CLEAN", "S1"))
+        except Settled:
+            # The teardown answered it first. `Settled` means a caller settled
+            # an item twice, which is normally its own ordering bug, and this
+            # is the one place where it is not: RC13's race is exactly this.
+            # Narrowed to a closed session so a genuine double settlement on a
+            # LIVE session still raises the way it is meant to.
+            if self._closed is None:
+                raise
+        finally:
+            with self._settlement:
+                self._settling.discard(identity)
+        return self._closed is None
+
     def _close(self, reason, detail, rule="S5", budget=None):
         """Tear down once, supervise the processes, and RETAIN what is owed.
 
@@ -711,7 +827,12 @@ class Session:
             # per-item cause and the refusal on the wire has to agree with it,
             # or the receipt and the client's error tell two different stories
             # about the same request.
-            for identity in list(self._pending):
+            # RC13. `_settling` as well as `_pending`: an item whose entry has
+            # been removed and whose core settlement has not landed yet is
+            # still a client waiting for a frame, and it used to be invisible
+            # here. That is the "in neither table" window, seen from the side
+            # that pays the debt.
+            for identity in list(self._pending) + list(self._settling):
                 if identity[0] != ORIGIN_CLIENT:
                     continue
                 own = self._core.terminal_cause(self._core_key(identity))
