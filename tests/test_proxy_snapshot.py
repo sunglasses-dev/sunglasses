@@ -209,3 +209,89 @@ def test_the_result_is_json_serialisable_for_the_capture_file():
     time, so what this produces has to survive a round trip through JSON."""
     result = snapshot.collect(_pager([_page([_tool("a")])]), scan=_clean)
     assert json.loads(json.dumps(result.capture()))["sha256"] == result.sha256
+
+
+# ── the mutation round: one term at a time ───────────────────────────────
+#
+# Every case above that exercised T5.R3(c) changed two or three fields at once,
+# so removing any single term from the conjunction left another term catching
+# the case anyway. Four terms, four cases, each differing from clean in exactly
+# one field. That is the only shape that can tell which check is load bearing,
+# and it is the same catch that found the missing pending-calls condition in
+# the approval activation.
+
+CLEAN = {"accepted": True, "status": "complete", "inspection_complete": True,
+         "decision": "allow", "findings": []}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("accepted", False),
+    ("status", "incomplete"),
+    ("inspection_complete", False),
+    ("decision", "review"),
+    ("findings", [{"rule_id": "GLS-PI-001", "severity": "low",
+                   "source": "engine"}]),
+])
+def test_each_activation_term_alone_stops_the_snapshot(field, value):
+    page = dict(CLEAN, **{field: value})
+    result = snapshot.collect(_pager([_page([_tool("a")])]),
+                              scan=lambda _page: page)
+    assert result.complete is False, f"{field} alone did not stop it"
+    assert result.sha256 is None
+
+
+def test_a_clean_page_by_every_term_does_activate():
+    """The control for the five cases above. Without it they would all pass
+    against a collector that refuses everything."""
+    result = snapshot.collect(_pager([_page([_tool("a")])]),
+                              scan=lambda _page: dict(CLEAN))
+    assert result.complete is True
+
+
+def test_an_alternating_cursor_is_still_a_repeat():
+    """a b a b never repeats CONSECUTIVELY, so comparing against the previous
+    cursor alone loops for ever on the cheapest possible attack."""
+    request = _pager([_page([_tool("a")], cursor="x"),
+                      _page([_tool("b")], cursor="y"),
+                      _page([_tool("c")], cursor="x"),
+                      _page([_tool("d")], cursor="y")])
+    result = snapshot.collect(request, scan=_clean)
+    assert result.complete is False
+    assert "cursor" in result.detail
+
+
+def test_the_same_tool_name_with_a_different_descriptor_hashes_differently():
+    """T5.R2 compares the tool's descriptor sha, so a hash over the name alone
+    would admit a renamed-in-place tool whose description now says something
+    else entirely, which is exactly the T5.R4 case."""
+    first = snapshot.collect(_pager([_page([_tool("a", "reads a file")])]),
+                             scan=_clean)
+    second = snapshot.collect(_pager([_page([_tool("a", "reads everything")])]),
+                              scan=_clean)
+    assert first.tools["a"] != second.tools["a"]
+
+
+def test_two_different_page_sequences_are_two_different_snapshots():
+    """What this proves, and what it does not.
+
+    It proves that rearranging which tool arrives on which page produces a
+    different sha, so a server cannot repackage an approved list.
+
+    It does NOT isolate page ORDER, and no test can: `nextCursor` lives inside
+    the page, so the same pages in a different order is not a constructible
+    input. A mutation that sorts the pages before hashing therefore survives
+    every test here and is equivalent rather than uncaught. Iterating in
+    arrival order is still the right implementation, and this note exists so
+    the next reader does not spend the hour I nearly did trying to kill it."""
+    one = snapshot.collect(_pager([_page([_tool("a")], cursor="p2"),
+                                   _page([_tool("bb")])]), scan=_clean)
+    two = snapshot.collect(_pager([_page([_tool("bb")], cursor="p2"),
+                                   _page([_tool("a")])]), scan=_clean)
+    assert one.sha256 != two.sha256
+
+
+def test_an_incomplete_snapshot_refuses_a_sha_even_if_one_is_handed_to_it():
+    """The absence IS the guarantee, so it is enforced at construction rather
+    than left to every caller of _incomplete to remember."""
+    refused = snapshot.Snapshot(complete=False, sha256="a" * 64)
+    assert refused.sha256 is None
