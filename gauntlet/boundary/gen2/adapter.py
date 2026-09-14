@@ -35,7 +35,41 @@ IMPLEMENTED = frozenset({
     "assert_zero_upstream_copies",
     "await_client_error",
     "await_error",
+    # `await_event` reads the mediator's own receipt stream. It is listed here
+    # as an opcode, but the opcode is NOT the unit of capability for it: see
+    # SUPPORTED_EVENTS. On its own it unlocks nothing, which is measured rather
+    # than assumed — all 24 variants naming it need at least one other
+    # unimplemented operation beside it.
+    "await_event",
 })
+
+# THE EVENTS THIS MEDIATOR ACTUALLY EMITS, of the seven the contract names.
+#
+# PROFILE_STEPS.md lists REQUEST_RECEIVED, SCAN_STARTED, HOLD_ENTERED,
+# CANCEL_ACCEPTED, APPROVAL_INVALIDATED, DESCRIPTOR_CHANGED and UPSTREAM_CLOSED.
+# `proxy/passthrough.py` emits twenty event kinds and exactly three of those
+# seven are among them. The missing four have plausible-looking neighbours:
+# RPC_INGRESS arrives when a request does, PUMP_CLOSED happens when a stream
+# ends. Binding REQUEST_RECEIVED to RPC_INGRESS, or UPSTREAM_CLOSED to
+# PUMP_CLOSED, would be THIS ADAPTER deciding what the contract's word means,
+# and a row built on that substitution reads as a verdict about the candidate
+# while really being a verdict about the guess. Recognising the name is not
+# recognising the call.
+#
+# So the four are refused BY NAME until the mediator emits them, and the
+# refusal happens in `plan()` rather than at execution time. An opcode-level
+# capability check would pass a REQUEST_RECEIVED variant as drivable and then
+# fail partway, which is the "half a schedule produces evidence" failure this
+# module exists to prevent.
+SUPPORTED_EVENTS = frozenset({"SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED"})
+
+# Every await_event step naming a supported event carries actor `proxy` or
+# omits it, and the contract says an omitted actor means proxy. Measured across
+# the 74 delivered schedules: 0 exceptions. `upstream` appears only on
+# REQUEST_RECEIVED, which is refused above. An upstream-actor event could not be
+# answered from the proxy's receipts anyway, so it is refused rather than
+# answered from the wrong record.
+SUPPORTED_EVENT_ACTORS = frozenset({"proxy"})
 
 # tools_v2/PROFILE_STEPS.md, 2026-09-13. Pinned, not fetched: a contract that
 # silently follows the file it describes cannot tell you the file changed.
@@ -121,6 +155,21 @@ def check_step(step: dict) -> None:
             "an extra field means this schedule is not the one described.")
 
 
+class UnsupportedEvent(Exception):
+    """An await_event step names an event this mediator does not emit."""
+
+    def __init__(self, requests):
+        self.requests = sorted(set(requests))
+        detail = ", ".join(f"{event} (actor {actor})" for event, actor in self.requests)
+        super().__init__(
+            "this mediator does not emit " + detail + ". The step contract names "
+            "seven events and `proxy/passthrough.py` emits three of them; the "
+            "rest have neighbours that arrive at a similar moment and mean "
+            "something else. Answering one of those from a neighbour would make "
+            "this adapter the author of the scenario's meaning, so the variant "
+            "is refused whole until the event exists by name.")
+
+
 class NoStepsToDrive(Exception):
     """A schedule with no steps in it. Not an empty run, a missing one."""
 
@@ -161,4 +210,17 @@ def plan(schedule: dict) -> list[dict]:
     missing = {step["op"] for step in steps} - IMPLEMENTED
     if missing:
         raise UnimplementedOperation(missing)
+    # CAPABILITY FINER THAN THE OPCODE. `await_event` is implemented, but only
+    # for the events the mediator actually emits, so the whole schedule is
+    # checked for the ones it does not before any of it is returned. Same rule
+    # as above and for the same reason: refused whole, never driven in part.
+    unsupported = {
+        (step["event"], step.get("actor", "proxy"))
+        for step in steps
+        if step["op"] == "await_event"
+        and (step["event"] not in SUPPORTED_EVENTS
+             or step.get("actor", "proxy") not in SUPPORTED_EVENT_ACTORS)
+    }
+    if unsupported:
+        raise UnsupportedEvent(unsupported)
     return steps
