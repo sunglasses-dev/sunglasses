@@ -92,10 +92,13 @@ def test_the_upstream_frames_are_checked_against_the_declaration(run_root):
 
 
 def test_a_route_this_adapter_cannot_drive_is_refused_by_name(run_root):
+    """`proxy_strict` used to be the example here and is now driven, so the
+    example moved rather than the rule. `install_uninstall` is a real route in
+    the package that this adapter does not implement."""
     entry, variant = _case("G2-13", "error_message")
     with pytest.raises(execute.UnsupportedRoute) as exc:
-        execute.run(entry, variant, route="proxy_strict", run_root=run_root)
-    assert "proxy_strict" in str(exc.value)
+        execute.run(entry, variant, route="install_uninstall", run_root=run_root)
+    assert "install_uninstall" in str(exc.value)
 
 
 def test_an_undrivable_schedule_is_refused_before_a_process_starts(run_root):
@@ -263,3 +266,151 @@ def test_an_upstream_with_no_declared_step_serves_nothing(run_root):
                  / "initialize.response.jsonl").read_bytes()
     assert run.upstream_wire == handshake, run.upstream_wire[:300]
     assert run.terminal_expected is False
+
+
+# ── the strict route ────────────────────────────────────────────────────────
+# The control establishes what a session looks like with nothing in the middle.
+# It is only worth having as the thing the mediated route is compared against,
+# and until now `execute.run` refused `proxy_strict` by name, so there was
+# nothing to compare it to.
+
+def test_the_strict_route_runs_the_declared_session_through_the_mediator(run_root):
+    """G2-13.error_message on proxy_strict, real proxy, real scanner, real pipes.
+
+    The injection is in `error.message`, so this is a scenario the mediator is
+    supposed to act on: the client must not be handed the hostile frame
+    unchanged the way the control route hands it over.
+    """
+    entry, variant = _case("G2-13", "error_message")
+    run = execute.run(entry, variant, route="proxy_strict", run_root=run_root,
+                      timeout_ms=20000)
+
+    assert (run.run_dir / "proxy.receipts.jsonl").is_file(), "no mediator receipts"
+    assert run.client_wire, "nothing was sent"
+    assert run.upstream_wire, "nothing came back"
+
+
+def test_the_declaration_is_checked_at_the_MEDIATOR_not_at_the_client(run_root):
+    """On strict the client's wire is the mediator's output, not the declaration.
+
+    This is the whole difference between the two routes and the easiest thing to
+    get wrong: comparing what the client received against the seed would call
+    every correct withholding a stream that is not the scenario. What the seed
+    declares is what the UPSTREAM sent, which the mediator records at ingress.
+    """
+    entry, variant = _case("G2-13", "error_message")
+    run = execute.run(entry, variant, route="proxy_strict", run_root=run_root,
+                      timeout_ms=20000)
+
+    declared = [json.loads(l) for l in
+                (artifacts.of_record(entry, variant).path / variant["upstream_output"])
+                .read_bytes().splitlines() if l.strip()]
+    ingress = []
+    for line in (run.run_dir / "proxy.receipts.jsonl").read_bytes().splitlines():
+        event = json.loads(line)
+        if event.get("kind") == "RPC_INGRESS" and event.get("direction") == "result":
+            ingress.append(json.loads(event["raw"]))
+    handshake = [json.loads(l) for l in
+                 (artifacts.of_record(entry, variant).path / "initialize.response.jsonl")
+                 .read_bytes().splitlines() if l.strip()]
+    assert ingress, "the mediator recorded no result arriving from the upstream"
+    # The handshake reply crosses the mediator too and is first in its ingress.
+    assert ingress == handshake + declared, "the upstream did not send the seed"
+    assert run.upstream_as_declared is True
+
+
+def test_the_mediator_records_a_disposition_for_the_primary_request(run_root):
+    """A disposition, in the mediator's own vocabulary, NOT a settlement.
+
+    The first version of this asserted a SETTLED event and failed, and the
+    failure was mine. G2-13 is a carriers scenario: it puts the injection in
+    `error.message`, and this mediator records NO_INSPECTABLE_CONTENT for that
+    frame. Requiring a settlement assumes the answer to the question the
+    scenario asks, and the stimulus is proven either way, the declared frame is
+    in the mediator's own ingress record.
+
+    So the run reports what the mediator did and the grader decides what it
+    means. What must not happen is silence.
+    """
+    entry, variant = _case("G2-13", "error_message")
+    run = execute.run(entry, variant, route="proxy_strict", run_root=run_root,
+                      timeout_ms=20000)
+
+    assert run.disposition in ("SETTLED", "NO_INSPECTABLE_CONTENT"), run.disposition
+    assert run.terminal is not None, "the client was never answered"
+    record = json.loads((run.run_dir / "execution.json").read_text())
+    assert record["mediator_disposition"] == run.disposition
+
+
+def test_a_route_still_outside_this_adapter_is_refused_by_name(run_root):
+    """The refusal did not become a shrug. Everything else is still named."""
+    entry, variant = _case("G2-13", "error_message")
+    with pytest.raises(execute.UnsupportedRoute) as exc:
+        execute.run(entry, variant, route="doctor", run_root=run_root)
+    assert "doctor" in str(exc.value)
+
+
+def test_every_drivable_variant_runs_on_the_strict_route(run_root):
+    """The same sweep as the control, through the mediator, zero model calls.
+
+    The control establishes what a session looks like with nothing in the
+    middle. This is the half it exists to be compared against, and running both
+    over the same set is what makes the comparison mean anything.
+
+    Dispositions are RECORDED, not required to be settlements. Several of these
+    seeds carry their payload somewhere a mediator may not look, which is the
+    question they were written to ask.
+    """
+    ran = []
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            if "routes" not in variant or "proxy_strict" not in variant["routes"]:
+                continue
+            try:
+                adapter.plan(artifacts.of_record(entry, variant).schedule)
+            except (adapter.UnimplementedOperation, adapter.NoStepsToDrive):
+                continue
+            root = run_root / f"strict-{entry['id']}.{variant['name']}"
+            run = execute.run(entry, variant, route="proxy_strict", run_root=root,
+                              timeout_ms=20000)
+            ran.append({"id": f"{entry['id']}.{variant['name']}",
+                        "as_declared": run.upstream_as_declared,
+                        "disposition": run.disposition,
+                        "terminal": run.terminal is not None,
+                        "expected": run.terminal_expected})
+
+    assert ran, "nothing was drivable on the strict route"
+    assert all(r["as_declared"] for r in ran), \
+        [r for r in ran if not r["as_declared"]]
+    assert all(r["terminal"] == r["expected"] for r in ran), \
+        [r for r in ran if r["terminal"] != r["expected"]]
+    # Every row that HAS a primary request got a disposition for it. A row with
+    # none that has one is a row that never crossed the boundary.
+    # G2-21.client_malformed_tail declares no `await_primary_terminal` step and
+    # so has no primary request: requiring a disposition there asked the
+    # mediator to have an opinion about a request the scenario never makes.
+    assert all(r["disposition"] for r in ran if r["expected"]), \
+        [r for r in ran if r["expected"] and not r["disposition"]]
+    assert len(ran) == 19, [r["id"] for r in ran]
+
+
+def test_the_disposition_is_the_primary_request_s_and_not_the_handshake_s(run_root):
+    """G2-13.structured_key is the variant where the two differ.
+
+    The mediator records NO_INSPECTABLE_CONTENT for the initialize reply and
+    SETTLED for the primary result, so a lookup that takes any terminal event on
+    the result direction reports the handshake's answer and hides the one that
+    matters. Every other variant has the same value for both, which is why the
+    sweep could not tell the two rules apart: deleting the id match killed no
+    test until this one.
+    """
+    entry, variant = _case("G2-13", "structured_key")
+    run = execute.run(entry, variant, route="proxy_strict", run_root=run_root,
+                      timeout_ms=20000)
+
+    assert run.disposition == "SETTLED", run.disposition
+    kinds = [json.loads(l) for l in
+             (run.run_dir / "proxy.receipts.jsonl").read_bytes().splitlines()]
+    handshake = [e for e in kinds if e.get("kind") == "NO_INSPECTABLE_CONTENT"
+                 and e.get("request_id") != run.primary_id]
+    assert handshake, "this variant no longer separates the two dispositions"
