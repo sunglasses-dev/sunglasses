@@ -633,6 +633,61 @@ ALL_SEEDS = {**RARE_OBJECT_SEEDS, **GROUP_B_SEEDS}
 TRIALS = 7
 CONFIRM_TRIALS = 15
 ANCHOR_OVERHEAD_VS_BASELINE = 0.10
+
+# THE INSTRUMENT CHANGED 2026-09-14, after the first assertion failed #164's
+# integrity (3.14) job on a green tree while passing the other five interpreters
+# and every main run that week. Four PRs times eight jobs were sharing runners.
+#
+# Measured here rather than reasoned about, on 16 cores with 64 CPU burners, the
+# real test, four repetitions:
+#     unloaded, healthy           +0.007x .. +0.024x
+#     loaded, healthy             max 0.0404x, 0.1363x, 0.1059x, 0.0246x
+# Two of four crossed the 0.10x ceiling with nothing regressed. The median of
+# seven plus a recheck at fifteen rescued both, and CI's failure is simply the
+# case where the recheck crossed too. That is not a ceiling that is slightly too
+# tight; it is an instrument that cannot resolve what it is pointed at.
+#
+# WHY IT CANNOT. The gated quantity is `anchored - unanchored`, a difference
+# between two ~0.5s engine scans whose true difference is about 2 ms. Under
+# contention each timing moves by tens of milliseconds, so the difference is
+# noise by an order of magnitude. The ceiling scales with the baseline but
+# scheduling jitter does not scale proportionally, so contention eats the
+# headroom faster than it grants it.
+#
+# AND IT WAS NEVER CATCHING THE REGRESSIONS ANYWAY. Read the numbers in the
+# section above: a fold per declared term measures 0.043x - 0.046x against a
+# 0.10x ceiling. It passes. The ceiling is deliberately set ABOVE the known
+# regressions because noise forced it there, which means at engine level this
+# clock fires on scheduling and on nothing else. The fold count catches that
+# regression exactly, and always did.
+#
+# SO THE CLOCK KEEPS ITS JOB AND LOSES THE INSTRUMENT. Its job, stated in the
+# section above, is the one thing no count can see: a primitive getting slower,
+# a fold that stops being a C-level translate. That is measured directly below
+# against a reference primitive doing the same two C-level passes over the same
+# bytes, best-of-N because scheduling only ever ADDS time so the minimum is the
+# closest estimate of the true cost. Both sides are ~2 ms and adjacent, so a
+# starved runner slows both and the ratio holds:
+#     healthy, unloaded                      0.976x .. 1.026x
+#     healthy, 64 burners, five runs         0.933x .. 1.196x
+#     fold rewritten off the C-level path    4.82x .. 5.00x
+# A band a fifth of a turn wide instead of one that doubles, and the regression
+# is four times outside it.
+#
+# The ceiling is 2.0x and not 1.5x because 1.5x is what the FIRST loaded probe
+# supported, at 1.05x worst. Five more loaded runs then produced 1.196x, and a
+# ceiling justified by the smaller sample would have been the same mistake this
+# whole change is fixing, one decimal place further along. 2.0x sits 67% above
+# the worst excursion measured and 2.4x below the nearest proven regression.
+#
+# WHAT IT DOES NOT CATCH, said plainly: a primitive that gets 1.5x slower lands
+# inside the band. That is deliberate. This instrument is for a call becoming a
+# different KIND of call, which is an order-of-magnitude event; the counts hold
+# everything about how many calls there are, and they are exact.
+PRIMITIVE_TRIALS = 15            # best-of, per round. Stated because N matters.
+PRIMITIVE_ROUNDS = 7             # rounds, so the ratio itself has a spread
+ANCHOR_PRIMITIVE_CEILING = 2.0   # worst healthy under load 1.196x;
+                                 # a fold off the C-level path 4.82x
 RARE_OBJECT_VS_BASELINE = 2.0     # anchored against the engine without the rule
 
 # The saving depends on a mechanism, so the gate names the mechanism rather than
@@ -750,14 +805,110 @@ def test_anchoring_is_never_meaningfully_worse_than_not_anchoring(three_engines,
                          f"({overhead / base:+.4f}x of a {base:.3f}s baseline) "
                          f"on {CONFIRM_TRIALS} trials, allowed "
                          f"{allowed * 1e3:.1f} ms")
-    print("anchoring overhead, the gated number and the old strict ratio:\n  "
+    print("anchoring overhead, the old gated number and the old strict ratio:\n  "
           + "\n  ".join(rows))
-    assert worse == [], (
-        f"anchoring costs more than {ANCHOR_OVERHEAD_VS_BASELINE}x of the "
-        f"baseline scan of the same document, twice measured, on:\n  "
-        + "\n  ".join(worse)
-        + "\nevery document:\n  " + "\n  ".join(rows)
-    )
+    if worse:
+        # REPORTED, NOT ASSERTED, since 2026-09-14. See the section above: at
+        # this ceiling the number crossed on two of four loaded repetitions of a
+        # green tree, and it does not cross on the fold-per-term regression it
+        # would supposedly be guarding. Failing the build on it fails green
+        # trees and catches nothing the fold count does not catch exactly.
+        # The numbers stay because they are still worth reading, and because a
+        # quantity that disappears cannot be argued with later.
+        print("NOTE, not a failure: over the old ceiling on\n  "
+              + "\n  ".join(worse))
+
+
+def _primitive_best(work, trials=PRIMITIVE_TRIALS):
+    """Best of `trials`. The minimum, deliberately, not the median.
+
+    Scheduling only ever ADDS time to a measurement, so the fastest observation
+    is the one least disturbed and the closest estimate of the true cost. A
+    median still carries whatever the runner did to most of the trials, which is
+    exactly the property that made the engine-level gate above unusable on a
+    shared machine.
+    """
+    best = None
+    for _ in range(trials):
+        started = time.perf_counter()
+        work()
+        elapsed = time.perf_counter() - started
+        best = elapsed if best is None else min(best, elapsed)
+    return best
+
+
+def test_the_mechanism_primitives_are_still_c_level():
+    """The one thing no count can see, measured against a primitive.
+
+    The counts pin what the mechanism DOES: one fold of the document, one find
+    per term per occurrence plus one per term for the miss that ends it. They
+    are exact and a shared runner cannot argue with them. What they cannot see
+    is one of those calls becoming a slower KIND of call while the number of
+    calls stays the same, and that is what this measures.
+
+    THE REFERENCE IS THE POINT. It does the same two C-level passes over the
+    same bytes, a translate and a lower, then the same find loop. Both sides are
+    about two milliseconds and run adjacently, so a starved runner slows both
+    and the ratio between them survives. That is what the engine-level gate
+    could not do: it differenced two half-second numbers to find two
+    milliseconds, and contention moved each of them by tens.
+
+    Measured 2026-09-14 on 16 cores. Unloaded 0.976x to 1.026x; with 64 CPU
+    burners, five runs, 0.933x to 1.196x. Rewriting `fold` off its C-level path
+    puts it at 4.82x to 5.00x, four times outside the loaded band.
+
+    WHAT THIS DOES NOT CATCH, and which test does. Folding once per declared
+    term instead of once for the document does NOT fail here, and should not:
+    it is a change in how many calls are made, it is caught exactly by
+    `test_the_mechanism_makes_exactly_one_fold_and_one_find_pass_per_term`, and
+    both were verified by mutation on 2026-09-14. Each guard catches its own
+    class and neither catches the other's, which is the point of having two.
+    """
+    from sunglasses import _prefilter
+
+    document = _document(next(iter(GROUP_B_SEEDS.values())))
+    terms = sorted(TWO_GROUP_TERMS)[:4]
+
+    def find_loop(haystack):
+        for term in terms:
+            at = haystack.find(term)
+            while at != -1:
+                at = haystack.find(term, at + 1)
+
+    def mechanism():
+        find_loop(_prefilter.fold(document))
+
+    def reference():
+        # `fold` is `translate(table).lower()`. This is the same two passes with
+        # an empty table, so it measures the machine and the document rather
+        # than the table, and it moves with the runner exactly as the mechanism
+        # does. SAME DOCUMENT ON BOTH SIDES: an earlier version of this probe
+        # ran the regression over a fraction of the document and divided by a
+        # whole-document reference, which reported a 16x regression as 0.59x,
+        # faster than healthy. A ratio between two different amounts of work is
+        # not a ratio.
+        find_loop(document.translate({}).lower())
+
+    ratios = []
+    for _ in range(PRIMITIVE_ROUNDS):
+        mech = _primitive_best(mechanism)
+        ref = _primitive_best(reference)
+        ratios.append(mech / ref)
+
+    worst = max(ratios)
+    print(f"mechanism against a reference primitive over "
+          f"{len(document):,} bytes, best of {PRIMITIVE_TRIALS}, "
+          f"{PRIMITIVE_ROUNDS} rounds: "
+          f"{min(ratios):.3f}x - {worst:.3f}x "
+          f"(median {statistics.median(ratios):.3f}x), "
+          f"ceiling {ANCHOR_PRIMITIVE_CEILING}x")
+    assert worst <= ANCHOR_PRIMITIVE_CEILING, (
+        f"the mechanism costs {worst:.3f}x a reference primitive doing the same "
+        f"two C-level passes over the same {len(document):,} bytes, over a "
+        f"ceiling of {ANCHOR_PRIMITIVE_CEILING}x. The call COUNTS are checked "
+        f"elsewhere and are exact, so this is not more calls: it is one of the "
+        f"calls having become a slower kind of call. All {PRIMITIVE_ROUNDS} "
+        f"rounds: " + ", ".join(f"{r:.3f}" for r in ratios))
 
 
 @pytest.mark.slow
