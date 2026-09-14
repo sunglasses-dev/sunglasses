@@ -181,7 +181,14 @@ jobs:
 
   release-assets:
     name: attach the SBOM and SHA256SUMS to the GitHub Release
-    needs: [pypi, sbom]
+    # NOT `needs: [pypi, ...]`. These files describe the BUILT artifacts and
+    # have nothing to do with PyPI, so a publish that fails or is skipped
+    # (which is what happens when the version is already on PyPI) must not
+    # take them down with it. Depending on the upload left the tag with a
+    # Release carrying no SBOM and no checksums, which is the evidence gone
+    # because an unrelated step did not run. The provenance of a build is not
+    # contingent on its distribution. Guarded by tests/test_release_workflow.py.
+    needs: [build, sbom]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
