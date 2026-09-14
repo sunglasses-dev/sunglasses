@@ -311,7 +311,13 @@ def test_the_byte_budget_is_read_not_merely_accepted():
         "32,768 bytes were forwarded under a byte budget of 1, which is what "
         "ASTRA measured on the live run")
     assert outcome.reason_code == passthrough.OVER_BYTE_BUDGET
-    assert outcome.inspected_utf8_bytes == 32768
+    # 0, NOT 32,768. This test used to pin the document's size here, which is
+    # the number ASTRA then found in the reply and named as the defect: no
+    # worker was started, so nothing was inspected, and the size of a refused
+    # document is an answer to the other question. The size is asserted where it
+    # belongs, beside it.
+    assert outcome.inspected_utf8_bytes == 0
+    assert outcome.replacement["error"]["data"]["observed_content_bytes"] == 32768
     assert outcome.inspection_complete is False
     assert outcome.finding is False
 
