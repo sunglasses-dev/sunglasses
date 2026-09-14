@@ -132,7 +132,20 @@ def mcp_config(run_dir, upstream_argv, *, route, engine_root, deadline_ms,
         # scenario a call that went around the mediator is a different
         # experiment and must read as one; G2-12 is the case that passes its own
         # allowed set.
-        servers["direct"] = {"command": upstream_argv[0], "args": upstream_argv[1:]}
+        # WRAPPED, so the route produces its own evidence. The bare command went
+        # in here, so a real successful direct write deposited its bytes and the
+        # row still reported INVALID_STIMULUS: the consumer knew the filename and
+        # nothing ever wrote it. The wiretap forwards bytes untouched and records
+        # both directions; it parses nothing and decides nothing, because a
+        # direct route that acquired a mediator would stop being the thing the
+        # scenario is about.
+        servers["direct"] = {
+            "command": PY,
+            "args": [str(HERE / "proxy" / "wiretap.py"),
+                     "--ingress", str(run_dir / DIRECT_INGRESS),
+                     "--egress", str(run_dir / DIRECT_EGRESS),
+                     "--"] + upstream_argv,
+        }
     path = run_dir / f"mcp.{route}.json"
     path.write_text(json.dumps({"mcpServers": servers}, indent=1) + "\n")
     return path
@@ -196,6 +209,7 @@ def observed_route_call(transcript):
 
 DIRECT_ROUTE = "direct_second_server"
 DIRECT_INGRESS = "native.ingress.jsonl"
+DIRECT_EGRESS = "native.egress.jsonl"
 
 
 def _route_server(variant) -> str:
@@ -226,7 +240,11 @@ def route_call(run_dir, route, transcript, variant=None):
         # its 21 bytes, as no invocation and INVALID_STIMULUS. The route's own
         # captured ingress is the arrival record. Absent capture is still no
         # attestation; the transcript is never consulted here either.
-        return _frame_call(pathlib.Path(run_dir) / DIRECT_INGRESS), "direct_route_ingress"
+        # NO CAPTURE, NO ATTESTER. Naming one beside an empty observation is the
+        # same claim the proxy path refuses to make: an attester that produced
+        # nothing has attested nothing.
+        call = _frame_call(pathlib.Path(run_dir) / DIRECT_INGRESS)
+        return (call, "direct_route_ingress") if call else (None, None)
 
     if route != "control":
         receipts = pathlib.Path(run_dir) / "proxy.receipts.jsonl"
