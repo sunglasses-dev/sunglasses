@@ -619,6 +619,7 @@ def test_disable_extractors_can_only_make_a_result_more_conservative(bundle, tmp
 
 def test_package_reads_no_undeclared_environment_variables():
     """The wheel may read exactly three env vars, and each is accounted for."""
+    import ast
     import re
 
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT"}
@@ -628,17 +629,74 @@ def test_package_reads_no_undeclared_environment_variables():
     # its spelling is fixed by the contract and it travels on the wire rather
     # than being read from anywhere.
     #
-    # This scan stays a literal search on purpose and is NOT narrowed to
-    # `os.environ` call sites, because two of the three allowed vars are read
-    # through a named constant (`_PIN_CONSENT_ENV`, `_DISABLE_ENV`) and a scan
-    # that only looked at call sites would miss exactly the indirection it most
-    # needs to catch. So the exemption is explicit and small, and it is policed
-    # below rather than trusted: a wire constant that ever appears near an
-    # environment read stops being a wire constant.
+    # The literal scan below stays a literal search on purpose: two of the three
+    # allowed vars are read through a named constant (`_PIN_CONSENT_ENV`,
+    # `_DISABLE_ENV`), so a scan that only looked at call sites would miss the
+    # indirection it most needs to catch. The exemption is explicit and small,
+    # and it is policed below on the SYNTAX TREE rather than on source lines:
+    # ASTRA's review (2026-09-14, env mutants E02/E03) showed that a line test
+    # accepts `value = os.getenv(WIRE_MESSAGE)` (the name never shares a line
+    # with the read) and a read whose argument sits on the next line. A read is
+    # a call or subscript, not a line, so every environment read in the package
+    # is resolved to the name it reads and that name must be an allowed one.
     wire_constants = {"SUNGLASSES_WITHHELD"}
 
+    def _is_environ(node):
+        # os.environ / environ
+        return (isinstance(node, ast.Attribute) and node.attr == "environ") or (
+            isinstance(node, ast.Name) and node.id == "environ")
+
+    def _read_targets(tree):
+        """Every environment read in one module, resolved to the name it reads.
+
+        Returns (names, unresolved) where unresolved counts reads whose key is
+        not a string literal and not a module-level constant assigned one.
+        """
+        constants = {}
+        for stmt in tree.body:
+            if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant) \
+                    and isinstance(stmt.value.value, str):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        constants[target.id] = stmt.value.value
+
+        def resolve(key):
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                return key.value
+            if isinstance(key, ast.Name) and key.id in constants:
+                return constants[key.id]
+            return None
+
+        keys = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                f = node.func
+                # os.getenv(k) / getenv(k)
+                if (isinstance(f, ast.Attribute) and f.attr == "getenv") or (
+                        isinstance(f, ast.Name) and f.id == "getenv"):
+                    keys.append(node.args[0] if node.args else None)
+                # os.environ.get(k) / environ.get(k) / .pop / .setdefault
+                elif isinstance(f, ast.Attribute) and f.attr in {"get", "pop", "setdefault"} \
+                        and _is_environ(f.value):
+                    keys.append(node.args[0] if node.args else None)
+            elif isinstance(node, ast.Subscript) and _is_environ(node.value):
+                keys.append(node.slice)
+            elif isinstance(node, ast.Compare) and any(
+                    isinstance(op, (ast.In, ast.NotIn)) for op in node.ops) \
+                    and any(_is_environ(c) for c in node.comparators):
+                keys.append(node.left)
+        names, unresolved = set(), 0
+        for key in keys:
+            name = resolve(key) if key is not None else None
+            if name is None:
+                unresolved += 1
+            else:
+                names.add(name)
+        return names, unresolved
+
     found = set()
-    env_reads = []
+    read_names = set()
+    unresolved_reads = []
     pkg = os.path.dirname(_package_location())
     for dirpath, _dirs, files in os.walk(pkg):
         if "__pycache__" in dirpath:
@@ -646,23 +704,40 @@ def test_package_reads_no_undeclared_environment_variables():
         for name in files:
             if not name.endswith(".py"):
                 continue
-            text = open(os.path.join(dirpath, name), errors="ignore").read()
+            path = os.path.join(dirpath, name)
+            text = open(path, errors="ignore").read()
             found.update(re.findall(r"SUNGLASSES_[A-Z_]+", text))
-            for line in text.splitlines():
-                if "os.environ" in line or "getenv" in line:
-                    env_reads.append(line)
+            try:
+                tree = ast.parse(text)
+            except SyntaxError:
+                continue
+            names, unresolved = _read_targets(tree)
+            read_names.update(names)
+            if unresolved:
+                unresolved_reads.append((os.path.relpath(path, pkg), unresolved))
 
     undeclared = found - allowed - wire_constants
     assert not undeclared, f"undeclared env vars in the package: {sorted(undeclared)}"
 
-    # The exemption polices itself. If a name claimed as a wire constant turns
-    # up on a line that reads the environment, the claim was wrong and this
-    # fails rather than quietly permitting an undeclared read.
-    smuggled = sorted({constant for constant in wire_constants
-                       for line in env_reads if constant in line})
+    # Every environment read must resolve to a name, and that name must be
+    # allowed. A read whose key cannot be resolved is a read of something this
+    # test cannot account for, which is the same failure.
+    assert not unresolved_reads, (
+        f"environment reads whose key is not a literal or a module constant: "
+        f"{unresolved_reads}")
+    unaccounted = sorted(read_names - allowed)
+    assert not unaccounted, (
+        f"the package reads environment variables this test does not allow: "
+        f"{unaccounted}")
+
+    # The exemption polices itself on the tree. If a name claimed as a wire
+    # constant is the resolved target of any environment read, by literal, by
+    # alias or across lines, the claim was wrong and this fails rather than
+    # quietly permitting an undeclared read.
+    smuggled = sorted(read_names & wire_constants)
     assert not smuggled, (
-        f"{smuggled} is exempted as a wire constant and appears on a line that "
-        f"reads the environment; the exemption is not true")
+        f"{smuggled} is exempted as a wire constant and is read from the "
+        f"environment; the exemption is not true")
 
 
 # ==========================================================================
