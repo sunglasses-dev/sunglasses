@@ -206,6 +206,7 @@ class Session:
         # and "settled" is how an item gets answered twice: the check and the
         # settle have to be one atomic step or two threads both pass the check.
         self._lock = threading.RLock()
+        self._upstream_exit = None
         self._owed: dict = {}          # id -> when it was forwarded
         self._causes: dict = {}        # id -> [Cause], first recorded first
         self._settled: dict = {}       # id -> Cause it was settled with
@@ -500,8 +501,25 @@ class Session:
 
     def exit_code(self):
         """T7.R2 ends nonzero. A session that tore down did not succeed, and a
-        zero exit is read by everything upstream of us as "it worked"."""
-        return 1 if self.torn_down else 0
+        zero exit is read by everything upstream of us as "it worked".
+
+        T803. A CLEAN session whose upstream exited non-zero is not a success
+        either. The server failed and said so; swallowing its code and
+        reporting 0 tells whatever runs the proxy that the run was fine, which
+        is the proxy inventing a verdict about something it only carried.
+        The teardown still wins, because a session that tore down did not
+        succeed whatever the child's last word was.
+        """
+        if self.torn_down:
+            return 1
+        return self._upstream_exit or 0
+
+    def record_upstream_exit(self, code):
+        """The child's own status, recorded whether or not anything was
+        pending. The watcher used to return early on a clean exit, which is
+        exactly the case this exists for."""
+        if isinstance(code, int):
+            self._upstream_exit = code
 
     def _emit(self, kind, request_id, **fields):
         """Receipts identify an item, they do not reproduce it.
