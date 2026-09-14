@@ -734,11 +734,11 @@ class Session:
                 # direct-caller retirement instead: one frame for two requests,
                 # and with no second request the watcher returned without
                 # closing and the reader forwarded after a real exit.
-                if not self._discharge_before_handoff(
-                        key(ORIGIN_CLIENT, message["id"])):
+                yield self._handoff(key(ORIGIN_CLIENT, message["id"]),
+                                    forwarded)
+                if self._closed:
                     yield from self._drain_refusals()
                     return
-                yield forwarded
                 continue
 
             # T6.R5. A response for an id that was cancelled is DISCARDED and
@@ -760,10 +760,13 @@ class Session:
             # RC18/RC19/RC19b. The obligation ends HERE, under the lock, and
             # the yield happens only if this call says the close did not win.
             identity = key(ORIGIN_CLIENT, message["id"])
-            if not self._discharge_before_handoff(identity):
+            # The decision is IN the expression, so it is made when this line
+            # runs rather than before it. None means the close won and nothing
+            # crosses; consumers skip it.
+            yield self._handoff(identity, raw)
+            if self._closed:
                 yield from self._drain_refusals()
                 return
-            yield raw
             # IDEMPOTENT, and both halves are load-bearing for different
             # reasons. The gate above removes the record BEFORE the value
             # leaves, because a close landing after delivery must not pay an
@@ -939,8 +942,23 @@ class Session:
 
 
 
-    def _discharge_before_handoff(self, identity):
-        """The single point where an obligation ends, for EVERY caller.
+    def _handoff(self, identity, raw):
+        """The single point where an obligation ends, EVALUATED BY THE YIELD.
+
+        RC18 is why this is an expression and not a preceding statement. A
+        statement before `yield` runs before the yield LINE is reached, so a
+        close arriving at that moment found the record already discharged,
+        stood down, and the resumed reader delivered anyway: one original where
+        none should have crossed. Inside the yield expression the decision
+        happens when the line RUNS, so a close that completes while the reader
+        is parked at that line still finds the record owed, wins, and this
+        returns None -- nothing crosses.
+
+        After the yield there is no line event before the suspension, so a
+        close landing there finds the record discharged and does not pay: one
+        original and no double answer. Both orders are consistent, which is the
+        property; the few bytecodes in between cannot produce two answers.
+
 
         RC18, RC19, RC19b, RC21 and RC22 are five shapes of one mistake:
         retirement scattered across callers, each choosing its own moment, so
@@ -965,13 +983,12 @@ class Session:
         """
         with self._settlement:
             if self._closed:
-                return False
-        # `_retire_record` stays THE seam that removes a record, and this gate
-        # decides WHEN. Two jobs, one place each: a gate that also did the
-        # removal inline would leave the seam dead, and a reviewer wrapping it
-        # to observe retirement would see nothing.
-        self._retire_record(identity)
-        return True
+                # The close won. Nothing crosses, and the retained refusal it
+                # recorded is this client's one answer.
+                return None
+            self._settling.discard(identity)
+            self._settling_key.pop(identity, None)
+            return raw
 
     def _retire_record(self, identity):
         """RC14. The wire obligation is discharged; drop the record."""

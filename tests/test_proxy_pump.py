@@ -630,3 +630,98 @@ def test_an_id_is_free_again_once_its_answer_has_been_handed_over():
     assert session._settling == set()
     assert session.admit_request(41, method="tools/call", origin="client")
     assert session.closed_with() is None
+
+
+# ── RC18: the decision has to be IN the yield expression ───────────────────
+
+def test_a_close_at_the_handoff_instant_stops_the_frame_crossing():
+    """RC18. The instant that matters is while the yield LINE is running and
+    before the value leaves, and only an expression can be evaluated there.
+
+    A statement before the yield runs too early: a close arriving at this
+    moment found the record already discharged, stood down, and the resumed
+    reader delivered anyway -- one original where none should have crossed,
+    and the client's own refusal alongside it.
+
+    The barrier here is `_handoff` itself, which IS that instant.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    original = session._handoff
+    seen = {}
+
+    def blocking(ident, raw):
+        # The yield line is running; nothing has crossed yet.
+        seen["settling"] = set(session._settling)
+        session._close("MALFORMED_UPSTREAM", "review controlled close")
+        return original(ident, raw)
+
+    session._handoff = blocking
+    out = [frame for frame in session.read_upstream(wire(response(41)))
+           if frame is not None]
+    assert seen["settling"], "the record was already discharged at the handoff"
+    assert not any("result" in json.loads(frame) for frame in out), (
+        "an original crossed after the close had won")
+    assert len(out) == 1 and "error" in json.loads(out[0])
+
+
+def test_a_close_after_the_handoff_does_not_pay_again():
+    """The opposite order, and the reason the discharge cannot simply move
+    after the yield: once the frame is gone the obligation is gone with it, and
+    a close that pays it again puts two answers on the wire for one request."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    frames = list(session.read_upstream(wire(response(41))))
+    delivered = [f for f in frames if f is not None]
+    assert len(delivered) == 1 and "result" in json.loads(delivered[0])
+    session._close("MALFORMED_UPSTREAM", "review controlled close")
+    assert list(session._drain_refusals()) == [], (
+        "the close paid an obligation that was already discharged")
+
+
+def test_the_handoff_decision_is_made_by_the_yield_and_not_before_it():
+    """RC18, pinned at the LINE rather than at the function.
+
+    A control that wraps `_handoff` cannot see this: moving the call into a
+    preceding statement calls the same function at the same logical point, and
+    the wrapper is none the wiser. What changes is WHEN the call happens
+    relative to the yield, so the barrier has to be a line event.
+
+    Parked on the delivery line, before it runs, the record must still be
+    owed. That is what makes a close arriving here win, and a frame that has
+    not crossed stay uncrossed. With the decision in a preceding statement the
+    record is already discharged at this point, the close stands down, and the
+    original goes out behind it.
+    """
+    import inspect
+    import sys as _sys
+
+    source, first = inspect.getsourcelines(pump.Session.read_upstream)
+    delivery = [first + i for i, line in enumerate(source)
+                if line.strip().startswith("yield self._handoff(identity")]
+    assert len(delivery) == 1, (
+        "the delivery line moved; this control pins where the decision is made")
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    seen = {}
+
+    def tracer(frame, event, arg):
+        if (event == "line"
+                and frame.f_code is pump.Session.read_upstream.__code__
+                and frame.f_lineno == delivery[0] and "settling" not in seen):
+            seen["settling"] = set(session._settling)
+        return tracer
+
+    _sys.settrace(tracer)
+    try:
+        out = [f for f in session.read_upstream(wire(response(41)))
+               if f is not None]
+    finally:
+        _sys.settrace(None)
+
+    assert seen.get("settling"), (
+        "the record was discharged BEFORE the delivery line ran, so a close "
+        "arriving at that instant would stand down and the frame would cross")
+    assert len(out) == 1
