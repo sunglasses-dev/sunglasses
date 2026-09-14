@@ -231,31 +231,95 @@ def _is_filler(segment: str) -> bool:
     return False
 
 
+# The literal prefixes the shipped credential formats begin with, as the
+# SEGMENTS they become. A prefix is part of the FORMAT, not part of the claim
+# anyone is making about the material, so `ghp_` in `ghp_xxxx...` neither proves
+# nor disproves that the rest is filler. Listed per format rather than guessed,
+# because "the first segment does not count" would let a token clear by having
+# any first segment at all.
+_FORMAT_PREFIX_SEGMENTS = frozenset({
+    "akia", "asia",                                   # AWS
+    "ghp", "gho", "ghu", "ghs", "ghr",                # GitHub
+    "sk", "ant", "proj", "svcacct",                   # Anthropic, OpenAI
+    "xoxb", "xoxa", "xoxp", "xoxr", "xoxs", "xoxe",   # Slack
+    "aiza",                                           # Google
+    "live", "test",                                   # Stripe modes
+    "eyj",                                            # JWT header
+})
+
+# Words that DESCRIBE credential material without being any of it. `YOUR_KEY_HERE`
+# is a placeholder and `key` is not a placeholder word, so without this the
+# all-segments rule would refuse the most common placeholder there is. They are
+# nouns a human writes around a secret, never the secret.
+_STRUCTURAL_WORDS = frozenset({
+    "key", "keys", "token", "secret", "api", "id", "my", "the", "value",
+    "pass", "password", "credential", "credentials", "auth", "access", "code",
+    # Pronouns a human writes around a secret: REPLACE_ME, PUT_IT_HERE.
+    "me", "it", "this", "name", "user",
+})
+
+
+def _strip_format_prefix(segment: str) -> str:
+    """Remove a format literal that sits INSIDE a segment rather than beside it.
+
+    `AKIA...` and `AIza...` carry no separator, so the prefix and the body are
+    one segment and the body has to be recovered before it can be judged.
+    """
+    for prefix in ("akia", "asia", "aiza", "eyj"):
+        if segment.startswith(prefix) and len(segment) > len(prefix):
+            return segment[len(prefix):]
+    return segment
+
+
 def is_placeholder(token: str) -> bool:
     """True if this secret-shaped string is demonstrably not live material.
 
-    STATE #54. This decided on a SUBSTRING: any token whose lowercase form
-    contained one of the words above was called "demonstrably not live". Six of
-    those words are four characters (0000, aaaa, here, todo, xxxx, your) and a
-    credential is base62, so a real key can carry one by accident.
-    `AKIAHERE4CIPPERUVIFX`, `AKIAYOUR4CIPPERUVIFX` and `AKIA0000CIPPERUVIFXG`
-    are all well-formed AWS key ids and all three were cleared and allowed out,
-    while `AKIAJ7K2QW9PLM3XZV5B` was caught. That is a detection gap in the
-    outbound firewall, not a false-positive setting.
+    STATE #54, and the rule took two passes to get right because the same
+    mistake has two levels.
 
-    A placeholder is a token that IS a placeholder. It is not a token that
-    CONTAINS one. So the decision is made on whole segments -- the pieces a
-    token splits into at every non-alphanumeric character -- and never on a
-    substring of a segment.
+    FIRST it decided on a SUBSTRING: any token whose lowercase form contained
+    one of the words above was "demonstrably not live". Six of those words are
+    four characters (0000, aaaa, here, todo, xxxx, your) and a credential is
+    base62, so a real AWS key id carrying `here` in its body was cleared and
+    sent while the same shape without one was caught.
+
+    THEN it decided on ANY SEGMENT, which is the identical decision one level
+    up: a real token with separators carries a placeholder segment by accident
+    exactly as that key carried `here`. A live Slack token whose numeric groups
+    happen to run `1234-5678`, and a live Stripe key with a `here` segment in
+    its body, were both cleared by the repair.
+
+    The rule is the sentence that was written before either attempt and not
+    followed: A PLACEHOLDER IS A TOKEN THAT IS ONE. So the judgement is on the
+    whole secret material. Every segment outside the format's own literal
+    prefix must be a placeholder word, typed filler, or a structural noun, AND
+    at least one of them must actually be a placeholder or filler -- otherwise
+    `my_api_token`, which is all structure and no claim, would clear.
     """
     if any(c in token for c in _PLACEHOLDER_CHARS):
         return True
     low = token.lower()
     words = frozenset(_PLACEHOLDER_WORDS)
+
+    body = []
     for segment in _segments(low):
+        if segment in _FORMAT_PREFIX_SEGMENTS:
+            continue
+        stripped = _strip_format_prefix(segment)
+        if stripped:
+            body.append(stripped)
+    if not body:
+        # Nothing but format. That is not a statement that the material is
+        # fake, so it is not cleared.
+        return False
+
+    claimed = False
+    for segment in body:
         if segment in words or _is_filler(segment):
-            return True
-    return False
+            claimed = True
+        elif segment not in _STRUCTURAL_WORDS:
+            return False
+    return claimed
 
 
 # ── Known public canaries ───────────────────────────────────────────────────

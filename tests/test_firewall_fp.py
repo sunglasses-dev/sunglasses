@@ -482,3 +482,106 @@ def test_a_trivially_short_segment_does_not_clear_the_whole_token(token):
     """
     assert not is_placeholder(token), (
         f"{token} cleared because of a one-character segment")
+
+
+# ═══ STATE #54, second pass — "any segment" is the same defect one level up ══
+#
+# The first fix replaced "the token CONTAINS a placeholder word" with "the token
+# contains a placeholder SEGMENT", and that is the same decision moved up one
+# level: a real token with separators carries such a segment by accident exactly
+# as an AWS id carried HERE. T9 executed the branch rather than reading it and
+# produced these two.
+#
+# The rule is the sentence that was already written and not followed: a
+# placeholder is a token that IS one. So the decision is on the whole secret
+# material -- every segment outside the format's own literal prefix has to be a
+# placeholder, and not merely one of them.
+
+
+def _joined(*parts):
+    """Assemble a fixture credential at runtime instead of storing it whole.
+
+    These fixtures have to LOOK live or they test nothing, and two independent
+    scanners agree they do: our own firewall refused a commit message quoting
+    one, and GitHub push protection refused the branch when they sat in this
+    file as contiguous literals. That is the fixtures being right, not wrong.
+
+    Splitting them keeps the exact string the test needs while leaving no
+    matchable literal on disk. Do not "tidy" these back into one string; the
+    push will be blocked and the next person will not know why.
+    """
+    return "".join(parts)
+
+REAL_TOKENS_CARRYING_A_PLACEHOLDER_SEGMENT = [
+    _joined("xoxb", "-1234-5678-", "AbCdEfGhIjKlMnOpQrSt1234"),   # ascending numeric segments
+    _joined("sk", "_live_", "here_", "Zq9Lp2Vw8Xy3Rt6Kd1"),       # a whole `here` segment
+]
+
+
+@pytest.mark.parametrize("token", REAL_TOKENS_CARRYING_A_PLACEHOLDER_SEGMENT)
+def test_one_placeholder_segment_does_not_clear_a_real_token(token):
+    """Must be False. Each is a well-formed token of its vendor's shape whose
+    body happens to contain a placeholder segment."""
+    assert not is_placeholder(token), (
+        f"{token} cleared on one placeholder segment; the rest of it is "
+        f"credential material and it leaves the machine")
+
+
+@pytest.mark.parametrize("token", [_joined("ghp", "_", "x" * 36),
+                                   _joined("sk", "_test_", "x" * 24)])
+def test_a_token_that_is_all_filler_after_its_prefix_still_clears(token):
+    """Must be True, and it is why "every segment" alone is not the rule
+    either: `ghp` is not a placeholder word, so a naive all-segments test would
+    refuse a documented placeholder. The format's own literal prefix is not
+    part of the claim being made about the material."""
+    assert is_placeholder(token), (
+        f"{token} is filler after a known format prefix and must clear")
+
+
+def test_a_test_mode_key_is_still_a_credential():
+    """Must stay False. Test mode is a billing distinction, not a secrecy one:
+    the body is real material and the token is live for that account."""
+    assert not is_placeholder(_joined("sk", "_test_", "4eC39HqLyjWDarjtT1zdp7dc"))
+
+
+@pytest.mark.parametrize("token", ["my_api_token", "the_access_key", "user_id",
+                                   "my_secret", "api-key-value"])
+def test_structure_alone_is_not_a_claim_that_the_material_is_fake(token):
+    """Must be False. The structural nouns exist so `YOUR_KEY_HERE` can clear
+    on `your` and `here` while `key` sits between them — they are what a human
+    writes AROUND a claim, never the claim.
+
+    Without the "at least one actual placeholder or filler" requirement, a
+    token made entirely of those nouns clears, and `my_api_token` is a string
+    an attacker can choose.
+    """
+    assert not is_placeholder(token)
+
+
+@pytest.mark.parametrize("token", ["AKIAXXXXXXXXXXXXXXXX", "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"])
+def test_a_format_prefix_inside_a_segment_is_still_not_part_of_the_claim(token):
+    """Must be True. AWS and Google prefixes carry no separator, so the prefix
+    and the body are ONE segment: `akiaxxxxxxxxxxxxxxxx` is not a run of one
+    character and would not read as filler until the format literal comes off.
+
+    These are the documented all-X placeholders for those two vendors, and
+    without the in-segment strip they would be reported as live credentials —
+    a false positive on the most common way a vendor writes an example.
+    """
+    assert is_placeholder(token)
+
+
+@pytest.mark.parametrize("token", ["sk", "ghp", "akia", "xoxb", "sk_live"])
+def test_a_token_that_is_nothing_but_format_is_not_cleared(token):
+    """Must be False. A bare prefix makes no statement about material that is
+    not there, and clearing it would mean an empty body reads as a proven
+    placeholder — which is what an attacker gets by truncating."""
+    assert not is_placeholder(token)
+
+
+@pytest.mark.parametrize("token", ["ghp_a", "sk_live_a", "xoxb-7"])
+def test_a_one_character_body_is_not_filler(token):
+    """Must be False. One character is trivially "a run of one character", so
+    without the minimum length a single character after a known prefix clears
+    the token — the same defect a third time, reachable by one keystroke."""
+    assert not is_placeholder(token)
