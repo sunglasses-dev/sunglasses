@@ -38,9 +38,11 @@ import pytest
 
 from sunglasses.firewall import (
     KNOWN_PUBLIC_CANARIES,
+    _PLACEHOLDER_WORDS,
     check_egress_secrets,
     find_secret_material,
     is_egress_tool,
+    is_placeholder,
 )
 
 # ── CORPUS A — normal tool calls. Zero blocks allowed. ───────────────────────
@@ -334,7 +336,23 @@ def test_normalization_still_honours_the_placeholder_guard():
     """Stripping format characters must not turn a documented placeholder into
     a 'secret' — that would be an FP invented by the fix."""
     assert find_secret_material("sk-ant-YOUR​_KEY_HERE") == []
-    assert find_secret_material("AKIA​IOSFODNN7EXAMPLE") == []
+
+
+def test_normalization_still_clears_the_aws_docs_key_by_enumeration():
+    """The same property, at the layer that now owns the decision.
+
+    STATE #54 moved AKIAIOSFODNN7EXAMPLE from the placeholder guard to
+    KNOWN_PUBLIC_CANARIES, because EXAMPLE is a SUFFIX of that key and the
+    repaired guard decides on whole segments. `find_secret_material` does not
+    apply canary filtering on purpose — receipts must still see the raw hit —
+    so the assertion belongs on the egress decision, and it has to survive
+    normalization the way the placeholder path did.
+    """
+    assert "AKIAIOSFODNN7EXAMPLE" in KNOWN_PUBLIC_CANARIES
+    for text in ("AKIAIOSFODNN7EXAMPLE", "AKIA​IOSFODNN7EXAMPLE"):
+        decision = check_egress_secrets(
+            "WebFetch", {"url": "https://example.test/", "body": text})
+        assert decision is None, f"the AWS docs key blocked as {text!r}"
 
 
 def test_normalization_invents_nothing_in_clean_prose():
@@ -345,3 +363,122 @@ def test_normalization_invents_nothing_in_clean_prose():
         "The token is passed as $GITHUB​_TOKEN, never inline.",
     ):
         assert find_secret_material(text) == [], text
+
+
+# ═══ STATE #54 — the placeholder guard decides on a SUBSTRING ════════════════
+#
+# `is_placeholder` calls a token "demonstrably not live" when its lowercase form
+# CONTAINS one of eighteen words. Six of those words are four characters long
+# (0000, aaaa, here, todo, xxxx, your), and a real credential is base62: it can
+# contain any of them by accident. So a live AWS key that happens to carry
+# `here` in its body is cleared by the outbound firewall and leaves.
+#
+# This is the resemblance failure in a shipped guard. A placeholder is a token
+# that IS a placeholder; it is not a token that contains one.
+#
+# These are written BEFORE the fix and are expected to be RED on main.
+
+REAL_KEYS_CARRYING_A_PLACEHOLDER_WORD = [
+    "AKIAHERE4CIPPERUVIFX",
+    "AKIAYOUR4CIPPERUVIFX",
+    "AKIA0000CIPPERUVIFXG",
+]
+
+
+@pytest.mark.parametrize("key", REAL_KEYS_CARRYING_A_PLACEHOLDER_WORD)
+def test_a_real_key_is_not_a_placeholder_because_it_contains_a_word(key):
+    """The three T9 reproduced on main b7e33c2. Each is a well-formed AWS key
+    id; each was cleared as not-live because of four characters inside it."""
+    assert not is_placeholder(key), (
+        f"{key} was cleared as a placeholder on a substring; a live key of "
+        f"this shape leaves the machine")
+
+
+def _key_carrying(word):
+    """A well-formed 20-character AWS key id with `word` buried in its body.
+
+    Built rather than listed so the set cannot drift behind _PLACEHOLDER_WORDS:
+    a word added to the guard without a control is the hole re-opening quietly.
+    """
+    body = (word.upper() + "7K2QW9PLM3XZV5BQRS")[:16]
+    return "AKIA" + body
+
+
+@pytest.mark.parametrize("word", sorted(_PLACEHOLDER_WORDS))
+def test_no_placeholder_word_clears_a_key_that_merely_contains_it(word):
+    """One per word, including the long ones. The six four-character words are
+    the practical risk, and the defect is the same for every entry."""
+    key = _key_carrying(word)
+    assert not is_placeholder(key), (
+        f"{key} was cleared because it contains {word!r}")
+
+
+@pytest.mark.parametrize("placeholder", [
+    "YOUR_KEY_HERE", "xxxxxxxx", "0000-0000", "REPLACE_ME", "changeme",
+    "sk-ant-REPLACE_ME", "<YOUR_KEY>", "$TOKEN",
+    "insert-token-here", "TODO", "notreal", "abcdef", "123456", "aaaaaaaa",
+    "dummy", "sample-key", "redacted", "placeholder", "fixme",
+])
+def test_real_placeholders_still_clear(placeholder):
+    """The positive half, and the one that decides whether the fix is usable.
+    A guard that stops clearing genuine placeholders turns every vendor README
+    into a false positive, which is how a security tool gets switched off."""
+    assert is_placeholder(placeholder), (
+        f"{placeholder!r} is a documented placeholder and must still clear")
+
+
+@pytest.mark.parametrize("word", sorted(_PLACEHOLDER_WORDS))
+def test_every_word_still_clears_on_its_own_and_in_a_segment(word):
+    """Per word, both shapes a real placeholder takes: the bare word, and the
+    word as a whole segment of a separated string. Without this the fix could
+    satisfy the rows above by clearing nothing at all."""
+    assert is_placeholder(word), f"the bare word {word!r} stopped clearing"
+    for joined in (f"MY_{word.upper()}_TOKEN", f"my-{word}-token",
+                   f"my.{word}.token"):
+        assert is_placeholder(joined), f"{joined!r} stopped clearing"
+
+
+def test_a_real_key_with_no_placeholder_word_is_still_caught():
+    """The control that proves the three above are about the substring rule and
+    not about AWS key ids in general."""
+    assert not is_placeholder("AKIAJ7K2QW9PLM3XZV5B")
+
+
+@pytest.mark.parametrize("filler", ["abcd", "abcdefgh", "12345", "12345678",
+                                    "5678", "cdef", "xxxxxxxx", "aaaaaaaa",
+                                    "00000000", "zzzz"])
+def test_typed_filler_clears_by_its_shape_not_by_being_listed(filler):
+    """The five filler entries in _PLACEHOLDER_WORDS are four characters long,
+    and nobody types filler to a fixed length. `xxxx` and `xxxxxxxx` are the
+    same thing to a reader, so the rule is the SHAPE — one repeated character,
+    or a consecutive ascending run — and these are the variants no tuple
+    contains.
+
+    Without this the shape rule is dead code hiding behind the literal entries
+    `abcdef` and `123456`, which is how a mutation that deletes it survives.
+    """
+    assert is_placeholder(filler)
+
+
+def test_an_ascending_run_is_not_anchored_at_the_start_of_the_sequence():
+    """The bug this found in my own fix. The first version tested
+    `"0123456789".startswith(segment)`, so a digit run only counted if it began
+    at zero and `12345678` was not filler. Anchoring a sequence at its start is
+    the same error as anchoring a word at a substring: it decides on where the
+    thing sits rather than on what it is."""
+    assert is_placeholder("12345678")
+    assert is_placeholder("5678")
+
+
+@pytest.mark.parametrize("token", [
+    "a_AKIAJ7K2QW9PLM3XZV5B",
+    "1-AKIAJ7K2QW9PLM3XZV5B",
+    "x.AKIAJ7K2QW9PLM3XZV5B",
+])
+def test_a_trivially_short_segment_does_not_clear_the_whole_token(token):
+    """A single character is trivially 'a run of one character'. Without the
+    minimum length, prefixing any live key with `a_` would clear it — the
+    substring defect wearing a different hat, and reachable by one keystroke.
+    """
+    assert not is_placeholder(token), (
+        f"{token} cleared because of a one-character segment")

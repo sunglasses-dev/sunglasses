@@ -182,13 +182,80 @@ _PLACEHOLDER_WORDS = (
     "xxxx", "abcdef", "123456", "aaaa", "0000",
 )
 
+# The five entries above that are not words but TYPED FILLER: a run of one
+# character, or the beginning of the alphabet or the digits. They are matched
+# by their shape rather than by length, because `xxxx` and `xxxxxxxx` are the
+# same thing to a reader and only one of them is in the tuple.
+_MIN_FILLER = 4
+
+
+def _segments(low: str):
+    """The token split on everything that is not alphanumeric.
+
+    `YOUR_KEY_HERE` is three segments; `AKIAHERE4CIPPERUVIFX` is one. That
+    difference is the whole fix.
+    """
+    out, current = [], []
+    for char in low:
+        if char.isalnum():
+            current.append(char)
+        elif current:
+            out.append("".join(current))
+            current = []
+    if current:
+        out.append("".join(current))
+    return out
+
+
+def _is_filler(segment: str) -> bool:
+    """A run of one character, or a consecutive ascending run.
+
+    The minimum length matters as much as the shapes. Without it a single
+    character is trivially "a run of one character", so prefixing any key with
+    `a_` would clear it — the substring defect wearing a different hat.
+
+    Ascending means CONSECUTIVE, not "a prefix of the alphabet". The first
+    version of this tested `"0123456789".startswith(segment)`, which quietly
+    meant a digit run only counted if it started at zero: `12345678` was not
+    filler. Anchoring a sequence at its start is the same mistake as anchoring
+    a word at a substring — it decides on where the thing sits rather than on
+    what it is.
+    """
+    if len(segment) < _MIN_FILLER:
+        return False
+    if len(set(segment)) == 1:
+        return True
+    if segment.isdigit() or segment.isalpha():
+        codes = [ord(c) for c in segment]
+        return all(b - a == 1 for a, b in zip(codes, codes[1:]))
+    return False
+
 
 def is_placeholder(token: str) -> bool:
-    """True if this secret-shaped string is demonstrably not live material."""
+    """True if this secret-shaped string is demonstrably not live material.
+
+    STATE #54. This decided on a SUBSTRING: any token whose lowercase form
+    contained one of the words above was called "demonstrably not live". Six of
+    those words are four characters (0000, aaaa, here, todo, xxxx, your) and a
+    credential is base62, so a real key can carry one by accident.
+    `AKIAHERE4CIPPERUVIFX`, `AKIAYOUR4CIPPERUVIFX` and `AKIA0000CIPPERUVIFXG`
+    are all well-formed AWS key ids and all three were cleared and allowed out,
+    while `AKIAJ7K2QW9PLM3XZV5B` was caught. That is a detection gap in the
+    outbound firewall, not a false-positive setting.
+
+    A placeholder is a token that IS a placeholder. It is not a token that
+    CONTAINS one. So the decision is made on whole segments -- the pieces a
+    token splits into at every non-alphanumeric character -- and never on a
+    substring of a segment.
+    """
     if any(c in token for c in _PLACEHOLDER_CHARS):
         return True
     low = token.lower()
-    return any(word in low for word in _PLACEHOLDER_WORDS)
+    words = frozenset(_PLACEHOLDER_WORDS)
+    for segment in _segments(low):
+        if segment in words or _is_filler(segment):
+            return True
+    return False
 
 
 # ── Known public canaries ───────────────────────────────────────────────────
@@ -200,15 +267,26 @@ def is_placeholder(token: str) -> bool:
 # The alternative — loosening a regex — silently opens a hole for every real
 # key of that shape. Each entry is a full literal credential and is asserted to
 # still match a rule, so a stale entry cannot rot into a wildcard.
-# Note on what is NOT here: AWS's own docs key `AKIAIOSFODNN7EXAMPLE` needs no
-# entry — the placeholder guard already clears it on the literal word EXAMPLE.
-# Listing it anyway would be a dead entry that reads as coverage while proving
-# nothing, so the canary test asserts every entry still matches a rule.
+# STATE #54 changed what belongs here. This comment used to say AWS's own docs
+# key `AKIAIOSFODNN7EXAMPLE` needed no entry because the placeholder guard
+# cleared it "on the literal word EXAMPLE" — and that was true only while the
+# guard decided on a SUBSTRING, which is the defect that guard just had. EXAMPLE
+# is a suffix of that key, not a segment of it, so the repaired guard does not
+# clear it and enumeration is now the only thing that can. The note is corrected
+# rather than deleted: the reasoning it recorded is exactly what stopped being
+# true.
 KNOWN_PUBLIC_CANARIES: frozenset = frozenset({
     # trufflehog's detector fixture, published verbatim in its README (and so
     # in our clean corpus). A revoked key Truffle Security uses to demo
     # detection — it carries no EXAMPLE marker, so only enumeration clears it.
     "AKIAYVP4CIPPERUVIFXG",
+    # AWS's canonical documentation example, published across their own IAM and
+    # SDK docs for years. Not a live key and never was. It reached this list
+    # because the placeholder guard stopped matching EXAMPLE inside a token
+    # (STATE #54); it is a published vendor fixture, which is what this list is
+    # for, and the canary test asserts it still matches the AWS rule so it
+    # cannot rot into a wildcard.
+    "AKIAIOSFODNN7EXAMPLE",
 })
 
 
