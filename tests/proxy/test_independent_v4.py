@@ -132,13 +132,34 @@ def test_R2_normal_completion_cannot_hide_protocol_teardown():
     answer = session.teardown(protocol())[41]
     assert (answer.reason, answer.rule) == ('MALFORMED_UPSTREAM', 'S5')
 
-def test_R2_stop_failure_must_not_lose_settlement_delivery():
+def test_R2_v4_retained_batch_waits_for_successful_supervision():
+    import subprocess
+    import sys
     session = Session()
     session.admit(41)
+    child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    attempts = []
     def stop():
-        raise ProcessLookupError()
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise ProcessLookupError()
+        child.terminate()
+        child.wait(timeout=3)
     try:
-        session.teardown(protocol(), stop_processes=stop)
-    except ProcessLookupError:
-        pass
-    assert session.teardown(protocol())
+        with pytest.raises(ProcessLookupError):
+            session.teardown(protocol(), stop_processes=stop)
+        with pytest.raises(ProcessLookupError):
+            session.teardown(Cause('SCAN_DEADLINE', 'S3'))
+        assert child.poll() is None
+        assert not any(e['kind'] == 'UPSTREAM_CLOSED' for e in session.events)
+        batch = session.teardown(Cause('SCAN_DEADLINE', 'S3'))
+        assert child.poll() is not None and len(attempts) == 3
+        assert set(batch) == {41}
+        assert (batch[41].reason, batch[41].rule) == ('MALFORMED_UPSTREAM', 'S5')
+        assert len([e for e in session.events if e['kind'] == 'SETTLED']) == 1
+        assert len([e for e in session.events if e['kind'] == 'UPSTREAM_CLOSED']) == 1
+    finally:
+        if child.poll() is None:
+            child.terminate()
+        child.wait(timeout=3)
