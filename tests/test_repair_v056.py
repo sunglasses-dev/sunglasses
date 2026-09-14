@@ -763,6 +763,111 @@ def test_package_reads_no_undeclared_environment_variables():
                     and len(node.comparators) == 1 and environ_attr(node.comparators[0]):
                 yield node, node.left, {id(node.comparators[0])}
 
+
+    # ROUND 6 (ASTRA E45-E51, 2026-09-14): all seven survivors either COMPUTED
+    # a name at runtime ('get' + 'env'), ALIASED the thing that computes it
+    # (reader = getattr / vars), reached the module through a mapping
+    # (module.__dict__[...], vars(os)[...], globals()['K'] = ...), or produced
+    # the module by a call (importlib.import_module('os')). None carries a
+    # sensitive token the literal scan could see, and a resolver that followed
+    # each of those would pass the eighth shape. So the extension is four
+    # refusals with ONE enumerated exemption, in the spirit of the KEY rule:
+    #   R1 an os name may appear ONLY as the base of an attribute (os.<attr>);
+    #      as a value, argument, alias or return it refuses;
+    #   R2 introspection builtins may appear ONLY as the callee of a direct call
+    #      by their own name; assigned, passed, returned or from-imported (with
+    #      or without an alias) they refuse;
+    #   R3 a name given to getattr/setattr/hasattr/delattr must be a string
+    #      literal, EXCEPT the one form the package needs: a loop/comprehension
+    #      variable whose every binding iterates an enumerated literal tuple or
+    #      list of plain strings in this module (or a class's literal __slots__),
+    #      none of them a sensitive token. attrgetter/itemgetter/methodcaller/
+    #      import_module/__import__ take literals only, and none may name os;
+    #   R4 namespace and module introspection refuses everywhere: globals(),
+    #      locals(), vars(), .__dict__, .__getattribute__, .__getattr__,
+    #      .__builtins__, .__globals__, sys.modules[...].
+    INTROSPECTION = {"getattr", "setattr", "hasattr", "delattr", "vars", "globals",
+                     "locals", "__import__", "eval", "exec", "compile"}
+    NAMED_LOOKUPS = {"attrgetter", "itemgetter", "methodcaller", "import_module"}
+    MODULE_DUNDERS = {"__dict__", "__getattribute__", "__getattr__", "__builtins__", "__globals__"}
+    OS_MODULE_LITERALS = {"os", "posix", "nt"}
+
+    def _parents(tree):
+        p = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                p[id(child)] = node
+        return p
+
+    def _literal_strings(node):
+        """The plain-string elements of a literal tuple/list, or None."""
+        if isinstance(node, (ast.Tuple, ast.List)) and node.elts and all(
+                isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.elts):
+            return [e.value for e in node.elts]
+        return None
+
+    def _enumerated_iterable(it, tree, counts):
+        """True if `it` is an iterable whose members are enumerated literal strings
+        in THIS module and none is a sensitive token: a module-level Name bound
+        exactly once to a literal tuple/list, or <x>.__slots__ where every
+        __slots__ in the module is such a literal."""
+        if isinstance(it, ast.Name) and counts.get(it.id) == 1:
+            for stmt in tree.body:
+                if isinstance(stmt, ast.Assign) and any(isinstance(t_, ast.Name) and t_.id == it.id for t_ in stmt.targets):
+                    vals = _literal_strings(stmt.value)
+                    return vals is not None and not (set(vals) & SENSITIVE)
+            return False
+        if isinstance(it, ast.Attribute) and it.attr == "__slots__":
+            slots = [n.value for n in ast.walk(tree) if isinstance(n, ast.Assign)
+                     and any(isinstance(t_, ast.Name) and t_.id == "__slots__" for t_ in n.targets)]
+            return bool(slots) and all(
+                _literal_strings(v) is not None and not (set(_literal_strings(v)) & SENSITIVE) for v in slots)
+        return False
+
+    def _enumerated_name_arg(arg, call, tree, counts, parents):
+        """The single exempt computed-name form: `arg` is a Name that is bound
+        ONLY by for/comprehension targets anywhere in the module (never by an
+        assignment, parameter, import, except or with), and the loop that
+        ENCLOSES this call iterates an enumerated iterable (_enumerated_iterable).
+        Other loops over the same name elsewhere do not count for or against
+        it; only the binding in effect at the call site decides."""
+        if not isinstance(arg, ast.Name):
+            return False
+        # Second exact form: the attribute protocol itself. Inside a method named
+        # __setattr__/__delattr__/__getattr__/__getattribute__ of a class, the
+        # name being set/read IS the method's second parameter, and the object is
+        # `self`. Safe under R1/R3/R4 because no expression in the package can
+        # evaluate to the os module except an os name used as an attribute base,
+        # so `self` can never be os and can never hold it.
+        if isinstance(call, ast.Call) and len(call.args) > 1 and isinstance(call.args[0], ast.Name) \
+                and call.args[0].id == "self":
+            fn = parents.get(id(call))
+            while fn is not None and not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                fn = parents.get(id(fn))
+            if fn is not None and fn.name in {"__setattr__", "__delattr__", "__getattr__", "__getattribute__"} \
+                    and isinstance(parents.get(id(fn)), ast.ClassDef):
+                params = fn.args.posonlyargs + fn.args.args
+                if len(params) > 1 and params[0].arg == "self" and params[1].arg == arg.id \
+                        and not any(isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.NamedExpr, ast.For, ast.comprehension))
+                                    and any(isinstance(t_, ast.Name) and t_.id == arg.id
+                                            for t_ in (getattr(n, "targets", None) or [getattr(n, "target", None)]))
+                                    for n in ast.walk(fn)):
+                    return True
+        sites = [n for n in ast.walk(tree) if isinstance(n, (ast.For, ast.AsyncFor, ast.comprehension))
+                 and isinstance(n.target, ast.Name) and n.target.id == arg.id]
+        if not sites or len(sites) != counts.get(arg.id, 0):
+            return False
+        node = call
+        while node is not None:
+            if isinstance(node, (ast.For, ast.AsyncFor)) and isinstance(node.target, ast.Name) and node.target.id == arg.id:
+                return _enumerated_iterable(node.iter, tree, counts)
+            if isinstance(node, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp)):
+                for gen in node.generators:
+                    if isinstance(gen.target, ast.Name) and gen.target.id == arg.id:
+                        return _enumerated_iterable(gen.iter, tree, counts)
+            node = parents.get(id(node))
+        return False
+
     def _audit(tree, relpath):
         """Return (read_names, refusals) for one module."""
         os_names = _os_names(tree)
@@ -795,6 +900,40 @@ def test_package_reads_no_undeclared_environment_variables():
             elif isinstance(node, ast.Attribute) and node.attr in {"__dict__", "__getattribute__", "__getattr__"} \
                     and isinstance(node.value, ast.Name) and node.value.id in os_names:
                 refusals.append(f"{relpath}:{node.lineno} os.{node.attr} access")
+        # ROUND 6 refusals R1-R4 (see the block above _parents).
+        parents = _parents(tree)
+        for node in ast.walk(tree):
+            par = parents.get(id(node))
+            if isinstance(node, ast.Name) and node.id in os_names and isinstance(node.ctx, ast.Load) \
+                    and not (isinstance(par, ast.Attribute) and par.value is node):
+                refusals.append(f"{relpath}:{node.lineno} the os module used as a value, not as an attribute base (R1)")
+            if isinstance(node, ast.Name) and node.id in INTROSPECTION \
+                    and not (isinstance(par, ast.Call) and par.func is node):
+                refusals.append(f"{relpath}:{node.lineno} {node.id} used as a value: aliased, passed or returned (R2)")
+            if isinstance(node, ast.ImportFrom) and any(a.name in INTROSPECTION | NAMED_LOOKUPS for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} from-import of an introspection callable (R2)")
+            if isinstance(node, ast.Call):
+                fname = node.func.id if isinstance(node.func, ast.Name) else \
+                    (node.func.attr if isinstance(node.func, ast.Attribute) else None)
+                if isinstance(node.func, ast.Name) and fname in {"getattr", "setattr", "hasattr", "delattr"}:
+                    name_arg = node.args[1] if len(node.args) > 1 else None
+                    literal = isinstance(name_arg, ast.Constant) and isinstance(name_arg.value, str)
+                    if not literal and not _enumerated_name_arg(name_arg, node, tree, counts, parents):
+                        refusals.append(f"{relpath}:{node.lineno} {fname} with a computed attribute name (R3)")
+                if fname in NAMED_LOOKUPS or fname == "__import__":
+                    for a in node.args:
+                        if not (isinstance(a, ast.Constant) and isinstance(a.value, str)):
+                            refusals.append(f"{relpath}:{node.lineno} {fname} with a computed name (R3)")
+                            break
+                        if fname in {"import_module", "__import__"} and a.value.split(".")[0] in OS_MODULE_LITERALS:
+                            refusals.append(f"{relpath}:{node.lineno} {fname} of the os module; only a plain import may name it (R3)")
+                if isinstance(node.func, ast.Name) and fname in {"globals", "locals", "vars"}:
+                    refusals.append(f"{relpath}:{node.lineno} {fname}() namespace introspection (R4)")
+            if isinstance(node, ast.Attribute) and node.attr in MODULE_DUNDERS:
+                refusals.append(f"{relpath}:{node.lineno} .{node.attr} access (R4)")
+            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) and node.value.attr == "modules" \
+                    and isinstance(node.value.value, ast.Name) and node.value.value.id == "sys":
+                refusals.append(f"{relpath}:{node.lineno} sys.modules lookup (R4)")
         # Every other sensitive token refuses.
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and node.attr in SENSITIVE and id(node) not in consumed:
