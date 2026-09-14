@@ -172,6 +172,39 @@ def _error_for(messages: list, wanted) -> dict | None:
     return None
 
 
+def _event_for(receipts: pathlib.Path, kind: str, wanted) -> dict | None:
+    """The first receipt of `kind` correlated to `wanted`, or None.
+
+    TYPE AWARE BY DESIGN. JSON-RPC treats 4 and "4" as different correlation
+    ids, they render identically in a receipt, and Python would call 1 equal to
+    True and 4 equal to 4.0. The mediator records `request_id_type` beside the
+    id precisely so a reader does not have to guess, so the type name is
+    compared as well as the value and a receipt that merely looks like the one
+    asked for does not answer for it.
+
+    Absence is a finding, never an error. On the control route there is no
+    mediator and so no receipts file at all, and a control that emits no proxy
+    event is the definition of the control rather than a failure to observe one.
+    """
+    if not receipts.is_file():
+        return None
+    for line in receipts.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("kind") != kind:
+            continue
+        if event.get("request_id") != wanted:
+            continue
+        if event.get("request_id_type") != type(wanted).__name__:
+            continue
+        return event
+    return None
+
+
 def _mediator_ingress(receipts: pathlib.Path) -> list[bytes]:
     """The result frames the mediator saw arrive from the upstream, in order."""
     if not receipts.is_file():
@@ -347,6 +380,24 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
             copies = _count_copies(reference, sent)
             assertions.append({"op": op, "path": step["path"], "copies": copies,
                                "held": copies == 0})
+        elif op == "await_event":
+            # CORRELATED BY THE FILE THE STEP NAMES, like every other id here.
+            # `correlate_id_from` rather than `id_from`, and reading it from the
+            # wire instead would be this adapter choosing which request the
+            # event belongs to.
+            wanted = _primary_id(run_root, step["correlate_id_from"])
+            found = _event_for(run_root / "proxy.receipts.jsonl",
+                               step["event"], wanted)
+            assertions.append({
+                "op": op, "event": step["event"],
+                # The contract's default, recorded EXPLICITLY so the row says
+                # which actor it was answered for rather than leaving a reader
+                # to re-derive the omission rule.
+                "actor": step.get("actor", "proxy"),
+                "id": wanted, "held": found is not None,
+                "deadline_ms": step["timeout_ms"],
+                "seq": found.get("seq") if found is not None else None,
+            })
         elif op in ("await_client_error", "await_error"):
             wanted = _primary_id(run_root, step["id_from"])
             # THE CONTRACT GIVES THESE NO PER STEP TIMEOUT, so the enclosing
