@@ -424,7 +424,21 @@ def install(config, name, argv, root=None, fail_write=None) -> dict:
 
     record["file_sha_after"] = _sha256_bytes(new_raw)
     record["status"] = "installed"
-    _atomic_write_bytes(record_path, _json_bytes(record))
+    try:
+        _atomic_write_bytes(record_path, _json_bytes(record))
+    except OSError as exc:
+        # RS06. The config has been written by now, and this is the write that
+        # makes the install UNDOABLE. Without the record nothing knows what the
+        # original was, so leaving the wrapped config in place would leave a
+        # person wrapped with no way back. The transaction completes in the one
+        # direction still available: put the original bytes back and remove the
+        # half-made record.
+        try:
+            _atomic_write_bytes(config, raw, preserve_mode=True)
+        finally:
+            record_path.unlink(missing_ok=True)
+            bytes_path.unlink(missing_ok=True)
+        raise ConfigIOError(str(exc)) from exc
     return {**record, "already_wrapped": False}
 
 
@@ -439,6 +453,16 @@ def uninstall(config, name, root=None) -> UninstallOutcome:
     except ConfigIOError:
         return UninstallOutcome(REASON_CONFIG_CONFLICT, False,
                                 "the config could not be read", False)
+
+    # RS05. THE RECORD IS BOUND TO ITS CONFIG. Every other check here is about
+    # content, and content is copyable: a duplicate of the installed file has
+    # the same entry and the same sha, so a byte-exact "restore" would write
+    # our retained original over a file this tool never installed into. The
+    # record names the path it was made for, and that is the one it undoes.
+    if record is not None and record.get("config") not in (None, str(config)):
+        return UninstallOutcome(
+            REASON_CONFIG_CONFLICT, False,
+            "this install record belongs to a different config file", False)
 
     servers = data.get("mcpServers")
     if (record is None or record.get("status") != "installed"
@@ -494,10 +518,26 @@ def _wrap(entry, argv):
     return installed
 
 
+def _no_duplicate_keys(pairs):
+    """RS04. `json.loads` keeps the LAST of two identical keys and says
+    nothing, so a config naming `sample` twice parses as one entry and
+    rewriting the file silently deletes the other. We do not get to decide
+    which of two entries a person meant, and we do not get to delete one on
+    their behalf, so a file we cannot round-trip faithfully is one we refuse to
+    touch at all."""
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"the key {key!r} appears more than once")
+        seen[key] = value
+    return seen
+
+
 def _load(config):
     try:
         raw = Path(config).read_bytes()
-        data = json.loads(raw.decode("utf-8"))
+        data = json.loads(raw.decode("utf-8"),
+                          object_pairs_hook=_no_duplicate_keys)
     except (OSError, UnicodeDecodeError, ValueError) as exc:
         raise ConfigIOError(str(exc)) from exc
     if not isinstance(data, dict):

@@ -296,3 +296,60 @@ def test_an_incomplete_snapshot_refuses_a_sha_even_if_one_is_handed_to_it():
     than left to every caller of _incomplete to remember."""
     refused = snapshot.Snapshot(complete=False, sha256="a" * 64)
     assert refused.sha256 is None
+
+
+# ── RS01 to RS03, and the halves the review fixtures do not reach ──────────
+
+def _named(name="echo", **over):
+    body = {"name": name, "inputSchema": {"type": "object"}}
+    body.update(over)
+    return body
+
+
+def _clean(page):
+    return {"accepted": True, "status": "complete", "inspection_complete": True,
+            "decision": "allow", "findings": [], "check_pin": "clean"}
+
+
+def test_the_same_descriptor_listed_twice_is_not_a_conflict():
+    """RS01 refuses a name described DIFFERENTLY, and this says where the line
+    is. A server that lists one tool twice, identically, is redundant and
+    unambiguous: there is exactly one thing a human could be approving, so
+    refusing it would refuse a server that has done nothing wrong."""
+    page = {"tools": [_named(), _named()]}
+    assert snapshot.collect(lambda cursor: page, scan=_clean).complete
+
+
+def test_one_name_with_two_descriptions_is_refused():
+    """And the conflict itself. Whichever descriptor the dict kept last became
+    the record, so nobody -- including the human who approved it -- could say
+    which of the two they had agreed to."""
+    page = {"tools": [_named(), _named(title="changed")]}
+    outcome = snapshot.collect(lambda cursor: page, scan=_clean)
+    assert not outcome.complete
+    assert "described twice" in outcome.detail
+
+
+def test_the_tool_cap_counts_descriptors_that_are_all_different():
+    """RS03 with DISTINCT names, which the review fixture does not use: its 513
+    copies share one name, so the duplicate rule could have satisfied it and
+    left the cap itself unproven."""
+    page = {"tools": [_named("echo%d" % n) for n in range(snapshot.MAX_TOOLS + 1)]}
+    outcome = snapshot.collect(lambda cursor: page, scan=_clean)
+    assert not outcome.complete
+    assert "cap" in outcome.detail
+
+
+def test_exactly_the_cap_is_allowed():
+    """Inclusive, like every other bound in this package."""
+    page = {"tools": [_named("echo%d" % n) for n in range(snapshot.MAX_TOOLS)]}
+    assert snapshot.collect(lambda cursor: page, scan=_clean).complete
+
+
+@pytest.mark.parametrize("body", [{}, {"tools": None}, {"tools": {}},
+                                  {"tools": "echo"}])
+def test_a_result_without_a_tools_list_is_a_schema_fault(body):
+    """RS02. `.get("tools") or []` read all of these as a server with no tools,
+    so a list answered with `{}` could be approved as a complete description of
+    what the server offers."""
+    assert not snapshot.collect(lambda cursor: body, scan=_clean).complete

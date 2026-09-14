@@ -32,6 +32,8 @@ import hashlib
 import json
 import time
 
+from . import policy
+
 # T8.R13, as separate numbers because they bound separate things.
 MAX_PAGES = 64
 MAX_TOOLS = 512
@@ -94,6 +96,7 @@ def collect(request, *, scan, now=None, max_pages=MAX_PAGES,
     now = now or (lambda: time.monotonic() * 1000.0)
     started = now()
     pages, scans, tools = [], [], {}
+    descriptors = 0
     followed = set()
     cursor = None
     size = 0
@@ -118,17 +121,44 @@ def collect(request, *, scan, now=None, max_pages=MAX_PAGES,
             # T5.R3(c) is an AND over every page. A finding on page forty is a
             # finding in the document being approved, and the pages before it
             # are not separately approvable.
+            reason, rule = _scan_provenance(result)
             return _incomplete(pages, scans,
-                               "an activation scan of a page was not clean")
+                               "an activation scan of a page was not clean",
+                               reason=reason, rule=rule)
 
-        for tool in page.get("tools") or []:
+        # RS02. `tools` is REQUIRED on a tools/list result. `.get(...) or []`
+        # read a page with no tools member as a page with no tools, so a
+        # server could answer the list with `{}` and have it approved as a
+        # complete description of itself.
+        listed = page.get("tools")
+        if not isinstance(listed, list):
+            return _incomplete(pages, scans,
+                               "the tools/list result has no tools list")
+
+        for tool in listed:
             if not isinstance(tool, dict) or not isinstance(tool.get("name"), str):
                 return _incomplete(pages, scans,
                                    "a tool descriptor has no name")
-            tools[tool["name"]] = _descriptor_sha(tool)
-        if len(tools) > max_tools:
-            return _incomplete(pages, scans,
-                               f"more tools than the {max_tools} cap")
+            # RS03. The cap is on DESCRIPTORS, and it was reading `len(tools)`
+            # -- the size of a dict keyed by name. Five hundred and thirteen
+            # descriptors sharing one name counted as one, so the bound could
+            # be walked straight past by repeating a name.
+            descriptors += 1
+            if descriptors > max_tools:
+                return _incomplete(pages, scans,
+                                   f"more tools than the {max_tools} cap")
+            # RS01. A duplicate NAME is refused, not overwritten. The dict
+            # silently kept whichever descriptor came last, so a server could
+            # advertise `echo` twice with different shapes and the record would
+            # name one of them -- and nobody, including the human who approved
+            # it, could say which. An approval has to be of a definite thing.
+            name = tool["name"]
+            digest = _descriptor_sha(tool)
+            if name in tools and tools[name] != digest:
+                return _incomplete(
+                    pages, scans,
+                    f"the tool {name!r} is described twice, differently")
+            tools[name] = digest
 
         # The deadline is checked AFTER each page and covers the whole list.
         # Per page it would be ten minutes for a server that pages sixty four
@@ -157,10 +187,31 @@ def collect(request, *, scan, now=None, max_pages=MAX_PAGES,
                        f"more pages than the {max_pages} page cap")
 
 
-def _incomplete(pages, scans, detail):
+def _incomplete(pages, scans, detail, reason=None, rule=None):
     return Snapshot(complete=False, pages=pages, page_scans=scans,
-                    reason=REASON_APPROVAL_REQUIRED, rule=RULE_APPROVAL,
+                    reason=reason or REASON_APPROVAL_REQUIRED,
+                    rule=rule or RULE_APPROVAL,
                     detail=detail)
+
+
+def _scan_provenance(result):
+    """RS11. WHAT the page scan found, not merely that it found something.
+
+    A page carrying a critical engine finding and a page nobody has approved
+    yet are both "not activated", and reporting them the same way tells an
+    operator to go and approve a descriptor that a scanner is refusing. T5.R2
+    keeps the provenance for exactly this reason: APPROVAL_REQUIRED describes a
+    server nobody approved, and a scan reason describes what its descriptors
+    carried.
+    """
+    findings = (result or {}).get("findings") or []
+    if not findings:
+        return None, None
+    # The list is a tools/list RESULT, which is the direction and shape
+    # `finding_reason` needs to tell a secret leaving on a call from content
+    # arriving in a descriptor.
+    held = {"direction": "result", "is_request": False, "method": "tools/list"}
+    return policy.finding_reason(held, findings), "S2"
 
 
 def _page_is_clean(result):
