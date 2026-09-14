@@ -99,11 +99,17 @@ def _route(tmp_path, scan=None, approvals=None, **kw):
 
 
 def _call(payload="hello", request_id=1):
-    return (json.dumps({"jsonrpc": "2.0", "id": request_id,
-                        "method": "tools/call",
-                        "params": {"name": "fs_write",
-                                   "arguments": {"text": payload}}}) + "\n"
-            ).encode()
+    """Spelled so that NO re-serialisation reproduces it.
+
+    The spacing below is legal JSON and matches neither `json.dumps` defaults
+    nor its compact separators, so a route that rebuilds the frame it forwards
+    cannot accidentally rebuild it identically. The first version of this
+    helper used plain `json.dumps` and a mutation that re-serialised the frame
+    survived every byte-exactness assertion in the file.
+    """
+    return ('{"jsonrpc":"2.0", "id":%s, "method":"tools/call", '
+            '"params":{"name":"fs_write","arguments":{"text":%s}}}\n'
+            % (json.dumps(request_id), json.dumps(payload))).encode()
 
 
 # ── T2.R16 · an unknown method never reaches upstream ─────────────────────
@@ -149,7 +155,7 @@ def test_an_allowed_call_forwards_the_original_bytes_exactly(tmp_path):
 def test_a_blocked_call_sends_upstream_nothing_and_the_client_one_envelope(tmp_path):
     def blocking(message, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
-                       findings=[{"id": "GLS-SD-001", "severity": "critical",
+                       findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
 
     engine, upstream, client, _ = _route(tmp_path, scan=blocking)
@@ -170,7 +176,7 @@ def test_the_refusal_never_carries_the_payload_it_refused(tmp_path):
 
     def blocking(message, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
-                       findings=[{"id": "GLS-SD-001", "severity": "critical",
+                       findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine", "matched": secret}])
 
     engine, upstream, client, _ = _route(tmp_path, scan=blocking)
@@ -195,7 +201,7 @@ def test_an_allowed_release_is_recorded_as_authorised(tmp_path):
     engine.client_frame(_call())
     engine.log.close()
     events = [json.loads(line)["kind"]
-              for line in (tmp_path / "run.jsonl").read_text().splitlines()]
+              for line in (tmp_path / "receipts" / "run.jsonl").read_text().splitlines()]
     assert "RELEASE_AUTHORIZED" in events
     assert events.index("RELEASE_AUTHORIZED") < len(events)
 
@@ -205,7 +211,7 @@ def test_an_allowed_release_is_recorded_as_authorised(tmp_path):
 def test_a_client_notification_with_a_finding_is_dropped_and_not_answered(tmp_path):
     def blocking(message, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
-                       findings=[{"id": "GLS-SD-001", "severity": "critical",
+                       findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
 
     engine, upstream, client, _ = _route(tmp_path, scan=blocking)
@@ -271,7 +277,7 @@ def test_an_incoherent_worker_result_withholds_rather_than_deciding(tmp_path):
     as allow is how a scan that found the thing forwards it anyway."""
     def incoherent(message, *, channel, binding, content_bytes):
         return _result(binding, decision="allow", bytes_=content_bytes,
-                       findings=[{"id": "GLS-SD-001", "severity": "critical",
+                       findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
 
     engine, upstream, client, _ = _route(tmp_path, scan=incoherent)
@@ -298,7 +304,7 @@ def test_a_result_bound_to_another_invocation_is_not_this_items_answer(tmp_path)
 def test_a_client_request_is_answered_exactly_once(tmp_path):
     def blocking(message, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
-                       findings=[{"id": "GLS-SD-001", "severity": "critical",
+                       findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
 
     engine, upstream, client, _ = _route(tmp_path, scan=blocking)
@@ -325,3 +331,65 @@ def test_the_scan_is_given_the_selectors_channel_and_accounting(tmp_path):
     assert scans[0]["content_bytes"] == len("hello") + len("fs_write")
     for field in ("digest", "channel", "generation", "invocation_token"):
         assert field in scans[0]["binding"]
+
+
+# ── the mutation round: five clauses the first spec did not reach ────────
+
+def test_a_method_the_selector_has_no_row_for_is_refused(tmp_path):
+    """`resources/list` passes the handshake's known-method check and the
+    selector table has no row for it, so without the selector's own refusal it
+    would be inspected on a channel of None. A rule scoped to a channel cannot
+    run on a message that has none, which is a scan of nothing reported as a
+    scan."""
+    engine, upstream, client, scans = _route(tmp_path)
+    engine.client_frame(json.dumps({"jsonrpc": "2.0", "id": 1,
+                                    "method": "resources/list"}).encode() + b"\n")
+    assert upstream.bytes == b""
+    assert scans == []
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "UNINSPECTED_METHOD"
+
+
+def test_a_notification_is_not_a_request_even_borrowing_a_requests_method(tmp_path):
+    """T4.R4(7)'s direction test has three terms and `is_request` is the one a
+    client can attack directly, by sending `tools/call` with no id. It is not
+    an outbound call, so it settles PROHIBITED_CONTENT, and a descriptor that
+    hardcodes is_request would hand it the stronger reason on the strength of
+    a method name."""
+    def blocking(message, *, channel, binding, content_bytes):
+        return _result(binding, decision="block", bytes_=content_bytes,
+                       findings=[{"rule_id": "GLS-SD-001",
+                                  "severity": "critical", "source": "engine"}])
+
+    engine, upstream, client, _ = _route(tmp_path, scan=blocking)
+    engine.client_frame(json.dumps({
+        "jsonrpc": "2.0", "method": "tools/call",
+        "params": {"name": "fs_write",
+                   "arguments": {"text": "x"}}}).encode() + b"\n")
+    assert upstream.bytes == b""
+    assert client.bytes == b"", "a notification was answered"
+    settled = [json.loads(line) for line
+               in (tmp_path / "receipts" / "run.jsonl").read_text().splitlines()
+               if '"SETTLED"' in line]
+    assert settled[-1]["reason_code"] == "PROHIBITED_CONTENT"
+
+
+def test_the_binding_is_bound_to_this_frame_and_not_to_a_constant(tmp_path):
+    """A constant digest makes two different messages produce the same binding,
+    and the binding is the only thing that stops one item's scan settling
+    another item."""
+    engine, upstream, client, scans = _route(tmp_path)
+    engine.client_frame(_call(payload="first"))
+    engine.client_frame(_call(payload="second", request_id=2))
+    assert scans[0]["binding"]["digest"] != scans[1]["binding"]["digest"]
+
+
+def test_nothing_is_scanned_once_the_log_has_stopped(tmp_path):
+    """T9.R4. Work that cannot be recorded does not start. A route that carries
+    on scanning after the log failed spends a worker on a message whose
+    outcome it has already lost the ability to write down."""
+    engine, upstream, client, scans = _route(tmp_path)
+    engine.log.fail_writes(OSError("disk full"))
+    engine.client_frame(_call())
+    assert scans == [], "a worker was spent on an unrecordable message"
+    assert upstream.bytes == b""
