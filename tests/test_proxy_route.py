@@ -81,12 +81,12 @@ def _route(tmp_path, scan=None, approvals=None, **kw):
     upstream, client = _Sink(), _Sink()
     scans = []
 
-    def recording_scan(message, *, channel, binding, content_bytes):
-        scans.append({"message": message, "channel": channel,
+    def recording_scan(params, *, channel, binding, content_bytes):
+        scans.append({"params": params, "channel": channel,
                       "binding": binding, "content_bytes": content_bytes})
         if scan is None:
             return _result(binding, bytes_=content_bytes)
-        return scan(message, channel=channel, binding=binding,
+        return scan(params, channel=channel, binding=binding,
                     content_bytes=content_bytes)
 
     engine = route.Route(session=pump.Session(strict=False),
@@ -153,7 +153,7 @@ def test_an_allowed_call_forwards_the_original_bytes_exactly(tmp_path):
 
 
 def test_a_blocked_call_sends_upstream_nothing_and_the_client_one_envelope(tmp_path):
-    def blocking(message, *, channel, binding, content_bytes):
+    def blocking(params, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
@@ -174,7 +174,7 @@ def test_the_refusal_never_carries_the_payload_it_refused(tmp_path):
     block existed to protect."""
     secret = "AKIAIOSFODNN7EXAMPLE"
 
-    def blocking(message, *, channel, binding, content_bytes):
+    def blocking(params, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine", "matched": secret}])
@@ -209,7 +209,7 @@ def test_an_allowed_release_is_recorded_as_authorised(tmp_path):
 # ── T2.R13 · a notification has no response, whatever we decide ──────────
 
 def test_a_client_notification_with_a_finding_is_dropped_and_not_answered(tmp_path):
-    def blocking(message, *, channel, binding, content_bytes):
+    def blocking(params, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
@@ -275,7 +275,7 @@ def test_an_incoherent_worker_result_withholds_rather_than_deciding(tmp_path):
     """Allow beside a critical finding is the shape that matters. It is not a
     permissive verdict, it is a result that cannot be believed, and reading it
     as allow is how a scan that found the thing forwards it anyway."""
-    def incoherent(message, *, channel, binding, content_bytes):
+    def incoherent(params, *, channel, binding, content_bytes):
         return _result(binding, decision="allow", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
@@ -288,7 +288,7 @@ def test_an_incoherent_worker_result_withholds_rather_than_deciding(tmp_path):
 
 
 def test_a_result_bound_to_another_invocation_is_not_this_items_answer(tmp_path):
-    def stolen(message, *, channel, binding, content_bytes):
+    def stolen(params, *, channel, binding, content_bytes):
         other = dict(binding, invocation_token="somebody-elses")
         return _result(other, bytes_=content_bytes)
 
@@ -302,7 +302,7 @@ def test_a_result_bound_to_another_invocation_is_not_this_items_answer(tmp_path)
 # ── T6.R1 · exactly one response to a client request ─────────────────────
 
 def test_a_client_request_is_answered_exactly_once(tmp_path):
-    def blocking(message, *, channel, binding, content_bytes):
+    def blocking(params, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001", "severity": "critical",
                                   "source": "engine"}])
@@ -356,7 +356,7 @@ def test_a_notification_is_not_a_request_even_borrowing_a_requests_method(tmp_pa
     an outbound call, so it settles PROHIBITED_CONTENT, and a descriptor that
     hardcodes is_request would hand it the stronger reason on the strength of
     a method name."""
-    def blocking(message, *, channel, binding, content_bytes):
+    def blocking(params, *, channel, binding, content_bytes):
         return _result(binding, decision="block", bytes_=content_bytes,
                        findings=[{"rule_id": "GLS-SD-001",
                                   "severity": "critical", "source": "engine"}])
@@ -393,3 +393,37 @@ def test_nothing_is_scanned_once_the_log_has_stopped(tmp_path):
     engine.client_frame(_call())
     assert scans == [], "a worker was spent on an unrecordable message"
     assert upstream.bytes == b""
+
+
+# ── end to end through the real engine, no test double ───────────────────
+
+def test_the_default_route_blocks_a_real_secret_with_no_scan_injected(tmp_path):
+    """No fake engine, no injected scan, the pattern set this build ships.
+
+    Every test above supplies its own scanner, which proves the wiring and
+    proves nothing about the thing a user installs. This one is the product:
+    a real credential in a real tools/call, held by the real engine, and the
+    server receiving zero bytes of it."""
+    upstream, client = _Sink(), _Sink()
+    engine = route.Route(session=pump.Session(strict=False), log=_log(tmp_path),
+                         upstream_write=upstream, client_write=client,
+                         approvals=_Approved())
+    engine.client_frame(_call(payload="my key is AKIAIOSFODNN7EXAMPLE"))
+    assert upstream.bytes == b"", "a real credential reached the server"
+    reply = client.messages()[0]
+    assert reply["error"]["message"] == "SUNGLASSES_WITHHELD"
+    assert reply["error"]["data"]["reason_code"] == "PROHIBITED_SECRET"
+    assert "AKIAIOSFODNN7EXAMPLE" not in client.bytes.decode()
+
+
+def test_the_default_route_forwards_an_ordinary_call_untouched(tmp_path):
+    """And the other half, because a proxy that blocks everything is not a
+    proxy. The bytes upstream receives are the client's own, to the byte."""
+    upstream, client = _Sink(), _Sink()
+    engine = route.Route(session=pump.Session(strict=False), log=_log(tmp_path),
+                         upstream_write=upstream, client_write=client,
+                         approvals=_Approved())
+    raw = _call(payload="please save the meeting notes")
+    engine.client_frame(raw)
+    assert upstream.bytes == raw
+    assert client.bytes == b""

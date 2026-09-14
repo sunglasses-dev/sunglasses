@@ -27,7 +27,7 @@ import hashlib
 import json
 import uuid
 
-from . import envelope, framing, policy, receipts, selector, worker
+from . import envelope, framing, inspection, policy, receipts, selector, worker
 
 CLIENT = "client"
 REQUEST = "request"
@@ -47,15 +47,19 @@ RULE_PROTOCOL = "S5"
 class Route:
     """One MCP client on stdin, one mediated server on the other side."""
 
-    def __init__(self, *, session, log, upstream_write, client_write, scan,
-                 catalog=frozenset(), approvals=None,
+    def __init__(self, *, session, log, upstream_write, client_write,
+                 scan=None, catalog=None, approvals=None,
                  descriptor_sha_for=None):
         self.session = session
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
-        self.scan = scan
-        self.catalog = frozenset(catalog)
+        # The real adapter by default. A route whose scan has to be supplied
+        # is a route that does nothing on its own, and the default being a test
+        # double is how a suite goes green over a product that never scanned.
+        self.scan = scan if scan is not None else inspection.scan
+        self.catalog = (frozenset(catalog) if catalog is not None
+                        else inspection.engine_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
 
@@ -168,7 +172,10 @@ class Route:
         if not self._record("SCAN_STARTED", method=method):
             return
 
-        result = self.scan(message, channel=channel, binding=binding,
+        # The INSPECTED SURFACE, not the frame. T2's client rows all name
+        # `params`, and handing the scan the whole message would inspect our
+        # own envelope and the id we are correlating on.
+        result = self.scan(params, channel=channel, binding=binding,
                            content_bytes=held_bytes)
         try:
             worker.validate(result, binding=binding,
