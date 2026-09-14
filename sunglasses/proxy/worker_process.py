@@ -93,7 +93,7 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
 
 def default_argv():
     import sys
-    return [sys.executable, "-m", "sunglasses.proxy.scan_worker"]
+    return [sys.executable, "-m", "sunglasses._proxy_worker"]
 
 
 class _TooMuch(Exception):
