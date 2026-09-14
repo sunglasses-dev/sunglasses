@@ -177,7 +177,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 <title>Nightly gauntlet</title>
 <style>
  :root {{ color-scheme: dark; }}
- body {{ background:#0a0a0a; color:#e8e8e8; margin:0;
+ body {{ background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;
         font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }}
  main {{ max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }}
  h1,h2,h3 {{ color:#00ccff; line-height:1.25; }}
@@ -185,7 +185,11 @@ def render(report: dict, *, findings: list | None = None) -> str:
  h3 {{ font-size:1rem; margin-top:1.75rem; }}
  code {{ background:#151515; padding:.1em .35em; border-radius:3px;
         font-size:.87em; word-break:break-all; }}
- .fig {{ font-variant-numeric:tabular-nums; font-weight:600; color:#fff; }}
+ .fig {{ font-variant-numeric:tabular-nums; font-weight:600; color:#fff;
+        /* Digests are 64 unbroken hex characters. Without this the page is
+           594px wide at a 375px viewport, which the dry run measured rather
+           than guessed. */
+        overflow-wrap:anywhere; word-break:break-word; }}
  .detail {{ color:#9aa0a6; font-size:.92rem; }}
  .state {{ margin:.4rem 0; }}
  .state-unavailable, .state-not_computed, .state-invalid {{ color:#ffc857; }}
