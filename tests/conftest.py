@@ -58,12 +58,19 @@ def pytest_report_header(config):
 # path is a symlink back to this suite's own file. Collecting it twice is an
 # import-file-mismatch, and the controls are vendored unchanged, so the
 # directory is skipped here rather than the control being edited.
-# `stack/` is that, and `source/` is the same shape: the review layout lays a
-# symlink there so ASTRA's controls resolve this suite's sources at the paths
-# they were written against. It is laid down locally rather than tracked,
-# because a directory symlink pointing back at its own parent is a cycle for
-# anything that walks the tree. The glob is listed either way, so laying the
-# layout down never turns a green suite into an import-file-mismatch.
+# `stack/` is that, and `source/` is the same shape: the review layout resolves
+# this suite's sources at the paths ASTRA's controls were written against.
+#
+# Both are TRACKED, as per-FILE symlinks rather than a directory symlink. That
+# matters twice. A directory symlink pointing back at its own parent is a cycle
+# for anything that walks the tree; and leaving them untracked is the defect
+# that made #164's CI produce 67 red rows carrying no product signal, because a
+# path that exists only in one worktree exists nowhere that matters.
+# `test_controls_v6.py` loads through `source/` and would fail all seventeen of
+# its rows in CI without them.
+#
+# The glob stays, because the targets are collected under their real names and
+# collecting them again through here is an import-file-mismatch.
 collect_ignore_glob = ["stack/*", "source/*"]
 
 
