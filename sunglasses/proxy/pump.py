@@ -113,6 +113,16 @@ _SCHEMA_MEMBERS = {
     "title": str, "description": str,
 }
 
+# RC16. MCP fixes these too, and the guard stopped at the tool's own members.
+# `annotations` is a hint object the CLIENT is expected to read -- a title it
+# shows a user, and booleans it may use to decide whether a call is safe to
+# repeat -- so a number where a boolean belongs is a hint nobody can act on and
+# a number where the title belongs is a label that cannot be displayed.
+_ANNOTATION_MEMBERS = {
+    "title": str, "readOnlyHint": bool, "destructiveHint": bool,
+    "idempotentHint": bool, "openWorldHint": bool,
+}
+
 
 def _declared_members_typed(item, members):
     """Every DECLARED member's type, not only the discriminant's presence."""
@@ -121,6 +131,31 @@ def _declared_members_typed(item, members):
     for name, kind in members.items():
         if name in item and not isinstance(item[name], kind):
             return False
+    return True
+
+
+def _tool_is_complete(item):
+    """RC16. EVERY declared member, to its own shape, not just the one ASTRA
+    named first.
+
+    RC08 fixed the discriminated bodies, RC11 fixed the input schema, and seven
+    more shapes still settled CLEAN: an output schema that is not an object
+    schema, a property whose schema is a number, an annotation title that is a
+    number, a boolean hint that is a number. The pattern is the same one this
+    package keeps paying for -- a member was checked because it had been named
+    in a finding, rather than because the spec fixes its type.
+    """
+    if not _declared_members_typed(item, _TOOL_MEMBERS):
+        return False
+    if not _input_schema_is_complete(item.get("inputSchema")):
+        return False
+    # Declared and optional. Absent is fine; present and malformed is not.
+    if "outputSchema" in item and not _input_schema_is_complete(
+            item.get("outputSchema")):
+        return False
+    if "annotations" in item and not _declared_members_typed(
+            item.get("annotations"), _ANNOTATION_MEMBERS):
+        return False
     return True
 
 
@@ -144,6 +179,13 @@ def _input_schema_is_complete(schema):
     if required is not None and not all(
             isinstance(name, str) for name in required):
         return False
+    # RC16. A property's VALUE is a schema. `{"review": 7}` declares a property
+    # whose shape is the number seven, which describes nothing a client could
+    # build and nothing an approval could quote.
+    properties = schema.get("properties")
+    if properties is not None and not all(
+            isinstance(member, dict) for member in properties.values()):
+        return False
     return True
 
 
@@ -158,9 +200,7 @@ def _member_is_complete(method, item):
         # tool whose input schema is absent, null or `{}` describes nothing
         # about what it accepts, and an approval over that descriptor approves
         # a shape nobody stated.
-        if not _declared_members_typed(item, _TOOL_MEMBERS):
-            return False
-        return _input_schema_is_complete(item.get("inputSchema"))
+        return _tool_is_complete(item)
     if method == "resources/read":
         if not isinstance(item.get("uri"), str):
             return False
@@ -232,6 +272,8 @@ class Session:
         # park the watcher's close behind the reader, and the close is what
         # stops the processes -- so the window is CLOSED BY A RECORD instead.
         self._settling: set = set()
+        # RC17. identity -> the core key whose generation this record answers.
+        self._settling_key: dict = {}
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -255,6 +297,20 @@ class Session:
                              reason="UNINSPECTED_METHOD", method_known=False)
             return False
         identity = key(origin, request_id)
+        # RC17. The record is part of the pending state, so admission reads it.
+        # An id whose previous generation is still mid-handoff is not free: the
+        # old response would settle the new request, which answers a call the
+        # client never made with a result from one it did.
+        if identity in self._settling:
+            if origin == ORIGIN_CLIENT:
+                self._close("MALFORMED_CLIENT",
+                            "the client reused an id whose previous request is "
+                            "still being answered")
+            else:
+                self._close("MALFORMED_UPSTREAM",
+                            "upstream reused an id whose previous request is "
+                            "still being answered")
+            return False
         if identity in self._tombstones:
             # A cancelled id is refused for the rest of the session. The request
             # it named is gone and a reply to it would be a reply to nothing.
@@ -295,12 +351,21 @@ class Session:
         return self._pending.get(key(origin, request_id))
 
     # ── responses ───────────────────────────────────────────────────────────
-    def deliver_response(self, *, origin, request_id, frame=None):
+    def deliver_response(self, *, origin, request_id, frame=None,
+                         defer_retire=False):
         """T6.R1 and T6.R2. One answer, to the right owner, or the session ends.
 
         A response from upstream answers a CLIENT request; that is the direction
         the id belongs to, and looking it up under the upstream origin is how a
         pump convinces itself an unsolicited response was expected.
+
+        `defer_retire` says WHO completes the wire handoff. RC14's obligation
+        lasts until the frame reaches the client, and where that happens
+        depends on the caller: a direct caller has the frame the moment this
+        returns, so the handoff is done; the reader has only a value it still
+        has to yield, so it keeps the record and retires it afterwards. Getting
+        this wrong in the quiet direction leaves a record nobody ever drops,
+        which keeps the watcher awake and blocks the id for the session.
         """
         if self._closed:
             return None
@@ -341,6 +406,7 @@ class Session:
             # request is in neither. A close that wins now finds it in
             # `_settling`, records the debt, and the reader delivers nothing.
             self._settling.add(identity)
+            self._settling_key[identity] = self._core_key(identity)
         if not self._settle_outside_lock(identity):
             return None
 
@@ -349,6 +415,8 @@ class Session:
         # and data. Rebuilding it as a result would answer an error with a
         # success, and replacing it with our own error would tell the client we
         # withheld something when the server simply said no.
+        if not defer_retire:
+            self._retire_record(identity)
         if frame is not None and "error" in frame:
             return frame
         # T6.R1: C's TYPED id, returned as it was issued.
@@ -488,7 +556,12 @@ class Session:
             handle.wait()
         except Exception:                                   # pragma: no cover
             return
-        if self._closed or not self._pending:
+        # RC15. PENDING UNION SETTLING. The watcher returned when `_pending`
+        # was empty without looking at the record, so with one item mid-handoff
+        # and nothing pending a child exit closed nothing: the session went on
+        # forwarding after an unobserved fatal exit. An item in `_settling` is
+        # a client still waiting, which is the whole reason the record exists.
+        if self._closed or not (self._pending or self._settling):
             return
         # T7.R1, then T8.R12. The fault is recorded first so the cause is the
         # exit rather than whatever the kill produces, and the group is then
@@ -618,6 +691,7 @@ class Session:
                     self._answered.add(identity)
                     self._control_answers[identity] = message
                     self._settling.add(identity)
+                    self._settling_key[identity] = self._core_key(identity)
                 # RC05. The CORE owns the item too, so an answered control
                 # request has to settle there as well. Leaving it owed means a
                 # session that finished its work still reports an outstanding
@@ -626,6 +700,9 @@ class Session:
                 # call happens outside the lock, and the record left behind
                 # keeps the window closed.
                 self._settle_outside_lock(identity)
+                # No wire handoff for a control page: nobody is waiting on it,
+                # so the obligation ends with the settlement.
+                self._retire_record(identity)
                 continue
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
@@ -649,11 +726,15 @@ class Session:
 
             answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
                                            request_id=message["id"],
-                                           frame=message)
+                                           frame=message, defer_retire=True)
             if answer is None:
                 yield from self._drain_refusals()
                 return
             yield raw
+            # RC14. HANDED OVER, so the obligation is discharged. Anything
+            # before the yield retires the record while the client still has
+            # nothing.
+            self._retire_record(key(ORIGIN_CLIENT, message["id"]))
 
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
@@ -765,8 +846,22 @@ class Session:
         recorded the wire debt and the reader must deliver nothing, or T6.R1's
         one answer becomes two.
         """
+        core_key = self._core_key(identity)
         try:
-            self._core.settle(self._core_key(identity), Cause("CLEAN", "S1"))
+            # RC17. Bound to the generation being ANSWERED, captured when the
+            # entry left `_pending`, not re-read now. `_core_key` reads the
+            # CURRENT generation, so an id re-admitted while its old generation
+            # was still settling had the old response settle the NEW request.
+            #
+            # DEFENCE IN DEPTH, and the mutation round says so: with admission
+            # refusing an id that is still in `_settling`, the generation
+            # cannot advance inside this window, so removing this line changes
+            # nothing on any reachable path and the mutant survives. It is kept
+            # because it is the half that does not depend on the other half
+            # being right, and it is written down here rather than covered by a
+            # test that would have to reach a state the admission rule forbids.
+            core_key = self._settling_key.get(identity, core_key)
+            self._core.settle(core_key, Cause("CLEAN", "S1"))
         except Settled:
             # The teardown answered it first. `Settled` means a caller settled
             # an item twice, which is normally its own ordering bug, and this
@@ -775,10 +870,36 @@ class Session:
             # LIVE session still raises the way it is meant to.
             if self._closed is None:
                 raise
-        finally:
-            with self._settlement:
-                self._settling.discard(identity)
+        # RC14. The record is NOT retired here. It is the wire obligation, and
+        # the obligation lasts until the frame has actually been handed over:
+        # retiring it at the end of the settlement left a gap in which the item
+        # was settled CLEAN internally and present in neither table, so a child
+        # exit during that gap produced one frame for two known requests. The
+        # reader retires it after the yield, and `_close` pays it if the close
+        # wins first.
+        with self._settlement:
+            # The close is WRITTEN under this lock, so whether we still owe the
+            # frame is READ under it. Deciding to deliver outside the lock lets
+            # the reader commit to a frame at the instant the close is
+            # recording the debt for that same item, and T6.R1's one answer
+            # becomes two.
+            #
+            # Also a survivor of the mutation round, and for the same reason as
+            # the generation lookup above: the line below re-reads `_closed`,
+            # so deleting this one leaves the OUTCOME identical and only widens
+            # the window in which the two threads can disagree. A test would
+            # have to hit that window rather than assert a behaviour, so the
+            # narrowing is recorded here instead of being claimed as covered.
+            if self._closed is not None:
+                return False
         return self._closed is None
+
+
+    def _retire_record(self, identity):
+        """RC14. The wire obligation is discharged; drop the record."""
+        with self._settlement:
+            self._settling.discard(identity)
+            self._settling_key.pop(identity, None)
 
     def _close(self, reason, detail, rule="S5", budget=None):
         """Tear down once, supervise the processes, and RETAIN what is owed.
@@ -841,6 +962,11 @@ class Session:
                      own.reason if own is not None else reason,
                      own.rule if own is not None else rule))
             self._pending.clear()
+            # The debt above is now recorded for both tables, so the record has
+            # done its job and must not keep the watcher awake (RC15) or block
+            # a later admission (RC17).
+            self._settling.clear()
+            self._settling_key.clear()
         self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
                             stop_processes=self._stop_processes())
 

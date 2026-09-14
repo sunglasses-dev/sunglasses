@@ -498,3 +498,97 @@ def test_the_settling_record_does_not_outlive_the_settlement():
         assert list(session.read_upstream(wire(response(request_id))))
     assert session._settling == set()
     assert session.closed_with() is None
+
+
+# ── RC14 and RC17: the record's lifetime, and whose handoff it is ──────────
+#
+# ASTRA's round-5 controls cover the reader path and the watcher. Everything
+# below was written because a mutation SURVIVED them: the obligation's owner,
+# admission reading the record, and the close that pays it.
+
+def test_the_record_survives_until_the_frame_is_handed_over():
+    """RC14. The obligation ends at the HANDOFF, not at the settlement.
+
+    The generator is suspended exactly at its `yield` here, which is the gap
+    RC14 names: the item is settled CLEAN internally and the client still has
+    nothing. If the record is dropped at the settlement instead, a close that
+    lands in this gap finds the request in neither table and records no debt
+    for it, and two known requests produce one frame.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    frames = session.read_upstream(wire(response(41)))
+    next(frames)
+    assert session._settling, "the obligation was dropped before the handoff"
+    with pytest.raises(StopIteration):
+        next(frames)
+    assert session._settling == set(), "the obligation outlived the handoff"
+
+
+def test_a_direct_caller_has_the_frame_when_deliver_response_returns():
+    """The other side of the same rule. A caller that is handed the frame has
+    already taken it, so keeping a record for it would leave one nobody ever
+    drops: the watcher would never sleep and the id would be blocked for the
+    session."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    # A real result for the method that was asked, or T2's required-member
+    # check refuses the frame and this proves nothing about the handoff.
+    assert session.deliver_response(origin="upstream", request_id=41,
+                                    frame=response(41))
+    assert session._settling == set()
+
+
+def test_an_id_still_being_answered_cannot_be_re_admitted():
+    """RC17. The record is part of the pending state, so admission reads it.
+
+    An id whose previous request is mid-handoff is not free. Re-admitting it
+    lets the OLD response settle the NEW request, which answers a call the
+    client never made with the result of one it did.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    frames = session.read_upstream(wire(response(41)))
+    next(frames)
+    assert session._settling
+    assert not session.admit_request(41, method="tools/call", origin="client")
+    assert session.closed_with() == ("MALFORMED_CLIENT", "S5")
+
+
+def test_the_record_names_the_generation_it_answers():
+    """RC17's second half. The settlement is bound to the generation captured
+    when the entry left `_pending`, not to whatever the current one is when the
+    core is finally called."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    frames = session.read_upstream(wire(response(41)))
+    next(frames)
+    assert session._settling_key[identity] == identity + (1,)
+    assert session._core.settled_as(identity + (1,)) is not None
+
+
+def test_a_close_pays_the_record_and_then_drops_it():
+    """The record exists to be read by a close. Once that close has recorded
+    the debt it must not also keep the watcher awake (RC15) or block the id
+    from ever being admitted again (RC17)."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    frames = session.read_upstream(wire(response(41)))
+    next(frames)
+    assert session._settling
+    session._close("MALFORMED_UPSTREAM", "review controlled close")
+    assert session._settling == set(), "the record outlived the close"
+    assert session._settling_key == {}
+
+
+def test_an_id_is_free_again_once_its_answer_has_been_handed_over():
+    """The positive control for the admission rule, or it is satisfied by
+    refusing every reuse. T6.R6 allows a COMPLETED id to be used again; only
+    one still being answered is refused."""
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert list(session.read_upstream(wire(response(41))))
+    assert session._settling == set()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert session.closed_with() is None
