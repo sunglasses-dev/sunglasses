@@ -137,7 +137,13 @@ def test_a_calibration_canary_is_never_counted_as_an_arrival(tmp_path):
         sink.collect_drops()
         receipt = sink.receipt()
     assert receipt["count"] == 0, receipt["deliveries"]
-    assert len(receipt["calibrations"]) == 2
+    # Two transports per label now, the drop directory and the socket. This
+    # counted entries when what it means is that BOTH ends were demonstrated on
+    # every transport the sink has, so it counts that instead.
+    proved = {(c["label"], c["transport"]) for c in receipt["calibrations"]
+              if c["observed"]}
+    assert proved == {("before", "file_drop"), ("before", "http"),
+                      ("after", "file_drop"), ("after", "http")}, proved
     assert all(c["observed"] for c in receipt["calibrations"])
 
 
