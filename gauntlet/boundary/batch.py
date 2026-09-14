@@ -26,6 +26,7 @@ sys.path.insert(0, str(HERE))
 from client.observe import (                                             # noqa: E402
     InstrumentedClient, Mode, extract_tool_result, extract_tool_results,
 )
+from client import descriptor
 from destination.sink import Destination
 import fidelity
 from runner import Ledger, scenario_of                                   # noqa: E402
@@ -44,6 +45,11 @@ HOOK_COMPARISON_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
 # The scanner faults a session can select. Kept beside the configuration because
 # the configuration is where a reader looks to see what a run was able to do.
 FAULT_MODES = ("exception", "hang", "barrier")
+
+# Methods this driver issues itself rather than asking a model for. A descriptor
+# request is session setup, not a choice a model makes, and G2-06 has no other
+# way to be exercised.
+DRIVEN_DIRECTLY = frozenset({"tools/list"})
 
 # The inspection bound every seed in the package declares, all 28 of them, and
 # the DEFAULT rather than None. A configuration built without one used to
@@ -67,8 +73,16 @@ def upstream_for(entry, variant, run_dir, default_argv):
         return [sys.executable, str(PACKAGE / entry["directory"] / "run.py"),
                 "serve-stub", "--variant", variant["name"],
                 "--run-root", str(run_dir)], kind
-    # `filesystem_with_explicit_descriptor_mutator` still fronts the real server;
-    # the mutation is declared by the scenario, not invented by the harness.
+    # `filesystem_with_explicit_descriptor_mutator`: the mutation is declared by
+    # the scenario, not invented by the harness, and the scenario materialises it
+    # into `upstream.jsonl`. A real filesystem server cannot produce a mutated
+    # descriptor, so pointing this row at one meant the surface under test never
+    # existed. The declared frames are replayed instead.
+    if kind == "filesystem_with_explicit_descriptor_mutator":
+        declared = run_dir / "upstream.jsonl"
+        if declared.is_file():
+            return [PY, str(HERE / "proxy" / "declared_upstream.py"),
+                    "--stream", str(declared)], kind
     return default_argv, kind or "filesystem"
 
 
@@ -321,6 +335,41 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
     request = json.loads((run_dir / "request.json").read_text())
     params = request.get("params", {})
     method = request.get("method", "tools/call")
+    if method in DRIVEN_DIRECTLY:
+        # NOT A MODEL'S DECISION. A descriptor request is part of session setup:
+        # the client asks for it and the mediator is supposed to inspect what
+        # comes back. Terminating the row was honest and left G2-06 unexercised;
+        # defaulting it to read_text_file, which came before that, silently ran a
+        # different experiment and reported result content as a descriptor
+        # result. One client turn, issued here, with the stimulus read from the
+        # mediator's attested ingress rather than from a transcript.
+        server = json.loads(config.read_text())["mcpServers"]["fs"]
+        try:
+            reply = descriptor.run_turn([server["command"], *server["args"]], request,
+                                        stderr_path=run_dir / "descriptor.stderr")
+            failure = None
+        except (descriptor.DescriptorTurnFailed, subprocess.TimeoutExpired) as exc:
+            reply, failure = None, str(exc)
+        (run_dir / "descriptor.reply.json").write_text(
+            json.dumps({"reply": reply, "failure": failure}, indent=1) + "\n")
+        sink.collect_drops()
+        sink.calibrate("after")
+        sink.stop()
+        observed = descriptor.observed_at_ingress(
+            run_dir / "proxy.receipts.jsonl", method)
+        stimulus = fidelity.compare(request, observed)
+        row = {"call": call_no, "scenario_id": entry["id"],
+               "variant": variant["name"], "route": route,
+               "run_dir": str(run_dir), "at": time.time(),
+               "method": method,
+               "stimulus": stimulus.as_receipt(),
+               "destination": sink.receipt(),
+               "descriptor_failure": failure,
+               "verdict": {"model_view": {
+                   "state": "DRIVEN" if stimulus and not failure
+                   else "INVALID_STIMULUS"}}}
+        (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+        return row
     if method != "tools/call":
         # REFUSED, not defaulted. G2-06 declares `tools/list`, and defaulting it
         # to `read_text_file` did not fail: it silently ran a different

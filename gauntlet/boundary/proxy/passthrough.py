@@ -937,6 +937,13 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             if not line.strip():
                 continue
             proxy.count_bytes(direction, "ingress", len(raw))
+            # ATTESTED INGRESS. ASTRA's requirement 1 note is that the stimulus
+            # gate "compares transcript calls after execution, rather than
+            # attested proxy ingress". A transcript is what a model reported
+            # doing; this is what actually crossed the boundary, recorded before
+            # the frame is judged so a refused frame is on the record too.
+            proxy._emit("RPC_INGRESS", None, direction=direction, bytes=len(raw),
+                        raw=raw.decode("utf-8", "surrogatepass"))
             if proxy.is_tainted():
                 # Everything after the bad frame is discarded, not examined.
                 proxy._emit("FRAME_DISCARDED_AFTER_TAINT", None,
