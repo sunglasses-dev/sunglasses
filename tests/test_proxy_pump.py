@@ -525,10 +525,17 @@ def test_the_record_survives_until_the_frame_is_handed_over():
     assert session.admit_request(41, method="tools/call", origin="client")
     frames = session.read_upstream(wire(response(41)))
     next(frames)
-    assert session._settling, "the obligation was dropped before the handoff"
+    # ASTRA's RC19b settles what this instant MEANS, and it is not what I wrote
+    # here first. `next()` RETURNING is the delivery: the consumer has the
+    # frame. So at this point the obligation is discharged and the id is free,
+    # and my original assertion -- that `_settling` was still occupied here --
+    # was pinning the wrong moment. The obligation still exists strictly
+    # BEFORE the yield executes; there is no observable instant between the
+    # yield executing and `next()` returning.
+    assert session._settling == set(), "the obligation outlived the handoff"
     with pytest.raises(StopIteration):
         next(frames)
-    assert session._settling == set(), "the obligation outlived the handoff"
+    assert session._settling == set()
 
 
 def test_a_direct_caller_has_the_frame_when_deliver_response_returns():
@@ -556,9 +563,13 @@ def test_an_id_still_being_answered_cannot_be_re_admitted():
     assert session.admit_request(41, method="tools/call", origin="client")
     frames = session.read_upstream(wire(response(41)))
     next(frames)
-    assert session._settling
-    assert not session.admit_request(41, method="tools/call", origin="client")
-    assert session.closed_with() == ("MALFORMED_CLIENT", "S5")
+    # Same correction: after `next()` returns the frame is delivered, so reuse
+    # here is VALID (RC19b) and refusing it was the bug. The refusal this test
+    # was written for happens while the entry is genuinely mid-handoff, which
+    # RC20 reaches through admission's own interleaving.
+    assert session._settling == set()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert session.closed_with() is None
 
 
 def test_the_record_names_the_generation_it_answers():
@@ -568,9 +579,20 @@ def test_the_record_names_the_generation_it_answers():
     session = pump.Session()
     assert session.admit_request(41, method="tools/call", origin="client")
     identity = pump.key("client", 41)
-    frames = session.read_upstream(wire(response(41)))
-    next(frames)
-    assert session._settling_key[identity] == identity + (1,)
+    # BEFORE the handoff: the record exists and names the generation it
+    # answers. Checked through the settlement seam rather than after `next()`,
+    # because by the time `next()` returns the obligation is discharged
+    # (RC19b) and the record is correctly gone.
+    seen = {}
+    original = session._settle_outside_lock
+
+    def watched(key):
+        seen["key"] = session._settling_key.get(identity)
+        return original(key)
+
+    session._settle_outside_lock = watched
+    assert list(session.read_upstream(wire(response(41))))
+    assert seen["key"] == identity + (1,)
     assert session._core.settled_as(identity + (1,)) is not None
 
 
@@ -580,10 +602,20 @@ def test_a_close_pays_the_record_and_then_drops_it():
     from ever being admitted again (RC17)."""
     session = pump.Session()
     assert session.admit_request(41, method="tools/call", origin="client")
-    frames = session.read_upstream(wire(response(41)))
-    next(frames)
-    assert session._settling
-    session._close("MALFORMED_UPSTREAM", "review controlled close")
+    # The close is driven while the item is genuinely mid-handoff, which is
+    # the only state where the record is the thing a close reads. Reaching it
+    # from outside needs the settlement seam, for the same reason as above.
+    closed_during = {}
+    original = session._settle_outside_lock
+
+    def watched(key):
+        closed_during["settling"] = set(session._settling)
+        session._close("MALFORMED_UPSTREAM", "review controlled close")
+        return original(key)
+
+    session._settle_outside_lock = watched
+    list(session.read_upstream(wire(response(41))))
+    assert closed_during["settling"], "the record was absent while mid-handoff"
     assert session._settling == set(), "the record outlived the close"
     assert session._settling_key == {}
 

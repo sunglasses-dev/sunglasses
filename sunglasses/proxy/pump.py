@@ -301,6 +301,18 @@ class Session:
         # An id whose previous generation is still mid-handoff is not free: the
         # old response would settle the new request, which answers a call the
         # client never made with a result from one it did.
+        # RC20. These two reads stay SEPARATE and in this order, because the
+        # reader moves an entry between the tables they look at and the fix is
+        # not to merge them -- it is to make the INSERT re-check under the lock,
+        # below. Merging them here would short-circuit before the pending test
+        # and change which refusal a caller gets.
+        #
+        # This also corrects a comment I wrote at the generation lookup calling
+        # it unreachable "while admission refuses a still-settling id". That
+        # assumed admission was atomic. It is not: an admission can pass the
+        # settling test, pause, and find `_pending` empty because the reader
+        # moved the entry in between. RC20 reaches the lookup through ordinary
+        # operations and it is load-bearing.
         if identity in self._settling:
             if origin == ORIGIN_CLIENT:
                 self._close("MALFORMED_CLIENT",
@@ -328,8 +340,14 @@ class Session:
         # and without a generation the core refuses the second request because
         # it has already settled that identity. The generation is what makes
         # "the same id, a later request" a different item rather than a repeat.
-        self._generation[identity] = self._generation.get(identity, 0) + 1
-        self._pending[identity] = method
+        # RC20. The INSERT happens under the same lock as the test, re-checking
+        # both tables, so nothing can move an entry between deciding and
+        # recording.
+        with self._settlement:
+            if identity in self._settling or identity in self._pending:
+                return False
+            self._generation[identity] = self._generation.get(identity, 0) + 1
+            self._pending[identity] = method
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -711,6 +729,15 @@ class Session:
                 if forwarded is None:
                     yield from self._drain_refusals()
                     return
+                # RC21/RC22. Initialize returns to the READER like every other
+                # response, so it owns the same handoff and was using the
+                # direct-caller retirement instead: one frame for two requests,
+                # and with no second request the watcher returned without
+                # closing and the reader forwarded after a real exit.
+                if not self._discharge_before_handoff(
+                        key(ORIGIN_CLIENT, message["id"])):
+                    yield from self._drain_refusals()
+                    return
                 yield forwarded
                 continue
 
@@ -730,11 +757,22 @@ class Session:
             if answer is None:
                 yield from self._drain_refusals()
                 return
+            # RC18/RC19/RC19b. The obligation ends HERE, under the lock, and
+            # the yield happens only if this call says the close did not win.
+            identity = key(ORIGIN_CLIENT, message["id"])
+            if not self._discharge_before_handoff(identity):
+                yield from self._drain_refusals()
+                return
             yield raw
-            # RC14. HANDED OVER, so the obligation is discharged. Anything
-            # before the yield retires the record while the client still has
-            # nothing.
-            self._retire_record(key(ORIGIN_CLIENT, message["id"]))
+            # IDEMPOTENT, and both halves are load-bearing for different
+            # reasons. The gate above removes the record BEFORE the value
+            # leaves, because a close landing after delivery must not pay an
+            # obligation that is gone (RC19) and an id whose frame is on the
+            # wire is free (RC19b). This line is the reader stating that what
+            # it handed over is retired, on the advance that proves the
+            # consumer came back; by then the removal has already happened, so
+            # it takes nothing away and removes nothing twice.
+            self._retire_record(identity)
 
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
@@ -789,8 +827,13 @@ class Session:
         rebuilt = dict(message)
         rebuilt["result"] = dict(result, capabilities=filtered)
 
+        # RC21. `defer_retire=True` because this RETURNS TO THE READER, which
+        # performs the handoff. It was using the direct-caller retirement, so
+        # the obligation ended one step too early and a close landing in that
+        # step paid nothing: one frame for two known requests.
         self.deliver_response(origin=ORIGIN_UPSTREAM,
-                              request_id=message["id"], frame=rebuilt)
+                              request_id=message["id"], frame=rebuilt,
+                              defer_retire=True)
         if self._closed:
             return None
         return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
@@ -894,6 +937,41 @@ class Session:
                 return False
         return self._closed is None
 
+
+
+    def _discharge_before_handoff(self, identity):
+        """The single point where an obligation ends, for EVERY caller.
+
+        RC18, RC19, RC19b, RC21 and RC22 are five shapes of one mistake:
+        retirement scattered across callers, each choosing its own moment, so
+        the close and the reader disagreed about who still owed a frame.
+
+        Three things have to be true at once, and only a lock makes them so:
+
+          the close must not pay an obligation that is ABOUT to be discharged
+          (RC19: exit after the first original reached the wire, close pays it
+          again, three frames for two requests);
+
+          the reader must not hand over an original once a close has WON
+          (RC18: exit immediately before the yield, close pays it, and the
+          reader yields anyway -- three frames again);
+
+          and once the frame is genuinely gone the id is FREE (RC19b: reuse
+          after a real handoff, while this generator is suspended at its yield,
+          is valid and was being refused MALFORMED_CLIENT).
+
+        Returns False when the close won, in which case the caller yields
+        NOTHING and the retained refusal is the client's one answer.
+        """
+        with self._settlement:
+            if self._closed:
+                return False
+        # `_retire_record` stays THE seam that removes a record, and this gate
+        # decides WHEN. Two jobs, one place each: a gate that also did the
+        # removal inline would leave the seam dead, and a reviewer wrapping it
+        # to observe retirement would see nothing.
+        self._retire_record(identity)
+        return True
 
     def _retire_record(self, identity):
         """RC14. The wire obligation is discharged; drop the record."""
