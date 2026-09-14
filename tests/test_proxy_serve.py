@@ -35,18 +35,16 @@ SECRET = "AKIAIOSFODNN7EXAMPLE"
 def _run(frames, tmp_path, poison=None, timeout=60, linger=False):
     """Drive the real proxy over real pipes and read both sides afterwards."""
     ingress = tmp_path / "ingress.log"
-    env = dict(os.environ,
-               SUNGLASSES_ECHO_INGRESS=str(ingress),
-               SUNGLASSES_ECHO_PROC=str(tmp_path / "proc.json"),
-               SUNGLASSES_PROXY_ROOT=str(tmp_path / "state"))
+    server = [sys.executable, "-m", "sunglasses.proxy.echo_server",
+              "--ingress", str(ingress), "--proc", str(tmp_path / "proc.json")]
     if poison is not None:
-        env["SUNGLASSES_ECHO_INJECT"] = poison
+        server += ["--inject", poison]
     if linger:
-        env["SUNGLASSES_ECHO_LINGER"] = "1"
+        server += ["--linger"]
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.proxy",
-         "--", sys.executable, "-m", "sunglasses.proxy.echo_server"],
-        input=b"".join(frames), capture_output=True, env=env, timeout=timeout)
+         "--state-root", str(tmp_path / "state"), "--"] + server,
+        input=b"".join(frames), capture_output=True, timeout=timeout)
     replies = [json.loads(line) for line in proc.stdout.splitlines()
                if line.strip()]
     arrived = ingress.read_bytes() if ingress.exists() else b""

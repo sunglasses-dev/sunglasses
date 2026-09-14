@@ -35,8 +35,8 @@ import uuid
 
 from . import approvals, framing, pump, receipts, route, supervisor
 
-USAGE = ("usage: python -m sunglasses.proxy [--config PATH] -- "
-         "<server command> [args...]\n")
+USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
+         "[--state-root PATH] -- <server command> [args...]\n")
 
 EXIT_OK = 0
 EXIT_FAULT = 1
@@ -60,20 +60,30 @@ def parse(argv):
     parsed = {}
     index = 0
     while index < len(options):
-        if options[index] == "--config" and index + 1 < len(options):
-            parsed["config"] = options[index + 1]
+        if options[index] in ("--config", "--state-root") and \
+                index + 1 < len(options):
+            parsed[options[index][2:]] = options[index + 1]
             index += 2
             continue
         index += 1
     return (upstream or None), parsed
 
 
-def state_root():
-    return pathlib.Path(os.environ.get("SUNGLASSES_PROXY_ROOT")
-                        or pathlib.Path.home() / ".sunglasses" / "proxy")
+def state_root(override=None):
+    """Where receipts, approvals and install records live.
+
+    An ARGUMENT, not an environment variable. This module ships in the wheel,
+    and a variable that moves the receipt log and the approval store is a
+    switch anything in the process tree could flip: approvals read from a
+    directory an attacker controls are approvals an attacker writes.
+    """
+    if override:
+        return pathlib.Path(override)
+    return pathlib.Path.home() / ".sunglasses" / "proxy"
 
 
-def build_route(*, session, log, upstream_argv, upstream_write, client_write):
+def build_route(*, session, log, upstream_argv, upstream_write, client_write,
+                root=None):
     """The wiring, separated so it can be inspected without spawning anything.
 
     The approval store is the REAL one and not a bypass. T5.R2 refuses calls
@@ -83,7 +93,8 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write):
     the artifact feel finished is the one change that would make the rest of
     this decorative.
     """
-    store = approvals.Store(state_root(), server_id=_identity(upstream_argv))
+    store = approvals.Store(state_root(root),
+                            server_id=_identity(upstream_argv))
     return route.Route(session=session, log=log,
                        upstream_write=upstream_write,
                        client_write=client_write, approvals=store)
@@ -91,7 +102,8 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write):
 
 def main(argv=None, stdin=None, stdout=None, stderr=None):
     stderr = stderr if stderr is not None else sys.stderr
-    upstream_argv, _options = parse(sys.argv[1:] if argv is None else argv)
+    upstream_argv, options = parse(sys.argv[1:] if argv is None else argv)
+    root = options.get("state-root")
     if not upstream_argv:
         stderr.write(USAGE)
         return EXIT_USAGE
@@ -100,7 +112,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     stdout = stdout if stdout is not None else sys.stdout.buffer
 
     run_id = uuid.uuid4().hex
-    log = receipts.Log(state_root(), run_id=run_id, header={
+    log = receipts.Log(state_root(root), run_id=run_id, header={
         "session_id": run_id,
         "budget_version": "sg-proxy-budget/1",
         "catalog_version": "sg-proxy-catalog/1",
@@ -127,7 +139,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         child.stdin.flush()
 
     engine = build_route(session=session, log=log, upstream_argv=upstream_argv,
-                         upstream_write=to_upstream, client_write=to_client)
+                         upstream_write=to_upstream, client_write=to_client,
+                         root=root)
 
     reader = threading.Thread(target=_drain, args=(engine, child), daemon=True)
     reader.start()
