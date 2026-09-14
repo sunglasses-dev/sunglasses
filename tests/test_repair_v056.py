@@ -628,189 +628,160 @@ def test_package_reads_no_undeclared_environment_variables():
     # JSON-RPC error message T4.R7 freezes for the proxy's client envelope, so
     # its spelling is fixed by the contract and it travels on the wire rather
     # than being read from anywhere.
-    #
-    # The literal scan below stays a literal search on purpose: two of the three
-    # allowed vars are read through a named constant (`_PIN_CONSENT_ENV`,
-    # `_DISABLE_ENV`), so a scan that only looked at call sites would miss the
-    # indirection it most needs to catch. The exemption is explicit and small,
-    # and it is policed on the SYNTAX TREE rather than on source lines. ASTRA's
-    # reviews (2026-09-14) supplied the shapes this has to reject: a read whose
-    # KEY is an alias or sits on the next line (E02/E03), and a read whose
-    # FUNCTION or OBJECT is an alias (`from os import getenv as read`,
-    # `env = os.environ`, `read = os.getenv`, `from os import environ as env`)
-    # or a wrapper whose parameter shadows a module constant (E10-E14). So every
-    # environment read in the package is resolved to the name it reads, through
-    # aliases and one-argument wrappers, and that name must be an allowed one.
-    # Anything this cannot resolve is a failure, not a pass.
     wire_constants = {"SUNGLASSES_WITHHELD"}
 
+    # MECHANISM (2026-09-14, after ASTRA's rounds 2-4 kept constructing reader
+    # shapes a resolver had not imagined: aliased keys, aliased readers,
+    # annotated and tuple-unpacked aliases, wrappers, lambdas, shadowing).
+    # A resolver that follows aliases enumerates what it recognises and passes
+    # the rest, which is the wrong default for a guard. This one refuses the
+    # rest. Every token that can touch the environment (`environ`, `getenv`,
+    # `putenv`, `unsetenv`, as an attribute, a name, an import or a string)
+    # must be part of ONE canonical read form at a plain `os` module name:
+    #     os.environ.get(KEY) | os.environ[KEY] | os.getenv(KEY) | KEY in os.environ
+    # where KEY is a string literal or a module-level constant bound exactly
+    # once in the whole module (no parameter, lambda, local, loop or import
+    # may reuse the name), and the resolved KEY is allowed. One enumerated
+    # non-key use is exempt by file and form: `dict(os.environ)` in firewall.py,
+    # the environment copy handed to a spawned server. Anything else refuses.
+    # Two of the three allowed vars are read through a named constant
+    # (`_PIN_CONSENT_ENV`, `_DISABLE_ENV`); the literal scan keeps catching a
+    # SUNGLASSES_* name that appears anywhere without being read.
+    SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
+    SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
     ENV_METHODS = {"get", "pop", "setdefault"}
+    ENV_COPY_SITES = {"firewall.py"}
 
-    def _module_bindings(tree):
-        """Names bound to os, os.environ, os.getenv and os.environ.get-like."""
-        os_names, env_names, getenv_names, envget_names = set(), set(), set(), set()
+    def _os_names(tree):
+        """Names bound to the os module by a plain import. Any other way of
+        naming the module is not canonical and its reads refuse below."""
+        names = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
                     if a.name == "os":
-                        os_names.add(a.asname or "os")
-            elif isinstance(node, ast.ImportFrom) and node.module == "os":
+                        names.add(a.asname or "os")
+        return names
+
+    def _binding_counts(tree):
+        """How many times each name is bound anywhere in the module, and the
+        module-level string constant a name is bound to (if exactly once)."""
+        counts = {}
+        consts = {}
+
+        def bind(name):
+            counts[name] = counts.get(name, 0) + 1
+
+        def targets(node):
+            if isinstance(node, ast.Name):
+                bind(node.id)
+            elif isinstance(node, (ast.Tuple, ast.List)):
+                for e in node.elts:
+                    targets(e)
+            elif isinstance(node, ast.Starred):
+                targets(node.value)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for t_ in node.targets:
+                    targets(t_)
+            elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+                targets(node.target)
+            elif isinstance(node, ast.NamedExpr):
+                targets(node.target)
+            elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+                targets(node.target)
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                for item in node.items:
+                    if item.optional_vars is not None:
+                        targets(item.optional_vars)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                bind(node.name)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 for a in node.names:
-                    if a.name == "environ":
-                        env_names.add(a.asname or "environ")
-                    elif a.name == "getenv":
-                        getenv_names.add(a.asname or "getenv")
-        # Assignment aliases can reference earlier aliases, so iterate to a fixed point.
-        changed = True
-        while changed:
-            changed = False
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Assign):
-                    continue
-                targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
-                if not targets:
-                    continue
-                v = node.value
-                kind = None
-                if isinstance(v, ast.Name):
-                    if v.id in os_names:
-                        kind = "os"
-                    elif v.id in env_names:
-                        kind = "env"
-                    elif v.id in getenv_names:
-                        kind = "getenv"
-                    elif v.id in envget_names:
-                        kind = "envget"
-                elif isinstance(v, ast.Attribute):
-                    if isinstance(v.value, ast.Name) and v.value.id in os_names:
-                        kind = {"environ": "env", "getenv": "getenv"}.get(v.attr)
-                    elif v.attr in ENV_METHODS and _is_environ(v.value, os_names, env_names):
-                        kind = "envget"
-                target_set = {"os": os_names, "env": env_names, "getenv": getenv_names, "envget": envget_names}.get(kind)
-                if target_set is not None:
-                    for name in targets:
-                        if name not in target_set:
-                            target_set.add(name)
-                            changed = True
-        return os_names, env_names, getenv_names, envget_names
-
-    def _is_environ(node, os_names, env_names):
-        return (isinstance(node, ast.Attribute) and node.attr == "environ"
-                and isinstance(node.value, ast.Name) and node.value.id in os_names) or (
-            isinstance(node, ast.Name) and node.id in env_names)
-
-    def _read_key(node, b):
-        """If `node` is an environment read, return its key expression (or None
-        when the read has no key at all). Return the sentinel NOT_A_READ otherwise."""
-        os_names, env_names, getenv_names, envget_names = b
-        if isinstance(node, ast.Call):
-            f = node.func
-            is_read = (
-                (isinstance(f, ast.Attribute) and f.attr == "getenv"
-                 and isinstance(f.value, ast.Name) and f.value.id in os_names)
-                or (isinstance(f, ast.Name) and f.id in getenv_names)
-                or (isinstance(f, ast.Attribute) and f.attr in ENV_METHODS
-                    and _is_environ(f.value, os_names, env_names))
-                or (isinstance(f, ast.Name) and f.id in envget_names)
-            )
-            if is_read:
-                return node.args[0] if node.args else None
-        elif isinstance(node, ast.Subscript) and _is_environ(node.value, os_names, env_names):
-            return node.slice
-        elif isinstance(node, ast.Compare) and any(
-                isinstance(op, (ast.In, ast.NotIn)) for op in node.ops) and any(
-                _is_environ(c, os_names, env_names) for c in node.comparators):
-            return node.left
-        return NOT_A_READ
-
-    NOT_A_READ = object()
-
-    def _read_targets(tree):
-        """Every environment read in one module, resolved to the name it reads.
-
-        Returns (names, unresolved). A read inside a function whose key is that
-        function's parameter makes the function a wrapper; its call sites
-        supply the key. Anything else that is not a string literal or a
-        module-level constant assigned one is unresolved.
-        """
-        b = _module_bindings(tree)
-        constants = {}
+                    bind((a.asname or a.name).split(".")[0])
+            elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                for name in node.names:
+                    bind(name)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                bind(node.name)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                a = node.args
+                for arg in a.posonlyargs + a.args + a.kwonlyargs:
+                    bind(arg.arg)
+                if a.vararg:
+                    bind(a.vararg.arg)
+                if a.kwarg:
+                    bind(a.kwarg.arg)
         for stmt in tree.body:
             if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant) \
                     and isinstance(stmt.value.value, str):
-                for target in stmt.targets:
-                    if isinstance(target, ast.Name):
-                        constants[target.id] = stmt.value.value
+                for t_ in stmt.targets:
+                    if isinstance(t_, ast.Name):
+                        consts[t_.id] = stmt.value.value
+        return counts, consts
 
-        def resolve(key, params):
-            if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                return key.value
-            if isinstance(key, ast.Name) and key.id not in params and key.id in constants:
-                return constants[key.id]
-            return None
+    def _canonical_reads(tree, os_names):
+        """Yield (read_node, key_expr, consumed_attribute_nodes) for each
+        canonical read form. Nothing else counts as a read."""
+        def environ_attr(node):
+            return (isinstance(node, ast.Attribute) and node.attr == "environ"
+                    and isinstance(node.value, ast.Name) and node.value.id in os_names)
 
-        names, unresolved = set(), 0
-        wrappers = {}          # function name -> parameter index whose value is read
-        pending = []           # (key expr, params) reads found inside functions
-
-        def visit(node, params, func_name):
-            nonlocal unresolved
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                inner = {a.arg for a in node.args.args + node.args.kwonlyargs + node.args.posonlyargs}
-                if node.args.vararg:
-                    inner.add(node.args.vararg.arg)
-                if node.args.kwarg:
-                    inner.add(node.args.kwarg.arg)
-                for child in ast.iter_child_nodes(node):
-                    visit(child, inner, node.name)
-                return
-            key = _read_key(node, b)
-            if key is not NOT_A_READ:
-                if key is None:
-                    unresolved += 1
-                elif isinstance(key, ast.Name) and key.id in params and func_name is not None:
-                    args = [a.arg for a in _func_args[func_name]]
-                    wrappers[func_name] = args.index(key.id) if key.id in args else None
-                    if wrappers[func_name] is None:
-                        unresolved += 1
-                else:
-                    name = resolve(key, params)
-                    if name is None:
-                        unresolved += 1
-                    else:
-                        names.add(name)
-            for child in ast.iter_child_nodes(node):
-                visit(child, params, func_name)
-
-        _func_args = {n.name: n.args.posonlyargs + n.args.args
-                      for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
-        visit(tree, set(), None)
-
-        # Wrapper call sites supply the key. A wrapper nobody calls still
-        # contains a read this test cannot account for, so it is unresolved
-        # (ASTRA E07). A wrapper called from inside another function with that
-        # function's own parameter is unresolved as well: one level only.
-        called = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in wrappers:
-                called.add(node.func.id)
-                idx = wrappers[node.func.id]
-                key = node.args[idx] if idx is not None and idx < len(node.args) else None
-                if key is None:
-                    unresolved += 1
-                    continue
-                name = resolve(key, set())
-                if name is None:
-                    unresolved += 1
-                else:
-                    names.add(name)
-        unresolved += len(set(wrappers) - called)
-        return names, unresolved
+            if isinstance(node, ast.Call):
+                f = node.func
+                if isinstance(f, ast.Attribute) and f.attr == "getenv" \
+                        and isinstance(f.value, ast.Name) and f.value.id in os_names:
+                    yield node, (node.args[0] if node.args else None), {id(f)}
+                elif isinstance(f, ast.Attribute) and f.attr in ENV_METHODS and environ_attr(f.value):
+                    yield node, (node.args[0] if node.args else None), {id(f.value)}
+            elif isinstance(node, ast.Subscript) and environ_attr(node.value):
+                yield node, node.slice, {id(node.value)}
+            elif isinstance(node, ast.Compare) and len(node.ops) == 1 \
+                    and isinstance(node.ops[0], (ast.In, ast.NotIn)) \
+                    and len(node.comparators) == 1 and environ_attr(node.comparators[0]):
+                yield node, node.left, {id(node.comparators[0])}
+
+    def _audit(tree, relpath):
+        """Return (read_names, refusals) for one module."""
+        os_names = _os_names(tree)
+        counts, consts = _binding_counts(tree)
+        consumed = set()
+        read_names, refusals = set(), []
+        for node, key, attrs in _canonical_reads(tree, os_names):
+            consumed |= attrs
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                read_names.add(key.value)
+            elif isinstance(key, ast.Name) and counts.get(key.id) == 1 and key.id in consts:
+                read_names.add(consts[key.id])
+            else:
+                refusals.append(f"{relpath}:{node.lineno} read with a key that is not a literal "
+                                f"or a once-bound module constant")
+        # The enumerated environment copy: dict(os.environ) in firewall.py only.
+        if relpath.split("/")[-1] in ENV_COPY_SITES:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                        and node.func.id == "dict" and len(node.args) == 1 \
+                        and isinstance(node.args[0], ast.Attribute) and node.args[0].attr == "environ" \
+                        and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id in os_names:
+                    consumed.add(id(node.args[0]))
+        # Every other sensitive token refuses.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in SENSITIVE and id(node) not in consumed:
+                refusals.append(f"{relpath}:{node.lineno} non-canonical .{node.attr}")
+            elif isinstance(node, ast.Name) and node.id in SENSITIVE:
+                refusals.append(f"{relpath}:{node.lineno} bare name {node.id}")
+            elif isinstance(node, ast.ImportFrom) and any(a.name in SENSITIVE for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} from-import of an environment reader")
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str) \
+                    and SENSITIVE_RE.search(node.value) and node.value.strip() in SENSITIVE:
+                refusals.append(f"{relpath}:{node.lineno} environment reader named as a string")
+        return read_names, refusals
 
     found = set()
     read_names = set()
-    unresolved_reads = []
-    wrapper_defs = 0
+    refusals = []
     pkg = os.path.dirname(_package_location())
     for dirpath, _dirs, files in os.walk(pkg):
         if "__pycache__" in dirpath:
@@ -824,31 +795,25 @@ def test_package_reads_no_undeclared_environment_variables():
             try:
                 tree = ast.parse(text)
             except SyntaxError:
+                refusals.append(f"{os.path.relpath(path, pkg)}: does not parse")
                 continue
-            names, unresolved = _read_targets(tree)
+            names, bad = _audit(tree, os.path.relpath(path, pkg))
             read_names.update(names)
-            if unresolved:
-                unresolved_reads.append((os.path.relpath(path, pkg), unresolved))
+            refusals.extend(bad)
 
     undeclared = found - allowed - wire_constants
     assert not undeclared, f"undeclared env vars in the package: {sorted(undeclared)}"
 
-    # Every environment read must resolve to a name, and that name must be
-    # allowed. A read whose key cannot be resolved is a read of something this
-    # test cannot account for, which is the same failure.
-    assert not unresolved_reads, (
-        f"environment reads whose key is not a literal, a module constant or a "
-        f"wrapper argument: {unresolved_reads}")
+    # Anything that touches the environment outside the canonical form is a
+    # read this test cannot account for, which is the same failure.
+    assert not refusals, "non-canonical environment access in the package:\n  " + "\n  ".join(refusals)
     unaccounted = sorted(read_names - allowed)
     assert not unaccounted, (
         f"the package reads environment variables this test does not allow: "
         f"{unaccounted}")
 
-    # The exemption polices itself on the tree. If a name claimed as a wire
-    # constant is the resolved target of any environment read, by literal, by
-    # alias, across lines, through an aliased reader or through a wrapper, the
-    # claim was wrong and this fails rather than quietly permitting an
-    # undeclared read.
+    # The exemption polices itself on the tree: a wire constant that is the
+    # key of any canonical read was never a wire constant.
     smuggled = sorted(read_names & wire_constants)
     assert not smuggled, (
         f"{smuggled} is exempted as a wire constant and is read from the "
