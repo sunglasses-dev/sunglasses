@@ -445,6 +445,13 @@ class Passthrough:
         self._emit("SETTLED", request_id, forwarded=forwarded, reason=reason,
                    detector_status=status, inspection_complete=complete,
                    finding=bool(finding and finding["blocked"]),
+                   # THE COUNTS THIS SETTLEMENT WAS MADE OF. They were reaching
+                   # the client in a withheld reply and not the receipts, so a
+                   # grader could read a claim of a complete inspection with no
+                   # measurement behind it anywhere, and no counter check could
+                   # be written at all. Same two numbers the reply quotes.
+                   inspected_utf8_bytes=inspected_content_bytes,
+                   observed_content_bytes=content_bytes,
                    terminated=terminated, elapsed_ms=round(elapsed_ms, 3),
                    detector=finding and {k: finding[k] for k in
                                          ("decision", "rule_ids", "blocked")})

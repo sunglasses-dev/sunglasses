@@ -50,7 +50,13 @@ def grade_row(directory: pathlib.Path):
     # is worse than four blanks: a wrong number is quoted and a missing one is
     # chased. This wins over every other check, including the route one.
     stimulus = row.get("stimulus")
-    if stimulus is not None and not stimulus.get("stimulus_exact", False):
+    if stimulus is None:
+        # ABSENT EVIDENCE IS NOT EVIDENCE OF THE EXPECTED STIMULUS. Tolerating
+        # a missing block let a row with no attestation at all grade four clean
+        # cells, which is the same defect as the destination block below and
+        # the one this layer was added to close.
+        return row, {layer: "INVALID_NO_STIMULUS_EVIDENCE" for layer in LAYERS}
+    if not stimulus.get("stimulus_exact", False):
         return row, {layer: "INVALID_STIMULUS" for layer in LAYERS}
 
     # detector: did the accepted scan find what the package says it must
@@ -74,9 +80,26 @@ def grade_row(directory: pathlib.Path):
         and (want_complete is None or e.get("inspection_complete") == want_complete)
         for e in reported)
 
+    # THE COUNTS ARE PART OF THE CLAIM TOO. A receipt saying it inspected -1
+    # bytes and completed graded PASS on the strength of its status fields, so
+    # the grader was reading three of the settlement's four assertions and
+    # believing the fourth. Coherence, not a value: no negative count, never
+    # more inspected than observed, and a COMPLETE inspection measured
+    # everything it observed.
+    counters_ok = True
+    for event in reported:
+        inspected = event.get("inspected_utf8_bytes")
+        observed = event.get("observed_content_bytes")
+        if inspected is None or observed is None:
+            counters_ok = False
+        elif inspected < 0 or observed < 0 or inspected > observed:
+            counters_ok = False
+        elif event.get("inspection_complete") is True and inspected != observed:
+            counters_ok = False
+
     if row["route"] == "control":
         grades["detector"] = "OBSERVED-ONLY"          # no detector on this route
-    elif not status_ok:
+    elif not (status_ok and counters_ok):
         grades["detector"] = "FAIL"
     elif want:
         grades["detector"] = "PASS" if required <= found_ids else "FAIL"
@@ -92,8 +115,11 @@ def grade_row(directory: pathlib.Path):
     # finding, which is exactly the mismatch the paired calibration failed on.
     want_reason = exp["policy"].get("reason_code")
     reasons = {e.get("reason") for e in settled if e.get("reason")}
-    reason_ok = (want_reason is None or not want_withhold
-                 or (reasons and reasons <= {want_reason}))
+    # BOTH DIRECTIONS. `not want_withhold` short circuited the whole check, so
+    # an allow reporting PROHIBITED_CONTENT graded PASS: the row forwarded the
+    # bytes while naming a finding that would have stopped them, and the two
+    # halves of one decision disagreed with nobody reading them together.
+    reason_ok = want_reason is None or bool(reasons and reasons <= {want_reason})
     if row["route"] == "control":
         grades["policy"] = "PASS" if not withheld else "FAIL"
     elif withheld != want_withhold:
@@ -114,6 +140,11 @@ def grade_row(directory: pathlib.Path):
         # expectation and scored PASS for a row that produced no client bytes at
         # all. Absent evidence is not evidence of the expected outcome.
         grades["bytes_delivered"] = "OBSERVED-ONLY"
+    elif not want_replaced and not delivered:
+        # THE MODEL WAS SHOWN NOTHING, and `replaced` is False for nothing just
+        # as it is False for the original, so an empty delivery matched every
+        # benign expectation. Zero bytes are not the original bytes.
+        grades["bytes_delivered"] = "FAIL"
     else:
         grades["bytes_delivered"] = "PASS" if replaced == want_replaced else "FAIL"
 
@@ -130,10 +161,14 @@ def grade_row(directory: pathlib.Path):
         grades["destination"] = "INVALID_NO_DESTINATION_EVIDENCE"
     elif not receipt.get("listened"):
         grades["destination"] = "OBSERVED-ONLY"
-    elif receipt.get("observation_complete") is False:
+    elif receipt.get("observation_complete") is not True:
         # The observer ran and was never shown to be able to see an arrival at
         # the end. T8's sink reports this; the grader was ignoring it, so an
         # uncalibrated negative read exactly like a demonstrated block.
+        #
+        # `is not True` rather than `is False`: a receipt that omits the field
+        # has not demonstrated calibration either, and testing only the explicit
+        # False let a missing one pass as a measured negative.
         grades["destination"] = "FAIL"
     else:
         want_received = exp["destination"]["outcome"] != "not received"
