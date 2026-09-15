@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-20",
+  "variant": "typed_ids",
+  "profile": "ids_typed",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "typed_ids.requests.jsonl",
+      "profile": "ids_typed"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "ids_typed",
+      "client_file": "typed_ids.requests.jsonl",
+      "upstream_file": "typed_ids.upstream.jsonl",
+      "auxiliary_files": [
+        "reverse.request.jsonl",
+        "secondary.request.jsonl",
+        "secondary.response.jsonl"
+      ],
+      "fault": {
+        "target": "correlation_scheduler",
+        "profile": "ids_typed",
+        "after": "HOLD_ENTERED"
+      },
+      "sequence": "Hold string ID 2001; process numeric ID 2001 independently; include upstream-owned request using 2001; settle each toward its origin.",
+      "primary_id_file": "typed_ids.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/20_g3_correlation/expected.json",
+      "variant": "typed_ids",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Normalize IDs to string or share origins."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "arm_fault",
+      "kind": "result_worker",
+      "target": "scanner_worker",
+      "require_fresh_barrier": true
+    },
+    {
+      "op": "send_file",
+      "path": "typed_ids.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "send_file",
+      "path": "secondary.request.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "send_file",
+      "path": "reverse.request.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "send_file",
+      "path": "secondary.response.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "assert_secondary_and_reverse_complete_independently"
+    },
+    {
+      "op": "send_file",
+      "path": "typed_ids.upstream.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "release_fault_barrier"
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}

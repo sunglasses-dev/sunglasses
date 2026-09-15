@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-15",
+  "variant": "extension_request",
+  "profile": "extension_request",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "extension_request.requests.jsonl",
+      "profile": "extension_request"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "extension_request",
+      "client_file": "extension_request.requests.jsonl",
+      "upstream_file": "extension_request.upstream.jsonl",
+      "auxiliary_files": [],
+      "fault": {},
+      "sequence": "Client sends valid extension method with O in params; controllable upstream records and writes if forwarded.",
+      "primary_id_file": "extension_request.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/15_g3_unsupported/expected.json",
+      "variant": "extension_request",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Forward unknown methods with a receipt."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "send_file",
+      "path": "extension_request.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "await_client_error",
+      "id_from": "extension_request.requests.jsonl"
+    },
+    {
+      "op": "assert_zero_upstream_copies",
+      "path": "extension_request.requests.jsonl"
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}

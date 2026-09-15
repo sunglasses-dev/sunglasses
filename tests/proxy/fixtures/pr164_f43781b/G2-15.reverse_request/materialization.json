@@ -1,0 +1,90 @@
+{
+  "scenario_id": "G2-15",
+  "variant": "reverse_request",
+  "payload_source": {
+    "scenario_id": "G2-01",
+    "variant": "main",
+    "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
+    "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
+  },
+  "payload_materialized_sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52",
+  "profile": "reverse_request",
+  "artifacts": [
+    {
+      "path": "baseline.tools-list.json",
+      "bytes": 489,
+      "sha256": "e80d2ce8ba009aa203fd096850a1d0a9ad5d007898a64071f5567563eef88d10"
+    },
+    {
+      "path": "cancel.client.jsonl",
+      "bytes": 95,
+      "sha256": "89184a10dc16f7edb707b94df69ef0aa71e3ac174135be0eaff83545c8171d46"
+    },
+    {
+      "path": "changed.tools-list.json",
+      "bytes": 511,
+      "sha256": "e05af4637bf33b2abddf03849fa541de57e4a07c492be3fe1a5d2c0aabc95327"
+    },
+    {
+      "path": "health.request.jsonl",
+      "bytes": 57,
+      "sha256": "024fce1ef62dabbd8869fdb65f3c961de1df62c0ccff4b26b23c03bbf5200140"
+    },
+    {
+      "path": "health.response.jsonl",
+      "bytes": 41,
+      "sha256": "e2e0e4502626d80ac18280c713993ef74d6f1c5e99314b4de3adf8bcc8e0542f"
+    },
+    {
+      "path": "initialize.request.jsonl",
+      "bytes": 160,
+      "sha256": "85d57c6827872a8594790bde0995ed30c040512cf36ee32422a0611316c3a0da"
+    },
+    {
+      "path": "initialize.response.jsonl",
+      "bytes": 176,
+      "sha256": "e24aca4254e2556c251fba34d859ac42e7c1b56c524716fd2ed82c9c106f8339"
+    },
+    {
+      "path": "initialized.notification.jsonl",
+      "bytes": 67,
+      "sha256": "450e643eb7e4b12bdbc1751b4260b4d00fff686b36f67d6bbea0b22c897bed56"
+    },
+    {
+      "path": "limits.json",
+      "bytes": 341,
+      "sha256": "f7464ab8ae5df65da48460664283f77bfa2c8613400ba187df79b69a9808dde5"
+    },
+    {
+      "path": "list-changed.jsonl",
+      "bytes": 74,
+      "sha256": "4275e407a454a5719b9235c26b6e8aa0b1584d4076f69a081ad2f6e430c5fb9d"
+    },
+    {
+      "path": "payload.txt",
+      "bytes": 189,
+      "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
+    },
+    {
+      "path": "pending-clean.response.jsonl",
+      "bytes": 79,
+      "sha256": "e20e19e6babed2c4286b3f07c882c530050ac9b3af21652e81d1f5026b0c9c71"
+    },
+    {
+      "path": "reverse_request.requests.jsonl",
+      "bytes": 93,
+      "sha256": "a13291d492955cd0d943fc17c2bc4d5947fe8f838d013503f2f4013e98df62d2"
+    },
+    {
+      "path": "reverse_request.schedule.json",
+      "bytes": 2747,
+      "sha256": "019ec2051b86fbf24272a5bb5b09d1280d4b72fb60b5069eafb756c15bff20f3"
+    },
+    {
+      "path": "reverse_request.upstream.jsonl",
+      "bytes": 345,
+      "sha256": "0836cbc73fff5c3c2a05e856c9868b3a07962d7a0bc2c99da4f120bbc12cdcec"
+    }
+  ],
+  "candidate_executed": false
+}

@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-20",
+  "variant": "reused_id_late",
+  "profile": "ids_reused",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "reused_id_late.requests.jsonl",
+      "profile": "ids_reused"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "ids_reused",
+      "client_file": "reused_id_late.requests.jsonl",
+      "upstream_file": "reused_id_late.upstream.jsonl",
+      "auxiliary_files": [
+        "reuse.request.jsonl"
+      ],
+      "fault": {
+        "target": "correlation_scheduler",
+        "profile": "ids_reused",
+        "after": "HOLD_ENTERED"
+      },
+      "sequence": "Cancel generation 1; attempt same typed ID reuse; then release old worker/result. Require session-lifetime ID rejection/tombstone or fresh wire-ID translation.",
+      "primary_id_file": "reused_id_late.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/20_g3_correlation/expected.json",
+      "variant": "reused_id_late",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Accept old completion for replacement pending entry."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "arm_fault",
+      "kind": "result_worker",
+      "target": "release_scheduler",
+      "require_fresh_barrier": true
+    },
+    {
+      "op": "send_file",
+      "path": "reused_id_late.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "send_file",
+      "path": "reused_id_late.upstream.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "await_event",
+      "event": "HOLD_ENTERED",
+      "actor": "proxy",
+      "correlate_id_from": "reused_id_late.requests.jsonl",
+      "timeout_ms": 3000
+    },
+    {
+      "op": "send_file",
+      "path": "cancel.client.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "await_event",
+      "event": "CANCEL_ACCEPTED",
+      "actor": "proxy",
+      "correlate_id_from": "reused_id_late.requests.jsonl",
+      "timeout_ms": 3000
+    },
+    {
+      "op": "assert_pending_retired",
+      "id_from": "reused_id_late.requests.jsonl"
+    },
+    {
+      "op": "send_file",
+      "path": "reuse.request.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "release_fault_barrier",
+      "require_discard": true
+    },
+    {
+      "op": "send_file",
+      "path": "health.request.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "send_file",
+      "path": "health.response.jsonl",
+      "origin": "upstream"
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}

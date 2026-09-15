@@ -1,0 +1,9 @@
+# ASTRA's review controls write their observations into evidence/. Several do
+# it with a bare write_text and no mkdir at all, so the DIRECTORY has to exist
+# in the tree or the control dies with FileNotFoundError before it reaches an
+# assertion -- which is how #164's CI produced 67 red rows carrying no product
+# signal. The rule was `evidence/`, which ignores the directory itself, and git
+# does not descend into an ignored directory, so nothing inside it could be
+# kept. It is the CONTENTS that are run output, not the directory.
+/evidence/*
+!/evidence/.gitkeep

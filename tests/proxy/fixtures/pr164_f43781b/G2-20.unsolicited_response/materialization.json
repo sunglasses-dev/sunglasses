@@ -1,0 +1,90 @@
+{
+  "scenario_id": "G2-20",
+  "variant": "unsolicited_response",
+  "payload_source": {
+    "scenario_id": "G2-01",
+    "variant": "main",
+    "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
+    "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
+  },
+  "payload_materialized_sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52",
+  "profile": "ids_unsolicited",
+  "artifacts": [
+    {
+      "path": "baseline.tools-list.json",
+      "bytes": 489,
+      "sha256": "19b2c8147be8fc10dab7706eae95f98acd7536fd816c89d652fa4a723ccc5036"
+    },
+    {
+      "path": "cancel.client.jsonl",
+      "bytes": 95,
+      "sha256": "f02f5a3b70fd0d771eba467eee84b6bf48cf5cd011cc52cbe82d4037e8d48a35"
+    },
+    {
+      "path": "changed.tools-list.json",
+      "bytes": 511,
+      "sha256": "97b0997b7b2d60f6479db98143fceceec7bc2e0507ce5121f673c07c985802a4"
+    },
+    {
+      "path": "health.request.jsonl",
+      "bytes": 57,
+      "sha256": "a23b07ea05526d56eeb28adf5ff2142a1111d68ae23a4ea12c1e97f677dfeed9"
+    },
+    {
+      "path": "health.response.jsonl",
+      "bytes": 41,
+      "sha256": "b0751fb5bc06e4283f59ebc36f8406733fdb42c24f54d96bc06b8c8d42d74968"
+    },
+    {
+      "path": "initialize.request.jsonl",
+      "bytes": 160,
+      "sha256": "4dd6f43f00c0ae2a832077944aba3947e5b2e7e874dcfd29a318b77eaa7c9b56"
+    },
+    {
+      "path": "initialize.response.jsonl",
+      "bytes": 176,
+      "sha256": "78a23c5a6184b2bf568390ad547ed43e3a1f212b21195db04a16f04fcc779885"
+    },
+    {
+      "path": "initialized.notification.jsonl",
+      "bytes": 67,
+      "sha256": "450e643eb7e4b12bdbc1751b4260b4d00fff686b36f67d6bbea0b22c897bed56"
+    },
+    {
+      "path": "limits.json",
+      "bytes": 341,
+      "sha256": "f7464ab8ae5df65da48460664283f77bfa2c8613400ba187df79b69a9808dde5"
+    },
+    {
+      "path": "list-changed.jsonl",
+      "bytes": 74,
+      "sha256": "4275e407a454a5719b9235c26b6e8aa0b1584d4076f69a081ad2f6e430c5fb9d"
+    },
+    {
+      "path": "payload.txt",
+      "bytes": 189,
+      "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
+    },
+    {
+      "path": "pending-clean.response.jsonl",
+      "bytes": 79,
+      "sha256": "47514da0286333e1ed660e3472fb8469a26aac693c73cb0d740bc50412a76ab3"
+    },
+    {
+      "path": "unsolicited_response.requests.jsonl",
+      "bytes": 93,
+      "sha256": "0fb0662a897163f11cd5449d5eed6e4dcb4e3884be1653211716b786edf9eafc"
+    },
+    {
+      "path": "unsolicited_response.schedule.json",
+      "bytes": 2799,
+      "sha256": "14e228170995697392ff2790689bfc67b8f77d9e8ade3d91996a9ddc52d2716e"
+    },
+    {
+      "path": "unsolicited_response.upstream.jsonl",
+      "bytes": 287,
+      "sha256": "286fd779cfa1289640c7d97b1771b24a8c49825a8a0b757bdae0855ad45a04e3"
+    }
+  ],
+  "candidate_executed": false
+}

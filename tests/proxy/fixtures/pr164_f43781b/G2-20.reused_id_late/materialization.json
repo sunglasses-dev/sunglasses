@@ -1,0 +1,95 @@
+{
+  "scenario_id": "G2-20",
+  "variant": "reused_id_late",
+  "payload_source": {
+    "scenario_id": "G2-02",
+    "variant": "main",
+    "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+    "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
+  },
+  "payload_materialized_sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e",
+  "profile": "ids_reused",
+  "artifacts": [
+    {
+      "path": "baseline.tools-list.json",
+      "bytes": 489,
+      "sha256": "f89a07170aa025bef7e8f939562aaba0a599df5088cfa5dbd18dd9f73b1923b2"
+    },
+    {
+      "path": "cancel.client.jsonl",
+      "bytes": 95,
+      "sha256": "156590f68616e10aeab9fce25c3d7ff3ef83bf5c9fdc791bb78290c95427704d"
+    },
+    {
+      "path": "changed.tools-list.json",
+      "bytes": 511,
+      "sha256": "3ba9c7bd4ad2785bf8609c15a261a4e5945d6c04759d4b931ebed3b528a1db5d"
+    },
+    {
+      "path": "health.request.jsonl",
+      "bytes": 57,
+      "sha256": "1f85628fcba40c55229a195826526031c0fabedc8c05f56a079b64c012a92392"
+    },
+    {
+      "path": "health.response.jsonl",
+      "bytes": 41,
+      "sha256": "5f5bf360f209402f185acfac32d4bab557857928492354bff470bab5db3ddb19"
+    },
+    {
+      "path": "initialize.request.jsonl",
+      "bytes": 160,
+      "sha256": "592181be1a6221a15100ff044b8c1a15a794a2c36e25053232fc314289a5c8f2"
+    },
+    {
+      "path": "initialize.response.jsonl",
+      "bytes": 176,
+      "sha256": "aa3984dff3b9fae3d20e5c8f6bb755cc5d3143bd9b18655d3cbedc1ddd57ca6d"
+    },
+    {
+      "path": "initialized.notification.jsonl",
+      "bytes": 67,
+      "sha256": "450e643eb7e4b12bdbc1751b4260b4d00fff686b36f67d6bbea0b22c897bed56"
+    },
+    {
+      "path": "limits.json",
+      "bytes": 341,
+      "sha256": "f7464ab8ae5df65da48460664283f77bfa2c8613400ba187df79b69a9808dde5"
+    },
+    {
+      "path": "list-changed.jsonl",
+      "bytes": 74,
+      "sha256": "4275e407a454a5719b9235c26b6e8aa0b1584d4076f69a081ad2f6e430c5fb9d"
+    },
+    {
+      "path": "payload.txt",
+      "bytes": 147,
+      "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
+    },
+    {
+      "path": "pending-clean.response.jsonl",
+      "bytes": 79,
+      "sha256": "c03644eb87df511f75e9f275fdb4e11f73f2e09537b02ea1517c2af2b63d0a26"
+    },
+    {
+      "path": "reuse.request.jsonl",
+      "bytes": 93,
+      "sha256": "c2a3debccecde27a708221479d30b2159991bc3ceb308f2738bf9a0f519762f5"
+    },
+    {
+      "path": "reused_id_late.requests.jsonl",
+      "bytes": 93,
+      "sha256": "c2a3debccecde27a708221479d30b2159991bc3ceb308f2738bf9a0f519762f5"
+    },
+    {
+      "path": "reused_id_late.schedule.json",
+      "bytes": 3774,
+      "sha256": "bc134ae5630a0ef2fec9516dfec2d511b039a32c3b91552f6eb7a7324b0b03ca"
+    },
+    {
+      "path": "reused_id_late.upstream.jsonl",
+      "bytes": 244,
+      "sha256": "f763115feffee912ae88b6bba4150433b56caa818a1a72fa89af397106f967c2"
+    }
+  ],
+  "candidate_executed": false
+}

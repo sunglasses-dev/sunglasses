@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-21",
+  "variant": "ambiguous_result",
+  "profile": "protocol_ambiguous",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "ambiguous_result.requests.jsonl",
+      "profile": "protocol_ambiguous"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "protocol_ambiguous",
+      "client_file": "ambiguous_result.requests.jsonl",
+      "upstream_file": "ambiguous_result.upstream.jsonl",
+      "auxiliary_files": [
+        "clean-tail.client.jsonl",
+        "clean-tail.upstream.jsonl"
+      ],
+      "fault": {},
+      "sequence": "Known response ID carries both result and error; close and refuse tail, without detector masking.",
+      "primary_id_file": "ambiguous_result.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/21_g3_protocol_state/expected.json",
+      "variant": "ambiguous_result",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Validate only jsonrpc version."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "send_file",
+      "path": "ambiguous_result.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "await_event",
+      "event": "REQUEST_RECEIVED",
+      "actor": "upstream",
+      "correlate_id_from": "ambiguous_result.requests.jsonl",
+      "timeout_ms": 3000
+    },
+    {
+      "op": "send_file",
+      "path": "ambiguous_result.upstream.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "send_file",
+      "path": "clean-tail.upstream.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "await_event",
+      "event": "UPSTREAM_CLOSED",
+      "actor": "proxy",
+      "correlate_id_from": "ambiguous_result.requests.jsonl",
+      "timeout_ms": 3000
+    },
+    {
+      "op": "release_any_old_workers",
+      "require_discard": true
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}

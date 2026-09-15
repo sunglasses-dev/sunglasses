@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-22",
+  "variant": "exit_with_pending",
+  "profile": "limit_exit",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "exit_with_pending.requests.jsonl",
+      "profile": "limit_exit"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "limit_exit",
+      "client_file": "exit_with_pending.requests.jsonl",
+      "upstream_file": "exit_with_pending.upstream.jsonl",
+      "auxiliary_files": [],
+      "fault": {
+        "target": "process_and_transport",
+        "profile": "limit_exit",
+        "after": "REQUEST_FORWARDED",
+        "limits": "limits.json"
+      },
+      "sequence": "Known client calls pending; upstream exits 0 with no response; client receives bounded safe error and proxy exits nonzero.",
+      "primary_id_file": "exit_with_pending.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/22_g3_process_limits/expected.json",
+      "variant": "exit_with_pending",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Blindly propagate upstream zero exit."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "arm_process_transport_profile",
+      "name": "limit_exit",
+      "limits": "limits.json"
+    },
+    {
+      "op": "send_file",
+      "path": "exit_with_pending.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "execute_process_transport_profile",
+      "name": "limit_exit",
+      "upstream_path": "exit_with_pending.upstream.jsonl",
+      "auxiliary_files": [],
+      "barrier_and_limit_source": "limits.json"
+    },
+    {
+      "op": "assert_deadline_and_process_group_cleanup",
+      "limits": "limits.json"
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}
