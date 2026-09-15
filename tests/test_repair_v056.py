@@ -796,17 +796,41 @@ def test_package_reads_no_undeclared_environment_variables():
     #      (`<anything>.getattr`, `<anything>.import_module`, ...) is refused unless
     #      it is the callee of a direct call with literal arguments; as a value it
     #      refuses; `import builtins` and `__builtins__` refuse outright;
-    # Two more rules were built for this round and REMOVED before commit: "any
-    # attribute named os/_os/posix/nt on any base refuses" and "any attribute
-    # named modules on any base refuses". Executed against 83 shapes, disabling
-    # either changed nothing: every path from a re-exported os module to a read
-    # still carries a sensitive token (refused above) or a computed name (R3/R5).
-    # A rule with no red mutation of its own is decoration, so the shapes stay
-    # as controls (tempfile._os, subprocess.os, an aliased sys.modules) and the
-    # rules do not.
+    # ROUND 9 (ASTRA E68-E80). Two rules were REMOVED at round 8 for "having no
+    # red of their own"; ASTRA then constructed the reds (E73-E77: the os module
+    # obtained as a VALUE with no read at all, which the guard must also refuse)
+    # and eight readers that reach the attribute-protocol exemption with a MODULE
+    # as the receiver: a class whose __getattr__ calls getattr(self, name) is
+    # exposed as an unbound method (`read = __getattr__`) and called with os as
+    # `self`, os having been obtained via tempfile._os, an aliased sys.modules,
+    # importlib.machinery loaders, or os.stat.__self__. The exemption trusted a
+    # receiver by the spelling of a parameter. Rules restored and added:
+    #   R6 an attribute named os/_os/posix/nt on ANY base refuses (red: E73-E75, E77);
+    #   R7 an attribute named modules on ANY base refuses (red: E76);
+    #   R8 a dunder method reached OUTSIDE the protocol takes a literal name: an
+    #      explicit `.__getattr__(x, NAME)` call, or a call through a name bound
+    #      to a dunder (`read = __getattr__`, ASTRA's allowed A10 does this
+    #      benignly), must pass a string literal as the name, so the sensitive
+    #      literals die on the token rule and the computed ones die here; a
+    #      dunder named as a string refuses; a class deriving from a module type
+    #      refuses (red: a receiver obtained through gc.get_objects, which no
+    #      acquisition rule sees, T81/T82);
+    #   R9 function/method dunders that lead back to a module (__self__, __func__,
+    #      __wrapped__, __closure__, __code__) refuse on any base (red: E79);
+    #   R10 importer machinery on any base refuses: load_module, exec_module,
+    #      create_module, find_spec, find_module, module_from_spec,
+    #      spec_from_file_location, spec_from_loader, get_code, get_source, and
+    #      the importlib.machinery / importlib.util / importlib.abc names
+    #      (red: E78, E80). getattr_static joins the named lookups.
     INTROSPECTION = {"getattr", "setattr", "hasattr", "delattr", "vars", "globals",
                      "locals", "__import__", "eval", "exec", "compile"}
-    NAMED_LOOKUPS = {"attrgetter", "itemgetter", "methodcaller", "import_module"}
+    OS_REEXPORTS = {"os", "_os", "posix", "nt"}
+    DUNDER_METHODS = {"__getattr__", "__getattribute__", "__setattr__", "__delattr__"}
+    FUNCTION_DUNDERS = {"__self__", "__func__", "__wrapped__", "__closure__", "__code__"}
+    IMPORTER_ATTRS = {"load_module", "exec_module", "create_module", "find_spec", "find_module",
+                      "module_from_spec", "spec_from_file_location", "spec_from_loader",
+                      "get_code", "get_source", "machinery", "util", "abc"}
+    NAMED_LOOKUPS = {"attrgetter", "itemgetter", "methodcaller", "import_module", "getattr_static"}
     MODULE_DUNDERS = {"__dict__", "__getattribute__", "__getattr__", "__builtins__", "__globals__"}
     OS_MODULE_LITERALS = {"os", "posix", "nt"}
 
@@ -920,6 +944,14 @@ def test_package_reads_no_undeclared_environment_variables():
                 refusals.append(f"{relpath}:{node.lineno} os.{node.attr} access")
         # ROUND 6 refusals R1-R4 (see the block above _parents).
         parents = _parents(tree)
+        # names bound to a dunder method anywhere in the module (`read = __getattr__`), one level, no chasing
+        dunder_aliases = set()
+        for n in ast.walk(tree):
+            if isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None and any(
+                    isinstance(v, ast.Name) and v.id in DUNDER_METHODS for v in ast.walk(n.value)):
+                for t_ in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                    if isinstance(t_, ast.Name):
+                        dunder_aliases.add(t_.id)
         for node in ast.walk(tree):
             par = parents.get(id(node))
             if isinstance(node, ast.Name) and node.id in os_names and isinstance(node.ctx, ast.Load) \
@@ -964,6 +996,38 @@ def test_package_reads_no_undeclared_environment_variables():
                 refusals.append(f"{relpath}:{node.lineno} import builtins (R5)")
             if isinstance(node, ast.Name) and node.id == "__builtins__":
                 refusals.append(f"{relpath}:{node.lineno} __builtins__ (R5)")
+            # R6 / R7: the os module or the module table reached through any other name
+            if isinstance(node, ast.Attribute) and node.attr in OS_REEXPORTS:
+                refusals.append(f"{relpath}:{node.lineno} .{node.attr}: the os module reached through another module (R6)")
+            if isinstance(node, ast.Attribute) and node.attr == "modules":
+                refusals.append(f"{relpath}:{node.lineno} .modules: the module table on any base (R7)")
+            # R8: a dunder reached outside the protocol takes a literal name
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in DUNDER_METHODS:
+                refusals.append(f"{relpath}:{node.lineno} attribute-protocol method named as a string (R8)")
+            if isinstance(node, ast.Call):
+                target = node.func.attr if isinstance(node.func, ast.Attribute) else (node.func.id if isinstance(node.func, ast.Name) else None)
+                base = node.func.value if isinstance(node.func, ast.Attribute) else None
+                protocol_base = (isinstance(base, ast.Name) and base.id == "object") or \
+                    (isinstance(base, ast.Call) and isinstance(base.func, ast.Name) and base.func.id == "super")
+                # object.__setattr__(self, name, value) / super().__getattr__(name) ARE the protocol; their
+                # receiver cannot be a module without tripping R1/R6/R7/R9/R10 on the way in.
+                if (target in DUNDER_METHODS or target in dunder_aliases) and not protocol_base:
+                    if not (len(node.args) > 1 and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str)):
+                        refusals.append(f"{relpath}:{node.lineno} {target}() outside the attribute protocol with a computed name (R8)")
+            if isinstance(node, ast.ClassDef) and any(
+                    (isinstance(b, ast.Attribute) and b.attr == "ModuleType") or (isinstance(b, ast.Name) and b.id == "ModuleType")
+                    for b in node.bases):
+                refusals.append(f"{relpath}:{node.lineno} a class deriving from a module type (R8)")
+            # R9: function dunders that lead back to a module
+            if isinstance(node, ast.Attribute) and node.attr in FUNCTION_DUNDERS:
+                refusals.append(f"{relpath}:{node.lineno} .{node.attr} (R9)")
+            # R10: importer machinery
+            if isinstance(node, ast.Attribute) and node.attr in IMPORTER_ATTRS:
+                refusals.append(f"{relpath}:{node.lineno} .{node.attr}: importer machinery (R10)")
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                names = [a.name for a in node.names] + ([node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+                if any(n.startswith("importlib.") for n in names) or (isinstance(node, ast.ImportFrom) and node.module == "importlib" and any(a.name in {"machinery", "util", "abc"} for a in node.names)):
+                    refusals.append(f"{relpath}:{node.lineno} importlib submodule import: importer machinery (R10)")
             if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) and node.value.attr == "modules" \
                     and isinstance(node.value.value, ast.Name) and node.value.value.id == "sys":
                 refusals.append(f"{relpath}:{node.lineno} sys.modules lookup (R4)")
