@@ -33,6 +33,14 @@ REASONS = frozenset({
     "REQUEST_CANCELLED", "APPROVAL_REQUIRED", "DESCRIPTOR_CHANGED",
     "RECEIPT_IO_ERROR", "INCOMPLETE_SESSION", "ROUTE_UNVERIFIED",
     "CONFIG_CONFLICT", "CONFIG_IO_ERROR",
+    # Arrived from the core at the rebase onto 52b32b0. RC25/RC26's tripwire
+    # ends the session with it (rule S3, pump.py) when a settlement record is
+    # present and owned by another generation. This file froze its vocabulary
+    # on a branch cut before that rule existed, so the two met for the first
+    # time here: the tripwire fired and the envelope refused the reason, which
+    # turned a deliberate fault-and-close into a ValueError out of the reader.
+    # Six gate rows (RC29 x4, RC32 x2) caught it.
+    "INTERNAL_FAULT",
 })
 
 RULES = frozenset({"S1", "S2", "S3", "S4", "S5", "S6", "S7"})
