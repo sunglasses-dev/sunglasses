@@ -347,3 +347,54 @@ regression-test. The round-7 prompt carries this as CONTROLS_CORRECTION v7
 alongside R-RC03-1 and R-T903-1, and asks ASTRA to re-issue the selector in a
 text-independent form if he prefers -- an ast walk for the yield whose value
 calls `_handoff`.
+
+---
+
+## R-RC25-1, the ruling (T9, 2026-09-14)
+
+`test_round6_additional.py` is edited in ONE line and nothing else in it.
+
+    file    tests/proxy/test_round6_additional.py
+    before  d56a14adce6dc00982cc8113b727301daea309991fe4793a1d3b9c23169542f9
+    after   9e2b48eb4e5470b9c5e6eb29b4125c82211bc7f26a13cb0bae0a79b6a1ece2b3
+
+    -   def retire(identity):original(identity);entered.set()
+    +   def retire(identity,*rest):original(identity,*rest);entered.set()
+
+**Behaviour asserted unchanged; the signature follows the ruled key.**
+
+The control asserts a BEHAVIOUR: that the reader's retirement is OBSERVED on the
+advance. It still observes exactly that. `retire` is an instrument wrapped around
+`_retire_record` to learn when the old reader resumed, and it named a signature
+that RC25/RC26's repair changed.
+
+The repair gives the record a generation and lets a reader retire only what it
+created, so `_retire_record` now takes the record's key beside its identity.
+Left unchanged, the control raises `TypeError: retire() takes 1 positional
+argument but 2 were given` -- a failure of the instrument's shape, never of the
+behaviour it was written to pin.
+
+One consequence is recorded here because it is the reason the repair is shaped
+the way it is: **the CALL always happens, and only the DELETION is conditional.**
+The first repair had the caller skip retirement when it did not own the record,
+which is the same rule stated one level up -- and it made this control's tracer
+wait forever, because the tracer watches `_retire_record` RETURN as its signal
+that the old reader resumed. A reviewer's instrument observes calls, so the
+calls have to keep happening; what changes is what they do.
+
+The same ownership rule inside `_handoff` is a TRIPWIRE, not a tolerance
+(T9's second ruling): a record present under this identity and owned by another
+generation ENDS the session with `INTERNAL_FAULT`, rule S3, because the peer has
+violated nothing and our own invariant has. An ABSENT record stays ordinary --
+that is the idempotent case, and the same reading `_retire_record` takes. The
+production path cannot reach the mismatch today, since admission refuses an
+identity while `_settling` holds it and the record is created and handed off
+inside that window; the mutation that removed the check therefore survived the
+entire suite. A guard on a state the code calls impossible must fault rather than
+absorb, or it is a check that skips itself: green forever while the invariant
+beneath it rots. `test_a_handoff_for_another_generations_record_faults_the_session`
+pins it, and three mutations go red against it -- removing the check, removing
+the fault, and retiring by identity instead of generation.
+
+This goes to ASTRA as CONTROLS_CORRECTION v8 alongside the v7 items, and he is
+invited to re-issue the seam with `*rest` himself.
