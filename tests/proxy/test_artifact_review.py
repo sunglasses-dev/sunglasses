@@ -136,11 +136,16 @@ def test_AR13_stdout_stall_has_bounded_teardown(artifact):
  assert a.p.poll() is not None
 
 def test_AR14_upstream_exit_propagates_without_client_eof(artifact):
- # BOUNDED WAIT, not a sleep. With sleep(.5) this row passes alone and in this
- # file and failed once inside the full suite, reporting returncode 0: under
- # load the proxy reached its clean exit before the child's code was observed.
- # A fixed nap decides how long the race gets, and on a loaded machine it
- # decides wrong; waiting for the exit measures the thing the row is about.
+ # BOUNDED WAIT, not a sleep. sleep(.5) then poll() cannot distinguish "has not
+ # exited" from "exited, not reaped", so this row reported whichever the clock
+ # landed on.
+ #
+ # MY FIRST EXPLANATION WAS WRONG AND THE BOUND IS WHAT DISPROVED IT. I wrote
+ # that under load the proxy reached its clean exit before the child's code was
+ # observed. The bounded wait returned IMMEDIATELY with 0 rather than timing
+ # out, so the proxy had already decided -- and on an IDLE machine the same
+ # thing happened 3 runs in 12. It was never about load. The product read
+ # poll() and mapped None to success; AR14b pins that decision directly.
  a=artifact(exit_after_reply=7);a.send(req(1));a.answer(1)
  assert a.p.wait(timeout=10)==7
 
@@ -172,3 +177,43 @@ def test_AR19_null_id_upstream_error_is_inspected(artifact,tmp_path):
  a=artifact(error_file=str(p));a.approve();a.send(call(i=None));ans=a.answer(None)
  assert ans['error']['data']['reason_code']=='PROHIBITED_CONTENT'
  assert specimen('INJECTION') not in json.dumps(ans)
+
+def test_AR14b_an_unreaped_child_does_not_report_a_clean_exit():
+ """The race under AR14, made deterministic.
+
+ `_exit_code` read `child.poll()`, which answers None when the child has
+ exited but has not been reaped yet, and None was mapped to EXIT_OK. So
+ whether upstream's failure reached the caller depended on whether the
+ operating system had been asked for the status in time. Measured on an idle
+ machine before the repair: 3 runs in 12 exited 0 instead of 7, and those were
+ exactly the three where poll() returned None -- every run that saw a code
+ propagated it.
+
+ A stub rather than the artifact, because the point is the DECISION, not the
+ timing: a child that has already exited 7 and answers None to a
+ non-blocking poll must still produce 7."""
+ from sunglasses.proxy import serve
+ class UnreapedChild:
+  returncode=None
+  def poll(self):return None
+  def wait(self,timeout=None):
+   self.returncode=7;return 7
+ class OpenSession:
+  def closed_with(self):return None
+ assert serve._exit_code(OpenSession(),UnreapedChild())==7
+
+
+def test_AR14c_a_child_that_is_still_running_is_not_a_fault():
+ """The other side of it. A child that has NOT exited is not a failure: the
+ proxy may be leaving first, and inventing a nonzero code there would report a
+ fault that did not happen. Unknown stays EXIT_OK; only a KNOWN code
+ propagates."""
+ import subprocess
+ from sunglasses.proxy import serve
+ class RunningChild:
+  returncode=None
+  def poll(self):return None
+  def wait(self,timeout=None):raise subprocess.TimeoutExpired('upstream',timeout)
+ class OpenSession:
+  def closed_with(self):return None
+ assert serve._exit_code(OpenSession(),RunningChild())==serve.EXIT_OK

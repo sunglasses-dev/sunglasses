@@ -384,10 +384,27 @@ def _close(child):
 
 
 def _exit_code(session, child):
-    """T8.R14. A fault is nonzero always; an ordinary clean exit propagates."""
+    """T8.R14. A fault is nonzero always; an ordinary clean exit propagates.
+
+    AR14b. This read `child.poll()`, and poll answers None both for "still
+    running" and for "exited, not reaped yet" -- and None was mapped to
+    EXIT_OK. So an upstream that had already failed was reported as a clean run
+    whenever the status had not been collected in time, which on an idle
+    machine was 3 runs in 12. A non-blocking question cannot tell those two
+    states apart, so it is the wrong question: the child's stdin is already
+    closed by `_close` above, and a child that is going to exit has begun.
+
+    The wait is BOUNDED by the same kill grace the teardown uses, and a timeout
+    still means EXIT_OK. Unknown is not a fault -- the proxy may be leaving
+    first, and inventing a nonzero code there would report a failure that did
+    not happen. Only a code we actually have propagates.
+    """
     if session.closed_with():
         return EXIT_FAULT
-    code = child.poll()
+    try:
+        code = child.wait(timeout=bounds.KILL_GRACE_MS / 1000)
+    except subprocess.TimeoutExpired:
+        code = None
     return EXIT_OK if code in (None, 0) else int(code)
 
 
