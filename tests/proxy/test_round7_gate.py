@@ -10,7 +10,15 @@ from sunglasses.proxy import pump
 R=Path(__file__).resolve().parents[2]
 def wire(x):return json.dumps(x,separators=(',',':')).encode()+b'\n'
 def request(i,method='tools/call'):return wire({'jsonrpc':'2.0','id':i,'method':method,'params':{}})
-def save(name,data):(R/'evidence'/(name+'.json')).write_text(json.dumps(data,indent=2))
+def save(name,data):
+ # EVIDENCE GOES WHERE THE TREE KEEPS IT. This wrote to <root>/evidence,
+ # which is in no checkout and no archive: the directory existed only on a
+ # machine where somebody had already run these by hand, so every row that
+ # saved evidence died with FileNotFoundError the first time the suite
+ # actually collected them. tests/evidence is tracked and is where every
+ # neighbouring control in tests/proxy writes.
+ out=R/'tests'/'evidence';out.mkdir(parents=True,exist_ok=True)
+ (out/(name+'.json')).write_text(json.dumps(data,indent=2))
 def yield_line():
  tree=ast.parse(inspect.getsource(pump))
  fn=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='read_upstream')
