@@ -786,6 +786,24 @@ def test_package_reads_no_undeclared_environment_variables():
     #   R4 namespace and module introspection refuses everywhere: globals(),
     #      locals(), vars(), .__dict__, .__getattribute__, .__getattr__,
     #      .__builtins__, .__globals__, sys.modules[...].
+    # ROUND 8 (ASTRA E63-E67): the survivors reached the same two things through a
+    # different door: `builtins.getattr(...)` (an attribute of the builtins module,
+    # invisible to a rule that only looks at the bare name), the os module as a
+    # RE-EXPORT of another module (`tempfile._os`, `subprocess.os`), `sys.modules`
+    # through an aliased `sys`, and `importlib.import_module` bound to a local
+    # name. Three more refusals, still no resolver:
+    #   R5 any attribute named like an introspection builtin or a named lookup
+    #      (`<anything>.getattr`, `<anything>.import_module`, ...) is refused unless
+    #      it is the callee of a direct call with literal arguments; as a value it
+    #      refuses; `import builtins` and `__builtins__` refuse outright;
+    # Two more rules were built for this round and REMOVED before commit: "any
+    # attribute named os/_os/posix/nt on any base refuses" and "any attribute
+    # named modules on any base refuses". Executed against 83 shapes, disabling
+    # either changed nothing: every path from a re-exported os module to a read
+    # still carries a sensitive token (refused above) or a computed name (R3/R5).
+    # A rule with no red mutation of its own is decoration, so the shapes stay
+    # as controls (tempfile._os, subprocess.os, an aliased sys.modules) and the
+    # rules do not.
     INTROSPECTION = {"getattr", "setattr", "hasattr", "delattr", "vars", "globals",
                      "locals", "__import__", "eval", "exec", "compile"}
     NAMED_LOOKUPS = {"attrgetter", "itemgetter", "methodcaller", "import_module"}
@@ -931,6 +949,21 @@ def test_package_reads_no_undeclared_environment_variables():
                     refusals.append(f"{relpath}:{node.lineno} {fname}() namespace introspection (R4)")
             if isinstance(node, ast.Attribute) and node.attr in MODULE_DUNDERS:
                 refusals.append(f"{relpath}:{node.lineno} .{node.attr} access (R4)")
+            # R5: introspection reached as an attribute of any module (builtins.getattr, importlib.import_module ...)
+            # `compile` is excluded from the attribute form on purpose: re.compile is the package's own
+            # regex compiler and shares the builtin's name; the builtin `compile()` is still refused by name (R2).
+            if isinstance(node, ast.Attribute) and node.attr in (INTROSPECTION - {"compile"}) | NAMED_LOOKUPS:
+                if not (isinstance(par, ast.Call) and par.func is node):
+                    refusals.append(f"{relpath}:{node.lineno} .{node.attr} used as a value: aliased, passed or returned (R5)")
+                elif node.attr in {"getattr", "setattr", "hasattr", "delattr"} and not (
+                        len(par.args) > 1 and isinstance(par.args[1], ast.Constant) and isinstance(par.args[1].value, str)):
+                    refusals.append(f"{relpath}:{node.lineno} .{node.attr} with a computed name (R5)")
+                elif node.attr in {"vars", "globals", "locals", "eval", "exec", "__import__"}:
+                    refusals.append(f"{relpath}:{node.lineno} .{node.attr}() namespace or dynamic-code call (R5)")
+            if isinstance(node, ast.Import) and any(a.name == "builtins" for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} import builtins (R5)")
+            if isinstance(node, ast.Name) and node.id == "__builtins__":
+                refusals.append(f"{relpath}:{node.lineno} __builtins__ (R5)")
             if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) and node.value.attr == "modules" \
                     and isinstance(node.value.value, ast.Name) and node.value.value.id == "sys":
                 refusals.append(f"{relpath}:{node.lineno} sys.modules lookup (R4)")
