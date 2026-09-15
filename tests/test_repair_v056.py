@@ -822,6 +822,34 @@ def test_package_reads_no_undeclared_environment_variables():
     #      spec_from_file_location, spec_from_loader, get_code, get_source, and
     #      the importlib.machinery / importlib.util / importlib.abc names
     #      (red: E78, E80). getattr_static joins the named lookups.
+    # ROUND 10 (ASTRA N01-N10, 2026-09-15). The ten survivors named the same
+    # refused things by a spelling the rules above did not look at: the os
+    # re-export as a FROM-IMPORT (`from random import _os as m`), the module
+    # table as a from-import (`from sys import modules`), a module type under an
+    # alias, and refused attribute names handed to getattr AS STRING LITERALS
+    # ("_os", "__func__", "__globals__", "modules", "machinery"), which R3 waves
+    # through because a literal is what it asks for. The decisive pair (N09/N10)
+    # then read the environment through the enumerated-name exemption: an
+    # UNRELATED object carrying a runtime `__slots__` ("get" + "env") was
+    # iterated, and _enumerated_iterable trusted any `.__slots__` attribute once
+    # ONE literal slots assignment existed somewhere in the file. It never tied
+    # the iterable to a declaration. Rules widened and added, still no resolver:
+    #   R6 also refuses `import posix` / `import nt` and any from-import of an
+    #      os re-export name (red: N01, T90);
+    #   R7 also refuses a from-import of `modules` and any star import, whose
+    #      names cannot be enumerated (red: N02, T92);
+    #   R8 also refuses `ModuleType` by from-import or as a value, a computed
+    #      class base, and type() of an imported module, which IS the module
+    #      type under no name at all (red: N07, T93, T98, T99);
+    #   R11 the `.__slots__` exemption is granted ONLY to `self.__slots__` inside
+    #      a method of a class whose own body binds `__slots__` exactly once to a
+    #      literal tuple/list of non-sensitive strings (firewall.py's Decision is
+    #      the one real use); `.__slots__` assigned through an attribute, or
+    #      "__slots__" as a string, refuses (red: N09, N10, T94, T95, T96);
+    #   R12 a string literal handed to getattr/setattr/hasattr/delattr, a named
+    #      lookup or __import__ may not spell a refused attribute: an os
+    #      re-export, `modules`, a dunder, importer machinery, an introspection
+    #      name (red: N03-N06, N08).
     INTROSPECTION = {"getattr", "setattr", "hasattr", "delattr", "vars", "globals",
                      "locals", "__import__", "eval", "exec", "compile"}
     OS_REEXPORTS = {"os", "_os", "posix", "nt"}
@@ -833,6 +861,10 @@ def test_package_reads_no_undeclared_environment_variables():
     NAMED_LOOKUPS = {"attrgetter", "itemgetter", "methodcaller", "import_module", "getattr_static"}
     MODULE_DUNDERS = {"__dict__", "__getattribute__", "__getattr__", "__builtins__", "__globals__"}
     OS_MODULE_LITERALS = {"os", "posix", "nt"}
+    LOOKUP_CALLEES = {"getattr", "setattr", "hasattr", "delattr", "__import__"} | NAMED_LOOKUPS
+    REFUSED_LITERAL_NAMES = (OS_REEXPORTS | {"modules", "__slots__", "ModuleType"} | DUNDER_METHODS
+                             | FUNCTION_DUNDERS | IMPORTER_ATTRS | MODULE_DUNDERS | INTROSPECTION
+                             | NAMED_LOOKUPS | SENSITIVE)
 
     def _parents(tree):
         p = {}
@@ -851,8 +883,8 @@ def test_package_reads_no_undeclared_environment_variables():
     def _enumerated_iterable(it, tree, counts):
         """True if `it` is an iterable whose members are enumerated literal strings
         in THIS module and none is a sensitive token: a module-level Name bound
-        exactly once to a literal tuple/list, or <x>.__slots__ where every
-        __slots__ in the module is such a literal."""
+        exactly once to a literal tuple/list, or `self.__slots__` inside a class
+        whose OWN body binds __slots__ exactly once to such a literal (R11)."""
         if isinstance(it, ast.Name) and counts.get(it.id) == 1:
             for stmt in tree.body:
                 if isinstance(stmt, ast.Assign) and any(isinstance(t_, ast.Name) and t_.id == it.id for t_ in stmt.targets):
@@ -860,11 +892,33 @@ def test_package_reads_no_undeclared_environment_variables():
                     return vals is not None and not (set(vals) & SENSITIVE)
             return False
         if isinstance(it, ast.Attribute) and it.attr == "__slots__":
+            # every __slots__ bound in this module is a non-sensitive literal; WHICH
+            # declaration this receiver carries is R11's question, answered once, in
+            # the walk (_own_literal_slots), so that rule has a red of its own (T94).
             slots = [n.value for n in ast.walk(tree) if isinstance(n, ast.Assign)
                      and any(isinstance(t_, ast.Name) and t_.id == "__slots__" for t_ in n.targets)]
             return bool(slots) and all(
                 _literal_strings(v) is not None and not (set(_literal_strings(v)) & SENSITIVE) for v in slots)
         return False
+
+    def _own_literal_slots(attr, parents):
+        """R11 (ASTRA N09/N10): `<x>.__slots__` is an enumerated iterable ONLY when
+        x is `self` and the ENCLOSING class's own body binds __slots__ exactly once
+        to a literal tuple/list of non-sensitive strings. Any other `.__slots__` is
+        a runtime value this guard cannot read, and refuses."""
+        if not (isinstance(attr.value, ast.Name) and attr.value.id == "self"):
+            return False
+        cls = parents.get(id(attr))
+        while cls is not None and not isinstance(cls, ast.ClassDef):
+            cls = parents.get(id(cls))
+        if cls is None:
+            return False
+        own = [s.value for s in cls.body if isinstance(s, ast.Assign)
+               and any(isinstance(t_, ast.Name) and t_.id == "__slots__" for t_ in s.targets)]
+        if len(own) != 1:
+            return False
+        vals = _literal_strings(own[0])
+        return vals is not None and not (set(vals) & SENSITIVE)
 
     def _enumerated_name_arg(arg, call, tree, counts, parents):
         """The single exempt computed-name form: `arg` is a Name that is bound
@@ -952,6 +1006,9 @@ def test_package_reads_no_undeclared_environment_variables():
                 for t_ in (n.targets if isinstance(n, ast.Assign) else [n.target]):
                     if isinstance(t_, ast.Name):
                         dunder_aliases.add(t_.id)
+        # names bound by a plain `import x` / `import x as y`: modules for certain (R8 type() rule)
+        plain_imports = {(a.asname or a.name).split(".")[0] for n in ast.walk(tree)
+                         if isinstance(n, ast.Import) for a in n.names}
         for node in ast.walk(tree):
             par = parents.get(id(node))
             if isinstance(node, ast.Name) and node.id in os_names and isinstance(node.ctx, ast.Load) \
@@ -1031,6 +1088,49 @@ def test_package_reads_no_undeclared_environment_variables():
             if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) and node.value.attr == "modules" \
                     and isinstance(node.value.value, ast.Name) and node.value.value.id == "sys":
                 refusals.append(f"{relpath}:{node.lineno} sys.modules lookup (R4)")
+            # ROUND 10 (ASTRA N01-N10): the same refused things under another spelling.
+            # R6: the os module may enter a module ONLY as `import os` (with or without an alias)
+            if isinstance(node, ast.Import) and any(a.name.split(".")[0] in OS_REEXPORTS - {"os"} for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} import of an os re-export module; only `import os` may name it (R6)")
+            if isinstance(node, ast.ImportFrom) and any(a.name in OS_REEXPORTS for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} from-import of the os module under another module's name (R6)")
+            if isinstance(node, ast.ImportFrom) and node.module and node.module.split(".")[0] in OS_MODULE_LITERALS - {"os"}:
+                refusals.append(f"{relpath}:{node.lineno} from-import out of {node.module} (R6)")
+            # R7: the module table by from-import; a star import binds names nobody enumerated
+            if isinstance(node, ast.ImportFrom) and any(a.name == "modules" for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} from-import of the module table (R7)")
+            if isinstance(node, ast.ImportFrom) and any(a.name == "*" for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} star import: its names cannot be enumerated (R7)")
+            # R8: a module type by any spelling, and a class base the guard cannot read
+            if isinstance(node, ast.ImportFrom) and any(a.name == "ModuleType" for a in node.names):
+                refusals.append(f"{relpath}:{node.lineno} from-import of a module type (R8)")
+            if isinstance(node, ast.Attribute) and node.attr == "ModuleType" and not isinstance(par, ast.ClassDef):
+                refusals.append(f"{relpath}:{node.lineno} .ModuleType used as a value (R8)")
+            if isinstance(node, ast.ClassDef) and any(not isinstance(b, (ast.Name, ast.Attribute)) for b in node.bases):
+                refusals.append(f"{relpath}:{node.lineno} computed class base (R8)")
+            # type(<imported module>) IS the module type, under no name at all (langchain.py binds its
+            # bases from a call on purpose, so a rebound base is not the thing to refuse; this is)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "type" \
+                    and len(node.args) == 1 and isinstance(node.args[0], ast.Name) and node.args[0].id in plain_imports:
+                refusals.append(f"{relpath}:{node.lineno} type() of an imported module is the module type (R8)")
+            # R11: __slots__ is a declaration, never a runtime value
+            if isinstance(node, ast.Attribute) and node.attr == "__slots__" and not _own_literal_slots(node, parents):
+                refusals.append(f"{relpath}:{node.lineno} .__slots__ on a receiver whose declaration this guard cannot read (R11)")
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and any(
+                    isinstance(t_, ast.Attribute) and t_.attr == "__slots__"
+                    for t_ in (getattr(node, "targets", None) or [getattr(node, "target", None)])):
+                refusals.append(f"{relpath}:{node.lineno} __slots__ assigned through an attribute (R11)")
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value == "__slots__":
+                refusals.append(f"{relpath}:{node.lineno} __slots__ named as a string (R11)")
+            # R12: a literal handed to a lookup may not spell a refused attribute
+            if isinstance(node, ast.Call):
+                callee = node.func.id if isinstance(node.func, ast.Name) else \
+                    (node.func.attr if isinstance(node.func, ast.Attribute) else None)
+                if callee in LOOKUP_CALLEES:
+                    for a in list(node.args) + [k.value for k in node.keywords]:
+                        if isinstance(a, ast.Constant) and isinstance(a.value, str) and a.value in REFUSED_LITERAL_NAMES:
+                            refusals.append(f"{relpath}:{node.lineno} {callee} names a refused attribute {a.value!r} (R12)")
+                            break
         # Every other sensitive token refuses.
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and node.attr in SENSITIVE and id(node) not in consumed:
