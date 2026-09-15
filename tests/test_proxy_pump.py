@@ -1068,3 +1068,72 @@ def test_a_refusal_names_the_item_s_own_budget_not_the_session_s():
     data = json.loads(frames[0])["error"]["data"]
     assert data["reason_code"] == "OVER_BUDGET"
     assert data["budget"] == "content"
+
+
+# ── RC20 and AR10: the deadline stamp belongs under the admission lock ──────
+#
+# Written at the #168 rebase (T9 ruling, 2026-09-14). RC20 put admission's test
+# and insert under one lock so nothing can move an entry between deciding and
+# recording. AR10 added `_admitted_at` as a third table that the same insert
+# writes, and the rebase had to decide whether it goes inside the lock or after
+# it. Outside, the markers resolve and the module compiles, and the window RC20
+# exists to close is reopened for that one table.
+#
+# This control exists because the obvious assertion cannot catch that. Anything
+# checked AFTER `admit_request` returns is true either way -- by then the stamp
+# is written. The observation has to happen at the instant the lock is released.
+
+
+class _LockThatReadsTheTablesOnRelease:
+    """A stand-in for `_settlement` that snapshots the admission tables at each
+    release. Delegates everything to the real lock; it only watches."""
+
+    def __init__(self, real, read_tables):
+        self._real = real
+        self._read_tables = read_tables
+        self.releases: list = []
+
+    def __enter__(self):
+        return self._real.__enter__()
+
+    def __exit__(self, *exc_info):
+        self.releases.append(self._read_tables())
+        return self._real.__exit__(*exc_info)
+
+    def acquire(self, *a, **k):
+        return self._real.acquire(*a, **k)
+
+    def release(self):
+        return self._real.release()
+
+    def locked(self):
+        return self._real.locked()
+
+
+def test_the_deadline_stamp_is_written_under_the_admission_lock():
+    """RC20 + AR10. When admission commits, every table that insert writes must
+    already agree, measured where the lock is released rather than after the
+    call returns."""
+    session = pump.Session()
+    identity = pump.key("client", 41)
+    watcher = _LockThatReadsTheTablesOnRelease(
+        session._settlement,
+        lambda: {
+            "pending": identity in session._pending,
+            "generation": identity in session._generation,
+            "stamped": identity in session._admitted_at,
+        },
+    )
+    session._settlement = watcher
+
+    assert session.admit_request(41, method="tools/call", origin="client")
+
+    assert watcher.releases, "admission never took the settlement lock"
+    committed = watcher.releases[0]
+    assert committed["pending"], "the entry was not recorded under the lock"
+    assert committed["generation"], "the generation was not recorded under the lock"
+    assert committed["stamped"], (
+        "`_admitted_at` was written OUTSIDE the lock RC20 exists to hold. "
+        "Between the release and the stamp an admitted entry has no deadline, "
+        "which is the between-deciding-and-recording window, one table wide."
+    )
