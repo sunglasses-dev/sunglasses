@@ -290,25 +290,33 @@ def test_a_credential_arriving_in_a_result_is_content_and_not_exfiltration(tmp_p
         "PROHIBITED_CONTENT", "an arriving credential is not an exfiltration"
 
 
-def test_the_secret_lane_barely_covers_the_result_direction(tmp_path):
-    """MEASURED, and it is a gap rather than a design.
+def test_the_secret_lane_now_covers_the_result_direction(tmp_path):
+    """THE PIN FIRED, and this is it being answered rather than deleted.
 
-    An AWS access key arriving in a tool result is not detected at all. Nine of
-    the ten GLS-SD rules are scoped to channels that do not include
-    api_response, so the credential is forwarded to the model. Nothing in the
-    contract requires the secret lane to cover arriving messages, and there is
-    a reading where an inbound credential is not our business, but a product
-    that says it inspects tool results and forwards a raw AWS key in one is
-    making a claim its coverage does not support.
+    Until #170 this row asserted the opposite: an AWS access key arriving in a
+    tool result was not detected at all, because nine of the ten GLS-SD rules
+    were scoped to channels that did not include api_response, and it said "if
+    this now blocks, the secret lane grew api_response coverage". #170 added
+    the eight -API siblings and it now blocks, so the assertion follows the
+    evidence. That is the whole value of pinning a gap instead of writing it in
+    a document nobody runs.
 
-    Pinned here so the day somebody widens those channel lists this test is the
-    thing that notices, and so no video claims otherwise in the meantime.
+    WHAT THIS DOES AND DOES NOT CLAIM. Secret material in the eight -API
+    formats arriving in a tool result is blocked by the proxy. General
+    tool-result injection scanning is NOT claimed -- this is the credential
+    lane only, and GLS-SD-010 is still open in this direction because its
+    line anchor cannot match inside a JSON string.
     """
     raw = _result_frame("your key is AKIAIOSFODNN7EXAMPLE")
     engine, client, stream = _engine(tmp_path, [raw])
     engine.pump_upstream(stream)
-    assert client.bytes == raw, \
-        "if this now blocks, the secret lane grew api_response coverage"
+    assert client.bytes != raw, \
+        "the credential was forwarded to the model; api_response coverage regressed"
+    data = client.messages()[0]["error"]["data"]
+    assert data["reason_code"] == "PROHIBITED_CONTENT"
+    # Read off the receipt at the rebase, not guessed.
+    assert "GLS-SD-001-API" in data["rule_ids"], data["rule_ids"]
+    assert "GLS-SD-003-API" in data["rule_ids"], data["rule_ids"]
 
 
 def test_an_unbelievable_result_withholds_the_frame_as_a_scan_exception(tmp_path):

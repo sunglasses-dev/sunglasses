@@ -136,8 +136,13 @@ def test_AR13_stdout_stall_has_bounded_teardown(artifact):
  assert a.p.poll() is not None
 
 def test_AR14_upstream_exit_propagates_without_client_eof(artifact):
- a=artifact(exit_after_reply=7);a.send(req(1));a.answer(1);time.sleep(.5)
- assert a.p.poll()==7
+ # BOUNDED WAIT, not a sleep. With sleep(.5) this row passes alone and in this
+ # file and failed once inside the full suite, reporting returncode 0: under
+ # load the proxy reached its clean exit before the child's code was observed.
+ # A fixed nap decides how long the race gets, and on a loaded machine it
+ # decides wrong; waiting for the exit measures the thing the row is about.
+ a=artifact(exit_after_reply=7);a.send(req(1));a.answer(1)
+ assert a.p.wait(timeout=10)==7
 
 def test_AR15_client_unterminated_frame_not_forwarded(artifact):
  a=artifact();raw=wire(req(1))[:-1];a.p.stdin.write(raw);a.p.stdin.close();a.p.wait(timeout=8);a.reader.join(timeout=1)

@@ -67,9 +67,11 @@ def test_RS09_accepted_false_scan_keeps_session_state_closed_on_log_fault(tmp_pa
  log.close();assert s.closed_with()==('RECEIPT_IO_ERROR','S3')
 
 def test_RS10_catalog_counts():
- assert len(inspection.engine_catalog())==1557
+ # Recounted at the rebase onto 52b32b0. 1557 -> 1565 and 1569 -> 1577 are
+ # #170's eight -API siblings arriving from main, not a change in this stack.
+ assert len(inspection.engine_catalog())==1565
  assert len(inspection.helper_catalog())==12
- assert len(inspection.trusted_catalog())==1569
+ assert len(inspection.trusted_catalog())==1577
 
 def test_RS11_list_finding_provenance_is_preserved():
  page={'tools':[{'name':'echo','inputSchema':{'type':'object'}}]}
