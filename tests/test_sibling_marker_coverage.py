@@ -43,8 +43,56 @@ from sunglasses.engine import SunglassesEngine         # noqa: E402
 from sunglasses.patterns import PATTERNS               # noqa: E402
 from sunglasses.preprocessor import normalize          # noqa: E402
 
-SIBLINGS = [p for p in PATTERNS if p["id"].endswith("-API")]
 GAP_MARK = r"[\s\S]{0,"
+
+
+def _is_marker_sibling(pattern):
+    """A member of THIS family: a marker alternation followed by a bounded gap.
+
+    Membership is decided by the STRUCTURE this file exists to walk, not by the
+    `-API` suffix. The suffix is a naming convention every sibling family shares,
+    and it stopped meaning "prose marker rule" the moment GLS-SD grew secret
+    siblings: those match a literal token shape, have no marker to split from a
+    gap, and `_marker_source` returned None for each of them, so this file
+    asserted on eight rules it was never written about.
+
+    An id suffix is not family membership. That is the same mistake as reading a
+    pattern count instead of a file hash: a resemblance standing in for the
+    property you actually need.
+
+    Structure alone is not enough either, because a PI sibling that LOST its
+    marker would quietly drop out of the suite and this file would still report
+    green over a smaller set. So the membership is pinned below as well.
+    """
+    regexes = pattern.get("regex") or []
+    # BOTH conditions. The suffix alone admitted the GLS-SD secret siblings,
+    # which have no marker; the structure alone admits dozens of ordinary rules
+    # that happen to use a bounded gap (GLS-DFP-117, GLS-AW-013 and more, caught
+    # by the pin below the moment the selector was widened). The family is the
+    # intersection: a SIBLING that carries a MARKER.
+    return (pattern["id"].endswith("-API")
+            and bool(regexes)
+            and GAP_MARK in regexes[0])
+
+
+SIBLINGS = [p for p in PATTERNS if _is_marker_sibling(p)]
+
+# Pinned. A new marker sibling or a lost one changes this line, deliberately,
+# in the commit that causes it.
+EXPECTED_MARKER_SIBLINGS = {
+    "GLS-PI-013-API", "GLS-PI-016-API", "GLS-PI-017-API",
+    "GLS-PI-021-API", "GLS-PI-INFO-API", "GLS-PIEMN-001-API",
+}
+
+
+def test_the_family_this_file_walks_is_the_family_it_pins():
+    """The set under test is the set that was reviewed, not whatever matched.
+
+    Without this, narrowing the selector to fix a false member could also drop a
+    real one and nothing would say so: the suite would pass over less than it
+    used to, which is the failure mode of every selector that is quietly wrong.
+    """
+    assert {p["id"] for p in SIBLINGS} == EXPECTED_MARKER_SIBLINGS
 
 
 @pytest.fixture(scope="module")

@@ -2466,6 +2466,184 @@ PATTERNS = [
         "description": "Detects environment variable / config file secret leakage patterns."
     },
 
+    # ── GLS-SD -API siblings ─────────────────────────────────────────────────
+    # Secrets arriving in the RESULT direction. Nine of the ten GLS-SD rules
+    # carried no `api_response` channel, so an AWS key id, a private key or a
+    # GitHub token arriving in a TOOL RESULT was not detected; only GLS-SD-005
+    # (JWT) reached that direction. Measured before this change: `AKIA` shape,
+    # `ghp_` and `API_KEY=sk-` all BLOCK on `file` and ALLOW with zero findings
+    # on `api_response`.
+    #
+    # THE PARENT PREDICATE IS COPIED CHARACTER FOR CHARACTER. A sibling adds
+    # CHANNELS and nothing else. The parent's behaviour is the product's
+    # behaviour, and a sibling that also "improves" the predicate makes the two
+    # disagree on the channels they share, which is the widening this pattern
+    # exists to prevent.
+    #
+    # DISCLOSED LIMIT, asserted by a fixture rather than remembered: AWS's
+    # documented example key AKIAIOSFODNN7EXAMPLE blocks in a tool result
+    # exactly as it blocks in a file; an agent reading AWS documentation
+    # through a tool will see that block; the remedy is a policy allowlist
+    # entry for known vendor examples, which is a follow-up item, not a weaker
+    # rule.
+    #
+    # GLS-SD-010 is deliberately NOT paired. Its predicate is line anchored
+    # `(?m)^API_KEY=`, and inside a JSON string the key sits mid-line after
+    # quotes and escapes, so the anchor cannot match in the very channel the
+    # sibling would exist for. Measured: the same env line hits SD-001 and
+    # SD-010 as a bare line, and only SD-001 inside a tool-result JSON. A
+    # sibling that cannot fire where it is needed is worse than none, because
+    # it reviews as coverage. A shape for embedded content is a NEW rule with
+    # its own fixtures and review, and follows separately.
+
+    {
+        "id": "GLS-SD-001-API",
+        "name": "API key patterns (api_response)",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "regex": [
+            r"sk-[a-zA-Z0-9]{20,}",           # OpenAI
+            r"sk-ant-[a-zA-Z0-9\-]{20,}",     # Anthropic
+            r"AIza[0-9A-Za-z\-_]{35}",         # Google API
+            r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
+            r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
+            r"xoxb-[0-9]{10,}-[a-zA-Z0-9]+",   # Slack bot token
+            r"AKIA[0-9A-Z]{16}",               # AWS access key
+        ],
+        "description": "Known API key formats that should never appear in agent inputs."
+    },
+    {
+        "id": "GLS-SD-002-API",
+        "name": "Private key content (api_response)",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "keywords": [
+            "-----begin rsa private key-----",
+            "-----begin openssh private key-----",
+            "-----begin private key-----",
+            "-----begin ec private key-----",
+            "-----begin dsa private key-----",
+        ],
+        "description": "Private key material that should never be in agent-accessible content."
+    },
+    {
+        "id": "GLS-SD-003-API",
+        "name": "AWS access key ID (api_response)",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "keywords": [
+            "aws access key",
+            "credential",
+            "secret exposure",
+        ],
+        "regex": [
+            r"AKIA[0-9A-Z]{16}",
+        ],
+        "description": "Detects AWS access key IDs in text."
+    },
+    {
+        "id": "GLS-SD-004-API",
+        "name": "PEM-encoded private key (api_response)",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "keywords": [
+            "private key",
+            "PEM",
+            "SSH key",
+            "credential",
+        ],
+        "regex": [
+            r"-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----",
+        ],
+        "description": "Detects PEM-encoded private keys."
+    },
+    {
+        "id": "GLS-SD-006-API",
+        "name": "GitHub classic PAT (api_response)",
+        "category": "secret_detection",
+        "severity": "critical",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "keywords": [
+            "GitHub token",
+            "PAT",
+            "credential",
+        ],
+        "regex": [
+            r"ghp_[A-Za-z0-9]{36}",
+        ],
+        "description": "Detects GitHub classic personal access tokens."
+    },
+    {
+        "id": "GLS-SD-007-API",
+        "name": "Slack API token (api_response)",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["api_response", "log_memory", "agent_input"],
+        "keywords": [
+            "Slack token",
+            "bot token",
+            "credential",
+        ],
+        "regex": [
+            r"xox[baprs]-[A-Za-z0-9-]{10,}",
+        ],
+        "description": "Detects Slack API tokens."
+    },
+    {
+        "id": "GLS-SD-008-API",
+        "name": "Google API Key (api_response)",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["api_response", "agent_input"],
+        # NO log_memory FOR THIS ONE. The GLS-PI-021-API template carries
+        # api_response/log_memory/agent_input, but this parent's channels are
+        # message/file/code and do NOT include log_memory, so granting it here
+        # would be new coverage outside the result direction rather than a
+        # sibling. Measured: with log_memory the no-widening comparison reports
+        # a difference on a channel the parent never had; without it the
+        # comparison is exactly 0. Extending secret detection INTO log_memory is
+        # a separate decision with its own fixtures, not a side effect of
+        # closing the tool-result gap.
+        "keywords": [
+            "Google API key",
+            "AIza",
+            "google credential",
+        ],
+        "regex": [
+            r"AIza[0-9A-Za-z\-_]{35}",
+        ],
+        "description": "Detects Google API keys in the standard AIza format."
+    },
+    {
+        "id": "GLS-SD-009-API",
+        "name": "GitHub fine-grained PAT (api_response)",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["api_response", "agent_input"],
+        # NO log_memory FOR THIS ONE. The GLS-PI-021-API template carries
+        # api_response/log_memory/agent_input, but this parent's channels are
+        # message/file/code and do NOT include log_memory, so granting it here
+        # would be new coverage outside the result direction rather than a
+        # sibling. Measured: with log_memory the no-widening comparison reports
+        # a difference on a channel the parent never had; without it the
+        # comparison is exactly 0. Extending secret detection INTO log_memory is
+        # a separate decision with its own fixtures, not a side effect of
+        # closing the tool-result gap.
+        "keywords": [
+            "GitHub fine-grained token",
+            "github_pat_",
+            "PAT credential",
+        ],
+        "regex": [
+            r"github_pat_[A-Za-z0-9_]{20,}",
+        ],
+        "description": "Detects GitHub fine-grained personal access tokens."
+    },
+
     # --- GLS-EP-001: Large base64 encoded payload ---
     {
         "id": "GLS-EP-001",

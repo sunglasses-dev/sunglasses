@@ -39,7 +39,19 @@ from p1b_api_space import cases as _api_space   # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-API_IDS = {p["id"] for p in PATTERNS if p["id"].endswith("-API")}
+def _is_prose_sibling(pattern):
+    """This file is about the PROSE-injection siblings, which carry a regex.
+
+    `-API` alone is not the family. It is the naming convention every sibling
+    family uses, and the GLS-SD secret siblings adopted it: they match a literal
+    token shape, so counting their regex entries here took the pinned total from
+    12 to 25 and said nothing true about either family. An id suffix is not
+    family membership.
+    """
+    return pattern["id"].endswith("-API") and not pattern["id"].startswith("GLS-SD-")
+
+
+API_IDS = {p["id"] for p in PATTERNS if _is_prose_sibling(p)}
 NEW_CHANNELS = ["api_response", "log_memory", "agent_input"]
 OLD_CHANNELS = ["message", "file", "web_content", "tool_output"]
 SPACE = list(_api_space())
@@ -302,7 +314,7 @@ TIMING_DOCUMENTS.update({f"{name}_27KB": _fitted(seed, REPETITION_BYTES)
 @pytest.fixture(scope="module")
 def engine_without_the_siblings():
     """The same engine minus the six rules this PR adds, in this process."""
-    return SunglassesEngine([p for p in PATTERNS if not p["id"].endswith("-API")])
+    return SunglassesEngine([p for p in PATTERNS if not _is_prose_sibling(p)])
 
 
 def _seconds(target, text):
@@ -508,7 +520,7 @@ def test_a_reviewer_marker_row_fires_through_the_cli():
 def _sibling_entries(eng):
     out = {}
     for pattern, compiled in eng._regex_patterns:
-        if not pattern["id"].endswith("-API"):
+        if not _is_prose_sibling(pattern):
             continue
         for index, (mode, rx, key) in enumerate(compiled):
             out[(pattern["id"], index)] = (mode, rx, key)
@@ -516,8 +528,12 @@ def _sibling_entries(eng):
 
 
 def _without_anchors():
+    # Same family definition as everywhere else in this file. The GLS-SD
+    # siblings declare no anchors, so stripping them is a no-op, but leaving the
+    # bare suffix here would keep one more place where a future family that DOES
+    # declare anchors gets silently included in this control.
     return [{k: v for k, v in p.items() if not k.startswith("anchor_")}
-            if p["id"].endswith("-API") else p for p in PATTERNS]
+            if _is_prose_sibling(p) else p for p in PATTERNS]
 
 
 @pytest.fixture(scope="module")
@@ -534,8 +550,9 @@ def test_every_sibling_entry_actually_gets_the_anchored_mode(engine):
     assert len(entries) == 12, sorted(entries)
     not_anchored = {k: mode for k, (mode, _rx, _key) in entries.items()
                     if mode != "anchored"}
+    prose = {p["id"] for p in PATTERNS if _is_prose_sibling(p)}
     refusals = {k: why for k, why in engine._anchor_refusals.items()
-                if k[0].endswith("-API")}
+                if k[0] in prose}
     assert not_anchored == {}, (not_anchored, refusals)
     assert refusals == {}, refusals
     for key in entries:

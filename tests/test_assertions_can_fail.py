@@ -44,6 +44,13 @@ SANCTIONED_SUBSETS = [
     # iterated all seven here would be unable to express that.
     {"api_response", "log_memory", "agent_input"},          # the siblings' own
     {"message", "file", "web_content", "tool_output"},      # the parents' own
+    # The GLS-SD -API siblings, same split for the same reason. The no-widening
+    # proof asks one question: did any PARENT change on a channel it already
+    # had. Iterating `api_response` there would fold in the channel the siblings
+    # ADD, and the test could no longer tell a widened parent from working new
+    # coverage, which is the only thing it exists to separate. The result
+    # direction is asserted on its own, a few lines above.
+    {"file", "log_memory", "message", "web_content", "code"},   # the SD parents' own
 ]
 
 
