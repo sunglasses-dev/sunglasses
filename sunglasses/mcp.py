@@ -15,6 +15,7 @@ Register with Claude Code:
 import json
 import sys
 import os
+import threading
 
 # Ensure the package is importable when run as a module
 _pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -152,6 +153,35 @@ def handle_tools_call(params):
         }
 
 
+
+# ── one engine per process ──────────────────────────────────────────────────
+#
+# The MCP server is long-lived: `main()` reads requests in a loop for as long as
+# the client keeps it open. Building the engine inside each tool call made every
+# request pay the whole ruleset compile, and the compile is three orders of
+# magnitude more expensive than the work it enables -- measured on main at
+# 1,519 ms to build against 1.35 ms to scan, so a scan_text call was 1,526 ms of
+# which about a millisecond was scanning. On a slow box it is nearer three
+# seconds, per call, forever.
+#
+# Built on FIRST USE rather than at import, so importing the module stays cheap
+# and a client that never calls a tool never pays. The lock is what makes two
+# requests arriving together compile once instead of twice; the second check
+# inside it is what makes the first check outside it safe.
+_ENGINE = None
+_ENGINE_LOCK = threading.Lock()
+
+
+def _engine():
+    """The process's engine, built once, reused for every tool call."""
+    global _ENGINE
+    if _ENGINE is None:
+        with _ENGINE_LOCK:
+            if _ENGINE is None:
+                _ENGINE = SunglassesEngine()
+    return _ENGINE
+
+
 def _tool_scan_text(arguments):
     """Execute scan_text tool."""
     channel = arguments.get("channel", "message")
@@ -175,7 +205,7 @@ def _tool_scan_text(arguments):
             "isError": True,
         }
 
-    engine = SunglassesEngine()
+    engine = _engine()
     try:
         result = engine.scan(text, channel=channel)
     except ValueError as e:
@@ -298,7 +328,7 @@ def _tool_scan_file(arguments):
 
 def _tool_scanner_info(arguments):
     """Execute scanner_info tool."""
-    engine = SunglassesEngine()
+    engine = _engine()
     info = engine.info()
     output = json.dumps(info, indent=2)
     return {
