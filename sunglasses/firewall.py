@@ -110,29 +110,42 @@ class Decision:
 class SecretRule:
     """One credential format. Plain class for the same import-budget reason."""
 
-    __slots__ = ("id", "name", "regex")
+    __slots__ = ("id", "name", "regex", "prefixes")
 
-    def __init__(self, id: str, name: str, regex):
+    def __init__(self, id: str, name: str, regex, prefixes=()):
         self.id = id
         self.name = name
         self.regex = regex
+        # The literal alternatives this format BEGINS with, written beside the
+        # regex they come from. A prefix is part of the FORMAT only for the rule
+        # that owns it: `ASIA` is AWS's grammar and plain material anywhere
+        # else, which is the whole of ASTRA's R1a. Longest first, so `sk-proj-`
+        # is consumed before `sk-`.
+        self.prefixes = tuple(sorted(prefixes, key=len, reverse=True))
 
 
 SECRET_RULES: tuple = (
     SecretRule("GLS-FW-SEC-AWS", "AWS access key id",
-               re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+               re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+               prefixes=("AKIA", "ASIA")),
     SecretRule("GLS-FW-SEC-GITHUB", "GitHub token",
-               re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b")),
+               re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"),
+               prefixes=("ghp_", "gho_", "ghu_", "ghs_", "ghr_")),
     SecretRule("GLS-FW-SEC-ANTHROPIC", "Anthropic API key",
-               re.compile(r"\bsk-ant-[A-Za-z0-9]{2,}[A-Za-z0-9_\-]{20,}\b")),
+               re.compile(r"\bsk-ant-[A-Za-z0-9]{2,}[A-Za-z0-9_\-]{20,}\b"),
+               prefixes=("sk-ant-",)),
     SecretRule("GLS-FW-SEC-OPENAI", "OpenAI API key",
-               re.compile(r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_\-]{32,}\b")),
+               re.compile(r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_\-]{32,}\b"),
+               prefixes=("sk-proj-", "sk-svcacct-", "sk-")),
     SecretRule("GLS-FW-SEC-SLACK", "Slack token",
-               re.compile(r"\bxox[baprse]-[A-Za-z0-9\-]{20,}\b")),
+               re.compile(r"\bxox[baprse]-[A-Za-z0-9\-]{20,}\b"),
+               prefixes=("xoxb-", "xoxa-", "xoxp-", "xoxr-", "xoxs-", "xoxe-")),
     SecretRule("GLS-FW-SEC-GOOGLE", "Google API key",
-               re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}\b")),
+               re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}\b"),
+               prefixes=("AIza",)),
     SecretRule("GLS-FW-SEC-STRIPE", "Stripe live secret key",
-               re.compile(r"\bsk_live_[0-9A-Za-z]{20,}\b")),
+               re.compile(r"\bsk_live_[0-9A-Za-z]{20,}\b"),
+               prefixes=("sk_live_",)),
     SecretRule("GLS-FW-SEC-PEM", "private key block",
                re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----")),
     # Bearer credentials: only when the token itself has a checkable format.
@@ -141,7 +154,8 @@ SECRET_RULES: tuple = (
     # literal structure (base64url header.payload.signature, header starts
     # `eyJ`), which is a format, so they qualify.
     SecretRule("GLS-FW-SEC-JWT", "signed JWT",
-               re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b")),
+               re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"),
+               prefixes=("eyJ",)),
 )
 
 # ── Invisible-character normalization ───────────────────────────────────────
@@ -189,14 +203,19 @@ _PLACEHOLDER_WORDS = (
 _MIN_FILLER = 4
 
 
-def _segments(low: str):
+def _segments(text: str):
     """The token split on everything that is not alphanumeric.
 
     `YOUR_KEY_HERE` is three segments; `AKIAHERE4CIPPERUVIFX` is one. That
     difference is the whole fix.
+
+    CASE IS PRESERVED. The caller lowercases for WORD comparison and never for
+    SHAPE comparison -- ASTRA's R1b: lowercasing the whole token first turns a
+    case-sensitive alphabet into a run of one character, and `qQqQ...` is
+    material that only looks like filler after the material has been destroyed.
     """
     out, current = [], []
-    for char in low:
+    for char in text:
         if char.isalnum():
             current.append(char)
         elif current:
@@ -231,21 +250,16 @@ def _is_filler(segment: str) -> bool:
     return False
 
 
-# The literal prefixes the shipped credential formats begin with, as the
-# SEGMENTS they become. A prefix is part of the FORMAT, not part of the claim
-# anyone is making about the material, so `ghp_` in `ghp_xxxx...` neither proves
-# nor disproves that the rest is filler. Listed per format rather than guessed,
-# because "the first segment does not count" would let a token clear by having
-# any first segment at all.
-_FORMAT_PREFIX_SEGMENTS = frozenset({
-    "akia", "asia",                                   # AWS
-    "ghp", "gho", "ghu", "ghs", "ghr",                # GitHub
-    "sk", "ant", "proj", "svcacct",                   # Anthropic, OpenAI
-    "xoxb", "xoxa", "xoxp", "xoxr", "xoxs", "xoxe",   # Slack
-    "aiza",                                           # Google
-    "live", "test",                                   # Stripe modes
-    "eyj",                                            # JWT header
-})
+# The leading literals, taken from THE RULES THEMSELVES rather than from a
+# second list that can drift away from them. A prefix is format only for the
+# rule that owns it; the union below is used only when no rule is in hand, and
+# even then it is consumed ONCE, at the START of the token, never inside a
+# segment further along. ASTRA's R1a is what the old global set allowed: the AWS
+# temporary-credential prefix dropped into a GitHub token's BODY was discarded
+# as "format", and the q-filler left behind cleared a live credential.
+_FORMAT_PREFIX_LITERALS: tuple = tuple(sorted(
+    {prefix.lower() for rule in SECRET_RULES for prefix in rule.prefixes},
+    key=len, reverse=True))
 
 # Words that DESCRIBE credential material without being any of it. `YOUR_KEY_HERE`
 # is a placeholder and `key` is not a placeholder word, so without this the
@@ -259,19 +273,29 @@ _STRUCTURAL_WORDS = frozenset({
 })
 
 
-def _strip_format_prefix(segment: str) -> str:
-    """Remove a format literal that sits INSIDE a segment rather than beside it.
+def _strip_leading_format(token: str, prefixes=None) -> str:
+    """Remove ONE format literal from the FRONT of the token. Nothing else.
 
-    `AKIA...` and `AIza...` carry no separator, so the prefix and the body are
-    one segment and the body has to be recovered before it can be judged.
+    Two properties, and the defect needed both of them missing:
+
+    POSITION. Only at index 0. `AKIA...` and `AIza...` carry no separator, so
+    the prefix and the body are one segment and the body cannot be judged until
+    the literal comes off -- but a literal further along is something the SENDER
+    put there, and the sender does not get to label their own material as
+    format.
+
+    ONCE. A second format literal immediately after the first is material too.
+    Stripping repeatedly would hand back the same hole through a longer token.
     """
-    for prefix in ("akia", "asia", "aiza", "eyj"):
-        if segment.startswith(prefix) and len(segment) > len(prefix):
-            return segment[len(prefix):]
-    return segment
+    low = token.lower()
+    for prefix in (_FORMAT_PREFIX_LITERALS if prefixes is None else prefixes):
+        prefix = prefix.lower()
+        if low.startswith(prefix) and len(token) > len(prefix):
+            return token[len(prefix):]
+    return token
 
 
-def is_placeholder(token: str) -> bool:
+def is_placeholder(token: str, rule: "SecretRule | None" = None) -> bool:
     """True if this secret-shaped string is demonstrably not live material.
 
     STATE #54, and the rule took two passes to get right because the same
@@ -298,16 +322,16 @@ def is_placeholder(token: str) -> bool:
     """
     if any(c in token for c in _PLACEHOLDER_CHARS):
         return True
-    low = token.lower()
     words = frozenset(_PLACEHOLDER_WORDS)
 
-    body = []
-    for segment in _segments(low):
-        if segment in _FORMAT_PREFIX_SEGMENTS:
-            continue
-        stripped = _strip_format_prefix(segment)
-        if stripped:
-            body.append(stripped)
+    # THE RULE THAT MATCHED decides what its own format is. Called without one
+    # -- from a test, or from a caller holding a bare string -- the union is
+    # used, still only at the front of the token. Either way exactly one
+    # literal comes off and every remaining segment is material.
+    material = _strip_leading_format(
+        token, rule.prefixes if rule is not None else None)
+
+    body = _segments(material)
     if not body:
         # Nothing but format. That is not a statement that the material is
         # fake, so it is not cleared.
@@ -315,9 +339,12 @@ def is_placeholder(token: str) -> bool:
 
     claimed = False
     for segment in body:
-        if segment in words or _is_filler(segment):
+        # Words compare in lowercase; SHAPE is measured on the segment exactly
+        # as it arrived. Mixing those two is R1b.
+        low = segment.lower()
+        if low in words or _is_filler(segment):
             claimed = True
-        elif segment not in _STRUCTURAL_WORDS:
+        elif low not in _STRUCTURAL_WORDS:
             return False
     return claimed
 
@@ -380,7 +407,7 @@ def find_secret_material(text: str) -> list:
     for rule in SECRET_RULES:
         for match in rule.regex.finditer(text):
             token = match.group(0)
-            if token in seen or is_placeholder(token):
+            if token in seen or is_placeholder(token, rule):
                 continue
             seen.add(token)
             hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
@@ -440,16 +467,55 @@ def _fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8", "replace")).hexdigest()[:12]
 
 
+def egress_secret_hits(tool_name: str, tool_input: dict) -> tuple:
+    """(blocking hits, cleared canaries) for one call. Neither list is a
+    decision; `check_egress_secrets` turns the first into one and `evaluate`
+    puts the second in the receipt.
+
+    THE SECOND LIST EXISTS BECAUSE OF ASTRA'S C01. KNOWN_PUBLIC_CANARIES is the
+    only sanctioned way to clear a real format match, and it was also the only
+    event in this lane that left no trace: the raw hit was found, dropped here,
+    and the call ended on an ordinary clean decision. An exemption nobody can
+    see in the receipts is an exemption nobody can audit, and this list is
+    short and hand-maintained precisely so that each use of it is reviewable.
+
+    The cleared entry carries the rule and a FINGERPRINT, never the material.
+    The published fixtures in that set are public by definition, but a receipt
+    that prints credential material is a habit, not a special case, and the
+    habit is what leaks the next one.
+    """
+    if not is_egress_tool(tool_name, tool_input):
+        return [], []
+    hits, cleared = [], []
+    for hit in find_secret_material(egress_surface_text(tool_name, tool_input)):
+        if hit["match"] in KNOWN_PUBLIC_CANARIES:
+            cleared.append({
+                "rule_id": hit["rule_id"],
+                "name": hit["name"],
+                "fingerprint": f"sha256:{_fingerprint(hit['match'])}",
+                "reason": ("cleared by KNOWN_PUBLIC_CANARIES: a published vendor "
+                           "or tool fixture, exempted by enumeration and never "
+                           "by loosening a rule"),
+            })
+        else:
+            hits.append(hit)
+    return hits, cleared
+
+
 def check_egress_secrets(tool_name: str, tool_input: dict) -> "Decision | None":
     """HARD BLOCK if live credential material is heading out on this call.
 
     Returns None when there is nothing to say — the caller then continues to the
     other deterministic checks.
     """
-    if not is_egress_tool(tool_name, tool_input):
-        return None
-    hits = [h for h in find_secret_material(egress_surface_text(tool_name, tool_input))
-            if h["match"] not in KNOWN_PUBLIC_CANARIES]
+    hits, _cleared = egress_secret_hits(tool_name, tool_input)
+    return _deny_for_hits(hits, tool_name)
+
+
+def _deny_for_hits(hits: list, tool_name: str) -> "Decision | None":
+    """The block, built from hits that were already found. Separate so that
+    `evaluate` does not scan the same call twice to get a decision it can
+    already see the inputs for."""
     if not hits:
         return None
     first = hits[0]
@@ -1508,9 +1574,14 @@ def evaluate(payload: dict, home=None) -> "tuple":
                 None, {"skipped_event": event})
 
     # Checks that need zero configuration run first and unconditionally.
-    decision = check_egress_secrets(tool_name, tool_input)
-    if decision is not None:
-        return decision, None, extras
+    hits, cleared = egress_secret_hits(tool_name, tool_input)
+    if cleared:
+        # Rides in extras so it reaches the terminal record whatever decides
+        # this call: a canary cleared on a call that is then denied for some
+        # OTHER material still has to be visible (ASTRA C01).
+        extras["cleared_canaries"] = cleared
+    if hits:
+        return _deny_for_hits(hits, tool_name), None, extras
 
     # Config failures accumulate instead of returning early. A control that is
     # down has to reach the receipt even when some LATER check produced the

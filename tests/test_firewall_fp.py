@@ -528,14 +528,33 @@ def test_one_placeholder_segment_does_not_clear_a_real_token(token):
 
 
 @pytest.mark.parametrize("token", [_joined("ghp", "_", "x" * 36),
-                                   _joined("sk", "_test_", "x" * 24)])
+                                   _joined("sk", "_live_", "x" * 24)])
 def test_a_token_that_is_all_filler_after_its_prefix_still_clears(token):
     """Must be True, and it is why "every segment" alone is not the rule
     either: `ghp` is not a placeholder word, so a naive all-segments test would
     refuse a documented placeholder. The format's own literal prefix is not
-    part of the claim being made about the material."""
+    part of the claim being made about the material.
+
+    ROUND 3 CHANGED ONE OF THESE ROWS, and it is a narrowing, so it is stated
+    rather than quietly edited: the second token used to be `sk_test_` + filler
+    and now uses `sk_live_`. No shipped rule owns `sk_test_` -- ASTRA measured
+    zero raw matches for it (R2-05) -- and after this round a literal that no
+    rule declares is not format, it is just the first thing in the string. The
+    guard therefore no longer CLEARS such a token, which is the safe direction
+    and the same ruling as PREFIX-11: a prefix word with no credential format
+    behind it claims nothing. Nothing is cleared because nothing is caught.
+    `sk_live_` is a real shipped format and keeps the property under test.
+    """
     assert is_placeholder(token), (
         f"{token} is filler after a known format prefix and must clear")
+
+
+def test_a_format_literal_no_rule_owns_is_not_a_format():
+    """The row above, stated as its own expectation instead of as a gap in the
+    parametrize list. A test-mode Stripe prefix is not part of any rule's
+    grammar, so the material behind it is judged whole."""
+    assert not is_placeholder(_joined("sk", "_test_", "x" * 24))
+    assert not find_secret_material(_joined("sk", "_test_", "x" * 24))
 
 
 def test_a_test_mode_key_is_still_a_credential():
