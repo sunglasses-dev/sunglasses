@@ -50,9 +50,14 @@ MUTATIONS = [
      '        pass\n',
      "test_interrupted_write_leaves_no_temp_file_behind"),
 
+    # Re-pinned: the original anchor `        raise ArtifactUnresolved(` became
+    # ambiguous the moment resolve_artifact() gained its own raise, and an
+    # ambiguous anchor is reported ANCHOR LOST and proves nothing. This one is
+    # unique to install()'s digest guard.
     ("C5", "install proceeds when the artifact cannot be resolved",
-     '        raise ArtifactUnresolved(',
-     '        digest = "0" * 64\n    if False:\n        raise ArtifactUnresolved(',
+     '    try:\n        digest = _digest_file(artifact)\n    except OSError as e:',
+     '    try:\n        digest = _digest_file(artifact)\n    except OSError as e:\n'
+     '        digest = "0" * 64\n    if False:',
      "test_install_refuses_when_the_artifact_cannot_be_resolved"),
 
     # Control corrected after the first battery run: the row originally named
