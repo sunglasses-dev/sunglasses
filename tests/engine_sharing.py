@@ -29,6 +29,15 @@ def module_documents(module, minimum_length=40):
             for index, item in enumerate(value):
                 if isinstance(item, str) and len(item) > minimum_length:
                     found[f"{name}[{index}]"] = item
+                elif isinstance(item, (list, tuple)):
+                    # Rows of (name, text, channel) are a common fixture shape
+                    # here, so the document is one element of a tuple inside a
+                    # list. Collected by length rather than by position: the
+                    # column order differs between modules and picking index 1
+                    # would silently collect the wrong column in the next one.
+                    for column, cell in enumerate(item):
+                        if isinstance(cell, str) and len(cell) > minimum_length:
+                            found[f"{name}[{index}][{column}]"] = cell
     return found
 
 
