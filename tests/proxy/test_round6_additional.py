@@ -58,7 +58,7 @@ def test_RC20_opposite_orders(tmp_path,admit_first):
   else:
    frames=s.read_upstream(child.stdout);assert next(frames)==response
    entered=threading.Event();done=threading.Event();original=s._retire_record
-   def retire(identity):original(identity);entered.set()
+   def retire(identity,*rest):original(identity,*rest);entered.set()
    s._retire_record=retire
    def advance():
     try:list(frames)

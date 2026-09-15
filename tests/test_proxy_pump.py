@@ -651,11 +651,11 @@ def test_a_close_at_the_handoff_instant_stops_the_frame_crossing():
     original = session._handoff
     seen = {}
 
-    def blocking(ident, raw):
+    def blocking(ident, raw, *rest):
         # The yield line is running; nothing has crossed yet.
         seen["settling"] = set(session._settling)
         session._close("MALFORMED_UPSTREAM", "review controlled close")
-        return original(ident, raw)
+        return original(ident, raw, *rest)
 
     session._handoff = blocking
     # A refused handoff yields b"", which is nothing on a byte stream: a
@@ -750,9 +750,9 @@ def test_a_refused_handoff_is_always_a_closed_session_and_pays_everyone():
                                      origin="client")
     original = session._handoff
 
-    def closing(identity, raw):
+    def closing(identity, raw, *rest):
         session._close("MALFORMED_UPSTREAM", "review controlled close")
-        return original(identity, raw)
+        return original(identity, raw, *rest)
 
     session._handoff = closing
     out = [frame for frame in session.read_upstream(
@@ -773,4 +773,42 @@ def test_a_refusal_cannot_happen_while_the_session_is_open():
     assert session.admit_request(41, method="tools/call", origin="client")
     identity = pump.key("client", 41)
     assert session.closed_with() is None
-    assert session._handoff(identity, b"frame\n") == b"frame\n"
+    assert session._handoff(identity, b"frame\n",
+                            session._core_key(identity)) == b"frame\n"
+
+
+def test_a_handoff_for_another_generations_record_faults_the_session():
+    """RC25/RC26, the handoff half, ruled as a TRIPWIRE (T9, 2026-09-14).
+
+    `_retire_record`'s ownership check is pinned by ASTRA's round-7 gate: remove
+    it and two rows go red. The same check inside `_handoff` is NOT reachable
+    from the production path -- admission refuses an identity while the record
+    sits in `_settling`, and creation and handoff both happen inside that
+    window -- and the mutation that removed it survived the entire suite.
+
+    Unreachable today is not wrong tomorrow, and an equivalence argument is what
+    was wrong about the generation lookup earlier in this review. So the rule is
+    pinned as a contract. And it FAULTS rather than tolerating: a guard that
+    silently absorbs a state the code calls impossible is a check that skips
+    itself, green forever while the invariant beneath it rots. If admission's
+    refusal ever stops holding, the session stops and says so.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    mine = session._core_key(identity)
+    theirs = identity + (mine[-1] + 1,)
+
+    # The record standing here belongs to a LATER generation than the one this
+    # reader captured -- the shape a reused id would produce.
+    session._settling.add(identity)
+    session._settling_key[identity] = theirs
+
+    assert session._handoff(identity, b"frame\n", mine) == b"", (
+        "the frame must not cross: the session has just faulted")
+    assert session.closed_with() == ("INTERNAL_FAULT", "S3"), (
+        "the mismatch must END the session and name the cause, not be "
+        "absorbed; S3 because the peer violated nothing, we did")
+    assert session._settling_key.get(identity, theirs) == theirs or \
+        identity not in session._settling, (
+        "the other generation's record was not discharged by this reader")

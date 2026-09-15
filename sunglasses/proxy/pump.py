@@ -725,6 +725,8 @@ class Session:
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
                     "initialize" and "result" in message:
+                init_identity = key(ORIGIN_CLIENT, message["id"])
+                init_key = self._core_key(init_identity)
                 forwarded = self._initialize_result(message, raw)
                 if forwarded is None:
                     yield from self._drain_refusals()
@@ -734,8 +736,7 @@ class Session:
                 # direct-caller retirement instead: one frame for two requests,
                 # and with no second request the watcher returned without
                 # closing and the reader forwarded after a real exit.
-                yield self._handoff(key(ORIGIN_CLIENT, message["id"]),
-                                    forwarded)
+                yield self._handoff(init_identity, forwarded, init_key)
                 if self._closed:
                     yield from self._drain_refusals()
                     return
@@ -751,6 +752,15 @@ class Session:
                                  reason="the id was cancelled before this arrived")
                 continue
 
+            # RC25/RC26. The key is captured BEFORE the record is created,
+            # and it is EXACT rather than hopeful: a reuse cannot change the
+            # generation while the entry is still pending, because
+            # `admit_request` refuses an identity that is in `_pending` or in
+            # `_settling`, and the entry leaves the first only by entering the
+            # second in one locked step. So this is the generation the record
+            # about to be created carries -- the one THIS reader owns.
+            identity = key(ORIGIN_CLIENT, message["id"])
+            record_key = self._core_key(identity)
             answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
                                            request_id=message["id"],
                                            frame=message, defer_retire=True)
@@ -759,11 +769,10 @@ class Session:
                 return
             # RC18/RC19/RC19b. The obligation ends HERE, under the lock, and
             # the yield happens only if this call says the close did not win.
-            identity = key(ORIGIN_CLIENT, message["id"])
             # The decision is IN the expression, so it is made when this line
             # runs rather than before it. None means the close won and nothing
             # crosses; consumers skip it.
-            yield self._handoff(identity, raw)
+            yield self._handoff(identity, raw, record_key)
             if self._closed:
                 yield from self._drain_refusals()
                 return
@@ -775,7 +784,24 @@ class Session:
             # it handed over is retired, on the advance that proves the
             # consumer came back; by then the removal has already happened, so
             # it takes nothing away and removes nothing twice.
-            self._retire_record(identity)
+            #
+            # RC25/RC26. Retire only what THIS reader created. While the
+            # generator was suspended the id may have been reused, and the
+            # record standing under this identity then belongs to a LATER
+            # generation and another reader. Dropping it here left that
+            # reader's obligation unrecorded, and both failures followed from
+            # the one deletion: the watcher saw neither a pending entry nor a
+            # record and returned without closing on a real child exit (RC25),
+            # and admission, which refuses an identity already in `_settling`,
+            # found nothing there and let a duplicate in (RC26).
+            #
+            # An ABSENT record still calls through, because that is the
+            # ordinary case -- the handoff above already dropped it -- and the
+            # call is idempotent. Only a record belonging to someone else is
+            # left alone. There is no window between the test and the call: a
+            # record we still own cannot be superseded, since admission refuses
+            # an identity while `_settling` holds it.
+            self._retire_record(identity, record_key)
 
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
@@ -942,7 +968,7 @@ class Session:
 
 
 
-    def _handoff(self, identity, raw):
+    def _handoff(self, identity, raw, record_key):
         """The single point where an obligation ends, EVALUATED BY THE YIELD.
 
         RC18 is why this is an expression and not a preceding statement. A
@@ -1001,13 +1027,70 @@ class Session:
                 # and one that forgets it gets a TypeError in place of a
                 # refusal.
                 return b""
-            self._settling.discard(identity)
-            self._settling_key.pop(identity, None)
-            return raw
+            # RC25/RC26, and it is a TRIPWIRE rather than a tolerance.
+            #
+            # Discharging here a record THIS reader did not create would answer
+            # one reader's frame by cancelling another reader's debt. The
+            # production path cannot reach that today: admission refuses an
+            # identity while it is in `_settling`, and the record is created and
+            # handed off inside that window, so no reuse can intervene.
+            #
+            # Which is exactly why the mismatch must FAULT and not be absorbed.
+            # A guard that quietly tolerates a state the code calls impossible
+            # is a check that skips itself: it would run green forever while the
+            # invariant it depends on rotted underneath it. If admission's
+            # refusal ever stops holding, the session stops and says so.
+            #
+            # S3, not S5: the peer has violated nothing, our own invariant has.
+            # PRESENT and owned by another generation. An ABSENT record is
+            # the ordinary idempotent case, never a fault -- the same reading
+            # `_retire_record` takes, where a missing record calls through.
+            standing = self._settling_key.get(identity)
+            mismatch = standing is not None and standing != record_key
+            if not mismatch:
+                self._settling.discard(identity)
+                self._settling_key.pop(identity, None)
+        if mismatch:
+            # OUTSIDE the lock. `_close` takes `_settlement` itself and it is
+            # not reentrant, so faulting inside the block would deadlock the
+            # session instead of ending it. The record is left owed on purpose:
+            # the teardown drains `_pending` and `_settling`, so the generation
+            # that really owns it is still paid.
+            self._close("INTERNAL_FAULT",
+                        "a handoff arrived for a record another generation "
+                        "owns, so admission's refusal did not hold",
+                        rule="S3")
+            return b""
+        return raw
 
-    def _retire_record(self, identity):
-        """RC14. The wire obligation is discharged; drop the record."""
+    def _retire_record(self, identity, record_key=None):
+        """RC14. The wire obligation is discharged; drop the record.
+
+        RC25/RC26. `record_key` names WHICH record the caller is discharging --
+        the identity together with the generation captured when that record was
+        created. A reader may only retire the record it created. While a reader
+        is suspended at its yield the id can be reused, and the record standing
+        under the identity then belongs to a LATER generation and another
+        reader; retiring by identity alone dropped that reader's obligation.
+        Both round-7 failures came out of the one deletion: the watcher found
+        neither a pending entry nor a record and returned without closing on a
+        real child exit (RC25), and admission, which refuses an identity that is
+        already in `_settling`, found nothing there and admitted a duplicate
+        (RC26).
+
+        The call still HAPPENS in every case, and only the deletion is
+        conditional. An absent record is the ordinary case, because the handoff
+        has usually dropped it already, and the method has always been
+        idempotent on the way out.
+
+        `None` keeps the unconditional meaning for the callers that create and
+        retire inside one locked flow, where no reuse can intervene.
+        """
         with self._settlement:
+            if record_key is not None and \
+                    self._settling_key.get(identity, record_key) != record_key:
+                # Someone else's record, a later generation's. Leave it owed.
+                return
             self._settling.discard(identity)
             self._settling_key.pop(identity, None)
 
