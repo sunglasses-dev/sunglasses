@@ -2141,6 +2141,24 @@ def main():
     report_parser.set_defaults(func=cmd_report)
 
     # config
+    # install / uninstall (T10.R4/R5)
+    install_parser = subparsers.add_parser(
+        "install", help="Wrap an MCP server entry so it runs through Sunglasses")
+    install_parser.add_argument("name", help="The mcpServers key to wrap")
+    install_parser.add_argument(
+        "--config", help="Config file to edit (default: ./.mcp.json)")
+    install_parser.add_argument(
+        "argv", nargs="*",
+        help="Upstream command after `--`, when the entry does not exist yet")
+    install_parser.set_defaults(func=cmd_install)
+
+    uninstall_parser = subparsers.add_parser(
+        "uninstall", help="Unwrap an MCP server entry and restore the original")
+    uninstall_parser.add_argument("name", help="The mcpServers key to restore")
+    uninstall_parser.add_argument(
+        "--config", help="Config file to edit (default: ./.mcp.json)")
+    uninstall_parser.set_defaults(func=cmd_uninstall)
+
     config_parser = subparsers.add_parser("config", help="Configure SUNGLASSES")
     config_parser.add_argument("--email", "-e", help="Set email for daily reports")
     config_parser.set_defaults(func=cmd_config)
@@ -2183,6 +2201,63 @@ def cmd_report(args):
             print(f"  Open in browser: file://{os.path.abspath(args.save)}")
     else:
         print(report)
+
+
+def _install_config_path(args):
+    """The default target is the project `.mcp.json` in the working directory.
+
+    Never a path in the user's home. CLAUDE.md records why: `sunglasses init`
+    writing into a real settings file once had an agent's own tool calls
+    inspected by the build it was editing. A wiring command that defaults into
+    HOME is the same hazard wearing a different filename.
+    """
+    import pathlib as _pl
+    return _pl.Path(args.config) if args.config else _pl.Path.cwd() / ".mcp.json"
+
+
+def cmd_install(args):
+    """T10.R4 — wrap one MCP server entry so its traffic runs through us."""
+    from . import install as _inst
+    from .firewall import sunglasses_home
+
+    target = _install_config_path(args)
+    try:
+        artifact = _inst.resolve_artifact()
+        _inst.install(target, args.name, artifact=artifact,
+                      home=sunglasses_home(), argv=args.argv or None)
+    except _inst.ArtifactUnresolved as e:
+        print(f"\n  {RED}SUNGLASSES install refused{RESET} — {e}")
+        print(f"  {DIM}target: {target}{RESET}\n")
+        sys.exit(2)
+    except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
+        print(f"\n  {RED}SUNGLASSES install failed{RESET} — {e}")
+        print(f"  {DIM}target: {target}{RESET}\n")
+        sys.exit(2)
+    print(f"\n  {GREEN}Wrapped {args.name!r}{RESET} in {target}")
+    print(f"  {DIM}Undo with: sunglasses uninstall {args.name}{RESET}\n")
+    sys.exit(0)
+
+
+def cmd_uninstall(args):
+    """T10.R5 — put the entry back, byte-exact when the file has not moved."""
+    from . import install as _inst
+    from .firewall import sunglasses_home
+
+    target = _install_config_path(args)
+    try:
+        res = _inst.uninstall(target, args.name, home=sunglasses_home())
+    except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
+        print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {e}")
+        print(f"  {DIM}target: {target}{RESET}\n")
+        sys.exit(2)
+    if res.byte_exact:
+        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
+              f"{DIM}(byte-identical){RESET}\n")
+    else:
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        print(f"  {DIM}entry restored, file not byte-identical: it changed "
+              f"after the install{RESET}\n")
+    sys.exit(0)
 
 
 def cmd_config(args):
