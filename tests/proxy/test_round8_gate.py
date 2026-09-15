@@ -4,7 +4,12 @@ import pytest
 from sunglasses.proxy import pump,handshake
 from test_round4 import peer,wire
 from test_round7_gate import child_session,send,exit_child,yield_line
-R=Path(__file__).resolve().parents[1]
+# Moved from scripts/ to tests/proxy/ at the #166 rebase (T9 ruling): every
+# other vendored control lives here, and archive-suite and CI collect this
+# directory. parents[2] keeps R at the REPOSITORY ROOT, which is what it was
+# in scripts/ -- a relocation must not quietly move where a control reads its
+# fixtures or writes its evidence.
+R=Path(__file__).resolve().parents[2]
 def save(name,data):(R/'evidence'/(name+'.json')).write_text(json.dumps(data,indent=2))
 def rule_of(s):
  c=s.closed_with();return c[1] if c else None

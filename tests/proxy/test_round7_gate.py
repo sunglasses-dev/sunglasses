@@ -2,7 +2,12 @@ import ast,contextlib,inspect,json,os,signal,subprocess,sys,threading,time
 from pathlib import Path
 import pytest
 from sunglasses.proxy import pump
-R=Path(__file__).resolve().parents[1]
+# Moved from scripts/ to tests/proxy/ at the #166 rebase (T9 ruling): every
+# other vendored control lives here, and archive-suite and CI collect this
+# directory. parents[2] keeps R at the REPOSITORY ROOT, which is what it was
+# in scripts/ -- a relocation must not quietly move where a control reads its
+# fixtures or writes its evidence.
+R=Path(__file__).resolve().parents[2]
 def wire(x):return json.dumps(x,separators=(',',':')).encode()+b'\n'
 def request(i,method='tools/call'):return wire({'jsonrpc':'2.0','id':i,'method':method,'params':{}})
 def save(name,data):(R/'evidence'/(name+'.json')).write_text(json.dumps(data,indent=2))
