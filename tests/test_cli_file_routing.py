@@ -104,12 +104,12 @@ def test_compressed_pdf_payload_is_absent_from_raw_bytes(tmp_path):
     assert INJECTION.encode() not in raw
 
 
-def test_engine_scan_file_extracts_compressed_pdf(tmp_path):
+def test_engine_scan_file_extracts_compressed_pdf(shared_engine, tmp_path):
     pytest.importorskip("PyPDF2")
     pdf = tmp_path / "compressed.pdf"
     _build_pdf(str(pdf), compress=True)
 
-    result = SunglassesEngine().scan_file(str(pdf))
+    result = shared_engine.scan_file(str(pdf))
 
     assert result.decision in ("block", "quarantine"), (
         "C1 regression: a PDF carrying an injection in a compressed content stream "
@@ -132,7 +132,7 @@ def test_cli_scan_file_blocks_compressed_pdf(tmp_path):
     assert proc.returncode != 0
 
 
-def test_cli_and_python_api_agree_on_the_same_pdf(tmp_path):
+def test_cli_and_python_api_agree_on_the_same_pdf(shared_engine, tmp_path):
     """The audit's differential: the two surfaces disagreed. They must not."""
     pytest.importorskip("PyPDF2")
     from sunglasses.scanner import SunglassesScanner
@@ -141,7 +141,7 @@ def test_cli_and_python_api_agree_on_the_same_pdf(tmp_path):
     _build_pdf(str(pdf), compress=True)
 
     api_clean = SunglassesScanner().scan_auto(str(pdf)).get("is_clean")
-    cli_clean = SunglassesEngine().scan_file(str(pdf)).is_clean
+    cli_clean = shared_engine.scan_file(str(pdf)).is_clean
 
     assert api_clean == cli_clean is False
 
@@ -164,6 +164,10 @@ def test_missing_pdf_dependency_warns_and_does_not_claim_clean(tmp_path, monkeyp
 
     monkeypatch.setattr("builtins.__import__", blocked)
 
+    # A FRESH ENGINE ON PURPOSE, and the one test in this module that needs one.
+    # The import of PyPDF2 is blocked just above, and an engine built earlier
+    # would have resolved its extractors before that block existed, so a shared
+    # engine would quietly test the opposite of what this asserts.
     result = SunglassesEngine().scan_file(str(pdf))
 
     assert getattr(result, "extraction_warnings", None), (
@@ -194,10 +198,10 @@ def test_cli_surfaces_incomplete_scan_distinctly(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_plain_text_file_unchanged(tmp_path):
+def test_plain_text_file_unchanged(shared_engine, tmp_path):
     txt = tmp_path / "note.txt"
     txt.write_text(INJECTION)
-    result = SunglassesEngine().scan_file(str(txt))
+    result = shared_engine.scan_file(str(txt))
     assert result.decision in ("block", "quarantine")
     assert result.extraction_complete is True
     assert not result.extraction_warnings
@@ -211,15 +215,15 @@ def test_clean_text_file_still_passes_and_exits_zero(tmp_path):
     assert "PASS" in proc.stdout
 
 
-def test_unknown_extension_falls_back_to_text_without_warning(tmp_path):
+def test_unknown_extension_falls_back_to_text_without_warning(shared_engine, tmp_path):
     odd = tmp_path / "config.somethingweird"
     odd.write_text(INJECTION)
-    result = SunglassesEngine().scan_file(str(odd))
+    result = shared_engine.scan_file(str(odd))
     assert result.decision in ("block", "quarantine")
     assert result.extraction_complete is True
 
 
-def test_image_routes_through_extractors(tmp_path):
+def test_image_routes_through_extractors(shared_engine, tmp_path):
     """Images must reach the OCR/EXIF/QR path, not a raw byte read."""
     pytest.importorskip("PIL")
     from PIL import Image, PngImagePlugin
@@ -230,8 +234,25 @@ def test_image_routes_through_extractors(tmp_path):
     info.add_text("Comment", INJECTION)
     img.save(str(img_path), pnginfo=info)
 
-    result = SunglassesEngine().scan_file(str(img_path))
+    result = shared_engine.scan_file(str(img_path))
     assert result.extraction_complete is True
     assert result.decision in ("block", "quarantine"), (
         "PNG text-chunk metadata carrying an injection was not extracted"
     )
+
+
+# ── sharing one engine is a claim, so it is checked ─────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def _engine_budget(shared_engine, engine_budget):
+    """Two engines are expected here, and both are named.
+
+    One is built by the missing-dependency test, which blocks the PyPDF2 import
+    and so cannot use an engine that resolved its extractors earlier. The other
+    is built inside the CLI path that `test_cli_and_python_api_agree_on_the_same
+    _pdf` exercises, which is product code rather than this module's choice.
+
+    A budget of 2 rather than 0 because those two are real. If a third appears,
+    it is a test taking the slow road by accident and this says so.
+    """
+    engine_budget(2)

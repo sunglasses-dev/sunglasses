@@ -109,9 +109,8 @@ QUOTED_ATTACK_IN_DOCS = [
     QUOTED_ATTACK_IN_DOCS,
     ids=lambda p: p[:60].replace("\n", " "),
 )
-def test_quoted_attack_in_docs_xfail(payload):
+def test_quoted_attack_in_docs_xfail(engine, payload):
     """xfail: doc-context FPs are expected pending engine-side fix."""
-    engine = SunglassesEngine()
     result = engine.scan(payload, channel="message")
     triggering_new = [
         f for f in result.findings
@@ -124,11 +123,10 @@ def test_quoted_attack_in_docs_xfail(payload):
     )
 
 
-def test_gls_sc_man_242_requires_adversative():
+def test_gls_sc_man_242_requires_adversative(engine):
     """The MAN-242 regex requires claim-verb + safe-property + adversative
     ('but'/'yet'/'however') + has-verb. Manifests that just claim a safety
     property without the contradiction must NOT fire."""
-    engine = SunglassesEngine()
     benign_claims = [
         "The plugin manifest claims no network access — verified by audit.",
         "Manifest declares read-only access, which the runtime enforces.",
@@ -143,11 +141,10 @@ def test_gls_sc_man_242_requires_adversative():
         )
 
 
-def test_gls_sc_typ_243_requires_typosquat_word():
+def test_gls_sc_typ_243_requires_typosquat_word(engine):
     """TYP-243 should only fire when the text explicitly calls out a
     typosquat — generic mentions of package names with typos in benign
     bug-fix chatter must not trigger."""
-    engine = SunglassesEngine()
     benign = "I made a typo in 'requests' and got an import error — fixed."
     result = engine.scan(benign, channel="message")
     fired = [f for f in result.findings if f.get("id") == "GLS-SC-TYP-243"]
@@ -155,3 +152,23 @@ def test_gls_sc_typ_243_requires_typosquat_word():
         f"GLS-SC-TYP-243 must require the explicit 'typosquat' vocabulary. "
         f"Fired on benign typo chatter: findings={fired}"
     )
+
+# ── sharing one engine is a claim, so it is checked ─────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def _engine_budget(engine, engine_budget):
+    """No test here may build its own engine.
+
+    `engine` is requested first on purpose: fixtures in a signature are set up
+    before the body runs, so the module's one engine exists before counting
+    starts and is not charged to the budget meant to catch the unshared ones.
+    """
+    engine_budget(0)
+
+
+def test_one_engine_gives_the_same_answers_in_any_order(engine):
+    """The statelessness control, which is what makes the sharing honest."""
+    import sys
+    from engine_sharing import assert_engine_is_stateless, module_documents
+    assert_engine_is_stateless(engine, module_documents(sys.modules[__name__]),
+                               channel="message", minimum=3)
