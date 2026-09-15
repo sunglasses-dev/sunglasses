@@ -398,3 +398,48 @@ the fault, and retiring by identity instead of generation.
 
 This goes to ASTRA as CONTROLS_CORRECTION v8 alongside the v7 items, and he is
 invited to re-issue the seam with `*rest` himself.
+
+---
+
+## R-RC28-1, the ruling (T9, 2026-09-14)
+
+`scripts/test_round8_gate.py` is edited in ONE line and nothing else in it.
+
+    file    scripts/test_round8_gate.py
+    before  d48b800650ee744c8520b5eda590a9f597ac01149b0b9da0692743decd513e70
+    after   987cb9d1785a8f25a42c3354a0aa9ad3f1c8daf985c6b904e843c17e118f0b2f
+
+    -  target=next(n.lineno for n in ast.walk(fn) if isinstance(n,ast.Yield)
+    -       and isinstance(n.value,ast.Name) and n.value.id=='raw')
+    +  target=next(n.lineno for n in ast.walk(fn) if isinstance(n,ast.Yield)
+    +       and isinstance(n.value,ast.Call)
+    +       and getattr(n.value.func,'attr','')=='_handoff_notification')
+
+**The gate observes the notification boundary and still observes exactly that;
+the selector follows the ruled line.**
+
+RC28's control parks a tracer on the line that delivers a notification and asks
+what crosses when a close completes there. It found that line by its SYNTACTIC
+SHAPE -- a yield whose value is the bare name `raw` -- and the ruling changes
+that shape, because the repair is RC18's: the decision rides the yield
+expression, never a statement before it.
+
+Left unchanged, `next()` raises **StopIteration at line 18** and all six rows
+fail, three of which were passing before the repair. That is an instrument that
+cannot find its subject, not a behaviour that regressed. The third time today
+this exact shape has appeared, after R-RC18-1 and R-RC25-1.
+
+**A note on the mutation, because the obvious one lies.** Restoring the literal
+`yield raw` makes the gate go red -- and it is a FALSE KILL: the corrected
+selector then finds nothing and raises StopIteration again, so the rows fail on
+the instrument rather than on what crossed the wire. The honest mutation keeps
+the yield's shape and removes the DECISION inside `_handoff_notification`, and
+it kills exactly the three `close_first=True` rows that were red to begin with.
+A fail row is a harness defect until the stimulus is proven, and that applies to
+mutations we score ourselves.
+
+Carried to ASTRA as CONTROLS_CORRECTION v9 with the v8 items, and with a request
+to re-issue his selectors in a form that does NOT depend on the yield's
+syntactic shape: three of his instruments have now broken on ruled lines. An ast
+walk for the yield whose value calls `_handoff_notification` is one, and marking
+the delivery line explicitly would be another.
