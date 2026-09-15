@@ -675,7 +675,18 @@ class Session:
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=False)
                     continue
-                yield raw
+                # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
+                # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
+                # record gate that gives responses their boundary does not
+                # cover it, and this line delivered regardless: a close could
+                # complete while the reader was parked here and the frame went
+                # out anyway.
+                #
+                # The same shape RC18 settled for responses, for the same
+                # reason: the decision rides the YIELD EXPRESSION, so it is
+                # made when the line RUNS. A statement before the yield decides
+                # too early and a close arriving in between still crosses.
+                yield self._handoff_notification(raw)
                 continue
 
             # T2.R6. OUR OWN control traffic, handed to the collector and never
@@ -1062,6 +1073,25 @@ class Session:
                         rule="S3")
             return b""
         return raw
+
+    def _handoff_notification(self, raw):
+        """T7.R2 and RC28. A notification crosses only while the session lives.
+
+        There is no id here and so no record, which is exactly why this needed
+        its own boundary: `_handoff` decides by the obligation a request left
+        behind, and a notification leaves none. What both share is the instant
+        the decision is taken -- under `_settlement`, evaluated by the yield, so
+        a close that completes while the reader is parked at the line still
+        wins.
+
+        `b""` and not `None`, for the reason recorded on `_handoff`: a consumer
+        writes what the reader yields, and on a byte stream zero bytes IS
+        nothing, needing no special case anywhere.
+        """
+        with self._settlement:
+            if self._closed:
+                return b""
+            return raw
 
     def _retire_record(self, identity, record_key=None):
         """RC14. The wire obligation is discharged; drop the record.
