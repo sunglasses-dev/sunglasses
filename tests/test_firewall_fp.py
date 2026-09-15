@@ -722,10 +722,11 @@ def test_a_second_format_literal_is_not_stripped_inside_one_segment():
 
 
 def test_the_same_attack_with_a_separator_is_also_material():
-    """Not ASTRA's, and it is the neighbour that decides whether the repair is
-    a repair or a patch on one spelling: with a separator the foreign prefix is
-    its own SEGMENT rather than glued to the body. A fix that only declines to
-    strip inside a segment would clear this one."""
+    """The helper half of the separator neighbour. It is kept, but it is NOT
+    the control: this GitHub construction has no full rule match, so on its own
+    it measures the guard and says nothing about the firewall. The public
+    control is `test_a_separated_foreign_prefix_still_denies_through_the_hook`,
+    on a Slack token that does match."""
     token = _round3_token("GITHUB", _FOREIGN_AWS_PREFIX + "_" + "q" * 36)
     assert not is_placeholder(token)
 
@@ -770,13 +771,78 @@ def test_mixed_case_material_is_not_a_run_of_one_character(control, family):
         f"{control}: LOST DENIAL — live material left on an outbound call")
 
 
+def _hook_terminal_record(token, home):
+    """The real public boundary: run the hook with a valid policy and read the
+    terminal record it wrote.
+
+    Round 4 exists because the round-3 positives asserted `is_placeholder`
+    directly. That call takes ONE rule -- the caller passes the rule that
+    matched -- so it could not see a second rule matching the same span and
+    denying what the first one cleared. A helper cannot observe a collision
+    between two rules; only the whole lane can. This is the same correction
+    ASTRA made in R2-02, one turn later and in the other direction.
+    """
+    import json
+    from sunglasses.firewall import run_hook, starter_policy_text
+
+    (home / "policy.yaml").write_text(starter_policy_text())
+    run_hook(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "WebFetch",
+                         "tool_input": {"url": "https://example.com/review",
+                                        "prompt": token}}), home=home)
+    records = [json.loads(line)
+               for path in (home / "receipts").glob("*.jsonl")
+               for line in path.read_text().splitlines()]
+    terminal = [r for r in records if r.get("kind") == "decision"]
+    assert terminal, "the hook wrote no terminal record"
+    return terminal[-1]
+
+
 @pytest.mark.parametrize("family", sorted(_ROUND3_WRAPPERS))
-def test_same_case_filler_still_clears_after_the_case_repair(family):
-    """The positive half of R1b, one per format. Uppercase filler is filler:
-    the repair must separate word comparison from shape comparison, not make
-    the shape test case-sensitive in the sense of preferring lowercase."""
-    assert is_placeholder(_round3_token(family, "Q" * 40))
-    assert is_placeholder(_round3_token(family, "q" * 40))
+@pytest.mark.parametrize("filler", ["q" * 40, "Q" * 40], ids=["lower", "upper"])
+def test_same_case_filler_still_clears_after_the_case_repair(family, filler, tmp_path):
+    """The positive half of R1b, one per format in both cases, THROUGH the hook.
+
+    Uppercase filler is filler: the repair separates word comparison from shape
+    comparison, and does not make the shape test prefer lowercase.
+
+    ASTRA's FILLER-01-LOWER and FILLER-01-UPPER are the `sk-ant-` rows here,
+    and they were the two that showed the round-3 defect: the Anthropic rule
+    owns that token and clears it, then the OpenAI rule matches the SAME span,
+    consumes its shorter `sk-` literal, reads the rest of the Anthropic format
+    as material and denies. A documented placeholder refused by the firewall is
+    the failure this whole file was written to prevent.
+    """
+    record = _hook_terminal_record(_round3_token(family, filler), tmp_path)
+    assert record["decision"] != "deny", (
+        f"FALSE POSITIVE: {family} filler was refused by {record.get('rule_id')}")
+
+
+def test_the_owner_of_a_span_decides_it_and_a_broader_rule_does_not_reopen_it(tmp_path):
+    """ASTRA README-07-1, its exact bytes: `sk-ant-` and forty x characters.
+
+    Two rules match the whole token. Ownership goes to the LONGEST leading
+    literal at the front, because that is the rule whose format actually
+    describes this string; a rule that recognises three of its seven format
+    bytes is matching a superset, and its opinion about the remaining format
+    component is not a finding about material.
+    """
+    token = "sk" + "-ant-" + "x" * 40
+    assert len(token) == 47, "fixture drifted from ASTRA's README-07-1"
+    record = _hook_terminal_record(token, tmp_path)
+    assert record["decision"] != "deny", (
+        f"FALSE POSITIVE: a documented Anthropic placeholder was refused by "
+        f"{record.get('rule_id')}")
+
+
+def test_a_separated_foreign_prefix_still_denies_through_the_hook(tmp_path):
+    """ASTRA's PREFIX-SEP-SLACK, replacing my round-3 neighbour, which asserted
+    the HELPER on a GitHub token that had no full rule match -- so it measured
+    the guard without measuring the firewall. Same idea, real format, public
+    boundary: the foreign prefix is its own SEGMENT and is still material."""
+    token = "xoxb" + "-" + _FOREIGN_AWS_PREFIX + "-" + "q" * 36
+    assert _fully_matches_a_rule(token), "control does not match a rule"
+    record = _hook_terminal_record(token, tmp_path)
+    assert record["decision"] == "deny", "LOST DENIAL on a separated foreign prefix"
 
 
 def test_an_ascending_run_in_capitals_is_still_filler():
