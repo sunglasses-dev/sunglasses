@@ -402,16 +402,70 @@ def find_secret_material(text: str) -> list:
     if not text:
         return []
     text = strip_invisible(text)
-    hits = []
-    seen = set()
+
+    # Every rule's every match, with its span, BEFORE anything is judged.
+    # Formats overlap -- `sk-ant-` is also a `sk-` -- so which rule speaks for a
+    # given span has to be settled before the guard is asked about it.
+    found = []
     for rule in SECRET_RULES:
         for match in rule.regex.finditer(text):
             token = match.group(0)
-            if token in seen or is_placeholder(token, rule):
-                continue
-            seen.add(token)
-            hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
+            found.append((match.start(), match.end(), rule, token,
+                          _leading_literal_length(rule, token)))
+
+    hits = []
+    seen = set()
+    for start, end, rule, token, reach in found:
+        owner = _owner_of_span(found, start, end, rule, reach)
+        if owner is not rule:
+            # Somebody else's span. The owner's verdict is the span's verdict,
+            # and it is recorded when the owner's own entry comes round.
+            continue
+        if token in seen or is_placeholder(token, rule):
+            continue
+        seen.add(token)
+        hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
     return hits
+
+
+def _leading_literal_length(rule, token: str) -> int:
+    """How many bytes of THIS token the rule's own format grammar accounts for."""
+    low = token.lower()
+    for prefix in rule.prefixes:
+        if low.startswith(prefix.lower()):
+            return len(prefix)
+    return 0
+
+
+def _owner_of_span(found: list, start: int, end: int, rule, reach: int):
+    """Which rule speaks for this span. ASTRA's R3-1, ruling R-173-R4.
+
+    `sk-ant-` + filler is a documented Anthropic placeholder AND a match for the
+    broader OpenAI rule, which recognises three of those seven format bytes.
+    The Anthropic rule cleared it; the OpenAI rule then read `ant` as material
+    and DENIED -- a published placeholder refused by the firewall, which is the
+    exact failure this file exists to prevent, arriving through a repair that
+    made the guard MORE careful about material.
+
+    The span belongs to the rule whose leading literal is the LONGEST match at
+    the front, because that is the rule whose format actually describes the
+    string. A rule matching a superset does not get to reinterpret the part of
+    another format's literal that its own grammar never claimed.
+
+    Only a span CONTAINED in the owner's is answered by the owner: a longer
+    match reaching past it covers bytes the owner never saw, and suppressing
+    that would hide material rather than resolve a collision.
+    """
+    best, best_reach, best_len = rule, reach, end - start
+    for other_start, other_end, other_rule, _token, other_reach in found:
+        if other_rule is rule:
+            continue
+        if not (other_start <= start and end <= other_end):
+            continue
+        length = other_end - other_start
+        if (other_reach, length) > (best_reach, best_len):
+            best, best_reach, best_len = other_rule, other_reach, length
+    return best
 
 
 # ── Egress surface ──────────────────────────────────────────────────────────
