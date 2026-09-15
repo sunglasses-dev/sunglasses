@@ -585,3 +585,274 @@ def test_a_one_character_body_is_not_filler(token):
     without the minimum length a single character after a known prefix clears
     the token — the same defect a third time, reachable by one keystroke."""
     assert not is_placeholder(token)
+
+
+# ═══ ROUND 3 — ASTRA's blocking controls on the placeholder guard ════════════
+#
+# Round 2 moved the decision from a substring to a segment and then to the whole
+# material, and ASTRA's independent review (PR #173, head 525b698) found the
+# same defect one level further out, twice. Both are lost DENIALS on live
+# material, not false positives, so they are written here as public controls
+# through `check_egress_secrets` rather than as helper assertions: a helper
+# result is not a firewall decision, which is the correction in R2-02 below.
+#
+#   R1a  The guard did not know WHICH rule matched. It skipped any member of a
+#        global prefix-word set at ANY position and stripped four unseparated
+#        format literals from EVERY segment, so a foreign provider's prefix
+#        placed in the BODY of another provider's credential was discarded as
+#        "format" and the remaining filler cleared the token.
+#
+#   R1b  The token was lowercased before the SHAPE test, so a case-sensitive
+#        alphabet collapsed: `qQqQ…` became `qqqq…` and read as a run of one
+#        character. Word comparison needs the lowercase form; shape comparison
+#        needs the material exactly as it arrived.
+#
+# Constructions are ASTRA's, reproduced from its probe rather than invented, so
+# a green row here is the same measurement its review made.
+
+_ROUND3_WRAPPERS = {
+    "GITHUB": "ghp" + "_",
+    "STRIPE_LIVE": "sk" + "_live_",
+    "SLACK": "xoxb" + "-",
+    "GOOGLE": "AIza",
+    "ANTHROPIC": "sk" + "-ant-",
+    "OPENAI": "sk" + "-proj-",
+}
+
+# The AWS temporary-credential prefix, which is CREDENTIAL MATERIAL when it
+# appears inside any other provider's body. Spelled as a join so this file does
+# not itself carry a credential-shaped literal.
+_FOREIGN_AWS_PREFIX = "AS" + "IA"
+
+
+def _round3_token(family, body):
+    return _ROUND3_WRAPPERS[family] + body
+
+
+def _denies(token):
+    """The public boundary: a real egress call carrying `token`."""
+    return check_egress_secrets(
+        "WebFetch", {"url": "https://example.com/review", "prompt": token})
+
+
+def _fully_matches_a_rule(token):
+    """A control only measures the guard if a shipped rule matches the WHOLE
+    token. Without this assertion a "denied" row could be denied for some other
+    substring, and a cleared row could be a format-coverage limit wearing a
+    placeholder-guard costume — which is exactly what R2-02 turned out to be."""
+    return any(h["match"] == token for h in find_secret_material(token))
+
+
+# ── R1a: a foreign format prefix in the body is material, not format ─────────
+
+_PREFIX_ATTACK_UNSEPARATED = [
+    ("PREFIX-01", "GITHUB"), ("PREFIX-02", "STRIPE_LIVE"), ("PREFIX-03", "SLACK"),
+    ("PREFIX-04", "GOOGLE"), ("PREFIX-05", "ANTHROPIC"), ("PREFIX-06", "OPENAI"),
+]
+
+
+@pytest.mark.parametrize("control,family", _PREFIX_ATTACK_UNSEPARATED,
+                         ids=[c for c, _ in _PREFIX_ATTACK_UNSEPARATED])
+def test_a_foreign_prefix_inside_the_body_does_not_clear_the_token(control, family):
+    """ASTRA PREFIX-01/02/03/05/06 (blocking) and PREFIX-04 (already passing).
+
+    Each token is one provider's wrapper, then the AWS temporary-key prefix,
+    then 36 q characters. The foreign prefix is body material for these
+    formats; the candidate removed it anyway and called what was left filler.
+    """
+    token = _round3_token(family, _FOREIGN_AWS_PREFIX + "q" * 36)
+    assert _fully_matches_a_rule(token), f"{control}: control does not match a rule"
+    assert not is_placeholder(token), f"{control}: cleared as a placeholder"
+    decision = _denies(token)
+    assert decision is not None and decision.action == "deny", (
+        f"{control}: LOST DENIAL — live material left on an outbound call")
+
+
+_PREFIX_ATTACK_SEGMENTS = [
+    ("PREFIX-07", "SLACK"), ("PREFIX-08", "GOOGLE"),
+    ("PREFIX-09", "ANTHROPIC"), ("PREFIX-10", "OPENAI"),
+]
+
+
+@pytest.mark.parametrize("control,family", _PREFIX_ATTACK_SEGMENTS,
+                         ids=[c for c, _ in _PREFIX_ATTACK_SEGMENTS])
+def test_other_formats_words_in_the_body_are_material_not_format(control, family):
+    """ASTRA PREFIX-07 to PREFIX-10 (blocking).
+
+    The body joins an ascending run and four words that are OTHER providers'
+    format literals — none of them the matched rule's leading grammar — and
+    ends in filler. A globally listed prefix word in a body position is
+    material: it is a thing the sender chose, not a format the rule requires.
+    """
+    body = "-".join(["5678", "proj", "svcacct", "live", "test", "q" * 8])
+    token = _round3_token(family, body)
+    assert _fully_matches_a_rule(token), f"{control}: control does not match a rule"
+    assert not is_placeholder(token), f"{control}: cleared as a placeholder"
+    decision = _denies(token)
+    assert decision is not None and decision.action == "deny", (
+        f"{control}: LOST DENIAL — live material left on an outbound call")
+
+
+def test_a_second_format_literal_is_not_stripped_inside_one_segment():
+    """ASTRA PREFIX-04's useful half, kept as its own row: the defect is not
+    unlimited recursive stripping. One format literal comes off the front of
+    the token and nothing else, so a foreign prefix sitting immediately inside
+    a Google body is still material even though `AIza` was consumed."""
+    token = _round3_token("GOOGLE", _FOREIGN_AWS_PREFIX + "q" * 36)
+    assert not is_placeholder(token)
+
+
+def test_the_same_attack_with_a_separator_is_also_material():
+    """Not ASTRA's, and it is the neighbour that decides whether the repair is
+    a repair or a patch on one spelling: with a separator the foreign prefix is
+    its own SEGMENT rather than glued to the body. A fix that only declines to
+    strip inside a segment would clear this one."""
+    token = _round3_token("GITHUB", _FOREIGN_AWS_PREFIX + "_" + "q" * 36)
+    assert not is_placeholder(token)
+
+
+@pytest.mark.parametrize("token,expected", [
+    ("proj" + "-" + "5678", False),
+    ("unknown" + "-" + "5678", False),
+])
+def test_a_prefix_word_with_no_credential_format_claims_nothing(token, expected):
+    """ASTRA PREFIX-11 and PREFIX-12. Neither token has a credential format at
+    all, so neither is a statement that material is fake. PREFIX-11 cleared
+    before this round purely because `proj` was in a global set; a format
+    literal only means anything as the leading grammar of the rule that
+    actually matched."""
+    assert is_placeholder(token) is expected
+
+
+# ── R1b: shape is measured on the material, case and all ────────────────────
+
+_CASE_CONTROLS = [("CASE-01", "GITHUB"), ("CASE-02", "STRIPE_LIVE"),
+                  ("CASE-03", "SLACK"), ("CASE-04", "GOOGLE"),
+                  ("CASE-05", "ANTHROPIC"), ("CASE-06", "OPENAI")]
+
+
+@pytest.mark.parametrize("control,family", _CASE_CONTROLS,
+                         ids=[c for c, _ in _CASE_CONTROLS])
+def test_mixed_case_material_is_not_a_run_of_one_character(control, family):
+    """ASTRA CASE-01 to CASE-06 (blocking). Forty independent draws from `q`
+    and `Q`, ASTRA's exact deterministic generator. The raw body holds two
+    distinct characters and is not an ascending run, so it is material; only
+    after whole-token lowercasing does it read as a run of one character."""
+    import random
+    number = int(control.split("-")[1])
+    draw = random.Random(500 + number)
+    body = "".join(draw.choice("qQ") for _ in range(40))
+    assert len(set(body)) == 2, f"{control}: generator drifted, body is uniform"
+    token = _round3_token(family, body)
+    assert _fully_matches_a_rule(token), f"{control}: control does not match a rule"
+    assert not is_placeholder(token), f"{control}: cleared as a placeholder"
+    decision = _denies(token)
+    assert decision is not None and decision.action == "deny", (
+        f"{control}: LOST DENIAL — live material left on an outbound call")
+
+
+@pytest.mark.parametrize("family", sorted(_ROUND3_WRAPPERS))
+def test_same_case_filler_still_clears_after_the_case_repair(family):
+    """The positive half of R1b, one per format. Uppercase filler is filler:
+    the repair must separate word comparison from shape comparison, not make
+    the shape test case-sensitive in the sense of preferring lowercase."""
+    assert is_placeholder(_round3_token(family, "Q" * 40))
+    assert is_placeholder(_round3_token(family, "q" * 40))
+
+
+def test_an_ascending_run_in_capitals_is_still_filler():
+    """`ABCDEFGH` is typed filler for the same reason `abcdefgh` is.
+
+    Kept short on purpose: ascending means every adjacent codepoint difference
+    is one, so an alphabet that runs past Z and starts again at A is NOT one
+    run. My first version of this row asserted a 36-character body and was
+    wrong about the product rather than the other way round."""
+    assert is_placeholder(_round3_token("GITHUB", "ABCDEFGHIJKLMNOP"))
+    assert is_placeholder(_round3_token("GITHUB", "abcdefghijklmnop"))
+
+
+# ── R2-02 / R2-05: a helper result is not a firewall decision ────────────────
+
+@pytest.mark.parametrize("token", [
+    "sk" + "_live_" + "AAAA" + "_" + "here" + "_" + "BBBB",
+    "sk" + "_test_" + "abcdefghijklmnopqrstuvwxyz012345",
+])
+def test_a_helper_clearance_with_no_rule_match_is_a_coverage_limit(token):
+    """CORRECTION to round 2's closure claim, which counted these as leaks.
+
+    ASTRA measured both at ZERO raw rule matches: the shipped Stripe live rule
+    accepts alphanumerics only, so an underscore-delimited body never matched
+    it, and there is no Stripe TEST rule at all. `is_placeholder` may say what
+    it likes about a string no rule detects — nothing was cleared, because
+    nothing was ever caught. Pinned so the claim stays honest and so the day a
+    test-mode rule ships, this row notices that these strings become real
+    controls rather than staying a footnote.
+    """
+    assert not find_secret_material(token), (
+        "a rule now matches this token — it is no longer a coverage limit, and "
+        "the placeholder guard's behaviour on it is now load-bearing")
+    assert _denies(token) is None
+
+
+# ── The per-word generator, frozen ──────────────────────────────────────────
+
+_FROZEN_PLACEHOLDER_WORDS = (
+    "0000", "123456", "aaaa", "abcdef", "changeme", "dummy", "example",
+    "fixme", "here", "insert", "notreal", "placeholder", "redacted",
+    "replace", "sample", "todo", "xxxx", "your",
+)
+
+
+def test_the_word_list_is_frozen_so_a_generated_test_cannot_vanish_with_it():
+    """ASTRA §6. The per-word tests parametrize over the PRODUCT's tuple, so
+    deleting a word deletes its own test case in the same commit and the suite
+    stays green while the vocabulary shrinks. The expectation is written down
+    here instead; changing the vocabulary is then a two-file decision with a
+    diff a reviewer can see."""
+    assert tuple(sorted(_PLACEHOLDER_WORDS)) == _FROZEN_PLACEHOLDER_WORDS
+
+
+# ── R2: a cleared canary is an audited event ─────────────────────────────────
+
+def test_a_cleared_canary_reaches_the_terminal_receipt(tmp_path):
+    """ASTRA control C01 (blocking).
+
+    The allowlist ruling that put AWS's documentation key in
+    KNOWN_PUBLIC_CANARIES was accepted WITH an audit requirement: a hit that is
+    cleared has to say so in the receipt. It did not. `find_secret_material`
+    kept the raw hit, `check_egress_secrets` dropped it and returned no
+    decision, and the run produced an opening record and a clean terminal
+    decision that mention nothing — so the one mechanism allowed to clear a
+    real format match was also the one mechanism that left no trace.
+
+    The record must identify the hit and the rule and say WHY it was cleared,
+    and it must do that without carrying the material: a receipt that echoes a
+    credential is the leak it was written to report.
+    """
+    import json
+    from sunglasses.firewall import run_hook, starter_policy_text
+
+    canary = sorted(KNOWN_PUBLIC_CANARIES)[0]
+    (tmp_path / "policy.yaml").write_text(starter_policy_text())
+    run_hook(json.dumps({"hook_event_name": "PreToolUse", "tool_name": "WebFetch",
+                         "tool_input": {"url": "https://example.com/review",
+                                        "prompt": canary}}), home=tmp_path)
+
+    records = [json.loads(line)
+               for path in (tmp_path / "receipts").glob("*.jsonl")
+               for line in path.read_text().splitlines()]
+    terminal = [r for r in records if r.get("kind") == "decision"]
+    assert terminal, "no terminal record at all"
+
+    cleared = [c for r in terminal for c in r.get("cleared_canaries", [])]
+    assert cleared, (
+        "the terminal receipt does not record the cleared canary — the only "
+        "sanctioned way to clear a format match leaves no audit trail")
+    entry = cleared[0]
+    assert entry.get("rule_id"), "cleared hit does not name the rule that matched"
+    assert entry.get("fingerprint"), "cleared hit carries no identity"
+    assert "KNOWN_PUBLIC_CANARIES" in entry.get("reason", ""), (
+        "the clearance reason does not name the mechanism that cleared it")
+
+    blob = json.dumps(records)
+    assert canary not in blob, "the receipt carries the credential material itself"
