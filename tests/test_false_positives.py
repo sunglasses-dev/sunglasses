@@ -111,10 +111,40 @@ def test_clean_text_is_not_blocked(engine_name, engine, name, text, channel):
 @pytest.mark.parametrize("name,text,channel",
                          ATTACK_CANARIES,
                          ids=[c[0] for c in ATTACK_CANARIES])
-def test_real_attacks_still_blocked(name, text, channel):
-    """Real attacks must still be caught — FP fixes must not gut detection."""
-    engine = SunglassesEngine()
-    result = engine.scan(text, channel=channel)
+def test_real_attacks_still_blocked(shared_engine, name, text, channel):
+    """Real attacks must still be caught — FP fixes must not gut detection.
+
+    One engine for the whole module rather than one per canary. Measured with
+    the constructor instrumented: this parametrised test built 11 identical
+    default engines, 1.5 s of ruleset compile each, to run a scan of about two
+    milliseconds. The 12th identical one is the `hardcoded` entry in
+    `_engines()` above, which is built at collection time.
+    """
+    result = shared_engine.scan(text, channel=channel)
     assert not result.is_clean, (
         f"MISSED ATTACK '{name}' — detection regressed in the shipped engine"
     )
+
+
+# ── sharing one engine is a claim, so it is checked ─────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def _engine_budget(shared_engine, engine_budget):
+    """Two engines are expected, and both are named.
+
+    `_engines()` builds a default engine and a database-backed one at collection
+    time so the parametrisation can name them. Those are two genuinely different
+    configurations, verified by hashing the constructor arguments by CONTENT
+    rather than by shape: an earlier fingerprint collapsed every list argument to
+    `list[N]` and reported this file as having one shareable group when it has
+    two real ones.
+    """
+    engine_budget(2)
+
+
+def test_one_engine_gives_the_same_answers_in_any_order(shared_engine):
+    """The statelessness control, which is what makes the sharing honest."""
+    import sys
+    from engine_sharing import assert_engine_is_stateless, module_documents
+    assert_engine_is_stateless(shared_engine, module_documents(sys.modules[__name__]),
+                               channel="message", minimum=3)

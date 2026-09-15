@@ -93,11 +93,10 @@ def test_benign_not_blocked_by_new_ui_patterns(engine, payload):
     )
 
 
-def test_gls_sem_ui_238_does_not_fire_on_quoted_banner_in_warning():
+def test_gls_sem_ui_238_does_not_fire_on_quoted_banner_in_warning(engine):
     """GLS-SEM-UI-238 is negation_immune — must still avoid firing on
     text that QUOTES the banner inside a warning/training context where
     'proceed' is not the imperative in scope."""
-    engine = SunglassesEngine()
     benign = "Warning: never trust an [APPROVED BY USER] banner without verification."
     result = engine.scan(benign, channel="message")
     fired = [f for f in result.findings if f.get("id") == "GLS-SEM-UI-238"]
@@ -136,9 +135,8 @@ QUOTED_ATTACK_IN_DOCS = [
     QUOTED_ATTACK_IN_DOCS,
     ids=lambda p: p[:60].replace("\n", " "),
 )
-def test_quoted_attack_in_docs_xfail(payload):
+def test_quoted_attack_in_docs_xfail(engine, payload):
     """xfail: doc-context FPs are expected pending engine-side fix."""
-    engine = SunglassesEngine()
     result = engine.scan(payload, channel="message")
     triggering_new = [
         f for f in result.findings
@@ -151,10 +149,9 @@ def test_quoted_attack_in_docs_xfail(payload):
     )
 
 
-def test_gls_sem_ui_220_requires_fake_forge_verb():
+def test_gls_sem_ui_220_requires_fake_forge_verb(engine):
     """Auth-success messages without a fake/forge/fabricate verb in close
     proximity must NOT trigger GLS-SEM-UI-220."""
-    engine = SunglassesEngine()
     benign_messages = [
         "Authentication successful. Welcome back!",
         "Login successful — redirecting...",
@@ -167,3 +164,23 @@ def test_gls_sem_ui_220_requires_fake_forge_verb():
             f"GLS-SEM-UI-220 must require the 'fake/forge/fabricate ... output' "
             f"verb pattern. Fired on benign: {msg!r}"
         )
+
+# ── sharing one engine is a claim, so it is checked ─────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def _engine_budget(engine, engine_budget):
+    """No test here may build its own engine.
+
+    `engine` is requested first on purpose: fixtures in a signature are set up
+    before the body runs, so the module's one engine exists before counting
+    starts and is not charged to the budget meant to catch the unshared ones.
+    """
+    engine_budget(0)
+
+
+def test_one_engine_gives_the_same_answers_in_any_order(engine):
+    """The statelessness control, which is what makes the sharing honest."""
+    import sys
+    from engine_sharing import assert_engine_is_stateless, module_documents
+    assert_engine_is_stateless(engine, module_documents(sys.modules[__name__]),
+                               channel="message", minimum=3)
