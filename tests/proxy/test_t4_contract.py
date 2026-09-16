@@ -215,3 +215,33 @@ def test_AT28_a_null_id_is_still_a_request(request_id):
     settled = _invoke(request_id)
     assert settled, "nothing was settled"
     assert settled[0]["reason"] == "PROHIBITED_SECRET", settled
+
+
+# ── T4.R5 · the catalog has to contain what the product actually closes with ─
+
+def test_every_close_reason_is_in_the_frozen_catalog():
+    """A vocabulary frozen on one branch and a reason added on another meet for
+    the first time at a rebase, and the shape they meet in is a ValueError out
+    of the reader instead of the deliberate close somebody wrote.
+
+    This is written as a SWEEP rather than as a row per reason, because the
+    defect was never about INTERNAL_FAULT specifically: it was about the
+    catalog and the call sites drifting apart with nothing comparing them. Any
+    close reason this package uses must be a reason the envelope accepts.
+    """
+    import pathlib
+    import re
+
+    from sunglasses.proxy import envelope
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "sunglasses"
+    used = {}
+    for path in root.rglob("*.py"):
+        for match in re.finditer(r'_close\(\s*["\']([A-Z_]+)["\']', path.read_text()):
+            used.setdefault(match.group(1), path.name)
+    assert used, "the sweep found no close sites at all; it has stopped measuring"
+    missing = {name: where for name, where in used.items()
+               if name not in envelope.REASONS}
+    assert not missing, (
+        f"these reasons are closed with but are not in the frozen catalog, so "
+        f"the close raises instead of closing: {missing}")

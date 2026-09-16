@@ -33,6 +33,12 @@ REASONS = frozenset({
     "REQUEST_CANCELLED", "APPROVAL_REQUIRED", "DESCRIPTOR_CHANGED",
     "RECEIPT_IO_ERROR", "INCOMPLETE_SESSION", "ROUTE_UNVERIFIED",
     "CONFIG_CONFLICT", "CONFIG_IO_ERROR",
+    # RC25/RC26's tripwire ends the session with this (rule S3, pump.py) when a
+    # settlement record is present and owned by another generation. This file
+    # froze its vocabulary before that rule existed and the two never met: the
+    # tripwire fires, the envelope refuses the reason it was given, and a
+    # deliberate fault-and-close comes out of the reader as a ValueError.
+    "INTERNAL_FAULT",
 })
 
 RULES = frozenset({"S1", "S2", "S3", "S4", "S5", "S6", "S7"})
