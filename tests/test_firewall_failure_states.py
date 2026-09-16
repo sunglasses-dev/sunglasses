@@ -604,3 +604,88 @@ def test_a_fifo_policy_answers_in_a_separate_process_within_a_second(home):
     decision = out.get("hookSpecificOutput", {})
     assert decision.get("permissionDecision") == "ask", decision
     assert "cannot be read" in decision.get("permissionDecisionReason", "")
+
+
+# ═══ COST — the guard has to ANSWER, and a big document is not an excuse ═════
+#
+# ASTRA's round-4 blocker on #173, and the shape is the one this file exists
+# for: a hook that misses the harness deadline FAILS OPEN, in silence, with no
+# terminal receipt. The ownership rule added in round 4 asked "does anything
+# else contain me?" by walking the whole match list for every occurrence, so a
+# document carrying 16,000 credential-shaped tokens never reached a decision
+# and the call went through unexamined. A correctness fix that stops answering
+# on large input has not made the firewall safer, it has moved the hole.
+#
+# These run through `python -m sunglasses.firewall` with the SHIPPED timeout
+# rather than a number chosen here, because the deadline that matters is the
+# one the installed hook actually gets.
+
+_COST_TOKENS = 16000
+
+
+def _cost_document(count=_COST_TOKENS, unique=False):
+    """`count` credential-shaped tokens, ASTRA's shape: an Anthropic prefix and
+    a 40-character q/Q body, which is material rather than filler and is also
+    the overlap case -- two rules match every one of them."""
+    import random as _random
+    draw = _random.Random(173)
+    out = []
+    body = "".join(draw.choice("qQ") for _ in range(40))
+    for index in range(count):
+        out.append("sk" + "-ant-" + ("".join(draw.choice("qQ") for _ in range(40))
+                                     if unique else body))
+    return " " + " ".join(out)
+
+
+def _cost_payload(document):
+    return json.dumps({"hook_event_name": "PreToolUse", "tool_name": "WebFetch",
+                       "tool_input": {"url": "https://example.com/review",
+                                      "prompt": document}})
+
+
+def _denied(out):
+    decision = out.get("hookSpecificOutput", {})
+    return decision.get("permissionDecision") == "deny"
+
+
+@pytest.mark.parametrize("unique", [False, True], ids=["COST-16000", "COST-16000-UNIQUE"])
+def test_a_document_of_16000_credentials_is_answered_inside_the_shipped_deadline(home, unique):
+    """Both of ASTRA's blocking controls.
+
+    The assertion is the DEADLINE, not a stopwatch reading: `_hook_subprocess`
+    raises TimeoutExpired if the process has to be killed, which is exactly the
+    fail-open being tested. The seconds this takes on any given machine are
+    recorded by the curve below as evidence and asserted nowhere.
+
+    Repeated and unique are different defects wearing one number. Repeated is
+    fixed by judging each distinct token once; unique cannot be, and needs the
+    ownership pass itself to stop being quadratic.
+    """
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    _elapsed, out = _hook_subprocess(_cost_payload(_cost_document(unique=unique)),
+                                     home, deadline=firewall._HOOK_TIMEOUT)
+    assert _denied(out), (
+        f"16,000 live credentials were not denied: {out}. A document big enough "
+        f"to be slow is a document big enough to matter.")
+
+
+def test_the_cost_curve_is_recorded_as_evidence(home):
+    """1,000 to 16,000, written down rather than asserted.
+
+    Times are observations on whatever machine ran them -- they are not a
+    threshold and a slower laptop is not a regression. The curve is here so the
+    SHAPE is visible: the quadratic version measured 0.066 / 0.251 / 1.003 /
+    3.653 s at 1k / 2k / 4k / 8k and never finished 16k, and a doubling that
+    quadruples the time is the thing to notice, whatever the absolute numbers.
+    """
+    (home / firewall.INSTALL_MARKER).write_text("enrolled\n")
+    curve = {}
+    for count in (1000, 2000, 4000, 8000, 16000):
+        elapsed, out = _hook_subprocess(_cost_payload(_cost_document(count=count)),
+                                        home, deadline=firewall._HOOK_TIMEOUT)
+        assert _denied(out), f"{count} credentials were not denied: {out}"
+        curve[count] = round(elapsed, 3)
+    evidence = _REPO / "tests" / "evidence"
+    evidence.mkdir(parents=True, exist_ok=True)
+    (evidence / "firewall_cost_curve.json").write_text(json.dumps(curve, indent=2))
+    print("cost curve (seconds, this host):", curve)

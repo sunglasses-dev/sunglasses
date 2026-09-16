@@ -413,19 +413,81 @@ def find_secret_material(text: str) -> list:
             found.append((match.start(), match.end(), rule, token,
                           _leading_literal_length(rule, token)))
 
+    owns = _span_owners(found)
+
     hits = []
     seen = set()
-    for start, end, rule, token, reach in found:
-        owner = _owner_of_span(found, start, end, rule, reach)
-        if owner is not rule:
+    cleared = set()
+    for index, (start, end, rule, token, reach) in enumerate(found):
+        if not owns[index]:
             # Somebody else's span. The owner's verdict is the span's verdict,
             # and it is recorded when the owner's own entry comes round.
             continue
-        if token in seen or is_placeholder(token, rule):
+        if token in seen or token in cleared:
+            continue
+        if is_placeholder(token, rule):
+            # Judged ONCE per distinct token. A document repeating one cleared
+            # token 16,000 times asked the guard 16,000 identical questions.
+            cleared.add(token)
             continue
         seen.add(token)
         hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
     return hits
+
+
+def _span_owners(found: list) -> list:
+    """Which occurrences speak for their span. One pass, not one scan each.
+
+    THE FIRST VERSION OF THIS WAS A DENIAL OF SERVICE and ASTRA found it: it
+    asked "does anything else contain me?" by walking the ENTIRE match list for
+    EVERY occurrence. On a document carrying 16,000 credential-shaped tokens
+    that is 256,000,000 comparisons, and the hook's 10-second deadline passed
+    with no decision written -- a firewall that fails OPEN on a big input,
+    which is worse than the false positive the ownership rule was added to fix.
+    Measured before the repair: 1,000 occurrences 0.066 s, 2,000 0.251 s,
+    4,000 1.003 s, 8,000 3.653 s, 16,000 never inside the deadline.
+
+    Two observations make it linear in practice:
+
+    IDENTICAL SPANS are the collision that actually happens -- two formats
+    matching the same token -- so they are grouped and decided once, by the
+    same longest-leading-literal rule.
+
+    STRICT CONTAINMENT is a nesting chain, and a container always sorts before
+    what it contains, so one sweep with a stack sees every candidate. The chain
+    can be no deeper than the number of rules, because one rule's own matches
+    never overlap each other.
+    """
+    if not found:
+        return []
+
+    # One decision per distinct span.
+    groups: dict = {}
+    for index, (start, end, _rule, _token, reach) in enumerate(found):
+        key = (start, end)
+        current = groups.get(key)
+        if current is None or reach > found[current][4]:
+            groups[key] = index          # ties keep the earlier rule, which is
+                                         # SECRET_RULES order, as before
+    owns = [False] * len(found)
+    winners = sorted(groups.values(), key=lambda i: (found[i][0], -found[i][1]))
+
+    stack: list = []
+    for index in winners:
+        start, end, rule, _token, reach = found[index]
+        while stack and found[stack[-1]][1] < end:
+            stack.pop()                  # cannot contain this one, or anything after it
+        best = index
+        for outer in stack:
+            o_start, o_end, o_rule, _t, o_reach = found[outer]
+            if o_rule is rule or not (o_start <= start and end <= o_end):
+                continue
+            b_start, b_end, _r, _t2, b_reach = found[best]
+            if (o_reach, o_end - o_start) > (b_reach, b_end - b_start):
+                best = outer
+        owns[index] = best == index
+        stack.append(index)
+    return owns
 
 
 def _leading_literal_length(rule, token: str) -> int:
