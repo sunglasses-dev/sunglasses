@@ -132,7 +132,8 @@ class Route:
                 self._withhold(request_id, blocked, RULE_APPROVAL)
                 return
 
-        self._inspect(raw, message, method, request_id=request_id)
+        self._inspect(raw, message, method, request_id=request_id,
+                      is_request=True)
 
     # ── notifications ──────────────────────────────────────────────────────
 
@@ -146,11 +147,11 @@ class Route:
         if selector.zero_leaves_is_complete(method, message):
             self._release(raw, None)
             return
-        self._inspect(raw, message, method, request_id=None)
+        self._inspect(raw, message, method, request_id=None, is_request=False)
 
     # ── the held path ──────────────────────────────────────────────────────
 
-    def _inspect(self, raw, message, method, *, request_id):
+    def _inspect(self, raw, message, method, *, request_id, is_request):
         channel = selector.channel_for(method, REQUEST)
         params = message.get("params")
         params = params if isinstance(params, (dict, list)) else {}
@@ -193,8 +194,16 @@ class Route:
         # Handing it the raw frame makes `direction` and `is_request` absent,
         # the direction test false, and every outbound secret settles as the
         # weaker PROHIBITED_CONTENT while still looking blocked.
+        # A REQUEST IS A FRAME WITH AN `id` MEMBER, and `null` is a value that
+        # member can hold. This read `request_id is not None`, so a tools/call
+        # carrying `"id": null` -- which the caller reached through
+        # `if "id" in message` and treated as a request in every other respect
+        # -- was described here as a notification, and an engine secret heading
+        # out in it settled as the weaker PROHIBITED_CONTENT. The kind is
+        # decided by the caller that already knows it, not re-derived from a
+        # value that cannot tell absent from null.
         held = {"direction": REQUEST,
-                "is_request": request_id is not None,
+                "is_request": is_request,
                 "method": method}
         settlement = policy.settle(result, held=held,
                                    held_content_bytes=held_bytes)

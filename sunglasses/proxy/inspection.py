@@ -36,6 +36,7 @@ from . import selector, worker
 STATUS_COMPLETE = "complete"
 STATUS_INCOMPLETE = "incomplete"
 STATUS_EXCEPTION = "exception"
+STATUS_DEADLINE = "deadline"      # mirrors worker.STATUS_DEADLINE, like its neighbours
 
 DECISION_ALLOW = "allow"
 DECISION_REVIEW = "review"
@@ -121,6 +122,17 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
 
     try:
         result = engine.scan(text, channel=channel)
+    except TimeoutError:
+        # T4.R3 names this one separately: an engine TIMEOUT is `deadline`, not
+        # `exception`. Both were landing in the generic branch below, so a scan
+        # that ran out of time settled SCAN_EXCEPTION -- "the scanner broke"
+        # where "the scanner did not finish in the budget" is the fact. They
+        # are different things to whoever reads the receipt, and only one of
+        # them is a reason to distrust the scanner.
+        return _result(binding, accepted=False, status=STATUS_DEADLINE,
+                       inspection_complete=False, decision=DECISION_REVIEW,
+                       inspected=0, observed=content_bytes, elapsed=0,
+                       findings=())
     except Exception:
         # T4.R3. A scan that raised did not look. `allow` is the engine's word
         # for having looked and found nothing, and the exception text is

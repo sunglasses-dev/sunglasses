@@ -111,6 +111,25 @@ class Settlement:
                 f"complete={self.inspection_complete}>")
 
 
+# T7.R1/T7.R2. Which rule a recorded cause carries. Protocol faults are S5 and
+# nothing else is: the structural and resource breaches are explicitly NOT S5
+# per T7.R1, and cancellation and approval keep their own rules because those
+# are what actually happened to the item.
+# Named as literals because these causes are recorded by the SESSION, not
+# produced by this module, so they are not in the subset above; T4.R5 owns the
+# catalog they come from.
+_PROTOCOL_CAUSES = frozenset({"MALFORMED_CLIENT", "MALFORMED_UPSTREAM",
+                              "UNSUPPORTED_PROTOCOL"})
+_CAUSE_RULES = {REQUEST_CANCELLED: "S6", "APPROVAL_REQUIRED": "S4"}
+
+
+def rule_for_cause(cause):
+    """The rule that belongs to a cause recorded before the worker answered."""
+    if cause in _PROTOCOL_CAUSES:
+        return "S5"
+    return _CAUSE_RULES.get(cause, "S3")
+
+
 def settle(result, *, held, held_content_bytes, helper_outcome="clean",
            independent_cause=None, known_detector_gap=False):
     """T4.R4(6b) through (9), for an ALREADY VALIDATED worker result.
@@ -126,7 +145,17 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
     if independent_cause is not None:
         # T4.R4 Rule A. An earlier fault is terminal, and the completion that
         # arrives afterwards does not get to relabel it.
-        return Settlement(independent_cause, "S3", accepted=result["accepted"],
+        #
+        # THE RULE TRAVELS WITH THE CAUSE. This returned a hardcoded S3, so an
+        # item already settled for a PROTOCOL fault came back out as a scan
+        # fault: T7.R2 says each pending item settles with the first recorded
+        # cause AND its rule -- S5 for protocol, S3 for resource or deadline,
+        # S6 or S4 where that was what happened. The reason survived and the
+        # rule did not, which reads in a receipt as the wrong kind of thing
+        # having gone wrong, and S5 is the one that means the wire is no longer
+        # trustworthy.
+        return Settlement(independent_cause, rule_for_cause(independent_cause),
+                          accepted=result["accepted"],
                           status=result["status"], inspection_complete=False,
                           detail="an independent cause was recorded first")
 
@@ -173,7 +202,14 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
                           rule_ids=rule_ids, detail="; ".join(failed))
 
     # T4.R4(9). The one verdict that lets bytes through.
+    #
+    # The gap disposition is CHANNEL `message` ONLY, as the rule writes it. It
+    # fired wherever the flag was set, including `api_response`, which labels
+    # an ARRIVING result as a known published miss of OURS -- a statement about
+    # our own detector coverage attached to something we never claimed to
+    # cover. An S1 on any other channel is an ordinary CLEAN.
+    gap = known_detector_gap and result["binding"].get("channel") == "message"
     return Settlement(
         CLEAN, "S1", accepted=True, status=worker.STATUS_COMPLETE,
         inspection_complete=True,
-        disposition=NO_FINDING_KNOWN_DETECTOR_GAP if known_detector_gap else CLEAN)
+        disposition=NO_FINDING_KNOWN_DETECTOR_GAP if gap else CLEAN)
