@@ -86,6 +86,33 @@ def _digest_file(p):
     return _digest_bytes(pathlib.Path(p).read_bytes())
 
 
+def _reject_constant(name):
+    """`NaN`, `Infinity` and `-Infinity` are Python's extensions to JSON, not
+    JSON. `json.loads` accepts them by default, so a config carrying one parsed
+    fine and then round-tripped into a file no other reader can use. Refusing is
+    the same rule as duplicate keys: we do not silently accept a grammar the
+    user's other tools will reject."""
+    raise ValueError(f"{name} is not JSON")
+
+
+def _strict_loads(raw, what):
+    """One loader for every document we read, config or record.
+
+    A record is as untrusted as a config: it is a file on disk that anything can
+    edit, and it tells us which bytes to write into the user's configuration.
+    Reading it with a laxer parser than the config was read with is how a
+    document we refused to accept comes back in through the recovery path.
+    """
+    try:
+        text = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw
+        return json.loads(text, object_pairs_hook=_reject_duplicate_keys,
+                          parse_constant=_reject_constant)
+    except RecursionError as e:
+        raise ConfigIOError(f"{what} is nested too deeply to parse") from e
+    except (ValueError, UnicodeDecodeError) as e:
+        raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
+
+
 def _reject_duplicate_keys(pairs):
     """A duplicate key makes the document ambiguous and `json.loads` resolves it
     silently by keeping the last one. Rewriting such a file drops data the user
@@ -106,11 +133,7 @@ def _read_bytes(path):
 
 
 def _parse(raw, path):
-    try:
-        return json.loads(raw.decode("utf-8"),
-                          object_pairs_hook=_reject_duplicate_keys)
-    except (ValueError, UnicodeDecodeError) as e:
-        raise ConfigIOError(f"{path} is not usable JSON: {e}") from e
+    return _strict_loads(raw, str(path))
 
 
 def _servers(doc, path):
@@ -187,6 +210,55 @@ def _discard(*paths):
             pass
 
 
+# Every field a record must carry, with the type it must have. `target_path` is
+# REQUIRED: a record that does not say which file it describes cannot be checked
+# against the file in front of us, and R5-RECORD-TARGET-REQUIRED showed a record
+# with it deleted being applied to a file it was never taken from.
+RECORD_TYPES = {
+    "original_entry": dict,
+    "installed_entry": dict,
+    "file_sha_before": str,
+    "original_bytes_path": str,
+    "target_path": str,
+}
+
+
+def _read_record(path, name, *, expect_state):
+    """Read and validate a record, or refuse.
+
+    A record is a file on disk that tells us which bytes to write into the
+    user's configuration, so it is validated exactly as strictly as a config:
+    same parser, required fields, required types, and a state that has to be the
+    one we are reading it for. Anything else is CONFIG_CONFLICT with no mutation
+    rather than an exception from three frames deeper.
+    """
+    try:
+        raw = pathlib.Path(path).read_bytes()
+    except OSError as e:
+        raise ConfigConflict(f"the record for {name!r} could not be read: {e}") from e
+    try:
+        record = _strict_loads(raw, f"the record for {name!r}")
+    except ConfigIOError as e:
+        raise ConfigConflict(str(e)) from e
+    if not isinstance(record, dict):
+        raise ConfigConflict(f"the record for {name!r} is not an object")
+    for field_name, want in RECORD_TYPES.items():
+        if field_name not in record:
+            raise ConfigConflict(f"the record for {name!r} is missing {field_name}")
+        if not isinstance(record[field_name], want):
+            raise ConfigConflict(
+                f"the record for {name!r} has a {field_name} that is not a "
+                f"{want.__name__}")
+    if "file_sha_after" not in record:
+        raise ConfigConflict(f"the record for {name!r} is missing file_sha_after")
+    state = record.get("state")
+    if state != expect_state:
+        raise ConfigConflict(
+            f"the record for {name!r} is marked {state!r}, not {expect_state!r}; "
+            f"refusing to act on a transaction in a state we did not leave it in")
+    return record
+
+
 def resolve_artifact(*, package_root=None):
     """The artifact a wrapper must point at: this package's proxy entry point.
 
@@ -204,6 +276,21 @@ def resolve_artifact(*, package_root=None):
             f"so refusing rather than writing a config that runs nothing"
         )
     return entry
+
+
+def _could_execute(command) -> bool:
+    """Could this command run a Python artifact at all?
+
+    Decided WITHOUT the marker, because the marker is the thing being checked.
+    `sys.executable` is the interpreter we wire; anything else is accepted only
+    when it names a python. `/usr/bin/true` exits 0 and runs nothing, which is
+    exactly the shape this refuses.
+    """
+    if not isinstance(command, str) or not command:
+        return False
+    if command == sys.executable:
+        return True
+    return pathlib.Path(command).name.lower().startswith("python")
 
 
 def classify(entry, *, artifact):
@@ -227,7 +314,14 @@ def classify(entry, *, artifact):
     resolved = str(pathlib.Path(artifact).resolve())
     if meta.get("artifact") != resolved or meta.get("sha256") != actual:
         return "UNVERIFIED"
-    if entry.get("command") != meta.get("command"):
+    # C6-COMMAND-BINDING. The marker is untrusted data in a file the user (or
+    # anything else) can edit, so it cannot vouch for itself: setting BOTH the
+    # entry's command and the marker's command to `/usr/bin/true` made them
+    # agree while the artifact never ran. Agreement is necessary and not
+    # sufficient; the command also has to be something that could execute the
+    # artifact, judged without reading the marker.
+    command = entry.get("command")
+    if command != meta.get("command") or not _could_execute(command):
         return "UNVERIFIED"
     args = entry.get("args")
     if not isinstance(args, list) or args[:2] != [resolved, "--"]:
@@ -278,17 +372,39 @@ def install(config_path, name, *, artifact, home, argv=None):
     target_id = str(target.resolve())
     _, rec_path, pending_path, bytes_path = _records_dir(home, name)
 
-    # R4/R5-COLLISION: a record belongs to one target, not to a name.
+    # R4/R5-COLLISION and R4-IDENTITY-BEFORE-DIGEST. A completed record means an
+    # install is OUTSTANDING, and its retained bytes are the only way back to
+    # the state it captured. Overwriting it destroys that, which is what
+    # happened when a config was edited back to unwrapped and installed again:
+    # same path, different identity, prior recovery material gone.
     if rec_path.exists():
+        prior = None
         try:
-            prior = json.loads(rec_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            prior = None
-        prior_target = prior.get("target_path") if isinstance(prior, dict) else None
-        if prior_target != target_id:
+            prior = _read_record(rec_path, name, expect_state="complete")
+        except ConfigConflict:
+            pass
+        belongs = prior.get("target_path") if prior else None
+        raise ConfigConflict(
+            f"{name!r} already has a completed install record"
+            + (f" for {belongs}" if belongs else "")
+            + "; uninstall it before installing again, so the bytes it retained "
+              "are not the ones we throw away")
+
+    # A pending journal is a transaction we left open (R-177-R3: recover or
+    # refuse, never strand). It is safe to resume ONLY when the target is still
+    # byte-for-byte what the journal captured, i.e. the crash happened before
+    # the replace. Otherwise we cannot tell what is on disk and we refuse.
+    if pending_path.exists():
+        journal = _read_record(pending_path, name, expect_state="pending")
+        if journal.get("target_path") != target_id:
             raise ConfigConflict(
-                f"a record for {name!r} already belongs to {prior_target}; "
-                f"refusing to overwrite it and lose that original")
+                f"an open transaction for {name!r} describes "
+                f"{journal.get('target_path')}, not {target}")
+        if _digest_bytes(raw) != journal.get("file_sha_before"):
+            raise ConfigConflict(
+                f"an open transaction for {name!r} captured a different version "
+                f"of {target}; uninstall to recover it before installing again")
+        _discard(pending_path)
 
     # R4-OPTIONS: env, cwd and anything else the entry carries survive.
     wrapper = {k: v for k, v in original_entry.items() if k not in ("command", "args")}
@@ -318,7 +434,9 @@ def install(config_path, name, *, artifact, home, argv=None):
         pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
                                 encoding="utf-8")
     except OSError as e:
-        _discard(bytes_path)
+        # A half-written journal is worse than none: it is unparseable recovery
+        # material that the next run would have to refuse. Remove both.
+        _discard(pending_path, bytes_path)
         raise ConfigIOError(f"cannot write the pending record: {e}") from e
 
     try:
@@ -339,43 +457,29 @@ def install(config_path, name, *, artifact, home, argv=None):
             _atomic_write(target, raw)
         except ConfigIOError:
             rolled_back = False
-        _discard(bytes_path, pending_path, rec_path)
+        if rolled_back:
+            # The target is the original again, so the journal and the retained
+            # copy have nothing left to recover and would only confuse the next
+            # run.
+            _discard(bytes_path, pending_path, rec_path)
+        else:
+            # The target is STILL WRAPPED. The journal and the retained bytes
+            # are now the only route back to the user's original, so deleting
+            # them here would strand them permanently. Keep them and say so.
+            _discard(rec_path)
         raise ConfigIOError(
             f"could not record the install: {e}"
             + ("; the target was restored" if rolled_back else
-               "; THE TARGET IS STILL WRAPPED and could not be restored")
+               f"; THE TARGET IS STILL WRAPPED. Its original is retained at "
+               f"{bytes_path} and `sunglasses uninstall {name}` will restore it")
         ) from e
 
     _discard(pending_path)
 
 
-def uninstall(config_path, name, *, home):
-    """Restore. Byte-exact when the file has not moved, entry-only when it has,
-    and a typed refusal whenever the state is not one we can vouch for."""
-    target = pathlib.Path(config_path)
-    _, rec_path, pending_path, _ = _record_paths(home, name)
-
-    if not rec_path.exists():
-        raise ConfigConflict(f"no recorded install for {name!r}")
-    try:
-        record = json.loads(rec_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        raise ConfigConflict(
-            f"the record for {name!r} is not readable JSON, so the original it "
-            f"points at cannot be trusted: {e}") from e
-    if not isinstance(record, dict):
-        raise ConfigConflict(f"the record for {name!r} is not an object")
-    missing = [f for f in RECORD_FIELDS if f not in record]
-    if missing:
-        raise ConfigConflict(
-            f"the record for {name!r} is missing {', '.join(missing)}")
-
-    recorded_target = record.get("target_path")
-    if recorded_target is not None and recorded_target != str(target.resolve()):
-        raise ConfigConflict(
-            f"the record for {name!r} describes {recorded_target}, not {target}")
-
-    # R5-RETAINED: the retained bytes are validated before they are trusted.
+def _retained_of(record, name):
+    """The retained original, validated against the digest recorded at install
+    before anything is written from it (R5-RETAINED)."""
     retained_path = pathlib.Path(record["original_bytes_path"])
     try:
         retained = retained_path.read_bytes()
@@ -386,11 +490,62 @@ def uninstall(config_path, name, *, home):
         raise ConfigConflict(
             f"the retained original for {name!r} does not match the digest "
             f"recorded at install; refusing to restore bytes we cannot vouch for")
+    return retained_path, retained
+
+
+def _recover_from_journal(target, name, pending_path):
+    """Finish an interrupted install backwards.
+
+    Either the replace never happened, in which case the target already IS the
+    original and there is nothing to write, or it did, in which case the
+    retained bytes are the way back. Both end with the journal consumed, because
+    a journal left behind is a transaction that looks open forever.
+    """
+    journal = _read_record(pending_path, name, expect_state="pending")
+    if journal.get("target_path") != str(target.resolve()):
+        raise ConfigConflict(
+            f"the open transaction for {name!r} describes "
+            f"{journal.get('target_path')}, not {target}")
+    retained_path, retained = _retained_of(journal, name)
+    current = _read_bytes(target)
+    if _digest_bytes(current) != _digest_bytes(retained):
+        _atomic_write(target, retained)
+    _discard(pending_path, retained_path)
+    return UninstallResult(byte_exact=True)
+
+
+def uninstall(config_path, name, *, home):
+    """Restore. Byte-exact when the file has not moved, entry-only when it has,
+    and a typed refusal whenever the state is not one we can vouch for."""
+    target = pathlib.Path(config_path)
+    _, rec_path, pending_path, _ = _record_paths(home, name)
+
+    if not rec_path.exists():
+        # C4-REPLACE-CRASH-RECOVERY. No completed record, but an open journal
+        # means a transaction was interrupted, and if the replace had already
+        # happened the user's config is wrapped with nothing claiming to own it.
+        # The journal IS the recovery input, so uninstall consumes it rather
+        # than telling the user there is nothing installed.
+        if pending_path.exists():
+            return _recover_from_journal(target, name, pending_path)
+        raise ConfigConflict(f"no recorded install for {name!r}")
+    record = _read_record(rec_path, name, expect_state="complete")
+
+    recorded_target = record.get("target_path")
+    if recorded_target != str(target.resolve()):
+        raise ConfigConflict(
+            f"the record for {name!r} describes {recorded_target}, not {target}")
+
+    # R5-RETAINED: the retained bytes are validated before they are trusted.
+    retained_path, retained = _retained_of(record, name)
 
     current = _read_bytes(target)
 
     if _digest_bytes(current) == record.get("file_sha_after"):
-        _atomic_write(target, retained)
+        # C1: the retained BYTES, never a re-serialisation of the parsed
+        # original. A re-render compares equal under json.loads and differs on
+        # disk, so it would reformat a file we do not own.
+        _atomic_write(target, retained)   # byte-exact restore
         _discard(rec_path, pending_path, retained_path)
         return UninstallResult(byte_exact=True)
 

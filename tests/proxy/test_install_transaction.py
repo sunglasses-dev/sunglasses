@@ -378,6 +378,11 @@ def test_a_wrapper_with_a_changed_digest_is_never_wrapped_again(cfg, home, artif
     retained = read(rec["original_bytes_path"])
 
     artifact.write_text("# rebuilt\n", encoding="utf-8")
+    # Remove the completed record so the OUTSTANDING-RECORD refusal cannot fire
+    # and the any-marker check is the only gate left. Round 3 added that record
+    # check and it began answering this test, which would have left the marker
+    # check uncovered — the same "a different check fires first" shape as C6a.
+    (home / "proxy" / "installs" / "github.json").unlink()
 
     with pytest.raises(inst.ConfigConflict):
         inst.install(cfg, "github", artifact=artifact, home=home)
@@ -650,3 +655,246 @@ def test_a_marker_naming_a_different_artifact_than_it_launches_is_unverified(cfg
     entry[inst.MARKER]["artifact"] = str(elsewhere.resolve())
 
     assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 3. The ten controls ASTRA's review of 6be355d found failing.
+#
+# Round 2 passed all 48 of round 1's controls and its own 28-row battery, and
+# still failed ten NEW ones. Same lesson one level up: a battery generated from
+# the corrections you already made cannot find the corrections you did not.
+# These are red against 6be355d, verified before the fix, and the rule they
+# share is R-177-R3's: the pending record is a recovery JOURNAL that install and
+# uninstall both consume — recover or refuse, never strand.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _paths(home, name="github"):
+    d = home / "proxy" / "installs"
+    return d / f"{name}.json", d / f"{name}.pending", d / f"{name}.original"
+
+
+# ─────────────────────────────────────────────── C6-COMMAND-BINDING
+
+def test_a_marker_cannot_vouch_for_a_command_that_runs_nothing(cfg, home, artifact):
+    """C6-COMMAND-BINDING, the worst of the ten.
+
+    Setting BOTH the entry's command and the marker's command to `/usr/bin/true`
+    made them agree, and round 2 only checked that they agreed. `/usr/bin/true`
+    exits 0 and runs nothing, so a route that could never mediate anything
+    classified WRAPPED. The marker is untrusted data in a file anything can
+    edit; it cannot be its own witness.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    entry = servers(cfg)["github"]
+    assert inst.classify(entry, artifact=artifact) == "WRAPPED"
+
+    entry["command"] = "/usr/bin/true"
+    entry[inst.MARKER]["command"] = "/usr/bin/true"
+    assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
+
+
+# ──────────────────────────────────── R4-IDENTITY-BEFORE-DIGEST
+
+def test_install_refuses_while_a_completed_record_is_outstanding(cfg, home, artifact):
+    """R4-IDENTITY-BEFORE-DIGEST. The config was edited back to unwrapped and
+    installed again: same path, different identity. Round 2 overwrote the record
+    and the retained bytes, destroying the only route back to what the first
+    install had captured."""
+    original = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, _, bytes_path = _paths(home)
+    retained_before = read(bytes_path)
+
+    d = json.loads(original.decode("utf-8"))      # the PRE-wrap document
+    d["review_changed"] = True
+    cfg.write_text(json.dumps(d), encoding="utf-8")
+    changed = read(cfg)
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    assert read(cfg) == changed
+    assert read(bytes_path) == retained_before
+    assert read(rec_path) == read(rec_path)
+
+
+# ──────────────────────────────────────── the journal, both directions
+
+def test_uninstall_recovers_a_transaction_that_crashed_after_the_replace(cfg, home, artifact):
+    """C4-REPLACE-CRASH-RECOVERY. The replace committed and the process died
+    before the record completed. Round 2 said "no recorded install" and left the
+    user's config wrapped with nothing claiming to own it."""
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, bytes_path = _paths(home)
+    # the state a crash between replace and completion leaves behind
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["state"] = "pending"
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()
+
+    res = inst.uninstall(cfg, "github", home=home)
+
+    assert res.byte_exact is True
+    assert read(cfg) == before
+    assert not pending_path.exists()
+
+
+def test_install_resumes_a_transaction_that_crashed_before_the_replace(cfg, home, artifact):
+    """C4-PENDING-CRASH-RECOVERY. The journal exists and the target is still
+    byte-for-byte what it captured, so completing is safe.
+
+    A REGRESSION PIN, not a correction: this passed on 6be355d too, because a
+    round-2 install ignored the journal and simply installed fresh, which
+    happens to be the right outcome when the target was never replaced. It is
+    here so the journal handling added for the after-replace case cannot break
+    the before-replace case.
+    """
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, bytes_path = _paths(home)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["state"] = "pending"
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()
+    cfg.write_bytes(before)                       # pre-replace: target untouched
+
+    inst.install(cfg, "github", artifact=artifact, home=home)
+
+    assert inst.classify(servers(cfg)["github"], artifact=artifact) == "WRAPPED"
+    assert not pending_path.exists()
+    assert rec_path.exists()
+
+
+def test_install_refuses_a_journal_that_captured_a_different_version(cfg, home, artifact):
+    """Recover or refuse, never guess. If the target is neither the journal's
+    original nor its installed form, we cannot tell what is on disk."""
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, _ = _paths(home)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["state"] = "pending"
+    rec["file_sha_before"] = "0" * 64
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()
+    # Unwrapped, so the already-wrapped refusal CANNOT fire and the journal
+    # comparison is the only thing left that can refuse. Round 2 passed this
+    # test through the marker check while ignoring the journal entirely.
+    cfg.write_bytes(before)
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
+
+# ──────────────────────────────── C4-PENDING-PARTIAL / ROLLBACK-DURABILITY
+
+def test_a_half_written_journal_is_removed_not_left_behind(cfg, home, artifact, monkeypatch):
+    """C4-PENDING-PARTIAL. A half-written journal is worse than none: it is
+    unparseable recovery material the next run has to refuse."""
+    before = read(cfg)
+    real = pathlib.Path.write_text
+
+    def write_text(p, text, *a, **kw):
+        if p.name == "github.pending":
+            real(p, text[: len(text) // 2], *a, **kw)
+            raise OSError("injected")
+        return real(p, text, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
+    rec_path, pending_path, bytes_path = _paths(home)
+    assert read(cfg) == before
+    assert not pending_path.exists()
+    assert not rec_path.exists()
+    assert not bytes_path.exists()
+
+
+def test_a_failed_rollback_keeps_the_only_way_back(cfg, home, artifact, monkeypatch):
+    """C4-ROLLBACK-DURABILITY. The completion failed AND the rollback failed, so
+    the target is still wrapped and the retained bytes are the only route to the
+    user's original. Round 2 deleted them, stranding it permanently."""
+    before = read(cfg)
+    real_write, real_replace = pathlib.Path.write_text, inst.os.replace
+    calls = {"n": 0}
+
+    def write_text(p, *a, **kw):
+        if p.name == "github.json":
+            raise OSError("injected")
+        return real_write(p, *a, **kw)
+
+    def replace(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 2:                       # the rollback
+            raise OSError("injected")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+    monkeypatch.setattr(inst.os, "replace", replace)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.undo()
+
+    rec_path, pending_path, bytes_path = _paths(home)
+    assert read(cfg) != before                    # still wrapped, honestly
+    assert bytes_path.is_file() and read(bytes_path) == before
+    assert pending_path.is_file()
+
+
+# ─────────────────────────────────────── the record, validated like a config
+
+@pytest.mark.parametrize("corrupt,why", [
+    ("path_type", "R5-RECORD-PATH-TYPE: original_bytes_path is null"),
+    ("no_target", "R5-RECORD-TARGET-REQUIRED: no target_path at all"),
+    ("wrong_state", "R5-RECORD-STATE: a completed record marked pending"),
+    ("dup_key", "R5-RECORD-DUPKEY: duplicate key in the record itself"),
+])
+def test_uninstall_validates_a_record_as_strictly_as_a_config(cfg, home, artifact, corrupt, why):
+    """A record is a file anything can edit, and it tells us which bytes to
+    write into the user's configuration. Reading it with a laxer parser than the
+    config was read with is how a document we refused comes back in through the
+    recovery path."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    installed = read(cfg)
+    rec_path, _, _ = _paths(home)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+
+    if corrupt == "path_type":
+        rec["original_bytes_path"] = None
+        rec_path.write_text(json.dumps(rec))
+    elif corrupt == "no_target":
+        del rec["target_path"]
+        rec_path.write_text(json.dumps(rec))
+    elif corrupt == "wrong_state":
+        rec["state"] = "pending"
+        rec_path.write_text(json.dumps(rec))
+    else:
+        raw = json.dumps(rec)
+        rec_path.write_text(raw[:-1] + ',"file_sha_before":'
+                            + json.dumps(rec["file_sha_before"]) + "}")
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == installed
+
+
+# ──────────────────────────────────────────── R4-JSON grammar
+
+def test_install_refuses_a_config_with_nan(tmp_path, home, artifact):
+    """R4-JSON-NONFINITE. `NaN` is Python's extension, not JSON. `json.loads`
+    accepts it by default, so round 2 parsed it and would have round-tripped a
+    file no other JSON reader can use."""
+    p = tmp_path / ".mcp.json"
+    p.write_text('{"mcpServers":{"github":{"command":"npx"}},"extra":NaN}',
+                 encoding="utf-8")
+    before = read(p)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(p, "github", artifact=artifact, home=home)
+    assert read(p) == before
+
+
+def test_install_refuses_a_config_nested_past_the_parser(tmp_path, home, artifact):
+    """R4-JSON-DEPTH. A RecursionError is an operational refusal, not a crash."""
+    p = tmp_path / ".mcp.json"
+    p.write_bytes(b"[" * 1100 + b"0" + b"]" * 1100)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(p, "github", artifact=artifact, home=home)
