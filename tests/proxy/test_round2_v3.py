@@ -262,11 +262,7 @@ def test_Q12_reverse_request_cannot_retire_client_item():
     it: the teardown's, never the reverse request's UNINSPECTED_METHOD.
     """
     client_id = 1501
-    events = []
     session = pump.Session(strict=False)
-    original = session._core._emit
-    session._core._emit = lambda event, *a, **k: (
-        events.append(event), original(event, *a, **k))[1]
     assert session.admit_request(client_id, method='tools/call', origin='client')
 
     # G2-15's shape: upstream sends a REQUEST carrying the client's own id.
@@ -274,7 +270,11 @@ def test_Q12_reverse_request_cannot_retire_client_item():
                     'method': 'sampling/createMessage', 'params': {}})
     crossed = [f for f in session.read_upstream(reverse) if f]
 
-    assert 'UPSTREAM_REQUEST_REFUSED' in events, events
+    # `pump.Session.events` is the public seam (T10's second read): it observes
+    # the EVENT and not the settlement, so this still cannot pass for the EOF
+    # teardown's reasons, and a failure prints the whole ordered sequence.
+    assert any(e['kind'] == 'UPSTREAM_REQUEST_REFUSED' for e in session.events), (
+        [e['kind'] for e in session.events])
     assert not any(b'sampling/createMessage' in f for f in crossed), (
         "upstream's own request reached the client")
     settled = session.answer_for(client_id, origin='client')
@@ -293,10 +293,55 @@ def test_Q12_reverse_request_cannot_retire_client_item():
 # the pending method.
 #
 # The requirement is NOT lost: `pump.deliver_response` closes MALFORMED_UPSTREAM
-# on a shape mismatch and on a response for an id that is not pending, and
-# tests/proxy/test_round3_edges.py drives `_shape_matches`. Keeping a skipped
-# control pointed at the wrong layer would have looked like coverage of a rule
-# that is covered somewhere else entirely.
+# on a shape mismatch and on a response for an id that is not pending.
+#
+# WHAT I FIRST WROTE HERE WAS WRONG, and T10 measured it rather than reading it:
+# "tests/proxy/test_round3_edges.py drives `_shape_matches`". Both references
+# there wrap the function as a PAUSE POINT for the RC09 real-pipe race -- the
+# wrapper calls the original and returns the real verdict, so it is invoked, but
+# what those rows assert is answer count and teardown under a race. NOTHING
+# asserted the shape verdict itself, and the close it guards had no test in the
+# tree at all. Which is the same sin Q12 above names for
+# UPSTREAM_REQUEST_REFUSED, standing one `if` away from it. So the row is added
+# below instead of the claim being softened: it is the control Q13 was reaching
+# for and, at the framing layer, could never have been.
+
+def test_Q13R_a_result_that_does_not_fit_its_request_closes_the_session():
+    """pump.py's shape close, which nothing in the tree asserted (T10, 9-16).
+
+    `tools/call` must be answered with a result object carrying `content`. An
+    empty object is the milder-looking spelling of the same fault and the more
+    dangerous one: there is nothing to inspect, so an inspection of it is
+    vacuously clean and the client receives a result nobody read. The response
+    correlates to a real pending request, so the branch one `if` above -- "a
+    response arrived for an id that is not pending" -- cannot be what fires.
+    """
+    good = pump.Session(strict=False)
+    assert good.admit_request(77, method='tools/call', origin='client')
+    good.deliver_response(
+        origin='upstream', request_id=77,
+        frame={'jsonrpc': '2.0', 'id': 77,
+               'result': {'content': [{'type': 'text', 'text': 'hi'}]}})
+    assert good.closed_with() is None, (
+        'a well formed answer closed the session: ' + str(good.closed_with()))
+
+    session = pump.Session(strict=False)
+    assert session.admit_request(77, method='tools/call', origin='client')
+    assert session.expects(77, origin='client'), (
+        'the id is not pending, so the branch above this one would fire and '
+        'this row would pass for the wrong reason')
+    answer = session.deliver_response(
+        origin='upstream', request_id=77,
+        frame={'jsonrpc': '2.0', 'id': 77, 'result': {}})
+    assert answer is None
+    assert session.closed_with() == ('MALFORMED_UPSTREAM', 'S5'), (
+        session.closed_with())
+    # The two closes one `if` apart carry the SAME reason and rule, and the
+    # sentence that tells them apart never reaches a receipt -- `_close` takes a
+    # `detail` and drops it. So the discriminator here is the pair of sessions:
+    # same id, same method, same pending state, one answer well formed and one
+    # not. Reported to T9/T10 rather than fixed in a tests-only PR.
+
 
 def test_Q14_v3_unknown_api_settlement_refuses_without_correlation_change():
     s = item()
