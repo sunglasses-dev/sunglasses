@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 
-from . import framing, handshake, supervisor
+from . import bounds, framing, handshake, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
 ORIGIN_CLIENT = "client"
@@ -296,6 +296,30 @@ class Session:
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
             return False
+        if origin == ORIGIN_CLIENT:
+            # T801, T8.R6. The bounds table has said what the limits are since
+            # it was written and nothing was asking it. Eight outstanding
+            # correlations is the cap, compared with `>=` because the number
+            # counts items already held, so admitting one more at the limit
+            # would make it nine.
+            #
+            # CLIENT correlations only. Upstream's own requests live in their
+            # own namespace and counting them here would let a chatty server
+            # close the client's window, which is the opposite of what a bound
+            # on admission is for.
+            #
+            # The queued-byte half of this row reads an attribute the WRITE
+            # QUEUE owns, and that arrives with the result-direction work. It
+            # is passed as zero here rather than silently not checked, and the
+            # PR body says so: half a bound that reads as a whole one is how
+            # the other half stays unreachable.
+            breach = bounds.check_admission(
+                outstanding=sum(1 for i in self._pending if i[0] == ORIGIN_CLIENT),
+                queued=0)
+            if breach:
+                self._core._emit("ADMISSION_REFUSED", request_id,
+                                 reason=breach.reason, detail=breach.detail)
+                return False
         identity = key(origin, request_id)
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the

@@ -67,3 +67,24 @@ def test_an_upstream_request_is_not_counted_against_the_client_cap():
         assert session.admit_request(request_id, method="ping", origin="client")
     # The client cap is full; upstream's namespace is its own.
     assert session.admit_request(1, method="ping", origin="upstream")
+
+
+def test_an_upstream_correlation_does_not_consume_the_client_cap():
+    """The distinguishing control, and the reason it exists is worth writing
+    down: the row above cannot separate "count client correlations" from "count
+    everything", because an upstream admission skips the cap entirely either
+    way. Only a session holding BOTH can tell them apart.
+
+    One upstream request outstanding, then the client's full eight. If the
+    count is of everything, the eighth client is refused by a correlation the
+    client did not make -- a server that keeps one request open would
+    permanently cost the client a slot.
+    """
+    session = pump.Session()
+    assert session.admit_request(1, method="ping", origin="upstream")
+    for request_id in range(bounds.OUTSTANDING):
+        assert session.admit_request(request_id, method="ping", origin="client"), (
+            f"client request {request_id} was refused with an upstream "
+            f"correlation outstanding; the cap is counting the wrong things")
+    assert not session.admit_request(bounds.OUTSTANDING, method="ping",
+                                     origin="client")
