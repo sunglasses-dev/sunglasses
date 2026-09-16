@@ -132,10 +132,18 @@ def test_one_and_zero_are_not_booleans_either(field):
                                    "observed_content_bytes", "elapsed_ms"])
 def test_a_boolean_is_not_a_number(field):
     """`isinstance(True, int)` is True, so a bool passes a naive number check
-    and `inspected_utf8_bytes: True` would read as 1."""
+    and `inspected_utf8_bytes: True` would read as 1.
+
+    The REFUSAL is what this row is about and it is unchanged. The wording now
+    differs by counter because T4.R1 declares the two byte counters as integers
+    and `elapsed_ms` as a number (AT01), so the message names which one the
+    field failed; asserting the field and the rejection keeps the row about the
+    behaviour rather than about the prose."""
     with pytest.raises(Invalid) as refused:
         _validate(_result(**{field: True}))
-    assert "not a number" in str(refused.value)
+    message = str(refused.value)
+    assert field in message
+    assert "not a number" in message or "not an integer" in message
 
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf")])

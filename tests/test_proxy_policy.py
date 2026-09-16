@@ -167,7 +167,12 @@ def test_a_fully_clean_result_is_s1():
 def test_a_known_detector_gap_is_an_s1_allow_with_its_own_disposition():
     """G2-05. Distinguishable from protection, which is the whole point of the
     disposition being separate from the reason."""
-    settled = _settle(_result(), known_detector_gap=True)
+    # The binding carries the CHANNEL, because T4.R4(9) scopes this
+    # disposition to `message` (AT27) and the shared fixture's binding is
+    # empty. A real result always names its channel; leaving it out here made
+    # the row pass on a result that could not exist.
+    settled = _settle(_result(binding={"channel": "message"}),
+                      known_detector_gap=True)
     assert settled.reason == policy.CLEAN and settled.rule == "S1"
     assert settled.disposition == policy.NO_FINDING_KNOWN_DETECTOR_GAP
 

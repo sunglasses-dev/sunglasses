@@ -180,6 +180,10 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             f"inspection_complete is true with status {status!r}; only a "
             f"complete scan can claim it finished")
+    if not result["accepted"]:
+        raise Invalid(
+            f"accepted is false with status {status!r}; an unaccepted result is "
+            f"not a verdict whatever it claims")
     if status == STATUS_COMPLETE and not result["inspection_complete"]:
         # T4.R2, the other direction, and it was the one missing. A result that
         # says the scan RAN TO THE END while also saying the inspection did not
@@ -189,10 +193,6 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             "status is complete with inspection_complete false; a scan cannot "
             "have finished and not finished")
-    if not result["accepted"]:
-        raise Invalid(
-            f"accepted is false with status {status!r}; an unaccepted result is "
-            f"not a verdict whatever it claims")
     return result
 
 
