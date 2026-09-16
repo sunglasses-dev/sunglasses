@@ -241,6 +241,21 @@ class UnsupervisedUpstream(RuntimeError):
     """Strict mode was asked to read from a pipe with no process behind it."""
 
 
+class _Replaced:
+    """What the inspection seam decided should cross INSTEAD of the original.
+
+    A tiny wrapper rather than a bare bytes value because the reader has to
+    tell "deliver this instead" apart from "deliver the original", and an
+    ordinary frame is already a dict. `frame` may be None, which means the item
+    is settled and NOTHING crosses.
+    """
+
+    __slots__ = ("frame",)
+
+    def __init__(self, frame):
+        self.frame = frame
+
+
 class Session:
     """The correlation table, the tombstones, and the decision to stop reading."""
 
@@ -279,6 +294,8 @@ class Session:
         self._settling: set = set()
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
+        # identity -> the Cause this item settles with, when it is not CLEAN.
+        self._settling_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
         self.queued_bytes = 0
         # AR11, T8.R5. When each item was admitted, so the upstream-response
@@ -446,7 +463,7 @@ class Session:
 
     # ── responses ───────────────────────────────────────────────────────────
     def deliver_response(self, *, origin, request_id, frame=None,
-                         defer_retire=False):
+                         defer_retire=False, inspect=None, raw=None):
         """T6.R1 and T6.R2. One answer, to the right owner, or the session ends.
 
         A response from upstream answers a CLIENT request; that is the direction
@@ -492,6 +509,29 @@ class Session:
                             budget=over.budget)
                 return None
 
+        # THE INSPECTION HAPPENS HERE, and the position is the whole repair.
+        #
+        # AFTER the shape check and the content bound, so a malformed result is
+        # a protocol fault before anybody inspects it -- it was answered as a
+        # finding with the session left open, which also meant the shape check
+        # could be skipped by attaching a finding.
+        #
+        # BEFORE the item moves from `_pending` into `_settling`, because the
+        # inspection needs to know which METHOD the result answers and that
+        # lives in the pending table. Reading it a few lines lower finds
+        # nothing and silently inspects nothing, which is how the first version
+        # of this repair passed two rows and stopped scanning.
+        #
+        # What the seam returns then settles through the SAME call and hands
+        # off through the SAME lock as the original would have, so the close,
+        # the cancel and the one-answer-per-id rule apply to a replacement
+        # exactly as they apply to an original.
+        verdict = inspect(raw, frame) if inspect is not None else None
+        cause = replacement = None
+        if verdict is not None:
+            replacement, reason, rule = verdict
+            cause = Cause(reason, rule)
+
         with self._settlement:
             # RC09. ONE OWNER for removing a pending entry, and it is this
             # lock. The shape check above takes real time, and an upstream that
@@ -514,8 +554,12 @@ class Session:
             # `_settling`, records the debt, and the reader delivers nothing.
             self._settling.add(identity)
             self._settling_key[identity] = self._core_key(identity)
+        if cause is not None:
+            self._settling_cause[identity] = cause
         if not self._settle_outside_lock(identity):
             return None
+        if verdict is not None:
+            return _Replaced(replacement)
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -850,17 +894,6 @@ class Session:
                 self._retire_record(identity)
                 continue
 
-            # T2.R2 and T2.R4/R5. The inspection happens here, before either
-            # the initialize negotiation or the ordinary delivery, so the
-            # settlement below is the FIRST and only one for this item.
-            verdict = inspect(raw, message) if inspect is not None else None
-            if verdict is not None:
-                replacement, reason, rule = verdict
-                self.settle_from(ORIGIN_CLIENT, message["id"], reason, rule)
-                if replacement is not None:
-                    yield replacement
-                continue
-                continue
 
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
                     "initialize" and "result" in message:
@@ -902,16 +935,30 @@ class Session:
             record_key = self._core_key(identity)
             answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
                                            request_id=message["id"],
-                                           frame=message, defer_retire=True)
+                                           frame=message, defer_retire=True,
+                                           inspect=inspect, raw=raw)
             if answer is None:
                 yield from self._drain_refusals()
                 return
+            # ONE DELIVERY SITE, still. The seam's replacement crosses through
+            # the SAME yield as an original, which is not tidiness: RC18 puts
+            # the handoff decision IN the yield expression, and the vendored
+            # controls locate that decision by finding exactly one yield in
+            # this loop. A second one makes the instrument ambiguous and four
+            # reviewed rows fail on the instrument rather than on behaviour.
+            crossing = raw
+            if isinstance(answer, _Replaced):
+                if answer.frame is None:
+                    # Settled with nothing to deliver; the obligation still ends.
+                    self._retire_record(identity)
+                    continue
+                crossing = answer.frame
             # RC18/RC19/RC19b. The obligation ends HERE, under the lock, and
             # the yield happens only if this call says the close did not win.
             # The decision is IN the expression, so it is made when this line
             # runs rather than before it. None means the close won and nothing
             # crosses; consumers skip it.
-            yield self._handoff(identity, raw, record_key)
+            yield self._handoff(identity, crossing, record_key)
             if self._closed:
                 yield from self._drain_refusals()
                 return
@@ -1099,7 +1146,19 @@ class Session:
             # being right, and it is written down here rather than covered by a
             # test that would have to reach a state the admission rule forbids.
             core_key = self._settling_key.get(identity, core_key)
-            self._core.settle(core_key, Cause("CLEAN", "S1"))
+            # RD03/RD04/RD07/RD08. The cause is a PARAMETER because the result
+            # direction settles some items as refusals, and it has to do that
+            # through this path rather than beside it. A seam that settled on
+            # its own skipped the ownership this function completes, and the
+            # close, the cancel and the second-answer rule all hang off that.
+            # RD03/RD04/RD07/RD08. The cause travels WITH the record, the way
+            # `_settling_key` does, rather than as a parameter: the result
+            # direction settles some items as refusals and has to do it through
+            # this path, and every control that wraps this method takes the one
+            # argument it has always taken.
+            self._core.settle(core_key,
+                              self._settling_cause.pop(identity, None)
+                              or Cause("CLEAN", "S1"))
         except Settled:
             # The teardown answered it first. `Settled` means a caller settled
             # an item twice, which is normally its own ordering bug, and this

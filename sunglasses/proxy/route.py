@@ -279,6 +279,20 @@ class Route:
                      inspection_complete=settlement.inspection_complete,
                      rule_ids=[r for r in settlement.rule_ids
                                if r in self.catalog])
+        # THE BARRIER IS ASKED AGAIN, and the second asking is the point.
+        #
+        # It was asked once, before the scan, and never after -- so a
+        # cancellation or a `list_changed` that landed WHILE the scan ran was
+        # not seen, and the original crossed. That is the one window where it
+        # matters: the scan is the part that takes time, so it is where a
+        # descriptor change or a cancel is most likely to arrive, and an answer
+        # released after either one is an answer nobody is entitled to any
+        # more. Asked here, after the scan returns and before anything is
+        # handed back to the pump.
+        retired = self._release_barrier(request_id)
+        if retired is not None and is_response:
+            return self._withhold_result(request_id, retired, RULE_APPROVAL)
+
         if settlement.reason == REASON_CLEAN:
             # T2.R5, CB06. The ENTIRE original, its own id and its own code.
             # An error is a real answer and rewriting it into ours loses what
