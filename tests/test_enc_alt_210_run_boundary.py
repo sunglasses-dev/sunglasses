@@ -28,9 +28,28 @@ from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
 
 RULE = "GLS-ENC-ALT-210"
-WITHOUT_BOUNDARY = r'((?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)'
-WITH_BOUNDARY = (r'((?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{40,}={0,2})'
-                 r'.{0,120}\b(decode|base64)\b)')
+BOUNDARY = r"(?<![A-Za-z0-9+/])"
+
+
+def _shipped_regex():
+    """The rule's regex AS SHIPPED, read from PATTERNS at call time.
+
+    R2/F2 (T10, second reader). Round 1 held two local string literals and
+    compared them to each other, tied to the product only by "this lookbehind
+    appears somewhere in the rule". Two fossils pass their own differential
+    forever, and the guard stayed green while the text sat in any rule in the
+    file. So the differential now reads one side out of PATTERNS and DERIVES
+    the other by removing the boundary, which is the single edit the change
+    made. There is nothing left to drift out of sync with.
+    """
+    rule = next(p for p in PATTERNS if p["id"] == RULE)
+    assert len(rule["regex"]) == 1, (
+        f"{RULE} ships {len(rule['regex'])} regexes; this file assumes one")
+    return rule["regex"][0]
+
+
+WITH_BOUNDARY = _shipped_regex()
+WITHOUT_BOUNDARY = WITH_BOUNDARY.replace(BOUNDARY, "", 1)
 
 
 @pytest.fixture(scope="module")
@@ -61,10 +80,20 @@ def _documents(run_lengths, pads=(0, 120, 121),
 
 def test_the_shipped_rule_carries_the_boundary():
     """The rule this file is about, so a revert cannot leave the rows passing
-    against a pattern nobody ships."""
-    rule = next(p for p in PATTERNS if p["id"] == RULE)
-    assert any("(?<![A-Za-z0-9+/])" in r for r in rule["regex"]), (
-        "the run boundary is not in the shipped rule")
+    against a pattern nobody ships.
+
+    R2/F2: `in` was too weak twice over -- it passed on the text occurring
+    ANYWHERE in the rule, including inside a different branch, and it said
+    nothing about the unbounded form being gone. Exactly one boundary, and the
+    branch it guards present in the form this file measures.
+    """
+    shipped = _shipped_regex()
+    assert shipped.count(BOUNDARY) == 1, (
+        f"the run boundary occurs {shipped.count(BOUNDARY)} times in {RULE}; "
+        f"this file measures the single-boundary form")
+    assert BOUNDARY + r"(?:[A-Za-z0-9+/]{40,}={0,2})" in shipped, (
+        "the boundary is in the rule but no longer guards the base64 run")
+    assert WITHOUT_BOUNDARY != shipped, "the derivation removed nothing"
 
 
 def test_the_boundary_changes_no_span():
@@ -93,19 +122,53 @@ def test_the_boundary_changes_no_span():
                 == [(m.start(), m.end()) for m in new.finditer(document)])
 
 
-def test_the_shipped_engine_decides_the_same_way(engine):
-    """Spans are the mechanism; DECISIONS are what a user gets. Run the real
-    engine over the same corpus and require the rule ids to match what the
-    unbounded branch produced -- recorded here as the count, because the
-    interesting failure is the rule going quiet, not a reordering."""
+@pytest.fixture(scope="module")
+def unbounded_engine():
+    """The SAME engine with ONE edit: the boundary removed from this rule.
+
+    R2/F1 (T10, second reader). Round 1 compared the shipped engine against the
+    number 402 in its own docstring, so the row was a regression pin wearing a
+    differential's name: a mis-measured 402 would have been pinned forever and
+    nothing would ever have caught it. Both sides are now EXECUTED over the
+    same corpus. Costs a second build (~10 s); at these run lengths the
+    quadratic is not yet expensive, which is exactly why the equivalence
+    corpus lives at 39/40/41 and not at 4096.
+    """
+    patched = [dict(p, regex=[WITHOUT_BOUNDARY]) if p["id"] == RULE else p
+               for p in PATTERNS]
+    assert sum(1 for p in patched
+               if p.get("regex") == [WITHOUT_BOUNDARY]) == 1
+    return SunglassesEngine(patterns=patched, mechanisms=False)
+
+
+def _named(engine, document):
+    return {f.get("rule_id") or f.get("id")
+            for f in engine.scan(document, channel="file").findings}
+
+
+def test_the_shipped_engine_decides_the_same_way(engine, unbounded_engine):
+    """Spans are the mechanism; DECISIONS are what a user gets.
+
+    Both engines run. Not just "does ENC-ALT-210 still fire": the whole set of
+    rule ids per document, and the decision itself, because a change to one
+    rule's span can move what another rule sees.
+    """
     documents = list(_documents((39, 40, 41)))
-    naming = sum(1 for d in documents
-                 if RULE in {f.get("rule_id") or f.get("id")
-                             for f in engine.scan(d, channel="file").findings})
     assert len(documents) == 648, len(documents)
+    naming = 0
+    for document in documents:
+        before = unbounded_engine.scan(document, channel="file")
+        after = engine.scan(document, channel="file")
+        assert _named(unbounded_engine, document) == _named(engine, document), (
+            f"the rule set changed for {document[:60]!r}...")
+        assert before.decision == after.decision, (
+            f"decision {before.decision} -> {after.decision} for "
+            f"{document[:60]!r}...")
+        naming += RULE in _named(engine, document)
     assert naming == 402, (
-        f"{naming} of {len(documents)} documents name {RULE}; the unbounded "
-        f"branch named 402 of the same documents, measured before the change")
+        f"{naming} of {len(documents)} documents name {RULE}; 402 is the count "
+        f"recorded when this row was written, and it is now checkable -- both "
+        f"branches ran here, so a differing corpus is the only way to move it")
 
 
 @pytest.mark.parametrize("small,large", [(8000, 16000)])
