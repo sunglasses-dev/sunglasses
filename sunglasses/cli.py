@@ -2143,7 +2143,8 @@ def main():
     # config
     # install / uninstall (T10.R4/R5)
     install_parser = subparsers.add_parser(
-        "install", help="Wrap an MCP server entry so it runs through Sunglasses")
+        "install",
+        help="Rewrite an MCP server entry to launch through the Sunglasses proxy")
     install_parser.add_argument("name", help="The mcpServers key to wrap")
     install_parser.add_argument(
         "--config", help="Config file to edit (default: ./.mcp.json)")
@@ -2153,7 +2154,8 @@ def main():
     install_parser.set_defaults(func=cmd_install)
 
     uninstall_parser = subparsers.add_parser(
-        "uninstall", help="Unwrap an MCP server entry and restore the original")
+        "uninstall",
+        help="Restore an MCP server entry to the bytes install recorded")
     uninstall_parser.add_argument("name", help="The mcpServers key to restore")
     uninstall_parser.add_argument(
         "--config", help="Config file to edit (default: ./.mcp.json)")

@@ -619,6 +619,93 @@ python3 verify_ai_citations.py access.log --detail   # per-IP breakdown of fakes
 
 Output: verified / fake / uncheckable counts per claimed agent, plus the scanner tell (one IP wearing several vendor names). If you report AI citation numbers anywhere, run this first.
 
+## Wiring a route: `install`, `uninstall`, `doctor`
+
+**`install` rewrites your config. Read this before you try it.**
+
+`sunglasses install <name>` edits the named entry in your `.mcp.json` so the
+server is launched with `python -m sunglasses.proxy`, and records the proxy
+entry point's path and its `sha256` under an `x-sunglasses` key in that entry —
+the module form is what runs, and the recorded file is what it runs, which is
+how `uninstall` and `doctor` can tell your wrapper from somebody else's. It
+exits `0` and says `Wrapped '<name>'`. `sunglasses uninstall <name>` reads that
+record and puts the original back **byte-identical**, exiting `0`.
+
+**Wrapped is not the same as protected.** A successful `install` means the
+launch path now goes through us and nothing more: out of the box the wrapped
+server enforces nothing, because the proxy's approval gate refuses until a human
+has approved that server's tool snapshot at an interactive terminal. What it
+inspects once approved is described under the proxy enforcement heading, which
+lands with that documentation, and is measured there rather than inferred from
+the fact that a wrap succeeded.
+
+Content you route through the CLI, the Claude Code hook or the MCP server is
+scanned. Server responses arrive with 0.6.0.
+
+That wording is deliberate and it matches the site. A denial that spells out the
+claim it is denying still puts the claim in the file, and our claim gate matches
+substrings, so "we do not scan X" and "we scan X" look the same to it. Say what
+is true instead.
+
+### What each one will do
+
+```bash
+# Wrap one MCP server so its traffic runs through SUNGLASSES.
+# Edits ./.mcp.json by default, never a file in your home directory.
+sunglasses install github
+
+# A different config file, explicitly.
+sunglasses install github --config ~/some/other.json
+
+# Put it back. Byte-for-byte when the file has not changed since.
+sunglasses uninstall github
+
+# Report whether your routes are genuinely protected.
+sunglasses doctor
+```
+
+`install` keeps a copy of your original config and a record of what it changed,
+under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the
+copy still matches the digest taken at install time, and restores it. If the
+record or the copy is not something it can vouch for, it refuses and changes
+nothing rather than writing bytes it cannot verify.
+
+### Exit codes, and why `3` is not a failure
+
+SUNGLASSES uses the same four codes everywhere: `0` clean, `1` a real failure,
+`2` an operational error, `3` incomplete. For `doctor` that means:
+
+| code | meaning |
+|---|---|
+| `0` | every route it knows about is wrapped and every one passed a live check |
+| `1` | something it ran FAILED in front of it, or its own self-test failed |
+| `2` | it could not open a config or a record. It names the file. |
+| `3` | **not installed, or not verifiable.** A fact, not a failure. |
+
+**`3` is the code you get on a machine where nothing is wired yet, and it is the
+right answer.** "I looked and nothing is protected" and "I could not look" are
+different facts from "everything is fine", and a tool that collapses them into
+`0` is telling you that you are safe because it did not check. `0` and `3` never
+mean the same thing here.
+
+A failed self-test is always `1`, whatever the rest of the report says, because
+an instrument that failed has no standing to report on anything else.
+
+### Why `install` may refuse when you think it should not
+
+Each of these is a refusal with a message, never a silent partial change:
+
+- **the proxy artifact is missing** — on a build where the entry point is not
+  present. It is present in this one.
+- **that server is already wrapped** — it says so rather than wrapping it twice
+- **it carries a wrapper we cannot verify** — a rebuilt or foreign artifact; it
+  will not nest a second wrapper inside someone else's
+- **a previous install is still recorded** — uninstall it first, so the bytes
+  that install retained are not the ones thrown away
+- **the config is not something we will rewrite** — duplicate JSON keys, `NaN`,
+  or a shape we do not recognise. Rewriting a file whose meaning is ambiguous is
+  how data quietly disappears.
+
 ## Known Limitations
 
 SUNGLASSES is risk reduction, not magic.
@@ -628,6 +715,7 @@ SUNGLASSES is risk reduction, not magic.
 - **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 13 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
+- **`install` wraps; it does not by itself protect**: `sunglasses install` rewrites the named entry to launch through the proxy entry point and exits 0, and `uninstall` restores the original byte-identical. Out of the box the wrapped server enforces nothing until its tool snapshot is approved at an interactive terminal; what is enforced after that is stated under Proxy enforcement, measured rather than inferred. Do not read a successful wrap as a protection claim.
 - **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
 
 ## Integration Notes
