@@ -272,6 +272,9 @@ class Session:
         # park the watcher's close behind the reader, and the close is what
         # stops the processes -- so the window is CLOSED BY A RECORD instead.
         self._settling: set = set()
+        # The cause of the most recent refusal per identity, so the caller can
+        # answer the client with the reason that actually applied (R-179-R2).
+        self._refusals: dict = {}
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
         self._generation: dict = {}       # key -> how many times it has been issued
@@ -296,30 +299,6 @@ class Session:
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
             return False
-        if origin == ORIGIN_CLIENT:
-            # T801, T8.R6. The bounds table has said what the limits are since
-            # it was written and nothing was asking it. Eight outstanding
-            # correlations is the cap, compared with `>=` because the number
-            # counts items already held, so admitting one more at the limit
-            # would make it nine.
-            #
-            # CLIENT correlations only. Upstream's own requests live in their
-            # own namespace and counting them here would let a chatty server
-            # close the client's window, which is the opposite of what a bound
-            # on admission is for.
-            #
-            # The queued-byte half of this row reads an attribute the WRITE
-            # QUEUE owns, and that arrives with the result-direction work. It
-            # is passed as zero here rather than silently not checked, and the
-            # PR body says so: half a bound that reads as a whole one is how
-            # the other half stays unreachable.
-            breach = bounds.check_admission(
-                outstanding=sum(1 for i in self._pending if i[0] == ORIGIN_CLIENT),
-                queued=0)
-            if breach:
-                self._core._emit("ADMISSION_REFUSED", request_id,
-                                 reason=breach.reason, detail=breach.detail)
-                return False
         identity = key(origin, request_id)
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
@@ -367,11 +346,37 @@ class Session:
         # RC20. The INSERT happens under the same lock as the test, re-checking
         # both tables, so nothing can move an entry between deciding and
         # recording.
+        # T801, T8.R6, ROUND 2. The bound is evaluated and the slot reserved
+        # inside ONE critical section, and it runs HERE -- after every protocol
+        # test above -- because the two are different kinds of answer.
+        #
+        # R-179-R2/DP01: malformed before resource. At capacity, a duplicate id
+        # used to be refused OVERLOADED, so a client that broke the protocol was
+        # told the server was busy and the session stayed open on a correlation
+        # table both ends now disagree about. Protocol validation decides first;
+        # only a well-formed request can be too many.
+        #
+        # R-179-R2/AR06: the check and the insert are ONE step. Round 1 read the
+        # occupancy outside the lock, so two admissions both read seven and both
+        # inserted: nine pending against a cap of eight, reachable with ordinary
+        # concurrent traffic and no fault injection at all.
         with self._settlement:
             if identity in self._settling or identity in self._pending:
                 return False
-            self._generation[identity] = self._generation.get(identity, 0) + 1
-            self._pending[identity] = method
+            breach = bounds.check_admission(
+                outstanding=self._outstanding_locked(origin), queued=0)
+            if not breach:
+                self._generation[identity] = self._generation.get(identity, 0) + 1
+                self._pending[identity] = method
+                # An admitted id carries no refusal. Leaving the old one would
+                # let a later reader answer a live request with the reason a
+                # previous attempt was turned away.
+                self._refusals.pop(identity, None)
+        if breach:
+            # OUTSIDE the lock: the settlement below takes the core's lock, and
+            # taking the core's under ours is the nesting the reader avoids.
+            self._refuse_overloaded(identity, request_id, method, origin, breach)
+            return False
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -382,6 +387,65 @@ class Session:
             self._pending.pop(identity, None)
             return False
         return True
+
+    def _outstanding_locked(self, origin):
+        """Outstanding correlations for ONE origin. Call under `_settlement`.
+
+        R-179-R2/AR05: the union of PENDING and STILL-HELD. An item being
+        answered has left `_pending` and sits in `_settling` while the handoff
+        completes, and it is still outstanding for every purpose this bound
+        exists to serve -- the client is still waiting for it and its id is
+        still ours. Counting `_pending` alone admitted a ninth correlation
+        during any real response, which is not a rare window: it is every
+        response the proxy ever delivers.
+
+        R-179-R2/AR04, by refinement rather than exemption. The contract row
+        names outstanding correlations with no origin qualifier, and a literal
+        reading (one shared count of eight) lets a chatty server close the
+        client's window -- one upstream request outstanding permanently costs
+        the client a slot. Counting only the client left upstream UNBOUNDED,
+        which is worse. So each origin is bounded separately at the same
+        figure: no origin is unbounded, and neither can spend the other's
+        window. The contract copy carries this as the T8.R6 origin scope note
+        (v5.2) with this reason; it is a narrowing of the row, and ASTRA's AR04
+        as written measures the literal reading it replaces.
+        """
+        return (sum(1 for i in self._pending if i[0] == origin)
+                + sum(1 for i in self._settling if i[0] == origin))
+
+    def _refuse_overloaded(self, identity, request_id, method, origin, breach):
+        """T6.R7 + T4.R7. A refusal that a receipt can be graded against.
+
+        R-179-R2/AR07: round 1 answered `False` and emitted ADMISSION_REFUSED,
+        and that was the whole of it -- no terminal settlement, so nothing in
+        the receipt stream said the item ENDED and the caller had to invent a
+        reason for the client. (`route.py` invented UNINSPECTED_METHOD, which
+        told a client that had done nothing wrong that its method was not
+        inspectable.) The item is admitted and settled S3/OVERLOADED here, so
+        there is exactly one terminal receipt for it and the route layer reads
+        the cause instead of assuming one.
+
+        The generation is BURNED for the refused attempt so its core key can
+        never be confused with a later, legitimate use of the same id.
+        """
+        self._core._emit("ADMISSION_REFUSED", request_id,
+                         reason=breach.reason, detail=breach.detail)
+        with self._settlement:
+            self._generation[identity] = self._generation.get(identity, 0) + 1
+            core_key = self._core_key(identity)
+            self._refusals[identity] = Cause(breach.reason, breach.rule,
+                                             detail=breach.detail)
+        self._core.admit(core_key, method=method, origin=origin)
+        self._core.settle(core_key, Cause(breach.reason, breach.rule,
+                                          detail=breach.detail), origin=origin)
+
+    def refusal_for(self, request_id, *, origin):
+        """Why the last admission of this id was refused, or None.
+
+        The route layer needs the REASON, not a boolean. Without this it can
+        only guess, and it guessed the same reason for every refusal.
+        """
+        return self._refusals.get(key(origin, request_id))
 
     def _core_key(self, identity):
         return identity + (self._generation.get(identity, 0),)

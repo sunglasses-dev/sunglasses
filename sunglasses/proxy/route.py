@@ -102,8 +102,17 @@ class Route:
             if closed:
                 self._answer_close(closed, request_id)
             else:
-                self._withhold(request_id, REASON_UNINSPECTED_METHOD,
-                               RULE_ADMISSION)
+                # R-179-R2/AR07. ASK the session why. This used to answer every
+                # non-closing refusal with UNINSPECTED_METHOD, so an admission
+                # bound breach reached the client as "we cannot inspect your
+                # method" -- a receipt that cannot be graded against the row
+                # that actually fired, and advice the client cannot act on. The
+                # fallback stays UNINSPECTED_METHOD because that is the refusal
+                # with no cause of its own (T2.R16 decides before the bound).
+                refusal = self.session.refusal_for(request_id, origin=CLIENT)
+                self._withhold(request_id,
+                               refusal.reason if refusal else REASON_UNINSPECTED_METHOD,
+                               refusal.rule if refusal else RULE_ADMISSION)
             return
         self._record("ADMITTED", id_type=type(request_id).__name__)
 
