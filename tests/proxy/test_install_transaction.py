@@ -102,11 +102,21 @@ def test_install_preserves_the_file_mode(cfg, home, artifact):
     assert cfg.stat().st_mode & 0o777 == mode
 
 
-def test_install_is_idempotent_and_never_wraps_the_wrapper(cfg, home, artifact):
-    """C2. The second install must detect already-wrapped and not re-wrap."""
+def test_install_never_wraps_the_wrapper(cfg, home, artifact):
+    """C2. The second install must not re-wrap.
+
+    Round 1 asserted this as a silent no-op that still returned success, and
+    ASTRA's C2-REPEAT showed that is the wrong contract: a user who asks twice
+    was told it worked twice. The property that matters is unchanged (never wrap
+    the wrapper) but the outcome is an explicit refusal, so the assertion moved
+    with it. The old wording encoded the defect it was meant to prevent.
+    """
     inst.install(cfg, "github", artifact=artifact, home=home)
     once = read(cfg)
-    inst.install(cfg, "github", artifact=artifact, home=home)
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
     assert read(cfg) == once
     # and the original recorded is still the PRE-wrap entry, not the wrapper
     rec = json.loads((home / "proxy" / "installs" / "github.json").read_text())
@@ -328,3 +338,315 @@ def test_resolve_artifact_on_the_real_package_matches_what_is_shipped(tmp_path):
     else:
         with pytest.raises(inst.ArtifactUnresolved):
             inst.resolve_artifact()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 2. Every control ASTRA's review found failing on 0c184de, landed here.
+#
+# These were red on round 1 and the red was reproduced before the rewrite, not
+# assumed: 24 of 48 independent property controls failed, and each test below
+# corresponds to one of them. Round 1's own 16 mutations all passed, which is
+# the lesson: mutations chosen from the implementation ask whether the code does
+# what it already does. These ask what the contract requires.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _wrapped(cfg, home, artifact, name="github"):
+    inst.install(cfg, name, artifact=artifact, home=home)
+    return servers(cfg)[name]
+
+
+# ---------------------------------------------------- C2-REPEAT / C2-DRIFT
+
+def test_a_second_install_refuses_instead_of_reporting_success(cfg, home, artifact):
+    """C2-REPEAT. Round 1 made a matching wrapper a silent no-op and then
+    printed a fresh success, so a user asking twice was told it worked twice."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    before = read(cfg)
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    assert read(cfg) == before
+
+
+def test_a_wrapper_with_a_changed_digest_is_never_wrapped_again(cfg, home, artifact):
+    """C2-DRIFT. Round 1 only skipped re-wrapping when the wrapper VERIFIED, so
+    rebuilding the artifact made install nest a second wrapper and overwrite the
+    retained original. R4 says never wrap the wrapper, not never wrap a wrapper
+    we happen to recognise."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    before = read(cfg)
+    rec = json.loads((home / "proxy" / "installs" / "github.json").read_text())
+    retained = read(rec["original_bytes_path"])
+
+    artifact.write_text("# rebuilt\n", encoding="utf-8")
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    assert read(cfg) == before
+    assert read(rec["original_bytes_path"]) == retained
+
+
+def test_a_byte_identical_artifact_elsewhere_is_never_wrapped_again(cfg, home, artifact, tmp_path):
+    """C2-DRIFT, path form. The twin verifies on digest and differs on path."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    before = read(cfg)
+    twin = tmp_path / "artifact" / "twin.py"
+    twin.write_bytes(artifact.read_bytes())
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=twin, home=home)
+    assert read(cfg) == before
+
+
+# --------------------------------------------------------------- R5-RETAINED
+
+def test_uninstall_refuses_retained_bytes_that_do_not_match_the_record(cfg, home, artifact):
+    """R5-RETAINED, the worst defect in round 1 and reachable from the public
+    CLI with no proxy involved. `file_sha_before` was recorded and never read,
+    so altering the retained file made uninstall copy corrupted bytes into the
+    user's config and report byte-exact success."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    installed = read(cfg)
+    rec = json.loads((home / "proxy" / "installs" / "github.json").read_text())
+    pathlib.Path(rec["original_bytes_path"]).write_bytes(b'{"corrupted":true}')
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == installed
+
+
+def test_uninstall_refuses_when_the_retained_bytes_are_gone(cfg, home, artifact):
+    """R5-MISSING. Round 1 let this escape as an uncaught file error."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    installed = read(cfg)
+    rec = json.loads((home / "proxy" / "installs" / "github.json").read_text())
+    pathlib.Path(rec["original_bytes_path"]).unlink()
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == installed
+
+
+# ------------------------------------------------------------ R5-RECORD shapes
+
+@pytest.mark.parametrize("corrupt", ["truncated", "missing_field", "wrong_type"])
+def test_uninstall_refuses_a_record_it_cannot_read(cfg, home, artifact, corrupt):
+    """R5-RECORD. Each of these crashed round 1 with an uncaught error rather
+    than a typed refusal. A record we cannot read is a record whose retained
+    original we cannot trust."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    installed = read(cfg)
+    rec_path = home / "proxy" / "installs" / "github.json"
+    rec = json.loads(rec_path.read_text())
+
+    if corrupt == "truncated":
+        rec_path.write_bytes(rec_path.read_bytes()[:11])
+    elif corrupt == "missing_field":
+        del rec["original_bytes_path"]
+        rec_path.write_text(json.dumps(rec))
+    else:
+        rec_path.write_text(json.dumps(list(rec)))
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == installed
+
+
+# ------------------------------------------------------- R4/R5-COLLISION
+
+def test_the_same_name_in_a_second_config_does_not_steal_the_first_record(cfg, home, artifact, tmp_path):
+    """R4/R5-COLLISION. The record was keyed by name alone, so installing the
+    same name into a second config overwrote the first record and its retained
+    bytes, and uninstalling the FIRST file then restored the SECOND file's
+    original. A record belongs to a target, not to a name."""
+    original = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+
+    second = tmp_path / "second.json"
+    second.write_bytes(RAW_CONFIG.encode("utf-8") + b" \n")
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(second, "github", artifact=artifact, home=home)
+
+    res = inst.uninstall(cfg, "github", home=home)
+    assert res.byte_exact is True
+    assert read(cfg) == original
+
+
+# ------------------------------------------------------------- R5-INVERSE
+
+def test_uninstall_removes_an_entry_that_install_created(cfg, home, artifact):
+    """R5-INVERSE. When install created a previously absent server, round 1's
+    entry-only inverse put the ORIGINAL entry back, leaving behind a direct
+    entry that had never existed. The inverse of creating is removing."""
+    inst.install(cfg, "added", artifact=artifact, home=home, argv=["new-command"])
+    d = json.loads(read(cfg).decode("utf-8"))
+    d["later"] = 123                      # an unrelated edit, so not byte-exact
+    cfg.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    expected = json.loads(read(cfg).decode("utf-8"))
+    del expected["mcpServers"]["added"]
+
+    res = inst.uninstall(cfg, "added", home=home)
+
+    assert res.byte_exact is False
+    assert json.loads(read(cfg).decode("utf-8")) == expected
+
+
+# ------------------------------------------------------- R4-SHAPE / R4-DUPKEY
+
+@pytest.mark.parametrize("payload", [
+    b'[]',
+    b'null',
+    b'{"mcpServers":{"github":null}}',
+    b'{"mcpServers":{"github":{"args":1}}}',
+    # A VALID command with bad args. Without this the args check is never
+    # exercised: every other payload fails the command check first, so deleting
+    # the args validation survived the battery. Same shape as round 1's C6a.
+    b'{"mcpServers":{"github":{"command":"npx","args":1}}}',
+    b'{"mcpServers":{"github":{"command":"npx","args":["ok",7]}}}',
+])
+def test_install_refuses_an_invalid_shape_without_mutating(tmp_path, home, artifact, payload):
+    """R4-SHAPE. Valid JSON, invalid document or entry. Round 1 raised uncaught
+    errors on all four and the CLI exited 1 instead of refusing."""
+    p = tmp_path / ".mcp.json"
+    p.write_bytes(payload)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(p, "github", artifact=artifact, home=home)
+    assert read(p) == payload
+
+
+def test_install_refuses_duplicate_json_keys_rather_than_dropping_data(tmp_path, home, artifact):
+    """R4-DUPKEY. `json.loads` resolves a duplicate key silently by keeping the
+    last one, so round 1 rewrote the file and deleted an entry the user can
+    still see in their own config. Ambiguous input is refused."""
+    p = tmp_path / ".mcp.json"
+    p.write_bytes(b'{"mcpServers":{"github":{"command":"x"},'
+                  b'"keep":{"command":"first"},"keep":{"command":"second"}}}')
+    before = read(p)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(p, "github", artifact=artifact, home=home)
+    assert read(p) == before
+
+
+# ----------------------------------------------------------------- C6-ROUTE
+
+@pytest.mark.parametrize("change", ["command", "argv", "removed_artifact"])
+def test_wrapped_requires_the_entry_to_actually_launch_the_artifact(cfg, home, artifact, change):
+    """C6-ROUTE. Round 1 checked the marker's path and digest and never checked
+    that the entry executes them, so a correct marker beside any command at all
+    still classified WRAPPED. Both comparisons existed; neither was tied to what
+    would run."""
+    entry = _wrapped(cfg, home, artifact)
+    if change == "command":
+        entry["command"] = "/bin/echo"
+    elif change == "argv":
+        entry["args"] = [str(artifact.with_name("different.py")), "--", "run"]
+    else:
+        entry["args"] = []
+    assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
+
+
+# --------------------------------------------------------------- R4-OPTIONS
+
+def test_wrapping_preserves_the_entrys_execution_options(cfg, home, artifact):
+    """R4-OPTIONS. Round 1 rebuilt the entry from command and args alone, so a
+    server's env and cwd were silently dropped and it would have started in the
+    wrong directory without its variables."""
+    d = json.loads(read(cfg).decode("utf-8"))
+    d["mcpServers"]["github"]["env"] = {"TOKEN_NAME": "fixture"}
+    d["mcpServers"]["github"]["cwd"] = str(cfg.parent)
+    cfg.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    before = servers(cfg)["github"]
+
+    inst.install(cfg, "github", artifact=artifact, home=home)
+
+    after = servers(cfg)["github"]
+    assert after.get("env") == before["env"]
+    assert after.get("cwd") == before["cwd"]
+
+
+# ------------------------------------------------------------------ C4-IO
+
+@pytest.mark.parametrize("target_name", ["stat", "mkstemp"])
+def test_every_transaction_io_fault_is_one_typed_refusal(cfg, home, artifact, monkeypatch, target_name):
+    """C4-IO. Round 1 normalised faults inside `_atomic_write`'s write phase and
+    let the stat and the mkstemp escape, so the CLI exited 1 on a catchable
+    operational error."""
+    before = read(cfg)
+
+    def boom(*a, **kw):
+        raise OSError("injected")
+
+    if target_name == "stat":
+        real = pathlib.Path.stat
+        monkeypatch.setattr(pathlib.Path, "stat",
+                            lambda p, *a, **k: boom() if p.name == ".mcp.json"
+                            else real(p, *a, **k))
+    else:
+        monkeypatch.setattr(inst.tempfile, "mkstemp", boom)
+
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    assert read(cfg) == before
+
+
+def test_a_failed_record_write_restores_the_target(cfg, home, artifact, monkeypatch):
+    """C4-RECORD. Round 1 replaced the target and THEN wrote the record, so a
+    failure there left a wrapped config with no record, and the follow-up
+    uninstall refused because no record existed. Replace and record are one
+    recoverable transaction."""
+    before = read(cfg)
+    real = pathlib.Path.write_text
+
+    def write_text(p, *a, **kw):
+        if p.name == "github.json":
+            raise OSError("injected")
+        return real(p, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
+    assert read(cfg) == before
+    assert not (home / "proxy" / "installs" / "github.json").exists()
+
+
+def test_install_refuses_an_unreadable_config(tmp_path, home, artifact):
+    """Config-read handling, at module level with a resolvable artifact.
+
+    The CLI cannot reach the parser while the real artifact is absent, so this
+    is where the read boundary is proven rather than in a CLI test that stops
+    one step earlier.
+    """
+    missing = tmp_path / "nowhere" / ".mcp.json"
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(missing, "github", artifact=artifact, home=home)
+
+
+def test_install_refuses_a_config_that_is_not_utf8(tmp_path, home, artifact):
+    p = tmp_path / ".mcp.json"
+    p.write_bytes(b'\xff\xfe{"mcpServers":{}}')
+    before = read(p)
+    with pytest.raises(inst.ConfigIOError):
+        inst.install(p, "github", artifact=artifact, home=home)
+    assert read(p) == before
+
+
+def test_a_marker_naming_a_different_artifact_than_it_launches_is_unverified(cfg, home, artifact, tmp_path):
+    """The marker's artifact path, isolated.
+
+    Found by the battery: deleting the marker path comparison survived, because
+    the argv binding already catches a wrapper pointing at another artifact. The
+    one case it does not catch is an entry whose argv launches THIS artifact
+    while its marker claims a different one, which is exactly a wrapper telling
+    us something other than what it runs. Pinned so the comparison cannot be
+    dropped as redundant.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    entry = servers(cfg)["github"]
+    assert inst.classify(entry, artifact=artifact) == "WRAPPED"
+
+    elsewhere = tmp_path / "artifact" / "claimed.py"
+    elsewhere.write_bytes(artifact.read_bytes())
+    entry[inst.MARKER]["artifact"] = str(elsewhere.resolve())
+
+    assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
