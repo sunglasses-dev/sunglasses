@@ -5,6 +5,88 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+<!--
+DRAFT for 0.6.0, written 2026-09-16 by T8. Two rules govern every line below.
+
+FIRST, each entry says what a USER CAN NOW RELY ON, not what we built. A
+changelog that lists components is a commit log with nicer formatting.
+
+SECOND, and this is the one that costs discipline: what is NOT claimed is
+written down beside what is. Everything under "Merged" is on main and true
+today. Everything under "Queued" is REVIEWED OR AWAITING REVIEW AND NOT
+SHIPPED, so none of it may be claimed anywhere outward -- and the largest of
+them, the result direction, is exactly the claim people most want to make. It
+stays unclaimed until #168 ships.
+-->
+
+### Merged, and true of main today
+
+- **The proxy has a session core that names its faults.** (#164) A parser that
+  says which rule a malformed frame broke, a teardown that settles every held
+  request exactly once with the FIRST recorded cause, and ids correlated by
+  their JSON type, so `"2001"` and `2001` are different requests. What this
+  buys a user: when a session ends badly, the receipt says what ended it and
+  every request that was in flight has exactly one answer, instead of some
+  having none and some having two.
+
+- **A worker result that parses perfectly and means nothing is refused.**
+  (#178) Byte counters must be integers; a scan cannot claim to be complete and
+  unfinished at once; a binding compared by value AND type; an engine timeout
+  is recorded as a deadline rather than as a crash; a fault recorded earlier
+  keeps its own rule instead of being relabelled. What this buys a user: the
+  receipt describes what actually happened to their call. Several of these were
+  cases where it did not.
+
+- **MCP scans build one engine per process, not one per tool call.** (#175)
+  What this buys a user: the per-call latency of an MCP scan no longer includes
+  compiling the ruleset.
+
+- **Secrets arriving in a tool result are detected for eight formats.** (#170)
+  Already described in detail above. Note the limit stated there: this is the
+  CREDENTIAL lane on `api_response`, and it is not general inspection of tool
+  results.
+
+### Queued for 0.6.0 — reviewed or awaiting review, NOT shipped
+
+None of the following may be claimed outward until it merges.
+
+- **The outbound firewall stops clearing live credentials that happen to
+  contain a placeholder word.** (#173) `AKIAHERE4CIPPERUVIFX` was cleared and
+  sent because its body contains `here`. Also fixes the repair's own follow-on
+  defects: a foreign provider's prefix in another format's body is material,
+  not format; shape is judged on the material as it arrived rather than
+  lowercased; the rule whose format actually describes a token owns it; and the
+  ownership pass answers in one sweep, because the first version of it missed
+  the hook's 10-second deadline on a large document and a firewall that fails
+  open on a big input is worse than the false positive it fixed.
+
+- **The admission bound the contract has always declared is now asked.** (#179)
+  Eight outstanding client correlations, 16 MiB queued. `check_admission`
+  existed and nothing called it.
+
+- **The result direction: what comes BACK from a tool is inspected.** (#168)
+  **THIS IS THE CLAIM THAT STAYS UNCLAIMED UNTIL IT SHIPS.** Until #168 merges
+  and a release carries it, Sunglasses does not claim to scan tool results, and
+  no video, post or page may say otherwise. What it will buy a user when it
+  ships: a result that fails its own schema is a protocol fault before anything
+  inspects it; a cancellation or an approval change that lands DURING a scan is
+  seen before the answer is released; and a replacement answer takes the same
+  one-answer-per-id path as the original.
+
+- **Install and uninstall as a transaction that can refuse.** (#177)
+
+- **`sunglasses doctor`: a report with three lines and an exit code.** (#180)
+
+### Still NOT claimed after all of the above ships
+
+- General inspection of tool results. #168 inspects them; the CREDENTIAL lane
+  covers eight formats on `api_response` and `GLS-SD-010` remains open in that
+  direction because its line anchor cannot match inside a JSON string.
+- Proxy mediation as a shipped, supported surface. The proxy package is
+  reachable only once an entry point ships with it.
+- Anything about PipeLock or comparative performance.
+
+
 ### Added
 - **Secrets arriving in a TOOL RESULT are detected. Eight `-API` siblings for the GLS-SD rules.** Nine of the ten secret rules carried no `api_response` channel, so an AWS key id, a private key, a GitHub or Slack token coming back FROM a tool was not detected at all; only GLS-SD-005 (JWT) reached that direction. Measured before the change: the AWS shape, `ghp_` and `API_KEY=sk-` each BLOCK on `file` and ALLOW with zero findings on `api_response`, including an env line inside a tool-result JSON. Each sibling copies its parent predicate character for character and adds channels only, so the file lane and the result lane now return the same answer on the same bytes; that equality is the test, rather than each sibling naming itself, because GLS-SD-001's predicate is a superset that already outranks the Slack and Google rules on `file` and a faithful port must reproduce that. Proven: 65 comparisons across every channel the parents carry show 0 differences, 78 benign documents show 0 genuinely new detections and 0 regressions, and removing all eight siblings leaves every shape undetected on `api_response` again. 1 MiB costs 1.03x, so no `anchor_terms` were needed.
 - **Known limitation, stated rather than discovered:** AWS's documented example key AKIAIOSFODNN7EXAMPLE blocks in a tool result exactly as it blocks in a file; an agent reading AWS documentation through a tool will see that block; the remedy is a policy allowlist entry for known vendor examples, which is a follow-up item, not a weaker rule. One fixture per affected sibling pins this, so the limit is asserted and cannot drift unnoticed in either direction. It is not theoretical: on the benign corpus the only two changed results are trufflehog's README, whose own text demonstrates a found AWS key.
