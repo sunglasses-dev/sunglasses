@@ -138,12 +138,39 @@ def test_image_content_withholds_the_whole_message(tmp_path):
 
 
 def test_a_resource_blob_is_unsupported_too(tmp_path):
+    """A WELL-FORMED resource block whose payload is bytes.
+
+    The fixture used to omit the resource's `uri`, which made it malformed as
+    well as unsupported, and it read as UNSUPPORTED_CONTENT only because the
+    inspection ran before the shape check. With RD07's order -- shape first --
+    that fixture is a protocol fault, which is a different row. The blob is
+    what this row is named for, so the block now carries its uri and nothing
+    else changes: binary content is unsupported and the whole message is
+    withheld, with the session still open.
+    """
+    raw = (json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [
+        {"type": "resource",
+         "resource": {"uri": "file:///review", "blob": "AAAA"}}]}}) + "\n").encode()
+    engine, client, stream = _engine(tmp_path, [raw])
+    engine.pump_upstream(stream)
+    assert client.messages()[0]["error"]["data"]["reason_code"] == \
+        "UNSUPPORTED_CONTENT"
+    assert engine.session.closed_with() is None, (
+        "unsupported content withholds the message; it is not a protocol fault")
+
+
+def test_a_resource_block_with_no_uri_is_a_protocol_fault(tmp_path):
+    """The other half of the fixture that used to be one row. A resource block
+    that encloses bytes but names no resource does not satisfy the schema at
+    all, and T7.R1 makes a wrong-shape result MALFORMED_UPSTREAM -- decided
+    before anybody inspects it, which is the point of RD07."""
     raw = (json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [
         {"type": "resource", "resource": {"blob": "AAAA"}}]}}) + "\n").encode()
     engine, client, stream = _engine(tmp_path, [raw])
     engine.pump_upstream(stream)
     assert client.messages()[0]["error"]["data"]["reason_code"] == \
-        "UNSUPPORTED_CONTENT"
+        "MALFORMED_UPSTREAM"
+    assert engine.session.closed_with() is not None
 
 
 # ── T2.R5 · a clean error is the server's answer and stays the server's ──

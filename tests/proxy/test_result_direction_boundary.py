@@ -63,8 +63,15 @@ def _reason_codes(out):
 
 
 def _answer(content=None):
+    """A result with a REAL text leaf.
+
+    An empty `content` takes the zero-leaves exit and the scan is never called,
+    so a row that interrupts the scan would interrupt nothing and the original
+    would cross for a reason that has nothing to do with what is under test.
+    """
     return wire({"jsonrpc": "2.0", "id": 1,
-                 "result": {"content": content if content is not None else []}})
+                 "result": {"content": content if content is not None
+                            else [{"type": "text", "text": "hello"}]}})
 
 
 # ── RD07 · shape validation happens BEFORE inspection ───────────────────────
