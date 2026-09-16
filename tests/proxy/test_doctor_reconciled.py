@@ -164,3 +164,27 @@ def test_a_failed_self_test_outranks_an_unreadable_source(tmp_path, artifact):
     report = doctor.run(sources=[("project", p)], artifact=artifact,
                         self_test=lambda: (False, {}))
     assert report.exit_code == 1
+
+
+# ───────────────────────────── one implementation, enforced not just intended
+
+def test_the_doctor_defines_no_second_classifier():
+    """R-DOCTOR-OWNER, as a test rather than an intention.
+
+    The reconciliation wired `read_sources` to `install.classify` and left T8's
+    original `classify` sitting in the module, unreachable from inside it but
+    perfectly reachable as `doctor.classify(...)` from outside — with a
+    DIFFERENT signature, which is the disagreement the ruling exists to prevent.
+    Found while re-verifying against #178's modules. Dead code that contradicts
+    a ruling is not dead, it is waiting.
+    """
+    assert not hasattr(doctor, "_is_wrapper")
+    assert not hasattr(doctor, "_same_sha")
+    assert getattr(doctor, "classify", None) is inst.classify
+
+
+def test_the_doctor_defines_no_second_exception_family():
+    """Same reason. Two `ConfigConflict` types means an `except` in one module
+    silently misses the other's, which is a refusal that turns into a crash."""
+    assert doctor.ConfigConflict is inst.ConfigConflict
+    assert doctor.ConfigIOError is inst.ConfigIOError

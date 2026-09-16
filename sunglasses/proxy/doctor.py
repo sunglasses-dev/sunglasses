@@ -91,12 +91,11 @@ REASON_RESTORED = "RESTORED"
 REASON_RESTORED_ENTRY = "RESTORED_ENTRY"
 
 
-class ConfigIOError(Exception):
-    """T10.R6. The config could not be read, parsed or replaced."""
-
-
-class ConfigConflict(Exception):
-    """T10.R4/R5. The config is in a state this tool refuses to guess about."""
+# ONE exception family, install's. Re-exported rather than redefined: two
+# `ConfigConflict` types means an `except` in one module silently misses the
+# other's, which turns a refusal into a crash.
+ConfigIOError = _install.ConfigIOError
+ConfigConflict = _install.ConfigConflict
 
 
 @dataclass
@@ -210,59 +209,11 @@ def default_launcher(entry):
 
 # ── T10.R2 · classification, path AND hash ─────────────────────────────────
 
-def classify(command, artifact, artifact_sha, command_sha=None) -> str:
-    """WRAPPED only when the command invokes our module AND resolves to this
-    artifact by path and by hash.
-
-    A wrapper naming a DIFFERENT artifact is UNVERIFIED, not WRAPPED, and that
-    distinction is the interesting one: something is mediating that traffic and
-    it is not this, so reporting it as wrapped would credit our guarantees to a
-    binary we have never seen.
-    """
-    argv = [str(part) for part in (command or [])]
-    if not argv:
-        return UNVERIFIED
-    if not _is_wrapper(argv):
-        return DIRECT
-    if not _same_path(argv[0], artifact):
-        return UNVERIFIED
-    if not _same_sha(command_sha, artifact_sha):
-        return UNVERIFIED
-    return WRAPPED
-
-
-def _is_wrapper(argv) -> bool:
-    """Our module named before the argv separator.
-
-    Only before it. Everything after `--` is the upstream server's own command
-    line, and a server that happens to mention this module in its arguments is
-    not a wrapper, it is the thing being wrapped.
-    """
-    head = []
-    for part in argv:
-        if part == ARGV_SEPARATOR:
-            break
-        head.append(str(part))
-    for part in head:
-        if part == PROXY_MODULE or part.startswith(PROXY_MODULE + "."):
-            return True
-    if head and os.path.basename(head[0]) == "sunglasses" and head[1:2] == ["proxy"]:
-        return True
-    return False
-
-
-def _same_path(candidate, artifact) -> bool:
-    if not candidate or not artifact:
-        return False
-    return os.path.realpath(str(candidate)) == os.path.realpath(str(artifact))
-
-
-def _same_sha(candidate, artifact_sha) -> bool:
-    """An absent hash is not a matching hash. R2 says path AND hash, so a
-    command we could not hash is unverified rather than given the benefit."""
-    if not candidate or not artifact_sha:
-        return False
-    return str(candidate).lower() == str(artifact_sha).lower()
+# ONE classifier, install's (R-DOCTOR-OWNER). Re-exported rather than
+# redefined. The original lived here with a different signature, unreachable
+# from inside this module and perfectly reachable as `doctor.classify(...)`
+# from outside, which is the disagreement the ruling exists to prevent.
+classify = _install.classify
 
 
 def _sha256_of_file(path):
