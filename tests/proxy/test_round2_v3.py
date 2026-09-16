@@ -5,7 +5,7 @@ import subprocess
 import sys
 import threading
 import pytest
-from sunglasses.proxy import framing
+from sunglasses.proxy import framing, pump
 from sunglasses.proxy.session import Cause, Session, Settled
 
 # CI: vendored beside this file, byte-identical. Path only. See README.md.
@@ -239,28 +239,64 @@ def test_Q11_protocol_member_schema_rejected(field):
     f = framing.parse_frame(wire(body))
     assert not f.ok and f.rule == 'S5'
 
-@pytest.mark.skip(reason="Pump acceptance requirement: NOT IN THIS HEAD; sg-proxy-review-controls/3")
 def test_Q12_reverse_request_cannot_retire_client_item():
-    folder = FIX / 'G2-15.reverse_request'
-    request = json.loads((folder / 'reverse_request.requests.jsonl').read_bytes().splitlines()[0])
-    upstream = [json.loads(x) for x in (folder / 'reverse_request.upstream.jsonl').read_bytes().splitlines()]
-    reverse = next(x for x in upstream if 'method' in x and 'id' in x)
-    assert reverse['id'] == request['id']
-    s = Session()
-    s.admit(request['id'])
-    # No origin parameter exists; this is the same API use previously reviewed.
-    s.settle(reverse['id'],Cause('UNINSPECTED_METHOD','S3'))
-    assert not s.is_settled(request['id'])
+    """T2.R15, moved to the layer that owns it.
 
-@pytest.mark.parametrize('scenario,stem', [('G2-10','invalid_result_shape'),('G2-20.unsolicited_response','unsolicited_response')])
-@pytest.mark.skip(reason="Pump acceptance requirement: NOT IN THIS HEAD; sg-proxy-review-controls/3")
-def test_Q13_response_validation_requires_pending_method_context(scenario,stem):
-    folder = FIX / scenario
-    frames = [x for x in (folder / (stem + '.upstream.jsonl')).read_bytes().splitlines() if x]
-    responses = [x for x in frames if 'result' in json.loads(x) or 'error' in json.loads(x)]
-    assert responses
-    parsed = [framing.parse_frame(raw) for raw in responses]
-    assert any(not f.ok and f.rule == 'S5' for f in parsed)
+    This was skipped as "NOT IN THIS HEAD" and the reason was wrong in a way
+    worth recording: the REQUIREMENT is present and has been since #164 --
+    pump.py refuses an upstream request carrying both a method and an id,
+    emits UPSTREAM_REQUEST_REFUSED and answers UPSTREAM in its own namespace.
+    What was absent is the requirement at the layer this control drove.
+    `session.Session` is id-only BY DESIGN; origin-aware correlation lives in
+    the pump, so asserting the property against the core asserted it of an
+    object that never had it, and the skip hid that rather than saying it.
+
+    It was also the only thing in the suite naming UPSTREAM_REQUEST_REFUSED --
+    a rule enforced at two call sites with no test anywhere.
+
+    WHAT THIS DOES NOT ASSERT, and the first draft got it wrong: the session
+    ends MALFORMED_UPSTREAM here, and that is the EOF rule (T7.R1, upstream
+    ended owing a pending client request), NOT the reverse request. Asserting
+    the client item is "unsettled" at the end would be asserting the absence of
+    a teardown that is supposed to happen. The property is WHICH CAUSE settled
+    it: the teardown's, never the reverse request's UNINSPECTED_METHOD.
+    """
+    client_id = 1501
+    events = []
+    session = pump.Session(strict=False)
+    original = session._core._emit
+    session._core._emit = lambda event, *a, **k: (
+        events.append(event), original(event, *a, **k))[1]
+    assert session.admit_request(client_id, method='tools/call', origin='client')
+
+    # G2-15's shape: upstream sends a REQUEST carrying the client's own id.
+    reverse = wire({'jsonrpc': '2.0', 'id': client_id,
+                    'method': 'sampling/createMessage', 'params': {}})
+    crossed = [f for f in session.read_upstream(reverse) if f]
+
+    assert 'UPSTREAM_REQUEST_REFUSED' in events, events
+    assert not any(b'sampling/createMessage' in f for f in crossed), (
+        "upstream's own request reached the client")
+    settled = session.answer_for(client_id, origin='client')
+    assert settled is not None and settled.reason == 'MALFORMED_UPSTREAM', settled
+    assert settled.reason != 'UNINSPECTED_METHOD', (
+        "the reverse request settled the client's item by borrowing its id")
+
+
+# Q13 was deleted rather than repaired, and the reason belongs here.
+#
+# It asserted that `framing.parse_frame` returns S5 for an invalid result shape
+# and for an unsolicited response. It cannot, and should not: framing is pure,
+# and BOTH of those judgements need to know which request is pending -- which
+# is what the test's own name said, "requires_pending_method_context". The
+# context lives in `pump._shape_matches`, which takes the identity and reads
+# the pending method.
+#
+# The requirement is NOT lost: `pump.deliver_response` closes MALFORMED_UPSTREAM
+# on a shape mismatch and on a response for an id that is not pending, and
+# tests/proxy/test_round3_edges.py drives `_shape_matches`. Keeping a skipped
+# control pointed at the wrong layer would have looked like coverage of a rule
+# that is covered somewhere else entirely.
 
 def test_Q14_v3_unknown_api_settlement_refuses_without_correlation_change():
     s = item()
