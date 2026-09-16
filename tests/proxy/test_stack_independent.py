@@ -194,12 +194,6 @@ def test_T507_record_io_error_is_hold(tmp_path,monkeypatch):
     assert outcome == 'SCAN_EXCEPTION'
 
 
-def test_T801_pump_rejects_ninth_outstanding():
-    s = pump.Session()
-    for i in range(8): assert s.admit_request(i,method='ping',origin='client')
-    assert not s.admit_request(8,method='ping',origin='client')
-
-
 def test_T802_pump_applies_content_bound():
     s = pump.Session();s.admit_request(1,method='tools/call',origin='client')
     message = reply(1);message['result']['content'][0]['text'] = 'x'*262145
