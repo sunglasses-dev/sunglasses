@@ -4,8 +4,21 @@ import pytest
 from sunglasses.proxy import pump,handshake
 from test_round4 import peer,wire
 from test_round7_gate import child_session,send,exit_child,yield_line
-R=Path(__file__).resolve().parents[1]
-def save(name,data):(R/'evidence'/(name+'.json')).write_text(json.dumps(data,indent=2))
+# Moved from scripts/ to tests/proxy/ at the #166 rebase (T9 ruling): every
+# other vendored control lives here, and archive-suite and CI collect this
+# directory. parents[2] keeps R at the REPOSITORY ROOT, which is what it was
+# in scripts/ -- a relocation must not quietly move where a control reads its
+# fixtures or writes its evidence.
+R=Path(__file__).resolve().parents[2]
+def save(name,data):
+ # EVIDENCE GOES WHERE THE TREE KEEPS IT. This wrote to <root>/evidence,
+ # which is in no checkout and no archive: the directory existed only on a
+ # machine where somebody had already run these by hand, so every row that
+ # saved evidence died with FileNotFoundError the first time the suite
+ # actually collected them. tests/evidence is tracked and is where every
+ # neighbouring control in tests/proxy writes.
+ out=R/'tests'/'evidence';out.mkdir(parents=True,exist_ok=True)
+ (out/(name+'.json')).write_text(json.dumps(data,indent=2))
 def rule_of(s):
  c=s.closed_with();return c[1] if c else None
 @pytest.mark.parametrize('close_first',[True,False])
@@ -156,5 +169,5 @@ def test_RC33_pending_admission_refusal_keeps_its_boundary():
   seen.append(hashlib.sha256(detail.encode()).hexdigest());return original(reason,detail,*a,**k)
  s._close=close
  assert not s.admit_request(81,method='tools/call',origin='client')
- expected=(R/'fixtures/pending_detail.sha256').read_text().strip()
+ expected=(R/'tests'/'proxy'/'fixtures'/'pending_detail.sha256').read_text().strip()
  assert seen==[expected]
