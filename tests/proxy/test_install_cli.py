@@ -49,10 +49,15 @@ def sg(*args, cwd, home):
 
 def test_the_harness_actually_reaches_the_cli(tmp_path):
     """Guard on the guard: if this fails, every other test in this file is
-    asserting against a process that died on import."""
+    asserting against a process that died on import.
+
+    Asserts on help text only our CLI emits. Round 1 asserted `returncode == 0`
+    and "No module named" absent, which an empty `sys.exit(0)` satisfies.
+    """
     r = sg("--help", cwd=tmp_path, home=tmp_path / "h")
     assert r.returncode == 0, r.stderr
     assert "No module named" not in r.stderr
+    assert "Wrap an MCP server entry" in r.stdout
 
 
 @pytest.fixture
@@ -62,13 +67,17 @@ def project(tmp_path):
 
 
 def test_install_is_a_real_subcommand(project, tmp_path):
+    """Positive evidence: the refusal diagnostic our install prints. "invalid
+    choice" being absent is also true of a process that never started."""
     r = sg("install", "github", cwd=project, home=tmp_path / "h")
     assert "invalid choice" not in r.stderr
+    assert "SUNGLASSES install" in (r.stdout + r.stderr)
 
 
 def test_uninstall_is_a_real_subcommand(project, tmp_path):
     r = sg("uninstall", "github", cwd=project, home=tmp_path / "h")
     assert "invalid choice" not in r.stderr
+    assert "SUNGLASSES uninstall" in (r.stdout + r.stderr)
 
 
 def test_install_exits_2_and_says_why_when_the_artifact_is_absent(project, tmp_path):
@@ -83,7 +92,8 @@ def test_install_exits_2_and_says_why_when_the_artifact_is_absent(project, tmp_p
 
 def test_install_never_writes_outside_the_named_config(project, tmp_path):
     home = tmp_path / "h"
-    sg("install", "github", cwd=project, home=home)
+    r = sg("install", "github", cwd=project, home=home)
+    assert "proxy entry point" in r.stdout          # the refusal really ran
     assert not (home / "proxy" / "installs" / "github.json").exists()
 
 
@@ -92,15 +102,29 @@ def test_uninstall_without_a_record_exits_2_and_does_not_mutate(project, tmp_pat
     r = sg("uninstall", "github", cwd=project, home=tmp_path / "h")
     assert "invalid choice" not in r.stderr   # argparse also exits 2
     assert r.returncode == 2, r.stderr
+    assert "SUNGLASSES uninstall refused" in r.stdout
+    assert "no recorded install" in r.stdout
     assert (project / ".mcp.json").read_bytes() == before
 
 
-def test_install_exits_2_on_an_unreadable_config(tmp_path):
+def test_install_exits_2_when_it_cannot_proceed_at_all(tmp_path):
+    """Renamed from "on an unreadable config", which it did not prove.
+
+    ASTRA: on this head install refuses at artifact resolution BEFORE it ever
+    reads the config, so a green result here was never evidence about
+    config-read handling. While the artifact is absent the real CLI cannot
+    reach the parser, so config reading is proven at module level instead, in
+    `test_install_refuses_an_unreadable_config` and the R4-SHAPE controls.
+    What this still proves is that the CLI exits 2 rather than 1 and prints a
+    diagnostic instead of a traceback.
+    """
     d = tmp_path / "empty"
     d.mkdir()
     r = sg("install", "github", cwd=d, home=tmp_path / "h")
     assert "invalid choice" not in r.stderr   # argparse also exits 2
     assert r.returncode == 2, r.stderr
+    assert "SUNGLASSES install" in r.stdout
+    assert "Traceback" not in r.stderr
 
 
 def test_install_default_target_is_the_project_config_not_the_home_one(project, tmp_path):
