@@ -112,7 +112,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
     if not _typed(result.get("accepted"), bool):
         raise Invalid(f"accepted is {result.get('accepted')!r}, not a boolean")
     status = result.get("status")
-    if status not in STATUSES:
+    if not isinstance(status, str) or status not in STATUSES:
         raise Invalid(f"status {status!r} is not one of {sorted(STATUSES)}")
     if not _typed(result.get("inspection_complete"), bool):
         raise Invalid(
@@ -130,7 +130,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
             "cannot have finished and not finished")
 
     decision = result.get("decision")
-    if decision not in DECISIONS:
+    if not isinstance(decision, str) or decision not in DECISIONS:
         raise Invalid(f"decision {decision!r} is not one of {sorted(DECISIONS)}")
 
     for counter in _COUNTERS:
@@ -159,9 +159,14 @@ def validate(result, *, binding, held_content_bytes, catalog):
         for field in ("rule_id", "severity", "source"):
             if field not in finding:
                 raise Invalid(f"a finding is missing {field}")
-        if finding["severity"] not in SEVERITIES:
+        # AT11. `x in frozenset` RAISES TypeError when x is unhashable, and
+        # TypeError is not Invalid: it goes past the caller's `except Invalid`
+        # and out of the reader, on bytes a peer chooses.
+        if not isinstance(finding["severity"], str) or \
+                finding["severity"] not in SEVERITIES:
             raise Invalid(f"severity {finding['severity']!r} is not known")
-        if finding["source"] not in SOURCES:
+        if not isinstance(finding["source"], str) or \
+                finding["source"] not in SOURCES:
             raise Invalid(f"source {finding['source']!r} is not known")
         # T405. When the catalog says which LANE an id belongs to, the
         # finding's own `source` has to agree. `GLS-SD-001` is an engine id, so
@@ -175,7 +180,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
                     f"rule id {finding['rule_id']!r} belongs to the "
                     f"{catalog[finding['rule_id']]!r} lane and the finding "
                     f"claims {finding.get('source')!r}")
-        if finding["rule_id"] not in catalog:
+        if not isinstance(finding["rule_id"], str) or finding["rule_id"] not in catalog:
             # T4.R6. A worker cannot confer authority on itself by naming a rule.
             raise Invalid(
                 f"rule id {finding['rule_id']!r} is not in the trusted catalog")

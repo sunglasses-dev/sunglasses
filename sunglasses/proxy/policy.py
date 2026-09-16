@@ -210,7 +210,13 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
                           rule_ids=rule_ids, detail="; ".join(failed))
 
     # T4.R4(9). The one verdict that lets bytes through.
+    #
+    # The gap disposition is CHANNEL `message` ONLY, as the rule writes it. On
+    # `api_response` it labels an ARRIVING result as a known published miss of
+    # OURS -- a statement about our own coverage attached to something we never
+    # claimed to cover.
+    gap = known_detector_gap and result["binding"].get("channel") == "message"
     return Settlement(
         CLEAN, "S1", accepted=True, status=worker.STATUS_COMPLETE,
         inspection_complete=True,
-        disposition=NO_FINDING_KNOWN_DETECTOR_GAP if known_detector_gap else CLEAN)
+        disposition=NO_FINDING_KNOWN_DETECTOR_GAP if gap else CLEAN)
