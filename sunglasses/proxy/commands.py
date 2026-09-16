@@ -1,12 +1,14 @@
-"""The commands, so the doctor is something a person can run.
+"""The commands the proxy lane ships.
 
 Written against `tests/test_proxy_commands.py`, committed first.
 
-T10.R4 and T10.R5 are written as commands. T10.R3 is a report with three lines
-and an exit code, and an exit code only means something to somebody who can run
-the thing that returns it. Until this file existed, doctor.py was a correct
-library that nothing in the package called, which is the same fault a review of
-this lane found at five components.
+R-DOCTOR-OWNER (T9, 2026-09-15): `doctor`, `install` and `uninstall` are NOT
+here. They were, backed by a second install/uninstall/classify implementation
+in this lane's own doctor.py, and `sunglasses/install.py` is the one that has
+been through the property controls and the mutation round. Two classify()
+functions on main is how the doctor and the install command come to disagree
+about what WRAPPED means. What remains is the mediator form and `approve`,
+which is T5.R1's door and reads approvals.py, not the doctor.
 
 The dispatch has one rule that is not obvious and matters. A first token that
 is neither a known command nor `--` is a USAGE ERROR. It is never treated as a
@@ -22,13 +24,8 @@ from __future__ import annotations
 
 import sys
 
-from . import doctor
-
 USAGE = """usage:
   python -m sunglasses.proxy -- <server command> [args...]   run the mediator
-  python -m sunglasses.proxy doctor [--config PATH]          report the route
-  python -m sunglasses.proxy install <name> --config PATH -- <argv>
-  python -m sunglasses.proxy uninstall <name> --config PATH
   python -m sunglasses.proxy approve <server-id> --snapshot SHA [--state-root PATH]
 """
 
@@ -36,12 +33,11 @@ EXIT_OK = 0
 EXIT_FAULT = 1
 EXIT_USAGE = 2
 
-COMMANDS = ("doctor", "install", "uninstall", "approve")
+COMMANDS = ("approve",)
 SEPARATOR = "--"
 
 
-def main(argv=None, *, stdout=None, stderr=None, serve=None, report=None,
-         confirm=None):
+def main(argv=None, *, stdout=None, stderr=None, serve=None, confirm=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     stdout = stdout if stdout is not None else sys.stdout
     stderr = stderr if stderr is not None else sys.stderr
@@ -63,16 +59,9 @@ def main(argv=None, *, stdout=None, stderr=None, serve=None, report=None,
         return (serve or serve_main)(argv)
 
     options, rest = _options(argv[1:])
-    if head == "doctor":
-        return _doctor(options, stdout, report)
     if not rest:
         return _usage(stderr)
-    name = rest[0]
-    if head == "install":
-        return _install(name, options, stdout, stderr)
-    if head == "approve":
-        return _approve(name, options, stdout, stderr, confirm=confirm)
-    return _uninstall(name, options, stdout)
+    return _approve(rest[0], options, stdout, stderr, confirm=confirm)
 
 
 def _usage(stderr):
@@ -102,30 +91,6 @@ def _options(argv):
         index += 1
     options["wrapped"] = wrapped
     return options, positional
-
-
-def _doctor(options, stdout, report):
-    runner = report or doctor.run
-    sources = None
-    if options.get("config"):
-        sources = [("--config", options["config"])]
-    outcome = runner(sources=sources) if sources else runner()
-
-    rendered = doctor.render(outcome)
-    stdout.write("self test: %s\n" % (
-        "valid" if rendered["self_test"]["valid"] else "FAILED"))
-    if rendered["self_test"].get("detail"):
-        stdout.write("  %s\n" % rendered["self_test"]["detail"])
-    stdout.write("per wrapper:\n")
-    for row in rendered["per_wrapper"]:
-        stdout.write("  %s %s %s\n" % (row["source"], row["name"],
-                                       row["result"]))
-    stdout.write("inventory:\n")
-    for row in rendered["inventory"]:
-        stdout.write("  %s %s %s\n" % (row.get("source"), row.get("name"),
-                                       row.get("state")))
-    stdout.write("aggregate: %s\n" % rendered["aggregate"])
-    return rendered["exit_code"]
 
 
 
@@ -199,23 +164,4 @@ def _ask(stdout):
     return sys.stdin.readline().strip().lower() in ("y", "yes")
 
 
-def _install(name, options, stdout, stderr):
-    if not options.get("wrapped"):
-        # R4's syntax is `install <name> -- <argv>`. With no separator there is
-        # no wrapper command, and inventing one wraps the entry in whatever
-        # this process happens to be.
-        return _usage(stderr)
-    record = doctor.install(options.get("config"), name, options["wrapped"],
-                            root=options.get("state-root"))
-    stdout.write("%s %s\n" % ("already wrapped" if record.get("already_wrapped")
-                              else "wrapped", name))
-    return EXIT_OK
 
-
-def _uninstall(name, options, stdout):
-    outcome = doctor.uninstall(options.get("config"), name,
-                               root=options.get("state-root"))
-    stdout.write("%s %s\n" % (outcome.reason, outcome.detail))
-    # A conflict is not a restore. A script reading zero here carries on as
-    # though the entry were back.
-    return EXIT_OK if outcome.mutated else EXIT_FAULT

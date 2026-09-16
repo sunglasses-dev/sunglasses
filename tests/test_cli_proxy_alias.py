@@ -28,15 +28,20 @@ def _module(*args, **kw):
                           capture_output=True, timeout=120, **kw)
 
 
-def test_the_alias_and_the_module_give_the_same_report(tmp_path):
-    """Same command, same exit code, same three lines. If they ever differ,
-    one of them is the real product and nobody knows which."""
-    config = tmp_path / ".mcp.json"
-    config.write_text(json.dumps({"mcpServers": {"fs": {"command": "npx"}}}))
-    viaalias = _cli("proxy", "doctor", "--config", str(config))
-    viamodule = _module("doctor", "--config", str(config))
+def test_the_alias_and_the_module_are_the_same_program(tmp_path):
+    """Same input, same exit code, same bytes. If they ever differ, one of them
+    is the real product and nobody knows which.
+
+    This drove `doctor` until R-DOCTOR-OWNER moved that command to T10's lane.
+    The property is about the DISPATCH being one program, not about which
+    subcommand is dispatched, so it now drives the usage path: the reply is
+    produced by the same code either way and its exit code is a number a script
+    reads."""
+    viaalias = _cli("proxy", "approve")
+    viamodule = _module("approve")
     assert viaalias.returncode == viamodule.returncode
     assert viaalias.stdout == viamodule.stdout
+    assert viaalias.stderr == viamodule.stderr
 
 
 def test_the_alias_passes_the_separator_and_the_server_argv_through(tmp_path):
