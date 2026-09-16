@@ -453,10 +453,22 @@ def _span_owners(found: list) -> list:
     matching the same token -- so they are grouped and decided once, by the
     same longest-leading-literal rule.
 
-    STRICT CONTAINMENT is a nesting chain, and a container always sorts before
-    what it contains, so one sweep with a stack sees every candidate. The chain
-    can be no deeper than the number of rules, because one rule's own matches
-    never overlap each other.
+    STRICT CONTAINMENT needs an ACTIVE SET, not a stack, and the stack was
+    wrong: it assumed the intervals NEST, popping any entry whose end lay left
+    of the current one's. Intervals from different rules CROSS. ASTRA's
+    CROSS-ANTHROPIC-AWS is the shape -- an Anthropic match [0,49), a JWT match
+    [10,91) that crosses it, and an AWS match [29,49) inside the Anthropic one.
+    The JWT's farther-right end popped the Anthropic entry, so when the AWS
+    match arrived its owner was gone and the receipt named AWS where ANTHROPIC
+    belonged. Every such document still DENIED -- it is the equivalence
+    promise that broke, not the block -- and eight of twenty-four crossing
+    shapes reported the wrong rule.
+
+    So: one entry per RULE, because one rule's own matches never overlap and
+    the sweep visits them in order, and an entry expires only when it ends
+    before the current span BEGINS -- which is the only point at which it can
+    no longer contain anything still to come. The set is bounded by the number
+    of rules, so this stays linear.
     """
     if not found:
         return []
@@ -472,21 +484,31 @@ def _span_owners(found: list) -> list:
     owns = [False] * len(found)
     winners = sorted(groups.values(), key=lambda i: (found[i][0], -found[i][1]))
 
-    stack: list = []
+    active: dict = {}                    # rule -> its one span that is still open
     for index in winners:
         start, end, rule, _token, reach = found[index]
-        while stack and found[stack[-1]][1] < end:
-            stack.pop()                  # cannot contain this one, or anything after it
+        # EXPIRE ON START, NOT ON END. A span that ends before this one begins
+        # cannot contain this one or anything after it, because every span from
+        # here on starts at or after `start`. Expiring on a comparison with
+        # `end` is what dropped a live container when a crossing span reached
+        # farther right.
+        for other_rule, other in list(active.items()):
+            if found[other][1] < start:
+                del active[other_rule]
         best = index
-        for outer in stack:
-            o_start, o_end, o_rule, _t, o_reach = found[outer]
-            if o_rule is rule or not (o_start <= start and end <= o_end):
+        for other_rule, other in active.items():
+            if other_rule is rule:
+                continue
+            o_start, o_end, _or, _t, o_reach = found[other]
+            if not (o_start <= start and end <= o_end):
                 continue
             b_start, b_end, _r, _t2, b_reach = found[best]
             if (o_reach, o_end - o_start) > (b_reach, b_end - b_start):
-                best = outer
+                best = other
         owns[index] = best == index
-        stack.append(index)
+        # One entry per rule: a rule's own matches never overlap, so a new one
+        # starting means the previous one has already ended.
+        active[rule] = index
     return owns
 
 
