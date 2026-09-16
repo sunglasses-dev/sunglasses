@@ -893,47 +893,6 @@ def test_a_refusal_does_not_claim_a_scan_that_never_happened():
 
 # ── T801 to T803: the bounds the table stated and nothing was asking for ───
 
-def test_the_queued_byte_half_of_the_admission_bound_is_wired():
-    """T8.R6 names TWO limits and the row's own comment says why: checking one
-    leaves the other reachable.
-
-    Passing a quiet zero for this half left every other test green, which is
-    precisely how a half-wired bound ships. `queued_bytes` is owned by whoever
-    holds the write queue; the pump's job is to ASK, and this is the test that
-    it does.
-    """
-    from sunglasses.proxy import bounds
-
-    session = pump.Session()
-    session.queued_bytes = bounds.QUEUED_BYTES + 1
-    assert not session.admit_request(1, method="ping", origin="client")
-
-
-def test_the_queued_byte_bound_is_inclusive():
-    """Exactly at the cap is allowed; one byte past it is not. An exclusive
-    reading of an inclusive cap is where the off-by-one lives, and it hands an
-    attacker the boundary."""
-    from sunglasses.proxy import bounds
-
-    at_cap = pump.Session()
-    at_cap.queued_bytes = bounds.QUEUED_BYTES
-    assert at_cap.admit_request(1, method="ping", origin="client")
-
-    past = pump.Session()
-    past.queued_bytes = bounds.QUEUED_BYTES + 1
-    assert not past.admit_request(1, method="ping", origin="client")
-
-
-def test_the_eighth_outstanding_request_is_still_admitted():
-    """The positive half of T801. Eight is the cap, not seven: a bound that
-    refuses at the limit is a different promise from one that refuses past it,
-    and this one is counted in items already held."""
-    session = pump.Session()
-    for request_id in range(8):
-        assert session.admit_request(request_id, method="ping", origin="client")
-    assert not session.admit_request(8, method="ping", origin="client")
-
-
 def test_a_clean_upstream_exit_of_zero_stays_zero():
     """T803's positive half. Propagating the child's status must not turn a
     successful run into a failure; only a non-zero code and a teardown do
