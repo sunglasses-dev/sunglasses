@@ -1551,13 +1551,177 @@ def test_a_leftover_is_not_reclaimed_on_the_strength_of_its_name(
     impostor = records / (retained.name + ".discarding-1-a")
     impostor.write_bytes(b'{"not": "the retained original"}')
 
-    # No note at all.
+    # No note at all: nothing to reclaim, and nothing to complain about either.
     assert inst._reclaim_taken(home, "github") is False
     assert not retained.exists()
 
-    # A note, but the held bytes do not hash to what it says was taken.
+    # A note, but the held bytes do not hash to what it says was taken. Round 9
+    # makes this a TYPED refusal rather than a quiet False: a note is recovery
+    # material, and material that fails its own check is a thing to say out
+    # loud, not to step over and fail later for a different reason.
     (records / "github.taking").write_text(json.dumps(
         {"canonical": retained.name, "held": impostor.name,
          "sha256": inst._digest_bytes(claimed)}), encoding="utf-8")
-    assert inst._reclaim_taken(home, "github") is False
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst._reclaim_taken(home, "github")
+    assert "does not hash" in str(e.value)
     assert not retained.exists(), "bytes that failed their digest were restored"
+
+    # And the shapes that reached `.get` as an AttributeError through the
+    # public uninstall before round 9.
+    for body in ("[]", "null", '"a string"'):
+        (records / "github.taking").write_text(body, encoding="utf-8")
+        with pytest.raises(inst.ConfigConflict):
+            inst._reclaim_taken(home, "github")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 9. The three compositions from round 8's review, all of them in the
+# recovery paths round 8 added. The shape of the mistake was the same each
+# time: a plan that only exists once something goes wrong is a plan that has
+# never been run.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_the_inverse_is_on_disk_before_the_wrapper_it_undoes(
+        cfg, home, artifact, monkeypatch):
+    """R9-INVERSE-FIRST. Round 8 rebuilt the inverse from bytes held in memory
+    once it noticed it had been cancelled, and a rebuild that has to WRITE can
+    fail: failing the retained write, or the record write, left a wrapper with
+    nothing behind it either way. A second copy now goes down BEFORE the
+    wrapper is published, under a name a competing cleanup does not take, so
+    the rebuild is two renames of files that already exist."""
+    seen = []
+    real_replace = inst.os.replace
+
+    def watch(src, dst):
+        if pathlib.Path(dst) == cfg:
+            # At the instant of publication, the inverse must already be
+            # somewhere on disk that a cleanup of the canonical pair misses.
+            records = home / "proxy" / "installs"
+            seen.append(sorted(q.name for q in records.glob("*.inflight-*")))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(inst.os, "replace", watch)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst.os, "replace", real_replace)
+
+    assert seen, "the publication boundary was never reached"
+    assert len(seen[0]) == 2, (
+        f"the inverse was not on disk before the wrapper: {seen[0]}")
+    records = home / "proxy" / "installs"
+    assert not list(records.glob("*.inflight-*")), (
+        "the standby copy was left behind after an ordinary install")
+
+
+def test_a_rebuild_that_cannot_write_still_leaves_a_usable_inverse(
+        cfg, home, artifact, monkeypatch):
+    """The composition itself: cancelled, the rollback refuses, and then every
+    WRITE fails too. The inverse still has to be there, because it was put
+    there before any of this started."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    real_write_bytes = pathlib.Path.write_bytes
+    real_write_text = pathlib.Path.write_text
+    calls = []
+
+    def cancelled_then_no_rollback(target, data):
+        calls.append(True)
+        if len(calls) == 1:
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            return real_write(target, data)
+        raise inst.ConfigIOError("the rollback write cannot happen")
+
+    def no_writes_at_all(self, *a, **kw):
+        if len(calls) >= 2:
+            raise OSError("nothing may be written from here on")
+        return (real_write_bytes if isinstance(a[0] if a else b"", bytes)
+                else real_write_text)(self, *a, **kw)
+
+    monkeypatch.setattr(inst, "_atomic_write", cancelled_then_no_rollback)
+    monkeypatch.setattr(pathlib.Path, "write_bytes", no_writes_at_all)
+    monkeypatch.setattr(pathlib.Path, "write_text", no_writes_at_all)
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(pathlib.Path, "write_bytes", real_write_bytes)
+    monkeypatch.setattr(pathlib.Path, "write_text", real_write_text)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    assert len(calls) == 2, "the rollback boundary was never reached"
+    inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == original, (
+        "a rebuild that could not write left the wrapper with no way back")
+
+
+def test_a_second_cleanup_does_not_remove_the_first_cleanups_note(
+        cfg, home, artifact, monkeypatch):
+    """R9-NOTE-OWNERSHIP. The note lives at one name because that is the name
+    recovery looks for, so a second take would overwrite the first one's note
+    and the first one's bytes would be left under a held name nothing could
+    find. A take that a live note still answers for is not ours to overwrite."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    claimed = read(retained)
+
+    # An interrupted take: the note and the held bytes are both there, and
+    # nothing has answered for them yet.
+    real_rename = pathlib.Path.rename
+
+    def take_then_stop(self, dst):
+        result = real_rename(self, dst)
+        if self == retained:
+            raise KeyboardInterrupt("the first cleanup ends here")
+        return result
+
+    monkeypatch.setattr(pathlib.Path, "rename", take_then_stop)
+    with pytest.raises(KeyboardInterrupt):
+        inst._discard(retained)
+    monkeypatch.setattr(pathlib.Path, "rename", real_rename)
+
+    first_note = note.read_text()
+    held = records / json.loads(first_note)["held"]
+    assert held.is_file() and note.is_file()
+
+    # A competing install republishes the canonical retained original, and a
+    # second cleanup comes along for it while the first take is still open.
+    retained.write_bytes(b'{"a second install": "its own retained original"}')
+    inst._discard(retained)
+
+    assert note.read_text() == first_note, (
+        "a second take overwrote the note the first one is answered for by")
+    assert held.is_file() and read(held) == claimed, (
+        "the first take's bytes were lost")
+    assert retained.is_file(), (
+        "the second cleanup removed bytes while refusing to note the take")
+
+
+def test_a_take_whose_note_cannot_be_written_does_not_happen(
+        cfg, home, artifact, monkeypatch):
+    """R9-NOTE-FIRST. Round 8 swallowed the note-write error and took the bytes
+    anyway, which is the worst of both: they are moved, and nothing records
+    where. A take that cannot be recovered from does not happen, so the bytes
+    stay at the name the public path already knows."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    claimed = read(retained)
+    real_write_text = pathlib.Path.write_text
+
+    def no_note(self, *a, **kw):
+        if self.suffix == ".taking":
+            raise OSError("the note cannot be written")
+        return real_write_text(self, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "write_text", no_note)
+    with pytest.raises(inst.ConfigIOError) as e:
+        inst._discard(retained)
+    monkeypatch.setattr(pathlib.Path, "write_text", real_write_text)
+
+    assert "take note" in str(e.value)
+    assert retained.is_file() and read(retained) == claimed, (
+        "the bytes were taken although nothing recorded where they went")
+    assert not list(retained.parent.glob("*.discarding-*"))

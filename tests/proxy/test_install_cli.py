@@ -353,3 +353,85 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
     assert inst.classify(final, artifact=entry) == "WRAPPED", (
         "a second install completed and reported success, and our rename put "
         "the file back the way it was before it ran")
+
+
+def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
+        tmp_path, pkg_present):
+    """The remainder of the review's step 3 that it did not reach: not a
+    simulated wait, an actual one. A writer blocks on the lock while a second
+    process changes the file twice, and what it publishes has to describe what
+    is there when it finally gets in, not what it read before it waited."""
+    root, entry = pkg_present
+    project = tmp_path / "project"
+    project.mkdir()
+    target = project / ".mcp.json"
+    target.write_text(
+        '{\n  "mcpServers": {\n'
+        '    "github": {"command": "npx", "args": []},\n'
+        '    "other": {"command": "other", "args": []}\n'
+        '  }\n}', encoding="utf-8")
+    home = tmp_path / "h"
+    inst.install(target, "github", artifact=entry, home=home)
+
+    holder_ready = tmp_path / "holder-ready"
+    release = tmp_path / "release"
+    code = (
+        "import sys, time, pathlib\n"
+        "from sunglasses import install as i\n"
+        "with i._exclusive(pathlib.Path(sys.argv[1])):\n"
+        "    pathlib.Path(sys.argv[2]).touch()\n"
+        "    while not pathlib.Path(sys.argv[3]).exists():\n"
+        "        time.sleep(0.01)\n")
+    holder = subprocess.Popen(
+        [sys.executable, "-B", "-c", code,
+         str(inst._lock_path(home, target)), str(holder_ready), str(release)],
+        env=dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(root),
+                 PYTHONDONTWRITEBYTECODE="1"),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while not holder_ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert holder_ready.exists(), "the holder never took the lock"
+
+        real_write = inst._atomic_write
+        changed = []
+
+        def change_it_twice_then_wait(t, data):
+            if not changed:
+                # Set before the uninstall below, which writes through this
+                # same boundary; a guard set afterwards re-enters.
+                changed.append(None)
+                # Two real changes to the file itself. Written directly rather
+                # than through uninstall: uninstall takes the very lock the
+                # holder is holding, so routing them through it would measure the
+                # timeout instead of the re-derivation.
+                doc = json.loads(target.read_bytes())
+                doc["mcpServers"]["github"] = {"command": "npx", "args": []}
+                target.write_text(json.dumps(doc, indent=2) + "\n",
+                                  encoding="utf-8")
+                doc = json.loads(target.read_bytes())
+                doc["mcpServers"]["late"] = {"command": "late", "args": []}
+                target.write_text(json.dumps(doc, indent=2) + "\n",
+                                  encoding="utf-8")
+                changed[0] = target.read_bytes()
+                release.touch()
+            return real_write(t, data)
+
+        inst._atomic_write = change_it_twice_then_wait
+        try:
+            inst.install(target, "other", artifact=entry, home=home)
+        finally:
+            inst._atomic_write = real_write
+        holder.communicate(timeout=30)
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+            holder.communicate()
+
+    assert changed, "the change boundary was never reached"
+    servers = json.loads(target.read_bytes())["mcpServers"]
+    assert inst.classify(servers["other"], artifact=entry) == "WRAPPED"
+    assert "late" in servers, "the waiter published over a change it never read"
+    assert inst.classify(servers["github"], artifact=entry) != "WRAPPED", (
+        "the waiter resurrected a wrapper that had been undone while it waited")

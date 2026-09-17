@@ -554,8 +554,38 @@ def _records_dir(home, name):
     return (d, *rest)
 
 
-def _forget_take(taking):
-    """The take is finished, one way or the other; its note is spent."""
+def _note_is_live(taking, *, d):
+    """True when a take note still answers for bytes that are still there."""
+    try:
+        intent = json.loads(taking.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(intent, dict):
+        return False
+    held_name = intent.get("held")
+    if not isinstance(held_name, str) or not held_name:
+        return False
+    held = d / held_name
+    return held.name == held_name and held.is_file()
+
+
+def _forget_take(taking, held_name):
+    """Remove the note for THIS take, and never another take's.
+
+    R9-NOTE-OWNERSHIP (ASTRA round 8,
+    `R8_TAKE_NOTE_MUST_SURVIVE_UNTIL_RECOVERY[second_cleanup]`). A second
+    cleanup whose own take failed removed the note here by path, and the first
+    cleanup's bytes were then sitting under a held name nothing could find. The
+    note lives at one name by design -- it is the name recovery looks for -- so
+    ownership is checked by reading it: a note that names somebody else's held
+    file is somebody else's note.
+    """
+    try:
+        intent = json.loads(taking.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(intent, dict) or intent.get("held") != held_name:
+        return
     try:
         taking.unlink()
     except OSError:
@@ -577,22 +607,51 @@ def _reclaim_taken(home, name):
         return False
     try:
         intent = json.loads(taking.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
+    except OSError as e:
+        raise ConfigIOError(f"cannot read the take note at {taking}: {e}") from e
+    except ValueError as e:
+        raise ConfigConflict(
+            f"the take note at {taking} is not readable JSON, so the bytes it "
+            f"refers to cannot be trusted: {e}") from None
+
+    # R9-NOTE-SHAPE (ASTRA round 8, `R8_NOTE_VALIDATION[list]` and `[null]`).
+    # `json.loads` returns whatever the file says, and a list or a null reached
+    # `.get` as an AttributeError through the public uninstall. A note is
+    # recovery material: every part of it is checked before any of it is used,
+    # and a note that fails those checks is a typed refusal, never a traceback
+    # and never a silent skip that leaves the caller to fail later for a
+    # different reason.
+    if not isinstance(intent, dict):
+        raise ConfigConflict(
+            f"the take note at {taking} is a {type(intent).__name__} and not an "
+            f"object, so it names nothing that can be recovered")
     held_name = intent.get("held")
     expected = intent.get("sha256")
-    if not isinstance(held_name, str) or not _is_digest(expected):
-        return False
+    if not isinstance(held_name, str) or not held_name:
+        raise ConfigConflict(
+            f"the take note at {taking} does not name the file it moved")
+    if not _is_digest(expected):
+        raise ConfigConflict(
+            f"the take note at {taking} does not carry a sha256 digest, so "
+            f"nothing it points at can be checked against it")
     held = d / held_name
-    if held.parent != d or not held.is_file():
-        return False
+    if held.parent.resolve() != d.resolve() or held.name != held_name:
+        raise ConfigConflict(
+            f"the take note at {taking} points outside {d}, which is not a "
+            f"place this transaction put anything")
+    if not held.is_file():
+        raise ConfigConflict(
+            f"the take note at {taking} names {held_name}, which is not there")
     try:
         if _digest_file(held) != expected:
-            return False
+            raise ConfigConflict(
+                f"{held_name} does not hash to what the take note recorded, so "
+                f"it is not the retained original it claims to be")
         held.rename(bytes_path)
-    except OSError:
-        return False
-    _forget_take(taking)
+    except OSError as e:
+        raise ConfigIOError(
+            f"cannot put back the bytes {taking} named: {e}") from e
+    _forget_take(taking, held_name)
     return True
 
 
@@ -652,16 +711,31 @@ def _discard(*paths):
         try:
             intent = json.dumps({"canonical": q.name, "held": held.name,
                                  "sha256": _digest_file(q)})
-            taking.write_text(intent, encoding="utf-8")
         except OSError:
-            pass
+            # There is nothing at the canonical name to take. Whatever note is
+            # there belongs to a take that is still in flight, and removing it
+            # is how round 8 lost another cleanup's bytes.
+            continue
+        # R9-NOTE-OWNERSHIP. The note lives at one name because that is the
+        # name recovery looks for, so a second take would CLOBBER the first
+        # one's note and the first one's bytes would be under a held name
+        # nothing could find. A take that is still answered for by a live note
+        # is not ours to overwrite, and the bytes we were asked to remove are
+        # left where they are.
+        if _note_is_live(taking, d=q.parent):
+            continue
+        try:
+            taking.write_text(intent, encoding="utf-8")
+        except OSError as e:
+            # R9-NOTE-FIRST. A take whose note cannot be written is a take that
+            # cannot be recovered from, so it does not happen at all.
+            raise ConfigIOError(
+                f"cannot write the take note at {taking}, so {q.name} is left "
+                f"where it is: {e}") from e
         try:
             q.rename(held)
         except OSError:
-            try:
-                taking.unlink()
-            except OSError:
-                pass
+            _forget_take(taking, held.name)
             continue
         if q.with_suffix(".json").exists():
             # Somebody's completed install is relying on these bytes.
@@ -672,13 +746,13 @@ def _discard(*paths):
                     held.rename(q)
             except OSError:
                 pass
-            _forget_take(taking)
+            _forget_take(taking, held.name)
             continue
         try:
             held.unlink()
         except OSError:
             pass
-        _forget_take(taking)
+        _forget_take(taking, held.name)
 
 
 # Every field a record must carry, with the type it must have. `target_path` is
@@ -971,6 +1045,29 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         identities = {"retained": _identity(bytes_path)}
     except OSError as e:
         raise ConfigIOError(f"cannot retain the original bytes: {e}") from e
+    # R9-INVERSE-FIRST (ASTRA round 8,
+    # `R8_REBUILD_WRITE_FAILURE_KEEPS_USABLE_INVERSE`). Round 8 rebuilt the
+    # inverse out of bytes held in memory once it noticed it had been
+    # cancelled, and a rebuild that needs to WRITE can fail: his rows failed
+    # the retained write and the record write in turn, and both left a wrapper
+    # with nothing behind it. A recovery plan that only exists in memory is not
+    # on disk, and the whole PR is about what is on disk.
+    #
+    # So a second copy of the inverse goes down BEFORE the wrapper is
+    # published, under a name a competing cleanup does not know to remove --
+    # cleanups take the CANONICAL retained original, which is what makes the
+    # canonical pair recoverable by anybody and this pair ours. If we are
+    # cancelled, the rebuild is then two renames of files that already exist
+    # rather than two writes that can fail. On any ordinary ending it is
+    # removed, so nothing is left lying around.
+    # Deliberately NOT named `.original` or `.json`: those names mean "retained
+    # material somebody may claim", and the cleanup protocol treats them that
+    # way -- it would journal a take of our own standby copy and then decline to
+    # remove it because a record sits beside it. A standby is claimed by nobody
+    # and is ours to delete.
+    spare_bytes = bytes_path.with_name(
+        f"{name}.inflight-{os.getpid()}-{id(record):x}.standby")
+    spare_record = spare_bytes.with_suffix(".standbyrecord")
     try:
         pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
                                 encoding="utf-8")
@@ -1009,13 +1106,38 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         before["raw"] = current
         identities["retained"] = _identity(bytes_path)
         identities["journal"] = _identity(pending_path)
+        try:
+            stand_by(fresh_raw, current)
+        except OSError as e:
+            raise ConfigIOError(
+                f"cannot put the inverse of this install on disk before making "
+                f"it: {e}") from e
         return fresh_raw
+
+    def stand_by(published, original):
+        """The inverse, on disk, before the thing it is the inverse OF."""
+        spare_bytes.write_bytes(original)
+        spare_record.write_text(json.dumps(
+            {**record, "file_sha_after": _digest_bytes(published),
+             "original_bytes_path": str(bytes_path), "state": "complete"},
+            indent=2), encoding="utf-8")
+
+    try:
+        stand_by(new_raw, raw)
+    except OSError as e:
+        _discard(bytes_path, pending_path)
+        raise ConfigIOError(
+            f"cannot put the inverse of this install on disk before making it: "
+            f"{e}") from e
 
     try:
         with _render_from(target, raw, render_again):
             _atomic_write(target, new_raw)
     except ConfigIOError:
-        _discard(bytes_path, pending_path)
+        _discard(bytes_path, pending_path, spare_bytes, spare_record)
+        raise
+    except ConfigConflict:
+        _discard(spare_bytes, spare_record)
         raise
 
     # R7-CANCELLED-IN-FLIGHT (ASTRA round 6, `R6_INSTALL_RACES_UNINSTALL`). A
@@ -1058,17 +1180,17 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             # uninstall after this works, and it restores entry-only if the
             # competing install changed the file, which leaves that install
             # alone.
+            # Two renames of files that are already on disk, not two writes.
+            # Round 8 rebuilt by writing, and a write can fail: that is exactly
+            # what his rows failed, one at the retained copy and one at the
+            # record, and both left a wrapper with nothing behind it.
             rebuilt = True
             try:
-                bytes_path.parent.mkdir(parents=True, exist_ok=True)
-                bytes_path.write_bytes(before["raw"])
-                record["file_sha_after"] = _digest_bytes(wrapped_bytes)
-                rec_path.write_text(
-                    json.dumps({**record, "state": "complete"}, indent=2),
-                    encoding="utf-8")
+                spare_record.rename(rec_path)
+                spare_bytes.rename(bytes_path)
             except OSError:
                 rebuilt = False
-            _discard(pending_path)
+            _discard(pending_path, spare_bytes, spare_record)
         raise ConfigConflict(
             f"the open transaction installing {name!r} was cancelled by another "
             f"process while this one was writing {target}"
@@ -1101,6 +1223,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             # are now the only route back to the user's original, so deleting
             # them here would strand them permanently. Keep them and say so.
             _discard(rec_path)
+        _discard(spare_bytes, spare_record)
         raise ConfigIOError(
             f"could not record the install: {e}"
             + ("; the target was restored" if rolled_back else
@@ -1108,7 +1231,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
                f"{bytes_path} and `sunglasses uninstall {name}` will restore it")
         ) from e
 
-    _discard(pending_path)
+    _discard(pending_path, spare_bytes, spare_record)
 
 
 def _retained_of(record, name, *, home):
