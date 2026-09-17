@@ -268,6 +268,40 @@ _HELD: dict = {}
 _LOCK_FOR: dict = {}
 
 
+# target path -> (the bytes the caller rendered from, a callable that renders
+# again from whatever is there now). Out of band for the same reason as
+# `_EXPECTED` and `_LOCK_FOR`.
+_RENDER: dict = {}
+
+
+@contextlib.contextmanager
+def _render_from(path, seen, fn):
+    """Declare what the next write to `path` was rendered FROM, and how to
+    render it again if that is no longer what is there.
+
+    R8-WAITING-WRITER (ASTRA round 7,
+    `R7_WAITING_INSTALL_MUST_NOT_RESURRECT_FOCUS`). Round 7 locked the compare
+    and the rename, and a writer that had read the whole config BEFORE waiting
+    for that lock still published a whole-file rendering built from what it read.
+    While it waited, a recovery restored another server and removed that
+    server's record, journal and retained original; the waiter then resurrected
+    the wrapper it had seen, and nothing on disk could undo it. Locking a write
+    says nothing about the read it was derived from, and a lock held from the
+    read to the publication would deadlock any racer that has to finish inside
+    it. So the writer re-reads under the lock and re-derives, or refuses.
+    """
+    key = str(path)
+    prior = _RENDER.get(key)
+    _RENDER[key] = (seen, fn)
+    try:
+        yield
+    finally:
+        if prior is None:
+            _RENDER.pop(key, None)
+        else:
+            _RENDER[key] = prior
+
+
 @contextlib.contextmanager
 def _locked_for(path, lock_path):
     """Declare which lock the next write to `path` must hold."""
@@ -285,7 +319,17 @@ def _locked_for(path, lock_path):
 
 @contextlib.contextmanager
 def _exclusive(lock_path):
-    """Serialise config transactions on one target, or refuse in bounded time.
+    """Serialise THE WRITER on one target, or refuse in bounded time.
+
+    WHAT IS LOCKED, exactly, because round 7 was read as claiming more than it
+    did: the re-read, the re-derivation, the comparison and the rename inside
+    `_atomic_write`, and nothing else. NOT the caller's first read of the
+    config, NOT its validation, NOT the record and journal writes around it,
+    and NOT the transaction as a whole. A lock held from a caller's read to its
+    publication would deadlock any racing install that has to complete inside
+    that window, which is the shape of the reviewer's own controls. What makes
+    a stale read safe is therefore not this lock but `_render_from`: whoever
+    read before waiting re-reads under the lock and re-derives, or refuses.
 
     R7-CHECK-RENAME-GAP (ASTRA round 6, `R6_CHECK_RENAME_GAP`). The
     compare-and-swap compares and then renames, and his barrier sits INSIDE the
@@ -356,6 +400,9 @@ def _atomic_write(path, data: bytes):
     and no temp file is left behind (R6). Every OSError on this boundary becomes
     ConfigIOError, including the stat and the mkstemp.
 
+    WHAT IS LOCKED HERE: from the re-read below to the rename, and nothing
+    outside this function. See `_exclusive`.
+
     A caller inside `_expect_unchanged` makes the replace a COMPARE-AND-SWAP,
     checked immediately before the rename rather than by the caller. It travels
     out of band rather than as an argument ON PURPOSE: the reviewer's race
@@ -390,6 +437,20 @@ def _atomic_write(path, data: bytes):
             os.fsync(fh.fileno())
         os.chmod(tmp, mode)
         with _exclusive(_LOCK_FOR.get(str(p))):
+            rendering = _RENDER.get(str(p))
+            if rendering is not None:
+                seen, render_again = rendering
+                now, _ = _read_bytes_and_identity(p)
+                if now != seen:
+                    # The file moved between the caller's read and this lock.
+                    # Whatever it rendered describes a file that is gone.
+                    data = render_again(now)
+                    # Truncate and rewrite; the mode was set above and
+                    # reopening does not change it, so it is not set twice.
+                    with open(tmp, "wb") as fh:
+                        fh.write(data)
+                        fh.flush()
+                        os.fsync(fh.fileno())
             expectation = _EXPECTED.get(str(p))
             if expectation is not None:
                 expect_sha, expect_identity = expectation
@@ -493,6 +554,48 @@ def _records_dir(home, name):
     return (d, *rest)
 
 
+def _forget_take(taking):
+    """The take is finished, one way or the other; its note is spent."""
+    try:
+        taking.unlink()
+    except OSError:
+        pass
+
+
+def _reclaim_taken(home, name):
+    """Put back bytes a cleanup took and then never answered for.
+
+    Only ever from the note the cleanup wrote before it moved them, and only
+    when the held file still hashes to what that note recorded. A `.discarding-`
+    file on its own proves nothing: the name is a convention, and trusting a
+    convention is how a leftover becomes the thing we restore a user's config
+    from.
+    """
+    d, _, _, bytes_path = _record_paths(home, name)
+    taking = d / f"{name}.taking"
+    if bytes_path.exists() or not taking.is_file():
+        return False
+    try:
+        intent = json.loads(taking.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    held_name = intent.get("held")
+    expected = intent.get("sha256")
+    if not isinstance(held_name, str) or not _is_digest(expected):
+        return False
+    held = d / held_name
+    if held.parent != d or not held.is_file():
+        return False
+    try:
+        if _digest_file(held) != expected:
+            return False
+        held.rename(bytes_path)
+    except OSError:
+        return False
+    _forget_take(taking)
+    return True
+
+
 def _discard(*paths):
     """Remove our own transaction files, and NEVER one that is in use.
 
@@ -537,9 +640,28 @@ def _discard(*paths):
         # them back, and if the slot has been refilled by whoever wrote that
         # record, the copy we are holding is the superseded one and ours to drop.
         held = q.with_name(q.name + f".discarding-{os.getpid()}-{id(q):x}")
+        # R8-TAKE-JOURNALLED (ASTRA round 7, `R7_TAKE_CRASH_RECOVERABLE`). The
+        # take is atomic, but a process that ends between the take and the
+        # question leaves the bytes under a name no recovery path looks for,
+        # and the record that claims them pointing at a file that is gone. So
+        # say what is about to move, and where, and what it should hash to,
+        # BEFORE moving it. The leftover is never trusted for resembling
+        # retained material: it is restored only when its digest matches what
+        # this note says was taken.
+        taking = q.with_suffix(".taking")
+        try:
+            intent = json.dumps({"canonical": q.name, "held": held.name,
+                                 "sha256": _digest_file(q)})
+            taking.write_text(intent, encoding="utf-8")
+        except OSError:
+            pass
         try:
             q.rename(held)
         except OSError:
+            try:
+                taking.unlink()
+            except OSError:
+                pass
             continue
         if q.with_suffix(".json").exists():
             # Somebody's completed install is relying on these bytes.
@@ -550,11 +672,13 @@ def _discard(*paths):
                     held.rename(q)
             except OSError:
                 pass
+            _forget_take(taking)
             continue
         try:
             held.unlink()
         except OSError:
             pass
+        _forget_take(taking)
 
 
 # Every field a record must carry, with the type it must have. `target_path` is
@@ -743,31 +867,56 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
 
     target = pathlib.Path(config_path)
     raw = _read_bytes(target)
-    doc = _parse(raw, target)
-    servers = _servers(doc, target)
 
-    # Any marker at all stops us, verified or not (C2-REPEAT, C2-DRIFT).
-    existing = servers.get(name)
-    if isinstance(existing, dict) and MARKER in existing:
-        if classify(existing, artifact=artifact) == "WRAPPED":
+    def derive(current):
+        """Everything this install concludes FROM the file in front of it.
+
+        A function rather than a straight line because round 8 has to be able
+        to run it twice: once on what we read, and again under the writer lock
+        if the file moved while we waited for it. Every refusal below is a
+        conclusion about the CURRENT bytes, so re-reading means re-concluding,
+        not patching up an answer taken from bytes that are gone.
+        """
+        doc = _parse(current, target)
+        servers = _servers(doc, target)
+
+        # Any marker at all stops us, verified or not (C2-REPEAT, C2-DRIFT).
+        existing = servers.get(name)
+        if isinstance(existing, dict) and MARKER in existing:
+            if classify(existing, artifact=artifact) == "WRAPPED":
+                raise ConfigConflict(
+                    f"{name!r} is already wrapped in {target}; nothing to do")
             raise ConfigConflict(
-                f"{name!r} is already wrapped in {target}; nothing to do")
-        raise ConfigConflict(
-            f"{name!r} already carries a wrapper this build cannot verify; "
-            f"refusing to nest another inside it")
+                f"{name!r} already carries a wrapper this build cannot verify; "
+                f"refusing to nest another inside it")
 
-    if name in servers:
-        _validate_entry(existing, name, target)
-        original_entry = json.loads(json.dumps(existing))
-        entry_existed = True
-    else:
-        if argv is None:
-            raise ConfigConflict(f"no MCP server named {name!r} in {target}")
-        if not (isinstance(argv, (list, tuple)) and argv
-                and all(isinstance(a, str) for a in argv)):
-            raise ConfigIOError("the supplied argv is not a non-empty list of strings")
-        original_entry = {"command": argv[0], "args": list(argv[1:])}
-        entry_existed = False
+        if name in servers:
+            _validate_entry(existing, name, target)
+            original_entry = json.loads(json.dumps(existing))
+            entry_existed = True
+        else:
+            if argv is None:
+                raise ConfigConflict(f"no MCP server named {name!r} in {target}")
+            if not (isinstance(argv, (list, tuple)) and argv
+                    and all(isinstance(a, str) for a in argv)):
+                raise ConfigIOError(
+                    "the supplied argv is not a non-empty list of strings")
+            original_entry = {"command": argv[0], "args": list(argv[1:])}
+            entry_existed = False
+
+        # R4-OPTIONS: env, cwd and anything else the entry carries survive.
+        wrapper = {k: v for k, v in original_entry.items()
+                   if k not in ("command", "args")}
+        wrapper["command"] = sys.executable
+        wrapper["args"] = [resolved, "--", original_entry["command"],
+                           *(original_entry.get("args") or [])]
+        wrapper[MARKER] = {"artifact": resolved, "sha256": digest,
+                           "command": sys.executable}
+        servers[name] = wrapper
+        return (original_entry, entry_existed, wrapper,
+                (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+
+    original_entry, entry_existed, wrapper, new_raw = derive(raw)
 
     target_id = str(target.resolve())
     _, rec_path, pending_path, bytes_path = _records_dir(home, name)
@@ -807,16 +956,6 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
                 f"of {target}; uninstall to recover it before installing again")
         _discard(pending_path)
 
-    # R4-OPTIONS: env, cwd and anything else the entry carries survive.
-    wrapper = {k: v for k, v in original_entry.items() if k not in ("command", "args")}
-    wrapper["command"] = sys.executable
-    wrapper["args"] = [resolved, "--", original_entry["command"],
-                       *(original_entry.get("args") or [])]
-    wrapper[MARKER] = {"artifact": resolved, "sha256": digest,
-                       "command": sys.executable}
-    servers[name] = wrapper
-    new_raw = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
-
     record = {
         "original_entry": original_entry,
         "installed_entry": wrapper,
@@ -829,21 +968,52 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
 
     try:
         bytes_path.write_bytes(raw)
-        retained_identity = _identity(bytes_path)
+        identities = {"retained": _identity(bytes_path)}
     except OSError as e:
         raise ConfigIOError(f"cannot retain the original bytes: {e}") from e
     try:
         pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
                                 encoding="utf-8")
-        journal_identity = _identity(pending_path)
+        identities["journal"] = _identity(pending_path)
     except OSError as e:
         # A half-written journal is worse than none: it is unparseable recovery
         # material that the next run would have to refuse. Remove both.
         _discard(pending_path, bytes_path)
         raise ConfigIOError(f"cannot write the pending record: {e}") from e
 
+    # What this transaction believes the file was before it. A re-derivation
+    # under the lock replaces it, because the inverse has to describe the bytes
+    # we actually overwrote and not the ones we first read.
+    before = {"raw": raw}
+
+    def render_again(current):
+        """Under the writer lock, with the file no longer what we read."""
+        fresh_entry, fresh_existed, fresh_wrapper, fresh_raw = derive(current)
+        try:
+            bytes_path.write_bytes(current)
+        except OSError as e:
+            raise ConfigIOError(
+                f"cannot retain the original bytes: {e}") from e
+        record.update({
+            "original_entry": fresh_entry,
+            "installed_entry": fresh_wrapper,
+            "file_sha_before": _digest_bytes(current),
+            "entry_existed": fresh_existed,
+        })
+        try:
+            pending_path.write_text(
+                json.dumps({**record, "state": "pending"}, indent=2),
+                encoding="utf-8")
+        except OSError as e:
+            raise ConfigIOError(f"cannot write the pending record: {e}") from e
+        before["raw"] = current
+        identities["retained"] = _identity(bytes_path)
+        identities["journal"] = _identity(pending_path)
+        return fresh_raw
+
     try:
-        _atomic_write(target, new_raw)
+        with _render_from(target, raw, render_again):
+            _atomic_write(target, new_raw)
     except ConfigIOError:
         _discard(bytes_path, pending_path)
         raise
@@ -863,22 +1033,51 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     # flight. Cancelled means the target goes back and the caller is told, never
     # a wrapper with nothing behind it.
     wrapped_bytes, wrapped_identity = _read_bytes_and_identity(target)
-    if not (_still_ours(bytes_path, retained_identity)
-            and _still_ours(pending_path, journal_identity)):
+    if not (_still_ours(bytes_path, identities["retained"])
+            and _still_ours(pending_path, identities["journal"])):
         restored = True
         try:
             with _expect_unchanged(target, _digest_bytes(wrapped_bytes),
                                    wrapped_identity):
-                _atomic_write(target, raw)
+                _atomic_write(target, before["raw"])
         except (ConfigIOError, ConfigConflict):
             restored = False
-        _discard(rec_path)
+        if restored:
+            _discard(rec_path)
+        else:
+            # R8-INVERSE-LAST (ASTRA round 7, `R7_CANCEL_ROLLBACK_REFUSAL`).
+            # The rollback can fail for two honest reasons: the write itself
+            # errors, or its compare-and-swap correctly refuses because a
+            # different install landed while we were being cancelled. Round 7
+            # raised a typed refusal here and asked for the file to be
+            # reconciled by hand, which leaves a wrapper on disk with nothing
+            # that can undo it -- the one state every round of this PR has been
+            # about. The bytes we overwrote are still in hand, so the inverse is
+            # rebuilt rather than mourned: retained bytes back, a completed
+            # record describing what we published, and THEN the refusal. An
+            # uninstall after this works, and it restores entry-only if the
+            # competing install changed the file, which leaves that install
+            # alone.
+            rebuilt = True
+            try:
+                bytes_path.parent.mkdir(parents=True, exist_ok=True)
+                bytes_path.write_bytes(before["raw"])
+                record["file_sha_after"] = _digest_bytes(wrapped_bytes)
+                rec_path.write_text(
+                    json.dumps({**record, "state": "complete"}, indent=2),
+                    encoding="utf-8")
+            except OSError:
+                rebuilt = False
+            _discard(pending_path)
         raise ConfigConflict(
             f"the open transaction installing {name!r} was cancelled by another "
             f"process while this one was writing {target}"
             + ("; the target was restored" if restored else
-               f"; THE TARGET IS STILL WRAPPED and its retained original is "
-               f"gone, so {target} must be reconciled by hand"))
+               "; the target is still wrapped and its inverse has been rebuilt, "
+               f"so `sunglasses uninstall {name}` still restores it"
+               if rebuilt else
+               f"; THE TARGET IS STILL WRAPPED and the inverse could not be "
+               f"rebuilt, so {target} must be reconciled by hand"))
 
     # C4-RECORD: completion is part of the transaction. If it fails, put the
     # target back rather than leaving a wrapped config with nothing to undo it.
@@ -1042,6 +1241,13 @@ def uninstall(config_path, name, *, home):
 def _uninstall_locked(config_path, name, *, home):
     target = pathlib.Path(config_path)
     _, rec_path, pending_path, _ = _record_paths(home, name)
+
+    # A cleanup that was interrupted between taking the retained bytes and
+    # answering for them leaves a record claiming bytes that are not at their
+    # canonical name. Put them back first, from the note the cleanup wrote and
+    # only if they still hash to it, so everything below sees the state that
+    # cleanup would have left had it finished.
+    _reclaim_taken(home, name)
 
     if not rec_path.exists():
         # C4-REPLACE-CRASH-RECOVERY. No completed record, but an open journal

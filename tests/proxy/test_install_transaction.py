@@ -1395,3 +1395,169 @@ def test_an_install_cancelled_while_it_writes_does_not_report_success(
     rec_path, _, _ = _paths(home)
     assert not rec_path.exists(), (
         "a completed record survived a transaction that refused")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 8. ASTRA's three compositions, each one an instance of a single
+# invariant: a wrapped config must never be left without a usable inverse.
+# His own rows are the acceptance; these pin the three mechanisms directly so
+# each fails for one reason.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_a_writer_that_read_before_the_lock_re_derives_under_it(
+        cfg, home, artifact, monkeypatch, tmp_path):
+    """R8-WAITING-WRITER. Round 7 locked the compare and the rename. A writer
+    that had read the whole config BEFORE waiting for that lock still published
+    a whole-file rendering built from what it read, so while it waited a
+    recovery could restore another server and remove that server's record,
+    journal and retained original, and the waiter would resurrect the wrapper
+    it had seen with nothing left to undo it. Locking a write says nothing
+    about the read it was derived from."""
+    doc = json.loads(read(cfg))
+    doc["mcpServers"]["other"] = {"command": "other", "args": []}
+    cfg.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    wrapped_state = read(cfg)
+    restored_state = None
+
+    real_write = inst._atomic_write
+
+    fired = []
+
+    def recovery_lands_first(target, data):
+        nonlocal restored_state
+        if not fired:
+            # Set BEFORE the recovery runs: it writes through this same
+            # boundary, and a guard that is only set afterwards re-enters.
+            fired.append(True)
+            # What the waiting installer will find when it finally looks:
+            # github restored, and its recovery material gone with it.
+            inst.uninstall(cfg, "github", home=home)
+            restored_state = read(cfg)
+        return real_write(target, data)
+
+    monkeypatch.setattr(inst, "_atomic_write", recovery_lands_first)
+    inst.install(cfg, "other", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    assert restored_state is not None and restored_state != wrapped_state
+    servers = json.loads(read(cfg))["mcpServers"]
+    assert inst.classify(servers["other"], artifact=artifact) == "WRAPPED", (
+        "the second install did not survive")
+    assert inst.classify(servers["github"], artifact=artifact) != "WRAPPED", (
+        "a stale rendering resurrected a wrapper whose inverse was removed")
+
+
+def test_a_cancelled_install_whose_rollback_refuses_still_has_an_inverse(
+        cfg, home, artifact, monkeypatch):
+    """R8-INVERSE-LAST. Cancellation plus a rollback that legitimately cannot
+    happen — the write errors, or its compare-and-swap refuses because another
+    install landed — left a wrapper on disk with no record, no journal and no
+    retained original, and a message asking for the file to be reconciled by
+    hand. The bytes are still in hand at that point, so the inverse is rebuilt
+    before the refusal is raised."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    calls = []
+
+    def cancelled_then_no_rollback(target, data):
+        calls.append(True)
+        if len(calls) == 1:
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            return real_write(target, data)
+        raise inst.ConfigIOError("the rollback write cannot happen")
+
+    monkeypatch.setattr(inst, "_atomic_write", cancelled_then_no_rollback)
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    assert len(calls) == 2, "the rollback boundary was never reached"
+    rec_path, _, retained = _paths(home)
+    assert rec_path.is_file() and retained.is_file(), (
+        "the wrapper was left with nothing that can undo it")
+
+    inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == original, "the rebuilt inverse did not restore"
+    # Checked last on purpose: the wording is the least of it, and a row that
+    # goes red on a message before it goes red on the property reports the
+    # wrong defect.
+    assert "uninstall" in str(e.value), "the refusal does not say what to do"
+
+
+def test_bytes_taken_by_an_interrupted_cleanup_are_reclaimed_by_digest(
+        cfg, home, artifact, monkeypatch):
+    """R8-TAKE-JOURNALLED. The take is atomic, but a process that ends between
+    the take and the question leaves the bytes under a name no recovery path
+    looks for while the record that claims them points at a file that is gone.
+    The note written before the move is what makes them findable, and the
+    digest in it is what makes them trustworthy."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+
+    # The interruption is driven through the real cleanup, and the note under
+    # test is the one the PRODUCT writes. An earlier version of this row built
+    # the note by hand, so it proved the reader and said nothing about whether
+    # anything ever writes one: removing the write left this row green and the
+    # mutation harness caught it. KeyboardInterrupt because a dying process is
+    # not an OSError and must not be swallowed by the cleanup's own handlers.
+    real_rename = pathlib.Path.rename
+
+    def rename_then_die(self, dst):
+        result = real_rename(self, dst)
+        if self == retained:
+            raise KeyboardInterrupt("the process ends between take and check")
+        return result
+
+    monkeypatch.setattr(pathlib.Path, "rename", rename_then_die)
+    with pytest.raises(KeyboardInterrupt):
+        inst._discard(retained)
+    monkeypatch.setattr(pathlib.Path, "rename", real_rename)
+
+    assert list(records.glob("github.original.discarding-*")), (
+        "the bytes were not taken")
+    assert not retained.exists(), "the canonical name still holds the bytes"
+
+    # Through the PUBLIC path, not the helper: a row that calls a function only
+    # the fix has goes red with an AttributeError on the old build, which says
+    # "this is new" rather than "this was broken".
+    original = read(cfg)
+    inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) != original, "the wrapper was never undone"
+    assert inst.classify(json.loads(read(cfg))["mcpServers"]["github"],
+                         artifact=artifact) != "WRAPPED", (
+        "the bytes survived under the held name and nothing found them")
+    assert not (records / "github.taking").exists(), "the spent note was kept"
+
+
+def test_a_leftover_is_not_reclaimed_on_the_strength_of_its_name(
+        cfg, home, artifact):
+    """The other side, and the reason the note carries a digest: a file whose
+    name merely resembles taken material is not recovery material. Restoring a
+    user's config from something we recognised by convention is worse than
+    refusing."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    claimed = read(retained)
+    retained.unlink()
+
+    impostor = records / (retained.name + ".discarding-1-a")
+    impostor.write_bytes(b'{"not": "the retained original"}')
+
+    # No note at all.
+    assert inst._reclaim_taken(home, "github") is False
+    assert not retained.exists()
+
+    # A note, but the held bytes do not hash to what it says was taken.
+    (records / "github.taking").write_text(json.dumps(
+        {"canonical": retained.name, "held": impostor.name,
+         "sha256": inst._digest_bytes(claimed)}), encoding="utf-8")
+    assert inst._reclaim_taken(home, "github") is False
+    assert not retained.exists(), "bytes that failed their digest were restored"
