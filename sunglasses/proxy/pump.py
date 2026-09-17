@@ -40,6 +40,13 @@ CONTROL_PREFIX = "sg-"
 
 # T6.R6. Bounded, because a tombstone table that grows with the session is a
 # memory bound a peer controls.
+# R-168-R6/F1. How many times an answer may be re-derived because an
+# authority landed while it was being prepared. The precedence allows two
+# changes (None -> DESCRIPTOR_CHANGED -> REQUEST_CANCELLED) and each is
+# terminal once accepted, so this is slack above the reachable maximum
+# rather than a guess; exhausting it is an INTERNAL_FAULT and never a
+# stale answer delivered quietly.
+_REDERIVE_LIMIT = 8
 TOMBSTONE_LIMIT = 10_000
 
 
@@ -346,6 +353,17 @@ class Session:
         self._authority_observed = None
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
+        # R-168-R6/F2. CLIENT IDS ADMITTED AND NOT YET ANSWERED ON THE WIRE.
+        #
+        # Kept HERE and not on the route because admission is the session's
+        # event however the caller reached it -- the reviewer's controls admit
+        # straight through this method -- and kept apart from every other table
+        # because it has to OUTLIVE retirement. The release paths retire the
+        # record and THEN fail to authorise, and at that moment `_pending`,
+        # `_settling` and the core all agree there is nothing outstanding while
+        # the client has received no bytes at all. Retirement is not answering;
+        # a frame reaching the sink is.
+        self._unanswered: set = set()
         # identity -> the Cause this item settles with, when it is not CLEAN.
         self._settling_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
@@ -432,6 +450,8 @@ class Session:
             self._generation[identity] = self._generation.get(identity, 0) + 1
             self._pending[identity] = method
             self._admitted_at[identity] = time.monotonic()
+            if origin == ORIGIN_CLIENT:
+                self._unanswered.add(request_id)
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -560,6 +580,34 @@ class Session:
         if self._authority_observed is None or \
                 self._authority_epoch < self._authority_observed:
             self._authority_observed = self._authority_epoch
+
+    def release_decision(self, request_id, *, origin=ORIGIN_CLIENT):
+        """May this crossing go as it is, or what replaces it. THE one answer.
+
+        R-168-R6/F1. The policy moved here because every input it reads is
+        already the session's: the recorded terminal cause, the cancelled set,
+        the invalidation and the epoch that dates all three. `Route._release_gate`
+        keeps its name and its signature -- reviewer controls wrap that
+        attribute and count its calls -- and is now the adapter that calls this.
+        One implementation, two entry points, and not a copy: the retirement
+        below re-derives through THIS, so it can take a fresh decision without
+        spending a gate call that XE02_rederive_writer counts.
+
+        Precedence, unchanged and asserted by XB04: a recorded S3 fault is
+        terminal and no authority overrides it; then cancellation; then the
+        invalidation. `None` lets the crossing through.
+        """
+        identity = key(origin, request_id)
+        with self._authority_lock:
+            self._observe_authority()
+            recorded = self.recorded_terminal(request_id, origin=origin)
+            if recorded is not None and recorded.rule == "S3":
+                return None
+            if identity in self._cancelled_ids:
+                return "REQUEST_CANCELLED"
+            if self._invalidated_as:
+                return "DESCRIPTOR_CHANGED"
+            return None
 
     def _final_decision(self, request_id, decided):
         """The decision that actually reaches the wire, taken UNDER the lock.
@@ -1433,6 +1481,7 @@ class Session:
             self._authority_observed = None
             withheld = (self._handoff_decide(identity[2])
                         if self._handoff_decide is not None else None)
+            observed = self._authority_observed
             if not mismatch:
                 self._settling.discard(identity)
                 # R-168-R5. THE ORDERING, DEMONSTRATED RATHER THAN ARGUED.
@@ -1445,6 +1494,10 @@ class Session:
                 # round 4 lost six times.
                 with self._authority_lock:
                     withheld = self._final_decision(identity[2], withheld)
+                    # The epoch the decision that leaves this block was derived
+                    # from, carried to the retirement with the frame built from
+                    # it. R-168-R6/F1.
+                    observed = self._authority_observed
                     if withheld is not None and self._handoff_frame is not None:
                         # STILL OWED. The frame below is built by fallible
                         # code -- it writes a receipt, and a receipt that
@@ -1471,18 +1524,43 @@ class Session:
             # OUTSIDE the owner, because building the frame writes a receipt
             # and a failed write answers by calling `_close`, which takes this
             # same non-reentrant lock (XB06 deadlocked on exactly that).
-            frame = self._handoff_frame(identity[2], withheld)
-            if not self._retire_prepared(identity, record_key):
-                # A close completed while the frame was being prepared. It
-                # found the record still owed, recorded the debt, and pays it
-                # on the way out; handing this frame over as well would be
-                # T6.R1's one answer becoming two.
-                return b""
-            return frame
+            #
+            # R-168-R6/F1. AND IN A BOUNDED LOOP, because an authority accepted
+            # during the build invalidates the frame just built. The bound is
+            # not arbitrary: the precedence is recorded-S3 > cancellation >
+            # invalidation, and each is terminal once accepted, so the answer
+            # can move at most from None to DESCRIPTOR_CHANGED to
+            # REQUEST_CANCELLED -- two changes. The cap is larger than that and
+            # exhausting it is a FAULT rather than a stale answer quietly
+            # delivered, because a decision that will not hold still long
+            # enough to be spent is a session that cannot promise one answer.
+            for _ in range(_REDERIVE_LIMIT):
+                frame = self._handoff_frame(identity[2], withheld)
+                outcome, again, observed = self._retire_prepared(
+                    identity, record_key, observed, withheld)
+                if outcome == "retired":
+                    return frame
+                if outcome == "lost":
+                    # A close completed while the frame was being prepared. It
+                    # found the record still owed, recorded the debt, and pays
+                    # it on the way out; handing this frame over as well would
+                    # be T6.R1's one answer becoming two.
+                    return b""
+                withheld = again
+                if withheld is None:
+                    # Authority moved and the new answer is "let it through",
+                    # which cannot happen while the sets only grow -- but if it
+                    # ever does, the original is what the decision now asks for.
+                    return raw
+            self._close("INTERNAL_FAULT",
+                        "authority kept moving while an answer was being "
+                        "prepared, so no decision could be spent",
+                        rule="S3")
+            return b""
         return raw
 
-    def _retire_prepared(self, identity, record_key):
-        """End the obligation once the frame for it EXISTS. Says who won.
+    def _retire_prepared(self, identity, record_key, observed, prepared):
+        """End the obligation once the frame for it EXISTS, or say why not.
 
         R-168-R5. `_retire_record` cannot be reused here and the difference is
         the return value: this caller has a frame in its hand and has to be
@@ -1490,19 +1568,50 @@ class Session:
         a second acquisition after retiring would put the two reads either side
         of a lock release, which is the shape this whole round is about.
 
-        False means the close won while the frame was being built: it has
-        recorded the debt for this item and the reader delivers nothing.
+        R-168-R6/F1. AND THE EPOCH IS RE-VALIDATED HERE, because round 5's
+        protection ended too early. The epoch guarded the decision only until
+        `_authority_lock` was released; the frame is then built by fallible
+        code, and a cancellation accepted DURING that build -- including one
+        released by the re-derivation lock itself -- was invisible to this
+        retirement, which spent the stale DESCRIPTOR_CHANGED frame. The item
+        was still in `_settling` the whole time, so the route's own `_cancel`
+        had correctly left the answer to this gate.
+
+        The re-derivation goes through `release_decision` and NOT through the
+        route's gate: XE02_rederive_writer asserts exactly two gate calls and
+        this is the third derivation.
+
+        Returns `("retired", None, None)` when the frame stands, `("lost",
+        None, None)` when the close or a later generation won and nothing may
+        cross, or `("rederive", withheld, observed)` when the answer itself
+        changed and the caller must build it again. `prepared` is the decision
+        the frame in the caller's hand was built from.
         """
         with self._settlement:
             if self._closed:
-                return False
+                return ("lost", None, None)
             if self._settling_key.get(identity, record_key) != record_key:
                 # A later generation owns this record now. Leave it owed; the
                 # reader that created it is the one that may retire it.
-                return False
-            self._settling.discard(identity)
-            self._settling_key.pop(identity, None)
-            return True
+                return ("lost", None, None)
+            with self._authority_lock:
+                if self._authority_epoch != observed:
+                    # THE DECISION IS COMPARED, NOT THE EPOCH, and the first
+                    # draft compared the epoch: every rebuild let the writer
+                    # move it again, so the answer was re-derived to the SAME
+                    # value forever and the loop hit its cap and closed
+                    # INTERNAL_FAULT on a session that had the right answer in
+                    # hand. An epoch that moved says the decision MIGHT be
+                    # stale; only the decision says whether it is.
+                    self._authority_observed = None
+                    again = self.release_decision(identity[2],
+                                                  origin=identity[0])
+                    if again != prepared:
+                        return ("rederive", again, self._authority_observed)
+                    observed = self._authority_observed
+                self._settling.discard(identity)
+                self._settling_key.pop(identity, None)
+                return ("retired", None, None)
 
     def _handoff_notification(self, raw):
         """T7.R2 and RC28. A notification crosses only while the session lives.
@@ -1659,6 +1768,14 @@ class Session:
     def control_answer(self, request_id):
         """The frame a proxy-owned request got, or None while it is unanswered."""
         return self._control_answers.get(key(ORIGIN_PROXY, request_id))
+
+    def answered_on_the_wire(self, request_id):
+        """A frame for this id has actually reached the client sink."""
+        self._unanswered.discard(request_id)
+
+    def unanswered_clients(self):
+        """Every client id admitted and never answered, retired or not."""
+        return list(self._unanswered)
 
     def closed_with(self):
         return self._closed

@@ -93,6 +93,15 @@ class Route:
                         else inspection.trusted_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
+        # R-168-R6/F2. THE CLIENTS THIS ROUTE STILL OWES A FRAME, by id.
+        #
+        # RETIREMENT IS NOT ANSWERING, and that distinction is the finding. On
+        # the release paths the pump has already retired the record when
+        # authorisation fails, so the session has nothing owed to retain and
+        # the client -- who has received no bytes at all -- is owed an answer
+        # nobody is holding. An id leaves this set when a frame is actually
+        # WRITTEN for it, which is the only event that means answered.
+        self._paying = False
         # T2.R6's re-list runs through this. None means no control channel is
         # wired, and a tools/list is then refused rather than forwarded: the
         # client asked us, and handing its request to the server unread is the
@@ -174,16 +183,22 @@ class Route:
             # session stops rather than continuing to mediate with nothing
             # written down.
             #
-            # NOTHING BOUNDED IS SENT FROM HERE, and that is a decision rather
-            # than an omission. These bytes arrive with no id -- they may be an
-            # original, a withheld frame or a refusal the close retained -- and
-            # the party that knows whose answer it is has already sent the
-            # bounded error (`_release_frame`, `_release`). Improvising a
-            # second one here would put two answers on the wire for one
-            # request, which is the rule this path exists to keep.
+            # R-168-R6/F2. THE COMMENT THAT USED TO SIT HERE WAS FALSE, and
+            # the reviewer measured it: it said the party that knows whose
+            # answer it is had already sent the bounded error, and on these
+            # executions nobody had. `_release_frame` only pays when the BUILD
+            # fails; authorisation failing here happens after a successful
+            # build, with the record already retired, and the client had
+            # received nothing at all.
+            #
+            # The refusal is keyed on ownership rather than on this call
+            # failing, so the frame that already crossed is not answered twice
+            # and a notification -- which owns no id -- borrows nobody's.
             self._record("SETTLED", reason_code=REASON_RECEIPT_IO_ERROR,
                          rule=RULE_RESOURCE, forwarded=False)
+            self._pay_bounded_refusals()
             return
+        self._answered_for(raw)
         self._record("WRITE_COMPLETE", bytes=len(raw))
 
     def _release_barrier(self, request_id):
@@ -258,15 +273,20 @@ class Route:
         """
         if request_id is NO_ID:
             return None
-        # XB04. A RECORDED FAULT IS TERMINAL and no authority overrides it.
-        # An invalid worker completion settles SCAN_EXCEPTION before the
-        # handoff; a cancellation completing afterwards used to replace that
-        # frame with REQUEST_CANCELLED while the core kept SCAN_EXCEPTION, so
-        # the client's answer and the receipt disagreed about what happened.
-        recorded = self.session.recorded_terminal(request_id, origin=CLIENT)
-        if recorded is not None and recorded.rule == "S3":
-            return None
-        return self._release_barrier(request_id)
+        # R-168-R6/F1. THE ADAPTER, and the name is why it is still here. This
+        # attribute is wrapped by reviewer controls and its calls are COUNTED
+        # (XE02_rederive_writer asserts exactly two), so the decision it
+        # returns had to become reachable from somewhere that is not a call to
+        # it -- the retirement re-derives after a writer lands during the
+        # fallible frame build, which is a third derivation that may not be a
+        # third gate call. The policy moved to the session, where every input
+        # it reads already lives; this is not a copy of it.
+        #
+        # XB04 lives there now with the rest: a recorded S3 fault is terminal
+        # and no authority overrides it, so a cancellation arriving after a
+        # scan fault cannot replace SCAN_EXCEPTION on the wire while the core
+        # keeps it in the receipt.
+        return self.session.release_decision(request_id, origin=CLIENT)
 
     def _release_frame(self, request_id, reason):
         """The frame for a decision already taken, built OUTSIDE the owner.
@@ -290,15 +310,11 @@ class Route:
         has just lost its log may claim.
         """
         frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL)
-        closed = self.session.closed_with()
-        if closed is not None and closed[0] == REASON_RECEIPT_IO_ERROR:
-            # The receipt for THIS answer is what failed: `_withhold_result`
-            # records SETTLED before returning, and `_record` closes the
-            # session on a log that cannot be written. The withheld frame
-            # cannot be released -- nothing may cross unauthorised -- so the
-            # client gets the bounded error instead of silence.
-            self._receipt_failure(request_id)
-            return b""
+        # R-168-R6/F2. NO SPECIAL CASE HERE ANY MORE. Round 5 paid the bounded
+        # refusal from this one site, which is why it reached the client on
+        # exactly one of the receipt-failure paths. `_record` pays whatever is
+        # owed now, wherever it fails, so this site needs no branch of its own
+        # and there is one payer rather than two racing to answer the same id.
         return frame if frame is not None else b""
 
     def _inspect_result(self, raw, message):
@@ -927,11 +943,76 @@ class Route:
         self.session._close(reason, "the client frame could not be trusted",
                             rule=rule, budget=budget)
 
+    def _answered_for(self, raw):
+        """Clear the id a released frame answers, if it answers one.
+
+        A notification carries none, and `b""` is the reader saying nothing
+        crosses -- neither is an answer and neither clears anybody.
+        """
+        if not raw:
+            return
+        try:
+            message = json.loads(raw)
+        except ValueError:
+            return
+        if isinstance(message, dict) and "id" in message:
+            self._answered(message["id"])
+
     def _to_client(self, body):
+        if isinstance(body, dict) and body.get("id") is not None:
+            self._answered(body["id"])
         self.client_write((json.dumps(body, separators=(",", ":")) + "\n")
                           .encode("utf-8"))
         self._record("FRAME_OUT", direction="upstream_to_client",
                      raw_len=len(json.dumps(body)))
+
+    def _answered(self, request_id):
+        """A frame for this id has actually reached the sink."""
+        self.session.answered_on_the_wire(request_id)
+
+    def _pay_bounded_refusals(self):
+        """One bounded RECEIPT_IO_ERROR to every client still owed a frame.
+
+        R-168-R6/F2. T9.R4's answer, finally given on every path rather than
+        one. A receipt failure anywhere -- the scan events, the first
+        settlement, the release authorisation, the fsync inside it -- used to
+        end with the session closed and, for most of those sites, ZERO frames
+        for a client still blocked on its request. The close could not help:
+        the record had already been retired, so there was no obligation to
+        retain, and `_release_inbound` will not release what it cannot
+        authorise.
+
+        NOT A BLANKET REFUSAL ON EVERY FAILURE, which the reviewer names as the
+        wrong fix. It pays what is OWED and nothing else, so a failure to
+        record completion AFTER a frame has crossed pays nobody
+        (XE03_receipt_WRITE_COMPLETE_*), and an id paid once is never paid
+        twice however many later writes fail.
+
+        Written straight to the sink: no receipt, no authorisation, never
+        claimed durable. It is being sent by a component that has just
+        discovered it cannot write anything down.
+        """
+        if self._paying:
+            # `_to_client` records, a record fails, and the failure lands back
+            # here. The flag makes the second pass a drop rather than a
+            # recursion -- and these frames go out through `client_write`
+            # directly for the same reason.
+            return
+        self._paying = True
+        try:
+            for request_id in self.session.unanswered_clients():
+                self.session.answered_on_the_wire(request_id)
+                self.client_write(
+                    (json.dumps(envelope.withheld(
+                        request_id=request_id,
+                        reason_code=REASON_RECEIPT_IO_ERROR,
+                        rule=RULE_RESOURCE, accepted=False, status="not_run",
+                        inspection_complete=False, inspected_utf8_bytes=0,
+                        observed_content_bytes=0, elapsed_ms=0,
+                        catalog=self.catalog), separators=(",", ":"))
+                     + "\n").encode("utf-8"))
+        finally:
+            self._paying = False
 
     def _record(self, event, **fields):
         """Every receipt goes through here so a log that cannot be written
@@ -954,6 +1035,11 @@ class Route:
             # receipt decides the cause and the ones that follow it -- there
             # are always several, because a failed log fails every write --
             # cannot relabel it.
+            # R-168-R6/F2. PAY FIRST, then close. The close records what the
+            # SESSION still owes; this pays what the CLIENT is still owed, and
+            # on the release paths those are not the same set -- the record is
+            # retired by then and the client has had nothing.
+            self._pay_bounded_refusals()
             self.session._close(
                 REASON_RECEIPT_IO_ERROR,
                 "the receipt log could not be written, so the session cannot "

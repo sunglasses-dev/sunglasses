@@ -559,3 +559,254 @@ def test_nothing_under_the_discharge_lock_calls_into_the_route():
     assert "self._handoff_decide" in inside, (
         f"the DECISION must be taken under the lock, or a close racing it is "
         f"not blocked by the owner (XC01): {inside}")
+
+
+# ── round 6 · the window after the decision, and who is still owed ──────────
+
+def _during_the_frame_build(route, action):
+    """Complete `action` while the withheld frame is being PREPARED.
+
+    After the decision, after the authority lock has been released, and before
+    the obligation is retired -- the window round 5 left open. The item is
+    still in `_settling` throughout, so the route's own `_cancel` correctly
+    leaves the answer to the handoff gate.
+
+    ONCE, and bounded on its own thread, for the reasons round 5's helper
+    records: the builder is re-entered when the answer changes, and an inline
+    writer would self-deadlock under the mutation that takes the reader's lock.
+    """
+    original = route._release_frame
+    seen = {"builds": 0}
+
+    def build(request_id, reason):
+        seen["builds"] += 1
+        if seen["builds"] == 1:
+            worker = threading.Thread(target=lambda: action(route), daemon=True)
+            worker.start()
+            worker.join(2)
+            seen["completed"] = not worker.is_alive()
+        return original(request_id, reason)
+
+    route._release_frame = build
+    return seen
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_an_authority_during_the_frame_build_still_wins(tmp_path, finding):
+    """XE02_frame_cancel. The epoch stopped protecting too early.
+
+    Round 5 validated the decision under `_authority_lock` and then released
+    it, and the frame is built by fallible code outside every lock. A
+    cancellation accepted during that build -- including one released by the
+    re-derivation lock itself -- was invisible to the retirement, which spent
+    the stale `DESCRIPTOR_CHANGED` frame it already had in hand.
+
+    The obligation is still owed at that instant; that is exactly why the item
+    is retained through preparation at all. Retirement re-validates now.
+    """
+    route, out = _route(tmp_path, finding=finding)
+    _at_the_handoff(route, lambda r: setattr(r, "_invalidated",
+                                             "DESCRIPTOR_CHANGED"))
+    seen = _during_the_frame_build(
+        route, lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+
+    assert seen.get("completed"), "the cancellation never landed"
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+    assert len([raw for raw in out if raw]) == 1, "more than one answer"
+
+
+def test_the_retirement_re_derives_without_spending_a_gate_call(tmp_path):
+    """The shape ASTRA's count forces, and the reason the policy moved.
+
+    `XE02_rederive_writer` asserts the right answer AND exactly two gate calls.
+    Count them: the first returns nothing, an invalidation lands, the discharge
+    re-derives as the second, and a cancellation blocked on `_authority_lock`
+    during that second call completes only once it is released. The answer
+    that must reach the client therefore needs a THIRD derivation which may not
+    be a third gate call.
+
+    So `release_decision` lives on the session, where the recorded cause, the
+    cancelled set, the invalidation and the epoch already live, and
+    `Route._release_gate` is the adapter that keeps the name reviewer controls
+    wrap. One implementation, two entry points.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    original = route._release_gate
+    calls = []
+
+    def gate(request_id):
+        calls.append(request_id)
+        reason = original(request_id)
+        if len(calls) == 1:
+            route._invalidated = "DESCRIPTOR_CHANGED"
+        return reason
+
+    route._release_gate = gate
+    _during_the_frame_build(
+        route, lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+    assert len(calls) == 2, (
+        f"the retirement spent a gate call: {len(calls)}")
+
+
+def test_a_decision_that_does_not_change_is_not_re_derived_for_ever(tmp_path):
+    """The loop terminates, and the first draft of it did not.
+
+    Comparing the EPOCH rather than the decision meant every rebuild let the
+    writer move the epoch again, so the answer was re-derived to the same value
+    until the cap and the session closed INTERNAL_FAULT with the correct answer
+    already in hand. An epoch that moved says the decision MIGHT be stale; only
+    the decision says whether it is.
+    """
+    route, out = _route(tmp_path, finding=False)
+    original = route._release_frame
+    builds = []
+
+    def build(request_id, reason):
+        builds.append(reason)
+        # A writer on EVERY build, which is what the reviewer's control does.
+        worker = threading.Thread(
+            target=lambda: route._cancel({"params": {"requestId": 1}}),
+            daemon=True)
+        worker.start()
+        worker.join(2)
+        return original(request_id, reason)
+
+    _at_the_handoff(route, lambda r: setattr(r, "_invalidated",
+                                             "DESCRIPTOR_CHANGED"))
+    route._release_frame = build
+    route.pump_upstream(_answer())
+
+    assert route.session.closed_with() is None, (
+        f"the session closed: {route.session.closed_with()}")
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+    assert len(builds) == 2, f"the answer was rebuilt {len(builds)} times"
+
+
+# ── round 6 · a receipt failure answers everyone still owed ─────────────────
+
+def _fail_receipts_at(route, event):
+    """Break the log at one real event, the way the reviewer's sweep does."""
+    original = route.log.event
+    fired = []
+
+    def failing(kind, **fields):
+        if kind == event and not fired:
+            fired.append(kind)
+            route.log.fail_writes(OSError(f"injected full disk at {kind}"))
+        return original(kind, **fields)
+
+    route.log.event = failing
+    return fired
+
+
+@pytest.mark.parametrize("event", ["SCAN_STARTED", "SCAN_RESULT",
+                                   "RELEASE_AUTHORIZED"])
+def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event):
+    """XE03. The bounded refusal reached ONE path out of many.
+
+    Round 5 paid it from `_release_frame`, so it arrived only when the frame
+    BUILD failed. A failure at the scan events, at the first settlement, at the
+    release authorisation or inside its fsync leaves the record already retired
+    and the frame never written: the close finds nothing to retain, and
+    `_release_inbound` will not release what it cannot authorise. Zero frames
+    for a client still blocked on its request, on a perfectly writable sink.
+
+    The refusal is keyed on OWNERSHIP now -- admitted and not yet answered on
+    the wire -- so it is paid wherever the log dies, exactly once.
+    """
+    route, out = _route(tmp_path, finding=False)
+    fired = _fail_receipts_at(route, event)
+    route.pump_upstream(_answer())
+
+    assert fired, f"the {event} receipt was never reached"
+    assert _reason_codes(out) == ["RECEIPT_IO_ERROR"], _reason_codes(out)
+    body = json.loads([raw for raw in out if raw][0])
+    assert body["error"]["data"]["inspection_complete"] is False, body
+    assert body["error"]["data"]["status"] == "not_run", body
+
+
+def test_a_failure_recording_completion_does_not_answer_twice(tmp_path):
+    """The other side of the same rule, and the reason it is keyed on
+    ownership rather than on the failure.
+
+    `WRITE_COMPLETE` is recorded AFTER the frame has crossed. The client has
+    its one answer; a bounded refusal here would be a second. ASTRA names this
+    as the fix to avoid, so it has a row rather than a comment.
+    """
+    route, out = _route(tmp_path, finding=False)
+    fired = _fail_receipts_at(route, "WRITE_COMPLETE")
+    route.pump_upstream(_answer())
+
+    assert fired, "the WRITE_COMPLETE receipt was never reached"
+    assert len([raw for raw in out if raw]) == 1, "the client was answered twice"
+    assert b'"result"' in [raw for raw in out if raw][0], (
+        "the original did not cross")
+
+
+def test_every_client_still_owed_is_paid_exactly_once(tmp_path):
+    """XE04. Two pending requests, one receipt failure, two answers.
+
+    Paying only the item being handed off left the second client waiting for
+    ever: the close retained its obligation and `_release_inbound` suppressed
+    the retained frame on the dead log.
+    """
+    route, out = _route(tmp_path, finding=False)
+    assert route.session.admit_request(2, method="tools/call", origin="client")
+    fired = _fail_receipts_at(route, "SCAN_STARTED")
+    route.pump_upstream(_answer())
+
+    assert fired
+    codes = _reason_codes(out)
+    assert codes == ["RECEIPT_IO_ERROR", "RECEIPT_IO_ERROR"], codes
+    answered = sorted(json.loads(raw)["id"] for raw in out if raw)
+    assert answered == [1, 2], answered
+
+
+def test_a_notification_receipt_failure_pays_the_pending_request(tmp_path):
+    """XE05. The notification owns no id and borrows nobody's.
+
+    A receipt failure at the notification boundary left a known pending request
+    with no answer at all. The notification itself must not receive a JSON-RPC
+    response -- it never had an id to put one in -- so the refusal belongs to
+    the request that is still owed one.
+    """
+    route, out = _route(tmp_path, finding=False)
+    fired = _fail_receipts_at(route, "RELEASE_AUTHORIZED")
+    route.pump_upstream(wire({"jsonrpc": "2.0",
+                              "method": "notifications/message",
+                              "params": {"data": "ordinary notice"}}))
+
+    assert fired
+    assert _reason_codes(out) == ["RECEIPT_IO_ERROR"], _reason_codes(out)
+    assert json.loads([raw for raw in out if raw][0])["id"] == 1, (
+        "the refusal did not name the request that is owed one")
+
+
+def test_a_locally_written_answer_is_not_paid_a_second_time(tmp_path):
+    """The client-side half of the same ownership rule.
+
+    Not every answer leaves through the release path. A cancellation, an
+    admission refusal and a close answer are written straight to the client by
+    `_withhold` and friends, and those ids are answered just as finally as one
+    that crossed as a frame. A later receipt failure must not hand them a
+    second answer.
+
+    This row exists because the mutation that stops `_to_client` clearing the
+    id SURVIVED the rest of the file: every other path clears through
+    `_release_inbound`, so nothing reached the line. A control nothing reaches
+    is a control that is not there.
+    """
+    route, out = _route(tmp_path, finding=False)
+    route._cancel({"params": {"requestId": 1}})
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+
+    route.log.fail_writes(OSError("injected full disk after the answer"))
+    route._record("WRITE_COMPLETE", bytes=0)
+
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], (
+        f"the cancelled request was answered twice: {_reason_codes(out)}")
