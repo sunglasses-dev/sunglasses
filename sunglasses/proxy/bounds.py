@@ -54,15 +54,23 @@ class Breach:
     comparing to None and getting it wrong in the direction that continues.
     """
 
-    __slots__ = ("reason", "rule", "budget", "detail", "inspection_complete")
+    __slots__ = ("reason", "rule", "budget", "detail", "inspection_complete",
+                 "bound")
 
     def __init__(self, reason=None, rule=None, budget=None, detail=None,
-                 inspection_complete=None):
+                 inspection_complete=None, bound=None):
         self.reason = reason
         self.rule = rule
         self.budget = budget
         self.detail = detail
         self.inspection_complete = inspection_complete
+        # WHICH of a row's limits broke, from a fixed vocabulary, for callers
+        # that put this in evidence. `budget` cannot carry it: T4.R7 v5.1 says
+        # budget is populated ONLY for OVER_BUDGET, and OVERLOADED is not a
+        # budget breach. `detail` cannot carry it either -- it is prose, and
+        # prose is what receipts exclude by name. R6 has two limits under one
+        # reason, so without this a receipt cannot say which one fired.
+        self.bound = bound
 
     def __bool__(self):
         return self.reason is not None
@@ -101,10 +109,10 @@ def check_admission(*, outstanding, queued):
     already held: admitting one more at the limit would make it nine.
     """
     if outstanding >= OUTSTANDING:
-        return Breach("OVERLOADED", "S3",
+        return Breach("OVERLOADED", "S3", bound="outstanding",
                       detail=f"{outstanding} correlations already outstanding")
     if queued > QUEUED_BYTES:
-        return Breach("OVERLOADED", "S3",
+        return Breach("OVERLOADED", "S3", bound="queued",
                       detail=f"{queued} bytes queued over the {QUEUED_BYTES} cap")
     return _OK
 

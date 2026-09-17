@@ -35,6 +35,11 @@ EVENTS = frozenset({
     # T902, T9.R2. Required by the row and missing from the allowlist, so the
     # one event that says the stderr cap was applied could not be written.
     "STDERR_BOUNDED",
+    # R-179-R6/R5_NOATTEMPT_REFUSAL. A typed refusal is only typed if the log
+    # will take it: `Log.event` raises ValueError on a kind that is not here,
+    # so a refusal written through `Route._record` and missing from this list
+    # is an exception on a fault path rather than a receipt.
+    "SETTLEMENT_REFUSED",
 })
 
 # T9.R5. The events that END a session. A log that stops without one of these

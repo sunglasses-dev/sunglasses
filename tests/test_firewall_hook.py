@@ -102,10 +102,21 @@ def test_empty_stdin_defers(home):
 
 
 def test_internal_crash_defers_and_confesses(home, monkeypatch):
-    """The bug we have not written yet must still not wedge the user's agent."""
+    """The bug we have not written yet must still not wedge the user's agent.
+
+    The fault is injected at `egress_secret_hits`, which is what `evaluate`
+    calls. Round 3 split the scan from the decision so a cleared canary could
+    reach the receipt, and this row patched the OLD name for one commit: it
+    still passed the payload, still ran, and proved nothing, because the
+    explosion was wired to a function the path no longer entered. A control
+    that cannot reach its subject is not a control, so the seam is named here
+    and asserted to be the one in use.
+    """
     def boom(*a, **k):
         raise RuntimeError("synthetic detector explosion")
-    monkeypatch.setattr(firewall, "check_egress_secrets", boom)
+    assert firewall.evaluate.__code__.co_names.count("egress_secret_hits") == 1, \
+        "evaluate no longer calls egress_secret_hits — repoint this fault"
+    monkeypatch.setattr(firewall, "egress_secret_hits", boom)
 
     out = firewall.run_hook(json.dumps(LEAK))
     assert out == {}  # no opinion on the wire; the confession lives in the receipt

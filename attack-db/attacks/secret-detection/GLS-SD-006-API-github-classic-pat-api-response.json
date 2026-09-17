@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SD-006-API",
+  "name": "GitHub classic PAT (api_response)",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Detects GitHub classic personal access tokens.",
+  "keywords": [
+    "GitHub token",
+    "PAT",
+    "credential"
+  ],
+  "regex": [
+    "ghp_[A-Za-z0-9]{36}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-16",
+  "source": "patterns.py:GLS-SD-006-API"
+}

@@ -202,8 +202,12 @@ class Route:
         if owed is not None:
             self.session.answered_on_the_wire(owed)
         try:
-            self.log.authorise_release(self._token("inbound"),
-                                       write=lambda: self.client_write(raw))
+            # NOTE for T9: `owed` above IS the discharged obligation's token,
+            # so this receipt could name the generation it answered instead of
+            # the bare marker. Raised as a follow-up, not assumed to be a bug.
+            self.log.authorise_release(
+                self._token("inbound"),  # attempt-exempt: a literal marker, not a request id, so admission never ran and no attempt exists
+                write=lambda: self.client_write(raw))
         except receipts.ReceiptIOError:
             if owed is not None:
                 self.session.owe_again(owed)
@@ -532,34 +536,76 @@ class Route:
             catalog=self.catalog)
         return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
                 reason, rule)
+    def _withhold_refusal(self, request_id, attempt):
+        """The answer to an admission that was REFUSED, and nothing else.
+
+        R-179-R4, and the difference from `_withhold` is the whole point.
+        `_withhold` ends with `settle_from(CLIENT, request_id, ...)`, which
+        retires whatever is pending under that ID. For an item that WAS
+        admitted that is exactly right. For a refusal it is a live grenade: a
+        refused attempt and a later admitted attempt share the id, so the
+        earlier attempt's answer retired the later attempt's real request --
+        ASTRA's XR03_OWNER, where the live item ended neither owed nor
+        answerable.
+
+        A refused attempt has nothing of its own to settle here. The pump
+        already settled the refused attempt's own core key, under its own
+        reserved generation, when it reported the refusal. So this writes the
+        client's answer and the receipt, and touches no table.
+        """
+        cause = attempt.cause if attempt is not None else None
+        reason, rule = ((cause.reason, cause.rule) if cause is not None
+                        else (REASON_UNINSPECTED_METHOD, RULE_ADMISSION))
+        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        self._to_client(envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            catalog=self.catalog))
 
     # ── requests ───────────────────────────────────────────────────────────
 
     def _client_request(self, raw, message, method):
         request_id = message["id"]
 
+        # R-179-R4. THE ATTEMPT CARRIES ITS OWN ANSWER. `refusal` is a local
+        # in this call, so nothing else can read it and no later attempt on the
+        # same id can overwrite it -- which is what three rounds of a table
+        # keyed by the id kept producing.
+        refusal = []
+        admitted = []
         if not self.session.admit_request(request_id, method=method,
-                                          origin="client"):
+                                          origin="client",
+                                          on_refusal=refusal.append,
+                                          on_attempt=admitted.append):
             closed = self.session.closed_with()
             if closed:
                 self._answer_close(closed, request_id)
             else:
-                self._withhold(request_id, REASON_UNINSPECTED_METHOD,
-                               RULE_ADMISSION)
+                self._withhold_refusal(request_id, refusal[0] if refusal
+                                       else None)
             return
+        # R-179-R5. THE ATTEMPT THIS CALL OWNS, as a LOCAL and never on the
+        # instance. Parking it on `self` looks equivalent and is the same bug
+        # one level up: a second `client_frame` for the same id overwrites it,
+        # and an older call resuming mid-write then settles the NEWER attempt's
+        # item. Measured -- the newer request lost its debt and the older one
+        # kept it. It travels as a parameter from here to every settlement and
+        # every release token.
+        attempt = admitted[0] if admitted else None
         self._record("ADMITTED", id_type=type(request_id).__name__)
 
         # T2.R14. Zero inspectable leaves is COMPLETE for these shapes only, so
         # they are forwarded without a scan rather than sent to a worker to
         # inspect nothing on a clock that can still expire.
         if selector.zero_leaves_is_complete(method, message):
-            self._release(raw, request_id)
+            self._release(raw, request_id, attempt=attempt)
             return
 
         if method == "tools/list":
             # T2.R6. The client's frame is NOT forwarded. One client request
             # becomes up to sixty four of ours and is answered once, here.
-            self._client_list(request_id)
+            self._client_list(request_id, attempt=attempt)
             return
 
         # T2.R16 AFTER T2.R14, because a named row beats the fallback: `ping`
@@ -569,7 +615,8 @@ class Route:
         # for and R14 does not name is refused here, which is fail closed and
         # keeps it away from upstream either way.
         if selector.refusal(method, REQUEST, origin=CLIENT) is not None:
-            self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION)
+            self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION,
+                           attempt=attempt)
             return
 
         if method == "tools/call":
@@ -577,7 +624,8 @@ class Route:
             if blocked is not None:
                 # T5.R2. Before any scan, because a call we may not make is not
                 # a call whose contents are interesting.
-                self._withhold(request_id, blocked, RULE_APPROVAL)
+                self._withhold(request_id, blocked, RULE_APPROVAL,
+                               attempt=attempt)
                 return
 
         # AR09, T8.R2. The content bound is a bound on CONTENT, not on the
@@ -591,18 +639,33 @@ class Route:
         over = bounds.check_content(
             selector.content_bytes(message.get("params") or {}))
         if over:
+            # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
+            # existed, so it was the one `_withhold` in this method that did not
+            # thread it -- R-179-R4 reverted on r9's own new path, with nothing
+            # to notice it because `attempt` defaults to None. Found by
+            # attempt_threading_audit.py, not by the suite.
             self._withhold(request_id, over.reason, over.rule,
-                           budget=over.budget)
+                           budget=over.budget, attempt=attempt)
             return
 
-        self._inspect(raw, message, method, request_id=request_id)
+        self._inspect(raw, message, method, request_id=request_id,
+                      attempt=attempt)
 
     # ── T2.R6, T2.R7 and T5: the list flow ─────────────────────────────────
 
-    def _client_list(self, request_id):
-        """Re-list in our own namespace, scan every page, then decide."""
+    def _client_list(self, request_id, *, attempt=None):
+        """Re-list in our own namespace, scan every page, then decide.
+
+        MERGE, #168 r9 onto #179. The attempt is threaded because all three
+        refusals below are this attempt's own answer and `_client_request` has
+        it in scope at the one call site. r9 wrote the list flow before the
+        attempt existed, so every one of them defaulted to None: R-179-R4 lost
+        on the whole list flow, silently, because the parameter has a default.
+        Found by attempt_threading_audit.py.
+        """
         if self.control is None:
-            self._withhold(request_id, REASON_APPROVAL_REQUIRED, RULE_APPROVAL)
+            self._withhold(request_id, REASON_APPROVAL_REQUIRED, RULE_APPROVAL,
+                           attempt=attempt)
             return
         outcome = activation.activate(
             self.approvals,
@@ -617,7 +680,8 @@ class Route:
             # scan reason describes what its descriptors carried. Collapsing
             # them would tell an operator the wrong thing to do next.
             self._withhold(request_id, outcome.provenance or
-                           REASON_APPROVAL_REQUIRED, RULE_APPROVAL)
+                           REASON_APPROVAL_REQUIRED, RULE_APPROVAL,
+                           attempt=attempt)
             return
 
         found = outcome.snapshot
@@ -629,7 +693,8 @@ class Route:
         # here rather than left as an open survivor in a mutation report.
         blocked = self.approvals.may_deliver_list(found.sha256)
         if blocked is not None:
-            self._withhold(request_id, blocked, RULE_APPROVAL)
+            self._withhold(request_id, blocked, RULE_APPROVAL,
+                           attempt=attempt)
             return
 
         self._approved_tools = dict(found.tools)
@@ -749,9 +814,9 @@ class Route:
             self._cancel(message)
             return
         if selector.zero_leaves_is_complete(method, message):
-            self._release(raw, NO_ID)
+            self._release(raw, NO_ID)  # attempt-exempt: a notification has no id and gets no response, so admission is never called and there is no attempt
             return
-        self._inspect(raw, message, method, request_id=NO_ID)
+        self._inspect(raw, message, method, request_id=NO_ID)  # attempt-exempt: same, a notification has no id to answer
 
     def _cancel(self, message):
         params = message.get("params")
@@ -798,7 +863,7 @@ class Route:
 
     # ── the held path ──────────────────────────────────────────────────────
 
-    def _inspect(self, raw, message, method, *, request_id):
+    def _inspect(self, raw, message, method, *, request_id, attempt=None):
         channel = selector.channel_for(method, REQUEST)
         params = message.get("params")
         params = params if isinstance(params, (dict, list)) else {}
@@ -834,7 +899,7 @@ class Route:
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
-                                  RULE_RESOURCE)
+                                  RULE_RESOURCE, attempt=attempt)
             return
 
         # T4.R4(7) takes a DESCRIPTOR of the held message, not the message.
@@ -855,19 +920,20 @@ class Route:
                      observed_bytes=result.get("observed_content_bytes", 0))
 
         if settlement.reason == REASON_CLEAN:
-            self._release(raw, request_id)
+            self._release(raw, request_id, attempt=attempt)
             return
         self._settle_withheld(request_id, settlement.reason, settlement.rule,
-                              settlement=settlement, result=result)
+                              attempt=attempt, settlement=settlement,
+                              result=result)
 
     # ── the two exits ──────────────────────────────────────────────────────
 
-    def _release(self, raw, request_id):
+    def _release(self, raw, request_id, *, attempt=None):
         """T9.R2. The authorisation is durable BEFORE the first original byte
         leaves, so there is no moment where the payload is gone and the record
         of letting it go is not there."""
         try:
-            self.log.authorise_release(self._token(request_id),
+            self.log.authorise_release(self._token(request_id, attempt),
                                        write=lambda: self.upstream_write(raw))
         except receipts.ReceiptIOError:
             self._receipt_failure(request_id)
@@ -876,7 +942,8 @@ class Route:
         self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_ADMISSION,
                      forwarded=True)
 
-    def _settle_withheld(self, request_id, reason, rule, *, settlement=None,
+    def _settle_withheld(self, request_id, reason, rule, *, attempt=None,
+                         settlement=None,
                          result=None):
         if request_id is NO_ID:
             # T2.R13. Dropped with a receipt, and no acknowledgement, because a
@@ -884,11 +951,26 @@ class Route:
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
             return
-        self._withhold(request_id, reason, rule, settlement=settlement,
+        self._withhold(request_id, reason, rule, attempt=attempt,
+                       settlement=settlement,
                        result=result)
 
-    def _withhold(self, request_id, reason, rule, *, settlement=None,
-                  result=None, budget=None):
+    def _withhold(self, request_id, reason, rule, *, attempt=None,
+                  settlement=None, result=None, budget=None):
+        # R-179-R5/(3). CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A withheld
+        # request is never forwarded, so a response carrying its id is
+        # unsolicited -- but only if the item has stopped being pending by the
+        # time that response arrives. Claiming after the write left a window in
+        # which upstream could answer a request it had never seen.
+        if attempt is not None and attempt.request_id == request_id:
+            self.session.claim_for_local_answer(attempt.token)
+            # R-179-R7/(d). AND TAKE DELIVERY, before a byte is written. A
+            # close walking its retained obligations answers what nobody is
+            # delivering; if it got here first, this writer has nothing to
+            # write and says nothing rather than putting a second frame on the
+            # wire for one request.
+            if not self.session.take_delivery(attempt.token):
+                return
         result = result or {}
         body = envelope.withheld(
             request_id=request_id,
@@ -909,6 +991,24 @@ class Route:
         # nothing here to answer and writing anyway is the second frame.
         # `_to_client` keeps the one argument a reviewer control stubs it with,
         # so the ownership call sits beside it rather than inside it.
+        # MERGE, #168 r9 onto #179. THE ORDER OF THE TWO REPAIRS, and getting it
+        # wrong is silent. r9's ownership take (below) returned before anything
+        # was recorded, which swallowed #179's typed refusal whole: a `_withhold`
+        # for an item nobody owns wrote NO receipt at all instead of exactly one
+        # SETTLEMENT_REFUSED, and #179's own row R5_NOATTEMPT_REFUSAL caught it.
+        # Both repairs are right; composed in the wrong order one eats the other.
+        #
+        # So the no-owner case is decided FIRST, because r9's gate is about a
+        # COMPETING WRITER for an obligation this attempt owns, and on this path
+        # there is no attempt to own one. The client still gets the frame #179
+        # writes here, and the receipt still says the settlement was refused.
+        if attempt is None or attempt.request_id != request_id:
+            self._to_client(body)
+            # NO ATTEMPT, NO SETTLEMENT -- the typed refusal, verbatim from
+            # #179's reasoning below.
+            self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
+                         reason="no_attempt", forwarded=False)
+            return
         owed = self.session.obligation_for(request_id)
         if not self.session.take_obligation(owed):
             return
@@ -918,8 +1018,15 @@ class Route:
         # correlation table releases the id. Leaving it pending makes the next
         # legitimate use of that id look like a duplicate and closes the
         # session on the client for our own bookkeeping.
-        self.session.settle_from(CLIENT, request_id, reason, rule)
-        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        # R-179-R5/(2). By the OWNED token. `settle_from` recomputed the
+        # current generation, so an older withheld attempt resuming after a
+        # newer one was admitted on the same id popped the newer entry and
+        # settled ITS generation: the new request lost its debt. A stale token
+        # settles nothing and says so.
+        self.session.settle_attempt(attempt.token, reason, rule)
+        # EXACTLY ONE TERMINAL, and it is written here.
+        self._record("SETTLED", reason_code=reason, rule=rule,
+                     forwarded=False)
 
     def _refuse_unparsed(self, frame):
         """T7.R3. One error where JSON-RPC allows one, with a null id because
@@ -1185,6 +1292,14 @@ class Route:
                 rule=RULE_RESOURCE)
         return not stop.stopped
 
-    @staticmethod
-    def _token(request_id):
-        return hashlib.sha256(repr(request_id).encode()).hexdigest()[:16]
+    def _token(self, request_id, attempt=None):
+        """R-179-R5/(2). ID AND GENERATION.
+
+        Hashing the id alone gave two attempts on one id the same release
+        token, so a receipt could not say which attempt a release belonged to
+        -- the same id-only key as everything else this round, in the one place
+        that is supposed to be evidence.
+        """
+        owned = (attempt.token if attempt is not None
+                 and attempt.request_id == request_id else request_id)
+        return hashlib.sha256(repr(owned).encode()).hexdigest()[:16]

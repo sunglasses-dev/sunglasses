@@ -110,29 +110,42 @@ class Decision:
 class SecretRule:
     """One credential format. Plain class for the same import-budget reason."""
 
-    __slots__ = ("id", "name", "regex")
+    __slots__ = ("id", "name", "regex", "prefixes")
 
-    def __init__(self, id: str, name: str, regex):
+    def __init__(self, id: str, name: str, regex, prefixes=()):
         self.id = id
         self.name = name
         self.regex = regex
+        # The literal alternatives this format BEGINS with, written beside the
+        # regex they come from. A prefix is part of the FORMAT only for the rule
+        # that owns it: `ASIA` is AWS's grammar and plain material anywhere
+        # else, which is the whole of ASTRA's R1a. Longest first, so `sk-proj-`
+        # is consumed before `sk-`.
+        self.prefixes = tuple(sorted(prefixes, key=len, reverse=True))
 
 
 SECRET_RULES: tuple = (
     SecretRule("GLS-FW-SEC-AWS", "AWS access key id",
-               re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+               re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+               prefixes=("AKIA", "ASIA")),
     SecretRule("GLS-FW-SEC-GITHUB", "GitHub token",
-               re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b")),
+               re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"),
+               prefixes=("ghp_", "gho_", "ghu_", "ghs_", "ghr_")),
     SecretRule("GLS-FW-SEC-ANTHROPIC", "Anthropic API key",
-               re.compile(r"\bsk-ant-[A-Za-z0-9]{2,}[A-Za-z0-9_\-]{20,}\b")),
+               re.compile(r"\bsk-ant-[A-Za-z0-9]{2,}[A-Za-z0-9_\-]{20,}\b"),
+               prefixes=("sk-ant-",)),
     SecretRule("GLS-FW-SEC-OPENAI", "OpenAI API key",
-               re.compile(r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_\-]{32,}\b")),
+               re.compile(r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_\-]{32,}\b"),
+               prefixes=("sk-proj-", "sk-svcacct-", "sk-")),
     SecretRule("GLS-FW-SEC-SLACK", "Slack token",
-               re.compile(r"\bxox[baprse]-[A-Za-z0-9\-]{20,}\b")),
+               re.compile(r"\bxox[baprse]-[A-Za-z0-9\-]{20,}\b"),
+               prefixes=("xoxb-", "xoxa-", "xoxp-", "xoxr-", "xoxs-", "xoxe-")),
     SecretRule("GLS-FW-SEC-GOOGLE", "Google API key",
-               re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}\b")),
+               re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}\b"),
+               prefixes=("AIza",)),
     SecretRule("GLS-FW-SEC-STRIPE", "Stripe live secret key",
-               re.compile(r"\bsk_live_[0-9A-Za-z]{20,}\b")),
+               re.compile(r"\bsk_live_[0-9A-Za-z]{20,}\b"),
+               prefixes=("sk_live_",)),
     SecretRule("GLS-FW-SEC-PEM", "private key block",
                re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----")),
     # Bearer credentials: only when the token itself has a checkable format.
@@ -141,7 +154,8 @@ SECRET_RULES: tuple = (
     # literal structure (base64url header.payload.signature, header starts
     # `eyJ`), which is a format, so they qualify.
     SecretRule("GLS-FW-SEC-JWT", "signed JWT",
-               re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b")),
+               re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"),
+               prefixes=("eyJ",)),
 )
 
 # ── Invisible-character normalization ───────────────────────────────────────
@@ -182,13 +196,157 @@ _PLACEHOLDER_WORDS = (
     "xxxx", "abcdef", "123456", "aaaa", "0000",
 )
 
+# The five entries above that are not words but TYPED FILLER: a run of one
+# character, or the beginning of the alphabet or the digits. They are matched
+# by their shape rather than by length, because `xxxx` and `xxxxxxxx` are the
+# same thing to a reader and only one of them is in the tuple.
+_MIN_FILLER = 4
 
-def is_placeholder(token: str) -> bool:
-    """True if this secret-shaped string is demonstrably not live material."""
+
+def _segments(text: str):
+    """The token split on everything that is not alphanumeric.
+
+    `YOUR_KEY_HERE` is three segments; `AKIAHERE4CIPPERUVIFX` is one. That
+    difference is the whole fix.
+
+    CASE IS PRESERVED. The caller lowercases for WORD comparison and never for
+    SHAPE comparison -- ASTRA's R1b: lowercasing the whole token first turns a
+    case-sensitive alphabet into a run of one character, and `qQqQ...` is
+    material that only looks like filler after the material has been destroyed.
+    """
+    out, current = [], []
+    for char in text:
+        if char.isalnum():
+            current.append(char)
+        elif current:
+            out.append("".join(current))
+            current = []
+    if current:
+        out.append("".join(current))
+    return out
+
+
+def _is_filler(segment: str) -> bool:
+    """A run of one character, or a consecutive ascending run.
+
+    The minimum length matters as much as the shapes. Without it a single
+    character is trivially "a run of one character", so prefixing any key with
+    `a_` would clear it — the substring defect wearing a different hat.
+
+    Ascending means CONSECUTIVE, not "a prefix of the alphabet". The first
+    version of this tested `"0123456789".startswith(segment)`, which quietly
+    meant a digit run only counted if it started at zero: `12345678` was not
+    filler. Anchoring a sequence at its start is the same mistake as anchoring
+    a word at a substring — it decides on where the thing sits rather than on
+    what it is.
+    """
+    if len(segment) < _MIN_FILLER:
+        return False
+    if len(set(segment)) == 1:
+        return True
+    if segment.isdigit() or segment.isalpha():
+        codes = [ord(c) for c in segment]
+        return all(b - a == 1 for a, b in zip(codes, codes[1:]))
+    return False
+
+
+# The leading literals, taken from THE RULES THEMSELVES rather than from a
+# second list that can drift away from them. A prefix is format only for the
+# rule that owns it; the union below is used only when no rule is in hand, and
+# even then it is consumed ONCE, at the START of the token, never inside a
+# segment further along. ASTRA's R1a is what the old global set allowed: the AWS
+# temporary-credential prefix dropped into a GitHub token's BODY was discarded
+# as "format", and the q-filler left behind cleared a live credential.
+_FORMAT_PREFIX_LITERALS: tuple = tuple(sorted(
+    {prefix.lower() for rule in SECRET_RULES for prefix in rule.prefixes},
+    key=len, reverse=True))
+
+# Words that DESCRIBE credential material without being any of it. `YOUR_KEY_HERE`
+# is a placeholder and `key` is not a placeholder word, so without this the
+# all-segments rule would refuse the most common placeholder there is. They are
+# nouns a human writes around a secret, never the secret.
+_STRUCTURAL_WORDS = frozenset({
+    "key", "keys", "token", "secret", "api", "id", "my", "the", "value",
+    "pass", "password", "credential", "credentials", "auth", "access", "code",
+    # Pronouns a human writes around a secret: REPLACE_ME, PUT_IT_HERE.
+    "me", "it", "this", "name", "user",
+})
+
+
+def _strip_leading_format(token: str, prefixes=None) -> str:
+    """Remove ONE format literal from the FRONT of the token. Nothing else.
+
+    Two properties, and the defect needed both of them missing:
+
+    POSITION. Only at index 0. `AKIA...` and `AIza...` carry no separator, so
+    the prefix and the body are one segment and the body cannot be judged until
+    the literal comes off -- but a literal further along is something the SENDER
+    put there, and the sender does not get to label their own material as
+    format.
+
+    ONCE. A second format literal immediately after the first is material too.
+    Stripping repeatedly would hand back the same hole through a longer token.
+    """
+    low = token.lower()
+    for prefix in (_FORMAT_PREFIX_LITERALS if prefixes is None else prefixes):
+        prefix = prefix.lower()
+        if low.startswith(prefix) and len(token) > len(prefix):
+            return token[len(prefix):]
+    return token
+
+
+def is_placeholder(token: str, rule: "SecretRule | None" = None) -> bool:
+    """True if this secret-shaped string is demonstrably not live material.
+
+    STATE #54, and the rule took two passes to get right because the same
+    mistake has two levels.
+
+    FIRST it decided on a SUBSTRING: any token whose lowercase form contained
+    one of the words above was "demonstrably not live". Six of those words are
+    four characters (0000, aaaa, here, todo, xxxx, your) and a credential is
+    base62, so a real AWS key id carrying `here` in its body was cleared and
+    sent while the same shape without one was caught.
+
+    THEN it decided on ANY SEGMENT, which is the identical decision one level
+    up: a real token with separators carries a placeholder segment by accident
+    exactly as that key carried `here`. A live Slack token whose numeric groups
+    happen to run `1234-5678`, and a live Stripe key with a `here` segment in
+    its body, were both cleared by the repair.
+
+    The rule is the sentence that was written before either attempt and not
+    followed: A PLACEHOLDER IS A TOKEN THAT IS ONE. So the judgement is on the
+    whole secret material. Every segment outside the format's own literal
+    prefix must be a placeholder word, typed filler, or a structural noun, AND
+    at least one of them must actually be a placeholder or filler -- otherwise
+    `my_api_token`, which is all structure and no claim, would clear.
+    """
     if any(c in token for c in _PLACEHOLDER_CHARS):
         return True
-    low = token.lower()
-    return any(word in low for word in _PLACEHOLDER_WORDS)
+    words = frozenset(_PLACEHOLDER_WORDS)
+
+    # THE RULE THAT MATCHED decides what its own format is. Called without one
+    # -- from a test, or from a caller holding a bare string -- the union is
+    # used, still only at the front of the token. Either way exactly one
+    # literal comes off and every remaining segment is material.
+    material = _strip_leading_format(
+        token, rule.prefixes if rule is not None else None)
+
+    body = _segments(material)
+    if not body:
+        # Nothing but format. That is not a statement that the material is
+        # fake, so it is not cleared.
+        return False
+
+    claimed = False
+    for segment in body:
+        # Words compare in lowercase; SHAPE is measured on the segment exactly
+        # as it arrived. Mixing those two is R1b.
+        low = segment.lower()
+        if low in words or _is_filler(segment):
+            claimed = True
+        elif low not in _STRUCTURAL_WORDS:
+            return False
+    return claimed
 
 
 # ── Known public canaries ───────────────────────────────────────────────────
@@ -200,15 +358,33 @@ def is_placeholder(token: str) -> bool:
 # The alternative — loosening a regex — silently opens a hole for every real
 # key of that shape. Each entry is a full literal credential and is asserted to
 # still match a rule, so a stale entry cannot rot into a wildcard.
-# Note on what is NOT here: AWS's own docs key `AKIAIOSFODNN7EXAMPLE` needs no
-# entry — the placeholder guard already clears it on the literal word EXAMPLE.
-# Listing it anyway would be a dead entry that reads as coverage while proving
-# nothing, so the canary test asserts every entry still matches a rule.
+# STATE #54 changed what belongs here. This comment used to say AWS's own docs
+# key `AKIAIOSFODNN7EXAMPLE` needed no entry because the placeholder guard
+# cleared it "on the literal word EXAMPLE" — and that was true only while the
+# guard decided on a SUBSTRING, which is the defect that guard just had. EXAMPLE
+# is a suffix of that key, not a segment of it, so the repaired guard does not
+# clear it and enumeration is now the only thing that can. The note is corrected
+# rather than deleted: the reasoning it recorded is exactly what stopped being
+# true.
 KNOWN_PUBLIC_CANARIES: frozenset = frozenset({
     # trufflehog's detector fixture, published verbatim in its README (and so
     # in our clean corpus). A revoked key Truffle Security uses to demo
     # detection — it carries no EXAMPLE marker, so only enumeration clears it.
     "AKIAYVP4CIPPERUVIFXG",
+    # AWS's canonical documentation example. Not a live key and never was. It
+    # reached this list because the placeholder guard stopped matching EXAMPLE
+    # inside a token (STATE #54); it is a published vendor fixture, which is
+    # what this list is for, and the canary test asserts it still matches the
+    # AWS rule so it cannot rot into a wildcard.
+    #
+    # Vendor:   Amazon Web Services
+    # Document: Manage access keys for IAM users
+    #           https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+    # Read:     2026-09-14 — the page publishes it as "an access key ID (for
+    #           example, AKIAIOSFODNN7EXAMPLE)".
+    # Re-read on ship day per SHIP_MANUAL: a changed document retires the entry
+    # in the same ship.
+    "AKIAIOSFODNN7EXAMPLE",
 })
 
 
@@ -226,16 +402,154 @@ def find_secret_material(text: str) -> list:
     if not text:
         return []
     text = strip_invisible(text)
-    hits = []
-    seen = set()
+
+    # Every rule's every match, with its span, BEFORE anything is judged.
+    # Formats overlap -- `sk-ant-` is also a `sk-` -- so which rule speaks for a
+    # given span has to be settled before the guard is asked about it.
+    found = []
     for rule in SECRET_RULES:
         for match in rule.regex.finditer(text):
             token = match.group(0)
-            if token in seen or is_placeholder(token):
-                continue
-            seen.add(token)
-            hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
+            found.append((match.start(), match.end(), rule, token,
+                          _leading_literal_length(rule, token)))
+
+    owns = _span_owners(found)
+
+    hits = []
+    seen = set()
+    cleared = set()
+    for index, (start, end, rule, token, reach) in enumerate(found):
+        if not owns[index]:
+            # Somebody else's span. The owner's verdict is the span's verdict,
+            # and it is recorded when the owner's own entry comes round.
+            continue
+        if token in seen or token in cleared:
+            continue
+        if is_placeholder(token, rule):
+            # Judged ONCE per distinct token. A document repeating one cleared
+            # token 16,000 times asked the guard 16,000 identical questions.
+            cleared.add(token)
+            continue
+        seen.add(token)
+        hits.append({"rule_id": rule.id, "name": rule.name, "match": token})
     return hits
+
+
+def _span_owners(found: list) -> list:
+    """Which occurrences speak for their span. One pass, not one scan each.
+
+    THE FIRST VERSION OF THIS WAS A DENIAL OF SERVICE and ASTRA found it: it
+    asked "does anything else contain me?" by walking the ENTIRE match list for
+    EVERY occurrence. On a document carrying 16,000 credential-shaped tokens
+    that is 256,000,000 comparisons, and the hook's 10-second deadline passed
+    with no decision written -- a firewall that fails OPEN on a big input,
+    which is worse than the false positive the ownership rule was added to fix.
+    Measured before the repair: 1,000 occurrences 0.066 s, 2,000 0.251 s,
+    4,000 1.003 s, 8,000 3.653 s, 16,000 never inside the deadline.
+
+    Two observations make it linear in practice:
+
+    IDENTICAL SPANS are the collision that actually happens -- two formats
+    matching the same token -- so they are grouped and decided once, by the
+    same longest-leading-literal rule.
+
+    STRICT CONTAINMENT needs an ACTIVE SET, not a stack, and the stack was
+    wrong: it assumed the intervals NEST, popping any entry whose end lay left
+    of the current one's. Intervals from different rules CROSS. ASTRA's
+    CROSS-ANTHROPIC-AWS is the shape -- an Anthropic match [0,49), a JWT match
+    [10,91) that crosses it, and an AWS match [29,49) inside the Anthropic one.
+    The JWT's farther-right end popped the Anthropic entry, so when the AWS
+    match arrived its owner was gone and the receipt named AWS where ANTHROPIC
+    belonged. Every such document still DENIED -- it is the equivalence
+    promise that broke, not the block -- and eight of twenty-four crossing
+    shapes reported the wrong rule.
+
+    So: one entry per RULE, because one rule's own matches never overlap and
+    the sweep visits them in order, and an entry expires only when it ends
+    before the current span BEGINS -- which is the only point at which it can
+    no longer contain anything still to come. The set is bounded by the number
+    of rules, so this stays linear.
+    """
+    if not found:
+        return []
+
+    # One decision per distinct span.
+    groups: dict = {}
+    for index, (start, end, _rule, _token, reach) in enumerate(found):
+        key = (start, end)
+        current = groups.get(key)
+        if current is None or reach > found[current][4]:
+            groups[key] = index          # ties keep the earlier rule, which is
+                                         # SECRET_RULES order, as before
+    owns = [False] * len(found)
+    winners = sorted(groups.values(), key=lambda i: (found[i][0], -found[i][1]))
+
+    active: dict = {}                    # rule -> its one span that is still open
+    for index in winners:
+        start, end, rule, _token, reach = found[index]
+        # EXPIRE ON START, NOT ON END. A span that ends before this one begins
+        # cannot contain this one or anything after it, because every span from
+        # here on starts at or after `start`. Expiring on a comparison with
+        # `end` is what dropped a live container when a crossing span reached
+        # farther right.
+        for other_rule, other in list(active.items()):
+            if found[other][1] < start:
+                del active[other_rule]
+        best = index
+        for other_rule, other in active.items():
+            if other_rule is rule:
+                continue
+            o_start, o_end, _or, _t, o_reach = found[other]
+            if not (o_start <= start and end <= o_end):
+                continue
+            b_start, b_end, _r, _t2, b_reach = found[best]
+            if (o_reach, o_end - o_start) > (b_reach, b_end - b_start):
+                best = other
+        owns[index] = best == index
+        # One entry per rule: a rule's own matches never overlap, so a new one
+        # starting means the previous one has already ended.
+        active[rule] = index
+    return owns
+
+
+def _leading_literal_length(rule, token: str) -> int:
+    """How many bytes of THIS token the rule's own format grammar accounts for."""
+    low = token.lower()
+    for prefix in rule.prefixes:
+        if low.startswith(prefix.lower()):
+            return len(prefix)
+    return 0
+
+
+def _owner_of_span(found: list, start: int, end: int, rule, reach: int):
+    """Which rule speaks for this span. ASTRA's R3-1, ruling R-173-R4.
+
+    `sk-ant-` + filler is a documented Anthropic placeholder AND a match for the
+    broader OpenAI rule, which recognises three of those seven format bytes.
+    The Anthropic rule cleared it; the OpenAI rule then read `ant` as material
+    and DENIED -- a published placeholder refused by the firewall, which is the
+    exact failure this file exists to prevent, arriving through a repair that
+    made the guard MORE careful about material.
+
+    The span belongs to the rule whose leading literal is the LONGEST match at
+    the front, because that is the rule whose format actually describes the
+    string. A rule matching a superset does not get to reinterpret the part of
+    another format's literal that its own grammar never claimed.
+
+    Only a span CONTAINED in the owner's is answered by the owner: a longer
+    match reaching past it covers bytes the owner never saw, and suppressing
+    that would hide material rather than resolve a collision.
+    """
+    best, best_reach, best_len = rule, reach, end - start
+    for other_start, other_end, other_rule, _token, other_reach in found:
+        if other_rule is rule:
+            continue
+        if not (other_start <= start and end <= other_end):
+            continue
+        length = other_end - other_start
+        if (other_reach, length) > (best_reach, best_len):
+            best, best_reach, best_len = other_rule, other_reach, length
+    return best
 
 
 # ── Egress surface ──────────────────────────────────────────────────────────
@@ -291,16 +605,55 @@ def _fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8", "replace")).hexdigest()[:12]
 
 
+def egress_secret_hits(tool_name: str, tool_input: dict) -> tuple:
+    """(blocking hits, cleared canaries) for one call. Neither list is a
+    decision; `check_egress_secrets` turns the first into one and `evaluate`
+    puts the second in the receipt.
+
+    THE SECOND LIST EXISTS BECAUSE OF ASTRA'S C01. KNOWN_PUBLIC_CANARIES is the
+    only sanctioned way to clear a real format match, and it was also the only
+    event in this lane that left no trace: the raw hit was found, dropped here,
+    and the call ended on an ordinary clean decision. An exemption nobody can
+    see in the receipts is an exemption nobody can audit, and this list is
+    short and hand-maintained precisely so that each use of it is reviewable.
+
+    The cleared entry carries the rule and a FINGERPRINT, never the material.
+    The published fixtures in that set are public by definition, but a receipt
+    that prints credential material is a habit, not a special case, and the
+    habit is what leaks the next one.
+    """
+    if not is_egress_tool(tool_name, tool_input):
+        return [], []
+    hits, cleared = [], []
+    for hit in find_secret_material(egress_surface_text(tool_name, tool_input)):
+        if hit["match"] in KNOWN_PUBLIC_CANARIES:
+            cleared.append({
+                "rule_id": hit["rule_id"],
+                "name": hit["name"],
+                "fingerprint": f"sha256:{_fingerprint(hit['match'])}",
+                "reason": ("cleared by KNOWN_PUBLIC_CANARIES: a published vendor "
+                           "or tool fixture, exempted by enumeration and never "
+                           "by loosening a rule"),
+            })
+        else:
+            hits.append(hit)
+    return hits, cleared
+
+
 def check_egress_secrets(tool_name: str, tool_input: dict) -> "Decision | None":
     """HARD BLOCK if live credential material is heading out on this call.
 
     Returns None when there is nothing to say — the caller then continues to the
     other deterministic checks.
     """
-    if not is_egress_tool(tool_name, tool_input):
-        return None
-    hits = [h for h in find_secret_material(egress_surface_text(tool_name, tool_input))
-            if h["match"] not in KNOWN_PUBLIC_CANARIES]
+    hits, _cleared = egress_secret_hits(tool_name, tool_input)
+    return _deny_for_hits(hits, tool_name)
+
+
+def _deny_for_hits(hits: list, tool_name: str) -> "Decision | None":
+    """The block, built from hits that were already found. Separate so that
+    `evaluate` does not scan the same call twice to get a decision it can
+    already see the inputs for."""
     if not hits:
         return None
     first = hits[0]
@@ -1359,9 +1712,14 @@ def evaluate(payload: dict, home=None) -> "tuple":
                 None, {"skipped_event": event})
 
     # Checks that need zero configuration run first and unconditionally.
-    decision = check_egress_secrets(tool_name, tool_input)
-    if decision is not None:
-        return decision, None, extras
+    hits, cleared = egress_secret_hits(tool_name, tool_input)
+    if cleared:
+        # Rides in extras so it reaches the terminal record whatever decides
+        # this call: a canary cleared on a call that is then denied for some
+        # OTHER material still has to be visible (ASTRA C01).
+        extras["cleared_canaries"] = cleared
+    if hits:
+        return _deny_for_hits(hits, tool_name), None, extras
 
     # Config failures accumulate instead of returning early. A control that is
     # down has to reach the receipt even when some LATER check produced the

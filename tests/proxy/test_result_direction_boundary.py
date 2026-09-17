@@ -1240,7 +1240,16 @@ def test_a_payer_whose_write_fails_gives_the_obligation_back(tmp_path):
 #: source pattern can be satisfied while the behaviour is broken -- ASTRA
 #: demonstrated exactly that against the structural row above -- so each entry
 #: here is driven, not read.
-TOKEN_ENTRY_POINTS = ("take_obligation", "answered_on_the_wire", "owe_again")
+# MERGE, #168 r9 onto #179. The six below arrived with #179 and this row is
+# what stopped them arriving silently: it failed the moment the trees met,
+# naming every one. Each is driven with a foreign token in the behavioural row
+# under it, across all three identity dimensions -- which is the point, because
+# the STRUCTURAL row that used to sit beside this was defeated by two reachable
+# mutants and is not proof of anything.
+TOKEN_ENTRY_POINTS = ("take_obligation", "answered_on_the_wire", "owe_again",
+                      "take_delivery", "_take_delivery",
+                      "claim_for_local_answer", "settle_attempt",
+                      "settle_from", "cancel")
 
 
 def test_the_token_entry_point_inventory_is_complete():
@@ -1299,6 +1308,41 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
     session.owe_again(foreign)
     assert sorted(map(str, session._core.owed())) == before_owed, (
         f"{dimension}: a foreign token changed the core debt")
+
+    # ── #179's six, same question asked of each ────────────────────────────
+    #
+    # `mine` is still admitted and still owed at this point, so every call below
+    # is a foreign token arriving at an API that has a live item of its own to
+    # damage. Each must leave `mine` exactly where it is.
+    foreign_id = foreign[2]
+    foreign_origin = foreign[0]
+
+    session.claim_for_local_answer(foreign)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: claim_for_local_answer claimed another item's obligation")
+
+    session.take_delivery(foreign)
+    session._take_delivery(foreign)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: take_delivery took delivery of another item's answer")
+
+    session.settle_attempt(foreign, "UNINSPECTED_METHOD", "S1")
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: settle_attempt settled another item")
+    # NOT "the core debt is unchanged" -- `foreign` is a real admitted item and
+    # settling it is precisely what `settle_attempt` is for, so that assertion
+    # was my own false kill. The property is that MINE is untouched.
+    assert mine in session._core.owed(), (
+        f"{dimension}: settle_attempt with a foreign token settled MY item")
+
+    session.settle_from(foreign_origin, foreign_id, "UNINSPECTED_METHOD", "S1",
+                        token=foreign)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: settle_from settled another item")
+
+    session.cancel(foreign_id, origin=foreign_origin, token=foreign)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: cancel cancelled another item")
 
     # The ordinary follow-up still works for the item that was never involved.
     assert session.take_obligation(mine), (
