@@ -28,7 +28,13 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET = ROOT / "sunglasses" / "install.py"
-SUITE = "tests/proxy/test_install_transaction.py"
+# Both files, because round 7's lock is only observable through a control that
+# needs a real second process, and that machinery lives in the CLI file. A
+# mutation harness that runs one file cannot kill a mutant whose only control
+# is in the other: R7-LOCK came back "red but NOT by its control" until this
+# line was a list, and red-by-the-wrong-control is a survivor.
+SUITE = ["tests/proxy/test_install_transaction.py",
+         "tests/proxy/test_install_cli.py"]
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
@@ -211,9 +217,25 @@ MUTATIONS = [
      'test_uninstall_refuses_a_record_whose_entry_existed_is_not_a_bool'),
     # ── Round 6. ASTRA's two recovery races, one mutation per guard ────────
     ('R6-CLAIMED', 'cleanup deletes retained bytes another record still claims',
-     '        if q.suffix == ".original" and q.with_suffix(".json").exists():',
+     '        if q.with_suffix(".json").exists():',
      '        if False:',
      'test_discard_never_removes_a_retained_original_a_record_still_claims'),
+    ('R7-TAKE-FIRST', 'cleanup unlinks the NAME instead of the bytes it took',
+     '            q.rename(held)',
+     '            held = q',
+     'test_discard_takes_the_retained_bytes_before_it_asks_about_them'),
+    ('R7-ABA', 'a declared write accepts the same bytes in a different file',
+     '            if expect_identity is not None and identity != expect_identity:',
+     '            if False:',
+     'test_a_declared_write_refuses_bytes_that_are_the_same_file_no_longer'),
+    ('R7-CANCELLED', 'an install cancelled while it wrote still reports success',
+     '    if not (_still_ours(bytes_path, retained_identity)',
+     '    if False and (_still_ours(bytes_path, retained_identity)',
+     'test_an_install_cancelled_while_it_writes_does_not_report_success'),
+    ('R7-LOCK', 'the compare and the rename stop being one step',
+     '        with _exclusive(_LOCK_FOR.get(str(p))):',
+     '        with _exclusive(None):',
+     'test_a_racing_install_that_can_wait_survives_our_rename'),
     ('R6-CAS', 'a declared write overwrites a target that changed underneath',
      '            if _digest_bytes(current) != expect_sha:',
      '            if False:',
@@ -228,7 +250,7 @@ MUTATIONS = [
 def run():
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
     return subprocess.run(
-        [sys.executable, "-B", "-m", "pytest", SUITE, "-q", "--no-header",
+        [sys.executable, "-B", "-m", "pytest", *SUITE, "-q", "--no-header",
          "-p", "no:cacheprovider"],
         cwd=str(ROOT), env=env, capture_output=True, text=True)
 

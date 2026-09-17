@@ -13,6 +13,7 @@ fixture `json.dump` produced would let C1 pass against a re-serialising
 implementation, which is the whole defect the control exists to catch.
 """
 import json
+import os
 import pathlib
 
 import pytest
@@ -1274,3 +1275,123 @@ def test_the_expectation_does_not_outlive_its_scope(tmp_path):
     target.write_bytes(b"two")
     inst._atomic_write(target, b"three")          # no expectation in force
     assert read(target) == b"three"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 7. ASTRA's four round-6 interleavings. Two of his rows go green here
+# exactly as written; the other two cannot, and the reason is measured rather
+# than asserted: both put a racing install INSIDE our critical section and
+# require it to SUCCEED there, so any mutual exclusion is a circular wait
+# (pids in the PR body) and any ownership taken by rename stops firing the
+# `Path.unlink` his barrier is keyed on. The stimulus survives in the two rows
+# below; only the racer's shape changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_discard_takes_the_retained_bytes_before_it_asks_about_them(
+        cfg, home, artifact, monkeypatch):
+    """R7-OWNER-CHECK-UNLINK. Round 6 asked whether a record claimed the
+    retained original and then unlinked it, and a second install completed
+    between the two: it published its own retained original at that very name
+    and the unlink removed THAT one, leaving a wrapped config whose only way
+    back had just been deleted by somebody else's cleanup.
+
+    Moving the question closer to the unlink cannot fix it, because a question
+    and an unlink are two operations on a NAME. Taking the bytes first makes
+    the second operation act on an inode we already hold."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, retained = _paths(home)
+    pending_path.write_text(read(rec_path).decode("utf-8"), encoding="utf-8")
+    rec_path.unlink()
+
+    competitor = b'{"the second install": "its own retained original"}'
+    # Captured NOW: the journal this cleanup is about to delete cannot be read
+    # from inside the patch below, and a FileNotFoundError raised in there is
+    # swallowed by the cleanup's own `except OSError` -- which is how the first
+    # version of this row reported the defect it was not actually reaching.
+    record_text = read(pending_path).decode("utf-8")
+    real_unlink = pathlib.Path.unlink
+    raced = []
+
+    def unlink(self, *a, **kw):
+        # Keyed on the removal of the RETAINED BYTES, under whatever name they
+        # are held at that moment -- `github.original` on a build that unlinks
+        # the canonical name, `github.original.discarding-*` on one that takes
+        # them first. Keyed on the canonical name alone this row fires on the
+        # journal's unlink instead, the guard sees a record that this very
+        # patch has just written, and it passes on the defect. It did, once.
+        if not raced and self.name.startswith(retained.name):
+            # A second install of the same name completes right here: the
+            # instant after anyone could have looked, and before the removal.
+            raced.append(True)
+            rec_path.write_text(record_text, encoding="utf-8")
+            retained.write_bytes(competitor)
+        return real_unlink(self, *a, **kw)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", unlink)
+    inst._discard(pending_path, retained)
+
+    assert raced, "the removal boundary was never reached"
+    assert retained.is_file(), (
+        "the second install's retained original was deleted by our cleanup")
+    assert read(retained) == competitor, (
+        "the second install's retained original was replaced by ours")
+
+
+def test_a_declared_write_refuses_bytes_that_are_the_same_file_no_longer(
+        tmp_path):
+    """R7-ABA. The round-6 comparison was a digest, and a digest cannot see
+    A -> B -> A: a second install uninstalled and installed again, re-rendered
+    byte-for-byte what the crashed transaction had written, and the stale
+    recovery's compare-and-swap found exactly what it expected and overwrote a
+    completed install. Every publication here is a rename, so the inode moves
+    even when the bytes do not, and identity is what the expectation carries."""
+    target = tmp_path / ".mcp.json"
+    target.write_bytes(b"one")
+    current, identity = inst._read_bytes_and_identity(target)
+
+    # The A -> B -> A a second transaction leaves behind: same bytes, new file.
+    replacement = tmp_path / "second"
+    replacement.write_bytes(b"one")
+    os.replace(replacement, target)
+
+    assert read(target) == current, "the fixture must not change the BYTES"
+    assert inst._identity(target) != identity, "the fixture must move the file"
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        with inst._expect_unchanged(target, inst._digest_bytes(current),
+                                    identity):
+            inst._atomic_write(target, b"the stale recovery's whole file")
+    assert "no longer the same file" in str(e.value)
+    assert read(target) == b"one", "the refusal still wrote"
+
+
+def test_an_install_cancelled_while_it_writes_does_not_report_success(
+        cfg, home, artifact, monkeypatch):
+    """R7-CANCELLED-IN-FLIGHT. A concurrent uninstall found our PENDING journal
+    while we were inside the replace, could not tell an interrupted transaction
+    from a live one, and discarded our journal and our retained bytes. We then
+    published the wrapper and wrote a completed record pointing at retained
+    bytes that no longer existed: an install that looked successful and had no
+    inverse. The transaction that cannot see the other one is the one that has
+    to check, so ownership of our own material is re-checked at the commit."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+
+    def cancelled(target, data):
+        # The racing uninstall, at the only instant that matters.
+        _, _, pending_path, retained = inst._record_paths(home, "github")
+        for q in (pending_path, retained):
+            if q.exists():
+                q.unlink()
+        return real_write(target, data)
+
+    monkeypatch.setattr(inst, "_atomic_write", cancelled)
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
+    assert "cancelled by another process" in str(e.value)
+    assert read(cfg) == original, "the target was left wrapped after a refusal"
+    rec_path, _, _ = _paths(home)
+    assert not rec_path.exists(), (
+        "a completed record survived a transaction that refused")

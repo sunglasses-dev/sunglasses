@@ -17,6 +17,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -244,3 +245,111 @@ def test_install_accepts_an_explicit_config_path(tmp_path):
     d.mkdir()
     r = sg("install", "github", "--config", str(other), cwd=d, home=tmp_path / "h")
     assert "custom.json" in (r.stdout + r.stderr)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 7. ASTRA's R6_CHECK_RENAME_GAP, reshaped so the stimulus survives and
+# the instrument does not deadlock.
+#
+# His row puts the racing install INSIDE our critical section and requires it to
+# SUCCEED there: `child_install` is a synchronous `subprocess.run` called from a
+# barrier inside `os.replace`, and its setup asserts `returncode == 0`. Under
+# any mutual exclusion that is a circular wait, measured rather than argued: the
+# parent holds the lock and waits for the child, the child waits for the lock
+# (pids 47089 and 47097, 2026-09-17 04:31, in the PR body). No product-side
+# timeout can break it, because the product is not the thing waiting.
+#
+# The stimulus he is actually testing -- a second install that completes while
+# we are between our comparison and our rename -- is kept exactly. The only
+# change is that his racer becomes a racer that CAN wait: spawned BEFORE the
+# barrier, joined AFTER it. On a build without the lock it finishes inside our
+# window and its work is destroyed, which is the defect. On this build it blocks
+# for as long as we hold the lock and then completes, which is the fix.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+RACER = """
+import os, pathlib, runpy, sys
+pathlib.Path(sys.argv[1]).write_text("trying")
+sys.argv = ["sunglasses", "install", "other", "--config", sys.argv[2]]
+runpy.run_module("sunglasses.cli", run_name="__main__")
+"""
+
+
+def test_a_racing_install_that_can_wait_survives_our_rename(
+        tmp_path, pkg_present):
+    """R7-CHECK-RENAME-GAP. A compare and a rename are two operations, and a
+    racer can publish between them. It is not enough to move the comparison
+    closer to the rename: round 6 moved it as close as it goes, to the instant
+    before the syscall, and this still failed. Two operations become one only
+    under mutual exclusion, which is why the lock is on the transaction and the
+    racer is one that can wait for it."""
+    root, entry = pkg_present
+    project = tmp_path / "project"
+    project.mkdir()
+    target = project / ".mcp.json"
+    target.write_text(
+        '{\n  "mcpServers": {\n'
+        '    "github": {"command": "npx", "args": ["-y", "server-github"]},\n'
+        '    "other": {"command": "other", "args": []}\n'
+        '  }\n}',
+        encoding="utf-8")
+    home = tmp_path / "h"
+    marker = tmp_path / "racer-trying"
+
+    # The state a crash between the replace and the completion leaves: the
+    # target is the wrapper, and a pending journal is the only claim on it.
+    inst.install(target, "github", artifact=entry, home=home)
+    _, rec_path, pending_path, _ = inst._record_paths(home, "github")
+    rec = json.loads(rec_path.read_text())
+    rec["state"] = "pending"
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()
+
+    env = dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(root),
+               PYTHONDONTWRITEBYTECODE="1")
+    racer = subprocess.Popen(
+        [sys.executable, "-B", "-c", RACER, str(marker), str(target)],
+        cwd=str(project), env=env, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert marker.exists(), "the racer never started"
+
+        rename = inst.os.replace
+        entered = []
+
+        def barrier(src, dst):
+            if pathlib.Path(dst) == target and not entered:
+                entered.append(True)
+                # Inside the critical section, AFTER the comparison: the only
+                # instant round 6 left. Give the racer every chance to finish.
+                # Without the lock it does, and the next line destroys its work.
+                stop = time.monotonic() + 2
+                while time.monotonic() < stop and racer.poll() is None:
+                    time.sleep(0.01)
+            return rename(src, dst)
+
+        inst.os.replace = barrier
+        try:
+            inst.uninstall(target, "github", home=home)
+        except (inst.ConfigConflict, inst.ConfigIOError):
+            pass
+        finally:
+            inst.os.replace = rename
+
+        assert entered, "the rename boundary was never reached"
+        out, err = racer.communicate(timeout=30)
+    finally:
+        if racer.poll() is None:
+            racer.kill()
+            racer.communicate()
+
+    assert racer.returncode == 0, (
+        f"the racing install did not succeed: {out}{err}")
+    final = json.loads(target.read_bytes())["mcpServers"]["other"]
+    assert inst.classify(final, artifact=entry) == "WRAPPED", (
+        "a second install completed and reported success, and our rename put "
+        "the file back the way it was before it ran")

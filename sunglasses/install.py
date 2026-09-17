@@ -43,12 +43,14 @@ rather than leaking a traceback, duplicate JSON keys are rejected instead of
 silently collapsed, and execution options the entry carries are preserved.
 """
 import contextlib
+import errno
 import hashlib
 import json
 import os
 import pathlib
 import sys
 import tempfile
+import time
 
 MARKER = "x-sunglasses"
 
@@ -133,6 +135,51 @@ def _read_bytes(path):
         raise ConfigIOError(f"cannot read {path}: {e}") from e
 
 
+def _identity(path):
+    """(st_dev, st_ino): which file this is, as distinct from what it says."""
+    st = os.stat(str(path))
+    return (st.st_dev, st.st_ino)
+
+
+def _still_ours(path, identity):
+    """True only if `path` is still the very file we put there."""
+    try:
+        return _identity(path) == identity
+    except OSError:
+        return False
+
+
+def _read_bytes_and_identity(path):
+    """Bytes and file identity taken from ONE descriptor, so they describe the
+    same file and not two files that happened to share a path.
+
+    R7-ABA (ASTRA round 6, `R6_TWO_RECOVERIES_ABA`). Content is not identity. A
+    second process uninstalled and installed again while a recovery was in
+    flight; the new install re-rendered the SAME BYTES the crashed transaction
+    had written, so a digest comparison saw an unchanged file that had in fact
+    been replaced twice, and the stale recovery overwrote a completed install.
+    A -> B -> A is invisible to a hash and obvious to an inode: every
+    publication here is a rename, so the inode moves even when the bytes do not.
+    """
+    try:
+        fd = os.open(str(path), os.O_RDONLY)
+    except OSError as e:
+        raise ConfigIOError(f"cannot open {path}: {e}") from e
+    try:
+        st = os.fstat(fd)
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    except OSError as e:
+        raise ConfigIOError(f"cannot read the contents of {path}: {e}") from e
+    finally:
+        os.close(fd)
+    return b"".join(chunks), (st.st_dev, st.st_ino)
+
+
 def _parse(raw, path):
     return _strict_loads(raw, str(path))
 
@@ -171,11 +218,17 @@ _EXPECTED: dict = {}
 
 
 @contextlib.contextmanager
-def _expect_unchanged(path, sha):
-    """Declare what the next write to `path` is entitled to overwrite."""
+def _expect_unchanged(path, sha, identity=None):
+    """Declare what the next write to `path` is entitled to overwrite.
+
+    `identity` is the (st_dev, st_ino) the caller read those bytes from. It is
+    optional only so that a caller with nothing but a digest still gets the
+    content check; every caller inside this module supplies it, and without it
+    the comparison cannot see A -> B -> A (see `_read_bytes_and_identity`).
+    """
     key = str(path)
     prior = _EXPECTED.get(key)
-    _EXPECTED[key] = sha
+    _EXPECTED[key] = (sha, identity)
     try:
         yield
     finally:
@@ -183,6 +236,119 @@ def _expect_unchanged(path, sha):
             _EXPECTED.pop(key, None)
         else:
             _EXPECTED[key] = prior
+
+
+# How long a config transaction will wait for another one to finish before it
+# refuses. Bounded ON PURPOSE: a transaction that waits forever is a transaction
+# that can hang a user's install because some other process died holding a lock.
+_LOCK_WAIT_SECONDS = 5.0
+
+try:
+    import fcntl
+except ImportError:                                    # pragma: no cover - posix here
+    fcntl = None
+
+# Which primitive serialises config transactions on THIS platform, named rather
+# than discovered, so a reader and `doctor` can both see it. README promises Mac,
+# Windows and Linux; `fcntl` is POSIX-only, and an ImportError swallowed in
+# silence would leave Windows with an unserialised transaction that LOOKS
+# serialised. It is not silent: on a platform without `flock` the compare-and-swap
+# still runs and the narrow race that needs the lock stays open, and that is a
+# stated limitation with a control on it rather than a hidden one.
+LOCKING = "flock" if fcntl is not None else None
+
+# path -> depth, for the re-entrancy in `_exclusive`.
+_HELD: dict = {}
+
+# target path -> the lock file that serialises transactions on it. Dynamically
+# scoped for the SAME reason as `_EXPECTED`: the reviewer's race barrier
+# replaces `_atomic_write` with a two-positional stub, so anything that reaches
+# the rename as an argument turns his instrument into a TypeError instead of a
+# refusal. It travels beside the expectation and arrives at the same instant.
+_LOCK_FOR: dict = {}
+
+
+@contextlib.contextmanager
+def _locked_for(path, lock_path):
+    """Declare which lock the next write to `path` must hold."""
+    key = str(path)
+    prior = _LOCK_FOR.get(key)
+    _LOCK_FOR[key] = lock_path
+    try:
+        yield
+    finally:
+        if prior is None:
+            _LOCK_FOR.pop(key, None)
+        else:
+            _LOCK_FOR[key] = prior
+
+
+@contextlib.contextmanager
+def _exclusive(lock_path):
+    """Serialise config transactions on one target, or refuse in bounded time.
+
+    R7-CHECK-RENAME-GAP (ASTRA round 6, `R6_CHECK_RENAME_GAP`). The
+    compare-and-swap compares and then renames, and his barrier sits INSIDE the
+    rename: the one instant left after the comparison. No amount of moving the
+    check closes it, because the gap is not where the check is, it is that a
+    check and a rename are two operations. Two operations become one only under
+    mutual exclusion, so this is the narrowest lock that makes them one.
+
+    Narrow in scope (the compare and the replace, nothing else) and bounded in
+    time (`_LOCK_WAIT_SECONDS`, then a typed refusal). A lock that can be waited
+    on forever trades a rare lost install for a hang, which is a worse bargain.
+    """
+    if lock_path is None or LOCKING is None:
+        # No registered lock (a direct `_atomic_write`, or a platform without
+        # `flock`). The compare-and-swap below still runs; what is missing is
+        # the serialisation that makes the compare and the rename one step.
+        yield
+        return
+    key = str(lock_path)
+    if _HELD.get(key):
+        # Re-entrant ON PURPOSE. The transaction takes this lock, and the write
+        # inside it takes the same one; `flock` is per open file description,
+        # so a second `open` in this very process would block on a lock this
+        # process already holds. One transaction per process is the contract
+        # (see `_EXPECTED`), so a depth count is the whole of what re-entrancy
+        # means here.
+        _HELD[key] += 1
+        try:
+            yield
+        finally:
+            _HELD[key] -= 1
+        return
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(str(lock_path), "a+")
+    except OSError as e:
+        raise ConfigIOError(
+            f"cannot create the transaction lock at {lock_path}: {e}") from e
+    deadline = time.monotonic() + _LOCK_WAIT_SECONDS
+    try:
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as e:
+                if e.errno not in (errno.EACCES, errno.EAGAIN):
+                    raise ConfigIOError(
+                        f"cannot take the transaction lock {lock_path}: {e}"
+                    ) from e
+                if time.monotonic() >= deadline:
+                    raise ConfigIOError(
+                        f"another transaction has held {lock_path} for more "
+                        f"than {_LOCK_WAIT_SECONDS:g}s; refusing rather than "
+                        f"waiting any longer") from None
+                time.sleep(0.01)
+        _HELD[key] = 1
+        try:
+            yield
+        finally:
+            _HELD.pop(key, None)
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    finally:
+        fh.close()
 
 
 def _atomic_write(path, data: bytes):
@@ -223,18 +389,24 @@ def _atomic_write(path, data: bytes):
             fh.flush()
             os.fsync(fh.fileno())
         os.chmod(tmp, mode)
-        expect_sha = _EXPECTED.get(str(p))
-        if expect_sha is not None:
-            # The last instant at which refusing is still free.
-            try:
-                current = p.read_bytes()
-            except OSError as e:
-                raise ConfigIOError(f"cannot re-read {path}: {e}") from e
-            if _digest_bytes(current) != expect_sha:
-                raise _Changed(
-                    f"{path} changed while this transaction was in flight, so "
-                    f"writing would discard work that completed after we looked")
-        os.replace(tmp, str(p))
+        with _exclusive(_LOCK_FOR.get(str(p))):
+            expectation = _EXPECTED.get(str(p))
+            if expectation is not None:
+                expect_sha, expect_identity = expectation
+                # The last instant at which refusing is still free.
+                current, identity = _read_bytes_and_identity(p)
+                if _digest_bytes(current) != expect_sha:
+                    raise _Changed(
+                        f"{path} changed while this transaction was in flight, "
+                        f"so writing would discard work that completed after we "
+                        f"looked")
+                if expect_identity is not None and identity != expect_identity:
+                    raise _Changed(
+                        f"{path} holds the bytes this transaction expected but "
+                        f"is no longer the same file, so it was replaced and "
+                        f"replaced back while we were in flight; writing would "
+                        f"discard the work that put those bytes there")
+            os.replace(tmp, str(p))
     except _Changed as e:
         try:
             os.unlink(tmp)
@@ -247,6 +419,17 @@ def _atomic_write(path, data: bytes):
         except OSError:
             pass
         raise ConfigIOError(f"write to {path} was interrupted: {e}") from e
+    except ConfigIOError:
+        # The re-read and the lock both raise this from INSIDE the try, and
+        # neither clause above catches it, so before round 7 either one left a
+        # `.sg-*.tmp` behind while this docstring promised none. Same shape as
+        # everything else this round: the promise was in the prose and not in a
+        # clause.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _refuse_symlinked_storage(name, *paths):
@@ -275,6 +458,24 @@ def _refuse_symlinked_storage(name, *paths):
                 f"{path} is a symlink; the install record directory for "
                 f"{name!r} must hold real files, so refusing rather than "
                 f"writing through it to somewhere we were not asked to touch")
+
+
+def _lock_path(home, target):
+    """Where the transaction lock for `target` lives.
+
+    NOT beside the target. `test_install_never_writes_outside_the_named_config`
+    hashes the whole project tree and allows exactly one file to change, and it
+    is right to: the user's project is not ours to drop files in. So the lock
+    lives in OUR home, keyed by the resolved target path.
+
+    The limitation that follows is stated rather than hidden: two transactions
+    running under DIFFERENT `SUNGLASSES_HOME` values lock different files and do
+    not serialise against each other. A lock in a shared world-writable place
+    would serialise them and hand any local user a way to block installs by
+    squatting the path, which is the worse trade.
+    """
+    digest = hashlib.sha256(str(pathlib.Path(target).resolve()).encode("utf-8"))
+    return pathlib.Path(home) / "proxy" / "locks" / f"{digest.hexdigest()}.lock"
 
 
 def _record_paths(home, name):
@@ -317,11 +518,41 @@ def _discard(*paths):
         (pathlib.Path(x) for x in paths),
         key=lambda q: q.suffix == ".original")      # records first, bytes last
     for q in ordered:
-        if q.suffix == ".original" and q.with_suffix(".json").exists():
+        if q.suffix != ".original":
+            try:
+                q.unlink()
+            except OSError:
+                pass
+            continue
+        # R7-OWNER-CHECK-UNLINK (ASTRA round 6, `R6_OWNER_CHECK_UNLINK_GAP`).
+        # Round 6 asked whether a record claimed these bytes and then unlinked
+        # the path, and he paused it between the two: a second install completed
+        # in that gap, published its own retained original at this very name,
+        # and the unlink removed THAT. Checking closer to the unlink does not
+        # help, because a check and an unlink are two operations on a NAME.
+        #
+        # So take the bytes before asking about them. The rename is atomic, and
+        # afterwards we hold an inode rather than a name, which is the only
+        # thing an unlink can be sure about. If a record does claim them we put
+        # them back, and if the slot has been refilled by whoever wrote that
+        # record, the copy we are holding is the superseded one and ours to drop.
+        held = q.with_name(q.name + f".discarding-{os.getpid()}-{id(q):x}")
+        try:
+            q.rename(held)
+        except OSError:
+            continue
+        if q.with_suffix(".json").exists():
             # Somebody's completed install is relying on these bytes.
+            try:
+                if q.exists():
+                    held.unlink()
+                else:
+                    held.rename(q)
+            except OSError:
+                pass
             continue
         try:
-            q.unlink()
+            held.unlink()
         except OSError:
             pass
 
@@ -485,7 +716,21 @@ def classify(entry, *, artifact):
 
 
 def install(config_path, name, *, artifact, home, argv=None):
-    """Wrap one entry. Validates everything, then mutates recoverably."""
+    """Wrap one entry. Validates everything, then mutates recoverably.
+
+    The whole transaction runs under one lock on the target, not just the
+    write: round 6 closed the compare against the rename and round 7's
+    `R6_OWNER_CHECK_UNLINK_GAP` moved the same race to the cleanup, where a
+    second install completed between the check that the retained original was
+    unclaimed and the unlink that removed it. Serialising one syscall at a time
+    is how a race gets moved rather than closed.
+    """
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _install_locked(config_path, name, artifact=artifact, home=home,
+                               argv=argv)
+
+
+def _install_locked(config_path, name, *, artifact, home, argv=None):
     artifact = pathlib.Path(artifact)
     try:
         digest = _digest_file(artifact)
@@ -584,11 +829,13 @@ def install(config_path, name, *, artifact, home, argv=None):
 
     try:
         bytes_path.write_bytes(raw)
+        retained_identity = _identity(bytes_path)
     except OSError as e:
         raise ConfigIOError(f"cannot retain the original bytes: {e}") from e
     try:
         pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
                                 encoding="utf-8")
+        journal_identity = _identity(pending_path)
     except OSError as e:
         # A half-written journal is worse than none: it is unparseable recovery
         # material that the next run would have to refuse. Remove both.
@@ -601,10 +848,42 @@ def install(config_path, name, *, artifact, home, argv=None):
         _discard(bytes_path, pending_path)
         raise
 
+    # R7-CANCELLED-IN-FLIGHT (ASTRA round 6, `R6_INSTALL_RACES_UNINSTALL`). A
+    # concurrent uninstall ran while we were inside the replace. It found our
+    # PENDING journal, could not tell an interrupted transaction from a live
+    # one, correctly concluded the target was still the original, and discarded
+    # our journal and our retained bytes. Every step of that is defensible from
+    # where it stood. What is not defensible is what we did next: we published
+    # the wrapper and wrote a completed record pointing at retained bytes that
+    # no longer exist, so the install looked successful and had no inverse.
+    #
+    # The transaction that cannot see the other one is the one that must check.
+    # An install owns its own material from the moment it writes it, and at the
+    # commit boundary it either still owns it or it was cancelled while in
+    # flight. Cancelled means the target goes back and the caller is told, never
+    # a wrapper with nothing behind it.
+    wrapped_bytes, wrapped_identity = _read_bytes_and_identity(target)
+    if not (_still_ours(bytes_path, retained_identity)
+            and _still_ours(pending_path, journal_identity)):
+        restored = True
+        try:
+            with _expect_unchanged(target, _digest_bytes(wrapped_bytes),
+                                   wrapped_identity):
+                _atomic_write(target, raw)
+        except (ConfigIOError, ConfigConflict):
+            restored = False
+        _discard(rec_path)
+        raise ConfigConflict(
+            f"the open transaction installing {name!r} was cancelled by another "
+            f"process while this one was writing {target}"
+            + ("; the target was restored" if restored else
+               f"; THE TARGET IS STILL WRAPPED and its retained original is "
+               f"gone, so {target} must be reconciled by hand"))
+
     # C4-RECORD: completion is part of the transaction. If it fails, put the
     # target back rather than leaving a wrapped config with nothing to undo it.
     try:
-        record["file_sha_after"] = _digest_bytes(_read_bytes(target))
+        record["file_sha_after"] = _digest_bytes(wrapped_bytes)
         rec_path.write_text(json.dumps({**record, "state": "complete"}, indent=2),
                             encoding="utf-8")
     except (OSError, ConfigIOError) as e:
@@ -724,7 +1003,7 @@ def _recover_from_journal(target, name, pending_path, *, home):
             f"the open transaction for {name!r} describes "
             f"{journal.get('target_path')}, not {target}")
     retained_path, retained = _retained_of(journal, name, home=home)
-    current = _read_bytes(target)
+    current, current_identity = _read_bytes_and_identity(target)
 
     if _digest_bytes(current) == _digest_bytes(retained):
         # The replace never landed. The target already IS the original.
@@ -736,7 +1015,8 @@ def _recover_from_journal(target, name, pending_path, *, home):
         # We are entitled to overwrite EXACTLY the wrapper we wrote, and the
         # digest travels into the writer so the entitlement is checked at the
         # rename and not here.
-        with _expect_unchanged(target, _digest_bytes(installed)):
+        with _expect_unchanged(target, _digest_bytes(installed),
+                               current_identity):
             _atomic_write(target, retained)
         _discard(pending_path, retained_path)
         return UninstallResult(byte_exact=True)
@@ -751,7 +1031,15 @@ def _recover_from_journal(target, name, pending_path, *, home):
 
 def uninstall(config_path, name, *, home):
     """Restore. Byte-exact when the file has not moved, entry-only when it has,
-    and a typed refusal whenever the state is not one we can vouch for."""
+    and a typed refusal whenever the state is not one we can vouch for.
+
+    Under the same transaction lock as `install`, for the reason given there.
+    """
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _uninstall_locked(config_path, name, home=home)
+
+
+def _uninstall_locked(config_path, name, *, home):
     target = pathlib.Path(config_path)
     _, rec_path, pending_path, _ = _record_paths(home, name)
 
