@@ -42,6 +42,7 @@ are one type across the whole transaction boundary so the CLI can return 2
 rather than leaking a traceback, duplicate JSON keys are rejected instead of
 silently collapsed, and execution options the entry carries are preserved.
 """
+import contextlib
 import hashlib
 import json
 import os
@@ -159,10 +160,54 @@ def _validate_entry(entry, name, path):
         raise ConfigIOError(f"{path}: the {name!r} args are not a list of strings")
 
 
+class _Changed(Exception):
+    """Internal: the target moved under a compare-and-swap. Never escapes."""
+
+
+# path -> digest a caller expects to be overwriting. Dynamically scoped by
+# `_expect_unchanged` rather than passed, for the reason in `_atomic_write`.
+# Single-threaded by contract: this is a CLI transaction, one per process.
+_EXPECTED: dict = {}
+
+
+@contextlib.contextmanager
+def _expect_unchanged(path, sha):
+    """Declare what the next write to `path` is entitled to overwrite."""
+    key = str(path)
+    prior = _EXPECTED.get(key)
+    _EXPECTED[key] = sha
+    try:
+        yield
+    finally:
+        if prior is None:
+            _EXPECTED.pop(key, None)
+        else:
+            _EXPECTED[key] = prior
+
+
 def _atomic_write(path, data: bytes):
     """Replace in place, preserving mode. On failure the original is untouched
     and no temp file is left behind (R6). Every OSError on this boundary becomes
-    ConfigIOError, including the stat and the mkstemp."""
+    ConfigIOError, including the stat and the mkstemp.
+
+    A caller inside `_expect_unchanged` makes the replace a COMPARE-AND-SWAP,
+    checked immediately before the rename rather than by the caller. It travels
+    out of band rather than as an argument ON PURPOSE: the reviewer's race
+    barrier substitutes this function with a two-positional stub, and adding a
+    keyword would raise TypeError inside his instrument, which reads as a broken
+    harness rather than as a refusal. The expectation must reach the rename
+    without changing the shape of the call that reaches it.
+
+    R5-RECOVERY-OTHER-RACE (ASTRA round 5). A recovery had validated that the
+    target was the wrapper it wrote, then paused here while a second install
+    added ANOTHER server to the same file and succeeded. The recovery resumed
+    and wrote its stale whole-file original over that second wrapper, reporting
+    success, and the second install was gone while its record stayed behind.
+    The caller's check cannot close that window, because the window is INSIDE
+    this call: anything it verified is already old news by the time we rename.
+    Whoever knows what they expect to overwrite says so, and the comparison
+    happens at the last instant that can still refuse.
+    """
     p = pathlib.Path(path)
     try:
         mode = p.stat().st_mode & 0o777
@@ -178,7 +223,24 @@ def _atomic_write(path, data: bytes):
             fh.flush()
             os.fsync(fh.fileno())
         os.chmod(tmp, mode)
+        expect_sha = _EXPECTED.get(str(p))
+        if expect_sha is not None:
+            # The last instant at which refusing is still free.
+            try:
+                current = p.read_bytes()
+            except OSError as e:
+                raise ConfigIOError(f"cannot re-read {path}: {e}") from e
+            if _digest_bytes(current) != expect_sha:
+                raise _Changed(
+                    f"{path} changed while this transaction was in flight, so "
+                    f"writing would discard work that completed after we looked")
         os.replace(tmp, str(p))
+    except _Changed as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise ConfigConflict(str(e)) from None
     except OSError as e:
         try:
             os.unlink(tmp)
@@ -231,9 +293,35 @@ def _records_dir(home, name):
 
 
 def _discard(*paths):
-    for p in paths:
+    """Remove our own transaction files, and NEVER one that is in use.
+
+    R5-RECOVERY-RETRY-RACE (ASTRA round 5). A recovery that had already read and
+    validated everything paused here, a SECOND install of the same name
+    completed in another process and published its own record and retained
+    original, and this loop then deleted that NEW retained original by path and
+    reported a byte-identical success. The target was left wrapped by an install
+    whose inverse we had just destroyed, and the later uninstall exited 2 with
+    nothing to restore from.
+
+    The check has to live HERE and not in the caller: the caller's view of the
+    directory is from BEFORE the concurrent install: whatever it re-read a line
+    earlier is already stale by the time the unlink happens. This runs at the
+    moment of the unlink, which is the only moment that can see the truth.
+
+    So: the retained original belongs to whatever record currently claims it. A
+    completed record beside it means it is that install's only way back, and it
+    is not ours to remove. Records are removed BEFORE retained bytes in the same
+    call, so a caller discarding its own complete transaction is unaffected.
+    """
+    ordered = sorted(
+        (pathlib.Path(x) for x in paths),
+        key=lambda q: q.suffix == ".original")      # records first, bytes last
+    for q in ordered:
+        if q.suffix == ".original" and q.with_suffix(".json").exists():
+            # Somebody's completed install is relying on these bytes.
+            continue
         try:
-            pathlib.Path(p).unlink()
+            q.unlink()
         except OSError:
             pass
 
@@ -645,7 +733,11 @@ def _recover_from_journal(target, name, pending_path, *, home):
 
     installed = _installed_rendering(retained, name, journal)
     if installed is not None and current == installed:
-        _atomic_write(target, retained)
+        # We are entitled to overwrite EXACTLY the wrapper we wrote, and the
+        # digest travels into the writer so the entitlement is checked at the
+        # rename and not here.
+        with _expect_unchanged(target, _digest_bytes(installed)):
+            _atomic_write(target, retained)
         _discard(pending_path, retained_path)
         return UninstallResult(byte_exact=True)
 

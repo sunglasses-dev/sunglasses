@@ -1188,3 +1188,89 @@ def test_uninstall_refuses_a_record_whose_entry_existed_is_not_a_bool(
 
     assert read(cfg) == before
     assert "github" in servers(cfg), "an entry that existed before install was deleted"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 6. ASTRA's two deterministic recovery RACES. Both were pre-existing on
+# da5f6eb, neither was a regression of round 5, and both are closed at the
+# moment of the mutation rather than before it -- because a caller's view of
+# the directory is already stale by the time the unlink or the rename happens.
+# The controls below pin the two mechanisms directly, without a subprocess, so
+# they fail for one reason each.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_discard_never_removes_a_retained_original_a_record_still_claims(
+        cfg, home, artifact):
+    """R5-RECOVERY-RETRY-RACE. A recovery paused inside its own cleanup, a
+    second install of the same name completed, and the cleanup then deleted
+    THAT install's retained original by path and reported success. The target
+    was left wrapped by an install whose only way back we had just removed."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, retained = _paths(home)
+    pending_path.write_text(read(rec_path).decode("utf-8"), encoding="utf-8")
+    claimed = read(retained)
+
+    # What the racing recovery's cleanup call looks like: its own journal plus
+    # the retained bytes, with a completed record now sitting beside them.
+    inst._discard(pending_path, retained)
+
+    assert retained.is_file(), "the cleanup removed bytes a record still claims"
+    assert read(retained) == claimed
+    assert not pending_path.exists(), "the cleanup left its own journal behind"
+
+
+def test_discard_does_remove_the_retained_original_once_nothing_claims_it(
+        cfg, home, artifact):
+    """The other side, so the guard is not a blanket refusal: a caller
+    discarding its OWN complete transaction still cleans up, because records
+    are removed before retained bytes in the same call."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, retained = _paths(home)
+
+    inst._discard(rec_path, pending_path, retained)
+
+    assert not rec_path.exists() and not retained.exists()
+
+
+def test_a_declared_write_refuses_when_the_target_changed_underneath(tmp_path):
+    """R5-RECOVERY-OTHER-RACE. A recovery validated that the target was the
+    wrapper it wrote, paused, and a second install added ANOTHER server to the
+    same file and succeeded. The recovery resumed and wrote its stale whole-file
+    original over it. The comparison is at the rename now, which is the last
+    instant that can still refuse for free."""
+    target = tmp_path / ".mcp.json"
+    target.write_bytes(b'{"mcpServers": {}}')
+    expected = inst._digest_bytes(read(target))
+
+    target.write_bytes(b'{"mcpServers": {"z": {"command": "npx"}}}')  # the racer
+    after_race = read(target)
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        with inst._expect_unchanged(target, expected):
+            inst._atomic_write(target, b'{"mcpServers": {}}')
+
+    assert "changed while this transaction was in flight" in str(e.value)
+    assert read(target) == after_race, "a refused write still overwrote the racer"
+    assert not list(tmp_path.glob(".sg-*")), "the refused write leaked a temp file"
+
+
+def test_a_declared_write_proceeds_when_the_target_is_what_we_expected(tmp_path):
+    """And the positive side, so the compare is a compare and not a veto."""
+    target = tmp_path / ".mcp.json"
+    target.write_bytes(b'{"mcpServers": {}}')
+    with inst._expect_unchanged(target, inst._digest_bytes(read(target))):
+        inst._atomic_write(target, b'{"mcpServers": {"a": 1}}')
+    assert read(target) == b'{"mcpServers": {"a": 1}}'
+
+
+def test_the_expectation_does_not_outlive_its_scope(tmp_path):
+    """A dynamically scoped expectation that leaked would silently turn every
+    later write in the process into a compare against a stale digest."""
+    target = tmp_path / ".mcp.json"
+    target.write_bytes(b"one")
+    with inst._expect_unchanged(target, inst._digest_bytes(b"one")):
+        pass
+    target.write_bytes(b"two")
+    inst._atomic_write(target, b"three")          # no expectation in force
+    assert read(target) == b"three"
