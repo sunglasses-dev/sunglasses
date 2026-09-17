@@ -229,8 +229,8 @@ def test_the_refusal_names_its_own_cause_to_the_caller():
     mine = []
     assert not session.admit_request(99, method="ping", origin="client",
                                      on_refusal=mine.append)
-    assert len(mine) == 1 and mine[0].reason == "OVERLOADED"
-    assert mine[0].rule == "S3"
+    assert len(mine) == 1 and mine[0].cause.reason == "OVERLOADED"
+    assert mine[0].cause.rule == "S3"
     # An admission that SUCCEEDS tells its caller nothing, because there is
     # nothing to tell -- not "nothing left over from someone else".
     theirs = []
@@ -337,20 +337,20 @@ def test_a_second_refusal_reports_its_own_reason_not_the_previous_one():
     first = []
     assert not session.admit_request(99, method="ping", origin="client",
                                      on_refusal=first.append)
-    assert first[0].reason == "OVERLOADED"
+    assert first[0].cause.reason == "OVERLOADED"
     # Same id, a different refusal, decided before the bound is ever consulted.
     second = []
     assert not session.admit_request(99, method="extension/unknown",
                                      origin="client", on_refusal=second.append)
-    assert second[0].reason == "UNINSPECTED_METHOD", (
-        f"the second attempt was reported as {second[0].reason}, which is why "
+    assert second[0].cause.reason == "UNINSPECTED_METHOD", (
+        f"the second attempt was reported as {second[0].cause.reason}, which is why "
         f"the first one failed")
     # R-179-R4, the half round 3 could not express: the FIRST attempt's answer
     # is untouched by the second. With a shared table the earlier caller read
     # the later caller's reason (XE03_OVERLAP), and it could only be caught by
     # holding both answers at once -- which is what these two lists do.
-    assert first[0].reason == "OVERLOADED", (
-        f"the first attempt's cause became {first[0].reason} when a second "
+    assert first[0].cause.reason == "OVERLOADED", (
+        f"the first attempt's cause became {first[0].cause.reason} when a second "
         f"attempt on the same id was refused")
 
 
@@ -509,3 +509,205 @@ def test_an_earlier_refusal_cannot_retire_a_later_live_request(tmp_path):
     # And it can still be answered exactly once, which is the whole point of
     # keeping it: the client asked, and an answer is owed.
     assert session.deliver_response(origin="upstream", request_id=99) is not None
+
+
+# ── round 5, R-179-R5 · the attempt token, end to end ───────────────────────
+
+def test_every_refusal_reserves_a_generation(tmp_path):
+    """R4_UNKNOWN_TOKEN. Round 4 reserved for the bound refusal and not for the
+    unknown-method one, so that refusal reached the route with no attempt
+    identity at all -- a structural hole, not a wrong answer."""
+    session = pump.Session()
+    identity = pump.key("client", 99)
+    seen = []
+    for _ in range(2):
+        before = session._generation.get(identity, 0)
+        assert not session.admit_request(99, method="extension/unknown",
+                                         origin="client",
+                                         on_refusal=seen.append)
+        assert session._generation.get(identity, 0) > before, (
+            "the unknown-method refusal reserved no generation")
+    assert [a.token for a in seen] == [identity + (1,), identity + (2,)], seen
+    assert {a.cause.reason for a in seen} == {"UNINSPECTED_METHOD"}
+
+
+def test_an_older_withheld_attempt_cannot_settle_a_newer_generations_debt(tmp_path):
+    """R-179-R5, the reachable form of R4_WITHHOLD_OWNER.
+
+    ASTRA reached this property through a step ruling (3) now refuses -- a
+    response to a request that was withheld and never forwarded -- so his row
+    is retired as "setup step refused by (3)" and this is the reachable
+    variant: an older attempt withheld with its writer paused before the
+    trailing settlement, a NEW attempt admitted and forwarded on the same id,
+    then the older writer resumes.
+
+    Two things were wrong when this was first measured, and both were the same
+    mistake at different levels. `settle_from` recomputed the CURRENT
+    generation, so the older settlement popped the newer entry. And the
+    attempt was parked on `self`, so the second `client_frame` overwrote it and
+    the older call, resuming, claimed the NEWER attempt's item -- the newer
+    request lost its debt and the older kept it. The token is a LOCAL that
+    travels as a parameter now, which is what "end to end" means.
+    """
+    from sunglasses.proxy import receipts
+    from sunglasses.proxy.route import Route
+
+    entered, release = threading.Event(), threading.Event()
+    written, forwarded, failures = [], [], []
+
+    def client_write(raw):
+        if threading.current_thread().name == "older":
+            entered.set()
+            release.wait(5)
+        written.append(raw)
+
+    session = pump.Session()
+    route = Route(session=session,
+                  log=receipts.Log(tmp_path, run_id="r5", header={}),
+                  upstream_write=forwarded.append, client_write=client_write,
+                  catalog=frozenset(),
+                  approvals=types.SimpleNamespace(
+                      may_call=lambda *a: "APPROVAL_REQUIRED",
+                      invalidate=lambda: None))
+
+    def older():
+        try:
+            route.client_frame(json.dumps(
+                {"jsonrpc": "2.0", "id": 99, "method": "tools/call",
+                 "params": {"name": "review"}}).encode() + b"\n")
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=older, name="older")
+    worker.start()
+    try:
+        assert entered.wait(3), "the older attempt never reached its write"
+        older_token = session._core_key(pump.key("client", 99))
+        route.client_frame(json.dumps(
+            {"jsonrpc": "2.0", "id": 99, "method": "ping"}).encode() + b"\n")
+        live = session._core_key(pump.key("client", 99))
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert not failures, failures
+    assert older_token != live, "the newer attempt reserved no generation"
+    assert live in session._core.owed(), "the newer attempt lost its debt"
+    assert pump.key("client", 99) in session._pending
+    assert session._core.settled_as(live) is None, (
+        "the older attempt settled the newer generation's item")
+    assert session._core.settled_as(older_token) is not None, (
+        "the older attempt's own debt was left owed for the session")
+
+
+def test_a_response_to_a_request_that_was_never_forwarded_is_refused(tmp_path):
+    """R-179-R5/(3). A withheld request never reaches upstream, so a response
+    carrying its id is unsolicited by construction.
+
+    THE WINDOW IS THE ROW. Round 4 left the item in `_pending` until the
+    withhold's TRAILING settlement, which runs after the client frame is
+    written -- so a response arriving in between was ACCEPTED for a request
+    upstream had never seen, and ASTRA built R4_WITHHOLD_OWNER on that step.
+    Outside the window the old head refuses it too, so a row that does not
+    pause the writer passes on the defect. This one pauses it.
+    """
+    from sunglasses.proxy import receipts
+    from sunglasses.proxy.route import Route
+
+    entered, release = threading.Event(), threading.Event()
+    written, accepted = [], []
+
+    def client_write(raw):
+        entered.set()
+        release.wait(5)
+        written.append(raw)
+
+    session = pump.Session()
+    route = Route(session=session,
+                  log=receipts.Log(tmp_path, run_id="r5b", header={}),
+                  upstream_write=lambda raw: None, client_write=client_write,
+                  catalog=frozenset(),
+                  approvals=types.SimpleNamespace(
+                      may_call=lambda *a: "APPROVAL_REQUIRED",
+                      invalidate=lambda: None))
+    worker = threading.Thread(target=lambda: route.client_frame(json.dumps(
+        {"jsonrpc": "2.0", "id": 99, "method": "tools/call",
+         "params": {"name": "review"}}).encode() + b"\n"))
+    worker.start()
+    try:
+        assert entered.wait(3), "the withheld answer never reached the writer"
+        accepted.append(session.deliver_response(
+            origin="upstream", request_id=99,
+            frame={"jsonrpc": "2.0", "id": 99, "result": {"content": []}}))
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert accepted == [None], (
+        "a response was accepted for a request that was withheld and never "
+        "forwarded, in the window between the answer and its settlement")
+
+
+def test_settle_from_settles_the_generation_it_was_given_or_refuses():
+    """R-179-R5, the last two instances of the class.
+
+    `settle_from` recomputed `_core_key(identity)` after popping, which is the
+    current generation by definition. A caller holding an attempt passes its
+    token and settles exactly that; a stale token is a typed refusal, because
+    the item that caller is talking about is gone and settling something else
+    in its place is the whole defect.
+    """
+    session = pump.Session()
+    identity = pump.key("client", 7)
+    assert session.admit_request(7, method="ping", origin="client")
+    stale = session._core_key(identity)
+    # The first attempt is answered and a SECOND is admitted on the same id.
+    assert session.settle_from("client", 7, "UNINSPECTED_METHOD", "S1",
+                               token=stale) is not None
+    assert session.admit_request(7, method="ping", origin="client")
+    live = session._core_key(identity)
+    assert live != stale
+
+    refused = session.settle_from("client", 7, "UNINSPECTED_METHOD", "S1",
+                                  token=stale)
+    assert refused is None, "a stale token settled something"
+    assert live in session._core.owed(), (
+        "the stale settlement took the live generation's debt")
+    assert identity in session._pending
+
+
+def test_a_cancellation_settles_the_generation_it_observed():
+    """The same class in the cancellation path, driven through the window.
+
+    `cancel` settled `_core_key(identity)` at the END of the call -- current by
+    definition -- so a generation admitted between the pop and the settle is
+    the one that gets cancelled. `_remember_tombstone` runs in exactly that gap,
+    which makes it the seam to drive: admit a NEW attempt there and the old
+    head cancels the newcomer.
+
+    The first draft of this row asserted only that the observed token was
+    settled, with no interleaving, and it passed on the defect -- the fourth
+    control this week that was green on the thing it was written to catch.
+    """
+    session = pump.Session()
+    identity = pump.key("client", 7)
+    assert session.admit_request(7, method="ping", origin="client")
+    observed = session._core_key(identity)
+
+    original = session._remember_tombstone
+
+    def admit_a_newcomer(ident):
+        session._remember_tombstone = original       # once
+        assert session.admit_request(7, method="ping", origin="client")
+        return original(ident)
+
+    session._remember_tombstone = admit_a_newcomer
+    session.cancel(7, origin="client")
+
+    live = session._core_key(identity)
+    assert live != observed, "the newcomer reserved no generation"
+    assert session._core.settled_as(observed) is not None, (
+        "the cancellation did not settle the item it observed")
+    assert session._core.settled_as(live) is None, (
+        "the cancellation settled a generation admitted after it")
+    assert live in session._core.owed()

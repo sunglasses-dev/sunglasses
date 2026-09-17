@@ -23,7 +23,42 @@ import threading
 from . import bounds, framing, handshake, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
-def _tell(sink, cause):
+class Attempt:
+    """ONE admission attempt: its identity, the generation it reserved, and the
+    cause if it was refused.
+
+    R-179-R5, the fifth round on one theme. Rounds 2 and 4 each fixed the
+    instance ASTRA drove and left the next id-keyed call one frame away: a
+    refusal table keyed by the id, then a settlement keyed by the id. An id is
+    shared by every attempt that ever uses it, so anything an attempt owns has
+    to travel with a generation attached, or a later attempt inherits it.
+
+    The token is (origin, id-type, id, generation) and it is IMMUTABLE. A
+    holder uses the one it was handed and never re-reads the current
+    generation, because "current" is the id-only key wearing a timestamp.
+    """
+
+    __slots__ = ("identity", "generation", "cause")
+
+    def __init__(self, identity, generation, cause=None):
+        self.identity = identity
+        self.generation = generation
+        self.cause = cause
+
+    @property
+    def token(self):
+        return self.identity + (self.generation,)
+
+    @property
+    def request_id(self):
+        return self.identity[2]
+
+    def __repr__(self):
+        reason = f" {self.cause.reason}" if self.cause else ""
+        return f"<Attempt {self.token}{reason}>"
+
+
+def _tell(sink, attempt):
     """Hand a refusal to the ATTEMPT that asked for it, and to nobody else.
 
     R-179-R4. Three rounds of one bug were one mistake: refusal state kept in a
@@ -39,7 +74,7 @@ def _tell(sink, cause):
     sites depend on it and exactly one caller needs the cause.
     """
     if sink is not None:
-        sink(cause)
+        sink(attempt)
 
 
 ORIGIN_CLIENT = "client"
@@ -297,7 +332,8 @@ class Session:
         self._closed: tuple | None = None
 
     # ── admission ───────────────────────────────────────────────────────────
-    def admit_request(self, request_id, *, method, origin, on_refusal=None):
+    def admit_request(self, request_id, *, method, origin, on_refusal=None,
+                      on_attempt=None):
         """T6.R6. A duplicate typed id from the client closes the session."""
         if self._closed:
             return False
@@ -323,8 +359,12 @@ class Session:
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
             # Recorded, so the route reads this refusal's cause rather than
-            # falling back to a default that happens to match.
-            _tell(on_refusal, Cause("UNINSPECTED_METHOD", "S1"))
+            # falling back to a default that happens to match -- and it travels
+            # with a RESERVED GENERATION, so the route holds an attempt
+            # identity for this refusal exactly as it does for a bound breach.
+            reserved = self._reserve(identity)
+            _tell(on_refusal, Attempt(identity, reserved[-1],
+                                      Cause("UNINSPECTED_METHOD", "S1")))
             return False
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
@@ -404,7 +444,8 @@ class Session:
             self._generation[identity] = self._generation.get(identity, 0) + 1
             reserved = self._core_key(identity)
             if breach:
-                refused_with = Cause(breach.reason, breach.rule)
+                refused_with = Attempt(identity, self._generation[identity],
+                                       Cause(breach.reason, breach.rule))
             else:
                 self._pending[identity] = method
         if breach:
@@ -414,6 +455,12 @@ class Session:
             self._refuse_overloaded(reserved, request_id, method, origin, breach)
             _tell(on_refusal, refused_with)
             return False
+        if on_attempt is not None:
+            # The ADMITTED attempt's own token, handed over at the only moment
+            # it is unambiguous: now. A caller that re-reads the generation
+            # later is back to the id-only key, which is the whole of this
+            # round.
+            on_attempt(Attempt(identity, reserved[-1]))
         self._core.admit(reserved, method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -424,6 +471,18 @@ class Session:
             self._pending.pop(identity, None)
             return False
         return True
+
+    def _reserve(self, identity):
+        """Burn a generation for THIS attempt and return its core key.
+
+        Every admission decision calls this, refusals included. Round 4
+        reserved for the bound refusal and not for the unknown-method one, so
+        that refusal reached the route with no attempt identity at all --
+        the structural hole ASTRA's R4_UNKNOWN_TOKEN rows name.
+        """
+        with self._settlement:
+            self._generation[identity] = self._generation.get(identity, 0) + 1
+            return self._core_key(identity)
 
     def _outstanding_locked(self, origin):
         """Outstanding correlations for ONE origin. Call under `_settlement`.
@@ -635,26 +694,129 @@ class Session:
                 return False
         return True
 
-    def settle_from(self, origin, request_id, reason, rule):
-        """T6.R3. An upstream REQUEST is answered in U's id namespace, never C's."""
-        identity = key(origin, request_id)
-        if identity not in self._pending:
-            return None
-        self._pending.pop(identity)
-        self._answered.add(identity)
-        return self._core.settle(self._core_key(identity), Cause(reason, rule))
+    def claim_for_local_answer(self, token):
+        """This attempt is being answered HERE; upstream can no longer answer it.
 
-    def cancel(self, request_id, *, origin):
+        R-179-R5/(3). A withheld request is never forwarded, so a response
+        carrying its id is unsolicited by construction. Round 4 left the item
+        in `_pending` until the withhold's trailing settlement, which is after
+        the client frame is written -- so in the window between the two, a
+        response ARRIVED AND WAS ACCEPTED for a request upstream had never
+        seen. ASTRA built his R4_WITHHOLD_OWNER on exactly that step.
+
+        Claiming it first closes the window: the item leaves `_pending` before
+        the answer is written, and `deliver_response` then reads the id the way
+        it should have read it all along -- as one nobody is waiting on.
+
+        Returns False when the token is stale, so a caller that no longer owns
+        this id does not quietly claim a newer attempt's item.
+        """
+        identity = token[:-1]
+        with self._settlement:
+            if self._generation.get(identity) != token[-1]:
+                return False
+            if identity not in self._pending:
+                return False
+            self._pending.pop(identity)
+            self._answered.add(identity)
+            return True
+
+    def settle_attempt(self, token, reason, rule):
+        """Settle the item THIS attempt owns, or refuse in a way the caller can
+        read.
+
+        R-179-R5/(2). `settle_from` recomputed the CURRENT generation, so an
+        older withheld attempt, resuming after a newer one had been admitted on
+        the same id, popped the newer entry and settled its generation -- the
+        new request lost its debt. Settling by the owned token cannot do that:
+        if the generation this caller owns is no longer the live one, the item
+        it is talking about is gone and there is nothing here to settle.
+
+        Returns the terminal cause on success, or None when the attempt is
+        stale. None is a REFUSAL and not a silent no-op: the caller wrote a
+        frame for an item it no longer owns, and it needs to know that.
+        """
+        identity = token[:-1]
+        with self._settlement:
+            # POP ONLY WHAT THIS ATTEMPT OWNS. `_pending` is keyed by identity
+            # with no generation in it, so popping blind is the id-only key
+            # again: if a newer attempt has been admitted on this id, that
+            # entry is ITS debt and taking it is precisely the defect
+            # (R4_WITHHOLD_OWNER).
+            #
+            # A stale token still settles its OWN core item. The first draft of
+            # this refused outright when the generation had moved, which reads
+            # as the safer choice and is not: the older attempt's core entry
+            # was admitted and never answered, so refusing leaves it owed for
+            # the life of the session. Measured before it was changed.
+            mine = self._generation.get(identity) == token[-1]
+            if mine:
+                self._pending.pop(identity, None)
+                self._answered.add(identity)
+        if self._core.settled_as(token) is not None:
+            # ALREADY ANSWERED, and asking again raises `Settled` out of the
+            # reader rather than returning. A teardown settles everything owed,
+            # including this token, so a close landing while a withheld answer
+            # is mid-write left its trailing settlement calling into a core
+            # that had already answered -- an exception escaping
+            # `Route.client_frame`, which is not a teardown. `settle_from`
+            # never hit this because it bailed on the drained `_pending` table;
+            # settling by token has to make the same check explicitly.
+            self._core._emit("SETTLEMENT_REFUSED", identity[2],
+                             reason="already_settled", offered=reason,
+                             origin=identity[0])
+            return None
+        return self._core.settle(token, Cause(reason, rule))
+
+    def settle_from(self, origin, request_id, reason, rule, *, token=None):
+        """T6.R3. An upstream REQUEST is answered in U's id namespace, never C's.
+
+        R-179-R5, the class fix rather than the instance. This recomputed
+        `_core_key(identity)` AFTER popping, which is the current generation by
+        definition -- the same id-only key that cost rounds 2 and 4. A caller
+        that owns an attempt passes its token and settles exactly that; a
+        caller that does not gets the generation observed HERE, captured under
+        the same lock as the pop so nothing can move between the two.
+
+        A token that is no longer the live generation is a TYPED REFUSAL and
+        not a silent no-op: the caller is talking about an item that is gone,
+        and it needs to know rather than to have settled something else.
+        """
+        identity = key(origin, request_id)
+        with self._settlement:
+            if token is not None and self._generation.get(identity) != token[-1]:
+                self._core._emit("SETTLEMENT_REFUSED", request_id,
+                                 reason="stale_attempt", offered=reason,
+                                 origin=origin)
+                return None
+            if identity not in self._pending:
+                return None
+            # OBSERVED, not recomputed later: captured with the pop.
+            observed = token if token is not None else self._core_key(identity)
+            self._pending.pop(identity)
+            self._answered.add(identity)
+        return self._core.settle(observed, Cause(reason, rule))
+
+    def cancel(self, request_id, *, origin, token=None):
         """T6.R5 and T6.R6. The id is retired and tombstoned for the session."""
         identity = key(origin, request_id)
-        self._pending.pop(identity, None)
+        # R-179-R5. THE GENERATION THIS CANCELLATION OBSERVED, captured with
+        # the pop and under the lock. Reading `_core_key` at the settle below
+        # was "current by definition", so a cancellation could settle a
+        # generation admitted after it was accepted -- the same class as the
+        # withheld attempt settling a newer debt, in the cancellation path.
+        with self._settlement:
+            observed = token if token is not None else self._core_key(identity)
+            self._pending.pop(identity, None)
         self._remember_tombstone(identity)
         if self._closed:
             # The tombstone table overflowed and the session closed inside this
             # call. The item is already settled by the teardown, and settling it
             # again would raise `Settled` out of an ordinary cancellation.
             return identity
-        self._core.settle(self._core_key(identity), Cause("REQUEST_CANCELLED", "S6"))
+        if self._core.settled_as(observed) is not None:
+            return identity
+        self._core.settle(observed, Cause("REQUEST_CANCELLED", "S6"))
         return identity
 
     def _remember_tombstone(self, identity):
