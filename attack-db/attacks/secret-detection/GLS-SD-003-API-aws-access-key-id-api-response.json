@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SD-003-API",
+  "name": "AWS access key ID (api_response)",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Detects AWS access key IDs in text.",
+  "keywords": [
+    "aws access key",
+    "credential",
+    "secret exposure"
+  ],
+  "regex": [
+    "AKIA[0-9A-Z]{16}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-16",
+  "source": "patterns.py:GLS-SD-003-API"
+}
