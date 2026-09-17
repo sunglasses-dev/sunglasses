@@ -488,6 +488,27 @@ class Session:
         self._yielded_obligation = None
         # identity -> the Cause this item settles with, when it is not CLEAN.
         self._settling_cause: dict = {}
+        # R-CLOSE-KIND-R3/(1). THE CAUSE A LOCAL WRITER HAS COMMITTED TO, by
+        # TOKEN, before a byte of its answer moves.
+        #
+        # `_to_client` can block inside the sink, and while a withhold was
+        # paused there a legitimate close terminalised the item with ITS cause.
+        # The withhold's own settlement then arrived at a core that had already
+        # ended and left it alone, so the client held a frame saying
+        # APPROVAL_REQUIRED while the receipt said MALFORMED_UPSTREAM: one item,
+        # two accounts of how it ended, and nothing raised.
+        #
+        # Settling early instead is not the fix -- #179's row
+        # `test_a_locally_claimed_answer_still_counts_against_the_bound` says an
+        # answer mid-write must still count against the outstanding bound, and
+        # settling releases the correlation. So the CAUSE is committed here
+        # while the CORRELATION stays outstanding, and the close settles a
+        # committed item with the cause its wire frame carries.
+        #
+        # BY TOKEN, because a claim outlives the correlation it describes: this
+        # is a spanning table and `warroom/r168-followups/key_shape_audit.py`
+        # governs it as one.
+        self._committed_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
         self.queued_bytes = 0
         # AR11, T8.R5. When each item was admitted, so the upstream-response
@@ -1165,6 +1186,18 @@ class Session:
                 return False
         return True
 
+    def commit_local_cause(self, token, reason, rule):
+        """R-CLOSE-KIND-R3/(1). Say how this answer ends BEFORE it is written.
+
+        The receipt has to agree with the wire, and the wire is committed the
+        moment the bytes leave. A close that wins the race mid-write must
+        therefore settle this item with the cause the client was told, not with
+        its own: the close is why the session is ending, it is not a second
+        opinion about how this one request ended.
+        """
+        with self._settlement:
+            self._committed_cause[token] = (reason, rule)
+
     def claim_for_local_answer(self, token):
         """This attempt is being answered HERE; upstream can no longer answer it.
 
@@ -1264,6 +1297,7 @@ class Session:
         stale. None is a REFUSAL and not a silent no-op: the caller wrote a
         frame for an item it no longer owns, and it needs to know that.
         """
+        self._committed_cause.pop(token, None)
         identity = token[:-1]
         with self._settlement:
             # POP ONLY WHAT THIS ATTEMPT OWNS. `_pending` is keyed by identity
@@ -1597,6 +1631,27 @@ class Session:
                 if not handshake.notification_supported(method):
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=False)
+                    continue
+                # R-CLOSE-KIND-R3/(2). AN INVALIDATED SESSION FORWARDS NOTHING,
+                # AND A NOTIFICATION IS NOT AN EXCEPTION.
+                #
+                # Invalidation means the descriptors moved, so every frame of
+                # this generation is now something a server nobody approved has
+                # said. Responses are covered -- they have an id, so the record
+                # gate reaches them -- and a notification has no id, so it went
+                # out regardless: the one frame shape that could still cross
+                # after we had decided nothing may. Measured on bb7607b,
+                # 07c5c67 and cf294f5 before it was written down; all three
+                # forwarded it.
+                #
+                # Dropped with a receipt and NEVER a response, because a
+                # notification has no id to answer in, and the receipt carries
+                # WHICH invalidation stopped it -- a drop that cannot say why
+                # is indistinguishable from a frame we simply lost.
+                if self._invalidated_as:
+                    self._core._emit("NOTIFICATION_DROPPED", None,
+                                     supported=True,
+                                     invalidated_as=self._invalidated_as)
                     continue
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
@@ -2379,7 +2434,17 @@ class Session:
             # a later admission (RC17).
             self._settling.clear()
             self._settling_key.clear()
+            # R-CLOSE-KIND-R3/(1). Captured BEFORE the tables are cleared,
+            # settled BELOW rather than here: the settlement takes the core's
+            # lock and taking it under ours is the nesting the reader avoids.
+            committed = [(core_key, self._committed_cause[core_key])
+                         for _identity, core_key in owed
+                         if core_key in self._committed_cause]
             self._claimed.clear()
+        # The core settles FIRST WINS, so committing these before the teardown
+        # is what makes the receipt agree with the frame the client already has.
+        for core_key, (own_reason, own_rule) in committed:
+            self._core.settle(core_key, Cause(own_reason, own_rule))
         self._core.teardown(Cause(reason, rule, budget=budget, detail=detail, kind=kind),
                             stop_processes=self._stop_processes())
 

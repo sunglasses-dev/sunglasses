@@ -1041,6 +1041,12 @@ class Route:
             return
         # Already acquired above, in the claim branch, as one operation.
         owed = attempt.token
+        # R-CLOSE-KIND-R3/(1). The cause is committed BEFORE the bytes, so a
+        # close that wins the race while `_to_client` is paused inside the sink
+        # settles this item with the cause the client was actually told. The
+        # settlement itself still happens after the write, because #179's bound
+        # row requires an answer mid-write to stay outstanding.
+        self.session.commit_local_cause(attempt.token, reason, rule)
         self._to_client(body)
         self._answered(owed, final=True)
         # T6.R1. The held item is settled here and not merely answered, so the
