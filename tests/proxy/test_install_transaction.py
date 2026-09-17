@@ -415,6 +415,15 @@ def test_uninstall_refuses_retained_bytes_that_do_not_match_the_record(cfg, home
     rec = json.loads((home / "proxy" / "installs" / "github.json").read_text())
     pathlib.Path(rec["original_bytes_path"]).write_bytes(b'{"corrupted":true}')
 
+    # ROUND 10 TRIED TO SOFTEN THIS AND MEASURED THAT IT MUST NOT. An
+    # entry-only fallback for every unusable retained copy looks like the
+    # no-stranded-wrapper invariant and is not: it changes R5 behaviour that
+    # five of the reviewer's own rows pin, and they went red the moment it was
+    # tried. A record whose retained copy is corrupt is a record about a
+    # transaction we can no longer describe. The fallback exists only for a
+    # record promoted from a standby whose bytes had already failed, where the
+    # bytes were never that record's to begin with and refusing would strand a
+    # wrapper; that case is pinned separately.
     with pytest.raises(inst.ConfigConflict):
         inst.uninstall(cfg, "github", home=home)
     assert read(cfg) == installed
@@ -1725,3 +1734,152 @@ def test_a_take_whose_note_cannot_be_written_does_not_happen(
     assert retained.is_file() and read(retained) == claimed, (
         "the bytes were taken although nothing recorded where they went")
     assert not list(retained.parent.glob("*.discarding-*"))
+
+
+def test_a_new_owners_note_survives_an_older_cleanups_forget(
+        cfg, home, artifact, monkeypatch):
+    """R10-NOTE-FORGET-ATOMIC, substitution for
+    `R9_NOTE_REPLACED_BETWEEN_CHECK_AND_UNLINK`. His row drives the same
+    stimulus through `Path.unlink` of the note, which ruling (c) replaced with
+    a rename-to-private-then-unlink, so his boundary never fires. The race is
+    the same: an older cleanup decides the note is its own, a new owner
+    publishes a note in the gap, and the older cleanup must not delete it."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+
+    # An interrupted take leaves a note this cleanup believes is its own.
+    real_rename = pathlib.Path.rename
+
+    def take_then_stop(self, dst):
+        result = real_rename(self, dst)
+        if self == retained:
+            raise KeyboardInterrupt("the first cleanup ends here")
+        return result
+
+    monkeypatch.setattr(pathlib.Path, "rename", take_then_stop)
+    with pytest.raises(KeyboardInterrupt):
+        inst._discard(retained)
+    monkeypatch.setattr(pathlib.Path, "rename", real_rename)
+    mine = json.loads(note.read_text())["held"]
+
+    # A NEW owner publishes its note in the window between the older cleanup
+    # READING the note and acting on what it read. The injection is keyed on
+    # the read, which both builds do, rather than on the removal, which round 9
+    # did by path and round 10 does by rename: a row keyed on the removal can
+    # only be red on one of them.
+    newly_held = records / "github.original.discarding-999-new"
+    newly_held.write_bytes(b'{"the new owner": "its own bytes"}')
+    new_note = json.dumps(
+        {"canonical": retained.name, "held": newly_held.name,
+         "sha256": inst._digest_file(newly_held)})
+    real_read_text = pathlib.Path.read_text
+    replaced = []
+
+    def replace_after_reading(self, *a, **kw):
+        out = real_read_text(self, *a, **kw)
+        if self.name.startswith("github.taking") and not replaced:
+            replaced.append(True)
+            note.write_text(new_note, encoding="utf-8")
+        return out
+
+    monkeypatch.setattr(pathlib.Path, "read_text", replace_after_reading)
+    inst._forget_take(note, mine)
+    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+
+    assert replaced, "the note was never read, so the window was not reached"
+
+    assert note.is_file(), "the older cleanup deleted the new owner's note"
+    assert json.loads(note.read_text())["held"] == newly_held.name
+    assert newly_held.is_file(), "the new owner's bytes were lost with its note"
+
+
+def test_a_standby_left_by_an_ended_publisher_is_discovered(
+        cfg, home, artifact, monkeypatch):
+    """R10-DISCOVERABLE. Round 9 put the inverse on disk before the wrapper,
+    which was right, and then made it reachable ONLY through the promotion
+    inside the transaction that wrote it. A process that ended between
+    publishing and promoting left a perfectly good inverse that no public path
+    would look at. Two fallible renames may stay only because every state
+    between them is discoverable from the outside."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    ended = []
+
+    def end_after_publishing(target, data):
+        out = real_write(target, data)
+        if not ended:
+            ended.append(True)
+            # A racing uninstall takes the canonical journal and retained copy
+            # the way one really does, so the standby is the ONLY inverse left
+            # -- otherwise journal recovery answers this and the row proves
+            # nothing about the standby at all. It did, once.
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            raise KeyboardInterrupt("the publisher ends here")
+        return out
+
+    monkeypatch.setattr(inst, "_atomic_write", end_after_publishing)
+    with pytest.raises(KeyboardInterrupt):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    records = home / "proxy" / "installs"
+    assert ended and read(cfg) != original, "the wrapper was never published"
+    assert list(records.glob("*.standby")), "no standby was left behind"
+    assert not (records / "github.json").exists(), "the record was promoted"
+
+    # The public path, with nothing at the canonical names to go on.
+    inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == original, (
+        "the inverse the dead publisher left could not be discovered")
+
+
+def test_a_standby_whose_bytes_no_longer_match_is_not_promoted(
+        cfg, home, artifact, monkeypatch):
+    """R10-STANDBY-VALIDATED. A standby is only an inverse while it still
+    hashes to what its record says. Promoting one that does not would put a
+    guess where the user's original was; the record still says what the entry
+    was, so it is promoted alone and marked, and the copy that failed stays as
+    the evidence."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    corrupted = []
+
+    def corrupt_the_standby(target, data):
+        if not corrupted:
+            corrupted.append(True)
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            out = real_write(target, data)
+            for standby in (home / "proxy" / "installs").glob("*.standby"):
+                standby.write_bytes(b'{"not": "the original"}')
+            return out
+        raise inst.ConfigIOError("the rollback write cannot happen")
+
+    monkeypatch.setattr(inst, "_atomic_write", corrupt_the_standby)
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    assert corrupted
+    records = home / "proxy" / "installs"
+    rec_path, _, retained = _paths(home)
+    assert rec_path.is_file(), "the record was not promoted"
+    # The property first, the marker second: a row that goes red on a missing
+    # key before it goes red on promoted bytes reports the wrong defect.
+    assert not retained.exists(), "bytes that failed their digest were promoted"
+    assert json.loads(read(rec_path)).get("inverse_unusable") is True
+    assert list(records.glob("*.standby")), "the failed copy was not kept"
+
+    # And the wrapper still comes off, entry-only, without those bytes.
+    result = inst.uninstall(cfg, "github", home=home)
+    assert result.byte_exact is False
+    assert inst.classify(json.loads(read(cfg))["mcpServers"]["github"],
+                         artifact=artifact) != "WRAPPED"
+    assert b'"not": "the original"' not in read(cfg)

@@ -59,6 +59,17 @@ RECORD_FIELDS = ("original_entry", "installed_entry", "file_sha_before",
                  "file_sha_after", "original_bytes_path")
 
 
+class _RetainedUnusable(Exception):
+    """The retained BYTES cannot be used, while the record naming them is
+    sound. Separated from every other refusal on purpose: a wrapper may still
+    be undone entry-only when the copy is gone or corrupt, and may NOT be when
+    the record points somewhere it has no business pointing (round 10)."""
+
+    def __init__(self, conflict):
+        super().__init__(str(conflict))
+        self.conflict = conflict
+
+
 class ConfigConflict(Exception):
     """Unknown or conflicting state (R5). Never mutates."""
 
@@ -73,12 +84,18 @@ class ArtifactUnresolved(Exception):
 
 class UninstallResult:
     """`byte_exact` False means the entry was restored but the file is not
-    byte-identical, which R5 requires us to report rather than paper over."""
+    byte-identical, which R5 requires us to report rather than paper over.
 
-    __slots__ = ("byte_exact",)
+    `kept_at` names a retained copy that could NOT be used -- gone, or failing
+    the digest recorded at install -- and was set aside rather than deleted, so
+    a person can look at what failed. It is None on every ordinary uninstall.
+    """
 
-    def __init__(self, byte_exact):
+    __slots__ = ("byte_exact", "kept_at")
+
+    def __init__(self, byte_exact, kept_at=None):
         self.byte_exact = byte_exact
+        self.kept_at = kept_at
 
 
 def _digest_bytes(b):
@@ -569,6 +586,40 @@ def _note_is_live(taking, *, d):
     return held.name == held_name and held.is_file()
 
 
+def _claim_take_note(taking, intent):
+    """Create the note ATOMICALLY, and own the take only if we created it.
+
+    R10-NOTE-ATOMIC (ASTRA round 9, `R9_NOTE_PUBLISHED_BETWEEN_CHECK_AND_WRITE`).
+    Round 9 asked whether a live note was there and then wrote one, and a second
+    cleanup published its note and took its bytes in the gap, so the answer was
+    already old when it was used. `O_EXCL` removes the gap: the creation IS the
+    question, and the file system answers it once. A check before this is a fast
+    path and nothing else -- if it is wrong, this is what refuses.
+    """
+    try:
+        fd = os.open(str(taking), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return False
+    except OSError as e:
+        raise ConfigIOError(
+            f"cannot write the take note at {taking}: {e}") from e
+    os.close(fd)
+    # The CONTENT goes through the ordinary path on purpose. `O_EXCL` above is
+    # what makes the claim atomic; doing the write here as well would put this
+    # boundary out of reach of anything that wraps `write_text`, which is how a
+    # repair blinds an instrument.
+    try:
+        taking.write_text(intent, encoding="utf-8")
+    except OSError as e:
+        try:
+            taking.unlink()
+        except OSError:
+            pass
+        raise ConfigIOError(
+            f"cannot write the take note at {taking}: {e}") from e
+    return True
+
+
 def _forget_take(taking, held_name):
     """Remove the note for THIS take, and never another take's.
 
@@ -579,17 +630,151 @@ def _forget_take(taking, held_name):
     note lives at one name by design -- it is the name recovery looks for -- so
     ownership is checked by reading it: a note that names somebody else's held
     file is somebody else's note.
+
+    R10-NOTE-FORGET-ATOMIC (ASTRA round 9,
+    `R9_NOTE_REPLACED_BETWEEN_CHECK_AND_UNLINK`). Reading the note and then
+    unlinking it by path is the same gap in the other direction: a new owner
+    published its note between the two and round 9 deleted it. So the note is
+    taken OUT of the way first, by a rename that only one process can win, and
+    only then read. If it turns out to be somebody else's, it goes straight
+    back.
     """
+    private = taking.with_name(
+        f"{taking.name}.forgetting-{os.getpid()}-{id(taking):x}")
     try:
-        intent = json.loads(taking.read_text(encoding="utf-8"))
+        taking.rename(private)
+    except OSError:
+        return
+    try:
+        intent = json.loads(private.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return
-    if not isinstance(intent, dict) or intent.get("held") != held_name:
+        intent = None
+    if isinstance(intent, dict) and intent.get("held") == held_name:
+        try:
+            private.unlink()
+        except OSError:
+            pass
         return
     try:
-        taking.unlink()
+        private.rename(taking)
     except OSError:
         pass
+
+
+def _standby_pairs(home, name):
+    """Every standby inverse left for `name`, newest last."""
+    d, _, _, _ = _record_paths(home, name)
+    if not d.is_dir():
+        return []
+    out = []
+    for record in sorted(d.glob(f"{name}.inflight-*.standbyrecord")):
+        bytes_path = record.with_suffix(".standby")
+        if bytes_path.is_file():
+            out.append((record, bytes_path))
+    return out
+
+
+def _adopt_standby(home, name, target):
+    """Promote a standby inverse into the canonical pair, or say why not.
+
+    R10-DISCOVERABLE (ASTRA round 9, `R9_STANDBY_PROCESS_END` and
+    `R9_PROMOTION_IO_FAILURE`). Round 9 put the inverse on disk before the
+    wrapper, which was right, and then made it reachable ONLY through the
+    promotion inside the transaction that wrote it. A process that ended
+    between publication and promotion left a perfectly good inverse on disk
+    that no public path would look at, and a promotion that failed halfway left
+    a record naming bytes that were not at the canonical name yet.
+
+    Two fallible renames are allowed to stay, but only because every state
+    between them is discoverable from the outside. This is that outside: the
+    public uninstall asks for a standby the way it asks for a record, and
+    validates it the same way -- by digest, against what it says about itself
+    and about the file in front of us.
+    """
+    d, rec_path, pending_path, bytes_path = _record_paths(home, name)
+    if pending_path.exists():
+        # A transaction is open at the canonical names and its journal is the
+        # recovery route. Adopting a standby here would hand the caller a
+        # COMPLETE record for a wrapper that has not been published yet, and
+        # the open transaction would lose the recovery the journal describes.
+        return False
+    if rec_path.exists() and bytes_path.exists():
+        return False
+
+    # Half a promotion: the record is at its canonical name and the bytes are
+    # not there yet. Round 9 could reach this state two ways -- a process that
+    # ended between the two renames, and a second rename that failed -- and
+    # neither was discoverable, because the standby RECORD that named the bytes
+    # had already been consumed by the first rename. The canonical record names
+    # them just as well: it carries the digest they must have.
+    if rec_path.exists() and not bytes_path.exists():
+        try:
+            claim = json.loads(rec_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            claim = None
+        before = claim.get("file_sha_before") if isinstance(claim, dict) else None
+        if _is_digest(before):
+            for orphan in sorted(d.glob(f"{name}.inflight-*.standby")):
+                try:
+                    if _digest_file(orphan) != before:
+                        continue
+                    orphan.rename(bytes_path)
+                except OSError as e:
+                    raise ConfigIOError(
+                        f"cannot put back the inverse for {name!r}: {e}") from e
+                return True
+        return False
+
+    for record_path, standby_bytes in _standby_pairs(home, name):
+        try:
+            claim = json.loads(record_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(claim, dict):
+            continue
+        if claim.get("target_path") != str(pathlib.Path(target).resolve()):
+            continue
+        before = claim.get("file_sha_before")
+        if not _is_digest(before):
+            continue
+        # The bytes have to be the bytes this record is about. A standby whose
+        # copy has been edited is not an inverse, and promoting it would write
+        # somebody's guess over a user's config.
+        try:
+            usable = _digest_file(standby_bytes) == before
+        except OSError:
+            continue
+        if not usable:
+            # The bytes are not an inverse and promoting them would write
+            # somebody's guess over a user's config. The RECORD still says what
+            # the entry was, so it is promoted alone and MARKED: only a record
+            # that arrived this way may be restored entry-only without its
+            # bytes. The copy that failed stays exactly where it is, for a
+            # person to look at.
+            if rec_path.exists():
+                continue
+            try:
+                record_path.write_text(json.dumps(
+                    {**claim, "inverse_unusable": True}, indent=2),
+                    encoding="utf-8")
+                record_path.rename(rec_path)
+            except OSError as e:
+                raise ConfigIOError(
+                    f"cannot promote the record for {name!r}: {e}") from e
+            return True
+        # Record first, bytes second: the same order `_discard` relies on, so a
+        # process that ends between them leaves a record whose bytes are still
+        # findable as a standby by the next run.
+        try:
+            if not rec_path.exists():
+                record_path.rename(rec_path)
+            if not bytes_path.exists():
+                standby_bytes.rename(bytes_path)
+        except OSError as e:
+            raise ConfigIOError(
+                f"cannot promote the standby inverse for {name!r}: {e}") from e
+        return True
+    return False
 
 
 def _reclaim_taken(home, name):
@@ -634,6 +819,17 @@ def _reclaim_taken(home, name):
         raise ConfigConflict(
             f"the take note at {taking} does not carry a sha256 digest, so "
             f"nothing it points at can be checked against it")
+    # R10-TAKE-NAMES-A-TAKE (ASTRA round 9,
+    # `R9_STANDBY_NOT_RECLAIMED_BY_TAKE_NOTE`). A note names bytes a CLEANUP
+    # moved, and a cleanup only ever moves the canonical retained original to a
+    # `.discarding-` name. A standby is a different thing with a different
+    # lifecycle, and a note pointing at one is either confused or forged;
+    # either way promoting it would install one transaction's spare copy as
+    # another's retained original.
+    if not held_name.startswith(f"{name}.original.discarding-"):
+        raise ConfigConflict(
+            f"the take note at {taking} names {held_name}, which is not bytes a "
+            f"cleanup took from {name}.original")
     held = d / held_name
     if held.parent.resolve() != d.resolve() or held.name != held_name:
         raise ConfigConflict(
@@ -724,14 +920,12 @@ def _discard(*paths):
         # left where they are.
         if _note_is_live(taking, d=q.parent):
             continue
-        try:
-            taking.write_text(intent, encoding="utf-8")
-        except OSError as e:
-            # R9-NOTE-FIRST. A take whose note cannot be written is a take that
-            # cannot be recovered from, so it does not happen at all.
-            raise ConfigIOError(
-                f"cannot write the take note at {taking}, so {q.name} is left "
-                f"where it is: {e}") from e
+        # R9-NOTE-FIRST. A take whose note cannot be written is a take that
+        # cannot be recovered from, so it does not happen at all. The claim is
+        # atomic: whoever creates the note owns the take, and a stale answer
+        # from the fast path above cannot turn into a write.
+        if not _claim_take_note(taking, intent):
+            continue
         try:
             q.rename(held)
         except OSError:
@@ -1165,7 +1359,10 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         except (ConfigIOError, ConfigConflict):
             restored = False
         if restored:
-            _discard(rec_path)
+            # The target is the original again, so there is nothing left for a
+            # standby to be the inverse OF. Round 9 left it lying in the records
+            # directory after a cancellation it had handled perfectly well.
+            _discard(rec_path, spare_bytes, spare_record)
         else:
             # R8-INVERSE-LAST (ASTRA round 7, `R7_CANCEL_ROLLBACK_REFUSAL`).
             # The rollback can fail for two honest reasons: the write itself
@@ -1184,13 +1381,45 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             # Round 8 rebuilt by writing, and a write can fail: that is exactly
             # what his rows failed, one at the retained copy and one at the
             # record, and both left a wrapper with nothing behind it.
+            # R10-PROMOTION-DISCARDS-NOTHING (ASTRA round 9,
+            # `R9_PROMOTION_IO_FAILURE`). Round 9 ran the cleanup whatever
+            # happened, so a promotion that failed at either rename took the
+            # remaining material with it: the standby pair was the last copy of
+            # the inverse and the handler deleted it. Nothing is discarded until
+            # the canonical inverse has been READ BACK from disk; if it is not
+            # there, every file stays where it is and the refusal says so.
             rebuilt = True
             try:
-                spare_record.rename(rec_path)
-                spare_bytes.rename(bytes_path)
+                # The standby bytes are checked before they are promoted, the
+                # same way an adopted one is: a copy that no longer hashes to
+                # what this record says is not an inverse, and promoting it
+                # would put somebody's guess where the user's original was. The
+                # record still says what the entry was, so it is promoted alone
+                # and MARKED, which is the only thing that licenses an
+                # entry-only restore without bytes.
+                usable = _digest_file(spare_bytes) == record["file_sha_before"]
+                if usable:
+                    spare_record.rename(rec_path)
+                    spare_bytes.rename(bytes_path)
+                else:
+                    spare_record.write_text(json.dumps(
+                        {**record, "file_sha_after": _digest_bytes(wrapped_bytes),
+                         "original_bytes_path": str(bytes_path),
+                         "inverse_unusable": True, "state": "complete"},
+                        indent=2), encoding="utf-8")
+                    spare_record.rename(rec_path)
             except OSError:
                 rebuilt = False
-            _discard(pending_path, spare_bytes, spare_record)
+            # Read back from disk, never inferred from the calls above.
+            if rebuilt and rec_path.is_file():
+                _discard(pending_path)
+                if bytes_path.is_file():
+                    _discard(spare_bytes, spare_record)
+                # If the bytes are NOT there, the record was promoted marked
+                # `inverse_unusable` and the copy that failed stays put as the
+                # evidence of it.
+            else:
+                rebuilt = False
         raise ConfigConflict(
             f"the open transaction installing {name!r} was cancelled by another "
             f"process while this one was writing {target}"
@@ -1272,12 +1501,13 @@ def _retained_of(record, name, *, home):
     try:
         retained = retained_path.read_bytes()
     except OSError as e:
-        raise ConfigConflict(
-            f"the retained original for {name!r} is missing: {e}") from e
+        raise _RetainedUnusable(ConfigConflict(
+            f"the retained original for {name!r} is missing: {e}")) from e
     if _digest_bytes(retained) != record.get("file_sha_before"):
-        raise ConfigConflict(
+        raise _RetainedUnusable(ConfigConflict(
             f"the retained original for {name!r} does not match the digest "
-            f"recorded at install; refusing to restore bytes we cannot vouch for")
+            f"recorded at install; refusing to restore bytes we cannot vouch "
+            f"for"))
     return retained_path, retained
 
 
@@ -1324,7 +1554,14 @@ def _recover_from_journal(target, name, pending_path, *, home):
         raise ConfigConflict(
             f"the open transaction for {name!r} describes "
             f"{journal.get('target_path')}, not {target}")
-    retained_path, retained = _retained_of(journal, name, home=home)
+    try:
+        retained_path, retained = _retained_of(journal, name, home=home)
+    except _RetainedUnusable as e:
+        # `_RetainedUnusable` is an INTERNAL distinction, never an error a
+        # caller sees. Journal recovery has no entry-only fallback -- there is
+        # no completed record saying what the entry was -- so here it is
+        # exactly the refusal it always was.
+        raise e.conflict from None
     current, current_identity = _read_bytes_and_identity(target)
 
     if _digest_bytes(current) == _digest_bytes(retained):
@@ -1371,6 +1608,7 @@ def _uninstall_locked(config_path, name, *, home):
     # only if they still hash to it, so everything below sees the state that
     # cleanup would have left had it finished.
     _reclaim_taken(home, name)
+    _adopt_standby(home, name, target)
 
     if not rec_path.exists():
         # C4-REPLACE-CRASH-RECOVERY. No completed record, but an open journal
@@ -1401,11 +1639,38 @@ def _uninstall_locked(config_path, name, *, home):
 
     # R5-RETAINED: the retained bytes are validated before they are trusted,
     # and F1: so is the path they are read from and deleted at.
-    retained_path, retained = _retained_of(record, name, home=home)
+    #
+    # R10-ENTRY-ONLY-WITHOUT-BYTES (ASTRA round 9,
+    # `R9_STANDBY_DISAGREEMENT[retained_disagrees]`). When the retained copy
+    # does not survive validation, round 9 refused and the wrapper stayed on
+    # disk with no way out. But the bytes are only needed for the BYTE-EXACT
+    # restore; putting the entry back needs the record, which is intact and
+    # says what was there. Refusing both because one is unusable is how a
+    # config ends up wrapped forever. So the failure is kept, and taken again
+    # below only where it actually matters.
+    retained_path = retained = None
+    retained_failure = None
+    try:
+        retained_path, retained = _retained_of(record, name, home=home)
+    except _RetainedUnusable as e:
+        # NARROW ON PURPOSE (R-177-R10a, corrected). Falling back for every
+        # unusable retained copy changes R5-reviewed behaviour that five of the
+        # reviewer's own rows pin, and they said so the moment it was tried.
+        # The fallback belongs only to a record that was promoted from a
+        # standby whose bytes had already failed: there the bytes were never
+        # this record's to begin with, and refusing would leave a wrapper that
+        # nothing can undo.
+        if not record.get("inverse_unusable"):
+            raise e.conflict from None
+        # Only THIS failure is survivable. A record that points outside its own
+        # directory, or at a symlink, is refused here as it always was: those
+        # say the record cannot be trusted, and an entry-only restore driven by
+        # an untrustworthy record is not a safer outcome, it is a quieter one.
+        retained_failure = e.conflict
 
     current = _read_bytes(target)
 
-    if _digest_bytes(current) == record.get("file_sha_after"):
+    if retained is not None and _digest_bytes(current) == record.get("file_sha_after"):
         # C1: the retained BYTES, never a re-serialisation of the parsed
         # original. A re-render compares equal under json.loads and differs on
         # disk, so it would reformat a file we do not own.
@@ -1419,6 +1684,8 @@ def _uninstall_locked(config_path, name, *, home):
     doc = _parse(current, target)
     servers = _servers(doc, target)
     if name not in servers:
+        if retained_failure is not None:
+            raise retained_failure
         raise ConfigConflict(f"{name!r} is no longer in {target}")
     if servers[name] != record.get("installed_entry"):
         raise ConfigConflict(
@@ -1429,5 +1696,22 @@ def _uninstall_locked(config_path, name, *, home):
     else:
         del servers[name]
     _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
-    _discard(rec_path, pending_path, retained_path)
-    return UninstallResult(byte_exact=False)
+
+    # R10a-KEEP-WHAT-FAILED. An entry-only restore that happened BECAUSE the
+    # retained copy was unusable is a recovery, not a cleanup: the copy that
+    # failed its digest is the evidence of whatever went wrong, so it is set
+    # aside under a name the result carries rather than deleted with the rest
+    # of the transaction.
+    kept_at = None
+    if retained_failure is not None:
+        canonical = _record_paths(home, name)[3]
+        if canonical.is_file():
+            kept = canonical.with_name(
+                f"{name}.unusable-{os.getpid()}-{id(record):x}.original")
+            try:
+                canonical.rename(kept)
+                kept_at = str(kept)
+            except OSError:
+                pass
+    _discard(*(q for q in (rec_path, pending_path, retained_path) if q))
+    return UninstallResult(byte_exact=False, kept_at=kept_at)
