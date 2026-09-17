@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sunglasses-dev/sunglasses",
+  "title": "SUNGLASSES",
+  "description": "Input firewall for AI agents: scan text and files for prompt injection, credential leaks and exfiltration before an agent reads them. Local, no network calls.",
+  "repository": {
+    "url": "https://github.com/sunglasses-dev/sunglasses",
+    "source": "github"
+  },
+  "websiteUrl": "https://sunglasses.dev",
+  "version": "0.5.9",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "sunglasses",
+      "version": "0.5.9",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "python",
+      "runtimeArguments": [
+        { "type": "positional", "value": "-m", "description": "run the module" },
+        { "type": "positional", "value": "sunglasses.mcp", "description": "the SUNGLASSES MCP server (tools: scan_text, scan_file, scanner_info)" }
+      ]
+    }
+  ]
+}

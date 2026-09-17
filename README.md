@@ -1,4 +1,5 @@
 # SUNGLASSES
+<!-- mcp-name: io.github.sunglasses-dev/sunglasses -->
 
 [![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg?branch=main&event=push)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
 [![PyPI](https://img.shields.io/pypi/v/sunglasses)](https://pypi.org/project/sunglasses/)
@@ -37,6 +38,9 @@ and nothing matched" and "this format was not inspected" are different facts, an
 one is where agents get hurt. Exit `0` is not a guarantee that a file is safe — only that the
 supported scope was covered and no pattern fired. In JSON the same split is explicit:
 `is_clean` is `not threat_found and inspection_complete`.
+
+
+![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
 
 ## Sixty seconds
 
