@@ -43,6 +43,18 @@ REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
 REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
 REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
+
+
+class _NoFrameId:
+    """Not an id. A null id is one, so `None` cannot stand for "no id here"."""
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "<no frame id>"
+
+
+_NO_FRAME_ID = _NoFrameId()
 REASON_CLEAN = "CLEAN"
 
 
@@ -176,10 +188,21 @@ class Route:
         the half without it is the half that carries what a compromised server
         said.
         """
+        # R-168-R8/F3. TAKEN BEFORE THE AUTHORISATION, not cleared after the
+        # write. The window between committing to a release and clearing the
+        # id let a concurrent receipt failure pay a client whose frame was
+        # already on its way, so the original AND a bounded refusal both
+        # reached it (XS15, XS16). Committing first and giving the obligation
+        # back if the authorisation fails leaves exactly one of the two.
+        answering = self._id_of(raw)
+        if answering is not _NO_FRAME_ID:
+            self._answered(answering)
         try:
             self.log.authorise_release(self._token("inbound"),
                                        write=lambda: self.client_write(raw))
         except receipts.ReceiptIOError:
+            if answering is not _NO_FRAME_ID:
+                self.session.owe_again(answering)
             # T9.R4. A release that cannot be recorded does not happen, and the
             # session stops rather than continuing to mediate with nothing
             # written down.
@@ -199,6 +222,12 @@ class Route:
                          rule=RULE_RESOURCE, forwarded=False)
             self._pay_bounded_refusals()
             return
+        # IDEMPOTENT, AND THE NAME IS LOAD-BEARING. The id was taken above,
+        # before the authorisation; this confirms it once the bytes have
+        # actually moved, and a reviewer control locates this exact statement
+        # by AST to pause a thread here (XS15). Deleting it turned that control
+        # into a StopIteration -- an instrument broken by a change it had no
+        # reason to notice, the `_handoff` signature lesson one more time.
         self._answered_for(raw)
         self._record("WRITE_COMPLETE", bytes=len(raw))
 
@@ -321,7 +350,7 @@ class Route:
                                             record=False)
         return frame if frame is not None else b""
 
-    def _release_record(self, request_id, reason):
+    def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
 
         R-168-R7. Called by the pump when the obligation has been retired under
@@ -334,8 +363,8 @@ class Route:
         nothing may cross -- the client's one answer is then the bounded
         refusal the payer has already sent.
         """
-        return self._record("SETTLED", reason_code=reason, rule=RULE_APPROVAL,
-                            forwarded=False)
+        return self._record("SETTLED", reason_code=reason,
+                            rule=rule or RULE_APPROVAL, forwarded=forwarded)
 
     def _inspect_result(self, raw, message):
         """None to deliver the original, or (replacement, reason, rule).
@@ -367,7 +396,7 @@ class Route:
 
         retired = self._release_barrier(request_id)
         if retired is not None and is_response:
-            return self._withhold_result(request_id, retired, RULE_APPROVAL)
+            return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
         surface, channel = self._surface(message, method)
         if surface is None:
@@ -385,7 +414,7 @@ class Route:
             # a null channel runs no rule at all and reports a clean pass.
             return self._withhold_result(request_id,
                                          REASON_UNINSPECTED_METHOD,
-                                         RULE_ADMISSION)
+                                         RULE_ADMISSION, record=False)
 
         # T2.R4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
         # message is withheld. Skipping the blob and inspecting the rest
@@ -393,7 +422,7 @@ class Route:
         if selector.unsupported(method, surface) is not None:
             return self._withhold_result(request_id,
                                          REASON_UNSUPPORTED_CONTENT,
-                                         RULE_RESOURCE)
+                                         RULE_RESOURCE, record=False)
 
         held_bytes = selector.content_bytes(surface)
         binding = {"digest": hashlib.sha256(raw).hexdigest(),
@@ -402,7 +431,7 @@ class Route:
                    "invocation_token": uuid.uuid4().hex}
         if not self._record("SCAN_STARTED", method=method):
             return self._withhold_result(request_id, REASON_RECEIPT_IO_ERROR,
-                                         RULE_RESOURCE)
+                                         RULE_RESOURCE, record=False)
 
         result = self.scan(surface, channel=channel, binding=binding,
                            content_bytes=held_bytes)
@@ -412,7 +441,7 @@ class Route:
                             catalog=self.catalog)
         except worker.Invalid:
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
-                                         RULE_RESOURCE)
+                                         RULE_RESOURCE, record=False)
 
         # An inbound result is not an outbound call, so T4.R4(7)'s direction
         # test is false here and a finding settles PROHIBITED_CONTENT. Saying
@@ -438,7 +467,7 @@ class Route:
         # handed back to the pump.
         retired = self._release_barrier(request_id)
         if retired is not None and is_response:
-            return self._withhold_result(request_id, retired, RULE_APPROVAL)
+            return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
         if settlement.reason == REASON_CLEAN:
             # T2.R5, CB06. The ENTIRE original, its own id and its own code.
@@ -447,7 +476,7 @@ class Route:
             return None
         return self._withhold_result(request_id, settlement.reason,
                                      settlement.rule, settlement=settlement,
-                                     result=result)
+                                     result=result, record=False)
 
     def _surface(self, message, method):
         """The inspected surface and its channel, per T2's result rows."""
@@ -973,31 +1002,48 @@ class Route:
                             rule=rule, budget=budget)
 
     def _answered_for(self, raw):
-        """Clear the id a released frame answers, if it answers one.
+        """Confirm the id a released frame answered: the bytes have MOVED.
 
-        A notification carries none, and `b""` is the reader saying nothing
-        crosses -- neither is an answer and neither clears anybody.
+        Idempotent, and `final` is the half that matters: the take before the
+        authorisation is reversible, this is not.
+        """
+        answering = self._id_of(raw)
+        if answering is not _NO_FRAME_ID:
+            self._answered(answering, final=True)
+
+    def _id_of(self, raw):
+        """The id a released frame answers, or the sentinel when it answers none.
+
+        A notification carries no `id` key, and `b""` is the reader saying
+        nothing crosses -- neither is an answer. A null id IS one.
         """
         if not raw:
-            return
+            return _NO_FRAME_ID
         try:
             message = json.loads(raw)
         except ValueError:
-            return
+            return _NO_FRAME_ID
         if isinstance(message, dict) and "id" in message:
-            self._answered(message["id"])
+            return message["id"]
+        return _NO_FRAME_ID
 
     def _to_client(self, body):
-        if isinstance(body, dict) and body.get("id") is not None:
-            self._answered(body["id"])
+        # R-168-R8/F2. `"id" in body`, not `is not None`. A JSON-RPC null id is
+        # a real id a client may use, and the round-6 guard -- written to skip
+        # notifications -- skipped it too, so a null-id request was answered
+        # locally and then paid a SECOND bounded refusal when the log died
+        # (XS08). A notification has no `id` key at all, which is the actual
+        # distinction.
+        if isinstance(body, dict) and "id" in body:
+            self._answered(body["id"], final=True)
         self.client_write((json.dumps(body, separators=(",", ":")) + "\n")
                           .encode("utf-8"))
         self._record("FRAME_OUT", direction="upstream_to_client",
                      raw_len=len(json.dumps(body)))
 
-    def _answered(self, request_id):
-        """A frame for this id has actually reached the sink."""
-        self.session.answered_on_the_wire(request_id)
+    def _answered(self, request_id, *, final=False):
+        """This id's answer is committed to the sink; `final` once it moved."""
+        self.session.answered_on_the_wire(request_id, final=final)
 
     def _pay_bounded_refusals(self):
         """One bounded RECEIPT_IO_ERROR to every client still owed a frame.
@@ -1029,8 +1075,11 @@ class Route:
             return
         self._paying = True
         try:
-            for request_id in self.session.unanswered_clients():
-                self.session.answered_on_the_wire(request_id)
+            for identity in self.session.unanswered_clients():
+                request_id = identity[2]
+                # Straight to the sink: the bytes move on the next line, so
+                # this id is answered for good and no give-back resurrects it.
+                self.session.answered_on_the_wire(request_id, final=True)
                 self.client_write(
                     (json.dumps(envelope.withheld(
                         request_id=request_id,

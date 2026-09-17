@@ -875,3 +875,148 @@ def test_the_builder_writes_no_receipt_at_all(tmp_path):
     source = inspect.getsource(Route._release_frame)
     assert "record=False" in source, (
         "the builder still asks _withhold_result to record")
+
+
+# ── round 8 · one terminal, the right key, and bytes that actually moved ────
+
+def _settled_rows(tmp_path):
+    return [row for row in _receipt_rows(tmp_path)
+            if row.get("kind") == "SETTLED"]
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_an_authority_answer_leaves_one_terminal_equal_to_the_wire(
+        tmp_path, finding):
+    """XS02/XS17. Round 7 made the HANDOFF the single recorder for the
+    authority answer, and left two other recorders standing.
+
+    The inspection seam builds its replacement through `_withhold_result`,
+    which recorded -- so a finding, or an invalidation seen before the scan,
+    wrote a terminal that the handoff then superseded. The receipt named
+    PROHIBITED_CONTENT while the wire said REQUEST_CANCELLED: two terminals for
+    one item, disagreeing with each other and with the client.
+    """
+    route, out = _route(tmp_path, finding=finding)
+    route._invalidated = "DESCRIPTOR_CHANGED"
+    route.pump_upstream(_answer())
+    route.log.close()
+
+    settled = _settled_rows(tmp_path)
+    assert len(settled) == 1, [row.get("reason_code") for row in settled]
+    assert settled[0]["reason_code"] == _reason_codes(out)[0], (
+        "the receipt and the wire disagree about how this item ended")
+
+
+def test_a_clean_crossing_records_that_it_ended(tmp_path):
+    """XS13. The other half of "one terminal": not zero.
+
+    A crossing with no authority replacement wrote NO terminal at all, so an
+    ordinary answer reached the client with nothing in the receipt saying the
+    item had ended. `_handoff` calls itself the single point where an
+    obligation ends; that is where the terminal belongs, taken from the cause
+    the item was actually settled with.
+    """
+    route, out = _route(tmp_path, finding=False)
+    route.pump_upstream(_answer())
+    route.log.close()
+
+    settled = _settled_rows(tmp_path)
+    assert len(settled) == 1, [row.get("reason_code") for row in settled]
+    assert settled[0]["reason_code"] == "CLEAN", settled
+
+
+def test_two_ids_python_calls_equal_are_two_clients(tmp_path):
+    """XS06/XS14. `{1, 1.0}` is `{1}`.
+
+    The session keys its own tables on `key(origin, request_id)`, which carries
+    the JSON TYPE, precisely because 1 and 1.0 are different ids to a peer and
+    the same key to Python. My unanswered set held bare request ids, so two
+    waiting clients were recorded as one and the second was never answered.
+    Third time in two days that I used a weaker key than the session's own.
+    """
+    route, out = _route(tmp_path, finding=False)
+    assert route.session.admit_request(1.0, method="tools/call",
+                                       origin="client")
+    fired = _fail_receipts_at(route, "SCAN_STARTED")
+    route.pump_upstream(_answer())
+
+    assert fired
+    answered = sorted((type(json.loads(raw)["id"]).__name__,
+                       json.loads(raw)["id"]) for raw in out if raw)
+    assert answered == [("float", 1.0), ("int", 1)], answered
+
+
+def test_a_null_json_id_is_answered_once(tmp_path):
+    """XS08. A JSON-RPC null id is a real id, and my guard skipped it.
+
+    `_to_client` cleared the answered id only when it was `is not None` -- a
+    guard written to skip notifications, which also skipped a legitimate null
+    id. So a null-id request answered locally was paid a SECOND bounded refusal
+    when the log died. A notification has no `id` KEY at all, which is the
+    distinction that actually separates them.
+    """
+    route, out = _route(tmp_path, finding=False)
+    assert route.session.admit_request(None, method="tools/call",
+                                       origin="client")
+    route._cancel({"params": {"requestId": None}})
+    route.log.fail_writes(OSError("injected after the local answer"))
+    route._record("SCAN_STARTED")
+
+    ids = [json.loads(raw).get("id") for raw in out if raw]
+    assert ids.count(None) == 1, f"the null id was answered {ids.count(None)} times"
+
+
+def test_a_receipt_failure_during_a_release_does_not_answer_twice(tmp_path):
+    """XS15/XS16. The window between committing to a release and clearing it.
+
+    The id was cleared AFTER the write, so a receipt failure landing while the
+    authorisation was in flight found the id still owed, paid it, and then the
+    original crossed as well: two answers for one request, with the sink
+    perfectly writable. Delivery is taken BEFORE the authorisation now, and
+    given back only if the bytes never moved.
+    """
+    route, out = _route(tmp_path, finding=False)
+
+    # THE AUTHORISATION MUST SUCCEED, or this measures nothing. Failing the log
+    # before it means the release never happens and one frame is trivially
+    # true: the first draft of this row did exactly that and passed on the
+    # defect. The failure lands while the authorised bytes are on their way.
+    original_write = route.client_write
+    fired = []
+
+    def client_write(raw):
+        if not fired:
+            fired.append(True)
+            route.log.fail_writes(OSError("injected mid-release"))
+            route._record("SCAN_STARTED")
+        return original_write(raw)
+
+    route.client_write = client_write
+    route.pump_upstream(_answer())
+    assert fired, "the release never reached the sink"
+
+    assert len([raw for raw in out if raw]) == 1, (
+        f"one request, {len([raw for raw in out if raw])} answers")
+
+
+def test_a_give_back_never_resurrects_an_answered_id(tmp_path):
+    """The half I got wrong while fixing the half above.
+
+    Taking delivery early needs a give-back when the authorisation fails --
+    otherwise the one path that legitimately has no frame to show is the one
+    nobody answers. But the give-back resurrected ids whose bytes HAD moved:
+    the payer wrote a bounded refusal straight to the sink, the close then
+    drained a retained refusal for the same id whose authorisation failed, the
+    id went back on the owed list and was answered a second time.
+
+    Taking is reversible. Confirming is not.
+    """
+    route, out = _route(tmp_path, finding=False)
+    assert route.session.admit_request(1.0, method="tools/call",
+                                       origin="client")
+    fired = _fail_receipts_at(route, "WRITE_COMPLETE")
+    route.pump_upstream(_answer())
+
+    assert fired
+    ids = [json.loads(raw).get("id") for raw in out if raw]
+    assert len(ids) == len(set(map(repr, ids))), f"an id was answered twice: {ids}"

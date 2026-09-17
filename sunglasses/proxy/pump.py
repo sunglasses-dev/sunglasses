@@ -364,7 +364,16 @@ class Session:
         # `_settling` and the core all agree there is nothing outstanding while
         # the client has received no bytes at all. Retirement is not answering;
         # a frame reaching the sink is.
+        # R-168-R8/F2. BY IDENTITY, and round 6 held bare request ids. The
+        # session's own tables key on `key(origin, request_id)` -- which
+        # carries the JSON TYPE -- precisely because 1 and 1.0 are different
+        # ids to a peer and the same key to Python: `{1, 1.0}` is `{1}`. Two
+        # clients waiting, one recorded as owed, and the second never answered.
+        # Third time in two days that I used a weaker key than the session's
+        # own identity shape.
         self._unanswered: set = set()
+        # Identities whose bytes have actually left. Never owed again.
+        self._answered_final: set = set()
         # identity -> the Cause this item settles with, when it is not CLEAN.
         self._settling_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
@@ -452,7 +461,7 @@ class Session:
             self._pending[identity] = method
             self._admitted_at[identity] = time.monotonic()
             if origin == ORIGIN_CLIENT:
-                self._unanswered.add(request_id)
+                self._unanswered.add(identity)
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -1528,6 +1537,32 @@ class Session:
                         "owns, so admission's refusal did not hold",
                         rule="S3")
             return b""
+        if withheld is None and self._handoff_record is not None:
+            # R-168-R8/F1. THE HANDOFF IS THE SINGLE RECORDER, and round 7 made
+            # it the single recorder only for the AUTHORITY answer. Two shapes
+            # were left over.
+            #
+            # The inspection seam built its replacement through
+            # `_withhold_result`, which recorded -- so a finding, or an
+            # invalidation seen before the scan, wrote a terminal the handoff
+            # then superseded, and the receipt named a different outcome from
+            # the frame (XS02, XS17). That recorder is silent now.
+            #
+            # And a crossing with NO authority replacement wrote no terminal at
+            # all, so a clean answer and a PROHIBITED_CONTENT refusal both
+            # reached the client with nothing in the receipt saying the item
+            # had ended (XS13).
+            #
+            # This method's docstring calls itself the single point where an
+            # obligation ends; the terminal belongs where the obligation does.
+            # It is taken from the cause the item was actually settled with, so
+            # the receipt cannot disagree with the frame.
+            settled = self._core.settled_as(record_key)
+            self._handoff_record(identity[2],
+                                 settled.reason if settled is not None
+                                 else "CLEAN",
+                                 settled.rule if settled is not None else "S1",
+                                 settled is None or settled.reason == "CLEAN")
         if withheld is not None and self._handoff_frame is not None:
             # OUTSIDE the owner, because building the frame writes a receipt
             # and a failed write answers by calling `_close`, which takes this
@@ -1792,12 +1827,41 @@ class Session:
         """The frame a proxy-owned request got, or None while it is unanswered."""
         return self._control_answers.get(key(ORIGIN_PROXY, request_id))
 
-    def answered_on_the_wire(self, request_id):
-        """A frame for this id has actually reached the client sink."""
-        self._unanswered.discard(request_id)
+    def answered_on_the_wire(self, request_id, *, origin=ORIGIN_CLIENT,
+                             final=False):
+        """This id's answer is committed to the sink, or has reached it.
+
+        R-168-R8/F3. TAKING IS REVERSIBLE, CONFIRMING IS NOT, and collapsing
+        the two paid one client twice. The payer wrote a bounded refusal
+        straight to the sink -- bytes gone, client answered -- and then the
+        close drained a retained refusal for the same id whose authorisation
+        failed, `owe_again` put the id back, and the payer answered it a second
+        time. An id whose frame has actually MOVED is never owed again; an id
+        we merely committed to may be.
+        """
+        identity = key(origin, request_id)
+        self._unanswered.discard(identity)
+        if final:
+            self._answered_final.add(identity)
+
+    def owe_again(self, request_id, *, origin=ORIGIN_CLIENT):
+        """Give back an obligation we committed to and did not discharge.
+
+        Delivery is taken BEFORE the authorisation, so a concurrent receipt
+        failure cannot pay an id whose frame is already on its way; if that
+        authorisation then fails the bytes never moved and the client is owed
+        again. But only if nothing has ever reached them for this id.
+        """
+        identity = key(origin, request_id)
+        if identity not in self._answered_final:
+            self._unanswered.add(identity)
 
     def unanswered_clients(self):
-        """Every client id admitted and never answered, retired or not."""
+        """Every client identity admitted and never answered, retired or not.
+
+        Identities, not ids: the caller needs the JSON type to tell 1 from 1.0
+        and to answer a null id at all.
+        """
         return list(self._unanswered)
 
     def closed_with(self):
