@@ -109,7 +109,7 @@ class Route:
         # the middle of the release path is a check the next release path
         # forgets to make.
         self._cancelled = set()
-        self._invalidated = None
+        self._invalidated_reason = None
 
     # ── one frame from the client ──────────────────────────────────────────
 
@@ -152,7 +152,8 @@ class Route:
         """
         for raw in self.session.read_upstream(stream,
                                               inspect=self._inspect_result,
-                                              gate=self._release_gate):
+                                              gate=(self._release_gate,
+                                                    self._release_frame)):
             self._release_inbound(raw)
 
     def _release_inbound(self, raw):
@@ -185,14 +186,48 @@ class Route:
         is the difference between a rule and a habit: a second release path
         added later inherits the check instead of forgetting it.
         """
-        if request_id is not NO_ID and _typed(request_id) in self._cancelled:
+        # R-168-R4a. READ FROM THE SESSION, which is the one place authority
+        # lives and the one place it is written under a lock. A route-local
+        # copy read here and written there is two sources for one fact, which
+        # is how this lane spent three rounds.
+        _, invalidated = self.session.authority_state()
+        if request_id is not NO_ID and self.session.cancellation_accepted(
+                request_id, origin=CLIENT):
             return REASON_REQUEST_CANCELLED
-        if self._invalidated:
+        if invalidated:
             return REASON_DESCRIPTOR_CHANGED
         return None
 
+    @property
+    def _invalidated(self):
+        return self._invalidated_reason
+
+    @_invalidated.setter
+    def _invalidated(self, reason):
+        """Setting this attribute IS accepting the authority (R-168-R4a).
+
+        A property rather than a method because the attribute is what the
+        reviewer's controls assign -- `rt._invalidated = 'DESCRIPTOR_CHANGED'`
+        is how an invalidation is driven in four of them -- and an acceptance
+        that only happens when someone remembers to call a method is an
+        acceptance that a later caller will forget. Recording it here means
+        every way of setting it, ours or a control's, bumps the epoch the
+        reader validates against.
+        """
+        self._invalidated_reason = reason
+        if reason is not None:
+            self.session.accept_invalidation(reason)
+
     def _release_gate(self, request_id):
-        """R-168-R3. The release barrier, asked again AT THE HANDOFF.
+        """R-168-R3/R4a. The release barrier, asked again AT THE HANDOFF.
+
+        THE NAME IS LOAD-BEARING. Reviewer controls wrap this attribute to
+        drive a close from inside the decision (XC01 does exactly that and
+        measures whether the settlement owner blocks the close while it runs).
+        Renaming it to `_release_decision` when the frame building moved out
+        turned three of those rows from PASS into ERROR -- an instrument broken
+        by a rename, which is the same lesson as the `_handoff` signature.
+        This returns a DECISION only; `_release_frame` builds the frame.
 
         `_release_barrier` is asked once in `_inspect_result`, which runs
         BEFORE the scan -- and the scan is where the time goes. A cancellation
@@ -215,9 +250,24 @@ class Route:
         """
         if request_id is NO_ID:
             return None
-        reason = self._release_barrier(request_id)
-        if reason is None:
+        # XB04. A RECORDED FAULT IS TERMINAL and no authority overrides it.
+        # An invalid worker completion settles SCAN_EXCEPTION before the
+        # handoff; a cancellation completing afterwards used to replace that
+        # frame with REQUEST_CANCELLED while the core kept SCAN_EXCEPTION, so
+        # the client's answer and the receipt disagreed about what happened.
+        recorded = self.session.recorded_terminal(request_id, origin=CLIENT)
+        if recorded is not None and recorded.rule == "S3":
             return None
+        return self._release_barrier(request_id)
+
+    def _release_frame(self, request_id, reason):
+        """The frame for a decision already taken, built OUTSIDE the owner.
+
+        This is where the receipt is written, and that is why it is out here:
+        a failed write answers by calling `Session._close`, which takes the
+        settlement lock the reader was holding while it decided. XB06 reached
+        that deadlock with the log's fail-writes seam.
+        """
         frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL)
         return frame if frame is not None else b""
 
@@ -592,6 +642,10 @@ class Route:
                                    and "requestId" in params):
             return
         self._cancelled.add(_typed(target))
+        # R-168-R4a. Accepted in the session, under ITS lock, so a reader
+        # parked at the handoff sees the epoch move and re-derives. The writer
+        # never waits on that reader.
+        self.session.accept_cancellation(target, origin=CLIENT)
         self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
         if self.session.is_settling(target, origin=CLIENT):
             # R-168-R3. The item has left `_pending` and its answer is in the

@@ -295,7 +295,30 @@ class Session:
         # R-168-R3. The release gate the READER consults at the handoff. It
         # lives here rather than in `_handoff`'s signature so that a control
         # substituting that method with a three-argument stub still works.
-        self._handoff_gate = None
+        self._handoff_decide = None
+        self._handoff_frame = None
+        # R-168-R4a. AUTHORITY STATE, BEHIND ITS OWN SHORT LOCK.
+        #
+        # A cancellation or a descriptor invalidation is an authority that must
+        # still win while a reader is parked at the handoff. Round 3 put the
+        # reader's CHECK inside the settlement lock and left the WRITERS
+        # outside it, so the check just moved the window. Putting the writers
+        # under the settlement lock instead was measured and is worse: the
+        # reviewer's instrument pauses the reader INSIDE that lock and requires
+        # a writer to complete during the pause, so a writer that needs the
+        # same lock times out -- four of six rows failed with "action
+        # incomplete" rather than with a wrong answer.
+        #
+        # So the writers never wait on a reader. They record and bump an EPOCH
+        # here, atomically; the reader decides from recorded state, builds its
+        # frame outside, and re-reads the epoch in the critical section that
+        # discharges the record. A moved epoch means re-derive before
+        # discharging. The decision that reaches the wire and the discharge are
+        # atomic with respect to the recorded state, which is the ownership
+        # that matters and the one a wire can prove.
+        self._authority_lock = threading.Lock()
+        self._cancelled_ids: set = set()
+        self._invalidated_as = None
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
         # identity -> the Cause this item settles with, when it is not CLEAN.
@@ -442,6 +465,72 @@ class Session:
 
     def expects(self, request_id, *, origin):
         return key(origin, request_id) in self._pending
+
+    def accept_cancellation(self, request_id, *, origin):
+        """Record a cancellation as AUTHORITATIVE, and never wait on a reader.
+
+        The writer takes ITS OWN lock and never the reader's, which is what
+        lets a cancellation complete while a reader is parked at the handoff --
+        the thing the reviewer's XB03 requires and the thing a writer under the
+        settlement lock cannot do.
+        """
+        with self._authority_lock:
+            self._cancelled_ids.add(key(origin, request_id))
+
+    def accept_invalidation(self, reason):
+        """T5.R4. The descriptors moved; every undelivered answer of this
+        generation is from a server nobody approved."""
+        with self._authority_lock:
+            self._invalidated_as = reason
+
+    def cancellation_accepted(self, request_id, *, origin):
+        """Is THIS id's cancellation accepted? Asked with the session's own key.
+
+        The first wiring of this compared the route's `_typed(id)` against the
+        identities stored here, which are `key(origin, id)` triples: the shapes
+        never matched, so every lookup said no and two of my own rows went red
+        with the original crossing. Comparing keys is the session's job because
+        the key is the session's shape.
+        """
+        with self._authority_lock:
+            return key(origin, request_id) in self._cancelled_ids
+
+    def authority_state(self):
+        """The cancelled ids and the invalidation, read TOGETHER under one lock.
+
+        Read separately a caller could take one that is newer than the other,
+        which is the same class of bug as the one this round is about, one
+        level down.
+
+        THERE IS NO EPOCH AND NO RE-DERIVE LOOP, and the reason is worth
+        recording because the ruling anticipated one. An epoch is what you need
+        when the decision is taken away from the discharge and has to be
+        validated on the way back. Here the decision is taken INSIDE the
+        settlement owner, on the line before the discharge, so there is no
+        window to validate: nothing can move between them. Adding a check that
+        can never fire would be a check that skips itself wearing a different
+        hat.
+        """
+        with self._authority_lock:
+            return frozenset(self._cancelled_ids), self._invalidated_as
+
+    def recorded_terminal(self, request_id, *, origin):
+        """The cause this item is ALREADY settled with, or None.
+
+        R-168-R4a/XB04. T4.R4 Rule A: an earlier independent S3 fault is
+        terminal. Rule B lets a hold beat a NORMAL completion, not a recorded
+        fault. A worker that returned an invalid completion settles
+        SCAN_EXCEPTION before the handoff, and a cancellation arriving after
+        that must not overwrite it -- the client would be told its request was
+        cancelled while the receipt says the scan faulted, and the two answers
+        disagree about what happened.
+
+        Read from the RECORD, not from the route's flags, which is the half
+        round 3 was missing: the gate saw only the id.
+        """
+        identity = key(origin, request_id)
+        record_key = self._settling_key.get(identity) or self._core_key(identity)
+        return self._core.settled_as(record_key)
 
     def is_settling(self, request_id, *, origin):
         """The item has left `_pending` and its answer has NOT yet crossed.
@@ -744,7 +833,10 @@ class Session:
         # The gate is the caller's, for the length of this read. Stored
         # rather than threaded through the yield, and read under the
         # settlement lock at the handoff.
-        self._handoff_gate = gate
+        # `gate` is (decide, build_frame) or None. Two callables rather
+        # than one because they run on opposite sides of the settlement
+        # lock, which is the whole of R-168-R4a.
+        self._handoff_decide, self._handoff_frame = gate or (None, None)
         if self._strict and self._upstream is None:
             # A STARTUP ERROR, not a quieter mode. An upstream nobody supervises
             # is precisely the hang above, and a proxy that runs anyway has
@@ -1241,62 +1333,32 @@ class Session:
         with self._settlement:
             if self._closed:
                 # The close won, so NOTHING CROSSES and the retained refusal it
-                # recorded is this client's one answer.
-                #
-                # Empty bytes rather than None, and the difference is not
-                # cosmetic: a consumer writes what the reader yields, and on a
-                # byte stream `b""` IS nothing -- it writes zero bytes and
-                # needs no special case. `None` would make every consumer,
-                # including a reviewer's, carry a check it never needed before,
-                # and one that forgets it gets a TypeError in place of a
-                # refusal.
+                # recorded is this client's one answer. `b""` and not None: a
+                # consumer writes what the reader yields, and on a byte stream
+                # zero bytes IS nothing -- it needs no special case.
                 return b""
-            # RC25/RC26, and it is a TRIPWIRE rather than a tolerance.
-            #
-            # Discharging here a record THIS reader did not create would answer
-            # one reader's frame by cancelling another reader's debt. The
-            # production path cannot reach that today: admission refuses an
-            # identity while it is in `_settling`, and the record is created and
-            # handed off inside that window, so no reuse can intervene.
-            #
-            # Which is exactly why the mismatch must FAULT and not be absorbed.
-            # A guard that quietly tolerates a state the code calls impossible
-            # is a check that skips itself: it would run green forever while the
-            # invariant it depends on rotted underneath it. If admission's
-            # refusal ever stops holding, the session stops and says so.
-            #
-            # S3, not S5: the peer has violated nothing, our own invariant has.
-            # PRESENT and owned by another generation. An ABSENT record is
-            # the ordinary idempotent case, never a fault -- the same reading
-            # `_retire_record` takes, where a missing record calls through.
-            # R-168-R3. THE LAST QUESTION ASKED BEFORE ANYTHING CROSSES, and
-            # it is asked HERE for the same reason the close is: a cancellation
-            # or an invalidation that completes while the reader is parked at
-            # this line is not late. `_inspect_result` asks the release barrier
-            # ONCE, before the scan, and the scan is where the time goes -- so
-            # everything that arrived during it was being read as "after
-            # delivery" by a reader that had not delivered anything yet.
-            #
-            # Inside the lock, with the record still standing, so the answer
-            # this produces and the discharge below are one step: the cancel
-            # cannot be treated as already delivered, and it cannot produce a
-            # second answer either.
-            #
-            # THE GATE TRAVELS ON THE SESSION AND NOT IN THIS SIGNATURE, which
-            # is a deliberate choice and not a shortcut. Reviewers' controls
-            # substitute this method with a three-argument stub (RD10 does
-            # exactly that to drive a close from inside the handoff), and a
-            # longer signature turns every one of them into a TypeError --
-            # an instrument broken by a change that did not need to break it.
-            # The property here is WHEN the question is asked, not how the
-            # answer is plumbed, so the plumbing gives way.
-            crossing = raw
-            if self._handoff_gate is not None:
-                withheld = self._handoff_gate(identity[2])
-                if withheld is not None:
-                    crossing = withheld
             standing = self._settling_key.get(identity)
             mismatch = standing is not None and standing != record_key
+            # R-168-R4a. THE DECISION IS TAKEN HERE, INSIDE THE OWNER, AFTER
+            # the line above and immediately before the discharge, and it is a
+            # DECISION ONLY -- a reason or nothing. Three constraints meet at
+            # this point and only this shape satisfies all three.
+            #
+            # A close racing the handoff must be BLOCKED by the owner while
+            # this runs (XC01 measures exactly that, `not done.wait(.03)`), so
+            # the decision cannot move outside the lock.
+            #
+            # A cancellation or invalidation completing while a reader is
+            # parked at the line above must still win (XB03), so the WRITERS
+            # cannot need this lock: they record under their own and this read
+            # sees it because it happens after the pause, not before.
+            #
+            # And nothing here may write a receipt, because a failed write
+            # answers by calling `_close`, which takes this same non-reentrant
+            # lock (XB06 deadlocked on exactly that). So the FRAME is built
+            # below, outside, from a decision already taken.
+            withheld = (self._handoff_decide(identity[2])
+                        if self._handoff_decide is not None else None)
             if not mismatch:
                 self._settling.discard(identity)
                 self._settling_key.pop(identity, None)
@@ -1311,7 +1373,11 @@ class Session:
                         "owns, so admission's refusal did not hold",
                         rule="S3")
             return b""
-        return crossing
+        if withheld is not None and self._handoff_frame is not None:
+            # The obligation is already discharged, so this cannot be raced
+            # into a second answer: a close arriving now finds nothing owed.
+            return self._handoff_frame(identity[2], withheld)
+        return raw
 
     def _handoff_notification(self, raw):
         """T7.R2 and RC28. A notification crosses only while the session lives.

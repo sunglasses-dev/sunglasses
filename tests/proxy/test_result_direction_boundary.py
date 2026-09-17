@@ -9,6 +9,7 @@ answer T6.R1 allows per id.
 The rows are ASTRA's; the wiring is ours.
 """
 import json
+import threading
 import types
 
 import pytest
@@ -265,3 +266,98 @@ def test_a_close_at_the_handoff_still_wins_over_the_gate(tmp_path):
     route.pump_upstream(_answer())
     assert all(b'"result"' not in raw for raw in out), "the original crossed"
     assert route.session.closed_with()[0] == "MALFORMED_UPSTREAM"
+
+
+# ── round 4 · one ownership protocol, and what it is allowed to touch ────────
+
+def test_a_recorded_fault_is_terminal_and_a_cancel_cannot_overwrite_it(tmp_path):
+    """XB04. T4.R4 Rule A.
+
+    An invalid worker completion settles SCAN_EXCEPTION before the handoff.
+    Round 3's gate saw only the id, so a cancellation completing afterwards
+    replaced that frame with REQUEST_CANCELLED while the core kept
+    SCAN_EXCEPTION: the client's answer and the receipt disagreed about what
+    happened. Rule B lets a HOLD beat a normal completion; it does not let one
+    beat a recorded fault.
+    """
+    route, out = _route(tmp_path, finding=False)
+    route.scan = lambda surface, **kw: {}          # an invalid completion
+    _at_the_handoff(route, lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+    assert _reason_codes(out) == ["SCAN_EXCEPTION"], _reason_codes(out)
+
+
+def test_an_authority_writer_never_waits_on_a_parked_reader(tmp_path):
+    """The property that decides which lock the writers use.
+
+    A GUARD, NOT A RED-FIRST ROW, and it is labelled that way rather than
+    counted: it passes on `2c0eee7` too, because on that head the writers were
+    already outside the lock -- the defect there was the reader's check, not
+    the writers' lock. This row exists to stop the WRONG FIX, which is the one
+    the ruling first named: putting the writers under the settlement owner.
+    That was measured before it was written, and it turns four of six XB03 rows
+    into "action incomplete".
+
+    A cancellation must be able to COMPLETE while a reader is parked inside the
+    settlement owner, because that is where the reviewer's instrument pauses
+    it. Writers under the settlement lock were measured first and they cannot:
+    four of six XB03 rows failed with "action incomplete", the writer timing
+    out on a lock the parked reader was holding. So authority has its own lock,
+    and this row is the reason it is not a style choice.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    finished = threading.Event()
+
+    def park(_):
+        # Inside `_handoff`'s critical section, exactly where XB03 pauses.
+        worker = threading.Thread(
+            target=lambda: (route._cancel({"params": {"requestId": 1}}),
+                            finished.set()))
+        worker.start()
+        worker.join(2)
+
+    _at_the_handoff(route, park)
+    with session._settlement:
+        pass                                       # the lock is not held here
+    route.pump_upstream(_answer())
+    assert finished.is_set(), (
+        "the cancellation could not complete while the reader was parked; the "
+        "writers are waiting on the reader's lock")
+
+
+def test_nothing_under_the_discharge_lock_calls_into_the_route():
+    """XB06, as a property of the SOURCE rather than of one timing.
+
+    The frame builder writes a receipt, a failed write answers by calling
+    `Session._close`, and `_close` takes the settlement lock the reader holds
+    while it decides. Round 3 called the builder inside that block and the
+    reviewer reached the deadlock with the log's fail-writes seam. A timing row
+    can only catch it when the timing repeats; this catches the shape.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from sunglasses.proxy import pump
+
+    # `textwrap.dedent` because `getsource` of a METHOD keeps its class
+    # indentation, and `ast.parse` refuses that with IndentationError -- the
+    # first draft of this row failed on its own instrument rather than on the
+    # code it reads.
+    tree = ast.parse(textwrap.dedent(inspect.getsource(pump.Session._handoff)))
+    inside = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.With):
+            continue
+        if not any("_settlement" in ast.unparse(item.context_expr)
+                   for item in node.items):
+            continue
+        for call in ast.walk(node):
+            if isinstance(call, ast.Call):
+                inside.append(ast.unparse(call.func))
+    assert "self._handoff_frame" not in inside, (
+        f"the frame builder is called under the discharge lock: {inside}")
+    assert "self._handoff_decide" in inside, (
+        f"the DECISION must be taken under the lock, or a close racing it is "
+        f"not blocked by the owner (XC01): {inside}")
