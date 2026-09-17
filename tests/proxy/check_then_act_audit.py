@@ -126,12 +126,6 @@ INVENTORY = {
     "_discard: held.rename(q)":
         "Putting back bytes we took when a record turned out to claim them, "
         "only while the canonical name is free.",
-    "_install_locked: bytes_path.write_bytes(raw)":
-        "The canonical retained copy, written before the wrapper exists.",
-    "_install_locked: pending_path.write_text(json.dumps({**record, \"state\": \"pending\"}, indent=2),\n                                encoding=\"utf-8\")":
-        "The journal, written before the wrapper exists.",
-    "_install_locked: rec_path.write_text(json.dumps({**record, \"state\": \"complete\"}, indent=2),\n                            encoding=\"utf-8\")":
-        "Completion, after the wrapper is published and ownership re-checked.",
     "_install_locked: spare_record.rename(rec_path)":
         "Promotion, record first; nothing is discarded until the canonical "
         "pair is read back from disk.",
@@ -208,6 +202,20 @@ INVENTORY = {
     "_owner_file: private.name.replace(\".taking.\", \".forgetlock.\", 1)":
         "A string method building a name. It touches no filesystem; the walker "
         "cannot type the receiver, so this is listed rather than exempted.",
+    "_open_nofollow: os.open(str(path),\n                       os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,\n                       0o600)":
+        "O_NOFOLLOW is the whole point: a symlink arriving at one of our names "
+        "after the early check fails with ELOOP rather than being followed.",
+    "_write_private: os.write(fd, data[written:])":
+        "Our own descriptor, opened above. Looped because a short write is "
+        "legal, and a record missing its tail is the unparseable shape this "
+        "row exists to remove.",
+    "_write_private: os.fsync(fd)":
+        "Our own descriptor.",
+    "_publish_atomically: os.replace(str(tmp), str(path))":
+        "THE publication. Atomic on the destination name, so a reader sees the "
+        "whole record or none of it.",
+    "_publish_atomically: os.unlink(tmp)":
+        "Our own hidden temp, removed when the publication failed.",
 }
 
 

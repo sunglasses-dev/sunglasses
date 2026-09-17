@@ -543,6 +543,85 @@ def _atomic_write(path, data: bytes):
         raise
 
 
+def _open_nofollow(path, *, what):
+    """Open for writing WITHOUT following a symlink at the final component.
+
+    The deferred half of ASTRA's F3 (R-177-R5a). Round 5 closed the family by
+    refusing BEFORE any mutation, which is what a planted symlink needs, and
+    left the writer itself trusting. That check and this one answer different
+    questions: the check asks whether a symlink is there when we look, and this
+    asks what happens if one arrives after we looked. Only the second survives
+    a race, and only the first produces a diagnostic a user can act on, so the
+    row keeps both.
+
+    O_NOFOLLOW fails with ELOOP rather than following.
+    """
+    try:
+        return os.open(str(path),
+                       os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+                       0o600)
+    except OSError as e:
+        raise ConfigIOError(f"cannot write {what} at {path}: {e}") from e
+
+
+def _write_private(path, data: bytes, *, what):
+    """One door for every write into our own record directory.
+
+    `os.write` in a loop rather than one call, because a short write is legal
+    and a record missing its tail is exactly the unparseable-authority shape
+    this row exists to remove.
+    """
+    fd = _open_nofollow(path, what=what)
+    try:
+        written = 0
+        while written < len(data):
+            written += os.write(fd, data[written:])
+        os.fsync(fd)
+    except OSError as e:
+        raise ConfigIOError(f"writing {what} at {path} was interrupted: {e}") from e
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _temp_beside(path):
+    """The one name a partially written record is allowed to occupy.
+
+    DETERMINISTIC on purpose, not `mkstemp`. A crash driver has to be able to
+    inject a fault into the TEMP write, and it cannot hook a name it is unable
+    to predict. Round 5's first attempt at this row used `mkstemp` and made
+    four of the sixteen crash phases unreachable, which is how a repair blinds
+    the battery that proves it. Hidden, so nothing that reads the directory by
+    glob mistakes it for a record.
+    """
+    p = pathlib.Path(path)
+    return p.with_name(f".{p.name}.sg-new")
+
+
+def _publish_atomically(path, data: bytes, *, what):
+    """Publish by RENAME, so a reader sees all of it or none of it.
+
+    R4-COMPLETE-PARTIAL, the other half. Round 5 made an unreadable completed
+    record fall back to the journal, which stops the STRANDING. This stops the
+    unreadable record from ever existing: a kill during the write leaves bytes
+    in a hidden temp name that nothing reads, and the rename is what publishes.
+    Recovery and prevention are different properties and the fallback stays.
+    """
+    tmp = _temp_beside(path)
+    _write_private(tmp, data, what=f"the temporary {what}")
+    try:
+        os.replace(str(tmp), str(path))
+    except OSError as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise ConfigIOError(
+            f"publishing {what} at {path} was interrupted: {e}") from e
+
+
 def _refuse_symlinked_storage(name, *paths):
     """Refuse BEFORE any mutation if a symlink occupies one of our own names.
 
@@ -2321,10 +2400,10 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     }
 
     try:
-        bytes_path.write_bytes(raw)
+        _write_private(bytes_path, raw, what="the retained original")
         identities = {"retained": _identity(bytes_path)}
-    except OSError as e:
-        raise ConfigIOError(f"cannot retain the original bytes: {e}") from e
+    except ConfigIOError:
+        raise
     # R9-INVERSE-FIRST (ASTRA round 8,
     # `R8_REBUILD_WRITE_FAILURE_KEEPS_USABLE_INVERSE`). Round 8 rebuilt the
     # inverse out of bytes held in memory once it noticed it had been
@@ -2349,10 +2428,12 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         f"{name}.inflight-{os.getpid()}-{k:x}.standby"))
     spare_record = spare_bytes.with_suffix(".standbyrecord")
     try:
-        pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
-                                encoding="utf-8")
+        _write_private(
+            pending_path,
+            json.dumps({**record, "state": "pending"}, indent=2).encode("utf-8"),
+            what="the pending record")
         identities["journal"] = _identity(pending_path)
-    except OSError as e:
+    except (OSError, ConfigIOError) as e:
         # A half-written journal is worse than none: it is unparseable recovery
         # material that the next run would have to refuse. Remove both.
         _discard(pending_path, bytes_path)
@@ -2524,8 +2605,10 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     # target back rather than leaving a wrapped config with nothing to undo it.
     try:
         record["file_sha_after"] = _digest_bytes(wrapped_bytes)
-        rec_path.write_text(json.dumps({**record, "state": "complete"}, indent=2),
-                            encoding="utf-8")
+        _publish_atomically(
+            rec_path,
+            json.dumps({**record, "state": "complete"}, indent=2).encode("utf-8"),
+            what="the completed record")
     except (OSError, ConfigIOError) as e:
         rolled_back = True
         try:
