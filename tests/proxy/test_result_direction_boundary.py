@@ -879,6 +879,10 @@ def test_the_builder_writes_no_receipt_at_all(tmp_path):
 
 # ── round 8 · one terminal, the right key, and bytes that actually moved ────
 
+def pump_key(session, request_id, origin="client"):
+    return pump.key(origin, request_id)
+
+
 def _settled_rows(tmp_path):
     return [row for row in _receipt_rows(tmp_path)
             if row.get("kind") == "SETTLED"]
@@ -1020,3 +1024,282 @@ def test_a_give_back_never_resurrects_an_answered_id(tmp_path):
     assert fired
     ids = [json.loads(raw).get("id") for raw in out if raw]
     assert len(ids) == len(set(map(repr, ids))), f"an id was answered twice: {ids}"
+
+
+# ── round 9 · a table that outlives its correlation carries the generation ──
+
+def test_every_spanning_table_is_keyed_by_the_token():
+    """A READING AID, NOT A PROOF, and the difference is on the record.
+
+    ASTRA defeated the sibling of this row on #179 with two reachable mutants
+    that satisfy its source pattern and still break the behaviour -- the
+    behavioural suite rejected both, which is where the real guarantee lives.
+    So this row is NOT class-wide proof and must not be described as one. It is
+    a cheap reading of the source that catches the careless case early; the
+    inventory below is the part that actually holds each API to the property.
+
+    Four rounds, one mistake, four tables: `_claimed[identity]` on #179,
+    `_unanswered` by bare id, a token compared one element at a time, and now
+    `_unanswered`/`_answered_final` by identity. Each time I repaired the
+    instance the reviewer drove.
+
+    The rule is sharper than "always use the token", and the sharp form is what
+    makes it checkable:
+
+      a table describing the LIVE correlation may be keyed by IDENTITY --
+      admission refuses an id already pending or settling, so only one
+      generation is ever live and the identity cannot be ambiguous;
+
+      a table whose entries OUTLIVE the correlation must carry the GENERATION,
+      because its entries span generations by construction and an identity key
+      lets a finished generation speak for a live one.
+
+    This reads the source and holds every spanning table to the second half.
+    """
+    import ast
+    import collections
+    import inspect
+    import textwrap
+
+    spanning = {
+        "_unanswered": "owed until a frame reaches the sink, after retirement",
+        "_answered_final": "remembers an answer that already moved, for ever",
+    }
+    token_keys = {"token", "core_key", "self._core_key(identity)", "owed",
+                  "reserved", "observed"}
+
+    writes = collections.defaultdict(set)
+    for module in (pump,):
+        tree = ast.parse(textwrap.dedent(inspect.getsource(module)))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                    and node.func.attr in ("add", "discard") and node.args \
+                    and isinstance(node.func.value, ast.Attribute):
+                writes[node.func.value.attr].add(ast.unparse(node.args[0]))
+
+    offenders = {}
+    for name, why in spanning.items():
+        keys = writes.get(name, set())
+        assert keys, f"{name} is never written; this row has stopped reading it"
+        stray = sorted(k for k in keys if k not in token_keys)
+        if stray:
+            offenders[name] = (stray, why)
+    assert not offenders, (
+        f"these tables outlive the correlation they describe and must carry "
+        f"the generation: {offenders}")
+
+
+def test_two_generations_of_one_id_are_two_obligations(tmp_path):
+    """XU02. A finished generation spoke for a live one.
+
+    `_unanswered` and `_answered_final` were keyed `(origin, id)`. Admission
+    bumps the generation and adds the identity but never removes the OLD
+    identity from the final marker, so a reused completed id met a failed
+    release like this: the take removed the second obligation, and `owe_again`
+    found the first generation's marker and refused to restore it. Two admitted
+    requests, one response.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    first = session._core_key(pump_key(session, 1))
+    session.answered_on_the_wire(first, final=True)      # generation 1, answered
+    # AND COMPLETED, because admission refuses an id that is still pending --
+    # which is exactly why a table describing the live correlation may key on
+    # the identity, and why one that outlives it may not.
+    session.settle_from("client", 1, "CLEAN", "S1")
+
+    assert session.admit_request(1, method="tools/call", origin="client")
+    second = session._core_key(pump_key(session, 1))
+    assert first != second, "the second admission reserved no generation"
+
+    session.answered_on_the_wire(second)                 # taken, not confirmed
+    session.owe_again(second)                            # the release failed
+
+    assert second in session.unanswered_clients(), (
+        "a finished generation suppressed the live one's restitution")
+    assert first not in session.unanswered_clients()
+
+
+def test_a_late_confirmation_names_the_generation_it_confirms(tmp_path):
+    """XU13. Clearing at admission is not enough, because of the ordering.
+
+    A late confirmation for the FIRST generation arrives after the second has
+    been admitted. Keyed by identity it discarded the new generation's
+    obligation and the new request was never answered.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    first = session._core_key(pump_key(session, 1))
+    session.settle_from("client", 1, "CLEAN", "S1")      # generation 1 completes
+    assert session.admit_request(1, method="tools/call", origin="client")
+    second = session._core_key(pump_key(session, 1))
+    assert first != second
+
+    session.answered_on_the_wire(first, final=True)      # the late confirmation
+
+    assert second in session.unanswered_clients(), (
+        "a late confirmation for an older attempt discharged a live one")
+
+
+def test_the_payer_takes_its_work_and_never_snapshots_it(tmp_path):
+    """XU12. A snapshot is not a claim.
+
+    The payer read the whole outstanding list and marked each entry afterwards,
+    so a REAL answer could land while it was paused holding a stale copy -- and
+    the payer paid the same id again. `_paying` never helped: it prevents
+    recursion, not a race.
+
+    THE ORDERING IS THE REVIEWER'S AND MY FIRST DRAFT HAD IT BACKWARDS. Starting
+    the payer first and cancelling during its pause proves nothing, because the
+    cancellation's own receipt dies on the same failed log and it never reaches
+    the client -- one frame, and the row passed on the defect. The cancellation
+    has to be ALREADY MID-WRITE, with the payer starting from inside it.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    ready, failures = threading.Event(), []
+    local = route._to_client
+
+    def payer():
+        try:
+            route.log.fail_writes(OSError("injected"))
+            route._record("SCAN_STARTED")
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    def emit(body):
+        worker = threading.Thread(target=payer, daemon=True)
+        worker.start()
+        assert ready.wait(3) or True
+        local(body)                            # the real answer reaches the sink
+        worker.join(3)
+        assert not worker.is_alive(), "the payer never finished"
+
+    route._to_client = emit
+    ready.set()
+    route._cancel({"params": {"requestId": 1}})
+
+    assert not failures, failures
+    answers = [raw for raw in out if raw]
+    assert len(answers) == 1, (
+        f"one request, {len(answers)} answers: "
+        f"{[json.loads(a).get('error', {}).get('data', {}).get('reason_code') for a in answers]}")
+
+
+def test_a_retained_refusal_records_that_the_item_ended(tmp_path):
+    """XU15. Round 8 made the handoff the single recorder and the DRAIN does
+    not pass through it, so a refusal the close retained crossed with nothing
+    in the receipt saying the item had ended.
+
+    Pre-existing before round 8 as well -- measured on `bb7607b` and `07c5c67`
+    -- and fixed here because it is round 8's own principle in the one path
+    that only runs when something has already gone wrong.
+    """
+    route, out = _route(tmp_path, finding=False)
+    route.session._close("INTERNAL_FAULT", "a teardown", rule="S3")
+    route.pump_upstream(b"")
+    route.log.close()
+
+    settled = _settled_rows(tmp_path)
+    assert len([raw for raw in out if raw]) == 1, "the client was not answered"
+    assert len(settled) == 1, (
+        f"the retained refusal left {len(settled)} terminals")
+
+
+def test_a_payer_whose_write_fails_gives_the_obligation_back(tmp_path):
+    """Taking is reversible until the bytes move, in the payer as everywhere.
+
+    The payer takes an obligation and then writes. If that write raises, the
+    obligation was claimed and NOT discharged -- marking it answered at the
+    moment of taking made the claim permanent and the client was owed an answer
+    nobody held any longer.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    owed = session._core_key(pump_key(session, 1))
+    assert owed in session.unanswered_clients()
+
+    def refuse(raw):
+        raise OSError("the client sink is gone")
+
+    route.client_write = refuse
+    route.log.fail_writes(OSError("injected"))
+    try:
+        route._record("SCAN_STARTED")
+    except OSError:
+        pass
+
+    assert owed in session.unanswered_clients(), (
+        "the payer kept an obligation it never discharged")
+
+
+# ── the entry-point inventory, behavioural ─────────────────────────────────
+
+#: Every session API that accepts an attempt token on this branch, with what a
+#: FOREIGN token must not be able to do through it. Listed explicitly because a
+#: source pattern can be satisfied while the behaviour is broken -- ASTRA
+#: demonstrated exactly that against the structural row above -- so each entry
+#: here is driven, not read.
+TOKEN_ENTRY_POINTS = ("take_obligation", "answered_on_the_wire", "owe_again")
+
+
+def test_the_token_entry_point_inventory_is_complete():
+    """The list is checked against the source, so a new token API cannot be
+    added without either appearing here or failing this row."""
+    import inspect
+
+    taking = {name for name, member in inspect.getmembers(pump.Session,
+                                                          inspect.isfunction)
+              if not name.startswith("__")
+              and "token" in inspect.signature(member).parameters}
+    # `take_next_unanswered` hands a token OUT rather than accepting one.
+    taking.discard("take_next_unanswered")
+    missing = taking - set(TOKEN_ENTRY_POINTS)
+    assert not missing, (
+        f"these accept a token and are not in the inventory: {sorted(missing)}. "
+        f"Add them with a behavioural row for a foreign token.")
+
+
+@pytest.mark.parametrize("dimension", ["another id", "another JSON type",
+                                       "another origin"])
+def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
+                                                               dimension):
+    """Three identity dimensions, every listed API, driven rather than read.
+
+    A token is (origin, JSON id type, id, generation). Each dimension is a way
+    for a token to belong to a different item while still looking plausible,
+    and each entry point is asked to leave BOTH items exactly as they were.
+    """
+    session = pump.Session()
+    assert session.admit_request(1, method="tools/call", origin="client")
+    mine = session._core_key(pump_key(session, 1))
+
+    if dimension == "another id":
+        assert session.admit_request(2, method="ping", origin="client")
+        foreign = session._core_key(pump_key(session, 2))
+    elif dimension == "another JSON type":
+        assert session.admit_request(1.0, method="ping", origin="client")
+        foreign = session._core_key(pump_key(session, 1.0))
+    else:
+        assert session.admit_request(1, method="ping", origin="upstream")
+        foreign = session._core_key(pump.key("upstream", 1))
+    assert foreign != mine, dimension
+
+    before_owed = sorted(map(str, session._core.owed()))
+    before_unanswered = sorted(map(str, session.unanswered_clients()))
+
+    # Taking a foreign token must not take MINE.
+    session.take_obligation(foreign)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: take_obligation moved another item's obligation")
+    # ...and having taken the foreign one, mine is still answerable.
+    session.answered_on_the_wire(foreign, final=True)
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: a foreign confirmation discharged mine")
+    session.owe_again(foreign)
+    assert sorted(map(str, session._core.owed())) == before_owed, (
+        f"{dimension}: a foreign token changed the core debt")
+
+    # The ordinary follow-up still works for the item that was never involved.
+    assert session.take_obligation(mine), (
+        f"{dimension}: my own obligation was no longer takeable")

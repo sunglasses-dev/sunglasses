@@ -371,9 +371,36 @@ class Session:
         # clients waiting, one recorded as owed, and the second never answered.
         # Third time in two days that I used a weaker key than the session's
         # own identity shape.
+        # R-168-R9. TOKENS, not identities, and this is the FOURTH round of one
+        # mistake. `_claimed[identity]` on #179, `_unanswered` by bare id here,
+        # `settle_from` comparing one element of a token, and now these two.
+        #
+        # The rule is sharper than "always use the token", and the sharp form
+        # is what stops the next one. A table describing the LIVE correlation
+        # may be keyed by identity: admission refuses an id already pending or
+        # settling, so only one generation is ever live and the identity cannot
+        # be ambiguous -- `_pending`, `_settling`, `_generation` are right as
+        # they are. A table whose entries OUTLIVE the correlation must carry
+        # the generation, because its entries span generations by construction.
+        #
+        # These two outlive it on purpose: an obligation stands until a frame
+        # reaches the sink, which is after retirement, and a finished answer is
+        # remembered for ever. Keyed by identity, a COMPLETED generation spoke
+        # for a live one -- it consumed the new obligation's take and, through
+        # `_answered_final`, refused to let it be restored. Two admitted
+        # requests, one response.
         self._unanswered: set = set()
-        # Identities whose bytes have actually left. Never owed again.
         self._answered_final: set = set()
+        # R-168-R9/(a). WHICH obligation the frame just yielded discharges.
+        #
+        # The consumer cannot work it out from the frame: an id can have two
+        # unanswered tokens at once -- a finished generation whose frame never
+        # reached the sink, and a live one -- and that ambiguity IS the defect.
+        # So the reader, which owns `record_key`, says. Set under the owner
+        # immediately before each yield and read by the consumer immediately
+        # after it, on the one thread that does both; `pump_upstream` is a
+        # `for` loop over this generator, so there is no window between them.
+        self._yielded_obligation = None
         # identity -> the Cause this item settles with, when it is not CLEAN.
         self._settling_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
@@ -461,7 +488,7 @@ class Session:
             self._pending[identity] = method
             self._admitted_at[identity] = time.monotonic()
             if origin == ORIGIN_CLIENT:
-                self._unanswered.add(identity)
+                self._unanswered.add(self._core_key(identity))
         self._core.admit(self._core_key(identity), method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
@@ -1072,6 +1099,7 @@ class Session:
                 # reason: the decision rides the YIELD EXPRESSION, so it is
                 # made when the line RUNS. A statement before the yield decides
                 # too early and a close arriving in between still crosses.
+                self._yielded_obligation = None
                 yield self._handoff_notification(raw)
                 continue
 
@@ -1137,6 +1165,7 @@ class Session:
                 # direct-caller retirement instead: one frame for two requests,
                 # and with no second request the watcher returned without
                 # closing and the reader forwarded after a real exit.
+                self._yielded_obligation = init_key
                 yield self._handoff(init_identity, forwarded, init_key)
                 if self._closed:
                     yield from self._drain_refusals()
@@ -1187,6 +1216,7 @@ class Session:
             # The decision is IN the expression, so it is made when this line
             # runs rather than before it. None means the close won and nothing
             # crosses; consumers skip it.
+            self._yielded_obligation = record_key
             yield self._handoff(identity, crossing, record_key)
             if self._closed:
                 yield from self._drain_refusals()
@@ -1821,14 +1851,43 @@ class Session:
                 if not self._owed_refusals:
                     return
                 identity, reason, rule = self._owed_refusals.pop(0)
+            # The retained refusal discharges the obligation the close kept,
+            # under the token that close recorded it with.
+            owed = self._settling_key.get(identity) or self._core_key(identity)
+            self._yielded_obligation = owed
+            # R-168-R9. AND IT IS A TERMINAL, so it is recorded like one. The
+            # drain does not pass through `_handoff`, so round 8's single
+            # recorder never saw it and a retained refusal crossed with nothing
+            # in the receipt saying the item had ended (XU15) -- the same hole
+            # round 8 closed for the ordinary crossing, in the one path that
+            # only runs when something has already gone wrong. Pre-existing
+            # before round 8 as well; measured on `bb7607b` and `07c5c67`.
+            if self._handoff_record is not None:
+                self._handoff_record(identity[2], reason, rule, False)
             yield self._client_refusal(identity, reason, rule)
 
     def control_answer(self, request_id):
         """The frame a proxy-owned request got, or None while it is unanswered."""
         return self._control_answers.get(key(ORIGIN_PROXY, request_id))
 
-    def answered_on_the_wire(self, request_id, *, origin=ORIGIN_CLIENT,
-                             final=False):
+    def obligation_for(self, request_id, *, origin=ORIGIN_CLIENT):
+        """The token of the LIVE attempt under this id.
+
+        For a caller answering the item that is still pending -- a local
+        withhold, a cancellation -- where the live generation is unambiguous
+        because admission refuses an id that is already pending or settling.
+        A caller answering something that may have finished must carry its own
+        token instead; that is what `obligation_of_last_yield` is for.
+        """
+        return self._core_key(key(origin, request_id))
+
+    def obligation_of_last_yield(self):
+        """The token the frame just yielded discharges, or None for a frame
+        that discharges nothing (a notification, or the reader saying nothing
+        crosses)."""
+        return self._yielded_obligation
+
+    def answered_on_the_wire(self, token, *, final=False):
         """This id's answer is committed to the sink, or has reached it.
 
         R-168-R8/F3. TAKING IS REVERSIBLE, CONFIRMING IS NOT, and collapsing
@@ -1839,12 +1898,16 @@ class Session:
         time. An id whose frame has actually MOVED is never owed again; an id
         we merely committed to may be.
         """
-        identity = key(origin, request_id)
-        self._unanswered.discard(identity)
+        # THE CONFIRMATION NAMES THE GENERATION IT CONFIRMS. Clearing at
+        # admission is not enough: a LATE confirmation for the first generation
+        # arrives after the second is admitted, and keyed by identity it
+        # discarded the new generation's obligation (XU13). A token can only
+        # ever confirm its own attempt.
+        self._unanswered.discard(token)
         if final:
-            self._answered_final.add(identity)
+            self._answered_final.add(token)
 
-    def owe_again(self, request_id, *, origin=ORIGIN_CLIENT):
+    def owe_again(self, token):
         """Give back an obligation we committed to and did not discharge.
 
         Delivery is taken BEFORE the authorisation, so a concurrent receipt
@@ -1852,17 +1915,71 @@ class Session:
         authorisation then fails the bytes never moved and the client is owed
         again. But only if nothing has ever reached them for this id.
         """
-        identity = key(origin, request_id)
-        if identity not in self._answered_final:
-            self._unanswered.add(identity)
+        if token not in self._answered_final:
+            self._unanswered.add(token)
 
     def unanswered_clients(self):
-        """Every client identity admitted and never answered, retired or not.
+        """Every outstanding obligation, FOR LOOKING AT. Grants nothing.
 
-        Identities, not ids: the caller needs the JSON type to tell 1 from 1.0
-        and to answer a null id at all.
+        R-168-R9. This used to be how the payer got its work, and reading a
+        list and then marking its entries afterwards is not a claim: a real
+        cancellation answered an id while the payer held a stale copy and the
+        id was paid twice. Claiming now happens only through
+        `take_next_unanswered`, which takes under the owner.
+
+        The method stays because reviewer controls READ it to observe the
+        table, and an instrument that can no longer see the state it is
+        grading is an instrument broken by a change it had no reason to
+        notice. Observation is safe; it is acting on an observation held
+        across a lock release that is not.
         """
         return list(self._unanswered)
+
+    def take_obligation(self, token):
+        """Claim THIS obligation, or say somebody else already has it.
+
+        R-168-R9/(b). THE ONE OWNERSHIP OPERATION, and every delivery path goes
+        through it -- the payer, the local withhold, the cancellation, the
+        release. Round 9's first draft had the ordinary paths CONFIRM
+        unconditionally while only the payer took, so both answered the same
+        request: the payer paid an admitted id whose ordinary answer was still
+        in flight, and the client got two frames (RS09).
+
+        A caller that is refused here writes nothing. It has not failed; it has
+        learned that this obligation is someone else's to discharge.
+        """
+        with self._settlement:
+            if token not in self._unanswered:
+                return False
+            self._unanswered.discard(token)
+            return True
+
+    def take_next_unanswered(self, *, origin=ORIGIN_CLIENT):
+        """Take ONE outstanding obligation, or None. The only way to get one.
+
+        R-168-R9/(b). `unanswered_clients()` handed out a SNAPSHOT and the
+        caller marked each entry afterwards, so the list outlived the owner: a
+        real cancellation answered an id while the payer was paused holding a
+        stale copy, and the payer paid it again. Two responses, one request.
+        `_paying` never helped -- it prevents recursion, not a race.
+
+        Taking is the claim. There is no reading without taking, so nothing a
+        caller holds can go stale in its hand, and a token taken or already
+        confirmed grants nothing to anyone else. Same law as R-179-R7's
+        delivery ownership, which is where this shape comes from.
+        """
+        with self._settlement:
+            for token in self._unanswered:
+                if token[0] == origin:
+                    # TAKEN, NOT CONFIRMED. The caller has committed to
+                    # answering this obligation and nobody else may take it,
+                    # but the bytes have not moved: if its write raises, it
+                    # gives the obligation back through `owe_again` exactly as
+                    # the release path does (XU05). Marking it final here made
+                    # the take permanent and lost the answer.
+                    self._unanswered.discard(token)
+                    return token
+            return None
 
     def closed_with(self):
         return self._closed

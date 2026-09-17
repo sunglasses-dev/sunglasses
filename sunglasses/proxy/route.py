@@ -194,15 +194,19 @@ class Route:
         # already on its way, so the original AND a bounded refusal both
         # reached it (XS15, XS16). Committing first and giving the obligation
         # back if the authorisation fails leaves exactly one of the two.
-        answering = self._id_of(raw)
-        if answering is not _NO_FRAME_ID:
-            self._answered(answering)
+        # R-168-R9/(a). THE READER SAYS WHICH OBLIGATION THIS FRAME DISCHARGES.
+        # Working it out from the id cannot be done any more, and that is the
+        # point: an id can have two unanswered tokens at once -- a finished
+        # generation whose frame never reached the sink, and a live one.
+        owed = self.session.obligation_of_last_yield()
+        if owed is not None:
+            self.session.answered_on_the_wire(owed)
         try:
             self.log.authorise_release(self._token("inbound"),
                                        write=lambda: self.client_write(raw))
         except receipts.ReceiptIOError:
-            if answering is not _NO_FRAME_ID:
-                self.session.owe_again(answering)
+            if owed is not None:
+                self.session.owe_again(owed)
             # T9.R4. A release that cannot be recorded does not happen, and the
             # session stops rather than continuing to mediate with nothing
             # written down.
@@ -222,13 +226,23 @@ class Route:
                          rule=RULE_RESOURCE, forwarded=False)
             self._pay_bounded_refusals()
             return
+        except Exception:
+            # R-168-R9. THE SINK ITSELF FAILED, and the obligation is not
+            # discharged by an attempt to discharge it. Giving it back is the
+            # same rule as the receipt path: taking is reversible until the
+            # bytes have actually moved. Without this the take was permanent
+            # and a client whose write raised was owed an answer nobody held
+            # (XU03).
+            if owed is not None:
+                self.session.owe_again(owed)
+            raise
         # IDEMPOTENT, AND THE NAME IS LOAD-BEARING. The id was taken above,
         # before the authorisation; this confirms it once the bytes have
         # actually moved, and a reviewer control locates this exact statement
         # by AST to pause a thread here (XS15). Deleting it turned that control
         # into a StopIteration -- an instrument broken by a change it had no
         # reason to notice, the `_handoff` signature lesson one more time.
-        self._answered_for(raw)
+        self._answered_for(raw, owed)
         self._record("WRITE_COMPLETE", bytes=len(raw))
 
     def _release_barrier(self, request_id):
@@ -774,7 +788,11 @@ class Route:
             rule=RULE_ADMISSION, accepted=False, status="cancelled",
             inspection_complete=False, inspected_utf8_bytes=0,
             observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog)
+        owed = self.session.obligation_for(target)
+        if not self.session.take_obligation(owed):
+            return
         self._to_client(body)
+        self._answered(owed, final=True)
         self._record("SETTLED", reason_code=REASON_REQUEST_CANCELLED,
                      rule=RULE_ADMISSION, forwarded=False)
 
@@ -886,7 +904,16 @@ class Route:
             elapsed_ms=result.get("elapsed_ms", 0),
             rule_ids=settlement.rule_ids if settlement else (),
             catalog=self.catalog)
+        # R-168-R9/(b). TAKE, do not assume. If this obligation is already
+        # someone else's -- the payer has it, or a close drained it -- there is
+        # nothing here to answer and writing anyway is the second frame.
+        # `_to_client` keeps the one argument a reviewer control stubs it with,
+        # so the ownership call sits beside it rather than inside it.
+        owed = self.session.obligation_for(request_id)
+        if not self.session.take_obligation(owed):
+            return
         self._to_client(body)
+        self._answered(owed, final=True)
         # T6.R1. The held item is settled here and not merely answered, so the
         # correlation table releases the id. Leaving it pending makes the next
         # legitimate use of that id look like a duplicate and closes the
@@ -919,11 +946,20 @@ class Route:
         anything down."""
         if request_id is NO_ID:
             return
+        # R-168-R9/(b). A DELIVERY PATH, so it takes like the others. Writing
+        # without taking left the obligation on the books, and the payer -- run
+        # by the very receipt failure this frame is reporting -- answered the
+        # same request a second time (RS09). Every path that puts an answer on
+        # the wire owns it first.
+        owed = self.session.obligation_for(request_id)
+        if not self.session.take_obligation(owed):
+            return
         self._to_client(envelope.withheld(
             request_id=request_id, reason_code=REASON_RECEIPT_IO_ERROR,
             rule=RULE_RESOURCE, accepted=False, status="not_run",
             inspection_complete=False, inspected_utf8_bytes=0,
             observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog))
+        self.session.answered_on_the_wire(owed, final=True)
 
     # ── plumbing ───────────────────────────────────────────────────────────
 
@@ -1001,15 +1037,17 @@ class Route:
         self.session._close(reason, "the client frame could not be trusted",
                             rule=rule, budget=budget)
 
-    def _answered_for(self, raw):
-        """Confirm the id a released frame answered: the bytes have MOVED.
+    def _answered_for(self, raw, owed=None):
+        """Confirm the obligation a released frame answered: the bytes MOVED.
 
         Idempotent, and `final` is the half that matters: the take before the
-        authorisation is reversible, this is not.
+        authorisation is reversible, this is not. The token comes from the
+        reader rather than from the frame, because the frame's id names an
+        item and not an attempt (R-168-R9). A reviewer control locates this
+        statement by AST, so the name stays whatever it is handed.
         """
-        answering = self._id_of(raw)
-        if answering is not _NO_FRAME_ID:
-            self._answered(answering, final=True)
+        if owed is not None:
+            self.session.answered_on_the_wire(owed, final=True)
 
     def _id_of(self, raw):
         """The id a released frame answers, or the sentinel when it answers none.
@@ -1028,22 +1066,27 @@ class Route:
         return _NO_FRAME_ID
 
     def _to_client(self, body):
-        # R-168-R8/F2. `"id" in body`, not `is not None`. A JSON-RPC null id is
-        # a real id a client may use, and the round-6 guard -- written to skip
-        # notifications -- skipped it too, so a null-id request was answered
-        # locally and then paid a SECOND bounded refusal when the log died
-        # (XS08). A notification has no `id` key at all, which is the actual
-        # distinction.
-        if isinstance(body, dict) and "id" in body:
-            self._answered(body["id"], final=True)
+        """ONE ARGUMENT. R-168-R9, and the reason is a broken instrument.
+
+        A reviewer control substitutes this method with a one-argument stub to
+        watch what reaches the client, so giving it a second parameter turned
+        that control into a TypeError -- the `_handoff` signature lesson, and I
+        have now been taught it five times this week by five different files.
+
+        The obligation a local answer discharges is therefore confirmed by the
+        CALLER, which is the party that knows its token, immediately before
+        calling this. `_withhold` and `_cancel` both do.
+        """
         self.client_write((json.dumps(body, separators=(",", ":")) + "\n")
                           .encode("utf-8"))
         self._record("FRAME_OUT", direction="upstream_to_client",
                      raw_len=len(json.dumps(body)))
 
-    def _answered(self, request_id, *, final=False):
-        """This id's answer is committed to the sink; `final` once it moved."""
-        self.session.answered_on_the_wire(request_id, final=final)
+    def _answered(self, token, *, final=False):
+        """This attempt's answer is committed to the sink; `final` once it
+        moved."""
+        if token is not None:
+            self.session.answered_on_the_wire(token, final=final)
 
     def _pay_bounded_refusals(self):
         """One bounded RECEIPT_IO_ERROR to every client still owed a frame.
@@ -1075,20 +1118,37 @@ class Route:
             return
         self._paying = True
         try:
-            for identity in self.session.unanswered_clients():
-                request_id = identity[2]
-                # Straight to the sink: the bytes move on the next line, so
-                # this id is answered for good and no give-back resurrects it.
-                self.session.answered_on_the_wire(request_id, final=True)
-                self.client_write(
-                    (json.dumps(envelope.withheld(
+            # R-168-R9/(b). TAKEN ONE AT A TIME, UNDER THE OWNER, and never
+            # from a snapshot. The old loop read the whole list and marked each
+            # entry afterwards, so a real cancellation could answer an id while
+            # this payer was paused holding a stale copy -- and the payer then
+            # paid it again. Taking IS the claim, so nothing held here can go
+            # stale in the hand.
+            while True:
+                owed = self.session.take_next_unanswered()
+                if owed is None:
+                    break
+                request_id = owed[2]
+                confirmed = False
+                try:
+                    self.client_write((json.dumps(envelope.withheld(
                         request_id=request_id,
                         reason_code=REASON_RECEIPT_IO_ERROR,
                         rule=RULE_RESOURCE, accepted=False, status="not_run",
                         inspection_complete=False, inspected_utf8_bytes=0,
                         observed_content_bytes=0, elapsed_ms=0,
                         catalog=self.catalog), separators=(",", ":"))
-                     + "\n").encode("utf-8"))
+                        + "\n").encode("utf-8"))
+                    # The bytes have moved: confirm, and no give-back may
+                    # resurrect this one.
+                    self.session.answered_on_the_wire(owed, final=True)
+                    confirmed = True
+                finally:
+                    if not confirmed:
+                        # The sink failed. The obligation was taken and not
+                        # discharged, so it goes back on the books rather than
+                        # vanishing with the attempt to pay it (XU05).
+                        self.session.owe_again(owed)
         finally:
             self._paying = False
 
