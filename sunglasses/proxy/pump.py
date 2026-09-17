@@ -295,11 +295,22 @@ class Session:
             self._close("MALFORMED_CLIENT",
                         "the client used the proxy's control id namespace")
             return False
+        identity = key(origin, request_id)
+        # R-179-R3/XE02. A NEW ATTEMPT OWNS ITS OWN REFUSAL STATE. Round 2 kept
+        # the cause in a table keyed by identity and cleared it only on
+        # success, so an id refused OVERLOADED and then refused again for a
+        # different reason still answered the client OVERLOADED: the route
+        # asked why, and was told why the PREVIOUS attempt failed. Clearing
+        # here, before any decision, means `refusal_for` can only ever describe
+        # the attempt the caller is holding.
+        self._refusals.pop(identity, None)
         if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
+            # Recorded, so the route reads this refusal's cause rather than
+            # falling back to a default that happens to match.
+            self._refusals[identity] = Cause("UNINSPECTED_METHOD", "S1")
             return False
-        identity = key(origin, request_id)
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
         # old response would settle the new request, which answers a call the
@@ -365,19 +376,29 @@ class Session:
                 return False
             breach = bounds.check_admission(
                 outstanding=self._outstanding_locked(origin), queued=0)
-            if not breach:
-                self._generation[identity] = self._generation.get(identity, 0) + 1
+            # R-179-R3/XR03. THE ATTEMPT'S GENERATION IS RESERVED HERE, in the
+            # same critical section as the decision, whichever way the decision
+            # goes. Round 2 reserved the refused attempt's generation in a
+            # SECOND critical section inside `_refuse_overloaded`, after this
+            # one had been released: pause a refusal between the two and an
+            # ordinary admission of the same id can complete in the gap, and
+            # the refusal's later bump then renamed the live item's key --
+            # orphaning an entry the core still owed and raising out of the
+            # reader. A generation handed out here can never be taken back,
+            # so each attempt keeps exactly what it was given.
+            self._generation[identity] = self._generation.get(identity, 0) + 1
+            reserved = self._core_key(identity)
+            if breach:
+                self._refusals[identity] = Cause(breach.reason, breach.rule)
+            else:
                 self._pending[identity] = method
-                # An admitted id carries no refusal. Leaving the old one would
-                # let a later reader answer a live request with the reason a
-                # previous attempt was turned away.
-                self._refusals.pop(identity, None)
         if breach:
             # OUTSIDE the lock: the settlement below takes the core's lock, and
             # taking the core's under ours is the nesting the reader avoids.
-            self._refuse_overloaded(identity, request_id, method, origin, breach)
+            # Everything it needs was decided above; it only reports.
+            self._refuse_overloaded(reserved, request_id, method, origin, breach)
             return False
-        self._core.admit(self._core_key(identity), method=method, origin=origin)
+        self._core.admit(reserved, method=method, origin=origin)
         if self._closed:
             # RC06. The session closed while this admission was in flight, so
             # the item was admitted into a table that has already been torn
@@ -413,8 +434,14 @@ class Session:
         return (sum(1 for i in self._pending if i[0] == origin)
                 + sum(1 for i in self._settling if i[0] == origin))
 
-    def _refuse_overloaded(self, identity, request_id, method, origin, breach):
+    def _refuse_overloaded(self, reserved, request_id, method, origin, breach):
         """T6.R7 + T4.R7. A refusal that a receipt can be graded against.
+
+        R-179-R3: this method only REPORTS. The decision, the slot and the
+        generation were all settled inside the critical section above, so a
+        caller that pauses here -- as ASTRA's XR03 does -- cannot race an
+        ordinary admission of the same id, because there is nothing left here
+        for the two to disagree about.
 
         R-179-R2/AR07: round 1 answered `False` and emitted ADMISSION_REFUSED,
         and that was the whole of it -- no terminal settlement, so nothing in
@@ -425,19 +452,20 @@ class Session:
         there is exactly one terminal receipt for it and the route layer reads
         the cause instead of assuming one.
 
-        The generation is BURNED for the refused attempt so its core key can
-        never be confused with a later, legitimate use of the same id.
+        The generation reserved for the refused attempt is its own, so its core
+        key can never be confused with a later, legitimate use of the same id.
         """
+        # R-179-R3, my own audit finding: `detail` is PROSE and prose does not
+        # belong in evidence. It is the field `Cause.as_receipt` excludes by
+        # name, for a reason recorded there -- the frame receipt leaked peer
+        # material through exactly this field twice. WHICH BOUND BROKE is a
+        # fixed vocabulary, and it is what a reader actually needs.
         self._core._emit("ADMISSION_REFUSED", request_id,
-                         reason=breach.reason, detail=breach.detail)
-        with self._settlement:
-            self._generation[identity] = self._generation.get(identity, 0) + 1
-            core_key = self._core_key(identity)
-            self._refusals[identity] = Cause(breach.reason, breach.rule,
-                                             detail=breach.detail)
-        self._core.admit(core_key, method=method, origin=origin)
-        self._core.settle(core_key, Cause(breach.reason, breach.rule,
-                                          detail=breach.detail), origin=origin)
+                         reason=breach.reason, bound=breach.bound,
+                         origin=origin)
+        self._core.admit(reserved, method=method, origin=origin)
+        self._core.settle(reserved, Cause(breach.reason, breach.rule),
+                          origin=origin)
 
     def refusal_for(self, request_id, *, origin):
         """Why the last admission of this id was refused, or None.

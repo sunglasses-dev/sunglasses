@@ -305,3 +305,118 @@ def test_the_client_is_told_overloaded_and_not_uninspected_method():
     assert "OVERLOADED" in reasons, answered
     assert "UNINSPECTED_METHOD" not in reasons, (
         "the bound breach still reaches the client as an inspection refusal")
+
+
+# ── round 3, R-179-R3 ───────────────────────────────────────────────────────
+#
+# ASTRA drove round 2 through the real Route twice and found two defects in the
+# round-2 repair itself. Both come from the same mistake in different clothes:
+# state that belongs to ONE ATTEMPT was stored against the identity, where a
+# later attempt could read it or a paused earlier one could overwrite it.
+
+def test_a_second_refusal_reports_its_own_reason_not_the_previous_one():
+    """XE02. The refusal a caller is holding is the one it gets told about.
+
+    Round 2 kept the cause keyed by identity and cleared it only on success. So
+    an id refused OVERLOADED, then refused again by T2.R16 for an unknown
+    method, still answered the client OVERLOADED -- the route asked why, and
+    was told why the PREVIOUS attempt failed. On main that same sequence is
+    green, because main has nothing to remember; the regression arrived WITH
+    the repair, which is the kind this file exists to catch.
+    """
+    session = pump.Session()
+    assert _fill(session)
+    assert not session.admit_request(99, method="ping", origin="client")
+    assert session.refusal_for(99, origin="client").reason == "OVERLOADED"
+    # Same id, a different refusal, decided before the bound is ever consulted.
+    assert not session.admit_request(99, method="extension/unknown",
+                                     origin="client")
+    refusal = session.refusal_for(99, origin="client")
+    assert refusal.reason == "UNINSPECTED_METHOD", (
+        f"the second attempt was reported as {refusal.reason}, which is why "
+        f"the first one failed")
+
+
+def test_a_paused_refusal_cannot_rename_a_later_admission():
+    """XR03. A generation, once handed out, is never taken back.
+
+    Round 2 reserved the refused attempt's generation in a SECOND critical
+    section inside `_refuse_overloaded`, after the section that took the
+    decision had been released. Pause a refusal between the two, let an
+    ordinary admission of the same id complete in the gap, and the refusal's
+    bump renamed the live item's key: the core still owed an entry the pump no
+    longer had, and the reader raised.
+
+    ASTRA drove it through two real `Route.client_frame` calls. Driven here at
+    the pump, which is the layer that owns the generation.
+    """
+    session = pump.Session()
+    assert _fill(session)
+    entered, release = threading.Event(), threading.Event()
+    original = session._refuse_overloaded
+
+    def held(*args):
+        entered.set()
+        release.wait(5)
+        return original(*args)
+
+    session._refuse_overloaded = held
+    failures = []
+
+    def refuse():
+        try:
+            session.admit_request(99, method="ping", origin="client")
+        except Exception as error:            # noqa: BLE001 - the point of the row
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=refuse)
+    worker.start()
+    try:
+        assert entered.wait(3), "the refusal never reached its report"
+        # One slot frees, and the SAME id is admitted for real while the
+        # earlier attempt is still parked mid-report.
+        session.deliver_response(origin="upstream", request_id=0)
+        assert session.admit_request(99, method="ping", origin="client")
+        live = session._core_key(pump.key("client", 99))
+    finally:
+        release.set()
+        worker.join(5)
+    assert not failures, failures
+
+    # THE DISCRIMINATOR, and the first draft of this row missed it. Counting
+    # pending against owed passes on the broken head, because the damage is not
+    # a missing entry -- it is that the identity's generation moved UNDER a live
+    # item. On 184188f the live admission holds key (..., 1) while the counter
+    # reads 2, so every later lookup for this id computes a key the core does
+    # not own, and the orphan only surfaces when the reader tries to settle it.
+    # A row that waits for the symptom would have passed on the defect.
+    recomputed = session._core_key(pump.key("client", 99))
+    assert recomputed == live, (
+        f"the live item was admitted as {live} and is now looked up as "
+        f"{recomputed}; the earlier attempt moved its generation")
+    assert recomputed in session._core.owed(), "the live item is not owed"
+    assert len(session._pending) == len(session._core.owed())
+
+    # And it can still be answered, which is what ownership is FOR.
+    session.deliver_response(origin="upstream", request_id=99)
+    assert session._core.settled_as(live) is not None, (
+        "the live item could not be settled after the earlier attempt resumed")
+
+
+def test_the_refusal_receipt_carries_no_prose():
+    """My own audit finding, ruled in as R-179-R3(3).
+
+    Round 2 emitted `detail="8 correlations already outstanding"` into the
+    event stream. `Cause.as_receipt` excludes `detail` BY NAME and says why --
+    the frame receipt leaked peer material through exactly that field twice --
+    and an emit that adds it back defeats the allowlist from the other side.
+    WHICH BOUND broke is a fixed vocabulary and is what a reader needs.
+    """
+    session = pump.Session()
+    assert _fill(session)
+    assert not session.admit_request(99, method="ping", origin="client")
+    refused = [e for e in session.events if e["kind"] == "ADMISSION_REFUSED"]
+    assert len(refused) == 1, [e["kind"] for e in session.events]
+    assert "detail" not in refused[0], refused[0]
+    assert refused[0]["bound"] in ("outstanding", "queued"), refused[0]
+    assert refused[0]["origin"] == "client", refused[0]
