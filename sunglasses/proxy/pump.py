@@ -292,6 +292,10 @@ class Session:
         # park the watcher's close behind the reader, and the close is what
         # stops the processes -- so the window is CLOSED BY A RECORD instead.
         self._settling: set = set()
+        # R-168-R3. The release gate the READER consults at the handoff. It
+        # lives here rather than in `_handoff`'s signature so that a control
+        # substituting that method with a three-argument stub still works.
+        self._handoff_gate = None
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
         # identity -> the Cause this item settles with, when it is not CLEAN.
@@ -438,6 +442,16 @@ class Session:
 
     def expects(self, request_id, *, origin):
         return key(origin, request_id) in self._pending
+
+    def is_settling(self, request_id, *, origin):
+        """The item has left `_pending` and its answer has NOT yet crossed.
+
+        R-168-R3. `expects` reads one table, and a caller asking "is this still
+        ours?" during a handoff got False -- so a cancellation arriving in that
+        window was treated as though the client had already been answered. It
+        had not been: the frame is still in the reader's hands.
+        """
+        return key(origin, request_id) in self._settling
 
     def expected_method(self, request_id, *, origin):
         return self._pending.get(key(origin, request_id))
@@ -710,7 +724,7 @@ class Session:
                     "the upstream process exited with calls still pending")
 
     # ── reading ─────────────────────────────────────────────────────────────
-    def read_upstream(self, stream, inspect=None):
+    def read_upstream(self, stream, inspect=None, gate=None):
         """Yield the frames a client should see. Stops for good at a fault.
 
         `inspect` is the seam the result direction needs and defaults to None,
@@ -727,6 +741,10 @@ class Session:
         WITHOUT being parsed, because parsing it is how a proxy talks itself
         into continuing.
         """
+        # The gate is the caller's, for the length of this read. Stored
+        # rather than threaded through the yield, and read under the
+        # settlement lock at the handoff.
+        self._handoff_gate = gate
         if self._strict and self._upstream is None:
             # A STARTUP ERROR, not a quieter mode. An upstream nobody supervises
             # is precisely the hang above, and a proxy that runs anyway has
@@ -1251,6 +1269,32 @@ class Session:
             # PRESENT and owned by another generation. An ABSENT record is
             # the ordinary idempotent case, never a fault -- the same reading
             # `_retire_record` takes, where a missing record calls through.
+            # R-168-R3. THE LAST QUESTION ASKED BEFORE ANYTHING CROSSES, and
+            # it is asked HERE for the same reason the close is: a cancellation
+            # or an invalidation that completes while the reader is parked at
+            # this line is not late. `_inspect_result` asks the release barrier
+            # ONCE, before the scan, and the scan is where the time goes -- so
+            # everything that arrived during it was being read as "after
+            # delivery" by a reader that had not delivered anything yet.
+            #
+            # Inside the lock, with the record still standing, so the answer
+            # this produces and the discharge below are one step: the cancel
+            # cannot be treated as already delivered, and it cannot produce a
+            # second answer either.
+            #
+            # THE GATE TRAVELS ON THE SESSION AND NOT IN THIS SIGNATURE, which
+            # is a deliberate choice and not a shortcut. Reviewers' controls
+            # substitute this method with a three-argument stub (RD10 does
+            # exactly that to drive a close from inside the handoff), and a
+            # longer signature turns every one of them into a TypeError --
+            # an instrument broken by a change that did not need to break it.
+            # The property here is WHEN the question is asked, not how the
+            # answer is plumbed, so the plumbing gives way.
+            crossing = raw
+            if self._handoff_gate is not None:
+                withheld = self._handoff_gate(identity[2])
+                if withheld is not None:
+                    crossing = withheld
             standing = self._settling_key.get(identity)
             mismatch = standing is not None and standing != record_key
             if not mismatch:
@@ -1267,7 +1311,7 @@ class Session:
                         "owns, so admission's refusal did not hold",
                         rule="S3")
             return b""
-        return raw
+        return crossing
 
     def _handoff_notification(self, raw):
         """T7.R2 and RC28. A notification crosses only while the session lives.

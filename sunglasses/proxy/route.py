@@ -151,7 +151,8 @@ class Route:
         letters you send and none of the letters you receive.
         """
         for raw in self.session.read_upstream(stream,
-                                              inspect=self._inspect_result):
+                                              inspect=self._inspect_result,
+                                              gate=self._release_gate):
             self._release_inbound(raw)
 
     def _release_inbound(self, raw):
@@ -189,6 +190,36 @@ class Route:
         if self._invalidated:
             return REASON_DESCRIPTOR_CHANGED
         return None
+
+    def _release_gate(self, request_id):
+        """R-168-R3. The release barrier, asked again AT THE HANDOFF.
+
+        `_release_barrier` is asked once in `_inspect_result`, which runs
+        BEFORE the scan -- and the scan is where the time goes. A cancellation
+        or a descriptor invalidation that completed during it was therefore
+        being judged against a question asked before it happened, and the
+        original crossed anyway. ASTRA's instrument pauses the reader on the
+        yield line itself and completes the action there; on the previous head
+        the original (or, with a finding, the PROHIBITED_CONTENT refusal)
+        still went to the client instead of REQUEST_CANCELLED or
+        DESCRIPTOR_CHANGED.
+
+        Returns None to let the crossing through unchanged, or the bytes that
+        replace it. `b""` is a legitimate answer meaning nothing crosses.
+
+        Called by the pump INSIDE the settlement critical section, so the
+        decision and the discharge of the obligation are one step. It builds a
+        frame and writes a receipt; it does not settle in the core, because the
+        item was settled when it left `_pending` and T6.R1 allows exactly one
+        answer -- this REPLACES the frame, it does not add one.
+        """
+        if request_id is NO_ID:
+            return None
+        reason = self._release_barrier(request_id)
+        if reason is None:
+            return None
+        frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL)
+        return frame if frame is not None else b""
 
     def _inspect_result(self, raw, message):
         """None to deliver the original, or (replacement, reason, rule).
@@ -562,6 +593,15 @@ class Route:
             return
         self._cancelled.add(_typed(target))
         self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
+        if self.session.is_settling(target, origin=CLIENT):
+            # R-168-R3. The item has left `_pending` and its answer is in the
+            # reader's hands, NOT the client's. Settling it here would be the
+            # second answer T6.R1 forbids, and returning early -- which is what
+            # the `expects` test below used to do -- treated it as already
+            # delivered and let the original cross. The cancellation is
+            # recorded (above) and stays AUTHORITATIVE: `_release_gate` turns
+            # the crossing into this client's one answer at the handoff.
+            return
         if not self.session.expects(target, origin=CLIENT):
             return
         # session.cancel TOMBSTONES the id, which is the part that matters:

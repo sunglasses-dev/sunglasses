@@ -159,3 +159,109 @@ def test_RD03_invalidation_during_the_scan_withholds_the_original(tmp_path):
     codes = _reason_codes(out)
     assert codes == ["DESCRIPTOR_CHANGED"], codes
     assert all(b'"result"' not in raw for raw in out), "the original crossed"
+
+
+# ── round 3 · the barrier is asked AT THE HANDOFF, not only before the scan ──
+#
+# ASTRA's round-2 instrument pauses the reader ON the yield line and completes
+# the action there. The rows above interrupt the SCAN, which the round-2 repair
+# already covered; these interrupt the window the repair left open -- after the
+# scan returned, before anything crossed. He found four shapes, and the same
+# sentence explains all four: `_inspect_result` asks the release barrier once,
+# before the scan, and the scan is where the time goes.
+
+
+def _at_the_handoff(route, action):
+    """Complete `action` while the reader is at the handoff, before it decides.
+
+    A three-argument wrapper ON PURPOSE. `_handoff` keeps that signature and
+    the gate travels on the session instead, because reviewers' controls
+    substitute this method with a three-argument stub -- and a longer signature
+    turns every one of them into a TypeError. Round 3's first draft did exactly
+    that and broke RD10, which is an instrument failing on a change it had no
+    reason to notice.
+    """
+    original = route.session._handoff
+
+    def handoff(identity, raw, record_key):
+        action(route)
+        return original(identity, raw, record_key)
+
+    route.session._handoff = handoff
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_a_cancellation_at_the_handoff_wins(tmp_path, finding):
+    """RD04b/c. The frame is in the READER's hands, not the client's.
+
+    `Route._cancel` asked `session.expects`, which reads `_pending` only. By
+    the handoff the item has moved to `_settling`, so the cancel returned
+    without cancelling anything and the original crossed -- or, with a finding,
+    the PROHIBITED_CONTENT refusal did. Either way the client's last word about
+    a request it cancelled was an answer to it.
+    """
+    route, out = _route(tmp_path, finding=finding)
+    _at_the_handoff(route, lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+    codes = _reason_codes(out)
+    assert codes == ["REQUEST_CANCELLED"], codes
+    assert all(b'"result"' not in raw for raw in out), "the original crossed"
+    assert len([raw for raw in out if raw]) == 1, "more than one answer"
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_an_invalidation_at_the_handoff_wins(tmp_path, finding):
+    """RD03b/c. Same window, the other authority.
+
+    The descriptors moved while the answer was in flight, so what is about to
+    cross is from a server nobody approved. With a finding the previous head
+    sent PROHIBITED_CONTENT, which reads as "we inspected this and refused it"
+    when the truthful answer is that the approval it was inspected under no
+    longer exists.
+    """
+    route, out = _route(tmp_path, finding=finding)
+    _at_the_handoff(route, lambda r: setattr(r, "_invalidated",
+                                             "DESCRIPTOR_CHANGED"))
+    route.pump_upstream(_answer())
+    codes = _reason_codes(out)
+    assert codes == ["DESCRIPTOR_CHANGED"], codes
+    assert all(b'"result"' not in raw for raw in out), "the original crossed"
+    assert len([raw for raw in out if raw]) == 1, "more than one answer"
+
+
+def test_an_item_being_answered_is_not_an_item_already_delivered(tmp_path):
+    """The unit-level property under the cancel fix.
+
+    `expects` reads `_pending`; an item mid-handoff is in `_settling`. Asking
+    the wrong table is what made a live obligation look like a delivered one.
+    """
+    route, out = _route(tmp_path, finding=False)
+    seen = {}
+
+    def observe(r):
+        seen["expects"] = r.session.expects(1, origin="client")
+        seen["settling"] = r.session.is_settling(1, origin="client")
+
+    _at_the_handoff(route, observe)
+    route.pump_upstream(_answer())
+    assert seen == {"expects": False, "settling": True}, seen
+
+
+def test_a_close_at_the_handoff_still_wins_over_the_gate(tmp_path):
+    """RD08, kept green on purpose.
+
+    The gate runs inside the same critical section as the close check, AFTER
+    it. A round that made cancellation authoritative could easily have made it
+    authoritative over a torn-down session too, which would put a frame on the
+    wire after the session ended.
+    """
+    route, out = _route(tmp_path, finding=False)
+
+    def close_and_cancel(r):
+        r._cancel({"params": {"requestId": 1}})
+        r.session._close("MALFORMED_UPSTREAM", "review handoff fault")
+
+    _at_the_handoff(route, close_and_cancel)
+    route.pump_upstream(_answer())
+    assert all(b'"result"' not in raw for raw in out), "the original crossed"
+    assert route.session.closed_with()[0] == "MALFORMED_UPSTREAM"
