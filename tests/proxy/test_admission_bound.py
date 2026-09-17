@@ -1256,3 +1256,99 @@ def test_a_close_racing_a_local_writer_leaves_one_wire_answer(tmp_path):
     assert not failures, failures
     assert len(drained) + len(written) == 1, (
         f"one request, {len(drained)} drained + {len(written)} written")
+
+
+# ── round 8 · the complete-token rule, everywhere it applies ────────────────
+
+def _admit(session, request_id, origin="client", method="ping"):
+    issued = []
+    assert session.admit_request(request_id, method=method, origin=origin,
+                                 on_attempt=issued.append)
+    return issued[0].token
+
+
+@pytest.mark.parametrize("other,label", [
+    (2, "another id"),
+    (1.0, "the same value with another JSON type"),
+    ("upstream", "the same id from the other origin"),
+])
+def test_settle_from_refuses_a_token_for_another_item(tmp_path, other, label):
+    """R7_SETTLE_FROM_*. The rule `cancel` learned in round 7, one API short.
+
+    `settle_from` compared `token[-1]` alone, so a REAL token for another item
+    passed: the pending entry named by `request_id` was popped and the TOKEN's
+    item was settled. Two items damaged by one call, and neither of them the
+    one the caller asked about.
+    """
+    session = pump.Session()
+    first = _admit(session, 1)
+    if other == "upstream":
+        second_id, second_origin = 1, "upstream"
+    else:
+        second_id, second_origin = other, "client"
+    second = _admit(session, second_id, origin=second_origin)
+    assert first != second, f"{label}: the two tokens are the same"
+
+    answer = session.settle_from(second_origin, second_id, "CLEAN", "S1",
+                                 token=first)
+
+    assert answer is None, f"{label}: the call was not refused"
+    assert pump.key(second_origin, second_id) in session._pending, (
+        f"{label}: the item the caller named lost its correlation")
+    assert session._core.settled_as(first) is None, (
+        f"{label}: the token's own item was settled by a call about another")
+    assert session._core.settled_as(second) is None, (
+        f"{label}: the named item was settled by a refused call")
+
+
+def test_a_refused_wrong_token_leaves_the_first_item_answerable(tmp_path):
+    """R7_SETTLE_FROM_FOLLOWUP. The damage showed up one frame later.
+
+    With the first item quietly settled by a call about the second, its own
+    ordinary response then reached a SECOND core settlement and `Settled`
+    escaped the reader -- an exception where a receipt belongs, which is the
+    same ending as #168's round-6 close race by a different road.
+    """
+    session = pump.Session()
+    first = _admit(session, 1)
+    second = _admit(session, 2)
+    session.settle_from("client", 2, "CLEAN", "S1", token=first)
+
+    answered = session.settle_from("client", 1, "CLEAN", "S1", token=first)
+
+    assert answered is not None, "the first item could no longer be answered"
+    assert session._core.settled_as(first) is not None
+
+
+def test_every_token_entry_point_validates_the_whole_token():
+    """THE SHAPE OF THIS MISS, pinned so the next sibling cannot ship.
+
+    Round 7 fixed `cancel` and left `settle_from`, because I fixed the instance
+    the reviewer drove instead of the class. The class is stateable: a method
+    that takes a token AND a separate identity can be told two different things
+    and must check they agree. A method that derives its identity FROM the
+    token -- `claim_for_local_answer`, `settle_attempt`, `take_delivery` --
+    cannot disagree with itself and needs no such check.
+
+    So this row reads the source and holds every method of the first kind to
+    the rule, and it will fail on the next one added without it.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(pump.Session)))
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        args = {a.arg for a in node.args.args + node.args.kwonlyargs}
+        if "token" not in args or "request_id" not in args:
+            continue            # derives its identity from the token, or takes none
+        body = ast.unparse(node)
+        if "token[:-1]" not in body:
+            offenders.append(node.name)
+    assert not offenders, (
+        f"these take a token AND a separate identity but never compare the "
+        f"two: {offenders}. A token is (origin, id-type, id, generation); "
+        f"comparing only its generation lets another item's real token pass.")

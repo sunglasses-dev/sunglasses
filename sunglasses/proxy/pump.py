@@ -909,9 +909,31 @@ class Session:
         A token that is no longer the live generation is a TYPED REFUSAL and
         not a silent no-op: the caller is talking about an item that is gone,
         and it needs to know rather than to have settled something else.
+
+        R-179-R8. THE WHOLE TOKEN, and this method is where the round-7 rule
+        stopped one API short. `cancel` learned it; this did not, and the two
+        are the only entry points that take a token AND a separate identity --
+        everything else here (`claim_for_local_answer`, `settle_attempt`,
+        `take_delivery`) derives the identity FROM the token, so no
+        disagreement between the two is possible there.
+        
+        Comparing only the generation let a REAL token for another item pass:
+        a different id, the same numeric value with a different JSON type, or
+        the same id from the other origin. The pending entry named by
+        `request_id` was popped and the TOKEN's item was settled -- two items
+        damaged by one call, and the ordinary response for the first then
+        reached a second core settlement and raised out of the reader.
         """
         identity = key(origin, request_id)
         with self._settlement:
+            # A token for ANOTHER ITEM touches neither: not this correlation,
+            # which the caller asked about and does not own, and not the
+            # token's own item, which the caller did not ask about.
+            if token is not None and token[:-1] != identity:
+                self._core._emit("SETTLEMENT_REFUSED", request_id,
+                                 reason="wrong_item", offered=reason,
+                                 origin=origin)
+                return None
             if token is not None and self._generation.get(identity) != token[-1]:
                 self._core._emit("SETTLEMENT_REFUSED", request_id,
                                  reason="stale_attempt", offered=reason,
