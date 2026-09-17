@@ -91,28 +91,50 @@ class Route:
         else:
             self._client_notification(raw, message, method)
 
+    def _withhold_refusal(self, request_id, refusal):
+        """The answer to an admission that was REFUSED, and nothing else.
+
+        R-179-R4, and the difference from `_withhold` is the whole point.
+        `_withhold` ends with `settle_from(CLIENT, request_id, ...)`, which
+        retires whatever is pending under that ID. For an item that WAS
+        admitted that is exactly right. For a refusal it is a live grenade: a
+        refused attempt and a later admitted attempt share the id, so the
+        earlier attempt's answer retired the later attempt's real request --
+        ASTRA's XR03_OWNER, where the live item ended neither owed nor
+        answerable.
+
+        A refused attempt has nothing of its own to settle here. The pump
+        already settled the refused attempt's own core key, under its own
+        reserved generation, when it reported the refusal. So this writes the
+        client's answer and the receipt, and touches no table.
+        """
+        reason, rule = ((refusal[0].reason, refusal[0].rule) if refusal
+                        else (REASON_UNINSPECTED_METHOD, RULE_ADMISSION))
+        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        self._to_client(envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            catalog=self.catalog))
+
     # ── requests ───────────────────────────────────────────────────────────
 
     def _client_request(self, raw, message, method):
         request_id = message["id"]
 
+        # R-179-R4. THE ATTEMPT CARRIES ITS OWN ANSWER. `refusal` is a local
+        # in this call, so nothing else can read it and no later attempt on the
+        # same id can overwrite it -- which is what three rounds of a table
+        # keyed by the id kept producing.
+        refusal = []
         if not self.session.admit_request(request_id, method=method,
-                                          origin="client"):
+                                          origin="client",
+                                          on_refusal=refusal.append):
             closed = self.session.closed_with()
             if closed:
                 self._answer_close(closed, request_id)
             else:
-                # R-179-R2/AR07. ASK the session why. This used to answer every
-                # non-closing refusal with UNINSPECTED_METHOD, so an admission
-                # bound breach reached the client as "we cannot inspect your
-                # method" -- a receipt that cannot be graded against the row
-                # that actually fired, and advice the client cannot act on. The
-                # fallback stays UNINSPECTED_METHOD because that is the refusal
-                # with no cause of its own (T2.R16 decides before the bound).
-                refusal = self.session.refusal_for(request_id, origin=CLIENT)
-                self._withhold(request_id,
-                               refusal.reason if refusal else REASON_UNINSPECTED_METHOD,
-                               refusal.rule if refusal else RULE_ADMISSION)
+                self._withhold_refusal(request_id, refusal)
             return
         self._record("ADMITTED", id_type=type(request_id).__name__)
 

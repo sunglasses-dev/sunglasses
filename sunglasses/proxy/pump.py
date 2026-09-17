@@ -23,6 +23,25 @@ import threading
 from . import bounds, framing, handshake, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
+def _tell(sink, cause):
+    """Hand a refusal to the ATTEMPT that asked for it, and to nobody else.
+
+    R-179-R4. Three rounds of one bug were one mistake: refusal state kept in a
+    table keyed by the ID. Two attempts on the same id share that key, so a
+    later attempt overwrote what an earlier one was about to read (XE03), and
+    an earlier attempt's answer retired a later attempt's live request (XR03).
+    Clearing the entry sooner -- round 3 -- only narrows the window. The id is
+    simply the wrong key, because the thing being described is an ATTEMPT.
+
+    So nothing is stored. The caller passes the place its own answer goes, and
+    that place is unreachable from any other attempt: there is no table left to
+    read at the wrong moment. The boolean return is unchanged, because 165 call
+    sites depend on it and exactly one caller needs the cause.
+    """
+    if sink is not None:
+        sink(cause)
+
+
 ORIGIN_CLIENT = "client"
 ORIGIN_UPSTREAM = "upstream"
 # T6.R6. The proxy's own control traffic. T2.R6 turns one client tools/list
@@ -272,16 +291,13 @@ class Session:
         # park the watcher's close behind the reader, and the close is what
         # stops the processes -- so the window is CLOSED BY A RECORD instead.
         self._settling: set = set()
-        # The cause of the most recent refusal per identity, so the caller can
-        # answer the client with the reason that actually applied (R-179-R2).
-        self._refusals: dict = {}
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
     # ── admission ───────────────────────────────────────────────────────────
-    def admit_request(self, request_id, *, method, origin):
+    def admit_request(self, request_id, *, method, origin, on_refusal=None):
         """T6.R6. A duplicate typed id from the client closes the session."""
         if self._closed:
             return False
@@ -303,13 +319,12 @@ class Session:
         # asked why, and was told why the PREVIOUS attempt failed. Clearing
         # here, before any decision, means `refusal_for` can only ever describe
         # the attempt the caller is holding.
-        self._refusals.pop(identity, None)
         if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
             self._core._emit("ADMISSION_REFUSED", request_id,
                              reason="UNINSPECTED_METHOD", method_known=False)
             # Recorded, so the route reads this refusal's cause rather than
             # falling back to a default that happens to match.
-            self._refusals[identity] = Cause("UNINSPECTED_METHOD", "S1")
+            _tell(on_refusal, Cause("UNINSPECTED_METHOD", "S1"))
             return False
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
@@ -389,7 +404,7 @@ class Session:
             self._generation[identity] = self._generation.get(identity, 0) + 1
             reserved = self._core_key(identity)
             if breach:
-                self._refusals[identity] = Cause(breach.reason, breach.rule)
+                refused_with = Cause(breach.reason, breach.rule)
             else:
                 self._pending[identity] = method
         if breach:
@@ -397,6 +412,7 @@ class Session:
             # taking the core's under ours is the nesting the reader avoids.
             # Everything it needs was decided above; it only reports.
             self._refuse_overloaded(reserved, request_id, method, origin, breach)
+            _tell(on_refusal, refused_with)
             return False
         self._core.admit(reserved, method=method, origin=origin)
         if self._closed:
@@ -466,14 +482,6 @@ class Session:
         self._core.admit(reserved, method=method, origin=origin)
         self._core.settle(reserved, Cause(breach.reason, breach.rule),
                           origin=origin)
-
-    def refusal_for(self, request_id, *, origin):
-        """Why the last admission of this id was refused, or None.
-
-        The route layer needs the REASON, not a boolean. Without this it can
-        only guess, and it guessed the same reason for every refusal.
-        """
-        return self._refusals.get(key(origin, request_id))
 
     def _core_key(self, identity):
         return identity + (self._generation.get(identity, 0),)

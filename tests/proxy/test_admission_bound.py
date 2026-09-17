@@ -218,18 +218,26 @@ def test_the_refusal_names_its_own_cause_to_the_caller():
 
     `route.py` answered every non-closing refusal with UNINSPECTED_METHOD, so a
     bound breach told a well-behaved client that its method could not be
-    inspected. The session now says why, and the only reason the route layer
-    still carries a default is that T2.R16's refusal decides before the bound
-    and has no Cause of its own.
+    inspected. The session now says why.
+
+    R-179-R4: it says it TO THE CALLER, into a place that caller owns. Round 2
+    and round 3 both put the cause in a table keyed by the id, and an id is
+    shared by every attempt that ever uses it.
     """
     session = pump.Session()
     assert _fill(session)
-    assert not session.admit_request(99, method="ping", origin="client")
-    refusal = session.refusal_for(99, origin="client")
-    assert refusal is not None and refusal.reason == "OVERLOADED"
-    assert refusal.rule == "S3"
-    assert session.refusal_for(0, origin="client") is None, (
-        "an admitted id is carrying a refusal")
+    mine = []
+    assert not session.admit_request(99, method="ping", origin="client",
+                                     on_refusal=mine.append)
+    assert len(mine) == 1 and mine[0].reason == "OVERLOADED"
+    assert mine[0].rule == "S3"
+    # An admission that SUCCEEDS tells its caller nothing, because there is
+    # nothing to tell -- not "nothing left over from someone else".
+    theirs = []
+    session.deliver_response(origin="upstream", request_id=0)
+    assert session.admit_request(77, method="ping", origin="client",
+                                 on_refusal=theirs.append)
+    assert theirs == []
 
 
 def test_a_duplicate_id_at_capacity_is_malformed_not_overloaded():
@@ -326,15 +334,24 @@ def test_a_second_refusal_reports_its_own_reason_not_the_previous_one():
     """
     session = pump.Session()
     assert _fill(session)
-    assert not session.admit_request(99, method="ping", origin="client")
-    assert session.refusal_for(99, origin="client").reason == "OVERLOADED"
+    first = []
+    assert not session.admit_request(99, method="ping", origin="client",
+                                     on_refusal=first.append)
+    assert first[0].reason == "OVERLOADED"
     # Same id, a different refusal, decided before the bound is ever consulted.
+    second = []
     assert not session.admit_request(99, method="extension/unknown",
-                                     origin="client")
-    refusal = session.refusal_for(99, origin="client")
-    assert refusal.reason == "UNINSPECTED_METHOD", (
-        f"the second attempt was reported as {refusal.reason}, which is why "
+                                     origin="client", on_refusal=second.append)
+    assert second[0].reason == "UNINSPECTED_METHOD", (
+        f"the second attempt was reported as {second[0].reason}, which is why "
         f"the first one failed")
+    # R-179-R4, the half round 3 could not express: the FIRST attempt's answer
+    # is untouched by the second. With a shared table the earlier caller read
+    # the later caller's reason (XE03_OVERLAP), and it could only be caught by
+    # holding both answers at once -- which is what these two lists do.
+    assert first[0].reason == "OVERLOADED", (
+        f"the first attempt's cause became {first[0].reason} when a second "
+        f"attempt on the same id was refused")
 
 
 def test_a_paused_refusal_cannot_rename_a_later_admission():
@@ -420,3 +437,75 @@ def test_the_refusal_receipt_carries_no_prose():
     assert "detail" not in refused[0], refused[0]
     assert refused[0]["bound"] in ("outstanding", "queued"), refused[0]
     assert refused[0]["origin"] == "client", refused[0]
+
+
+def test_an_earlier_refusal_cannot_retire_a_later_live_request(tmp_path):
+    """XR03_OWNER. The row round 3 passed for the wrong reason.
+
+    Two attempts on id 99: the first is refused at the cap and parked
+    mid-report, a slot frees, the second is ADMITTED and forwarded upstream.
+    When the first resumes it must touch nothing of the second's.
+
+    Round 3 reserved the generation correctly and still failed this, because
+    the ROUTE side was keyed by the id alone: the refused attempt's
+    `_withhold` called `settle_from(CLIENT, 99, ...)` and retired the live
+    request as UNINSPECTED_METHOD. The live item ended neither owed nor
+    answerable -- pending 0, owed 0.
+
+    ASTRA's older XR03_ROUTE row read that as a PASS, because its predicate is
+    "no orphan AND a terminal exists", and settling the live item early
+    satisfies both. That row is RETIRED rather than repaired (T9, R-179-R4):
+    its predicate can only be met by the defect this one names. Measured, same
+    row, same file: round 3 `orphaned_live=False, pending 7 = owed 7`; round 4
+    `pending 8 = owed 8` with the item still answerable.
+    """
+    from sunglasses.proxy import receipts
+    from sunglasses.proxy.route import Route
+
+    written = []
+    session = pump.Session()
+    route = Route(session=session, log=receipts.Log(tmp_path, run_id="r4",
+                                                    header={}),
+                  upstream_write=lambda raw: None,
+                  client_write=written.append, scan=None, catalog=frozenset())
+    assert _fill(session)
+
+    entered, release = threading.Event(), threading.Event()
+    original = session._refuse_overloaded
+
+    def held(*args):
+        entered.set()
+        release.wait(5)
+        return original(*args)
+
+    session._refuse_overloaded = held
+    failures = []
+
+    def refuse():
+        try:
+            route.client_frame(json.dumps(
+                {"jsonrpc": "2.0", "id": 99, "method": "ping"}).encode() + b"\n")
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=refuse)
+    worker.start()
+    try:
+        assert entered.wait(3), "the refusal never reached its report"
+        session.deliver_response(origin="upstream", request_id=0)
+        route.client_frame(json.dumps(
+            {"jsonrpc": "2.0", "id": 99, "method": "ping"}).encode() + b"\n")
+        live = session._core_key(pump.key("client", 99))
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert not failures, failures
+    assert live in session._core.owed(), (
+        "the earlier refusal retired the later live request")
+    assert pump.key("client", 99) in session._pending
+    assert session._core.settled_as(live) is None, (
+        "the live request was given a terminal before its answer arrived")
+    # And it can still be answered exactly once, which is the whole point of
+    # keeping it: the client asked, and an answer is owed.
+    assert session.deliver_response(origin="upstream", request_id=99) is not None
