@@ -91,13 +91,46 @@ def test_a_deadline_miss_exits_1_like_any_other_self_test_failure(tmp_path):
 
 # ──────────────────────────────── the measured figure, beside the bound
 
-def test_the_report_prints_measured_beside_bound():
+def test_the_report_prints_measured_beside_bound(tmp_path):
     """R-DOCTOR-R3b: the honesty is in the printed figure, not a softer bound.
-    3,100 ms against a 2,250 ms bound teaches an operator something true."""
-    v = verdict(checks={**PASSING, "deadline": "FAIL"})
-    line = d.deadline_line(measured_ms=3100)
-    assert "3100" in line and str(d.DEADLINE_BOUND_MS) in line
-    assert d.DEADLINE_BOUND_MS == 2250
+
+    THIS ROW USED TO TEST THE FORMATTER ALONE, and that is why it passed while
+    `deadline_line` was called by nothing, `Report` carried no measured figure
+    and `render` emitted neither the measurement nor the bound. ASTRA's
+    test_F2 found it by walking the AST for a caller. A control that exercises
+    a helper proves the helper; it says nothing about whether the product ever
+    reaches it, which is the same lesson as every other one this PR earned. It
+    drives run -> render now, and the assertions are about what an operator
+    actually sees."""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text('{"mcpServers":{}}', encoding="utf-8")
+    checks = dict(PASSING); checks["deadline"] = "FAIL"
+
+    rendered = d.render(d.run(sources=[("project", cfg)],
+                              self_test=lambda: (False, CONTROLS_OK, checks)))
+
+    st = rendered["self_test"]
+    assert st["bound_ms"] == d.DEADLINE_BOUND_MS == 2250
+    assert isinstance(st["measured_ms"], int) and st["measured_ms"] >= 0
+    # The line an operator reads carries BOTH numbers, not just the bound.
+    assert str(st["measured_ms"]) in st["deadline"]
+    assert str(d.DEADLINE_BOUND_MS) in st["deadline"]
+
+
+def test_the_measured_figure_is_taken_and_not_handed_to_us(tmp_path):
+    """The figure is measured around the self-test call in `run`, so a slow
+    self-test shows up as a large measurement. A number the seam could supply
+    would be a claim, not a measurement."""
+    import time as _t
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text('{"mcpServers":{}}', encoding="utf-8")
+
+    def slow():
+        _t.sleep(0.05)
+        return (True, CONTROLS_OK, dict(PASSING))
+
+    rendered = d.render(d.run(sources=[("project", cfg)], self_test=slow))
+    assert rendered["self_test"]["measured_ms"] >= 40, rendered["self_test"]
 
 
 def test_the_bound_is_the_contracts_figure_and_is_not_configurable():

@@ -188,3 +188,81 @@ def test_the_doctor_defines_no_second_exception_family():
     silently misses the other's, which is a refusal that turns into a crash."""
     assert doctor.ConfigConflict is inst.ConfigConflict
     assert doctor.ConfigIOError is inst.ConfigIOError
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 2. ASTRA's three blockers on 3d3ee8c (R-DOCTOR-R2). Reproduced here so
+# the protection lives in the repo and not only in a reviewer's temp directory.
+# Both were RED on 3d3ee8c.
+#
+# No skip guard on the permission row, deliberately. It requires not running as
+# root, and a control that excuses itself when the environment is inconvenient
+# is the shape this lane has already ruled against twice. If it ever runs as
+# root it fails loudly, which is the correct outcome for a check whose premise
+# is gone.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_an_unsearchable_parent_is_named_unreadable_not_absent(cfg, artifact, tmp_path):
+    """R-DOCTOR-R2(1). `Path.exists()` answers False for EACCES and ENOTDIR as
+    well as for a file that is not there, so a REAL config inside a directory
+    with search permission removed was reported ABSENT: never named, never
+    counted unreadable, and the run exited 0 while the other source read
+    WRAPPED. "I could not look" collapsed into "there was nothing to see", and
+    it collapsed the safe-sounding way round, which is the one collapse R3
+    exists to prevent."""
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    hidden = locked / "config.json"
+    hidden.write_bytes(cfg.read_bytes())
+    locked.chmod(0)
+    try:
+        report = doctor.run(
+            sources=[("project", cfg), ("locked", hidden)], artifact=artifact,
+            self_test=lambda: (True, _CONTROLS, dict(_PASSING)),
+            launcher=lambda e: (True, dict(_PASSING)))
+        assert report.exit_code == 2, (
+            f"an unreadable source exited {report.exit_code}, not 2")
+        assert any(str(hidden) == e.get("source")
+                   for e in report.outcome.inventory), (
+            "the file we could not read was not named in the inventory")
+    finally:
+        locked.chmod(0o700)
+
+
+def test_a_genuinely_absent_source_is_still_absent(cfg, artifact, tmp_path):
+    """The other side of the same guard, so probing by read did not turn every
+    missing file into an operational error. ENOENT is the only absence."""
+    report = doctor.run(
+        sources=[("project", cfg), ("nowhere", tmp_path / "not-here.json")],
+        artifact=artifact,
+        self_test=lambda: (True, _CONTROLS, dict(_PASSING)),
+        launcher=lambda e: (True, dict(_PASSING)))
+    assert report.exit_code != 2, "a missing file was treated as unreadable"
+    assert not any("not-here.json" in str(e.get("source", ""))
+                   for e in report.outcome.inventory)
+
+
+def test_the_self_tests_checks_are_not_overwritten_by_a_route(cfg, home, artifact):
+    """R-DOCTOR-R2(2). The launcher loop assigned its checks to the SAME local
+    that held the self-test's, so `self_test_checks` ended up holding the LAST
+    route's: the rendered self-test said its deadline check PASSED while the
+    failure class said DEADLINE. The exit code survived and the EVIDENCE named
+    the wrong thing, which is worse than a wrong exit, because the evidence is
+    the part an operator reads and acts on."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    failing = dict(_PASSING, deadline="FAIL")
+
+    report = doctor.run(
+        sources=[("project", cfg)], artifact=artifact,
+        self_test=lambda: (False, _CONTROLS, failing),
+        launcher=lambda e: (True, dict(_PASSING)))
+    rendered = doctor.render(report)
+
+    assert rendered["self_test"]["checks"]["deadline"] == "FAIL", (
+        "the route's checks overwrote the self-test's")
+    assert rendered["self_test"]["failure_class"] == "DEADLINE"
+    # And the route's own checks are still reported, under the route.
+    assert rendered["route_checks"], "the launcher's checks went nowhere"
+    assert all(v.get("deadline") == "PASS"
+               for v in rendered["route_checks"].values())

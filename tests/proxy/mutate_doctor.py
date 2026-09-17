@@ -32,6 +32,19 @@ SUITE = "tests/proxy/test_doctor_reconciled.py tests/proxy/test_doctor_selftest.
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
+    # ── Round 2. ASTRA's three blockers, one mutation per fix ─────────────
+    ('R2-ABSENCE', 'a source we cannot read is reported absent instead of named',
+     '        except OSError:\n            unreadable.append(str(path))\n            continue',
+     '        except OSError:\n            continue',
+     'test_an_unsearchable_parent_is_named_unreadable_not_absent'),
+    ('R2-CHECKS-LOCAL', "a route's checks overwrite the self-test's evidence",
+     '        passed, route_result = launch(entry)',
+     '        passed, route_result = launch(entry); checks = route_result',
+     'test_the_self_tests_checks_are_not_overwritten_by_a_route'),
+    ('R2-MEASURED', 'the report carries a zero instead of the measured duration',
+     '                  self_test_measured_ms=measured_ms,',
+     '                  self_test_measured_ms=0,',
+     'test_the_measured_figure_is_taken_and_not_handed_to_us'),
     ('ONE-CLASSIFIER', "the doctor classifies with its own rule instead of install's",
      '                state=_install.classify(spec, artifact=artifact)))',
      '                state=WRAPPED if isinstance(spec, dict) and _install.MARKER in spec else DIRECT))',

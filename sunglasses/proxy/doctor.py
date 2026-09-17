@@ -34,6 +34,7 @@ import json
 import os
 import stat
 import sys
+import time
 from dataclasses import dataclass, field
 import pathlib
 from pathlib import Path
@@ -139,6 +140,9 @@ class Report:
     route_checks: dict = field(default_factory=dict)
     self_test_failure_class: str = ""
     self_test_failed_checks: list = field(default_factory=list)
+    # The self-test's own wall duration, measured in `run`. A field rather than
+    # a formatted string so the number can be compared as well as read.
+    self_test_measured_ms: int = 0
 
 
 # ── T10.R1 · an instrument that cannot fail proves nothing ─────────────────
@@ -272,14 +276,29 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
     entries, unreadable = [], []
     for label, path in sources:
         path = Path(path)
-        if not path.exists():
+        # R-DOCTOR-R2(1). ABSENCE IS ENOENT AND NOTHING ELSE. This used to be
+        # `if not path.exists(): continue`, and `Path.exists()` answers False
+        # for EACCES and ENOTDIR as well as for a file that is not there. So a
+        # real config inside a directory with search permission removed was
+        # reported as ABSENT: never named, never counted unreadable, and the
+        # run exited 0 while the other source read WRAPPED. "I could not look"
+        # collapsed into "there was nothing to see", which is the single
+        # collapse R3 exists to prevent, and it collapsed the safe way round.
+        #
+        # We probe by READING. An error on a real path is operational, is
+        # named, and drives exit 2.
+        try:
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            unreadable.append(str(path))
             continue
         # The SAME parser `install` uses, so a document install REFUSES is
         # never read here as if it were fine. A duplicate-key config resolves
         # silently under bare `json.loads`, and reporting on a document we
         # quietly resolved on the user's behalf is a different file than theirs.
         try:
-            raw = path.read_bytes()
             doc = _install._parse(raw, path)
             servers = _install._servers(doc, path)
         except (OSError, _install.ConfigIOError):
@@ -351,7 +370,14 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                                        artifact_sha=artifact_sha,
                                        hash_of=hash_of)
 
+    # R-DOCTOR-R2(3). MEASURED HERE, so the figure in the report is one we
+    # took rather than one we were handed. `deadline_line` existed, was called
+    # by nothing, and my own control exercised the formatter alone -- so it
+    # passed while the product emitted neither the measurement nor the bound.
+    # A helper with a test and no caller is not a feature.
+    started = time.monotonic_ns()
     result = (self_test or default_self_test)()
+    measured_ms = (time.monotonic_ns() - started) // 1_000_000
     # 2-tuple is the seam's original shape; 3-tuple adds the named checks so a
     # deadline miss is distinguishable from a schema miss in the report.
     if len(result) == 3:
@@ -369,9 +395,16 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     for entry in entries:
         if entry.state != WRAPPED:
             continue
-        passed, checks = launch(entry)
+        # R-DOCTOR-R2(2). `route_result` and not `checks`. This loop used to
+        # assign the launcher's checks to the SAME local that held the
+        # self-test's, so `self_test_checks` below stored the LAST route's
+        # checks: the rendered self-test said its deadline check PASSED while
+        # the failure class said DEADLINE. The exit code survived and the
+        # evidence named the wrong thing, which is worse than a wrong exit
+        # because it is the part an operator reads.
+        passed, route_result = launch(entry)
         entry.passed = bool(passed)
-        route_checks[f"{entry.source}:{entry.name}"] = _safe_checks(checks)
+        route_checks[f"{entry.source}:{entry.name}"] = _safe_checks(route_result)
 
     outcome = aggregate(sources_readable=not unreadable, entries=entries,
                         unreadable=unreadable)
@@ -385,6 +418,7 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                   self_test_failure_class=verdict.failure_class,
                   self_test_failed_checks=list(verdict.failed_checks),
                   self_test_detail=detail,
+                  self_test_measured_ms=measured_ms,
                   route_checks=route_checks)
 
 
@@ -410,7 +444,14 @@ def render(report) -> dict:
                       "failed": report.self_test_failed_checks,
                       "failure_class": report.self_test_failure_class,
                       "detail": (report.self_test_detail
-                                 if report.self_test_detail in DETAILS else "")},
+                                 if report.self_test_detail in DETAILS else ""),
+                      # Measured beside the bound, both as the number and as
+                      # the line an operator reads. R-DOCTOR-R3b asked for the
+                      # figure, and a figure the product never prints is not a
+                      # figure anybody gets.
+                      "measured_ms": report.self_test_measured_ms,
+                      "bound_ms": DEADLINE_BOUND_MS,
+                      "deadline": deadline_line(report.self_test_measured_ms)},
         "per_wrapper": report.outcome.per_wrapper,
         "inventory": report.outcome.inventory,
         "aggregate": report.outcome.aggregate,
