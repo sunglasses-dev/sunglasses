@@ -4699,7 +4699,7 @@ PATTERNS = [
             "confusable script jailbreak",
         ],
         "regex": [
-            r'(?is)(\b(decode|decrypt|transliterate|normalize|apply\s*(rot13|cipher|substitution)|convert\s*(braille|dots?)\s*to\s*text)\b.{0,220}\b(ignore\s+(all|previous)|reveal\s+(system\s*prompt|tool\s*schema)|export\s+(token|secret|key)|send\s+to\s+https?://)\b)|([\u2800-\u28FF]{8,})|((?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)',
+            r'(?is)(\b(decode|decrypt|transliterate|normalize|apply\s*(rot13|cipher|substitution)|convert\s*(braille|dots?)\s*to\s*text)\b.{0,220}\b(ignore\s+(all|previous)|reveal\s+(system\s*prompt|tool\s*schema)|export\s+(token|secret|key)|send\s+to\s+https?://)\b)|([\u2800-\u28FF]{8,})|((?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)',
         ],
         "description": "Detects prompt injection payloads concealed in alternate encodings (Braille, ROT13, base64, confusable scripts, dot-patterns) that become harmful after normalization or decoding.",
     },
