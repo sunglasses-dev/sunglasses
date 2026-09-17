@@ -711,3 +711,367 @@ def test_a_cancellation_settles_the_generation_it_observed():
     assert session._core.settled_as(live) is None, (
         "the cancellation settled a generation admitted after it")
     assert live in session._core.owed()
+
+
+# ── round 6 · what a refusal is allowed to touch ────────────────────────────
+
+def _route_for(session, tmp_path, *, client_write=None, upstream_write=None):
+    """The real Route over a real log, with approvals that always hold.
+
+    Every round-6 row drives ordinary frames through this rather than calling
+    the pump directly: four of ASTRA's seven are reachable only through the
+    route, and a row that pokes the pump would measure a composition no client
+    can actually produce.
+    """
+    from sunglasses.proxy import receipts
+    from sunglasses.proxy.route import Route
+
+    return Route(session=session,
+                 log=receipts.Log(tmp_path, run_id="r6", header={}),
+                 upstream_write=upstream_write or (lambda raw: None),
+                 client_write=client_write or (lambda raw: None),
+                 catalog=frozenset(),
+                 approvals=types.SimpleNamespace(
+                     may_call=lambda *a: "APPROVAL_REQUIRED",
+                     invalidate=lambda: None))
+
+
+def _request(request_id, method):
+    return json.dumps({"jsonrpc": "2.0", "id": request_id, "method": method,
+                       "params": {"name": "review"}}).encode() + b"\n"
+
+
+def test_a_refusal_never_renames_a_live_request(tmp_path):
+    """R5_UNKNOWN_LIVE. The refusal path reserved a generation FIRST.
+
+    An unknown method was refused before any of the three protocol tests ran,
+    and refusing reserves -- which bumps the very counter that identifies the
+    live correlation already standing under that id. So an unknown method sent
+    on a pending id renamed the pending request's core key: the core went on
+    owing the old one, `_core_key` returned the new one, and the real answer
+    when it arrived settled a generation nobody owned while the original debt
+    stayed owed with no pending entry to find it by. Pending 0, owed 1, no
+    exception anywhere.
+
+    Ownership is decided before anything is reserved now, so the duplicate is
+    what it has always been -- a protocol fault -- and the refusal can only
+    ever reserve on an id that owns nothing.
+    """
+    session = pump.Session()
+    forwarded = []
+    route = _route_for(session, tmp_path, upstream_write=forwarded.append)
+    route.client_frame(_request(99, "ping"))
+    live = session._core_key(pump.key("client", 99))
+    assert live in session._core.owed(), "the ping was never really forwarded"
+
+    route.client_frame(_request(99, "extension/unknown"))
+
+    assert session._core_key(pump.key("client", 99)) == live, (
+        "the refusal moved the generation that names the live request")
+    assert session.closed_with() is not None, (
+        "reusing a pending id is a protocol fault whatever method it carries")
+    assert not session._core.owed(), (
+        f"the live debt was orphaned: {session._core.owed()}")
+
+
+def test_a_paused_owner_keeps_the_claim_on_its_own_item(tmp_path):
+    """R5_UNKNOWN_WITHHOLD. The same generation move, from the other side.
+
+    An admitted request is paused at its withhold, an unknown method arrives on
+    the same id, and the older caller resumes to find its claim REFUSED --
+    because the generation it owns is no longer the current one. Its core debt
+    was settled and its pending entry was left behind: pending with no owed
+    owner, the exact mirror of the row above. The route ignored the failed
+    claim and carried on.
+    """
+    session = pump.Session()
+    entered, release, failures = threading.Event(), threading.Event(), []
+    original = pump.Session.claim_for_local_answer
+
+    def paused(self, token):
+        if threading.current_thread().name == "older":
+            entered.set()
+            assert release.wait(5)
+        return original(self, token)
+
+    session.claim_for_local_answer = types.MethodType(paused, session)
+    route = _route_for(session, tmp_path)
+
+    def older():
+        try:
+            route.client_frame(_request(99, "tools/call"))
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=older, name="older")
+    worker.start()
+    try:
+        assert entered.wait(3), "the older attempt never reached its claim"
+        route.client_frame(_request(99, "extension/unknown"))
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert not failures, failures
+    assert not session._pending, f"a pending entry was stranded: {session._pending}"
+    assert not session._core.owed(), f"a debt was stranded: {session._core.owed()}"
+
+
+def test_a_locally_claimed_answer_still_counts_against_the_bound(tmp_path):
+    """R5_LOCAL_CAP, and a REGRESSION of the bound this PR exists to add.
+
+    Claiming an attempt for a local answer takes it out of `_pending` before
+    the frame is written, which is what makes a later upstream response
+    unsolicited (round 5's own fix). It also took it out of the count: eight
+    refused attempts parked at their writers counted ZERO, and a ninth request
+    was admitted with nine debts owed. Round 4 refused that ninth in the same
+    window, so this is the bound going backwards, not a pre-existing gap --
+    and T8.R6 names in-flight held messages explicitly.
+    """
+    entered, release, failures = threading.Condition(), threading.Event(), []
+    arrived = [0]
+
+    def client_write(raw):
+        with entered:
+            arrived[0] += 1
+            entered.notify_all()
+        assert release.wait(5)
+
+    session = pump.Session()
+    route = _route_for(session, tmp_path, client_write=client_write)
+
+    def offer(request_id):
+        try:
+            route.client_frame(_request(request_id, "tools/call"))
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    workers = [threading.Thread(target=offer, args=(i,))
+               for i in range(bounds.OUTSTANDING)]
+    for worker in workers:
+        worker.start()
+    try:
+        with entered:
+            ready = entered.wait_for(lambda: arrived[0] == bounds.OUTSTANDING, 3)
+        assert ready, f"only {arrived[0]} attempts reached their writer"
+        admitted = session.admit_request(99, method="ping", origin="client")
+        owed_at_cap = len(session._core.owed())
+    finally:
+        release.set()
+        for worker in workers:
+            worker.join(5)
+
+    assert not failures, failures
+    assert owed_at_cap == bounds.OUTSTANDING, owed_at_cap
+    assert not admitted, (
+        "a ninth correlation was admitted while eight answers were mid-write")
+
+
+def test_a_claimed_answer_does_not_make_upstream_solicited(tmp_path):
+    """The other half of the row above, and the reason `_claimed` is its own
+    table rather than a second home in `_settling`.
+
+    Counting the item again must not undo what claiming it was FOR: the
+    request was never forwarded, so a response carrying its id is unsolicited
+    by construction and stays that way while the local answer is being written.
+    """
+    session = pump.Session()
+    route = _route_for(session, tmp_path)
+    attempts = []
+    session.admit_request(5, method="tools/call", origin="client",
+                          on_attempt=attempts.append)
+    assert session.claim_for_local_answer(attempts[0].token)
+    with session._settlement:
+        counted = session._outstanding_locked("client")
+    assert counted == 1, "the claim stopped counting"
+    assert not session.expects(5, origin="client"), (
+        "a claimed item still reads as one upstream may answer")
+
+
+def test_a_teardown_racing_the_settlement_never_raises_at_a_client(tmp_path):
+    """R5_WITHHOLD_CLOSE, in its reachable form.
+
+    Round 5 added an already-settled guard as `settled_as` and then `settle`:
+    two acquisitions of the core's lock with a legitimate `_close` able to land
+    between them, so the teardown settled the token and the settle that
+    followed raised `Settled` out of `Route.client_frame` -- an exception
+    reaching a client where a receipt belongs. ADJACENT LINES ARE NOT
+    ATOMICITY, the same sentence as #168's round 5, one module over.
+
+    ASTRA's row pauses `settled_as`, which the fix DELETES from this path, so
+    his barrier can no longer fill: superseded, not satisfied, and measured as
+    zero calls rather than asserted. This drives the same race on the seam that
+    replaced it.
+    """
+    session = pump.Session()
+    entered, release, failures = threading.Event(), threading.Event(), []
+
+    # BOTH SEAMS ARE ARMED AND THE FIRST ONE TO FIRE WINS, because the row
+    # has to pause wherever the implementation ACTUALLY decides, not wherever
+    # this file guesses it does.
+    #
+    # On the old head the window is AFTER `settled_as` has answered "not
+    # settled" and before `settle` acts on that answer, so that seam pauses on
+    # the way out. On the fixed head there is no between -- decision and action
+    # are one call under the core's lock -- so the closest reachable drive is a
+    # teardown completing immediately BEFORE the call, and that seam pauses on
+    # the way in.
+    #
+    # Two earlier shapes of this row were measured and thrown away. Wrapping
+    # `settle_or_report` alone was an AttributeError on `d72dc43`: a red that
+    # says only "this method is new", which is the API-shape red ASTRA counted
+    # three of last round. Then CHOOSING the seam by what the core offers made
+    # the P04 mutant -- which leaves `settle_or_report` defined and stops
+    # calling it -- fail on "the settlement was never reached", a kill scored
+    # from a barrier that never filled rather than from behaviour.
+    fired = []
+
+    def arm(name, before):
+        original = getattr(session._core, name, None)
+        if original is None:
+            return
+
+        def paused(*args, **kwargs):
+            mine = (threading.current_thread().name == "older"
+                    and not fired)
+            if mine and before:
+                fired.append(name)
+                entered.set()
+                assert release.wait(5)
+            value = original(*args, **kwargs)
+            if mine and not before:
+                fired.append(name)
+                entered.set()
+                assert release.wait(5)
+            return value
+
+        setattr(session._core, name, paused)
+
+    arm("settle_or_report", before=True)
+    arm("settled_as", before=False)
+    route = _route_for(session, tmp_path)
+
+    def older():
+        try:
+            route.client_frame(_request(99, "tools/call"))
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=older, name="older")
+    worker.start()
+    try:
+        assert entered.wait(3), "the settlement was never reached"
+        session._close("MALFORMED_CLIENT", "a legitimate teardown")
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert not failures, f"an exception reached the client: {failures}"
+    assert not session._core.owed(), session._core.owed()
+
+
+def test_the_settled_guard_is_one_call_and_not_two():
+    """The shape, pinned, because the timing row above can only catch it when
+    the timing repeats. `settle_attempt` must not ask the core a question and
+    then act on the answer in a second call."""
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(
+        inspect.getsource(pump.Session.settle_attempt)))
+    called = {ast.unparse(node.func) for node in ast.walk(tree)
+              if isinstance(node, ast.Call)}
+    assert "self._core.settled_as" not in called, (
+        "the guard is a check followed by a separate action again")
+    assert "self._core.settle_or_report" in called, called
+
+
+def test_a_stale_token_cancels_nothing(tmp_path):
+    """R5_STALE_CANCEL. The optional token is new API and was never validated.
+
+    `cancel` popped the pending entry and tombstoned the id BEFORE looking at
+    the token it was handed, so a cancellation carrying the token of an attempt
+    that had already been answered retired the LIVE request admitted on that id
+    afterwards -- and tombstoned the id for the rest of the session. The newer
+    request kept its debt and lost its correlation.
+    """
+    session = pump.Session()
+    session.admit_request(7, method="ping", origin="client")
+    stale = session._core_key(pump.key("client", 7))
+    session.deliver_response(origin="upstream", request_id=7)
+    session.admit_request(7, method="ping", origin="client")
+    live = session._core_key(pump.key("client", 7))
+    assert stale != live
+
+    session.cancel(7, origin="client", token=stale)
+
+    assert live in session._core.owed(), "the live request lost its debt"
+    assert pump.key("client", 7) in session._pending, (
+        "the live request lost its pending correlation")
+    assert pump.key("client", 7) not in session._tombstones, (
+        "a stale cancellation tombstoned an id it does not own")
+
+
+def test_an_attempt_cannot_be_edited_after_it_is_issued():
+    """R5_IMMUTABLE_ATTEMPT. The docstring claimed it since round 5.
+
+    Only the TUPLE the property returns was immutable. The carrier was not, so
+    `attempt.generation += 1` changed the token every later reader would be
+    handed -- an id-only key with extra steps, which is the defect this lane
+    has spent five rounds on.
+    """
+    session = pump.Session()
+    issued = []
+    session.admit_request(99, method="extension/unknown", origin="client",
+                          on_refusal=issued.append)
+    attempt = issued[0]
+    before = attempt.token
+    with pytest.raises(AttributeError):
+        attempt.generation += 1
+    assert attempt.token == before
+
+
+def test_a_withhold_with_no_attempt_refuses_instead_of_settling_twice(tmp_path):
+    """R5_NOATTEMPT_REFUSAL. The comment promised a refusal; the code wrote
+    two successful settlements.
+
+    The no-attempt branch recorded SETTLED and then fell through to a second
+    unconditional SETTLED below it: two terminal receipts for an item that was
+    never settled at all, on the one path whose whole point is that nobody owns
+    the thing being answered.
+    """
+    session = pump.Session()
+    route = _route_for(session, tmp_path)
+    events = []
+    route._record = lambda event, **fields: events.append(event) or True
+
+    route._withhold(99, "UNINSPECTED_METHOD", "S1")
+
+    assert events.count("SETTLED") == 0, events
+    assert events.count("SETTLEMENT_REFUSED") == 1, events
+
+
+def test_a_close_while_an_answer_is_claimed_still_pays_that_debt(tmp_path):
+    """The third table has to be drained, or counting it creates the hole.
+
+    `_close` retains what is owed by walking `_pending` and `_settling`. An
+    attempt claimed for a local answer is in neither, so adding the table
+    without adding it here would be RC13's "in neither table" window with a new
+    name: a client blocked on a request the teardown never records a debt for,
+    and never answers. Measured rather than assumed, because the fix for the
+    bound and the hole in the close are one line apart.
+    """
+    session = pump.Session()
+    attempts = []
+    session.admit_request(5, method="tools/call", origin="client",
+                          on_attempt=attempts.append)
+    assert session.claim_for_local_answer(attempts[0].token)
+
+    session._close("MALFORMED_UPSTREAM", "a teardown mid-answer")
+
+    assert not session._core.owed(), (
+        f"the claimed attempt's debt was never recorded: {session._core.owed()}")
+    owed_ids = [identity for identity, _, _ in session._owed_refusals]
+    assert pump.key("client", 5) in owed_ids, (
+        "the close retained no refusal for the item being answered")

@@ -334,16 +334,24 @@ class Route:
         # settles nothing and says so.
         if attempt is not None and attempt.request_id == request_id:
             self.session.settle_attempt(attempt.token, reason, rule)
+            # EXACTLY ONE TERMINAL, and it is written here.
+            self._record("SETTLED", reason_code=reason, rule=rule,
+                         forwarded=False)
         else:
             # NO ATTEMPT, NO SETTLEMENT. Every caller of `_withhold` now
             # carries the attempt it is answering, so reaching this line means
             # an answer is being written for an item nobody owns -- and the old
             # fallback settled it BY ID, which is the defect this round exists
             # to remove. A typed refusal says so instead of guessing which
-            # generation was meant. R-179-R5.
-            self._record("SETTLED", reason_code=reason, rule=rule,
-                         forwarded=False)
-        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+            # generation was meant.
+            #
+            # R-179-R6/R5_NOATTEMPT_REFUSAL: the comment above promised that
+            # refusal and the code wrote a SETTLED, then fell through to a
+            # second unconditional SETTLED below it -- two successful-settlement
+            # receipts for an item that was never settled at all. The promise
+            # and the branch now agree, and each branch writes ONE terminal.
+            self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
+                         reason="no_attempt", forwarded=False)
 
     def _refuse_unparsed(self, frame):
         """T7.R3. One error where JSON-RPC allows one, with a null id because

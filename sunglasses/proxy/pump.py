@@ -38,12 +38,30 @@ class Attempt:
     generation, because "current" is the id-only key wearing a timestamp.
     """
 
-    __slots__ = ("identity", "generation", "cause")
+    __slots__ = ("identity", "generation", "cause", "_frozen")
 
     def __init__(self, identity, generation, cause=None):
+        object.__setattr__(self, "_frozen", False)
         self.identity = identity
         self.generation = generation
         self.cause = cause
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name, value):
+        """FROZEN MEANS FROZEN. R-179-R6/R5_IMMUTABLE_ATTEMPT.
+
+        The docstring above has said the token is immutable since round 5, and
+        only the TUPLE it returns was: `attempt.generation += 1` changed the
+        token every later reader would be handed. A carrier whose contents can
+        move is an id-only key with extra steps, which is the defect this whole
+        lane is about. `Cause` was frozen for the same reason and by the same
+        shape.
+        """
+        if getattr(self, "_frozen", False):
+            raise AttributeError(
+                f"an Attempt is immutable once issued; {name!r} names the "
+                f"generation a holder was handed and it may not move under it")
+        object.__setattr__(self, name, value)
 
     @property
     def token(self):
@@ -328,6 +346,10 @@ class Session:
         self._settling: set = set()
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
+        # R-179-R6. identity -> the token of the attempt answering it LOCALLY.
+        # Counted against the bound and drained by `_close`; read by nothing
+        # that decides admission or correlation, on purpose.
+        self._claimed: dict = {}
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -355,17 +377,6 @@ class Session:
         # asked why, and was told why the PREVIOUS attempt failed. Clearing
         # here, before any decision, means `refusal_for` can only ever describe
         # the attempt the caller is holding.
-        if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
-            self._core._emit("ADMISSION_REFUSED", request_id,
-                             reason="UNINSPECTED_METHOD", method_known=False)
-            # Recorded, so the route reads this refusal's cause rather than
-            # falling back to a default that happens to match -- and it travels
-            # with a RESERVED GENERATION, so the route holds an attempt
-            # identity for this refusal exactly as it does for a bound breach.
-            reserved = self._reserve(identity)
-            _tell(on_refusal, Attempt(identity, reserved[-1],
-                                      Cause("UNINSPECTED_METHOD", "S1")))
-            return False
         # RC17. The record is part of the pending state, so admission reads it.
         # An id whose previous generation is still mid-handoff is not free: the
         # old response would settle the new request, which answers a call the
@@ -412,6 +423,35 @@ class Session:
         # RC20. The INSERT happens under the same lock as the test, re-checking
         # both tables, so nothing can move an entry between deciding and
         # recording.
+        # R-179-R6/R5_UNKNOWN_LIVE. THE UNKNOWN-METHOD REFUSAL LIVES HERE, and
+        # its position is the finding. It used to run FIRST, before the three
+        # protocol tests above, and it reserves a generation -- the same
+        # counter that names the LIVE correlation under this identity. So an
+        # unknown method sent on an id whose real request was still pending
+        # renamed that request's core key: the core went on owing the old key,
+        # `_core_key` returned the new one, and the answer that finally arrived
+        # settled a generation nobody owned while the original debt stayed owed
+        # with no pending entry. Pending 0, owed 1, no exception, no timing
+        # assumption -- ordinary frames in order.
+        #
+        # OWNERSHIP IS VALIDATED BEFORE ANYTHING IS RESERVED. Reusing a live,
+        # settling or tombstoned id is a fact about the CORRELATION and it is
+        # decided above, on its own terms: a duplicate now closes the session
+        # coherently whatever method it carried, instead of being refused by a
+        # path that quietly renames the request it collided with. Only an id
+        # that owns nothing reaches this line, so the reservation here cannot
+        # take anything away from anyone.
+        #
+        # The refusal still RESERVES (M13) and still travels with an attempt
+        # identity (R4_UNKNOWN_TOKEN_1/2): those two rows are the reason this
+        # block exists at all, and moving it does not weaken either.
+        if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
+            self._core._emit("ADMISSION_REFUSED", request_id,
+                             reason="UNINSPECTED_METHOD", method_known=False)
+            reserved = self._reserve(identity)
+            _tell(on_refusal, Attempt(identity, reserved[-1],
+                                      Cause("UNINSPECTED_METHOD", "S1")))
+            return False
         # T801, T8.R6, ROUND 2. The bound is evaluated and the slot reserved
         # inside ONE critical section, and it runs HERE -- after every protocol
         # test above -- because the two are different kinds of answer.
@@ -506,8 +546,16 @@ class Session:
         (v5.2) with this reason; it is a narrowing of the row, and ASTRA's AR04
         as written measures the literal reading it replaces.
         """
+        # R-179-R6/R5_LOCAL_CAP adds the third table. An attempt claimed for a
+        # LOCAL answer has left `_pending` before its frame is written, and
+        # between the claim and the settlement it was counted by nothing: eight
+        # of them parked at their writers left the count at zero and a ninth
+        # request was admitted with nine debts owed. T8.R6 names in-flight held
+        # messages, and a held message being answered is the most in-flight it
+        # ever gets.
         return (sum(1 for i in self._pending if i[0] == origin)
-                + sum(1 for i in self._settling if i[0] == origin))
+                + sum(1 for i in self._settling if i[0] == origin)
+                + sum(1 for i in self._claimed if i[0] == origin))
 
     def _refuse_overloaded(self, reserved, request_id, method, origin, breach):
         """T6.R7 + T4.R7. A refusal that a receipt can be graded against.
@@ -719,6 +767,30 @@ class Session:
                 return False
             self._pending.pop(identity)
             self._answered.add(identity)
+            # R-179-R6/R5_LOCAL_CAP. STILL COUNTED, AND THIS LINE IS THE FIX.
+            # Round 5 dropped the item out of `_pending` and into nothing that
+            # `_outstanding_locked` reads, so eight attempts refused by the
+            # ordinary approval path and parked at their writers counted ZERO
+            # against a bound of eight, and a ninth request was admitted with
+            # nine debts owed. That is a regression of the bound itself --
+            # round 4 refused that ninth in the same window -- and T8.R6 names
+            # in-flight held messages and obligations mid-handoff explicitly.
+            #
+            # ITS OWN TABLE, and `_settling` was measured first. Putting the
+            # item there counts it, and it also makes admission treat the id as
+            # "still being answered" and CLOSE the session on reuse -- which
+            # turned the reachable R4_WITHHOLD_OWNER row red, because the
+            # newer attempt it admits on that id stopped being admissible at
+            # all. That is a redesign of reviewed behaviour smuggled in under a
+            # bound fix, so it was backed out.
+            #
+            # `_claimed` is counted by `_outstanding_locked` and drained by
+            # `_close`, and it is read by nothing else: admission still decides
+            # reuse on `_pending`/`_settling` exactly as before, and
+            # `deliver_response` still reads this id as one nobody is waiting
+            # on, so the unsolicited-response window this method exists to
+            # close stays closed.
+            self._claimed[identity] = token
             return True
 
     def settle_attempt(self, token, reason, rule):
@@ -753,20 +825,28 @@ class Session:
             if mine:
                 self._pending.pop(identity, None)
                 self._answered.add(identity)
-        if self._core.settled_as(token) is not None:
-            # ALREADY ANSWERED, and asking again raises `Settled` out of the
-            # reader rather than returning. A teardown settles everything owed,
-            # including this token, so a close landing while a withheld answer
-            # is mid-write left its trailing settlement calling into a core
-            # that had already answered -- an exception escaping
-            # `Route.client_frame`, which is not a teardown. `settle_from`
-            # never hit this because it bailed on the drained `_pending` table;
-            # settling by token has to make the same check explicitly.
+            # THE ANSWER OBLIGATION ENDS HERE, so the count this attempt has
+            # been holding since `claim_for_local_answer` is released here --
+            # by the OWNED token and never blind, because `_settling` is keyed
+            # by identity and a newer attempt's entry is ITS debt (the same
+            # rule as the pop above).
+            if self._claimed.get(identity) == token:
+                self._claimed.pop(identity, None)
+        # R-179-R6/R5_WITHHOLD_CLOSE. ONE CORE CALL, under the core's lock,
+        # returning WHICH happened. Round 5 asked `settled_as` and then called
+        # `settle`, and a legitimate `_close` landing between the two settled
+        # the token first, so the `settle` raised `Settled` out of
+        # `Route.client_frame` -- an exception reaching a client where a
+        # receipt belongs. The guard was right and its shape was not: two
+        # acquisitions of a lock are not one critical section.
+        terminal, already = self._core.settle_or_report(
+            token, Cause(reason, rule), origin=identity[0])
+        if already:
             self._core._emit("SETTLEMENT_REFUSED", identity[2],
                              reason="already_settled", offered=reason,
                              origin=identity[0])
             return None
-        return self._core.settle(token, Cause(reason, rule))
+        return terminal
 
     def settle_from(self, origin, request_id, reason, rule, *, token=None):
         """T6.R3. An upstream REQUEST is answered in U's id namespace, never C's.
@@ -806,17 +886,43 @@ class Session:
         # generation admitted after it was accepted -- the same class as the
         # withheld attempt settling a newer debt, in the cancellation path.
         with self._settlement:
+            # R-179-R6/R5_STALE_CANCEL. VALIDATED BEFORE THE POP, because the
+            # pop and the tombstone are the irreversible part. Round 5 popped
+            # first and validated never: a cancellation carrying the token of
+            # an attempt that had already been answered retired the LIVE entry
+            # admitted on that id afterwards, and tombstoned the id for the
+            # rest of the session. The newer request kept its debt and lost its
+            # pending correlation -- the same orphan this lane keeps producing,
+            # reached through the new optional argument.
+            #
+            # A stale token cancels NOTHING. It does not pop, it does not
+            # tombstone, and it never settles the generation it does not own;
+            # it settles its own item if that is somehow still owed, which is
+            # the identical rule `settle_attempt` follows.
+            stale = (token is not None
+                     and token[-1] != self._generation.get(identity))
             observed = token if token is not None else self._core_key(identity)
-            self._pending.pop(identity, None)
+            if not stale:
+                self._pending.pop(identity, None)
+        if stale:
+            self._core._emit("SETTLEMENT_REFUSED", request_id,
+                             reason="stale_attempt", offered="REQUEST_CANCELLED",
+                             origin=origin)
+            self._core.settle_or_report(observed,
+                                        Cause("REQUEST_CANCELLED", "S6"),
+                                        origin=origin)
+            return identity
         self._remember_tombstone(identity)
         if self._closed:
             # The tombstone table overflowed and the session closed inside this
             # call. The item is already settled by the teardown, and settling it
             # again would raise `Settled` out of an ordinary cancellation.
             return identity
-        if self._core.settled_as(observed) is not None:
-            return identity
-        self._core.settle(observed, Cause("REQUEST_CANCELLED", "S6"))
+        # One core call, for the reason recorded on `settle_attempt`: asking
+        # and then acting is two acquisitions of the core's lock, and a
+        # teardown between them turns an ordinary cancellation into a raise.
+        self._core.settle_or_report(observed, Cause("REQUEST_CANCELLED", "S6"),
+                                    origin=origin)
         return identity
 
     def _remember_tombstone(self, identity):
@@ -1462,7 +1568,13 @@ class Session:
             # still a client waiting for a frame, and it used to be invisible
             # here. That is the "in neither table" window, seen from the side
             # that pays the debt.
-            for identity in list(self._pending) + list(self._settling):
+            # R-179-R6. `_claimed` TOO. An attempt whose local answer is
+            # mid-write is owed a frame exactly as a pending or settling one
+            # is; leaving it out here is RC13's "in neither table" window with
+            # a third table, and the client waiting on it would be told
+            # nothing.
+            for identity in (list(self._pending) + list(self._settling)
+                             + list(self._claimed)):
                 if identity[0] != ORIGIN_CLIENT:
                     continue
                 own = self._core.terminal_cause(self._core_key(identity))
@@ -1476,6 +1588,7 @@ class Session:
             # a later admission (RC17).
             self._settling.clear()
             self._settling_key.clear()
+            self._claimed.clear()
         self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
                             stop_processes=self._stop_processes())
 
