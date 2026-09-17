@@ -173,6 +173,14 @@ class Route:
             # T9.R4. A release that cannot be recorded does not happen, and the
             # session stops rather than continuing to mediate with nothing
             # written down.
+            #
+            # NOTHING BOUNDED IS SENT FROM HERE, and that is a decision rather
+            # than an omission. These bytes arrive with no id -- they may be an
+            # original, a withheld frame or a refusal the close retained -- and
+            # the party that knows whose answer it is has already sent the
+            # bounded error (`_release_frame`, `_release`). Improvising a
+            # second one here would put two answers on the wire for one
+            # request, which is the rule this path exists to keep.
             self._record("SETTLED", reason_code=REASON_RECEIPT_IO_ERROR,
                          rule=RULE_RESOURCE, forwarded=False)
             return
@@ -267,8 +275,30 @@ class Route:
         a failed write answers by calling `Session._close`, which takes the
         settlement lock the reader was holding while it decided. XB06 reached
         that deadlock with the log's fail-writes seam.
+
+        R-168-R5. XB06 PASSING MEANS NO DEADLOCK, NOT ONE ANSWER DELIVERED.
+        With the deadlock gone the receipt failure took the answer with it:
+        the write below closes the session, the reader hands over nothing, and
+        `_release_inbound` refuses to release anything it cannot authorise --
+        so the client got zero frames for a request it is still blocked on
+        (XD03). The bounded refusal is sent from HERE because this is the
+        frame's owner and the only party that still knows whose answer it was:
+        `_release_inbound` holds bytes with no id, and a second bounded error
+        raised down there would be the second answer T6.R1 forbids.
+
+        Best effort and never claimed durable, which is all a component that
+        has just lost its log may claim.
         """
         frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL)
+        closed = self.session.closed_with()
+        if closed is not None and closed[0] == REASON_RECEIPT_IO_ERROR:
+            # The receipt for THIS answer is what failed: `_withhold_result`
+            # records SETTLED before returning, and `_record` closes the
+            # session on a log that cannot be written. The withheld frame
+            # cannot be released -- nothing may cross unauthorised -- so the
+            # client gets the bounded error instead of silence.
+            self._receipt_failure(request_id)
+            return b""
         return frame if frame is not None else b""
 
     def _inspect_result(self, raw, message):

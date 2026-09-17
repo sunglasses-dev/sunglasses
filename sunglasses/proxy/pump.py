@@ -316,9 +316,34 @@ class Session:
         # discharging. The decision that reaches the wire and the discharge are
         # atomic with respect to the recorded state, which is the ownership
         # that matters and the one a wire can prove.
-        self._authority_lock = threading.Lock()
+        # REENTRANT, and the reason is the re-derivation below: the reader
+        # holds this lock across the final decision so that no writer can land
+        # between it and the discharge, and the decision it re-runs reads
+        # authority through `cancellation_accepted` and `authority_state`,
+        # which take this same lock. A plain Lock deadlocks the reader on
+        # itself there; an RLock lets the owner re-enter and still blocks every
+        # other thread, which is the exclusion the property needs.
+        self._authority_lock = threading.RLock()
         self._cancelled_ids: set = set()
         self._invalidated_as = None
+        # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
+        #
+        # Round 4 claimed the decision and the discharge were atomic because
+        # they are adjacent lines. They are not: the reader releases this lock
+        # when the decision returns and takes the settlement owner only, which
+        # the writers do not need. ASTRA's XD01 measured the window six ways --
+        # a cancellation completing there still lost.
+        #
+        # ADJACENT LINES ARE NOT ATOMICITY. What closes the window is a stamp:
+        # every authority READ records the epoch it saw, and the discharge
+        # refuses to spend a decision derived from an older one. The stamp is
+        # taken at the READ and not before the call, which is the difference
+        # between this and the epoch round 3 proposed: a writer that lands
+        # BEFORE the decision reads is already visible to it and needs no
+        # re-derivation, so the re-derivation fires exactly when the decision
+        # is actually stale.
+        self._authority_epoch = 0
+        self._authority_observed = None
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
         # identity -> the Cause this item settles with, when it is not CLEAN.
@@ -476,12 +501,14 @@ class Session:
         """
         with self._authority_lock:
             self._cancelled_ids.add(key(origin, request_id))
+            self._authority_epoch += 1
 
     def accept_invalidation(self, reason):
         """T5.R4. The descriptors moved; every undelivered answer of this
         generation is from a server nobody approved."""
         with self._authority_lock:
             self._invalidated_as = reason
+            self._authority_epoch += 1
 
     def cancellation_accepted(self, request_id, *, origin):
         """Is THIS id's cancellation accepted? Asked with the session's own key.
@@ -493,6 +520,7 @@ class Session:
         the key is the session's shape.
         """
         with self._authority_lock:
+            self._observe_authority()
             return key(origin, request_id) in self._cancelled_ids
 
     def authority_state(self):
@@ -502,17 +530,62 @@ class Session:
         which is the same class of bug as the one this round is about, one
         level down.
 
-        THERE IS NO EPOCH AND NO RE-DERIVE LOOP, and the reason is worth
-        recording because the ruling anticipated one. An epoch is what you need
-        when the decision is taken away from the discharge and has to be
-        validated on the way back. Here the decision is taken INSIDE the
-        settlement owner, on the line before the discharge, so there is no
-        window to validate: nothing can move between them. Adding a check that
-        can never fire would be a check that skips itself wearing a different
-        hat.
+        THE EPOCH IS BACK, AND THIS DOCSTRING IS WHY. Round 4 said here that
+        there was no window to validate, because the decision is taken inside
+        the settlement owner on the line before the discharge and "nothing can
+        move between them". That is false and it was measured: this lock is
+        released when this call returns, the writers never take `_settlement`,
+        and ASTRA's XD01 completed a cancellation in that window six times --
+        the reader delivered the original every time. I argued the epoch out of
+        round 4 on that sentence, so the sentence is kept above its correction:
+        ADJACENT LINES ARE NOT ATOMICITY, and an argument is not a measurement.
+
+        The read STAMPS the epoch it saw (`_observe_authority`), and the
+        discharge refuses to spend a decision derived from an older one.
         """
         with self._authority_lock:
+            self._observe_authority()
             return frozenset(self._cancelled_ids), self._invalidated_as
+
+    def _observe_authority(self):
+        """Record the epoch THIS decision was derived from. Under the lock.
+
+        The EARLIEST read wins, because a decision that read the cancelled set
+        at one epoch and the invalidation at a later one is internally
+        inconsistent and has to be re-derived just as surely as a stale one.
+        `None` means no authority was read at all -- the gate returned on a
+        recorded fault or on a missing id -- and a decision that never asked
+        cannot have asked too early.
+        """
+        if self._authority_observed is None or \
+                self._authority_epoch < self._authority_observed:
+            self._authority_observed = self._authority_epoch
+
+    def _final_decision(self, request_id, decided):
+        """The decision that actually reaches the wire, taken UNDER the lock.
+
+        Called from inside the settlement owner, at the discharge. If authority
+        moved after the decision read it, the decision is re-derived HERE,
+        while this lock is held, so nothing can move between the re-derivation
+        and the discharge that follows it. That is the shared ordering round 4
+        claimed from adjacency and did not have.
+
+        The callback is re-entered at most ONCE, and only when the epoch says
+        it must be: the reviewer's XG01 counts the calls, and a control that
+        drives its writer INTO the decision is already accounted for by the
+        stamp -- that decision read the new epoch and is not stale.
+        """
+        with self._authority_lock:
+            observed = self._authority_observed
+            if observed is None or observed == self._authority_epoch:
+                return decided
+            # Stale: an authority landed between the read and this point, and
+            # on this head that is the whole of XD01. Re-derive through the
+            # SAME callback, so the recorded-fault precedence and the reason
+            # mapping stay in one place rather than being restated here.
+            if self._handoff_decide is None:
+                return decided
+            return self._handoff_decide(request_id)
 
     def recorded_terminal(self, request_id, *, origin):
         """The cause this item is ALREADY settled with, or None.
@@ -1357,11 +1430,32 @@ class Session:
             # answers by calling `_close`, which takes this same non-reentrant
             # lock (XB06 deadlocked on exactly that). So the FRAME is built
             # below, outside, from a decision already taken.
+            self._authority_observed = None
             withheld = (self._handoff_decide(identity[2])
                         if self._handoff_decide is not None else None)
             if not mismatch:
                 self._settling.discard(identity)
-                self._settling_key.pop(identity, None)
+                # R-168-R5. THE ORDERING, DEMONSTRATED RATHER THAN ARGUED.
+                # The decision above read authority and let go of it; this
+                # block takes it back, re-derives if the epoch moved while the
+                # reader was between the two, and updates the tables before
+                # releasing it. A writer landing in the window either is
+                # visible to the decision (it arrived before the read) or moves
+                # the epoch (it arrived after), and the second case is the one
+                # round 4 lost six times.
+                with self._authority_lock:
+                    withheld = self._final_decision(identity[2], withheld)
+                    if withheld is not None and self._handoff_frame is not None:
+                        # STILL OWED. The frame below is built by fallible
+                        # code -- it writes a receipt, and a receipt that
+                        # cannot be written closes the session -- so the
+                        # obligation is put back and stays on the books until
+                        # the frame exists. Round 4 removed it here and the
+                        # close that followed found nothing to retain, so the
+                        # client got no answer at all (XD03).
+                        self._settling.add(identity)
+                    else:
+                        self._settling_key.pop(identity, None)
         if mismatch:
             # OUTSIDE the lock. `_close` takes `_settlement` itself and it is
             # not reentrant, so faulting inside the block would deadlock the
@@ -1374,10 +1468,41 @@ class Session:
                         rule="S3")
             return b""
         if withheld is not None and self._handoff_frame is not None:
-            # The obligation is already discharged, so this cannot be raced
-            # into a second answer: a close arriving now finds nothing owed.
-            return self._handoff_frame(identity[2], withheld)
+            # OUTSIDE the owner, because building the frame writes a receipt
+            # and a failed write answers by calling `_close`, which takes this
+            # same non-reentrant lock (XB06 deadlocked on exactly that).
+            frame = self._handoff_frame(identity[2], withheld)
+            if not self._retire_prepared(identity, record_key):
+                # A close completed while the frame was being prepared. It
+                # found the record still owed, recorded the debt, and pays it
+                # on the way out; handing this frame over as well would be
+                # T6.R1's one answer becoming two.
+                return b""
+            return frame
         return raw
+
+    def _retire_prepared(self, identity, record_key):
+        """End the obligation once the frame for it EXISTS. Says who won.
+
+        R-168-R5. `_retire_record` cannot be reused here and the difference is
+        the return value: this caller has a frame in its hand and has to be
+        told whether it is still allowed to hand it over. Reading `_closed` in
+        a second acquisition after retiring would put the two reads either side
+        of a lock release, which is the shape this whole round is about.
+
+        False means the close won while the frame was being built: it has
+        recorded the debt for this item and the reader delivers nothing.
+        """
+        with self._settlement:
+            if self._closed:
+                return False
+            if self._settling_key.get(identity, record_key) != record_key:
+                # A later generation owns this record now. Leave it owed; the
+                # reader that created it is the one that may retire it.
+                return False
+            self._settling.discard(identity)
+            self._settling_key.pop(identity, None)
+            return True
 
     def _handoff_notification(self, raw):
         """T7.R2 and RC28. A notification crosses only while the session lives.

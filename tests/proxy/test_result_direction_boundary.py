@@ -287,43 +287,241 @@ def test_a_recorded_fault_is_terminal_and_a_cancel_cannot_overwrite_it(tmp_path)
     assert _reason_codes(out) == ["SCAN_EXCEPTION"], _reason_codes(out)
 
 
-def test_an_authority_writer_never_waits_on_a_parked_reader(tmp_path):
-    """The property that decides which lock the writers use.
+def test_an_authority_writer_completes_while_the_decision_runs(tmp_path):
+    """The property that decides which lock the writers use. XG01's shape.
 
-    A GUARD, NOT A RED-FIRST ROW, and it is labelled that way rather than
-    counted: it passes on `2c0eee7` too, because on that head the writers were
-    already outside the lock -- the defect there was the reader's check, not
-    the writers' lock. This row exists to stop the WRONG FIX, which is the one
-    the ruling first named: putting the writers under the settlement owner.
-    That was measured before it was written, and it turns four of six XB03 rows
-    into "action incomplete".
+    A GUARD, NOT A RED-FIRST ROW. It exists to stop the WRONG FIX -- putting
+    the authority writers under the settlement owner -- which was measured
+    before it was written: it turns four of six XB03 rows into "action
+    incomplete", the writer timing out on a lock the parked reader holds.
 
-    A cancellation must be able to COMPLETE while a reader is parked inside the
-    settlement owner, because that is where the reviewer's instrument pauses
-    it. Writers under the settlement lock were measured first and they cannot:
-    four of six XB03 rows failed with "action incomplete", the writer timing
-    out on a lock the parked reader was holding. So authority has its own lock,
-    and this row is the reason it is not a style choice.
+    THE PREVIOUS VERSION OF THIS ROW DID NOT MEASURE THAT. It completed the
+    cancellation in a wrapper around `_handoff`, BEFORE the original ran, so
+    its `with session._settlement: pass` had already exited and no reader was
+    parked anywhere. ASTRA mutated `accept_cancellation` to take `_settlement`
+    before `_authority_lock` -- the exact wrong fix this row is named after --
+    and the row passed 0/1. A guard that would survive the thing it guards
+    against is a guard that measures itself.
+
+    So the writer is driven from INSIDE the decision, with the settlement owner
+    provably held, and it has to finish there. That is what the reviewer's
+    XG01 does and it is the shape that goes red on the mutation.
     """
     route, out = _route(tmp_path, finding=False)
     session = route.session
+    original = route._release_gate
     finished = threading.Event()
+    seen = {}
 
-    def park(_):
-        # Inside `_handoff`'s critical section, exactly where XB03 pauses.
+    def gate(request_id):
+        seen["owner_held"] = session._settlement.locked()
         worker = threading.Thread(
             target=lambda: (route._cancel({"params": {"requestId": 1}}),
                             finished.set()))
         worker.start()
+        seen["completed_under_owner"] = finished.wait(1)
         worker.join(2)
+        return original(request_id)
 
-    _at_the_handoff(route, park)
-    with session._settlement:
-        pass                                       # the lock is not held here
+    route._release_gate = gate
     route.pump_upstream(_answer())
-    assert finished.is_set(), (
-        "the cancellation could not complete while the reader was parked; the "
-        "writers are waiting on the reader's lock")
+    assert seen.get("owner_held"), (
+        "the decision did not run under the settlement owner, so this row "
+        "proves nothing about writers racing a parked reader")
+    assert seen.get("completed_under_owner"), (
+        "the cancellation could not complete while the reader held the "
+        "settlement owner; the writers are waiting on the reader's lock")
+
+
+# ── round 5 · the window between the decision and the discharge ─────────────
+
+def _after_the_decision(route, action):
+    """Complete `action` AFTER the gate decided and BEFORE the discharge.
+
+    The window round 4 said did not exist. The reader is inside the settlement
+    owner, the decision has been taken from authority it has already stopped
+    holding, and the record has not been retired yet -- so the item is still
+    owed and an authority landing here is not late.
+
+    ON ITS OWN THREAD, BOUNDED, and that is not decoration. Called inline it
+    runs on the READER's thread, which already holds the settlement owner, so
+    the wrong fix this round rejects -- an authority writer that takes that
+    same owner -- turns this row into a self-deadlock and the whole file hangs.
+    A hang is not a kill: it reports the same way whether the property broke or
+    the harness did, which is the failure ASTRA's XG01 was careful to avoid.
+    Bounded and reported, the same mutation fails this row with a sentence.
+
+    ONCE, and the first draft of this helper is the reason it says so. The
+    discharge RE-ENTERS the decision when the epoch moved, and that second call
+    runs while the reader holds `_authority_lock` -- so an unguarded wrapper
+    fired again there and its writer blocked on the exclusion that makes the
+    re-derivation atomic. The row then reported "the authority could not
+    complete", which is true of the second firing and says nothing about the
+    window under test. ASTRA's XD01 carries the same guard (`not fired`).
+
+    Returns a dict the row asserts on: `completed` is False when the writer
+    could not finish while the reader held the owner, and `calls` counts how
+    many times the decision was taken.
+    """
+    original = route._release_gate
+    seen = {"calls": 0}
+
+    def gate(request_id):
+        seen["calls"] += 1
+        reason = original(request_id)
+        if seen["calls"] > 1:
+            return reason
+        worker = threading.Thread(target=lambda: action(route), daemon=True)
+        worker.start()
+        worker.join(2)
+        seen["completed"] = not worker.is_alive()
+        return reason
+
+    route._release_gate = gate
+    return seen
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+@pytest.mark.parametrize("action", ["cancel", "invalidate", "both"])
+def test_an_authority_after_the_decision_still_wins(tmp_path, action, finding):
+    """XD01. ADJACENT LINES ARE NOT ATOMICITY.
+
+    Round 4 removed the epoch and said so in `authority_state`: the decision is
+    taken on the line before the discharge, so "nothing can move between
+    them". Nothing needs to move far. The reader releases `_authority_lock`
+    when the decision returns and takes only the settlement owner, which no
+    writer needs -- so a cancellation completing between those two lines
+    completes, and on that head the original crossed anyway. Six ways, zero
+    harness errors.
+
+    What closes it is not a shorter gap: it is a stamp. The decision records
+    the epoch it read, and the discharge refuses to spend one derived from an
+    older epoch and re-derives instead, holding the lock across both.
+    """
+    route, out = _route(tmp_path, finding=finding)
+
+    def authority(r):
+        if action in ("invalidate", "both"):
+            r._invalidated = "DESCRIPTOR_CHANGED"
+        if action in ("cancel", "both"):
+            r._cancel({"params": {"requestId": 1}})
+
+    seen = _after_the_decision(route, authority)
+    route.pump_upstream(_answer())
+    assert seen.get("completed"), (
+        "the authority could not complete while the reader held the "
+        "settlement owner, so this row measured the lock and not the window")
+    expected = ("REQUEST_CANCELLED" if action in ("cancel", "both")
+                else "DESCRIPTOR_CHANGED")
+    assert _reason_codes(out) == [expected], _reason_codes(out)
+    assert all(b'"result"' not in raw for raw in out), "the original crossed"
+    assert len([raw for raw in out if raw]) == 1, "more than one answer"
+
+
+def test_the_decision_is_re_derived_only_when_the_epoch_moved(tmp_path):
+    """The mechanism itself, counted.
+
+    The stamp is taken at the READ, not before the call, and that is what keeps
+    the re-derivation rare enough to be countable: a writer that lands before
+    the decision reads authority is already in the epoch that decision saw, so
+    there is nothing stale to re-derive. A writer that lands after it moves the
+    epoch and the decision is taken again.
+
+    Counting matters beyond tidiness. The reviewer's XG01 drives its writer
+    INTO the decision and asserts on exactly one pass through it; a re-derive
+    keyed on "did the epoch change at all" fires there too and turns that
+    control into an instrument failure.
+    """
+    route, out = _route(tmp_path, finding=False)
+    quiet = _after_the_decision(route, lambda r: None)
+    route.pump_upstream(_answer())
+    assert quiet["calls"] == 1, "nothing moved, so nothing needed re-deriving"
+
+    route, out = _route(tmp_path, finding=False)
+    moved = _after_the_decision(route,
+                                lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+    assert moved["calls"] == 2, "the stale decision was spent, not re-derived"
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+
+
+def test_a_recorded_fault_survives_an_authority_after_the_decision(tmp_path):
+    """XD02. The re-derivation must not smuggle Rule A out of the round.
+
+    Re-deriving is re-asking the SAME question, through the same callback, so
+    an earlier recorded S3 fault still outranks a cancellation that arrives
+    afterwards. Deriving the reason a second way -- in the session, from the
+    authority it holds -- would answer REQUEST_CANCELLED here while the receipt
+    kept SCAN_EXCEPTION, which is the disagreement XB04 exists to prevent.
+    """
+    route, out = _route(tmp_path, finding=False)
+    route.scan = lambda surface, **kw: {}          # an invalid completion
+    seen = _after_the_decision(route,
+                               lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+    assert seen.get("completed"), "the cancellation never landed"
+    assert _reason_codes(out) == ["SCAN_EXCEPTION"], _reason_codes(out)
+
+
+def test_a_receipt_failure_at_the_handoff_still_answers_the_client(tmp_path):
+    """XD03. XB06 PASSING MEANT NO DEADLOCK, NOT ONE ANSWER DELIVERED.
+
+    Round 3 deadlocked here and round 4 moved the frame builder out, which
+    fixed the liveness and lost the answer: the record was retired before the
+    fallible write, the failed receipt closed the session, the close found
+    nothing owed to retain, and `_release_inbound` refused to release a frame
+    it could not authorise. The client got ZERO frames for a request it is
+    still blocked on -- which is worse than the deadlock, because nothing
+    reports it.
+
+    Two halves, and both are needed. The obligation is put back before the
+    frame is built, so a close that lands during the build has a debt to
+    record; and the frame's owner sends the bounded RECEIPT_IO_ERROR itself,
+    because it is the only party that still knows whose answer it was.
+    """
+    route, out = _route(tmp_path, finding=False)
+    original = route.session._handoff
+
+    def handoff(identity, raw, record_key):
+        route._invalidated = "DESCRIPTOR_CHANGED"
+        route.log.fail_writes(OSError("injected full disk at the handoff"))
+        return original(identity, raw, record_key)
+
+    route.session._handoff = handoff
+    done = threading.Event()
+    worker = threading.Thread(target=lambda: (route.pump_upstream(_answer()),
+                                              done.set()), daemon=True)
+    worker.start()
+    assert done.wait(5), "the reader never finished; the receipt failure hung"
+    assert _reason_codes(out) == ["RECEIPT_IO_ERROR"], _reason_codes(out)
+    assert all(b'"result"' not in raw for raw in out), "the original crossed"
+    assert route.session.closed_with()[0] == "RECEIPT_IO_ERROR"
+
+
+def test_a_close_during_the_frame_build_pays_the_debt_exactly_once(tmp_path):
+    """The other half of the retained obligation, on a HEALTHY log.
+
+    The frame is built outside the settlement owner, so a close can complete
+    while it is being built. Because the record is still owed at that moment
+    the close records the debt and pays it on the way out -- and the reader,
+    told it no longer owns the record, hands over nothing. Retiring before the
+    build loses the answer; delivering afterwards anyway makes two.
+    """
+    route, out = _route(tmp_path, finding=False)
+    session = route.session
+    original = route._release_frame
+
+    def build(request_id, reason):
+        frame = original(request_id, reason)
+        session._close("MALFORMED_UPSTREAM", "close racing the frame build")
+        return frame
+
+    route._release_frame = build
+    _at_the_handoff(route, lambda r: setattr(r, "_invalidated",
+                                             "DESCRIPTOR_CHANGED"))
+    route.pump_upstream(_answer())
+    assert len([raw for raw in out if raw]) == 1, "more than one answer"
+    assert _reason_codes(out) == ["MALFORMED_UPSTREAM"], _reason_codes(out)
 
 
 def test_nothing_under_the_discharge_lock_calls_into_the_route():
