@@ -810,3 +810,68 @@ def test_a_locally_written_answer_is_not_paid_a_second_time(tmp_path):
 
     assert _reason_codes(out) == ["REQUEST_CANCELLED"], (
         f"the cancelled request was answered twice: {_reason_codes(out)}")
+
+
+# ── round 7 · a superseded decision is not a settlement ────────────────────
+
+def _receipt_rows(tmp_path):
+    route_log = sorted(path for path in tmp_path.rglob("*") if path.is_file())
+    return [json.loads(line) for path in route_log
+            for line in path.read_text().splitlines() if line.strip()]
+
+
+def test_a_re_derived_answer_settles_the_item_exactly_once(tmp_path):
+    """R-168-R6a. SETTLED is the item's TERMINAL, not a note on a decision.
+
+    Round 6 recorded inside the frame builder, and the builder repeats when
+    authority moves during preparation -- so a cancellation arriving mid-build
+    left `SETTLED(DESCRIPTOR_CHANGED)` behind before `SETTLED(REQUEST_CANCELLED)`.
+    Two terminals for one item, while the wire correctly carried one answer and
+    the core settled once. Anything that counts settlements per item -- #185's
+    verify, any reader shaped like XB04 -- then disagrees with what the client
+    actually got, which is the whole class of defect this lane keeps closing.
+
+    The split: building is PURE and may repeat; recording is fallible and
+    happens once, after `_retire_prepared` has established under
+    `_authority_lock` that the decision can no longer move.
+    """
+    route, out = _route(tmp_path, finding=False)
+    _at_the_handoff(route, lambda r: setattr(r, "_invalidated",
+                                             "DESCRIPTOR_CHANGED"))
+    seen = _during_the_frame_build(
+        route, lambda r: r._cancel({"params": {"requestId": 1}}))
+    route.pump_upstream(_answer())
+    route.log.close()
+
+    assert seen["builds"] == 2, (
+        f"the answer was not re-derived, so this row measured nothing: {seen}")
+    assert _reason_codes(out) == ["REQUEST_CANCELLED"], _reason_codes(out)
+
+    settled = [row for row in _receipt_rows(tmp_path)
+               if row.get("kind") == "SETTLED"]
+    assert len(settled) == 1, (
+        f"one item, {len(settled)} terminals: "
+        f"{[row.get('reason_code') for row in settled]}")
+    assert settled[0]["reason_code"] == "REQUEST_CANCELLED", settled
+    assert settled[0]["reason_code"] == _reason_codes(out)[0], (
+        "the receipt and the wire disagree about how this item ended")
+
+
+def test_the_builder_writes_no_receipt_at_all(tmp_path):
+    """The shape, pinned, because the row above only catches it when the
+    rebuild happens. A receipt written from inside the builder is a receipt
+    written once per attempt at an answer."""
+    import ast
+    import inspect
+    import textwrap
+
+    from sunglasses.proxy.route import Route
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(Route._release_frame)))
+    called = {ast.unparse(node.func) for node in ast.walk(tree)
+              if isinstance(node, ast.Call)}
+    assert "self._record" not in called, called
+    assert any("_withhold_result" in name for name in called), called
+    source = inspect.getsource(Route._release_frame)
+    assert "record=False" in source, (
+        "the builder still asks _withhold_result to record")

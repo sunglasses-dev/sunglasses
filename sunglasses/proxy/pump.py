@@ -304,6 +304,7 @@ class Session:
         # substituting that method with a three-argument stub still works.
         self._handoff_decide = None
         self._handoff_frame = None
+        self._handoff_record = None
         # R-168-R4a. AUTHORITY STATE, BEHIND ITS OWN SHORT LOCK.
         #
         # A cancellation or a descriptor invalidation is an authority that must
@@ -957,7 +958,14 @@ class Session:
         # `gate` is (decide, build_frame) or None. Two callables rather
         # than one because they run on opposite sides of the settlement
         # lock, which is the whole of R-168-R4a.
-        self._handoff_decide, self._handoff_frame = gate or (None, None)
+        # R-168-R7. THREE callables now, and a 2-tuple still works: the build
+        # is pure and repeatable, the RECORD is fallible and happens once. A
+        # caller that passes two gets no recorder and behaves as before, which
+        # keeps every control that builds its own gate tuple running.
+        decide, frame, record = (tuple(gate) + (None,) * 3)[:3] if gate \
+            else (None, None, None)
+        self._handoff_decide, self._handoff_frame = decide, frame
+        self._handoff_record = record
         if self._strict and self._upstream is None:
             # A STARTUP ERROR, not a quieter mode. An upstream nobody supervises
             # is precisely the hang above, and a proxy that runs anyway has
@@ -1539,6 +1547,21 @@ class Session:
                 outcome, again, observed = self._retire_prepared(
                     identity, record_key, observed, withheld)
                 if outcome == "retired":
+                    # R-168-R7. THE RECORD HAPPENS HERE, once, and only now.
+                    # The decision can no longer move -- the retirement took
+                    # `_authority_lock` to establish that -- so this writes the
+                    # answer that actually crosses. Recording per BUILD left a
+                    # SETTLED row for every superseded decision, and a
+                    # superseded decision is not a settlement: the item settles
+                    # once and the receipt has to say so once, or #185's verify
+                    # and every reader shaped like XB04 disagree with the wire.
+                    if self._handoff_record is not None and \
+                            not self._handoff_record(identity[2], withheld):
+                        # The receipt could not be written. Nothing crosses;
+                        # the client's one answer is the bounded refusal the
+                        # route's payer has already sent, because the id stays
+                        # unanswered on the wire until a frame reaches it.
+                        return b""
                     return frame
                 if outcome == "lost":
                     # A close completed while the frame was being prepared. It

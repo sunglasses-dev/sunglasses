@@ -162,7 +162,8 @@ class Route:
         for raw in self.session.read_upstream(stream,
                                               inspect=self._inspect_result,
                                               gate=(self._release_gate,
-                                                    self._release_frame)):
+                                                    self._release_frame,
+                                                    self._release_record)):
             self._release_inbound(raw)
 
     def _release_inbound(self, raw):
@@ -309,13 +310,32 @@ class Route:
         Best effort and never claimed durable, which is all a component that
         has just lost its log may claim.
         """
-        frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL)
-        # R-168-R6/F2. NO SPECIAL CASE HERE ANY MORE. Round 5 paid the bounded
-        # refusal from this one site, which is why it reached the client on
-        # exactly one of the receipt-failure paths. `_record` pays whatever is
-        # owed now, wherever it fails, so this site needs no branch of its own
-        # and there is one payer rather than two racing to answer the same id.
+        # R-168-R7. PURE, AND IT KEEPS ITS NAME. Reviewer controls wrap this
+        # attribute to drive a writer during preparation (XE02_frame_cancel,
+        # XE02_rederive_writer), so it stays the thing called once per build --
+        # but building is all it does now. A superseded decision leaves no
+        # trace in the receipt stream, because it is not a settlement: the item
+        # settles once, `_release_record` writes that once, and a reader
+        # counting SETTLED rows per item counts what the wire carried.
+        frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL,
+                                            record=False)
         return frame if frame is not None else b""
+
+    def _release_record(self, request_id, reason):
+        """The FALLIBLE half, once, after the decision can no longer move.
+
+        R-168-R7. Called by the pump when the obligation has been retired under
+        `_authority_lock`, so the answer this records is the answer that
+        crosses. It is the half that can fail, and a failure here is covered by
+        the ownership payer: the id is still unanswered on the wire until its
+        frame reaches the sink, whatever the record did.
+
+        Returns False when the receipt could not be written, in which case
+        nothing may cross -- the client's one answer is then the bounded
+        refusal the payer has already sent.
+        """
+        return self._record("SETTLED", reason_code=reason, rule=RULE_APPROVAL,
+                            forwarded=False)
 
     def _inspect_result(self, raw, message):
         """None to deliver the original, or (replacement, reason, rule).
@@ -440,10 +460,19 @@ class Route:
         return None, None
 
     def _withhold_result(self, request_id, reason, rule, *, settlement=None,
-                         result=None):
+                         result=None, record=True):
         """One answer in the client's own typed id, or nothing at all when the
-        thing withheld was a notification."""
-        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        thing withheld was a notification.
+
+        R-168-R7. `record=False` builds the BYTES and writes nothing. The
+        result direction re-derives its answer when authority moves during
+        preparation, so the build may run more than once for one item -- and a
+        SETTLED row per build is a second terminal for an item that settles
+        once. The caller records separately, after the decision is final.
+        """
+        if record:
+            self._record("SETTLED", reason_code=reason, rule=rule,
+                         forwarded=False)
         if request_id is NO_ID:
             return (None, reason, rule)
         result = result or {}
