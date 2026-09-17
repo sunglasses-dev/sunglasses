@@ -1,0 +1,31 @@
+{
+  "id": "GLS-SD-001-API",
+  "name": "API key patterns (api_response)",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Known API key formats that should never appear in agent inputs.",
+  "keywords": [],
+  "regex": [
+    "sk-[a-zA-Z0-9]{20,}",
+    "sk-ant-[a-zA-Z0-9\\-]{20,}",
+    "AIza[0-9A-Za-z\\-_]{35}",
+    "ghp_[a-zA-Z0-9]{36}",
+    "glpat-[a-zA-Z0-9\\-]{20}",
+    "xoxb-[0-9]{10,}-[a-zA-Z0-9]+",
+    "AKIA[0-9A-Z]{16}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-16",
+  "source": "patterns.py:GLS-SD-001-API"
+}

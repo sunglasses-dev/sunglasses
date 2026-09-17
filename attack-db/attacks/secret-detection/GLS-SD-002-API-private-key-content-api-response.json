@@ -1,0 +1,29 @@
+{
+  "id": "GLS-SD-002-API",
+  "name": "Private key content (api_response)",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "critical",
+  "channels": [
+    "api_response",
+    "log_memory",
+    "agent_input"
+  ],
+  "description": "Private key material that should never be in agent-accessible content.",
+  "keywords": [
+    "-----begin rsa private key-----",
+    "-----begin openssh private key-----",
+    "-----begin private key-----",
+    "-----begin ec private key-----",
+    "-----begin dsa private key-----"
+  ],
+  "regex": [],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-16",
+  "source": "patterns.py:GLS-SD-002-API"
+}
