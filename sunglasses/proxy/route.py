@@ -558,7 +558,7 @@ class Route:
         reason, rule = ((cause.reason, cause.rule) if cause is not None
                         else (REASON_UNINSPECTED_METHOD, RULE_ADMISSION))
         self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
-        self._to_client(envelope.withheld(
+        self._to_client(envelope.withheld(  # to-client-exempt: the attempt was refused AT ADMISSION, so the pump already settled it under its own token and there is no obligation here to take
             request_id=request_id, reason_code=reason, rule=rule,
             accepted=False, status="not_run", inspection_complete=False,
             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
@@ -699,8 +699,21 @@ class Route:
             return
 
         self._approved_tools = dict(found.tools)
+        # R-168-R11/F2 (ASTRA MS05, MS07), and this one is r9's own regression:
+        # it passes on 07c5c67 and failed here. r9 moved take/confirm OUT of
+        # `_to_client` and into the callers, repaired the three REFUSAL callers
+        # in this method, and left the SUCCESS caller behind -- so an approved
+        # list was delivered without ever taking its wire obligation, and under
+        # a receipt failure the same request was answered twice. Success is a
+        # response like any other: take, deliver, confirm.
+        owed = (attempt.token if attempt is not None
+                and attempt.request_id == request_id
+                else self.session.obligation_for(request_id))
+        if not self.session.take_obligation(owed):
+            return
         self._to_client({"jsonrpc": "2.0", "id": request_id,
                          "result": {"tools": self._tools_of(found)}})
+        self._answered(owed, final=True)
         # T6.R1. Delivering the answer is not settling the item. Left pending,
         # the teardown still owes this id a refusal and the client receives a
         # SECOND answer to a request it has already had answered, which is the
@@ -1004,13 +1017,22 @@ class Route:
         # there is no attempt to own one. The client still gets the frame #179
         # writes here, and the receipt still says the settlement was refused.
         if attempt is None or attempt.request_id != request_id:
-            self._to_client(body)
+            self._to_client(body)  # to-client-exempt: nobody owns this item, so there is no obligation to take; the sibling branch below does take, which is why source order alone would credit this path wrongly
             # NO ATTEMPT, NO SETTLEMENT -- the typed refusal, verbatim from
             # #179's reasoning below.
             self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
                          reason="no_attempt", forwarded=False)
             return
-        owed = self.session.obligation_for(request_id)
+        # R-168-R11/F1 (ASTRA MS04, MS10). THE CARRIED TOKEN, and a fresh
+        # lookup here is the defect. `obligation_for` re-derives the CURRENT
+        # generation, and its own docstring says a caller answering something
+        # that may have finished must carry its own token instead. By this line
+        # we HAVE claimed: the claim removed the identity from `_pending`, and
+        # #179 permits a new generation to be admitted the moment it is free.
+        # So the lookup returned the NEWER obligation and this refusal paid it:
+        # three wire responses for two admitted requests, with the older
+        # attempt's own obligation left unpaid.
+        owed = attempt.token
         if not self.session.take_obligation(owed):
             return
         self._to_client(body)
@@ -1033,7 +1055,7 @@ class Route:
         """T7.R3. One error where JSON-RPC allows one, with a null id because
         there is no id we can trust, then the session closes. A frame we could
         not parse is not a frame we may resynchronise after."""
-        self._to_client(envelope.withheld(
+        self._to_client(envelope.withheld(  # to-client-exempt: an unparsed frame has a null id and no correlation, so no obligation exists to take
             request_id=None, reason_code=frame.reason, rule=frame.rule,
             budget=frame.budget, accepted=False, status="not_run",
             inspection_complete=False, inspected_utf8_bytes=0,
@@ -1042,7 +1064,7 @@ class Route:
 
     def _answer_close(self, closed, request_id):
         reason, rule = closed
-        self._to_client(envelope.withheld(
+        self._to_client(envelope.withheld(  # to-client-exempt: the close took delivery of each retained obligation in its own walk before handing it here, so taking again would refuse its own frame
             request_id=None, reason_code=reason, rule=rule, accepted=False,
             status="not_run", inspection_complete=False,
             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,

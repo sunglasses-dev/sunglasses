@@ -1378,6 +1378,18 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
     assert session.take_obligation(mine), (
         f"{dimension}: my own obligation was no longer takeable")
 
+    # `owe_again` RESTORES an obligation, so its foreign-token question can only
+    # be asked once mine has been taken. The original row asked whether the CORE
+    # DEBT moved, which `owe_again` does not touch at all -- so it ran without
+    # being able to fail, and both mutant shapes survived it. Found by deriving
+    # the API list from the tree instead of hardcoding it, which brought the
+    # three oldest entries back under the harness.
+    assert mine not in session.unanswered_clients(), (
+        f"{dimension}: taking my obligation did not clear it")
+    session.owe_again(foreign)
+    assert mine not in session.unanswered_clients(), (
+        f"{dimension}: owe_again with a foreign token restored MY obligation")
+
 
 # ── MERGE ROUND · the inbound release receipt names WHAT IT ANSWERED ─────────
 
