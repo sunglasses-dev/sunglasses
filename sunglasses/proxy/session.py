@@ -385,6 +385,37 @@ class Session:
         self._emit("SETTLED", request_id, **terminal.as_receipt())
         return terminal
 
+    def settle_or_report(self, request_id, cause, *, origin=ORIGIN_API):
+        """Settle it, or say it was ALREADY settled. One lock, one answer.
+
+        R-179-R6/R5_WITHHOLD_CLOSE. Callers asked `settled_as` and then called
+        `settle`, which is check-then-act across two acquisitions of this lock:
+        a legitimate teardown landing between them settles the token, and the
+        `settle` that follows raises `Settled` out of `Route.client_frame` --
+        an exception reaching a client where a receipt belongs. ADJACENT LINES
+        ARE NOT ATOMICITY; the pair has to be one critical section, and this is
+        it.
+
+        Returns `(terminal, already)`. `already` is True when something else
+        answered it first, and the terminal cause returned is THAT answer, so
+        the caller reports rather than guesses. Nothing here raises `Settled`:
+        a caller that wants the exception still has `settle`.
+        """
+        with self._lock:
+            settled = self._settled.get(request_id)
+            if settled is not None:
+                return settled, True
+            if request_id not in self._owed:
+                self._emit("SETTLEMENT_REFUSED", request_id,
+                           reason="not_owed", offered=cause.reason,
+                           origin=origin)
+                return None, False
+            if self._torn_down is not None and not self._tearing_down:
+                self._emit("SETTLEMENT_REFUSED", request_id,
+                           reason="session_closed", offered=cause.reason)
+                return None, False
+            return self._settle_locked(request_id, cause), False
+
     def settled_as(self, request_id):
         with self._lock:
             return self._settled.get(request_id)

@@ -31,6 +31,11 @@ EVENTS = frozenset({
     "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE", "WRITE_STALLED",
     "SETTLED", "UPSTREAM_CLOSED", "SESSION_TORN_DOWN", "WATCHDOG",
     "RECEIPT_IO_ERROR", "NOTIFICATION_DROPPED", "TEARDOWN",
+    # R-179-R6/R5_NOATTEMPT_REFUSAL. A typed refusal is only typed if the log
+    # will take it: `Log.event` raises ValueError on a kind that is not here,
+    # so a refusal written through `Route._record` and missing from this list
+    # is an exception on a fault path rather than a receipt.
+    "SETTLEMENT_REFUSED",
 })
 
 # T9.R3's never-list, as field names rather than as a hope. Anything not in the

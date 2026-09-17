@@ -91,27 +91,70 @@ class Route:
         else:
             self._client_notification(raw, message, method)
 
+    def _withhold_refusal(self, request_id, attempt):
+        """The answer to an admission that was REFUSED, and nothing else.
+
+        R-179-R4, and the difference from `_withhold` is the whole point.
+        `_withhold` ends with `settle_from(CLIENT, request_id, ...)`, which
+        retires whatever is pending under that ID. For an item that WAS
+        admitted that is exactly right. For a refusal it is a live grenade: a
+        refused attempt and a later admitted attempt share the id, so the
+        earlier attempt's answer retired the later attempt's real request --
+        ASTRA's XR03_OWNER, where the live item ended neither owed nor
+        answerable.
+
+        A refused attempt has nothing of its own to settle here. The pump
+        already settled the refused attempt's own core key, under its own
+        reserved generation, when it reported the refusal. So this writes the
+        client's answer and the receipt, and touches no table.
+        """
+        cause = attempt.cause if attempt is not None else None
+        reason, rule = ((cause.reason, cause.rule) if cause is not None
+                        else (REASON_UNINSPECTED_METHOD, RULE_ADMISSION))
+        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        self._to_client(envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            catalog=self.catalog))
+
     # ── requests ───────────────────────────────────────────────────────────
 
     def _client_request(self, raw, message, method):
         request_id = message["id"]
 
+        # R-179-R4. THE ATTEMPT CARRIES ITS OWN ANSWER. `refusal` is a local
+        # in this call, so nothing else can read it and no later attempt on the
+        # same id can overwrite it -- which is what three rounds of a table
+        # keyed by the id kept producing.
+        refusal = []
+        admitted = []
         if not self.session.admit_request(request_id, method=method,
-                                          origin="client"):
+                                          origin="client",
+                                          on_refusal=refusal.append,
+                                          on_attempt=admitted.append):
             closed = self.session.closed_with()
             if closed:
                 self._answer_close(closed, request_id)
             else:
-                self._withhold(request_id, REASON_UNINSPECTED_METHOD,
-                               RULE_ADMISSION)
+                self._withhold_refusal(request_id, refusal[0] if refusal
+                                       else None)
             return
+        # R-179-R5. THE ATTEMPT THIS CALL OWNS, as a LOCAL and never on the
+        # instance. Parking it on `self` looks equivalent and is the same bug
+        # one level up: a second `client_frame` for the same id overwrites it,
+        # and an older call resuming mid-write then settles the NEWER attempt's
+        # item. Measured -- the newer request lost its debt and the older one
+        # kept it. It travels as a parameter from here to every settlement and
+        # every release token.
+        attempt = admitted[0] if admitted else None
         self._record("ADMITTED", id_type=type(request_id).__name__)
 
         # T2.R14. Zero inspectable leaves is COMPLETE for these shapes only, so
         # they are forwarded without a scan rather than sent to a worker to
         # inspect nothing on a clock that can still expire.
         if selector.zero_leaves_is_complete(method, message):
-            self._release(raw, request_id)
+            self._release(raw, request_id, attempt=attempt)
             return
 
         # T2.R16 AFTER T2.R14, because a named row beats the fallback: `ping`
@@ -121,7 +164,8 @@ class Route:
         # for and R14 does not name is refused here, which is fail closed and
         # keeps it away from upstream either way.
         if selector.refusal(method, REQUEST, origin=CLIENT) is not None:
-            self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION)
+            self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION,
+                           attempt=attempt)
             return
 
         if method == "tools/call":
@@ -129,10 +173,12 @@ class Route:
             if blocked is not None:
                 # T5.R2. Before any scan, because a call we may not make is not
                 # a call whose contents are interesting.
-                self._withhold(request_id, blocked, RULE_APPROVAL)
+                self._withhold(request_id, blocked, RULE_APPROVAL,
+                               attempt=attempt)
                 return
 
         self._inspect(raw, message, method, request_id=request_id,
+                      attempt=attempt,
                       is_request=True)
 
     # ── notifications ──────────────────────────────────────────────────────
@@ -151,7 +197,8 @@ class Route:
 
     # ── the held path ──────────────────────────────────────────────────────
 
-    def _inspect(self, raw, message, method, *, request_id, is_request):
+    def _inspect(self, raw, message, method, *, request_id, is_request,
+                 attempt=None):
         channel = selector.channel_for(method, REQUEST)
         params = message.get("params")
         params = params if isinstance(params, (dict, list)) else {}
@@ -187,7 +234,7 @@ class Route:
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
-                                  RULE_RESOURCE)
+                                  RULE_RESOURCE, attempt=attempt)
             return
 
         # T4.R4(7) takes a DESCRIPTOR of the held message, not the message.
@@ -216,19 +263,20 @@ class Route:
                      observed_bytes=result.get("observed_content_bytes", 0))
 
         if settlement.reason == REASON_CLEAN:
-            self._release(raw, request_id)
+            self._release(raw, request_id, attempt=attempt)
             return
         self._settle_withheld(request_id, settlement.reason, settlement.rule,
-                              settlement=settlement, result=result)
+                              attempt=attempt, settlement=settlement,
+                              result=result)
 
     # ── the two exits ──────────────────────────────────────────────────────
 
-    def _release(self, raw, request_id):
+    def _release(self, raw, request_id, *, attempt=None):
         """T9.R2. The authorisation is durable BEFORE the first original byte
         leaves, so there is no moment where the payload is gone and the record
         of letting it go is not there."""
         try:
-            self.log.authorise_release(self._token(request_id),
+            self.log.authorise_release(self._token(request_id, attempt),
                                        write=lambda: self.upstream_write(raw))
         except receipts.ReceiptIOError:
             self._receipt_failure(request_id)
@@ -237,7 +285,8 @@ class Route:
         self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_ADMISSION,
                      forwarded=True)
 
-    def _settle_withheld(self, request_id, reason, rule, *, settlement=None,
+    def _settle_withheld(self, request_id, reason, rule, *, attempt=None,
+                         settlement=None,
                          result=None):
         if request_id is None:
             # T2.R13. Dropped with a receipt, and no acknowledgement, because a
@@ -245,11 +294,26 @@ class Route:
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
             return
-        self._withhold(request_id, reason, rule, settlement=settlement,
+        self._withhold(request_id, reason, rule, attempt=attempt,
+                       settlement=settlement,
                        result=result)
 
-    def _withhold(self, request_id, reason, rule, *, settlement=None,
-                  result=None, budget=None):
+    def _withhold(self, request_id, reason, rule, *, attempt=None,
+                  settlement=None, result=None, budget=None):
+        # R-179-R5/(3). CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A withheld
+        # request is never forwarded, so a response carrying its id is
+        # unsolicited -- but only if the item has stopped being pending by the
+        # time that response arrives. Claiming after the write left a window in
+        # which upstream could answer a request it had never seen.
+        if attempt is not None and attempt.request_id == request_id:
+            self.session.claim_for_local_answer(attempt.token)
+            # R-179-R7/(d). AND TAKE DELIVERY, before a byte is written. A
+            # close walking its retained obligations answers what nobody is
+            # delivering; if it got here first, this writer has nothing to
+            # write and says nothing rather than putting a second frame on the
+            # wire for one request.
+            if not self.session.take_delivery(attempt.token):
+                return
         result = result or {}
         body = envelope.withheld(
             request_id=request_id,
@@ -270,8 +334,31 @@ class Route:
         # correlation table releases the id. Leaving it pending makes the next
         # legitimate use of that id look like a duplicate and closes the
         # session on the client for our own bookkeeping.
-        self.session.settle_from(CLIENT, request_id, reason, rule)
-        self._record("SETTLED", reason_code=reason, rule=rule, forwarded=False)
+        # R-179-R5/(2). By the OWNED token. `settle_from` recomputed the
+        # current generation, so an older withheld attempt resuming after a
+        # newer one was admitted on the same id popped the newer entry and
+        # settled ITS generation: the new request lost its debt. A stale token
+        # settles nothing and says so.
+        if attempt is not None and attempt.request_id == request_id:
+            self.session.settle_attempt(attempt.token, reason, rule)
+            # EXACTLY ONE TERMINAL, and it is written here.
+            self._record("SETTLED", reason_code=reason, rule=rule,
+                         forwarded=False)
+        else:
+            # NO ATTEMPT, NO SETTLEMENT. Every caller of `_withhold` now
+            # carries the attempt it is answering, so reaching this line means
+            # an answer is being written for an item nobody owns -- and the old
+            # fallback settled it BY ID, which is the defect this round exists
+            # to remove. A typed refusal says so instead of guessing which
+            # generation was meant.
+            #
+            # R-179-R6/R5_NOATTEMPT_REFUSAL: the comment above promised that
+            # refusal and the code wrote a SETTLED, then fell through to a
+            # second unconditional SETTLED below it -- two successful-settlement
+            # receipts for an item that was never settled at all. The promise
+            # and the branch now agree, and each branch writes ONE terminal.
+            self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
+                         reason="no_attempt", forwarded=False)
 
     def _refuse_unparsed(self, frame):
         """T7.R3. One error where JSON-RPC allows one, with a null id because
@@ -340,6 +427,14 @@ class Route:
         stop = self.log.record_or_stop(event, **fields)
         return not stop.stopped
 
-    @staticmethod
-    def _token(request_id):
-        return hashlib.sha256(repr(request_id).encode()).hexdigest()[:16]
+    def _token(self, request_id, attempt=None):
+        """R-179-R5/(2). ID AND GENERATION.
+
+        Hashing the id alone gave two attempts on one id the same release
+        token, so a receipt could not say which attempt a release belonged to
+        -- the same id-only key as everything else this round, in the one place
+        that is supposed to be evidence.
+        """
+        owned = (attempt.token if attempt is not None
+                 and attempt.request_id == request_id else request_id)
+        return hashlib.sha256(repr(owned).encode()).hexdigest()[:16]
