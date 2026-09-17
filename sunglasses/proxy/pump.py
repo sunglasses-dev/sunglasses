@@ -1649,9 +1649,16 @@ class Session:
                 # WHICH invalidation stopped it -- a drop that cannot say why
                 # is indistinguishable from a frame we simply lost.
                 if self._invalidated_as:
+                    # `reason_code`, not a new field name. `receipts._clean`
+                    # DROPS any name outside PERMITTED_FIELDS silently, so an
+                    # invented field would vanish on the way to disk and every
+                    # in-memory assertion would still pass -- the same trap
+                    # R-CLOSE-KIND measured for `cause_kind`. `reason_code` is
+                    # permitted AND value-checked, and the invalidation cause
+                    # is a reason code from our own vocabulary.
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=True,
-                                     invalidated_as=self._invalidated_as)
+                                     reason_code=self._invalidated_as)
                     continue
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:

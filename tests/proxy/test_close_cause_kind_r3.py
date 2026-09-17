@@ -13,6 +13,8 @@ import pathlib
 import threading
 import types
 
+import pytest
+
 from sunglasses.proxy import pump, receipts
 from sunglasses.proxy.route import Route
 
@@ -133,7 +135,7 @@ def test_the_dropped_notification_is_recorded_with_its_invalidation_cause(tmp_pa
     dropped = [e for e in session._core.events
                if e.get("kind") == "NOTIFICATION_DROPPED"]
     assert len(dropped) == 1, [e.get("kind") for e in session._core.events]
-    assert dropped[0].get("invalidated_as") == "DESCRIPTOR_CHANGED", dropped[0]
+    assert dropped[0].get("reason_code") == "DESCRIPTOR_CHANGED", dropped[0]
 
 
 def test_the_dropped_notification_gets_no_wire_response(tmp_path):
@@ -153,3 +155,48 @@ def test_the_dropped_notification_gets_no_wire_response(tmp_path):
                         if json.loads(raw).get("id", "absent") is None]
     assert not answered_nothing, (
         f"a notification drop produced a null-id response: {answered_nothing}")
+
+
+# ── item 2, part 2 · the drop reaches DISK by the path the product uses ──────
+
+@pytest.mark.xfail(strict=True, reason=(
+    "the core-event drain is #185 part 2 (attach_receipts -> _core_event -> "
+    "jsonl) and is not on this base; STRICT so this row demands attention the "
+    "moment the drain arrives, instead of quietly passing"))
+def test_the_dropped_notification_reaches_the_receipt_file(tmp_path):
+    """R-CLOSE-KIND-R2's shape, and the reason it has that shape.
+
+    A previous version of this idea wrote through `receipts.Log` DIRECTLY and
+    passed, which proved the Log CAN carry a field and never that the product
+    DOES. ASTRA then measured the native path: `Session._emit` appends to an
+    in-memory list, nothing drains it, and the field reached disk 0 times in
+    20. So this row constructs NO transport of its own. It drives the product
+    -- an invalidated session, a notification arriving -- and then reads the
+    receipt FILE back through `proxy.receipts.verify`, which is the reader an
+    operator would use.
+
+    A receipt that exists only in memory is not a receipt. It is gone with the
+    process, and #185's whole subject is a record somebody can read afterwards.
+    """
+    _session, route, log, _out = _invalidated_route(tmp_path)
+    route.pump_upstream(_notification())
+    # `verify` requires a terminal event, and the terminal is written by
+    # serve.py (`log.event("SESSION_TORN_DOWN", ...)`), one layer above this
+    # row. Standing in for that ONE line is not constructing the transport for
+    # the field under test -- the drop has to arrive on its own, by the path the
+    # product uses, or this row fails. Without it the row goes red on "the log
+    # has no terminal event", which would be the harness talking, not the
+    # defect.
+    log.event("SESSION_TORN_DOWN")
+    log.close()
+
+    report = receipts.verify(log.path)
+    assert report.ok, getattr(report, "detail", report)
+
+    rows = _rows(log)
+    dropped = [r for r in rows if r.get("kind") == "NOTIFICATION_DROPPED"]
+    assert len(dropped) == 1, (
+        f"the drop is not on disk: the file holds "
+        f"{[r.get('kind') for r in rows]}. A receipt that exists only in the "
+        f"core's in-memory list is not a receipt.")
+    assert dropped[0].get("reason_code") == "DESCRIPTOR_CHANGED", dropped[0]
