@@ -152,7 +152,14 @@ class Route:
             # A response arriving from the client correlates to an upstream
             # REQUEST, which T2.R15 never let through, so there is nothing it
             # can be an answer to.
-            self._close(framing.MALFORMED_CLIENT, RULE_PROTOCOL, None)
+            # Its own kind: this frame PARSED, so there is no parse fault to
+            # inherit. The client sent a response, and a response from the
+            # client can only answer an upstream request, which T2.R15 never
+            # let through. My enumeration missed this site because I grouped it
+            # with the ones that take their reason from a parse result; it
+            # takes the reason but not the fault.
+            self._close(framing.MALFORMED_CLIENT, RULE_PROTOCOL, None,
+                        kind="CLIENT_RESPONSE_UNSOLICITED")
             return
 
         if "id" in message:
@@ -1059,7 +1066,7 @@ class Route:
             budget=frame.budget, accepted=False, status="not_run",
             inspection_complete=False, inspected_utf8_bytes=0,
             observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog))
-        self._close(frame.reason, frame.rule, frame.budget)
+        self._close(frame.reason, frame.rule, frame.budget, kind=frame.kind)
 
     def _answer_close(self, closed, request_id):
         reason, rule = closed
@@ -1158,13 +1165,13 @@ class Route:
             return None
         return record.get("snapshot_sha256")
 
-    def _close(self, reason, rule, budget):
+    def _close(self, reason, rule, budget, *, kind):
         # pump.Session owns the teardown and exposes it privately. A public
         # close belongs on Session and is owed, and it is not added here
         # because that module is under review and this is not the change to
         # put in front of it.
         self.session._close(reason, "the client frame could not be trusted",
-                            rule=rule, budget=budget)
+                            rule=rule, budget=budget, kind=kind)
 
     def _answered_for(self, raw, owed=None):
         """Confirm the obligation a released frame answered: the bytes MOVED.

@@ -97,10 +97,11 @@ class Frame:
     still produced a dict is exactly the case worth getting right.
     """
 
-    __slots__ = ("ok", "message", "rule", "reason", "budget", "detail", "bytes")
+    __slots__ = ("ok", "message", "rule", "reason", "budget", "detail", "bytes",
+                 "kind")
 
     def __init__(self, *, ok, message=None, rule=None, reason=None, budget=None,
-                 detail=None, size=0):
+                 detail=None, size=0, kind=None):
         self.ok = ok
         self.message = message
         self.rule = rule
@@ -108,6 +109,14 @@ class Frame:
         self.budget = budget
         self.detail = detail
         self.bytes = size
+        # R-CLOSE-KIND. WHICH malformation, from the frozen catalog in
+        # `session.py`. Produced HERE, where the fault is recognised, because
+        # the two sites that close on a parse result cannot know which of the
+        # eight MALFORMED returns produced it -- and a kind chosen by the
+        # caller is a field that can lie. The OVER_BUDGET returns carry None:
+        # `budget` already names which limit broke and now reaches the receipt,
+        # so a second field would describe the same thing twice.
+        self.kind = kind
 
     def __bool__(self):
         return self.ok
@@ -335,17 +344,17 @@ def parse_frame(raw, *, origin="upstream"):
         text = body.decode("utf-8")
     except UnicodeDecodeError as bad:
         return Frame(ok=False, rule=S5, reason=malformed,
-                     detail=f"invalid UTF-8 at byte {bad.start}", size=size)
+                     detail=f"invalid UTF-8 at byte {bad.start}", size=size, kind='FRAME_INVALID_UTF8')
 
     try:
         message = json.loads(text, object_pairs_hook=_no_duplicate_keys,
                              parse_constant=_reject_constant)
     except NotJsonNumber as constant:
         return Frame(ok=False, rule=S5, reason=malformed,
-                     detail=str(constant), size=size)
+                     detail=str(constant), size=size, kind='FRAME_JSON_CONSTANT')
     except DuplicateKey as duplicated:
         return Frame(ok=False, rule=S5, reason=malformed,
-                     detail=str(duplicated), size=size)
+                     detail=str(duplicated), size=size, kind='FRAME_DUPLICATE_KEY')
     except RecursionError:
         # Nesting deep enough to exhaust the parser. The cause is the same as a
         # measured depth breach and it is reported the same way, because "we
@@ -355,7 +364,7 @@ def parse_frame(raw, *, origin="upstream"):
                      detail="nesting exhausted the parser", size=size)
     except ValueError as broken:
         return Frame(ok=False, rule=S5, reason=malformed,
-                     detail=f"unparseable: {broken}", size=size)
+                     detail=f"unparseable: {broken}", size=size, kind='FRAME_UNPARSEABLE')
 
     depth, nodes = _shape(message)
     if depth > MAX_DEPTH:
@@ -368,22 +377,22 @@ def parse_frame(raw, *, origin="upstream"):
     if not isinstance(message, dict):
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=f"top level is {type(message).__name__}, not an object",
-                     size=size)
+                     size=size, kind='FRAME_TOP_LEVEL_NOT_OBJECT')
     if message.get("jsonrpc") != "2.0":
         version = message.get("jsonrpc")
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=f"jsonrpc is not '2.0' (a "
                             f"{type(version).__name__} of "
                             f"{len(str(version))} characters)",
-                     size=size)
+                     size=size, kind='FRAME_JSONRPC_VERSION')
     envelope = _envelope_fault(message)
     if envelope:
         return Frame(ok=False, rule=S5, reason=malformed, detail=envelope,
-                     size=size)
+                     size=size, kind='FRAME_ENVELOPE_INVALID')
     if "id" in message and not valid_id(message["id"]):
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=f"id is {type(message['id']).__name__}, which is not "
                             f"a string, number or null",
-                     size=size)
+                     size=size, kind='FRAME_ID_TYPE')
 
     return Frame(ok=True, message=message, size=size)

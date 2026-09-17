@@ -78,15 +78,79 @@ class Settled(Exception):
     """An attempt to settle an item that already has an answer."""
 
 
-class Cause:
-    __slots__ = ("reason", "rule", "budget", "at", "detail", "_frozen")
+# R-CLOSE-KIND. WHICH fault, from a fixed vocabulary, for the receipt.
+#
+# The reason catalog is small on purpose and two pairs carry most of the
+# traffic: MALFORMED_UPSTREAM/S5 fires at eight close sites and
+# MALFORMED_CLIENT/S5 at four, so a receipt could say that a protocol fault
+# ended the session and never which one. "A response arrived that nobody asked
+# for" and "the response does not fit the request it answers" are different
+# server defects and a support conversation goes different ways on them.
+#
+# The obvious fix -- emit `_close`'s `detail` -- is the one this codebase
+# already banned: see `Cause.as_receipt` below, where prose is excluded BY NAME
+# because the frame receipt leaked peer material through that field twice. A
+# kind is not prose. It is a closed set, written here, comparable against a
+# fixture byte for byte, and carrying nothing the peer supplied.
+#
+# ONE FAULT, ONE KIND, WHEREVER THE CODE IS STANDING. `pump.py` closes with
+# "the upstream process exited with calls still pending" at one site and
+# "upstream exited with calls still pending" at another; those are two
+# sentences about one fault and they share UPSTREAM_EXIT_WITH_PENDING. The map
+# test pins that, so the next close site cannot quietly invent a synonym.
+CAUSE_KINDS = frozenset({
+    # the pump's and the core's own close sites
+    "ID_NAMESPACE_CLAIMED",
+    "ID_REUSED_WHILE_SETTLING",
+    "ID_REUSED_WHILE_PENDING",
+    "RESPONSE_NOT_PENDING",
+    "RESPONSE_SHAPE_MISMATCH",
+    "UPSTREAM_EXIT_WITH_PENDING",
+    "FRAME_UNTERMINATED",
+    "INITIALIZE_RESULT_SHAPE",
+    "TOMBSTONE_TABLE_FULL",
+    "HANDOFF_GENERATION_MISMATCH",
+    # framing's MALFORMED returns, which reach a close through the two sites
+    # that take their reason from a parse result
+    "FRAME_INVALID_UTF8",
+    "FRAME_JSON_CONSTANT",
+    "FRAME_DUPLICATE_KEY",
+    "FRAME_UNPARSEABLE",
+    "FRAME_TOP_LEVEL_NOT_OBJECT",
+    "FRAME_JSONRPC_VERSION",
+    "FRAME_ENVELOPE_INVALID",
+    "FRAME_ID_TYPE",
+    # handshake
+    "PROTOCOL_VERSION_UNSUPPORTED",
+    # route's own: a frame that PARSED and still cannot be anything. It takes
+    # framing's reason but not framing's fault, so it has no parse kind to
+    # inherit -- the site my first enumeration grouped with the pass-through
+    # ones and got wrong.
+    "CLIENT_RESPONSE_UNSOLICITED",
+})
 
-    def __init__(self, reason, rule, budget=None, detail=None):
+
+class Cause:
+    __slots__ = ("reason", "rule", "budget", "at", "detail", "kind", "_frozen")
+
+    def __init__(self, reason, rule, budget=None, detail=None, kind=None):
         object.__setattr__(self, "_frozen", False)
         self.reason = reason
         self.rule = rule
         self.budget = budget
         self.detail = detail
+        # None means "this cause did not come from a close", which is the
+        # honest value for the ordinary settlements -- CLEAN/S1 when a result
+        # is delivered, REQUEST_CANCELLED/S6 when a client cancels. Inventing a
+        # name for those to avoid a null would describe a close that never
+        # happened. A kind outside the catalog is refused rather than stored,
+        # because a receipt field nobody can grade is worse than no field.
+        if kind is not None and kind not in CAUSE_KINDS:
+            raise ValueError(
+                f"{kind!r} is not in the frozen cause-kind catalog; a receipt "
+                f"field that is not from a fixed vocabulary cannot be compared "
+                f"to a fixture")
+        self.kind = kind
         self.at = time.monotonic()
 
     def __setattr__(self, name, value):
@@ -136,7 +200,7 @@ class Cause:
         # frozen in any sense that matters. V01 mutates a nested list to prove
         # it, and a shallow copy of the Cause is not enough.
         copy = Cause(self.reason, self.rule, self.budget,
-                     _snapshot(self.detail))
+                     _snapshot(self.detail), self.kind)
         copy.at = self.at
         object.__setattr__(copy, "_frozen", True)
         return copy
@@ -151,7 +215,7 @@ class Cause:
         for logs and exceptions and never enters evidence.
         """
         return {"reason_code": self.reason, "rule": self.rule,
-                "budget": self.budget}
+                "budget": self.budget, "cause_kind": self.kind}
 
     def __repr__(self):
         return f"<Cause {self.rule}/{self.reason}>"
@@ -254,6 +318,7 @@ class Session:
                            reason="duplicate_pending_id")
                 self._teardown_locked(Cause(
                     "MALFORMED_CLIENT", "S5",
+                    kind="ID_REUSED_WHILE_PENDING",
                     detail="a second request arrived carrying an id already "
                            "pending, so correlation is no longer sound"))
                 return False
@@ -369,6 +434,7 @@ class Session:
                     # about the caller, so the session cannot continue.
                     self._teardown_locked(Cause(
                         "MALFORMED_UPSTREAM", "S5",
+                        kind="RESPONSE_NOT_PENDING",
                         detail="a response arrived from upstream for an id "
                                "that was never issued"))
                 return None

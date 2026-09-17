@@ -567,7 +567,10 @@ def test_W18_receipt_allowlists_and_detail_caller_snapshot():
     s=Core();s.admit(41);detail=dict(indices=[1]);stored=s.record(41,Cause('SCAN_DEADLINE','S3',detail=detail))
     detail['indices'].append(2)
     assert stored.detail==dict(indices=[1])
-    assert stored.as_receipt()==dict(reason_code='SCAN_DEADLINE',rule='S3',budget=None)
+    # `cause_kind` is None here and that is the point of the field: this cause
+    # did not come from a close. A name invented to avoid a null would describe
+    # a close that never happened (R-CLOSE-KIND).
+    assert stored.as_receipt()==dict(reason_code='SCAN_DEADLINE',rule='S3',budget=None,cause_kind=None)
     with pytest.raises(AttributeError):del stored.rule
     assert not any('detail' in e for e in s.events)
 

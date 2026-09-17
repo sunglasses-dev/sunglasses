@@ -533,7 +533,8 @@ class Session:
             # refusal, because a client that knows to send this is not making
             # an ordinary mistake.
             self._close("MALFORMED_CLIENT",
-                        "the client used the proxy's control id namespace")
+                        "the client used the proxy's control id namespace",
+                        kind="ID_NAMESPACE_CLAIMED")
             return False
         identity = key(origin, request_id)
         # R-179-R3/XE02. A NEW ATTEMPT OWNS ITS OWN REFUSAL STATE. Round 2 kept
@@ -563,11 +564,13 @@ class Session:
             if origin == ORIGIN_CLIENT:
                 self._close("MALFORMED_CLIENT",
                             "the client reused an id whose previous request is "
-                            "still being answered")
+                            "still being answered",
+                            kind="ID_REUSED_WHILE_SETTLING")
             else:
                 self._close("MALFORMED_UPSTREAM",
                             "upstream reused an id whose previous request is "
-                            "still being answered")
+                            "still being answered",
+                            kind="ID_REUSED_WHILE_SETTLING")
             return False
         if identity in self._tombstones:
             # A cancelled id is refused for the rest of the session. The request
@@ -576,10 +579,12 @@ class Session:
         if identity in self._pending:
             if origin == ORIGIN_CLIENT:
                 self._close("MALFORMED_CLIENT",
-                            "the client reused an id that was already pending")
+                            "the client reused an id that was already pending",
+                            kind="ID_REUSED_WHILE_PENDING")
             else:
                 self._close("MALFORMED_UPSTREAM",
-                            "upstream reused an id that was already pending")
+                            "upstream reused an id that was already pending",
+                            kind="ID_REUSED_WHILE_PENDING")
             return False
         # T6.R6 stores an id with its GENERATION. A cancelled id is tombstoned
         # for the session, but a COMPLETED one may legitimately be used again,
@@ -1001,13 +1006,15 @@ class Session:
             # waiting for it, and T7.R1 makes that a protocol fault.
             self._close("MALFORMED_UPSTREAM" if origin == ORIGIN_UPSTREAM
                         else "MALFORMED_CLIENT",
-                        "a response arrived for an id that is not pending")
+                        "a response arrived for an id that is not pending",
+                        kind="RESPONSE_NOT_PENDING")
             return None
 
         if frame is not None and not self._shape_matches(identity, frame):
             self._close("MALFORMED_UPSTREAM",
                         "the response shape does not match the request it "
-                        "claims to answer")
+                        "claims to answer",
+                        kind="RESPONSE_SHAPE_MISMATCH")
             return None
 
         # T802, T8.R2. The content bound existed in the table and nothing
@@ -1429,6 +1436,7 @@ class Session:
             # because `cancel` is a normal operation and a session that has just
             # decided to shut down should not also crash its caller.
             self._close("OVERLOADED", "the tombstone table overflowed",
+                        kind="TOMBSTONE_TABLE_FULL",
                         rule="S3")
 
     # ── the process behind the pipe ────────────────────────────────────────
@@ -1475,7 +1483,8 @@ class Session:
         # teardown rather than beside it. Doing it twice was how the close
         # could be claimed before anything had actually been stopped.
         self._close("MALFORMED_UPSTREAM",
-                    "the upstream process exited with calls still pending")
+                    "the upstream process exited with calls still pending",
+                    kind="UPSTREAM_EXIT_WITH_PENDING")
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream, inspect=None, gate=None):
@@ -1544,7 +1553,8 @@ class Session:
                 # client a truncated message as a complete answer, and the one
                 # place that is certain to happen is a server dying mid write.
                 self._close("MALFORMED_UPSTREAM",
-                            "the last frame ended without its terminator")
+                            "the last frame ended without its terminator",
+                            kind="FRAME_UNTERMINATED")
                 yield from self._drain_refusals()
                 return
             parsed = framing.parse_frame(raw, origin=ORIGIN_UPSTREAM)
@@ -1553,7 +1563,7 @@ class Session:
                 # broke, and an answer that says OVER_BUDGET without saying
                 # which one cannot be graded against a fixture.
                 self._close(parsed.reason, parsed.detail, rule=parsed.rule,
-                            budget=parsed.budget)
+                            budget=parsed.budget, kind=parsed.kind)
                 yield from self._drain_refusals()
                 return
             message = parsed.message
@@ -1758,7 +1768,8 @@ class Session:
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
             self._close("MALFORMED_UPSTREAM",
-                        "upstream exited with calls still pending")
+                        "upstream exited with calls still pending",
+                        kind="UPSTREAM_EXIT_WITH_PENDING")
         # T4.R7 and T6.R1. The client is WAITING, whoever closed the session
         # and whenever. Recording the fault and saying nothing leaves it
         # waiting for ever on a session that has already decided it is over, so
@@ -1791,14 +1802,15 @@ class Session:
             # client is told nothing, and the exception surfaces wherever the
             # caller happens to be standing.
             self._close("MALFORMED_UPSTREAM",
-                        "the initialize result is not a result object")
+                        "the initialize result is not a result object",
+                        kind="INITIALIZE_RESULT_SHAPE")
             return None
         negotiated = handshake.negotiate(result)
         if not negotiated.ok:
             self._close(negotiated.reason,
                         "the server offered a protocol version outside the "
                         "frozen set",
-                        rule="S3")
+                        rule="S3", kind=negotiated.kind)
             return None
 
         filtered = handshake.advertise(result.get("capabilities") or {})
@@ -2072,7 +2084,7 @@ class Session:
             self._close("INTERNAL_FAULT",
                         "a handoff arrived for a record another generation "
                         "owns, so admission's refusal did not hold",
-                        rule="S3")
+                        rule="S3", kind="HANDOFF_GENERATION_MISMATCH")
             return b""
         if withheld is None and self._handoff_record is not None:
             # R-168-R8/F1. THE HANDOFF IS THE SINGLE RECORDER, and round 7 made
@@ -2258,8 +2270,19 @@ class Session:
             self._settling.discard(identity)
             self._settling_key.pop(identity, None)
 
-    def _close(self, reason, detail, rule="S5", budget=None):
+    def _close(self, reason, detail, rule="S5", budget=None, *, kind=None):
         """Tear down once, supervise the processes, and RETAIN what is owed.
+
+        `kind` DEFAULTS TO NONE AND THE TEST IS THE GATE (R-CLOSE-KIND). Making
+        it required looked like the stronger guarantee and was measured before
+        it shipped: it breaks six of the reviewer's controls -- including the
+        acceptance file for another PR -- and 21 of our own rows, all with
+        TypeError, because a control drives a close positionally to prove what
+        happens when one lands mid-flight. A TypeError that fires only in a
+        harness is not a guarantee, it is a broken instrument. The AST map test
+        in `tests/proxy/test_cause_kind_map.py` asserts that every `_close`
+        call site IN THIS PACKAGE supplies a kind, so a new site without one
+        fails by name, and an external control that drives a close still runs.
 
         Two things were missing and they were the same mistake twice.
 
@@ -2288,7 +2311,7 @@ class Session:
                 # still up, and the one thing worse than a failed kill is a
                 # failed kill nobody tries again.
                 self._core.teardown(
-                    Cause(reason, rule, budget=budget, detail=detail),
+                    Cause(reason, rule, budget=budget, detail=detail, kind=kind),
                     stop_processes=self._stop_processes())
                 return
             self._closed = (reason, rule)
@@ -2357,7 +2380,7 @@ class Session:
             self._settling.clear()
             self._settling_key.clear()
             self._claimed.clear()
-        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
+        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail, kind=kind),
                             stop_processes=self._stop_processes())
 
     def _stop_processes(self):

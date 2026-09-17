@@ -67,6 +67,14 @@ PERMITTED_FIELDS = frozenset({
     "inspection_complete", "decision", "rule_ids", "inspected_bytes",
     "observed_bytes", "elapsed_ms", "worker_pid", "leaf_provenance", "bytes",
     "reason_code", "rule", "budget", "settled", "supervised", "count",
+    # R-CLOSE-KIND, and this line is the difference between the change working
+    # and only LOOKING like it works. The kind reaches `session.events` as soon
+    # as a Cause carries it, but this list is what the DURABLE receipt keeps:
+    # a field missing here is dropped on the way to disk, silently, and every
+    # in-memory assertion would still pass. Measured before it was added --
+    # a SETTLED row written with `cause_kind` came back without it.
+    "cause_kind", "origin", "bound", "redelivering", "method_known",
+    "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
 })

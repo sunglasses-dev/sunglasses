@@ -52,14 +52,18 @@ def client_method_known(method):
 
 
 class Negotiation:
-    __slots__ = ("ok", "version", "reason", "close", "detail")
+    __slots__ = ("ok", "version", "reason", "close", "detail", "kind")
 
-    def __init__(self, ok, version=None, reason=None, close=False, detail=None):
+    def __init__(self, ok, version=None, reason=None, close=False, detail=None,
+                 kind=None):
         self.ok = ok
         self.version = version
         self.reason = reason
         self.close = close
         self.detail = detail
+        # R-CLOSE-KIND. The caller closes with OUR reason, so it carries our
+        # kind too rather than choosing one.
+        self.kind = kind
 
     def as_receipt(self):
         """An allowlist, for the third time in this package. The version we
@@ -84,6 +88,7 @@ def negotiate(params):
     if not isinstance(version, str) or version not in SUPPORTED_VERSIONS:
         return Negotiation(
             False, reason=UNSUPPORTED_PROTOCOL, close=True,
+            kind="PROTOCOL_VERSION_UNSUPPORTED",
             detail=f"the client offered a {type(version).__name__} that is not "
                    f"one of the {len(SUPPORTED_VERSIONS)} supported versions")
     return Negotiation(True, version=version)
