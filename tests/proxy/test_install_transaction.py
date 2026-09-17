@@ -1874,8 +1874,14 @@ def test_a_standby_whose_bytes_no_longer_match_is_not_promoted(
     # The property first, the marker second: a row that goes red on a missing
     # key before it goes red on promoted bytes reports the wrong defect.
     assert not retained.exists(), "bytes that failed their digest were promoted"
-    assert json.loads(read(rec_path)).get("inverse_unusable") is True
-    assert list(records.glob("*.standby")), "the failed copy was not kept"
+    # ROUND 11: no field decides this, the state does. The record names the
+    # copy that failed and the digest it failed with, and both are checked on
+    # disk before an entry-only restore is allowed. A forged key buys nothing.
+    claim = json.loads(read(rec_path))
+    failed = records / claim["failed_bytes_name"]
+    assert failed.is_file() and inst._digest_file(failed) == claim[
+        "failed_bytes_sha256"]
+    assert list(records.glob("*.failed-*")), "the failed copy was not kept"
 
     # And the wrapper still comes off, entry-only, without those bytes.
     result = inst.uninstall(cfg, "github", home=home)
@@ -1883,3 +1889,113 @@ def test_a_standby_whose_bytes_no_longer_match_is_not_promoted(
     assert inst.classify(json.loads(read(cfg))["mcpServers"]["github"],
                          artifact=artifact) != "WRAPPED"
     assert b'"not": "the original"' not in read(cfg)
+
+
+def test_a_put_back_loses_to_a_new_owner_of_the_name(
+        cfg, home, artifact, monkeypatch):
+    """R11-PUTBACK-CONTESTS-THE-NAME, substitution for
+    `R10_NOTE_IO_BOUNDARIES[putback]`, whose fault is injected on a rename out
+    of the private name that ruling (a) replaced with a link. The race is the
+    one that matters: the rename is exclusive on the INODE and says nothing
+    about the destination NAME, so a new owner can claim it while an older
+    cleanup holds the old note privately."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": "somebody-elses", "sha256": "0" * 64}),
+        encoding="utf-8")
+
+    real_read_text = pathlib.Path.read_text
+    published = []
+
+    def a_new_owner_claims_the_name(self, *a, **kw):
+        out = real_read_text(self, *a, **kw)
+        if ".forgetting-" in self.name and not published:
+            published.append(True)
+            # The name is free for exactly this moment, and a new owner takes
+            # it. Whatever the older cleanup is holding is stale by definition.
+            note.write_text(json.dumps(
+                {"canonical": retained.name, "held": "the-new-owners",
+                 "sha256": "1" * 64}), encoding="utf-8")
+        return out
+
+    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    inst._forget_take(note, "an-older-take")
+    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+
+    assert published, "the put-back window was never reached"
+    assert json.loads(read(note))["held"] == "the-new-owners", (
+        "the put-back overwrote a note published while it held the old one")
+    assert not list(records.glob("*.forgetting-*")), (
+        "the stale note was left lying in the records directory")
+
+
+def test_a_forged_marker_does_not_license_an_entry_only_restore(
+        cfg, home, artifact):
+    """R11-NO-FIELD-DECIDES. Round 10 let a record carry a field that meant
+    "you may restore entry-only without bytes", so editing that field into an
+    ordinary record and corrupting the retained copy turned a refusal into a
+    silent lossy restore. A record is not a capability."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, _, retained = _paths(home)
+    installed = read(cfg)
+
+    for forged in (True, "yes", 1, {"any": "truthy thing"}):
+        claim = json.loads(read(rec_path))
+        claim["inverse_unusable"] = forged
+        claim["failed_bytes_name"] = "github.failed-1-a.original"
+        claim["failed_bytes_sha256"] = "0" * 64
+        rec_path.write_text(json.dumps(claim), encoding="utf-8")
+        retained.write_bytes(b'{"corrupted":true}')
+
+        with pytest.raises(inst.ConfigConflict):
+            inst.uninstall(cfg, "github", home=home)
+        assert read(cfg) == installed, (
+            f"a forged {forged!r} bought an entry-only restore")
+
+
+def test_the_standby_that_describes_the_live_file_is_the_one_adopted(
+        cfg, home, artifact, monkeypatch):
+    """R11-ADOPT-THE-CURRENT-ONE. More than one standby can be on disk, and
+    round 10 took the first by name order, which is the oldest. A standby is
+    the inverse of a PARTICULAR published wrapper, so the one to adopt is the
+    one whose record describes the file that is actually there."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    ended = []
+
+    def end_after_publishing(target, data):
+        out = real_write(target, data)
+        if not ended:
+            ended.append(True)
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            raise KeyboardInterrupt("the publisher ends here")
+        return out
+
+    monkeypatch.setattr(inst, "_atomic_write", end_after_publishing)
+    with pytest.raises(KeyboardInterrupt):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    records = home / "proxy" / "installs"
+    live = sorted(records.glob("*.standbyrecord"))
+    assert len(live) == 1
+
+    # A STALE pair from an earlier transaction, sorting FIRST by name, whose
+    # record describes a file that is no longer there.
+    stale_record = records / "github.inflight-000000-0.standbyrecord"
+    stale_bytes = records / "github.inflight-000000-0.standby"
+    claim = json.loads(read(live[0]))
+    stale_bytes.write_bytes(b'{"an older original":true}')
+    stale_record.write_text(json.dumps(
+        {**claim, "file_sha_before": inst._digest_file(stale_bytes),
+         "file_sha_after": "2" * 64}), encoding="utf-8")
+
+    inst.uninstall(cfg, "github", home=home)
+    assert read(cfg) == original, (
+        "a stale standby was adopted ahead of the one describing the live file")

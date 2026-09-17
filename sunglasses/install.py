@@ -639,6 +639,9 @@ def _forget_take(taking, held_name):
     only then read. If it turns out to be somebody else's, it goes straight
     back.
     """
+    # The private name stays INSIDE the records directory and keeps the
+    # `<name>.taking` prefix on purpose: `_reclaim_taken` scans every note, so a
+    # process that ends while holding one privately has not hidden it.
     private = taking.with_name(
         f"{taking.name}.forgetting-{os.getpid()}-{id(taking):x}")
     try:
@@ -655,10 +658,71 @@ def _forget_take(taking, held_name):
         except OSError:
             pass
         return
+
+    # R11-PUTBACK-CONTESTS-THE-NAME (ASTRA round 10,
+    # `R10_FORGET_PUTBACK_NEW_OWNER`). The rename above is exclusive on the
+    # INODE and says nothing about the destination NAME: a new owner can claim
+    # `<name>.taking` while we hold the old note privately, and a plain rename
+    # back would overwrite it. So the put-back competes for the name the same
+    # way the claim does, and loses gracefully: if a new owner is there, ITS
+    # note stands and the one we are holding is stale -- whatever it referred
+    # to has already been dealt with by whoever moved it on.
     try:
-        private.rename(taking)
+        os.link(str(private), str(taking))
+    except FileExistsError:
+        try:
+            private.unlink()
+        except OSError:
+            pass
+        return
+    except OSError:
+        return
+    try:
+        private.unlink()
     except OSError:
         pass
+
+
+def _failed_copy_is_present(record, name, *, home):
+    """Whether the state that licenses an entry-only restore is ON DISK.
+
+    R11-NO-FIELD-DECIDES (ASTRA round 10, `R10_FORGED_MARKER_REFUSES`). Round 10
+    let a record carry `inverse_unusable` and treated it as permission, so
+    editing that field into an ordinary record and corrupting the retained copy
+    turned a refusal into a silent entry-only restore. A record is not a
+    capability. What licenses the fallback is a state nobody can write by
+    editing one key: a copy this transaction SET ASIDE because it failed, still
+    on disk, still hashing to the failure that was recorded at the time -- and
+    a canonical retained copy that is genuinely absent or does not match.
+    """
+    failed_name = record.get("failed_bytes_name")
+    failed_sha = record.get("failed_bytes_sha256")
+    if not isinstance(failed_name, str) or not _is_digest(failed_sha):
+        return False
+    d, _, _, bytes_path = _record_paths(home, name)
+    failed = d / failed_name
+    if failed.name != failed_name or not failed.is_file():
+        return False
+    try:
+        if _digest_file(failed) != failed_sha:
+            return False
+    except OSError:
+        return False
+    # And the canonical copy really is unusable, checked here rather than
+    # inherited from whoever wrote the record.
+    if not bytes_path.exists():
+        return True
+    try:
+        return _digest_file(bytes_path) != record.get("file_sha_before")
+    except OSError:
+        return True
+
+
+def _set_aside_failed(standby_bytes, name, *, records):
+    """Keep a copy that failed its digest, under a name of its own."""
+    kept = records / f"{name}.failed-{os.getpid()}-{id(standby_bytes):x}.original"
+    standby_bytes.rename(kept)
+    return kept.name, _digest_file(kept)
 
 
 def _standby_pairs(home, name):
@@ -725,6 +789,10 @@ def _adopt_standby(home, name, target):
                 return True
         return False
 
+    try:
+        live = _read_bytes(target)
+    except ConfigIOError:
+        return False
     for record_path, standby_bytes in _standby_pairs(home, name):
         try:
             claim = json.loads(record_path.read_text(encoding="utf-8"))
@@ -733,6 +801,16 @@ def _adopt_standby(home, name, target):
         if not isinstance(claim, dict):
             continue
         if claim.get("target_path") != str(pathlib.Path(target).resolve()):
+            continue
+        # R11-ADOPT-THE-CURRENT-ONE (ASTRA round 10,
+        # `R10_TWO_PAIRS_SELECT_CURRENT_WRAPPER`). More than one standby can be
+        # on disk -- a transaction that ended and another that ran after it --
+        # and round 10 took the first it found by name order, which is the
+        # oldest. A standby is the inverse of a PARTICULAR published wrapper, so
+        # the one to adopt is the one whose record describes the file that is
+        # actually there. Sorted order is not a decision.
+        after = claim.get("file_sha_after")
+        if not _is_digest(after) or after != _digest_bytes(live):
             continue
         before = claim.get("file_sha_before")
         if not _is_digest(before):
@@ -754,8 +832,11 @@ def _adopt_standby(home, name, target):
             if rec_path.exists():
                 continue
             try:
+                failed_name, failed_sha = _set_aside_failed(
+                    standby_bytes, name, records=d)
                 record_path.write_text(json.dumps(
-                    {**claim, "inverse_unusable": True}, indent=2),
+                    {**claim, "failed_bytes_name": failed_name,
+                     "failed_bytes_sha256": failed_sha}, indent=2),
                     encoding="utf-8")
                 record_path.rename(rec_path)
             except OSError as e:
@@ -787,8 +868,15 @@ def _reclaim_taken(home, name):
     from.
     """
     d, _, _, bytes_path = _record_paths(home, name)
-    taking = d / f"{name}.taking"
-    if bytes_path.exists() or not taking.is_file():
+    if bytes_path.exists():
+        return False
+    # Every note, not only the canonical name: one held privately by a process
+    # that ended mid-forget is still recovery material, and it is named so that
+    # this scan finds it.
+    notes = [d / f"{name}.taking"] + sorted(
+        q for q in d.glob(f"{name}.taking.*") if q.is_file())
+    taking = next((q for q in notes if q.is_file()), None)
+    if taking is None:
         return False
     try:
         intent = json.loads(taking.read_text(encoding="utf-8"))
@@ -1402,10 +1490,14 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
                     spare_record.rename(rec_path)
                     spare_bytes.rename(bytes_path)
                 else:
+                    failed_name, failed_sha = _set_aside_failed(
+                        spare_bytes, name, records=bytes_path.parent)
                     spare_record.write_text(json.dumps(
                         {**record, "file_sha_after": _digest_bytes(wrapped_bytes),
                          "original_bytes_path": str(bytes_path),
-                         "inverse_unusable": True, "state": "complete"},
+                         "failed_bytes_name": failed_name,
+                         "failed_bytes_sha256": failed_sha,
+                         "state": "complete"},
                         indent=2), encoding="utf-8")
                     spare_record.rename(rec_path)
             except OSError:
@@ -1660,7 +1752,7 @@ def _uninstall_locked(config_path, name, *, home):
         # standby whose bytes had already failed: there the bytes were never
         # this record's to begin with, and refusing would leave a wrapper that
         # nothing can undo.
-        if not record.get("inverse_unusable"):
+        if not _failed_copy_is_present(record, name, home=home):
             raise e.conflict from None
         # Only THIS failure is survivable. A record that points outside its own
         # directory, or at a symlink, is refused here as it always was: those

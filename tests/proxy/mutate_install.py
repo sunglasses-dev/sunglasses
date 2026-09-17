@@ -252,10 +252,26 @@ MUTATIONS = [
      '        if not _claim_take_note(taking, intent):',
      '        if False:',
      'test_a_second_cleanup_does_not_remove_the_first_cleanups_note'),
+    # The mutant RESTORES round 9's shape rather than deleting the line. A
+    # `pass` here empties the control's barrier and the row dies on its setup,
+    # which is a kill from an unfilled barrier and not a kill at all -- the
+    # reviewer counted it against us and was right (R-177-R11 (e)).
     ('R10-FORGET-ATOMIC', 'the note is unlinked by path instead of taken first',
      '        taking.rename(private)',
-     '        pass',
+     '        private = taking',
      'test_a_new_owners_note_survives_an_older_cleanups_forget'),
+    ('R11-PUTBACK-NAME', 'the put-back overwrites a new owner by renaming onto the name',
+     '        os.link(str(private), str(taking))',
+     '        private.rename(taking)',
+     'test_a_put_back_loses_to_a_new_owner_of_the_name'),
+    ('R11-NO-FIELD', 'a record field decides that an entry-only restore is allowed',
+     '        if not _failed_copy_is_present(record, name, home=home):',
+     '        if False:',
+     'test_a_forged_marker_does_not_license_an_entry_only_restore'),
+    ('R11-ADOPT-CURRENT', 'the oldest standby pair is adopted instead of the live one',
+     '        if not _is_digest(after) or after != _digest_bytes(live):',
+     '        if False:',
+     'test_the_standby_that_describes_the_live_file_is_the_one_adopted'),
     ('R9-INVERSE-FIRST', 'the inverse is only in memory until the rebuild needs it',
      '        stand_by(new_raw, raw)',
      '        pass',
@@ -300,6 +316,49 @@ def run():
         cwd=str(ROOT), env=env, capture_output=True, text=True)
 
 
+# A failure that is ABOUT THE SETUP rather than about the product. Each of these
+# means the row never reached the thing it is named for, so its redness is the
+# harness talking to itself.
+# DELIBERATELY NOT exception types. A mutant that removes a type check makes the
+# product leak an `AttributeError` or a `TypeError` through a public call, and
+# the control that pins the typed refusal is red FOR THAT REASON -- that is the
+# defect, not an instrument fault. Four real kills were flagged as fake by a
+# version of this list that named those types. What marks a kill as fake is the
+# row failing on its OWN bookkeeping: a barrier that never filled, a child that
+# never started, a fixture or import that never resolved.
+_NOT_BEHAVIOURAL = (
+    "ImportError", "ModuleNotFoundError", "Failed: Timeout", "error: fixture",
+    "not reached", "never reached", "never fired", "never started",
+    "did not complete", "barrier not", "boundary not", "was not reached",
+    "never ran",
+)
+
+
+def _why_it_failed(stdout, control):
+    """The reason `control` went red, when that reason is not behaviour."""
+    block = []
+    seen = False
+    for line in stdout.splitlines():
+        if line.startswith("_" * 5) and control in line:
+            seen = True
+            block = []
+            continue
+        if seen and line.startswith("_" * 5):
+            break
+        if seen:
+            block.append(line)
+    # ONLY the assertion that actually fired. The first version of this read
+    # the whole failure block and flagged real kills, because a row's other
+    # assertion messages ("the boundary was never reached") and its fixture
+    # names live in that block too. What a row says about itself is not what
+    # went wrong.
+    fired = next((l for l in block if l.startswith("E ")), "")
+    for marker in _NOT_BEHAVIOURAL:
+        if marker in fired:
+            return marker
+    return None
+
+
 def main():
     original = TARGET.read_text()
 
@@ -326,8 +385,18 @@ def main():
         fails = [l.split("::")[-1].split()[0].split("[")[0]
                  for l in r.stdout.splitlines() if l.startswith("FAILED")]
         if r.returncode != 0 and control in fails:
-            print(f"  {mid:12} KILLED by {control}  ({len(fails)} failed)")
-            killed.append(mid)
+            # R-177-R11 (e): ONLY BEHAVIOURAL KILLS COUNT. A mutant that empties
+            # its control's barrier, or breaks an attribute the control reaches
+            # for, makes the row red without saying anything about the product.
+            # The reviewer counted one of those against us and was right.
+            reason = _why_it_failed(r.stdout, control)
+            if reason:
+                print(f"  {mid:12} red by {control} but NOT behaviourally "
+                      f"— {reason}")
+                survived.append((mid, why, f"not behavioural: {reason}"))
+            else:
+                print(f"  {mid:12} KILLED by {control}  ({len(fails)} failed)")
+                killed.append(mid)
         elif r.returncode != 0:
             print(f"  {mid:12} red but NOT by {control} — fails: {sorted(set(fails))[:3]}")
             survived.append((mid, why, "wrong control"))
