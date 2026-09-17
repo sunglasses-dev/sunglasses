@@ -898,3 +898,132 @@ def test_install_refuses_a_config_nested_past_the_parser(tmp_path, home, artifac
     p.write_bytes(b"[" * 1100 + b"0" + b"]" * 1100)
     with pytest.raises(inst.ConfigIOError):
         inst.install(p, "github", artifact=artifact, home=home)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 4. T8's second-reader findings on 8b16d96, each proven red on that head
+# before the repair (F1-UNINSTALL, F1-JOURNAL, F1-SYMLINK, F2-SHIM).
+#
+# F1 is one defect reachable through two callers, so there is a control per
+# caller rather than one control and an assumption. The digest check that was
+# already there vouches for the BYTES; a record supplies both the path and the
+# digest, so it was proving itself.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _decoy_with(tmp_path, raw: bytes):
+    """A file OUTSIDE the record directory whose bytes an attacker knows."""
+    d = tmp_path / "elsewhere" / "keepme.txt"
+    d.parent.mkdir(parents=True, exist_ok=True)
+    d.write_bytes(raw)
+    return d
+
+
+def test_uninstall_refuses_a_record_whose_retained_path_is_not_the_canonical_one(
+        cfg, home, artifact, tmp_path):
+    """F1-UNINSTALL. The record named an unrelated file, the digest agreed
+    because the record supplied that too, and uninstall wrote the decoy's bytes
+    into the user's config and then deleted the decoy, byte_exact=True."""
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, _, canonical = _paths(home)
+
+    decoy = _decoy_with(tmp_path, before)          # same bytes, so the digest passes
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["original_bytes_path"] = str(decoy)
+    rec_path.write_text(json.dumps(rec), encoding="utf-8")
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.uninstall(cfg, "github", home=home)
+
+    assert str(canonical) in str(e.value), e.value
+    assert decoy.exists(), "the decoy outside the record directory was deleted"
+    assert read(decoy) == before
+    assert read(cfg) != before, "the wrapped config was restored from a file we do not own"
+
+
+def test_journal_recovery_refuses_a_retained_path_outside_the_record_directory(
+        cfg, home, artifact, tmp_path):
+    """F1-JOURNAL. The same defect down the crash-recovery path, which is why
+    the check belongs in `_retained_of` and not in `uninstall`. A repair applied
+    only at the `uninstall` call site leaves this control red."""
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, canonical = _paths(home)
+
+    decoy = _decoy_with(tmp_path, before)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["state"] = "pending"
+    rec["original_bytes_path"] = str(decoy)
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()                               # the shape a crash leaves
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.uninstall(cfg, "github", home=home)
+
+    assert str(canonical) in str(e.value), e.value
+    assert decoy.exists(), "journal recovery deleted a file outside its own directory"
+    assert pending_path.exists(), "the journal was consumed by a refused recovery"
+
+
+def test_uninstall_refuses_when_the_canonical_retained_path_is_a_symlink(
+        cfg, home, artifact, tmp_path):
+    """F1-SYMLINK. The path now matches the canonical name, so the name check
+    passes and this is what stops it. `resolve()`ing both sides would have made
+    the two agree on the attacker's target, which is why the name comparison is
+    lexical and this control exists separately."""
+    before = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, canonical = _paths(home)
+
+    decoy = _decoy_with(tmp_path, before)
+    canonical.unlink()
+    canonical.symlink_to(decoy)                     # right name, wrong file
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.uninstall(cfg, "github", home=home)
+
+    assert "symlink" in str(e.value), e.value
+    assert decoy.exists(), "restoring through a symlink deleted the target"
+
+
+def test_a_command_that_merely_names_a_python_is_unverified_not_wrapped(
+        cfg, home, artifact, tmp_path):
+    """F2-SHIM. Round 3 asked whether the basename started with "python", which
+    is a resemblance. A shim by that name that exits 0 and runs nothing was
+    WRAPPED, so a route was reported protected while the artifact never ran.
+
+    UNVERIFIED is the right answer and not DIRECT: the marker IS present, we
+    simply cannot vouch for what executes."""
+    shim = tmp_path / "bin" / "python-shim"
+    shim.parent.mkdir(parents=True, exist_ok=True)
+    shim.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    shim.chmod(0o755)
+
+    resolved = str(pathlib.Path(artifact).resolve())
+    entry = {
+        "command": str(shim),
+        "args": [resolved, "--", "npx", "-y", "@modelcontextprotocol/server-github"],
+        inst.MARKER: {"artifact": resolved,
+                      "sha256": inst._digest_file(artifact),
+                      "command": str(shim)},
+    }
+
+    assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
+
+
+def test_every_mutation_anchor_is_still_present_in_install_py():
+    """The instrument, not the product. A mutation whose anchor text has
+    drifted does not fail loudly, it fails to APPLY, and the harness then
+    reports a kill count for mutants that were never introduced. Round 4 moved
+    the `_recover_from_journal` call and its JOURNAL-RECOVER anchor went stale
+    in the same edit, which is exactly how the count would have lied."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_mutate_install", pathlib.Path(__file__).resolve().parent / "mutate_install.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    source = pathlib.Path(inst.__file__).read_text(encoding="utf-8")
+    stale = [row[0] for row in mod.MUTATIONS if row[2] not in source]
+    assert not stale, f"mutation anchors no longer in install.py: {stale}"

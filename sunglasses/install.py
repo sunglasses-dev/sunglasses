@@ -279,18 +279,29 @@ def resolve_artifact(*, package_root=None):
 
 
 def _could_execute(command) -> bool:
-    """Could this command run a Python artifact at all?
+    """Is this EXACTLY the interpreter we wired (F2)?
 
     Decided WITHOUT the marker, because the marker is the thing being checked.
-    `sys.executable` is the interpreter we wire; anything else is accepted only
-    when it names a python. `/usr/bin/true` exits 0 and runs nothing, which is
-    exactly the shape this refuses.
+
+    Round 3 accepted any basename beginning with "python", which is a
+    RESEMBLANCE test and not an identity one: a shim named `python-shim` that
+    exits 0 and runs nothing satisfied it, so a wrapper pointing at that shim
+    classified WRAPPED and the route was reported protected while the artifact
+    never ran. `/usr/bin/true` was refused and `./python-shim` was not, and the
+    only difference between them is a name.
+
+    `install` writes `sys.executable` into BOTH the entry's command and the
+    marker's command, so exact equality is what a route we created round-trips
+    through. Anything else is a route we cannot vouch for, which classifies
+    UNVERIFIED -- a refusal to vouch, not an accusation, and the caller decides
+    what to do about it.
+
+    BOUNDARY CHANGE, stated because it moves rows between two public answers:
+    a wrapper whose command merely names a python used to be WRAPPED and is now
+    UNVERIFIED. Nothing moves into or out of DIRECT, because DIRECT is decided
+    earlier and only by the absence of the marker.
     """
-    if not isinstance(command, str) or not command:
-        return False
-    if command == sys.executable:
-        return True
-    return pathlib.Path(command).name.lower().startswith("python")
+    return isinstance(command, str) and command == sys.executable
 
 
 def classify(entry, *, artifact):
@@ -477,10 +488,41 @@ def install(config_path, name, *, artifact, home, argv=None):
     _discard(pending_path)
 
 
-def _retained_of(record, name):
+def _retained_of(record, name, *, home):
     """The retained original, validated against the digest recorded at install
-    before anything is written from it (R5-RETAINED)."""
+    AND against the only path we are willing to read it from (R5-RETAINED, F1).
+
+    The digest check vouches for the BYTES and says nothing about WHERE they
+    came from. `original_bytes_path` is a string in a file on disk, so a record
+    naming an unrelated file made `uninstall` write that file's bytes into the
+    user's config and then UNLINK it, returning byte_exact=True, because the
+    bytes matched a digest the same record supplied. A record that supplies
+    both halves of its own proof proves nothing.
+
+    The check lives HERE and not in `uninstall` because
+    `_recover_from_journal` reads the same field through this function. One
+    choke point both callers pass through cannot be half-fixed; a check at one
+    call site would have left the crash-recovery path holding the same hole,
+    which is the shape that already cost this lane a round.
+
+    The comparison is LEXICAL and deliberately not `resolve()`d on both sides:
+    resolving the canonical path as well would follow a symlink planted at that
+    name and both sides would agree on the attacker's target. So the name must
+    match exactly, and a symlink AT that name is refused separately.
+    """
+    canonical = _record_paths(home, name)[3]
     retained_path = pathlib.Path(record["original_bytes_path"])
+    if retained_path != canonical:
+        raise ConfigConflict(
+            f"the record for {name!r} keeps its retained original at "
+            f"{retained_path}, not at {canonical}; refusing to read bytes "
+            f"from, or delete, a file outside the install record's own "
+            f"directory")
+    if retained_path.is_symlink():
+        raise ConfigConflict(
+            f"the retained original for {name!r} at {retained_path} is a "
+            f"symlink; refusing to restore from a name that points somewhere "
+            f"else")
     try:
         retained = retained_path.read_bytes()
     except OSError as e:
@@ -493,7 +535,7 @@ def _retained_of(record, name):
     return retained_path, retained
 
 
-def _recover_from_journal(target, name, pending_path):
+def _recover_from_journal(target, name, pending_path, *, home):
     """Finish an interrupted install backwards.
 
     Either the replace never happened, in which case the target already IS the
@@ -506,7 +548,7 @@ def _recover_from_journal(target, name, pending_path):
         raise ConfigConflict(
             f"the open transaction for {name!r} describes "
             f"{journal.get('target_path')}, not {target}")
-    retained_path, retained = _retained_of(journal, name)
+    retained_path, retained = _retained_of(journal, name, home=home)
     current = _read_bytes(target)
     if _digest_bytes(current) != _digest_bytes(retained):
         _atomic_write(target, retained)
@@ -527,7 +569,7 @@ def uninstall(config_path, name, *, home):
         # The journal IS the recovery input, so uninstall consumes it rather
         # than telling the user there is nothing installed.
         if pending_path.exists():
-            return _recover_from_journal(target, name, pending_path)
+            return _recover_from_journal(target, name, pending_path, home=home)
         raise ConfigConflict(f"no recorded install for {name!r}")
     record = _read_record(rec_path, name, expect_state="complete")
 
@@ -536,8 +578,9 @@ def uninstall(config_path, name, *, home):
         raise ConfigConflict(
             f"the record for {name!r} describes {recorded_target}, not {target}")
 
-    # R5-RETAINED: the retained bytes are validated before they are trusted.
-    retained_path, retained = _retained_of(record, name)
+    # R5-RETAINED: the retained bytes are validated before they are trusted,
+    # and F1: so is the path they are read from and deleted at.
+    retained_path, retained = _retained_of(record, name, home=home)
 
     current = _read_bytes(target)
 

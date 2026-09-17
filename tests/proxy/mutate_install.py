@@ -144,8 +144,8 @@ MUTATIONS = [
      'if command != meta.get("command"):',
      'test_a_marker_cannot_vouch_for_a_command_that_runs_nothing'),
     ('JOURNAL-RECOVER', 'uninstall ignores an open journal and strands the target',
-     '        if pending_path.exists():\n            return _recover_from_journal(target, name, pending_path)',
-     '        if False:\n            return _recover_from_journal(target, name, pending_path)',
+     '        if pending_path.exists():\n            return _recover_from_journal(target, name, pending_path, home=home)',
+     '        if False:\n            return _recover_from_journal(target, name, pending_path, home=home)',
      'test_uninstall_recovers_a_transaction_that_crashed_after_the_replace'),
     ('JOURNAL-GUARD', 'install resumes a journal that captured other bytes',
      '        if _digest_bytes(raw) != journal.get("file_sha_before"):',
@@ -179,6 +179,19 @@ MUTATIONS = [
      '                          parse_constant=_reject_constant)',
      '                          )',
      'test_install_refuses_a_config_with_nan'),
+    # ── Round 4. One mutation per new guard, so each is proven reachable ────
+    ('F1-PATH', 'the retained original is read from any path the record names',
+     '    if retained_path != canonical:',
+     '    if False:',
+     'test_uninstall_refuses_a_record_whose_retained_path_is_not_the_canonical_one'),
+    ('F1-SYMLINK', 'the canonical name may be a symlink to somewhere else',
+     '    if retained_path.is_symlink():',
+     '    if False:',
+     'test_uninstall_refuses_when_the_canonical_retained_path_is_a_symlink'),
+    ('F2-EXACT', 'a command that merely names a python verifies a route',
+     '    return isinstance(command, str) and command == sys.executable',
+     '    return isinstance(command, str) and (command == sys.executable or pathlib.Path(command).name.lower().startswith("python"))',
+     'test_a_command_that_merely_names_a_python_is_unverified_not_wrapped'),
 ]
 
 
