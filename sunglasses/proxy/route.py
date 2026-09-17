@@ -307,6 +307,13 @@ class Route:
         # which upstream could answer a request it had never seen.
         if attempt is not None and attempt.request_id == request_id:
             self.session.claim_for_local_answer(attempt.token)
+            # R-179-R7/(d). AND TAKE DELIVERY, before a byte is written. A
+            # close walking its retained obligations answers what nobody is
+            # delivering; if it got here first, this writer has nothing to
+            # write and says nothing rather than putting a second frame on the
+            # wire for one request.
+            if not self.session.take_delivery(attempt.token):
+                return
         result = result or {}
         body = envelope.withheld(
             request_id=request_id,

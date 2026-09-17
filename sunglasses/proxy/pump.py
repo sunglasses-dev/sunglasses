@@ -63,6 +63,19 @@ class Attempt:
                 f"generation a holder was handed and it may not move under it")
         object.__setattr__(self, name, value)
 
+    def __delattr__(self, name):
+        """DELETION IS A WRITE, and round 6's guard covered only assignment.
+
+        R-179-R7/(c). `del attempt._frozen` succeeded, and with the guard gone
+        `attempt.generation += 1` changed the token every later holder would be
+        handed -- so "frozen the way `Cause` is" was false, because `Cause` has
+        carried this guard all along. A freeze with a documented way out is a
+        convention, not an invariant.
+        """
+        raise AttributeError(
+            f"an Attempt is immutable once issued; {name!r} may not be "
+            f"deleted, least of all the flag that freezes it")
+
     @property
     def token(self):
         return self.identity + (self.generation,)
@@ -346,10 +359,25 @@ class Session:
         self._settling: set = set()
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
-        # R-179-R6. identity -> the token of the attempt answering it LOCALLY.
-        # Counted against the bound and drained by `_close`; read by nothing
-        # that decides admission or correlation, on purpose.
-        self._claimed: dict = {}
+        # R-179-R7. EVERY OUTSTANDING LOCAL CLAIM, BY ITS FULL ATTEMPT TOKEN.
+        #
+        # Round 6 keyed this by IDENTITY, which is the id-only key this PR has
+        # spent six rounds removing -- introduced, of all places, in the fix
+        # for the bound. Same-id reuse is reviewed behaviour, so two live
+        # generations of one id can both be claimed, and a dict keyed by
+        # identity kept only the newest: nine owed, one counted, a tenth
+        # admitted. Finishing the newer one erased the older one's slot as
+        # well, and the teardown retained one obligation for two.
+        #
+        # A record is keyed on WHAT IT RETIRES. These are tokens, counted per
+        # origin per token, retired only by the matching token, and walked in
+        # full by `_close`.
+        self._claimed: set = set()
+        # R-179-R7/(d). Core keys whose WIRE ANSWER somebody has committed to
+        # delivering. The close walk and a running local writer both used to
+        # assume it was theirs, so one request got two frames; whoever takes it
+        # first under `_settlement` owns it and the other finds nothing to do.
+        self._delivering: set = set()
         self._generation: dict = {}       # key -> how many times it has been issued
         self._closed: tuple | None = None
 
@@ -555,7 +583,7 @@ class Session:
         # ever gets.
         return (sum(1 for i in self._pending if i[0] == origin)
                 + sum(1 for i in self._settling if i[0] == origin)
-                + sum(1 for i in self._claimed if i[0] == origin))
+                + sum(1 for t in self._claimed if t[0] == origin))
 
     def _refuse_overloaded(self, reserved, request_id, method, origin, breach):
         """T6.R7 + T4.R7. A refusal that a receipt can be graded against.
@@ -790,8 +818,27 @@ class Session:
             # `deliver_response` still reads this id as one nobody is waiting
             # on, so the unsolicited-response window this method exists to
             # close stays closed.
-            self._claimed[identity] = token
+            self._claimed.add(token)
             return True
+
+    def take_delivery(self, token):
+        """Claim the WIRE ANSWER for this item. True to the first caller only.
+
+        R-179-R7/(d). Atomic core settlement establishes one TERMINAL; it
+        cannot establish one FRAME. A local writer paused inside the client
+        sink and a close walking its retained obligations were both certain
+        they owed the client an answer, and the client got both. Ownership of
+        delivery is decided here, under the settlement owner, exactly once.
+        """
+        with self._settlement:
+            return self._take_delivery(token)
+
+    def _take_delivery(self, token):
+        """Call under `_settlement`."""
+        if token in self._delivering:
+            return False
+        self._delivering.add(token)
+        return True
 
     def settle_attempt(self, token, reason, rule):
         """Settle the item THIS attempt owns, or refuse in a way the caller can
@@ -830,8 +877,9 @@ class Session:
             # by the OWNED token and never blind, because `_settling` is keyed
             # by identity and a newer attempt's entry is ITS debt (the same
             # rule as the pop above).
-            if self._claimed.get(identity) == token:
-                self._claimed.pop(identity, None)
+            # BY THE MATCHING TOKEN, so another generation's live claim on
+            # this same id keeps its own slot.
+            self._claimed.discard(token)
         # R-179-R6/R5_WITHHOLD_CLOSE. ONE CORE CALL, under the core's lock,
         # returning WHICH happened. Round 5 asked `settled_as` and then called
         # `settle`, and a legitimate `_close` landing between the two settled
@@ -899,18 +947,36 @@ class Session:
             # tombstone, and it never settles the generation it does not own;
             # it settles its own item if that is somehow still owed, which is
             # the identical rule `settle_attempt` follows.
-            stale = (token is not None
-                     and token[-1] != self._generation.get(identity))
+            # R-179-R7/(b). THE WHOLE TOKEN, and round 6 compared its last
+            # element. A token is (origin, id-type, id, generation): comparing
+            # only the generation makes ANOTHER id's real token at the same
+            # generation pass this check, so cancelling id 2 while holding id
+            # 1's token popped id 2's correlation, tombstoned id 2, and settled
+            # id 1. Generation equality is not ownership; the identity half is
+            # most of the identity.
+            # TWO DIFFERENT WRONGS, and round 7's first draft collapsed them.
+            # A token for ANOTHER id is not this caller's business at all, so
+            # it changes NOTHING -- it must not settle the item it names either,
+            # because the caller asked to cancel something else entirely. A
+            # token for THIS id at an older generation is a late cancellation
+            # of an attempt that has been answered: it cancels nothing, and it
+            # may still settle its own item if that is somehow still owed,
+            # which is R5_STALE_CANCEL's shape and `settle_attempt`'s rule.
+            wrong_item = token is not None and token[:-1] != identity
+            stale = token is not None and (
+                wrong_item or token[-1] != self._generation.get(identity))
             observed = token if token is not None else self._core_key(identity)
             if not stale:
                 self._pending.pop(identity, None)
         if stale:
             self._core._emit("SETTLEMENT_REFUSED", request_id,
-                             reason="stale_attempt", offered="REQUEST_CANCELLED",
-                             origin=origin)
-            self._core.settle_or_report(observed,
-                                        Cause("REQUEST_CANCELLED", "S6"),
-                                        origin=origin)
+                             reason="wrong_item" if wrong_item
+                             else "stale_attempt",
+                             offered="REQUEST_CANCELLED", origin=origin)
+            if not wrong_item:
+                self._core.settle_or_report(observed,
+                                            Cause("REQUEST_CANCELLED", "S6"),
+                                            origin=origin)
             return identity
         self._remember_tombstone(identity)
         if self._closed:
@@ -1573,11 +1639,27 @@ class Session:
             # is; leaving it out here is RC13's "in neither table" window with
             # a third table, and the client waiting on it would be told
             # nothing.
-            for identity in (list(self._pending) + list(self._settling)
-                             + list(self._claimed)):
+            # R-179-R7. EACH OBLIGATION WITH THE KEY THAT OWNS IT. Round 6
+            # walked identities and recomputed `_core_key(identity)`, which
+            # returns the LATEST generation -- so two claimed generations of
+            # one id retained one refusal between them and the older debt was
+            # read under the newer one's key. A claimed obligation is owned by
+            # its token; a pending or settling one by the key its record was
+            # created with.
+            owed = [(identity, self._settling_key.get(identity)
+                     or self._core_key(identity))
+                    for identity in list(self._pending) + list(self._settling)]
+            owed += [(token[:-1], token) for token in self._claimed]
+            for identity, core_key in owed:
                 if identity[0] != ORIGIN_CLIENT:
                     continue
-                own = self._core.terminal_cause(self._core_key(identity))
+                # R-179-R7/(d). DELIVERY IS TAKEN, NOT ASSUMED. A local writer
+                # already committed to answering this item delivers it; the
+                # close retains only what nobody is delivering, so the client
+                # gets one frame either way.
+                if not self._take_delivery(core_key):
+                    continue
+                own = self._core.terminal_cause(core_key)
                 self._owed_refusals.append(
                     (identity,
                      own.reason if own is not None else reason,

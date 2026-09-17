@@ -1075,3 +1075,184 @@ def test_a_close_while_an_answer_is_claimed_still_pays_that_debt(tmp_path):
     owed_ids = [identity for identity, _, _ in session._owed_refusals]
     assert pump.key("client", 5) in owed_ids, (
         "the close retained no refusal for the item being answered")
+
+
+# ── round 7 · a record is keyed on what it retires ──────────────────────────
+
+def _claim_two_generations(session, request_id=7):
+    """Two live locally-claimed generations of ONE id, the reviewed way.
+
+    Same-id reuse is behaviour this lane deliberately keeps: a completed id may
+    be used again. Claiming removes the pending entry, so the next admission of
+    that id is legitimate while the first answer is still being written.
+    """
+    tokens = []
+    for _ in range(2):
+        issued = []
+        assert session.admit_request(request_id, method="tools/call",
+                                     origin="client",
+                                     on_attempt=issued.append)
+        tokens.append(issued[0].token)
+        assert session.claim_for_local_answer(tokens[-1])
+    assert tokens[0] != tokens[1], "the second admission reserved no generation"
+    return tokens
+
+
+def test_two_claimed_generations_of_one_id_each_hold_a_slot(tmp_path):
+    """R6_CLAIM_SAME_ID_CAP. I keyed the new table by IDENTITY.
+
+    That is the id-only key this PR has spent six rounds removing, and I
+    introduced it in the fix for the bound itself. `_claimed[identity] = token`
+    keeps only the newest claim, so nine owed generations of one id counted as
+    ONE and a tenth request was admitted. The distinct-id row stayed green
+    because distinct ids cannot collide in that dictionary -- a control that
+    cannot reach the defect.
+    """
+    session = pump.Session()
+    tokens = _claim_two_generations(session)
+
+    with session._settlement:
+        counted = session._outstanding_locked("client")
+    assert counted == 2, f"two live claims counted as {counted}"
+    assert len(session._core.owed()) == 2, session._core.owed()
+
+
+def test_finishing_the_newer_claim_leaves_the_older_counted(tmp_path):
+    """R6_CLAIM_NEWEST_FINISHES_FIRST. Completion order is not ownership.
+
+    Settling the newer generation popped the single identity-keyed entry, so
+    the older claim -- still owed, still being written -- stopped consuming a
+    slot. A claim that is still held keeps its own slot whatever else finishes.
+    """
+    session = pump.Session()
+    older, newer = _claim_two_generations(session)
+
+    session.settle_attempt(newer, "UNINSPECTED_METHOD", "S1")
+
+    with session._settlement:
+        counted = session._outstanding_locked("client")
+    assert counted == 1, f"the older claim stopped counting: {counted}"
+    assert older[:-1] in [t[:-1] for t in session._claimed] or \
+        older in session._claimed, session._claimed
+
+
+def test_a_close_retains_one_obligation_for_every_claim(tmp_path):
+    """R6_CLOSE_MULTI_CLAIM. The teardown recomputed the LATEST key.
+
+    `_core_key(identity)` answers for the newest generation, so two claimed
+    generations of one id were read under one key and the close retained a
+    single refusal for two waiting obligations. Each obligation is owned by the
+    token it was claimed with.
+    """
+    session = pump.Session()
+    _claim_two_generations(session)
+
+    session._close("MALFORMED_UPSTREAM", "teardown mid-answer")
+    drained = list(session.read_upstream(b""))
+
+    assert len(drained) == 2, f"two claims, {len(drained)} refusals"
+    assert not session._core.owed(), session._core.owed()
+
+
+def test_a_cancel_holding_another_ids_token_changes_nothing(tmp_path):
+    """R6_CANCEL_WRONG_ID. Generation equality is not token ownership.
+
+    The round-6 validation compared `token[-1]` alone, so another id's REAL
+    token at the same generation passed it: cancelling id 2 while holding id
+    1's token popped id 2's correlation, tombstoned id 2 for the session, and
+    settled id 1. A token is (origin, id-type, id, generation) and the identity
+    half is most of the identity.
+    """
+    session = pump.Session()
+    first, second = [], []
+    assert session.admit_request(1, method="ping", origin="client",
+                                 on_attempt=first.append)
+    assert session.admit_request(2, method="ping", origin="client",
+                                 on_attempt=second.append)
+
+    session.cancel(2, origin="client", token=first[0].token)
+
+    assert pump.key("client", 2) in session._pending, (
+        "the wrong id lost its correlation")
+    assert pump.key("client", 2) not in session._tombstones, (
+        "the wrong id was tombstoned for the session")
+    assert second[0].token in session._core.owed(), "the wrong id lost its debt"
+    assert session._core.settled_as(first[0].token) is None, (
+        "a cancellation for another id settled this one")
+
+
+def test_an_issued_attempt_cannot_be_unfrozen_by_deleting_the_flag():
+    """R6_ATTEMPT_DELETE. Deletion is a write, and my guard covered assignment.
+
+    `del attempt._frozen` succeeded and the token became editable again, so
+    "frozen the way `Cause` is" was false -- `Cause` has carried a
+    `__delattr__` guard all along. A freeze with a documented way out is a
+    convention, not an invariant.
+    """
+    session = pump.Session()
+    issued = []
+    session.admit_request(99, method="extension/unknown", origin="client",
+                          on_refusal=issued.append)
+    attempt = issued[0]
+    before = attempt.token
+
+    with pytest.raises(AttributeError):
+        del attempt._frozen
+    with pytest.raises(AttributeError):
+        del attempt.generation
+    assert attempt.token == before
+
+
+def test_a_close_racing_a_local_writer_leaves_one_wire_answer(tmp_path):
+    """R6_CLOSE_LOCAL_DOUBLE_ANSWER. One TERMINAL is not one FRAME.
+
+    The close walk and a local writer already inside the client sink were both
+    certain they owed this request an answer, and the client got both -- one
+    drained refusal and one local frame, with a single core terminal and no
+    exception anywhere. Atomic core settlement cannot establish this; delivery
+    has to be owned.
+
+    Whoever takes delivery under the settlement owner keeps it and the other
+    finds nothing to write.
+    """
+    from sunglasses.proxy import receipts
+    from sunglasses.proxy.route import Route
+
+    entered, release = threading.Event(), threading.Event()
+    written, failures = [], []
+
+    def client_write(raw):
+        entered.set()
+        assert release.wait(5)
+        written.append(raw)
+
+    session = pump.Session()
+    route = Route(session=session,
+                  log=receipts.Log(tmp_path, run_id="r7", header={}),
+                  upstream_write=lambda raw: None, client_write=client_write,
+                  catalog=frozenset(),
+                  approvals=types.SimpleNamespace(
+                      may_call=lambda *a: "APPROVAL_REQUIRED",
+                      invalidate=lambda: None))
+
+    def offer():
+        try:
+            route.client_frame(json.dumps(
+                {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                 "params": {"name": "review"}}).encode() + b"\n")
+        except Exception as error:            # noqa: BLE001
+            failures.append(type(error).__name__)
+
+    worker = threading.Thread(target=offer)
+    worker.start()
+    try:
+        assert entered.wait(3), "the local writer never reached the sink"
+        session._close("MALFORMED_UPSTREAM", "reader teardown")
+        drained = list(session.read_upstream(b""))
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert not failures, failures
+    assert len(drained) + len(written) == 1, (
+        f"one request, {len(drained)} drained + {len(written)} written")
