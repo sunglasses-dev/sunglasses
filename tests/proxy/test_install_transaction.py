@@ -1025,5 +1025,166 @@ def test_every_mutation_anchor_is_still_present_in_install_py():
     spec.loader.exec_module(mod)
 
     source = pathlib.Path(inst.__file__).read_text(encoding="utf-8")
-    stale = [row[0] for row in mod.MUTATIONS if row[2] not in source]
-    assert not stale, f"mutation anchors no longer in install.py: {stale}"
+    counts = {row[0]: source.count(row[2]) for row in mod.MUTATIONS}
+    missing = sorted(k for k, v in counts.items() if v == 0)
+    # UNIQUENESS, not presence. Round 5 is why this assertion changed: the F1
+    # never-strand repair created a SECOND identical `if pending_path.exists()`
+    # call site, so JOURNAL-RECOVER's anchor matched twice, the harness could
+    # not place the mutant unambiguously and reported it as a SURVIVOR. The
+    # presence-only version of this test passed while that was true, which
+    # makes presence the weaker claim and this the honest one.
+    duplicated = sorted(k for k, v in counts.items() if v > 1)
+    assert not missing, f"mutation anchors no longer in install.py: {missing}"
+    assert not duplicated, (
+        f"mutation anchors that match more than once, so the mutant cannot be "
+        f"placed: {duplicated}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Round 5. ASTRA's four round-4 families, each reproduced here so the
+# protection lives in the repo and not only in a reviewer's temp directory.
+# Every one of these was RED on da5f6eb; the reviewer's own controls were the
+# source, not my reading of my own diff.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _journal_from_record(home, name="github"):
+    """The shape a crash between replace and completion leaves: a pending
+    journal, no completed record."""
+    rec_path, pending_path, _ = _paths(home, name)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["state"] = "pending"
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.unlink()
+    return pending_path
+
+
+def test_uninstall_recovers_from_the_journal_when_the_completed_record_is_unreadable(
+        cfg, home, artifact):
+    """R4-COMPLETE-PARTIAL. A SIGKILL halfway through writing the completed
+    record left a file whose NAME claimed authority and whose CONTENT could not
+    be parsed. Uninstall refused with exit 2 and never looked at the valid
+    journal sitting beside it: a stranded transaction with its own recovery
+    material present on disk. The filename no longer outranks the journal."""
+    original = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, pending_path, _ = _paths(home)
+    complete = read(rec_path)
+    rec = json.loads(complete.decode("utf-8"))
+    rec["state"] = "pending"
+    pending_path.write_text(json.dumps(rec), encoding="utf-8")
+    rec_path.write_bytes(complete[:len(complete) // 2])   # the half-written half
+
+    res = inst.uninstall(cfg, "github", home=home)
+
+    assert res.byte_exact is True
+    assert read(cfg) == original, "the valid journal was stranded"
+    assert not pending_path.exists(), "recovery left the journal open"
+
+
+def test_journal_recovery_refuses_a_target_edited_since_the_crash(
+        cfg, home, artifact):
+    """R5-JOURNAL-CONFLICT. Recovery checked the journal's target path and its
+    retained digest, both of which describe the JOURNAL, and then copied the
+    whole retained original over whatever was on disk. An edit made after the
+    interrupted install was erased with exit 0. A pending journal does not
+    waive R5."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    pending_path = _journal_from_record(home)
+
+    doc = json.loads(read(cfg).decode("utf-8"))
+    doc["an_unrelated_setting"] = {"keep": "this"}
+    cfg.write_text(json.dumps(doc), encoding="utf-8")
+    edited = read(cfg)
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.uninstall(cfg, "github", home=home)
+
+    assert "edited" in str(e.value), e.value
+    assert read(cfg) == edited, "a refused recovery still overwrote the edit"
+    assert pending_path.exists(), (
+        "the refusal consumed the journal, which makes the refusal permanent")
+
+
+def test_journal_recovery_still_restores_the_state_we_actually_left(
+        cfg, home, artifact):
+    """The other side of the same guard, so the refusal is not a blanket one:
+    when the target IS the wrapper we wrote, recovery proceeds."""
+    original = read(cfg)
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    pending_path = _journal_from_record(home)
+
+    res = inst.uninstall(cfg, "github", home=home)
+
+    assert res.byte_exact is True
+    assert read(cfg) == original
+    assert not pending_path.exists()
+
+
+def test_install_refuses_when_a_symlink_occupies_a_record_name(
+        cfg, home, artifact, tmp_path):
+    """F1-JOURNAL-RETRY-SYMLINK. `_retained_of` guarded both uninstall paths
+    and the install RETRY path never called it, then wrote through
+    `write_bytes`, which follows a symlink planted at the canonical retained
+    name and overwrote an unrelated file with exit 0. Guarding the READERS of a
+    resource is not guarding the resource.
+
+    Refused before any mutation, so the unrelated file AND the recovery state
+    both survive."""
+    decoy = tmp_path / "elsewhere" / "must-survive.txt"
+    decoy.parent.mkdir(parents=True, exist_ok=True)
+    decoy.write_bytes(b"unrelated bytes that must survive")
+    before = read(cfg)
+
+    d = home / "proxy" / "installs"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "github.original").symlink_to(decoy)
+
+    with pytest.raises(inst.ConfigConflict) as e:
+        inst.install(cfg, "github", artifact=artifact, home=home)
+
+    assert "symlink" in str(e.value), e.value
+    assert read(decoy) == b"unrelated bytes that must survive"
+    assert read(cfg) == before, "a refused install still touched the config"
+
+
+def test_uninstall_refuses_a_complete_record_whose_after_digest_is_not_a_digest(
+        cfg, home, artifact):
+    """R5-AFTER-NULL / R5-AFTER-LIST. Presence of `file_sha_after` was checked
+    and its TYPE was not, so a record carrying null or [] was accepted and the
+    restore proceeded through the inverse."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, _, _ = _paths(home)
+    for bad in (None, []):
+        rec = json.loads(read(rec_path).decode("utf-8"))
+        rec["file_sha_after"] = bad
+        rec_path.write_text(json.dumps(rec), encoding="utf-8")
+        before = read(cfg)
+        with pytest.raises(inst.ConfigConflict):
+            inst.uninstall(cfg, "github", home=home)
+        assert read(cfg) == before
+        assert rec_path.exists(), "a refused uninstall consumed the record"
+
+
+def test_uninstall_refuses_a_record_whose_entry_existed_is_not_a_bool(
+        cfg, home, artifact):
+    """R5-EXISTED-LIST. `entry_existed` decides between putting an entry BACK
+    and DELETING it. A list is falsey, so an entry that existed before the
+    install was deleted on uninstall with exit 0."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    rec_path, _, _ = _paths(home)
+    rec = json.loads(read(rec_path).decode("utf-8"))
+    rec["entry_existed"] = []
+    rec_path.write_text(json.dumps(rec), encoding="utf-8")
+    # The edit that made the old behaviour visible: the file has moved on, so
+    # uninstall takes the entry-inverse path rather than the byte-exact one.
+    doc = json.loads(read(cfg).decode("utf-8"))
+    doc["later"] = "preserve"
+    cfg.write_text(json.dumps(doc), encoding="utf-8")
+    before = read(cfg)
+
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+
+    assert read(cfg) == before
+    assert "github" in servers(cfg), "an entry that existed before install was deleted"

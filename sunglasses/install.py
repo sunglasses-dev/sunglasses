@@ -187,6 +187,34 @@ def _atomic_write(path, data: bytes):
         raise ConfigIOError(f"write to {path} was interrupted: {e}") from e
 
 
+def _refuse_symlinked_storage(name, *paths):
+    """Refuse BEFORE any mutation if a symlink occupies one of our own names.
+
+    F1-JOURNAL-RETRY-SYMLINK (ASTRA round 4). `_retained_of` guarded both
+    uninstall paths; the install RETRY path never called it and then wrote
+    through `write_bytes`, which follows a symlink planted at the canonical
+    retained name and overwrote an unrelated file with exit 0. Guarding the
+    READERS of a resource is not guarding the resource.
+
+    The check lives HERE, before any mutation, rather than at the write, for
+    two reasons. It preserves the unrelated file AND the recovery state,
+    because the journal is discarded further down and a refusal after that
+    point would strand it. And it leaves the write itself as an ordinary
+    `write_bytes`/`write_text`, which is what the reviewer's crash driver
+    injects SIGKILL into by patching `Path.write_text` and `Path.write_bytes`
+    keyed on the record filenames. An `O_NOFOLLOW` writer closes the same hole
+    and makes four of the sixteen crash phases unreachable, so the fault can no
+    longer be tested; see the note in the PR body. Refusing early is the fix
+    that does not break the instrument that proves it.
+    """
+    for path in paths:
+        if pathlib.Path(path).is_symlink():
+            raise ConfigConflict(
+                f"{path} is a symlink; the install record directory for "
+                f"{name!r} must hold real files, so refusing rather than "
+                f"writing through it to somewhere we were not asked to touch")
+
+
 def _record_paths(home, name):
     d = pathlib.Path(home) / "proxy" / "installs"
     return d, d / f"{name}.json", d / f"{name}.pending", d / f"{name}.original"
@@ -223,6 +251,12 @@ RECORD_TYPES = {
 }
 
 
+def _is_digest(value) -> bool:
+    """A sha256 hexdigest and nothing that merely resembles one."""
+    return (isinstance(value, str) and len(value) == 64
+            and all(c in "0123456789abcdef" for c in value))
+
+
 def _read_record(path, name, *, expect_state):
     """Read and validate a record, or refuse.
 
@@ -251,6 +285,28 @@ def _read_record(path, name, *, expect_state):
                 f"{want.__name__}")
     if "file_sha_after" not in record:
         raise ConfigConflict(f"the record for {name!r} is missing file_sha_after")
+    # R5-AFTER-NULL / R5-AFTER-LIST / R5-EXISTED-LIST (ASTRA round 4). Presence
+    # was checked and TYPE was not, so a record carrying `null` or `[]` for the
+    # after-digest was accepted and restoration proceeded through the inverse.
+    # A COMPLETE record has always been through the replace, so its after-digest
+    # is a digest; a PENDING one has not, so `null` there is a state and not a
+    # defect, which is why only the complete case is strict.
+    after = record["file_sha_after"]
+    if expect_state == "complete" and not _is_digest(after):
+        raise ConfigConflict(
+            f"the record for {name!r} is marked complete but its file_sha_after "
+            f"is not a sha256 digest; refusing to restore from a record whose "
+            f"own after-image we cannot read")
+    # `entry_existed` decides between putting an entry BACK and DELETING it, so
+    # an unvalidated one is a delete waiting to happen: a list is falsey, and an
+    # entry that existed before the install was removed on uninstall with exit 0.
+    if "entry_existed" not in record:
+        raise ConfigConflict(f"the record for {name!r} is missing entry_existed")
+    if not isinstance(record["entry_existed"], bool):
+        raise ConfigConflict(
+            f"the record for {name!r} has an entry_existed that is not a bool; "
+            f"it decides whether uninstall restores an entry or deletes one, so "
+            f"a value we cannot read is not a default")
     state = record.get("state")
     if state != expect_state:
         raise ConfigConflict(
@@ -382,6 +438,7 @@ def install(config_path, name, *, artifact, home, argv=None):
 
     target_id = str(target.resolve())
     _, rec_path, pending_path, bytes_path = _records_dir(home, name)
+    _refuse_symlinked_storage(name, rec_path, pending_path, bytes_path)
 
     # R4/R5-COLLISION and R4-IDENTITY-BEFORE-DIGEST. A completed record means an
     # install is OUTSTANDING, and its retained bytes are the only way back to
@@ -535,13 +592,43 @@ def _retained_of(record, name, *, home):
     return retained_path, retained
 
 
-def _recover_from_journal(target, name, pending_path, *, home):
-    """Finish an interrupted install backwards.
+def _installed_rendering(retained: bytes, name, journal):
+    """The exact bytes `install` would have written for THIS journal.
 
-    Either the replace never happened, in which case the target already IS the
-    original and there is nothing to write, or it did, in which case the
-    retained bytes are the way back. Both end with the journal consumed, because
-    a journal left behind is a transaction that looks open forever.
+    So that "is the target the state we left it in?" is answered by comparing
+    bytes rather than by assuming. `install` renders with `indent=2` and a
+    trailing newline from the parsed original, so the reconstruction is exact.
+    Returns None when the retained original cannot produce a rendering, which
+    is itself an answer: we cannot vouch for the current file.
+    """
+    try:
+        doc = _strict_loads(retained, f"the retained original for {name!r}")
+    except ConfigIOError:
+        return None
+    if not isinstance(doc, dict) or not isinstance(doc.get("mcpServers"), dict):
+        return None
+    if not isinstance(journal.get("installed_entry"), dict):
+        return None
+    doc["mcpServers"][name] = journal["installed_entry"]
+    return (json.dumps(doc, indent=2) + "\n").encode("utf-8")
+
+
+def _recover_from_journal(target, name, pending_path, *, home):
+    """Finish an interrupted install backwards, and ONLY from a state we left.
+
+    R5-JOURNAL-CONFLICT (ASTRA round 4). This used to check the journal's target
+    path and the retained digest and then copy the whole retained original over
+    whatever was there. Both of those describe the JOURNAL; neither describes
+    the file in front of us. So an unrelated edit made after the interrupted
+    install was silently erased, and a conflicting edit was overwritten instead
+    of refused, both with exit 0. A pending journal does not waive R5.
+
+    There are exactly two states we are entitled to act on: the target is still
+    the before-image, so the crash preceded the replace and there is nothing to
+    write, or it is the wrapper we wrote, so the retained bytes are the way
+    back. Anything else is somebody's edit and gets a typed refusal that keeps
+    the journal, because destroying the recovery material is how a refusal
+    becomes permanent.
     """
     journal = _read_record(pending_path, name, expect_state="pending")
     if journal.get("target_path") != str(target.resolve()):
@@ -550,10 +637,24 @@ def _recover_from_journal(target, name, pending_path, *, home):
             f"{journal.get('target_path')}, not {target}")
     retained_path, retained = _retained_of(journal, name, home=home)
     current = _read_bytes(target)
-    if _digest_bytes(current) != _digest_bytes(retained):
+
+    if _digest_bytes(current) == _digest_bytes(retained):
+        # The replace never landed. The target already IS the original.
+        _discard(pending_path, retained_path)
+        return UninstallResult(byte_exact=True)
+
+    installed = _installed_rendering(retained, name, journal)
+    if installed is not None and current == installed:
         _atomic_write(target, retained)
-    _discard(pending_path, retained_path)
-    return UninstallResult(byte_exact=True)
+        _discard(pending_path, retained_path)
+        return UninstallResult(byte_exact=True)
+
+    raise ConfigConflict(
+        f"{target} is neither the bytes the open transaction for {name!r} "
+        f"captured nor the wrapper it wrote, so it has been edited since; "
+        f"restoring the retained original would throw that edit away. Refusing "
+        f"and keeping the journal at {pending_path} so the recovery is still "
+        f"available once the file is reconciled by hand")
 
 
 def uninstall(config_path, name, *, home):
@@ -571,7 +672,18 @@ def uninstall(config_path, name, *, home):
         if pending_path.exists():
             return _recover_from_journal(target, name, pending_path, home=home)
         raise ConfigConflict(f"no recorded install for {name!r}")
-    record = _read_record(rec_path, name, expect_state="complete")
+    try:
+        record = _read_record(rec_path, name, expect_state="complete")
+    except ConfigConflict:
+        # R4-COMPLETE-PARTIAL. A completed record that cannot be READ is an
+        # interrupted completion, not an authority. Before this, uninstall saw
+        # the completed FILENAME, failed to parse it, and refused with exit 2
+        # while the still-valid journal sat unread beside it: a stranded
+        # transaction with its recovery material present on disk. The filename
+        # no longer outranks the journal.
+        if pending_path.exists():
+            return _recover_from_journal(target, name, pending_path, home=home)
+        raise
 
     recorded_target = record.get("target_path")
     if recorded_target != str(target.resolve()):
