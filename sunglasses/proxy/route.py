@@ -202,11 +202,12 @@ class Route:
         if owed is not None:
             self.session.answered_on_the_wire(owed)
         try:
-            # NOTE for T9: `owed` above IS the discharged obligation's token,
-            # so this receipt could name the generation it answered instead of
-            # the bare marker. Raised as a follow-up, not assumed to be a bug.
             self.log.authorise_release(
-                self._token("inbound"),  # attempt-exempt: a literal marker, not a request id, so admission never ran and no attempt exists
+                # There is no Attempt on this path: the reader holds the
+                # obligation TOKEN itself, and passing it names the generation
+                # this release answered, which is the whole point of the
+                # receipt. A bare marker named nothing.
+                self._token("inbound", token=owed),  # attempt-exempt: no Attempt here; the obligation token is passed instead and names the generation
                 write=lambda: self.client_write(raw))
         except receipts.ReceiptIOError:
             if owed is not None:
@@ -1292,14 +1293,25 @@ class Route:
                 rule=RULE_RESOURCE)
         return not stop.stopped
 
-    def _token(self, request_id, attempt=None):
+    def _token(self, request_id, attempt=None, *, token=None):
         """R-179-R5/(2). ID AND GENERATION.
 
         Hashing the id alone gave two attempts on one id the same release
         token, so a receipt could not say which attempt a release belonged to
         -- the same id-only key as everything else this round, in the one place
         that is supposed to be evidence.
+
+        MERGE ROUND, T9's ruling. `token=` takes a raw obligation token for the
+        one caller that holds the token WITHOUT an Attempt: `_release_inbound`
+        gets it from `obligation_of_last_yield`, because the reader is what
+        knows which obligation a frame discharges. It used to hash the literal
+        marker "inbound", so the one receipt that exists to say WHAT WAS
+        ANSWERED named nothing -- the id-only key again, wearing no id at all.
+        R-168-R6a: the receipt equals the wire.
         """
-        owned = (attempt.token if attempt is not None
-                 and attempt.request_id == request_id else request_id)
+        if token is not None:
+            owned = token
+        else:
+            owned = (attempt.token if attempt is not None
+                     and attempt.request_id == request_id else request_id)
         return hashlib.sha256(repr(owned).encode()).hexdigest()[:16]

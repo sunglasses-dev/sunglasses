@@ -8,6 +8,7 @@ answer T6.R1 allows per id.
 
 The rows are ASTRA's; the wiring is ours.
 """
+import hashlib
 import json
 import threading
 import types
@@ -1270,7 +1271,7 @@ def test_the_token_entry_point_inventory_is_complete():
 
 
 @pytest.mark.parametrize("dimension", ["another id", "another JSON type",
-                                       "another origin"])
+                                       "another origin", "another generation"])
 def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
                                                                dimension):
     """Three identity dimensions, every listed API, driven rather than read.
@@ -1289,9 +1290,25 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
     elif dimension == "another JSON type":
         assert session.admit_request(1.0, method="ping", origin="client")
         foreign = session._core_key(pump_key(session, 1.0))
-    else:
+    elif dimension == "another origin":
         assert session.admit_request(1, method="ping", origin="upstream")
         foreign = session._core_key(pump.key("upstream", 1))
+    else:
+        # ANOTHER GENERATION, and the three identity dimensions above do not
+        # reach it. `settle_from` and `cancel` are keyed on (origin, id) with
+        # the token as the AUTHORITY, so a token from another id or origin
+        # never pointed at my item in the first place and their mutants
+        # survived every row above -- measured, not guessed. The defect they
+        # are actually about is a STALE token for the SAME id: #179 r7's
+        # `settle_from` compared one element of a token and let an older
+        # attempt settle the generation that replaced it.
+        #
+        # So here the stale token is the foreign one and the LIVE generation
+        # is mine.
+        foreign = mine
+        session.settle_attempt(foreign, "UNINSPECTED_METHOD", "S1")
+        assert session.admit_request(1, method="tools/call", origin="client")
+        mine = session._core_key(pump_key(session, 1))
     assert foreign != mine, dimension
 
     before_owed = sorted(map(str, session._core.owed()))
@@ -1309,41 +1326,93 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
     assert sorted(map(str, session._core.owed())) == before_owed, (
         f"{dimension}: a foreign token changed the core debt")
 
-    # ── #179's six, same question asked of each ────────────────────────────
+    # ── #179's six, each asked about the table IT governs ──────────────────
     #
-    # `mine` is still admitted and still owed at this point, so every call below
-    # is a foreign token arriving at an API that has a live item of its own to
-    # damage. Each must leave `mine` exactly where it is.
+    # The first version of this block asserted `mine in unanswered_clients()`
+    # after every call, and five of the six mutants SURVIVED it: these APIs do
+    # not touch `_unanswered`, they touch `_pending`, `_delivering` and the
+    # core's debt. A row that observes the wrong table runs without being able
+    # to fail, which is the shape ASTRA rejected on #179 r8. Proven by
+    # warroom/r168-followups/inventory_rows_mutation_proof.py: one
+    # generation-only mutant per API, each now killed by assertion.
+    #
+    # These are reads, not calls that consume state, so the sequence below
+    # cannot make a later assertion vacuous.
     foreign_id = foreign[2]
     foreign_origin = foreign[0]
+    my_identity = mine[:3]
 
+    # `claim_for_local_answer` pops MY identity out of `_pending` if it accepts
+    # a foreign token as mine.
     session.claim_for_local_answer(foreign)
-    assert mine in session.unanswered_clients(), (
-        f"{dimension}: claim_for_local_answer claimed another item's obligation")
+    assert my_identity in session._pending, (
+        f"{dimension}: claim_for_local_answer claimed another item's request")
 
-    session.take_delivery(foreign)
+    # `take_delivery`/`_take_delivery` add to `_delivering`.
+    assert session.take_delivery(foreign) in (True, False)
     session._take_delivery(foreign)
-    assert mine in session.unanswered_clients(), (
-        f"{dimension}: take_delivery took delivery of another item's answer")
+    assert mine not in session._delivering, (
+        f"{dimension}: take_delivery took delivery of MY answer")
 
+    # `settle_attempt` settles in the core.
     session.settle_attempt(foreign, "UNINSPECTED_METHOD", "S1")
-    assert mine in session.unanswered_clients(), (
-        f"{dimension}: settle_attempt settled another item")
-    # NOT "the core debt is unchanged" -- `foreign` is a real admitted item and
-    # settling it is precisely what `settle_attempt` is for, so that assertion
-    # was my own false kill. The property is that MINE is untouched.
     assert mine in session._core.owed(), (
         f"{dimension}: settle_attempt with a foreign token settled MY item")
+    assert mine in session.unanswered_clients(), (
+        f"{dimension}: settle_attempt discharged MY obligation")
 
+    # `settle_from` settles by origin and id, with the token as the authority.
     session.settle_from(foreign_origin, foreign_id, "UNINSPECTED_METHOD", "S1",
                         token=foreign)
-    assert mine in session.unanswered_clients(), (
-        f"{dimension}: settle_from settled another item")
+    assert mine in session._core.owed(), (
+        f"{dimension}: settle_from settled MY item")
 
+    # `cancel` retires an id for the rest of the session.
     session.cancel(foreign_id, origin=foreign_origin, token=foreign)
-    assert mine in session.unanswered_clients(), (
-        f"{dimension}: cancel cancelled another item")
+    assert mine in session._core.owed(), (
+        f"{dimension}: cancel cancelled MY item")
+    assert my_identity not in getattr(session, "_tombstones", {}), (
+        f"{dimension}: cancel tombstoned MY id")
 
     # The ordinary follow-up still works for the item that was never involved.
     assert session.take_obligation(mine), (
         f"{dimension}: my own obligation was no longer takeable")
+
+
+# ── MERGE ROUND · the inbound release receipt names WHAT IT ANSWERED ─────────
+
+def test_the_inbound_release_receipt_names_the_generation_it_answered(tmp_path):
+    """T9's ruling on the merge round: `_release_inbound` hashed the literal
+    marker "inbound", so the one receipt whose job is to say what a release
+    answered named nothing at all -- the id-only key with no id in it.
+
+    The reader holds the obligation token (`obligation_of_last_yield`), so the
+    receipt carries it. R-168-R6a: the receipt equals the wire.
+    """
+    route, out = _route(tmp_path, finding=False)
+
+    owed = list(route.session.unanswered_clients())
+    assert len(owed) == 1, owed
+    owed = owed[0]
+
+    route.pump_upstream(_answer())
+    route.log.close()
+
+    rows = [json.loads(line) for line in
+            route.log.path.read_text().splitlines() if line.strip()]
+    authorised = [r for r in rows if r.get("kind") == "RELEASE_AUTHORIZED"]
+    assert len(authorised) == 1, [r.get("kind") for r in rows]
+
+    def token_of(value):
+        return hashlib.sha256(repr(value).encode()).hexdigest()[:16]
+
+    assert authorised[0]["id_token"] == token_of(owed), (
+        "the release receipt does not name the obligation it discharged")
+
+    # The two ways it could be wrong and still look like a token.
+    assert authorised[0]["id_token"] != token_of("inbound"), (
+        "the receipt is still hashing the bare marker")
+    later_generation = owed[:-1] + (owed[-1] + 1,)
+    assert authorised[0]["id_token"] != token_of(later_generation), (
+        "the receipt does not distinguish generations of one id, which is the "
+        "id-only key this whole lane exists to remove")
