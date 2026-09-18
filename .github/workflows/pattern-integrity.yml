@@ -403,7 +403,14 @@ jobs:
       # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above
       # only cover ~4 test families; major families ran local-only until now.
       - name: Full test suite
-        run: pytest -q
+        # --durations=25 (2026-09-17). The 3.12 leg is the slowest in 7 of
+        # 8 full-matrix runs -- median 135 min against 61-91 for every other
+        # interpreter -- and this step was bare `pytest -q`, so the slowest
+        # leg we have produced no per-test timing at all. The `fast` job has
+        # carried --durations=15 since it existed; this is the same
+        # instrument on the job that actually needs it, measuring the
+        # environment the slowdown lives in rather than somebody's laptop.
+        run: pytest -q --durations=25
 
   coverage:
     # The single check merge automation may rely on. always() so a skipped or
