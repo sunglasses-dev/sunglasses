@@ -1,0 +1,156 @@
+name: engine-build-timing
+
+# WHY THIS EXISTS (T8, 2026-09-18, WO R-CI-312-ENGINE from T9).
+#
+# The integrity matrix's 3.12 leg is the slowest in 7 of 8 full-matrix runs.
+# --durations=0 on PR #188 turned that from an estimate into a count: against
+# the 3.13 leg of the SAME commit, 3.12 carries 41 fixed waits of ~86.45s --
+# 3543s of a 3809s excess, 93% of it -- and 3.9, 3.10, 3.11 and 3.14 carry
+# ZERO. The waits land on the `setup` AND the `call` of unrelated tests, and
+# every site that carries one builds a FRESH SunglassesEngine over the whole
+# pattern DB. Counting source sites gives 41 against 41 waits.
+#
+# That last line is a LEAD, not a finding, and this workflow is the one
+# measurement that settles it: time the construction ALONE, on the platform
+# where the phenomenon lives. A laptop cannot answer it -- the same comparison
+# run locally came back +3% against +85% on CI, which is why this is a workflow
+# and not a script somebody runs.
+#
+# IT MATTERS BEYOND CI. If a Linux 3.12 user pays ~86s to build the engine,
+# they pay it on `sunglasses scan`, and that is a user-facing defect and a
+# 0.6.0 blocker rather than a CI nuisance. So this measures the INSTALLED
+# WHEEL from a neutral directory, not the checkout, and (b) times the
+# user-facing command rather than an import a user never writes.
+#
+# IT DOES NOT TAX EVERY PR. workflow_dispatch, plus pull_request filtered to
+# this file, so it runs on the PR that introduces it and on demand afterwards.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/engine-build-timing.yml'
+
+permissions: read-all
+
+concurrency:
+  group: engine-build-timing-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the leg under suspicion. 3.11 and 3.13 bracket it, and both
+        # carry zero waits in the run this came from, so they are the controls:
+        # if 3.12's construction is not an outlier against BOTH, the lead dies
+        # here and the excess is something else.
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build the wheel from THIS head
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir "$RUNNER_TEMP/dist"
+          ls -la "$RUNNER_TEMP/dist"
+
+      - name: Install that wheel into its own venv
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/venv/bin/python" -m pip install "$RUNNER_TEMP"/dist/*.whl
+          "$RUNNER_TEMP/venv/bin/python" -m pip freeze > "$RUNNER_TEMP/freeze.txt"
+          cat "$RUNNER_TEMP/freeze.txt"
+
+      # PROVENANCE FIRST. `python` run from the checkout puts the checkout on
+      # sys.path ahead of the venv, and then this whole job would be timing the
+      # source tree while reporting on the wheel. Three installs of this package
+      # have been confused for each other before; the run says which one it has
+      # and fails if it is not the installed one.
+      - name: (0) the timing must come from the WHEEL
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import pathlib, sunglasses
+          from sunglasses.engine import SunglassesEngine
+          f = pathlib.Path(sunglasses.__file__).resolve()
+          print("import from :", f)
+          print("version     :", getattr(sunglasses, "__version__", "?"))
+          assert "site-packages" in f.parts, f"NOT the installed wheel: {f}"
+          print("PROVENANCE OK")
+          PY
+
+      # (a) THE MEASUREMENT. Three FRESH interpreters, because a second
+      # construction in the same process can be served by whatever the first
+      # one cached, and a cached build is not the build a user pays for.
+      - name: (a) SunglassesEngine() construction, three fresh interpreters
+        working-directory: ${{ runner.temp }}
+        run: |
+          for i in 1 2 3; do
+            "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import time
+          t0 = time.perf_counter()
+          from sunglasses.engine import SunglassesEngine
+          t1 = time.perf_counter()
+          engine = SunglassesEngine()
+          t2 = time.perf_counter()
+          rules = getattr(engine, "patterns", None) or getattr(engine, "rules", None) or []
+          print(f"RESULT construct import={t1 - t0:8.3f}s "
+                f"build={t2 - t1:8.3f}s total={t2 - t0:8.3f}s rules={len(rules)}")
+          PY
+          done
+
+      # (b) THE PATH A USER ACTUALLY TAKES. If the cost is in construction, it
+      # is in every scan, and this is the number that decides whether this is a
+      # CI nuisance or a 0.6.0 blocker.
+      - name: (b) python -m sunglasses scan, the user-facing path
+        working-directory: ${{ runner.temp }}
+        run: |
+          printf 'just some ordinary text, nothing to find here\n' > small.txt
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import subprocess, sys, time, os
+          exe = os.environ["RUNNER_TEMP"] + "/venv/bin/python"
+          for i in range(3):
+              t0 = time.perf_counter()
+              p = subprocess.run([exe, "-m", "sunglasses", "scan", "small.txt"],
+                                 capture_output=True, text=True)
+              t1 = time.perf_counter()
+              print(f"RESULT scan wall={t1 - t0:8.3f}s exit={p.returncode}")
+              if i == 0:
+                  print("--- first run stdout, first 400 chars ---")
+                  print((p.stdout or p.stderr)[:400])
+          PY
+
+      # (c) WHERE THE TIME GOES, on the leg that has it. Printed for every leg
+      # rather than gated to 3.12, because a profile of a fast leg is the
+      # control that says which line is the difference -- a profile with
+      # nothing to compare it to names a slowest function and proves nothing.
+      - name: (c) cProfile of one construction, top 15 cumulative
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import cProfile, pstats, io
+          from sunglasses.engine import SunglassesEngine
+          pr = cProfile.Profile()
+          pr.enable()
+          SunglassesEngine()
+          pr.disable()
+          s = io.StringIO()
+          pstats.Stats(pr, stream=s).sort_stats("cumulative").print_stats(15)
+          print(s.getvalue())
+          PY
+
+      - name: environment receipt
+        run: |
+          echo "python : $("$RUNNER_TEMP/venv/bin/python" -V 2>&1)"
+          echo "libc   : $(ldd --version 2>&1 | head -1)"
+          echo "kernel : $(uname -srm)"
+          echo "cpu    : $(nproc) x $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
