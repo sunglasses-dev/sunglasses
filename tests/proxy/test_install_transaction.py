@@ -2294,6 +2294,75 @@ def test_a_dead_owners_pid_answering_alive_does_not_keep_its_alias(
     assert held.name in named, "the held file ended up named by no valid note"
 
 
+_PRELOCK_DEATH = """
+import os, pathlib, signal, sys
+sys.path.insert(0, %r)
+from sunglasses import install as inst
+mine = os.getpid()
+# Die at the owner-file boundary: the instant the forget reaches for its lock,
+# BEFORE the rename that would publish an alias.
+def die(alias):
+    os.kill(mine, signal.SIGKILL)
+inst._hold_owner_file = die
+inst._forget_take(pathlib.Path(sys.argv[1]), "an-older-take")
+"""
+
+
+def test_a_death_before_the_owner_lock_leaves_no_alias_at_all(
+        cfg, home, artifact, tmp_path):
+    """R16-THE-OWNER-EXISTS-FIRST (ruling R-177-R16 (a), ASTRA round 15
+    `test_R15_PRELOCK_DEATH_ALIAS_BOUND`).
+
+    Round 15 took the owner lock AFTER the rename that publishes the alias, and
+    that leaves an ordinary crash window -- no reused pid, no swapped inode,
+    nothing exotic. Die in between and there is an alias with no owner file,
+    which the conservative missing-owner rule can never prove dead. Eight
+    deaths, eight aliases: the bound broken by a process ending at the wrong
+    instant.
+
+    Order is the repair, not another rule. The owner file is created and locked
+    FIRST, so an alias cannot exist without its owner having existed. A death
+    at that boundary therefore leaves NO alias, the note is still at its public
+    name, and any owner file left behind is swept as an orphan.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": inst._digest_file(held)}),
+        encoding="utf-8")
+
+    driver = tmp_path / "prelock_death.py"
+    driver.write_text(_PRELOCK_DEATH % str(
+        pathlib.Path(inst.__file__).resolve().parents[1]), encoding="utf-8")
+
+    for _ in range(8):
+        done = subprocess.run(
+            [sys.executable, "-B", str(driver), str(note)],
+            env=dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
+                     PYTHONDONTWRITEBYTECODE="1"),
+            capture_output=True, timeout=30)
+        assert done.returncode == -signal.SIGKILL, (
+            "the forget was not killed at the owner-lock boundary: rc=%r %r"
+            % (done.returncode, done.stderr[-300:]))
+        assert not list(records.glob("github.taking*.forgetting-*")), (
+            "a death BEFORE the owner lock published an alias anyway")
+        # The note never moved, so the route back is the public name itself.
+        assert note.is_file(), "the note was taken without an owner to answer for it"
+
+    # AND NO STRAY LOCK FILES EITHER. Turning a retained alias into a retained
+    # lock file would be the same leak wearing a different name.
+    strays = list(records.glob("*.forgetlock.forgetting-*.owner"))
+    inst._collect_orphaned_owner_files(records)
+    assert not list(records.glob("*.forgetlock.forgetting-*.owner")), (
+        "owner files survived with no alias to answer for: %r"
+        % ([x.name for x in strays],))
+
+
 def test_a_live_siblings_alias_is_never_collected(cfg, home, artifact):
     """The other side of R15, and the one a careless repair breaks.
 

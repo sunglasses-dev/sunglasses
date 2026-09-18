@@ -174,6 +174,33 @@ INVENTORY = {
     "_collect_stale_aliases: _owner_file(alias).unlink()":
         "The lock file of an alias we have just collected, whose owner that "
         "lock itself proved dead.",
+    # Round 16: the owner file is created and locked BEFORE the alias exists,
+    # and it records the identity of what was locked.
+    "_hold_owner_file: os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)":
+        "THE owner file's creation, and O_EXCL is the point: only this pid and "
+        "serial build this name, so an exclusive create is the claim.",
+    "_hold_owner_file: os.open(str(owner), os.O_RDWR)":
+        "Reopening a name only a dead predecessor of ours can have left. It is "
+        "reused only after its lock proves free.",
+    "_hold_owner_file: os.ftruncate(fd, 0)":
+        "Emptying that reclaimed file before it records our own identity; it "
+        "is ours exclusively at that point, by the lock above.",
+    "_finish_owner_file: os.write(fd, _owner_identity(fd).encode(\"ascii\"))":
+        "Recording WHAT WAS LOCKED inside the file itself, written by the only "
+        "process that can know it -- fstat of the descriptor it just locked.",
+    "_finish_owner_file: os.fsync(fd)":
+        "Our own descriptor.",
+    "_lock_is_enforced: os.open(str(owner), os.O_RDONLY)":
+        "Read-only. A second descriptor used to prove this filesystem enforces "
+        "the lock we are already holding; it opens and never writes.",
+    "_alias_owner_is_gone: os.open(str(owner), os.O_RDONLY)":
+        "Read-only. The collector's own look at the owner file.",
+    "_collect_orphaned_owner_files: owner.unlink()":
+        "A lock file with no alias to answer for, left by a death before the "
+        "rename, whose lock proved its writer gone.",
+    # Another string method the walker cannot type; see the entry above.
+    "_collect_orphaned_owner_files: owner.name[:-len(\".owner\")].replace(\".forgetlock.\", \".taking.\", 1)":
+        "A string method deriving the alias name. It touches no filesystem.",
     # NOT A FILESYSTEM MUTATION AT ALL, and inventoried BECAUSE the walk cannot
     # prove that. `replace` is in MUTATORS for `os.replace` and `Path.replace`;
     # this is `str.replace` on a name, and an AST cannot type the receiver. The

@@ -769,59 +769,99 @@ def _owner_file(private):
         private.name.replace(".taking.", ".forgetlock.", 1) + ".owner")
 
 
+def _owner_identity(fd):
+    """The (device, inode) of what this descriptor actually refers to."""
+    st = os.fstat(fd)
+    return f"{st.st_dev}:{st.st_ino}"
+
+
 def _hold_owner_file(private):
-    """Take an exclusive lock that this process holds for the whole forget.
+    """Create the owner file and hold its lock BEFORE the alias exists.
 
-    R15-OWNERSHIP-IS-AN-INCARNATION-NOT-A-PID (ASTRA round 14,
-    `test_R14_LIVE_REUSED_PID_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND[distinct]`).
-    Round 14 asked the operating system whether a pid was alive. The reviewer's
-    driver answered yes for every dead owner's pid -- which is what pid reuse
-    looks like from inside -- and the collector then kept all eight aliases.
-    He is right, and the sentence is worth keeping: **a liveness answer for
-    another pid is not proof that the current occupant wrote the alias.** A pid
-    names a slot, not an incarnation.
+    R16-THE-OWNER-EXISTS-FIRST (ASTRA round 15,
+    `test_R15_PRELOCK_DEATH_ALIAS_BOUND`). Round 15 took this lock AFTER the
+    rename that publishes the alias, which leaves an ordinary crash window: die
+    in between and there is an alias with no owner file, and the conservative
+    missing-owner rule then keeps it for ever. Eight deaths, eight aliases --
+    the same bound broken by the plainest fault of all, a process ending at the
+    wrong instant, with nothing exotic about it.
 
-    A lock names the incarnation. The kernel drops this one when the process
-    that took it ends, however it ends, and hands it to nobody else in the
-    meantime. So "can I take this lock" is a question about the writer of this
-    file rather than about whoever now holds a number.
+    Order fixes it rather than a new rule: the owner file is created and locked
+    FIRST, so an alias can never exist without its owner having existed. Dying
+    before the lock now leaves an unlocked owner file and NO alias, and that
+    file is collectable garbage rather than a retention.
 
-    Returns the open file object to keep, or None when this platform has no
-    locking at all -- see `_collect_stale_aliases`, which then refuses to
-    collect rather than guess.
+    R16-AN-OWNER-IS-AN-INODE-NOT-A-PATH (`R15_OWNER_REPLACED_WHILE_LIVE`,
+    `R15_OWNER_REPLACED_BETWEEN_OPEN_AND_FLOCK`). The lock lives on an INODE and
+    the collector reaches it by a PATH, so a path swapped to a different inode
+    hands the collector a free lock on a file nobody was ever holding. The
+    identity of what was locked is therefore written INTO the file, by the only
+    process that can know it -- fstat of the descriptor it just locked. The
+    product never replaces an owner file, so a disagreement is somebody else's
+    doing and the answer is UNPROVEN.
+
+    Returns the open file to keep, or None when this platform cannot lock (see
+    `_collect_stale_aliases`, which then refuses to collect at all).
     """
     if LOCKING is None:
         return None
     owner = _owner_file(private)
     try:
-        fh = owner.open("a+")
+        fd = os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        # Only this process's pid and serial build this name, so an existing
+        # one was left by a predecessor. If its lock is free it is garbage and
+        # ours to reuse; if it is held, somebody is using that name and we take
+        # nothing.
+        try:
+            fd = os.open(str(owner), os.O_RDWR)
+        except OSError:
+            return None
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return None
+        try:
+            os.ftruncate(fd, 0)
+        except OSError:
+            os.close(fd)
+            return None
+        return _finish_owner_file(fd, locked=True)
     except OSError:
         return None
+    return _finish_owner_file(fd, locked=False)
+
+
+def _finish_owner_file(fd, *, locked):
+    """Lock it if it is not locked yet, then record what was locked."""
     try:
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if not locked:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.write(fd, _owner_identity(fd).encode("ascii"))
+        os.fsync(fd)
     except OSError:
         try:
-            fh.close()
+            os.close(fd)
         except OSError:
             pass
         return None
-    return fh
+    return os.fdopen(fd, "r+b")
 
 
 def _release_owner_file(private, fh):
     """Drop the lock, and the file ONLY IF THE ALIAS IT ANSWERS FOR IS GONE.
 
     The owner file's lifetime is the alias's, not this call's. A first cut
-    removed it unconditionally here, and a control of our own caught what that
+    removed it unconditionally, and a control of our own caught what that
     costs: a contested forget that COMPLETES leaves its alias behind on purpose
-    -- that is the whole of round 12 -- and removing the owner file with it left
-    an alias no later collector could ever prove dead, because the evidence of
-    the incarnation went with it. The bound would have come back by a quieter
-    road than the one the reviewer drove, on the ordinary path rather than under
-    a kill.
+    -- that is round 12 -- and removing the owner file with it left an alias no
+    later collector could ever prove dead. The bound would have come back by a
+    quieter road than the reviewer drove, on the ordinary path rather than
+    under a kill.
 
-    Left unlocked beside a kept alias, the file says exactly what it should: the
-    writer has finished, take the lock and find out.
+    Since round 16 this also runs when the rename never happened, so the file
+    it leaves in that case has no alias and is swept as an orphan.
     """
     if fh is None:
         return
@@ -840,47 +880,121 @@ def _release_owner_file(private, fh):
         pass
 
 
+def _lock_is_enforced(owner):
+    """Whether a lock we are ALREADY holding excludes a second one.
+
+    Called only while the caller holds an exclusive lock on `owner`. A second
+    exclusive attempt from another descriptor must fail; if it succeeds, this
+    filesystem is taking the call and enforcing nothing, and no conclusion
+    drawn from a free lock here means anything.
+    """
+    try:
+        fd = os.open(str(owner), os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True               # refused, as a real lock must
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        return False                  # granted twice: not enforced
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
 def _alias_owner_is_gone(private):
     """Whether the incarnation that took this note privately has ended.
 
-    Three answers, in order, and only the last one is about another process:
+    In order, and only the last two are about another process:
 
     * it is in OUR hands, including another thread's -- not gone;
-    * this platform cannot lock, so nothing here can be proven -- not gone, and
-      the caller refuses to collect at all (the declared `flock`/`None` limit,
-      growth acknowledged rather than a wrong delete);
-    * the owner file's lock is FREE -- the writer's incarnation has ended,
-      because the kernel holds that lock for exactly as long as the process
-      that took it lives and gives it to no successor.
+    * this platform cannot lock, so nothing here is provable -- not gone;
+    * no owner file -- not gone. Since round 16 an alias cannot be published
+      before its owner file exists, so this now means somebody deleted it from
+      outside, and that is not evidence of death;
+    * the lock is HELD -- not gone;
+    * the lock is free, and the file we locked is the file whose identity is
+      recorded inside it, and the path still leads to that same inode -- gone.
 
-    An alias with no owner file beside it was written before this mechanism
-    existed, or its owner never got as far as taking the lock. Neither is
-    evidence of death, so it is kept.
+    THE LAST CLAUSE IS THE ROUND-16 REPAIR. A lock lives on an inode; a
+    collector reaches it by a path. Replace the path with an unlocked inode and
+    a free lock says nothing about the writer who is still holding the original
+    (`R15_OWNER_REPLACED_WHILE_LIVE`), and doing it between the open and the
+    flock says nothing either (`R15_OWNER_REPLACED_BETWEEN_OPEN_AND_FLOCK`).
+    Both are answered by asking what we actually locked and whether the name
+    still means it. Any disagreement is UNPROVEN, and unproven retains.
     """
     if private in _HELD_PRIVATELY:
         return False
     if LOCKING is None:
         return False
     owner = _owner_file(private)
-    if not owner.is_file():
-        return False
     try:
-        fh = owner.open("a+")
+        fd = os.open(str(owner), os.O_RDONLY)
     except OSError:
         return False
     try:
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            return False          # somebody is still holding it: alive
+            return False                      # somebody is holding it
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            # R16-PROVE THE LOCK IS A LOCK. `flock` is advisory and some
+            # filesystems -- a network mount is the ordinary case -- accept the
+            # call and enforce nothing. There, every lock looks free and every
+            # live owner reads as dead. So while we are holding this one, take
+            # a SECOND, independent one on the same file: on a filesystem that
+            # honours locks that must fail, and if it succeeds the answer here
+            # is worth nothing. An instrument that self-tests at the moment of
+            # use, rather than a platform check written once and believed.
+            if not _lock_is_enforced(owner):
+                return False
+            actual = _owner_identity(fd)
+            recorded = os.read(fd, 128).decode("ascii", "replace").strip()
+            if recorded != actual:
+                return False                  # not the file that was locked
+            after = owner.stat()
+            if f"{after.st_dev}:{after.st_ino}" != actual:
+                return False                  # the name moved while we held it
         except OSError:
-            pass
+            return False
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
         return True
     finally:
         try:
-            fh.close()
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _collect_orphaned_owner_files(d):
+    """Owner files whose alias never appeared, left by a death before the rename.
+
+    R16: creating the owner first turns the prelock crash from a retained alias
+    into a stray lock file. Stray is not free -- it is the same leak wearing a
+    different name -- so the same collector removes it, under the same proof:
+    the lock is takeable and the file is the one its own content names.
+    """
+    for owner in sorted(d.glob("*.forgetlock.forgetting-*.owner")):
+        alias = owner.with_name(
+            owner.name[:-len(".owner")].replace(".forgetlock.", ".taking.", 1))
+        if alias.exists():
+            continue
+        if not _alias_owner_is_gone(alias):
+            continue
+        try:
+            owner.unlink()
         except OSError:
             pass
 
@@ -972,6 +1086,7 @@ def _collect_stale_aliases(d, private, intent):
             _owner_file(alias).unlink()
         except OSError:
             pass
+    _collect_orphaned_owner_files(d)
 
 
 def _forget_take(taking, owner):
@@ -998,12 +1113,17 @@ def _forget_take(taking, owner):
     # process that ends while holding one privately has not hidden it.
     private = _unique_name(lambda k: taking.with_name(
         f"{taking.name}.forgetting-{os.getpid()}-{k:x}"))
+    # THE OWNER FILE IS CREATED AND LOCKED BEFORE THE RENAME THAT PUBLISHES THE
+    # ALIAS (R-177-R16 (a)). Round 15 did it after, and dying in between left an
+    # alias with no owner that nothing could ever prove dead. Now a death there
+    # leaves a stray lock file and no alias at all.
+    held_open = _hold_owner_file(private)
     try:
         taking.rename(private)
     except OSError:
+        _release_owner_file(private, held_open)
         return
     _HELD_PRIVATELY.add(private)
-    held_open = _hold_owner_file(private)
     try:
         return _forget_held(taking, private, owner)
     finally:
