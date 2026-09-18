@@ -275,6 +275,16 @@ except ImportError:                                    # pragma: no cover - posi
 # stated limitation with a control on it rather than a hidden one.
 LOCKING = "flock" if fcntl is not None else None
 
+# Bound once, as an ATTRIBUTE and not a computed lookup: the package forbids
+# `getattr(os, ...)` (a reader in disguise, ASTRA E33/E34) and the repo guard
+# `test_package_reads_no_undeclared_environment_variables` caught the first cut
+# of this line. The flag is POSIX-only, so its absence is an ImportError-shaped
+# fact and is handled the same way `fcntl` is.
+try:
+    _O_NOFOLLOW = os.O_NOFOLLOW
+except AttributeError:                             # pragma: no cover - posix here
+    _O_NOFOLLOW = 0
+
 # path -> depth, for the re-entrancy in `_exclusive`.
 _HELD: dict = {}
 
@@ -758,7 +768,7 @@ def _open_set_aside(record, name, *, home):
     try:
         if os.path.realpath(str(failed.parent)) != os.path.realpath(str(d)):
             return None
-        fd = os.open(str(failed), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(str(failed), os.O_RDONLY | _O_NOFOLLOW)
     except OSError:
         return None
     try:
