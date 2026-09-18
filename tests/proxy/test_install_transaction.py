@@ -15,6 +15,9 @@ implementation, which is the whole defect the control exists to catch.
 import json
 import os
 import pathlib
+import signal
+import subprocess
+import sys
 
 import pytest
 
@@ -2099,6 +2102,128 @@ def test_contested_forgets_keep_every_held_file_named(
     assert retained.is_file(), "recovery did not put the bytes back"
     assert len(list(records.glob("*.forgetting-*"))) < len(kept), (
         "recovery put bytes back without spending the note that named them")
+
+
+_KILLED_FORGET = """
+import os, pathlib, signal, sys
+sys.path.insert(0, %r)
+from sunglasses import install as inst
+mine = os.getpid()
+note = pathlib.Path(sys.argv[1])
+if sys.argv[2] == "reused":
+    os.getpid = lambda: 424242
+real_link = os.link
+def link_then_die(src, dst, *a, **kw):
+    out = real_link(src, dst, *a, **kw)
+    os.kill(mine, signal.SIGKILL)
+    return out
+os.link = link_then_die
+inst._forget_take(note, "an-older-take")
+"""
+
+
+def test_a_killed_forget_does_not_leave_an_alias_per_death(
+        cfg, home, artifact, tmp_path):
+    """R14-A-CRASH-IS-NOT-A-QUANTITY (ruling R-177-R14, ASTRA round 13
+    `test_R13_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND`).
+
+    Round 13's counting control drove contested forgets that RETURNED, and the
+    bound it proved -- one note per outstanding held file -- was true for every
+    sequence it could reach. The reviewer drove the one it could not: a forget
+    links its note back and is killed before it unlinks the private alias it
+    was holding. Eight deaths, eight aliases, ONE held file. Not bytes, hard
+    links to one inode, and every one of them a name the scan has to read.
+    Retention grew with the crash count instead of with the evidence owed.
+
+    The row is here and not only in the reviewer's file because a property no
+    suite of ours drives is a property we find out about from somebody else.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    held_sha = inst._digest_file(held)
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": held_sha}),
+        encoding="utf-8")
+
+    driver = tmp_path / "killed_forget.py"
+    driver.write_text(_KILLED_FORGET % str(
+        pathlib.Path(inst.__file__).resolve().parents[1]), encoding="utf-8")
+
+    mode = "distinct"
+    series = []
+    for _ in range(8):
+        done = subprocess.run(
+            [sys.executable, "-B", str(driver), str(note), mode],
+            env=dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
+                     PYTHONDONTWRITEBYTECODE="1"),
+            capture_output=True, timeout=30)
+        assert done.returncode == -signal.SIGKILL, (
+            "the forget was not killed at the boundary this row is about, so "
+            "it proves nothing: rc=%r %r"
+            % (done.returncode, done.stderr[-300:]))
+        aliases = list(records.glob("github.taking*.forgetting-*"))
+        held_files = list(records.glob("github.original.discarding-*"))
+        series.append((len(aliases), len(held_files)))
+        # COVERAGE AT EVERY INSTANT, not only at the end: a collector that
+        # bounds the count by removing the last route is not a repair.
+        named = set()
+        for q in records.glob("github.taking*"):
+            entry = inst._read_note(q)
+            if entry is None:
+                continue
+            body = records / entry["held"]
+            if body.is_file() and inst._digest_file(body) == entry["sha256"]:
+                named.add(body.name)
+        assert all(h.name in named for h in held_files), (
+            "a held file is named by no valid note: %r" % (series,))
+
+    assert all(a <= h for a, h in series), (
+        "private aliases outgrew the held files they answer for: %r" % (series,))
+
+
+def test_a_killed_forget_does_not_leave_an_alias_per_death_with_a_reused_pid(
+        cfg, home, artifact, tmp_path):
+    """The same sequence where the new process reports the DEAD owner's pid.
+
+    R14-A-PID-IS-NOT-AN-IDENTITY. The first cut of the collector asked "is this
+    pid alive, and is it mine", which this defeats exactly: the predecessor's
+    alias reads as the caller's own and is kept forever. A pid says which
+    process is running now, never which process wrote a name. What answers it
+    is the set of names this process is actually holding.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": inst._digest_file(held)}),
+        encoding="utf-8")
+
+    driver = tmp_path / "killed_forget.py"
+    driver.write_text(_KILLED_FORGET % str(
+        pathlib.Path(inst.__file__).resolve().parents[1]), encoding="utf-8")
+
+    for _ in range(8):
+        done = subprocess.run(
+            [sys.executable, "-B", str(driver), str(note), "reused"],
+            env=dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
+                     PYTHONDONTWRITEBYTECODE="1"),
+            capture_output=True, timeout=30)
+        assert done.returncode == -signal.SIGKILL, (
+            "not killed at the boundary: rc=%r %r"
+            % (done.returncode, done.stderr[-300:]))
+        aliases = list(records.glob("github.taking*.forgetting-*"))
+        assert len(aliases) <= 1, (
+            "a reused pid made every predecessor's alias look like our own: "
+            "%d aliases for one held file" % len(aliases))
 
 
 def test_a_forged_marker_does_not_license_an_entry_only_restore(

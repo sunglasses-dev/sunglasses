@@ -47,10 +47,10 @@ INVENTORY = {
     # Repeats. Each occurrence is its own site and answers for itself; the
     # reviewer's duplicate-site shape is exactly this, and a single entry
     # covering both was how it walked past round 11.
-    "_forget_take: private.unlink() #1":
+    "_forget_held: private.unlink() #1":
         "The discard when the held bytes ARE answered for, on a note we hold "
         "exclusively.",
-    "_forget_take: private.unlink() #2":
+    "_forget_held: private.unlink() #2":
         "The discard after a successful link put the note back; the private "
         "name is ours alone at that point.",
     "_atomic_write: os.unlink(tmp) #1":
@@ -95,19 +95,15 @@ INVENTORY = {
         "can hold that name at that moment.",
     "_claim_take_note: taking.write_text(intent, encoding=\"utf-8\")":
         "The content of a note THIS call created exclusively.",
-    "_claim_take_note: os.fsync(fh.fileno())":
-        "Our own descriptor.",
     "_forget_take: taking.rename(private)":
         "ATOMIC. Forgetting takes the note out of the way first and reads it "
         "afterwards; the private name stays discoverable to `_reclaim_taken`.",
-    "_forget_take: private.unlink()":
+    "_forget_held: private.unlink()":
         "A note we hold exclusively, either ours or stale once the name is "
         "taken by a new owner.",
-    "_forget_take: os.link(str(private), str(taking))":
+    "_forget_held: os.link(str(private), str(taking))":
         "ATOMIC on the destination NAME: EEXIST means a new owner published "
         "and its note stands.",
-    "_reclaim_taken: held.rename(bytes_path)":
-        "Only after the held bytes hash to what the note recorded.",
     "_set_aside_failed: standby_bytes.rename(kept)":
         "A copy that failed its digest, moved to a name nothing else claims.",
     "_adopt_standby: record_path.rename(rec_path)":
@@ -154,12 +150,21 @@ INVENTORY = {
         "Same, for its record.",
     "_uninstall_locked: canonical.rename(kept)":
         "Setting aside a copy that failed its digest; nothing claims that name.",
-    "_refuse_symlinked_storage: p.parent.mkdir(parents=True, exist_ok=True)":
-        "Idempotent creation of our own records directory.",
     "_records_dir: d.mkdir(parents=True, exist_ok=True)":
         "Idempotent creation of our own records directory.",
     "_records_dir: os.chmod(str(d), 0o700)":
         "Our own records directory, narrowed at creation.",
+    # Round 14's two collectors. Both remove a NOTE and never held bytes, and
+    # each answers for itself rather than sharing one entry.
+    "_collect_discharged_notes: spent.unlink()":
+        "A note whose held file is no longer there. Recovery put those bytes "
+        "back at the canonical name, so the note answers for a file that does "
+        "not exist and nothing can be recovered from it.",
+    "_collect_stale_aliases: alias.unlink()":
+        "A private alias of a note we are holding ourselves, left by a process "
+        "that has ended. Our own alias names the same held file with the same "
+        "digest and cannot be collected by anyone while we live, so the route "
+        "back is never empty.",
 }
 
 
@@ -320,7 +325,26 @@ def main():
         for lineno, key in unlisted:
             print(f"  {SOURCE.name}:{lineno} {' '.join(key.split())[:100]}")
         return 1
-    print("\nevery filesystem mutation is inventoried")
+    # AND THE REVERSE. R14-AN-ANSWER-WITH-NO-QUESTION. The walk proves every
+    # site has an entry and has never proved every entry has a site. Three
+    # entries on `8349bb6` named call text that is nowhere in the file any
+    # more; they had outlived their sites quietly, because nothing looked.
+    #
+    # A stale entry is a PRE-LOADED BORROWED ANSWER. The moment any function
+    # acquires that name and that call text, an unaudited site is inventoried
+    # the instant it is written -- which is round 12's relocation escape
+    # arriving from the other direction, and removing the three instances
+    # without this would leave the class open. The inventory is checked BOTH
+    # ways now.
+    stale = sorted(set(INVENTORY) - {key for _, _, _, key in keyed})
+    if stale:
+        print(f"\nSTALE ({len(stale)}): every one of these answers for a call "
+              f"that is no longer in the file")
+        for key in stale:
+            print(f"  {' '.join(key.split())[:100]}")
+        return 1
+    print("\nevery filesystem mutation is inventoried, and every entry has a "
+          "site")
     return 0
 
 
