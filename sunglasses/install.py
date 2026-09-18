@@ -45,6 +45,7 @@ silently collapsed, and execution options the entry carries are preserved.
 import contextlib
 import errno
 import hashlib
+import itertools
 import json
 import os
 import pathlib
@@ -450,6 +451,13 @@ def _atomic_write(path, data: bytes):
     happens at the last instant that can still refuse.
     """
     p = pathlib.Path(path)
+    authority = _AUTHORISED.get(str(p))
+    if authority is not None and not authority.still_valid():
+        # The evidence that licensed this write is no longer what it was when
+        # it was read, checked on the descriptor itself rather than by name.
+        raise ConfigConflict(
+            f"the evidence authorising this restore of {path} changed after it "
+            f"was verified; refusing")
     try:
         mode = p.stat().st_mode & 0o777
     except OSError as e:
@@ -592,9 +600,51 @@ def _read_note(path):
         return None
     held = intent.get("held")
     sha = intent.get("sha256")
+    owner = intent.get("owner")
+    # R13-IDENTITY (ASTRA round 12, `R12_INVALID_SECOND_NOTE_MUST_NOT_ANSWER`).
+    # A note is identified by WHAT it names, WHAT that should hash to, and WHO
+    # wrote it. Round 12 compared the filename alone, so a valid-shaped note
+    # carrying the same held name and a wrong digest answered for bytes it had
+    # never seen, and the good note was deleted on the strength of it.
     if not isinstance(held, str) or not held or not _is_digest(sha):
         return None
+    if not isinstance(owner, str) or not owner:
+        return None
     return intent
+
+
+_NAME_SERIAL = itertools.count()
+
+
+def _unique_name(build):
+    """The first name `build(k)` produces that nothing is using.
+
+    R13-A-FLAT-COUNT-IS-NOT-A-BOUND (ruling R-177-R13 item 4,
+    `test_contested_forgets_keep_every_held_file_named`). Every private name in
+    this file used to be built from `id(<object>)`, and `id()` is an address
+    CPython hands out AGAIN once the previous object is collected. It is unique
+    among objects alive at the same moment, which is all it was ever asked for
+    -- but these names outlive the objects. Twenty-four contested forgets in
+    one process produced ONE private name twenty-four times, and each rename
+    silently replaced the last: the leftover count stayed at 1, which reads
+    exactly like a bound, while twenty-three held files were left named by
+    nothing and could never be put back. A flat count was a total loss.
+
+    The same shape was under every set-aside here -- the held copy a take moves
+    out of the way, the standby pair, the copy that failed its digest, the
+    unusable original an entry-only restore keeps -- each of them a rename onto
+    a name a later call in the same process could rebuild, and a rename is
+    silent about what it lands on.
+
+    A monotonic counter cannot repeat while this process lives. The only names
+    that could already be taken carry OUR pid and were written before it, so
+    stepping past one is a decision no live process can race: nothing else
+    builds a name with our pid in it.
+    """
+    while True:
+        candidate = build(next(_NAME_SERIAL))
+        if not candidate.exists():
+            return candidate
 
 
 def _held_bytes_are_answered_for(private, *, d):
@@ -618,8 +668,18 @@ def _held_bytes_are_answered_for(private, *, d):
         if other == private:
             continue
         theirs = _read_note(other)
-        if theirs and theirs["held"] == mine["held"]:
-            return True
+        # The WHOLE identity: another note answers for these bytes only if it
+        # names the same file AND agrees on what that file should hash to. A
+        # note that merely reuses the name is a different claim about a
+        # different thing, and round 12 deleted good evidence on exactly that.
+        if theirs and (theirs["held"], theirs["sha256"]) == (
+                mine["held"], mine["sha256"]):
+            try:
+                held = d / theirs["held"]
+                if held.is_file() and _digest_file(held) == theirs["sha256"]:
+                    return True
+            except OSError:
+                continue
     return False
 
 
@@ -672,7 +732,7 @@ def _claim_take_note(taking, intent):
     return True
 
 
-def _forget_take(taking, held_name):
+def _forget_take(taking, owner):
     """Remove the note for THIS take, and never another take's.
 
     R9-NOTE-OWNERSHIP (ASTRA round 8,
@@ -694,8 +754,8 @@ def _forget_take(taking, held_name):
     # The private name stays INSIDE the records directory and keeps the
     # `<name>.taking` prefix on purpose: `_reclaim_taken` scans every note, so a
     # process that ends while holding one privately has not hidden it.
-    private = taking.with_name(
-        f"{taking.name}.forgetting-{os.getpid()}-{id(taking):x}")
+    private = _unique_name(lambda k: taking.with_name(
+        f"{taking.name}.forgetting-{os.getpid()}-{k:x}"))
     try:
         taking.rename(private)
     except OSError:
@@ -704,7 +764,10 @@ def _forget_take(taking, held_name):
         intent = json.loads(private.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         intent = None
-    if isinstance(intent, dict) and intent.get("held") == held_name:
+    # OWNERSHIP IS THE AUTHOR, not the filename. Two cleanups that took
+    # different bytes can name the same held file; round 12's mutual discard is
+    # each deleting the other's note because the names matched.
+    if isinstance(intent, dict) and intent.get("owner") == owner:
         try:
             private.unlink()
         except OSError:
@@ -730,12 +793,27 @@ def _forget_take(taking, held_name):
     try:
         os.link(str(private), str(taking))
     except FileExistsError:
-        if _held_bytes_are_answered_for(private, d=taking.parent):
+        # Consulted, and deliberately NOT sufficient. Whether the held bytes
+        # look answered for is worth knowing -- it is what tells a reader
+        # whether this note is still the only route back -- but it cannot
+        # authorise a deletion on its own, for the reason below.
+        answered = _held_bytes_are_answered_for(private, d=taking.parent)
+        mine = _read_note(private)
+        if answered and mine is not None and mine.get("owner") == owner:
             try:
                 private.unlink()
             except OSError:
                 pass
-        # Otherwise it stays, under a name `_reclaim_taken` scans.
+            return
+        # R13-NEVER-DELETE-WHAT-YOU-DID-NOT-AUTHOR (ASTRA round 12,
+        # `R12_TWO_NOTES_MUTUAL_DISCARD`). Round 12 discarded here when the
+        # bytes looked answered for by ANOTHER note -- and two cleanups each
+        # holding a copy of the same note each saw the other as the answer and
+        # both deleted, so the held bytes ended up named by nothing. "Somebody
+        # else has this covered" is not a fact when the somebody else is doing
+        # the same thing at the same time. A note we did not author is never
+        # ours to remove; it stays under a name `_reclaim_taken` scans, and the
+        # sweep is where leftovers go.
         return
     except OSError:
         return
@@ -743,6 +821,108 @@ def _forget_take(taking, held_name):
         private.unlink()
     except OSError:
         pass
+
+
+# target -> the open descriptor that licensed the write about to happen. Held
+# across the write so the authorisation cannot be invalidated between the check
+# and the act; dropped in a finally.
+_AUTHORISED: dict = {}
+
+
+class _Authority:
+    """An open fd on the set-aside copy, plus what it was verified to contain."""
+
+    __slots__ = ("fd", "digest", "path")
+
+    def __init__(self, fd, digest, path):
+        self.fd = fd
+        self.digest = digest
+        self.path = path
+
+    def still_valid(self):
+        """The fd re-checked on itself, AND the name still resolving to it."""
+        try:
+            mine = os.fstat(self.fd)
+            theirs = os.stat(str(self.path))
+            if (mine.st_dev, mine.st_ino) != (theirs.st_dev, theirs.st_ino):
+                return False
+        except OSError:
+            return False
+        try:
+            os.lseek(self.fd, 0, os.SEEK_SET)
+            chunks = []
+            while True:
+                chunk = os.read(self.fd, 1 << 20)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+        except OSError:
+            return False
+        return _digest_bytes(b"".join(chunks)) == self.digest
+
+    def close(self):
+        try:
+            os.close(self.fd)
+        except OSError:
+            pass
+
+
+def _authorise_from_one_fd(record, name, *, home):
+    """Open the set-aside copy ONCE and keep the descriptor that licenses it.
+
+    The predicate runs first and on the same file: whatever `_open_set_aside`
+    concludes is what this is about, and the descriptor below is what carries
+    that conclusion to the write. Two steps, one fd, and the fd is checked
+    against the NAME at the write as well as against itself -- a replacement
+    leaves the fd intact and the name pointing somewhere else, and that is a
+    replacement, not a coincidence.
+    """
+    if _open_set_aside(record, name, home=home) is None:
+        return None
+    failed_name = record.get("failed_bytes_name")
+    failed_sha = record.get("failed_bytes_sha256")
+    if not isinstance(failed_name, str) or not _is_digest(failed_sha):
+        return None
+    d, _, _, bytes_path = _record_paths(home, name)
+    failed = d / failed_name
+    if failed.name != failed_name:
+        return None
+    try:
+        if os.path.realpath(str(failed.parent)) != os.path.realpath(str(d)):
+            return None
+        fd = os.open(str(failed), os.O_RDONLY | _O_NOFOLLOW)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise OSError("not a regular file")
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    except OSError:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        return None
+    if _digest_bytes(b"".join(chunks)) != failed_sha:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        return None
+    if bytes_path.exists():
+        try:
+            if _digest_file(bytes_path) == record.get("file_sha_before"):
+                os.close(fd)
+                return None
+        except OSError:
+            pass
+    return _Authority(fd, failed_sha, failed)
 
 
 def _open_set_aside(record, name, *, home):
@@ -812,7 +992,8 @@ def _failed_copy_is_present(record, name, *, home):
 
 def _set_aside_failed(standby_bytes, name, *, records):
     """Keep a copy that failed its digest, under a name of its own."""
-    kept = records / f"{name}.failed-{os.getpid()}-{id(standby_bytes):x}.original"
+    kept = _unique_name(lambda k: records /
+                        f"{name}.failed-{os.getpid()}-{k:x}.original")
     standby_bytes.rename(kept)
     return kept.name, _digest_file(kept)
 
@@ -1033,7 +1214,7 @@ def _reclaim_one(taking, name, *, d, bytes_path):
     except OSError as e:
         raise ConfigIOError(
             f"cannot put back the bytes {taking} named: {e}") from e
-    _forget_take(taking, held_name)
+    _forget_take(taking, intent.get("owner"))
     return True
 
 def _discard(*paths):
@@ -1079,7 +1260,8 @@ def _discard(*paths):
         # thing an unlink can be sure about. If a record does claim them we put
         # them back, and if the slot has been refilled by whoever wrote that
         # record, the copy we are holding is the superseded one and ours to drop.
-        held = q.with_name(q.name + f".discarding-{os.getpid()}-{id(q):x}")
+        held = _unique_name(lambda k: q.with_name(
+            q.name + f".discarding-{os.getpid()}-{k:x}"))
         # R8-TAKE-JOURNALLED (ASTRA round 7, `R7_TAKE_CRASH_RECOVERABLE`). The
         # take is atomic, but a process that ends between the take and the
         # question leaves the bytes under a name no recovery path looks for,
@@ -1090,8 +1272,9 @@ def _discard(*paths):
         # this note says was taken.
         taking = q.with_suffix(".taking")
         try:
+            owner = held.name.split(".discarding-", 1)[-1]
             intent = json.dumps({"canonical": q.name, "held": held.name,
-                                 "sha256": _digest_file(q)})
+                                 "owner": owner, "sha256": _digest_file(q)})
         except OSError:
             # There is nothing at the canonical name to take. Whatever note is
             # there belongs to a take that is still in flight, and removing it
@@ -1114,7 +1297,7 @@ def _discard(*paths):
         try:
             q.rename(held)
         except OSError:
-            _forget_take(taking, held.name)
+            _forget_take(taking, owner)
             continue
         if q.with_suffix(".json").exists():
             # Somebody's completed install is relying on these bytes.
@@ -1125,13 +1308,13 @@ def _discard(*paths):
                     held.rename(q)
             except OSError:
                 pass
-            _forget_take(taking, held.name)
+            _forget_take(taking, owner)
             continue
         try:
             held.unlink()
         except OSError:
             pass
-        _forget_take(taking, held.name)
+        _forget_take(taking, owner)
 
 
 # Every field a record must carry, with the type it must have. `target_path` is
@@ -1444,8 +1627,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     # way -- it would journal a take of our own standby copy and then decline to
     # remove it because a record sits beside it. A standby is claimed by nobody
     # and is ours to delete.
-    spare_bytes = bytes_path.with_name(
-        f"{name}.inflight-{os.getpid()}-{id(record):x}.standby")
+    spare_bytes = _unique_name(lambda k: bytes_path.with_name(
+        f"{name}.inflight-{os.getpid()}-{k:x}.standby"))
     spare_record = spare_bytes.with_suffix(".standbyrecord")
     try:
         pending_path.write_text(json.dumps({**record, "state": "pending"}, indent=2),
@@ -1891,17 +2074,27 @@ def _uninstall_locked(config_path, name, *, home):
     else:
         del servers[name]
     if retained_failure is not None:
-        # R12-AUTHORISE AT THE MOMENT OF USE (ASTRA round 11,
-        # `R11_FAILED_STATE_VALIDATION[replaced_after_check]`). The gate above
-        # ran before everything between here and there; the evidence it read can
-        # be swapped afterwards. So the authorisation is taken again, on one
-        # fresh descriptor, immediately before the write it authorises -- a
-        # check whose answer is carried across other work is a check about the
-        # past.
-        if _open_set_aside(record, name, home=home) is None:
+        # R13-ONE-AUTHORITY-FD (ASTRA round 12, `R12_AUTHORITY_REPLACEMENT`).
+        # Round 12 re-opened the set-aside copy immediately before the write,
+        # which is closer but still two opens: the evidence could be replaced
+        # between the second open and the write, and between the predicate and
+        # the write at `_atomic_write`'s own entry. An authorisation that can be
+        # re-taken is an authorisation with a lifetime, and this one's lifetime
+        # is a DESCRIPTOR: opened once, verified on that descriptor, and held
+        # open across the write it authorises. A replacement after that point
+        # changes a name, not the file this fd refers to, and the fd is what
+        # was authorised.
+        authority = _authorise_from_one_fd(record, name, home=home)
+        if authority is None:
             raise retained_failure
+        _AUTHORISED[str(target)] = authority
 
-    _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+    try:
+        _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+    finally:
+        spent = _AUTHORISED.pop(str(target), None)
+        if spent is not None:
+            spent.close()
 
     # R10a-KEEP-WHAT-FAILED. An entry-only restore that happened BECAUSE the
     # retained copy was unusable is a recovery, not a cleanup: the copy that
@@ -1912,8 +2105,8 @@ def _uninstall_locked(config_path, name, *, home):
     if retained_failure is not None:
         canonical = _record_paths(home, name)[3]
         if canonical.is_file():
-            kept = canonical.with_name(
-                f"{name}.unusable-{os.getpid()}-{id(record):x}.original")
+            kept = _unique_name(lambda k: canonical.with_name(
+                f"{name}.unusable-{os.getpid()}-{k:x}.original"))
             try:
                 canonical.rename(kept)
                 kept_at = str(kept)

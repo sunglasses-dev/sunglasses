@@ -269,9 +269,15 @@ MUTATIONS = [
     # a second authorisation immediately before the write, so disabling the
     # first one alone changes nothing and the mutant survived its own control --
     # correctly. The authority is where the decision is acted on.
+    # ROUND 13 RE-POINTED THIS ANCHOR. The gate did not go away: the
+    # authorisation it takes is now a DESCRIPTOR held across the write
+    # (`_authorise_from_one_fd`), so the call text changed in the same edit.
+    # An anchor that goes stale does not fail loudly, it fails to APPLY -- the
+    # harness then reports a kill for a mutant it never introduced -- which is
+    # why the presence row above is part of the suite and not a convenience.
     ('R11-NO-FIELD', 'a record field decides that an entry-only restore is allowed',
-     '        if _open_set_aside(record, name, home=home) is None:\n            raise retained_failure',
-     '        if False:\n            raise retained_failure',
+     '        authority = _authorise_from_one_fd(record, name, home=home)\n        if authority is None:\n            raise retained_failure',
+     '        authority = _authorise_from_one_fd(record, name, home=home)\n        if False:\n            raise retained_failure',
      'test_evidence_swapped_after_the_gate_does_not_license_the_restore'),
     ('R11-ADOPT-CURRENT', 'the oldest standby pair is adopted instead of the live one',
      '        if not _is_digest(after) or after != _digest_bytes(live):',

@@ -1570,7 +1570,7 @@ def test_a_leftover_is_not_reclaimed_on_the_strength_of_its_name(
     # loud, not to step over and fail later for a different reason.
     (records / "github.taking").write_text(json.dumps(
         {"canonical": retained.name, "held": impostor.name,
-         "sha256": inst._digest_bytes(claimed)}), encoding="utf-8")
+         "owner": "1-a", "sha256": inst._digest_bytes(claimed)}), encoding="utf-8")
     with pytest.raises(inst.ConfigConflict) as e:
         inst._reclaim_taken(home, "github")
     assert "does not hash" in str(e.value)
@@ -1773,7 +1773,7 @@ def test_a_new_owners_note_survives_an_older_cleanups_forget(
     newly_held.write_bytes(b'{"the new owner": "its own bytes"}')
     new_note = json.dumps(
         {"canonical": retained.name, "held": newly_held.name,
-         "sha256": inst._digest_file(newly_held)})
+         "owner": "999-new", "sha256": inst._digest_file(newly_held)})
     real_read_text = pathlib.Path.read_text
     replaced = []
 
@@ -1793,6 +1793,27 @@ def test_a_new_owners_note_survives_an_older_cleanups_forget(
     assert note.is_file(), "the older cleanup deleted the new owner's note"
     assert json.loads(note.read_text())["held"] == newly_held.name
     assert newly_held.is_file(), "the new owner's bytes were lost with its note"
+
+    # ROUND 13 ADDS WHAT MAKES THIS ROW LOAD-BEARING AGAIN. The three
+    # assertions above went green under `R10-FORGET-ATOMIC` once ownership
+    # arrived: with a forget forbidden from deleting a note it did not author,
+    # the new owner's note survives whether or not the old one was taken out of
+    # the way first, so the row stopped discriminating and the mutant was red
+    # only by OTHER tests. Two checks covering one thing can mean neither is
+    # load-bearing.
+    #
+    # The rename is what gives the OLDER cleanup a name of its own. Without it
+    # the new owner's write lands on the very file the old note lives in, and
+    # the bytes that note was the only route back to are named by nothing.
+    named = set()
+    for q in records.glob("github.taking*"):
+        try:
+            named.add(json.loads(read(q))["held"])
+        except (ValueError, KeyError, TypeError):
+            continue
+    assert mine in named, (
+        "the older cleanup's own held bytes are named by no note: the note was "
+        "not taken out of the way before the new owner published over it")
 
 
 def test_a_standby_left_by_an_ended_publisher_is_discovered(
@@ -1904,7 +1925,8 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
     records = retained.parent
     note = records / "github.taking"
     note.write_text(json.dumps(
-        {"canonical": retained.name, "held": "somebody-elses", "sha256": "0" * 64}),
+        {"canonical": retained.name, "held": "somebody-elses",
+         "owner": "a-take-that-is-not-ours", "sha256": "0" * 64}),
         encoding="utf-8")
 
     real_read_text = pathlib.Path.read_text
@@ -1918,7 +1940,7 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
             # it. Whatever the older cleanup is holding is stale by definition.
             note.write_text(json.dumps(
                 {"canonical": retained.name, "held": "the-new-owners",
-                 "sha256": "1" * 64}), encoding="utf-8")
+                 "owner": "the-new-owner", "sha256": "1" * 64}), encoding="utf-8")
         return out
 
     monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
@@ -1952,7 +1974,7 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
     held.write_bytes(read(retained))
     note.write_text(json.dumps(
         {"canonical": retained.name, "held": held.name,
-         "sha256": inst._digest_file(held)}), encoding="utf-8")
+         "owner": "1-a", "sha256": inst._digest_file(held)}), encoding="utf-8")
 
     real_read_text = pathlib.Path.read_text
     published = []
@@ -1963,7 +1985,7 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
             published.append(True)
             note.write_text(json.dumps(
                 {"canonical": retained.name, "held": "the-new-owners",
-                 "sha256": "1" * 64}), encoding="utf-8")
+                 "owner": "the-new-owner", "sha256": "1" * 64}), encoding="utf-8")
         return out
 
     monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
@@ -1971,10 +1993,112 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
     monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
 
     assert published
-    # The canonical retained copy is present and hashes to what the old note
-    # recorded, so those bytes are answered for and the note is spent.
-    assert not list(records.glob("*.forgetting-*")), (
-        "a note whose bytes are already back was kept")
+    # ROUND 13 CORRECTS THIS ROW AGAIN, and the reason is the reviewer's
+    # mutual-discard finding. "The bytes are answered for" is not a fact a
+    # forget can act on when another cleanup may be concluding the same thing
+    # about the same bytes at the same moment -- both then delete and the held
+    # file is named by nothing. A note we did not author is never ours to
+    # remove, whatever its bytes look like; leftovers are the sweep's job.
+    kept = list(records.glob("*.forgetting-*"))
+    assert kept, "a note this cleanup did not author was deleted"
+
+
+def test_contested_forgets_keep_every_held_file_named(
+        cfg, home, artifact, monkeypatch):
+    """R13-BOUNDED (ruling R-177-R13, item 4). THE COUNTING CONTROL.
+
+    Round 13 stopped a forget from deleting a note it did not author, and the
+    row above now asserts a note is KEPT where round 12 asserted it was
+    dropped. That is a repair only if the kept notes are bounded AND each one
+    is still doing a job. A rule that never deletes is a leak with a good
+    reason; a rule that quietly overwrites is worse, because the count stays
+    flat and looks like a bound.
+
+    Round 12's private name was `.forgetting-<pid>-<id(note):x}`, and `id()` is
+    an address that CPython hands out again. Twenty-four contested forgets in
+    one process produced twenty-four identical private names, so each rename
+    silently replaced the last: one leftover, twenty-three held files named by
+    nothing and unrecoverable. The first count this control ever printed was
+    `[1, 1, 1, ... 1]` -- a flat series that was a total loss, not a bound.
+
+    So this counts EVIDENCE, not files. Retention is bounded when the note set
+    never exceeds the held files it answers for, and no held file is ever left
+    without a note.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    rounds = 24
+
+    real_read_text = pathlib.Path.read_text
+    contests = []
+
+    def a_new_owner_claims_the_name(self, *a, **kw):
+        # The put-back reads the note it holds privately; a new owner claims
+        # the canonical name in that window, so the `os.link` back genuinely
+        # fails with EEXIST. Nothing is faked -- the name really is taken by
+        # another note.
+        out = real_read_text(self, *a, **kw)
+        if ".forgetting-" in self.name:
+            contests.append(self.name)
+            note.write_text(json.dumps(
+                {"canonical": retained.name, "held": "the-new-owners",
+                 "owner": "new-owner-%d" % len(contests),
+                 "sha256": "1" * 64}), encoding="utf-8")
+        return out
+
+    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    counts = []
+    for n in range(rounds):
+        held = records / ("github.original.discarding-%d-a" % n)
+        held.write_bytes(read(retained))
+        note.write_text(json.dumps(
+            {"canonical": retained.name, "held": held.name,
+             "owner": "take-%d" % n,
+             "sha256": inst._digest_file(held)}), encoding="utf-8")
+        inst._forget_take(note, "an-older-take")
+        counts.append(len(list(records.glob("*.forgetting-*"))))
+    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+
+    assert len(contests) >= rounds, (
+        "SETUP: the contested branch was not reached %d times, only %d"
+        % (rounds, len(contests)))
+
+    held_files = sorted(q.name for q in
+                        records.glob("github.original.discarding-*"))
+    named = set()
+    for q in records.glob("github.taking*"):
+        try:
+            named.add(json.loads(read(q))["held"])
+        except (ValueError, KeyError, TypeError):
+            continue
+    stranded = [h for h in held_files if h not in named]
+    assert not stranded, (
+        "%d of %d held files are named by no note and cannot be put back: %r"
+        % (len(stranded), len(held_files), stranded[:5]))
+
+    # THE BOUND. One note per outstanding held file, never one per forget:
+    # retention is proportional to the evidence still owed and not to how many
+    # times a forget was contested. The series is reported on failure because
+    # its SHAPE is the finding -- flat meant loss, rising by one per held file
+    # is the bound.
+    kept = list(records.glob("*.forgetting-*"))
+    assert len(kept) <= len(held_files), (
+        "the kept-note set outgrew the evidence it answers for: %d notes for "
+        "%d held files, counts %r" % (len(kept), len(held_files), counts))
+
+    # AND THE EVIDENCE CLEARS. A bound that only says "no more notes than held
+    # files" is still a leak if nothing ever discharges a held file. Recovery
+    # is the collector: it puts the bytes back and spends the note it used --
+    # `_reclaim_one` forgets that note under the note's OWN owner, which is the
+    # one case where a deletion is authorised.
+    retained.unlink()
+    assert inst._reclaim_taken(home, "github"), (
+        "recovery could not use any of the notes the contested forgets kept")
+    assert retained.is_file(), "recovery did not put the bytes back"
+    assert len(list(records.glob("*.forgetting-*"))) < len(kept), (
+        "recovery put bytes back without spending the note that named them")
 
 
 def test_a_forged_marker_does_not_license_an_entry_only_restore(

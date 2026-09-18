@@ -32,6 +32,18 @@ OS_MUTATORS = {"replace", "rename", "unlink", "remove", "link", "symlink",
 
 # "<function>: <source text>" -> why it is safe.
 INVENTORY = {
+    # Read-only opens, listed rather than exempted: the audit now refuses to
+    # guess at flags it cannot read, and `_O_NOFOLLOW` is a module constant it
+    # cannot follow. Each is O_RDONLY and creates nothing; saying so here is
+    # cheaper than teaching the walker to resolve constants, and it leaves the
+    # claim where a reader can check it.
+    "_read_bytes_and_identity: os.open(str(path), os.O_RDONLY)":
+        "Read-only. Opens the target to take bytes and identity from one fd.",
+    "_authorise_from_one_fd: os.open(str(failed), os.O_RDONLY | _O_NOFOLLOW)":
+        "Read-only, no-follow. THE authority fd, held across the write it "
+        "licenses.",
+    "_open_set_aside: os.open(str(failed), os.O_RDONLY | _O_NOFOLLOW)":
+        "Read-only, no-follow. The predicate's own open.",
     # Repeats. Each occurrence is its own site and answers for itself; the
     # reviewer's duplicate-site shape is exactly this, and a single entry
     # covering both was how it walked past round 11.
@@ -131,14 +143,14 @@ INVENTORY = {
         "Promotion, bytes second.",
     "_install_locked: spare_record.write_text(json.dumps(\n                        {**record, \"file_sha_after\": _digest_bytes(wrapped_bytes),\n                         \"original_bytes_path\": str(bytes_path),\n                         \"failed_bytes_name\": failed_name,\n                         \"failed_bytes_sha256\": failed_sha,\n                         \"state\": \"complete\"},\n                        indent=2), encoding=\"utf-8\")":
         "A standby record we still hold privately, before promotion.",
-    "render_again: bytes_path.write_bytes(current)":
+    "_install_locked.render_again: bytes_path.write_bytes(current)":
         "Re-derivation under the writer lock; the inverse is rewritten to "
         "describe the bytes actually being overwritten.",
-    "render_again: pending_path.write_text(\n                json.dumps({**record, \"state\": \"pending\"}, indent=2),\n                encoding=\"utf-8\")":
+    "_install_locked.render_again: pending_path.write_text(\n                json.dumps({**record, \"state\": \"pending\"}, indent=2),\n                encoding=\"utf-8\")":
         "Same, for the journal.",
-    "stand_by: spare_bytes.write_bytes(original)":
+    "_install_locked.stand_by: spare_bytes.write_bytes(original)":
         "The standby copy, written before the wrapper it is the inverse of.",
-    "stand_by: spare_record.write_text(json.dumps(\n            {**record, \"file_sha_after\": _digest_bytes(published),\n             \"original_bytes_path\": str(bytes_path), \"state\": \"complete\"},\n            indent=2), encoding=\"utf-8\")":
+    "_install_locked.stand_by: spare_record.write_text(json.dumps(\n            {**record, \"file_sha_after\": _digest_bytes(published),\n             \"original_bytes_path\": str(bytes_path), \"state\": \"complete\"},\n            indent=2), encoding=\"utf-8\")":
         "Same, for its record.",
     "_uninstall_locked: canonical.rename(kept)":
         "Setting aside a copy that failed its digest; nothing claims that name.",
@@ -173,6 +185,22 @@ def _qualified(tree):
     return out
 
 
+def _os_names(tree):
+    """Every name bound to the os module, however it was imported.
+
+    R13-ALIASES (ASTRA round 12, `R12_AUDIT_NEW_SHAPES[os_alias]`). `import os
+    as anything` gives the same syscalls a different label, and an audit that
+    matches the label `os` sees none of them.
+    """
+    names = {"os"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == "os":
+                    names.add(a.asname or "os")
+    return names
+
+
 def _aliases(tree):
     """Names bound to mutating callables by an import, e.g. `from os import
     unlink`. Round 11 renamed one of these and the regular-expression audit did
@@ -186,16 +214,29 @@ def _aliases(tree):
     return bound
 
 
-def _is_mutation(node, aliases):
-    """Every shape that changes the filesystem, by AST rather than by name."""
+def _is_mutation(node, aliases, os_names):
+    """Every shape that changes the filesystem, by AST rather than by name.
+
+    UNKNOWN COUNTS AS MUTATING. Round 12 read the flags of `os.open` and the
+    mode of `open` only when they were literals, so putting either in a
+    variable hid the call. An audit that cannot prove a call is harmless has
+    not proved anything, so anything it cannot read is inventoried.
+    """
     f = node.func
     if isinstance(f, ast.Attribute):
-        if isinstance(f.value, ast.Name) and f.value.id == "os":
+        if isinstance(f.value, ast.Name) and f.value.id in os_names:
             if f.attr == "open":
+                if len(node.args) < 2:
+                    return False            # read-only by signature
                 for arg in node.args[1:]:
+                    if not isinstance(arg, (ast.BinOp, ast.Attribute,
+                                            ast.Constant)):
+                        return True         # flags we cannot read
                     for sub in ast.walk(arg):
                         if isinstance(sub, ast.Attribute) and sub.attr in OPEN_FLAGS:
                             return True
+                        if isinstance(sub, ast.Name):
+                            return True     # a variable in the flags
                 return False
             return f.attr in OS_MUTATORS
         return f.attr in MUTATORS
@@ -203,69 +244,73 @@ def _is_mutation(node, aliases):
         if f.id in aliases:
             return True
         if f.id == "open":
-            mode = ""
+            if len(node.args) < 2 and not node.keywords:
+                return False                # read-only by signature
             for arg in node.args[1:]:
                 if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                    mode = arg.value
+                    if set(arg.value) & WRITE_MODES:
+                        return True
+                else:
+                    return True             # a mode we cannot read
             for kw in node.keywords:
-                if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
-                    mode = kw.value.value or ""
-            return bool(set(mode) & WRITE_MODES)
+                if kw.arg == "mode":
+                    if isinstance(kw.value, ast.Constant):
+                        if set(kw.value.value or "") & WRITE_MODES:
+                            return True
+                    else:
+                        return True
+            return False
     return False
 
 
 def main():
     src = SOURCE.read_text(encoding="utf-8")
     tree = ast.parse(src)
-    # Innermost function wins: a nested helper is its own site, and reporting
-    # it under the enclosing function would let two different sites share a key.
+    # R13-SITE-IDENTITY (ASTRA round 12,
+    # `R12_AUDIT_NEW_SHAPES[qualified_site_relocation]`). A site is named by its
+    # FULL dotted path, not by the innermost function's bare name. Round 12's
+    # version computed the path and then threw it away, keying on the bare name
+    # instead: defining a nested helper called `_discard` anywhere in the file
+    # gave its `q.unlink()` the key `_discard: q.unlink()`, which is the
+    # module-level `_discard`'s inventory entry. The reviewer moved the real
+    # site out and put an unaudited one in under that borrowed answer, and the
+    # audit exited 0. A path cannot be borrowed: the same helper nested in
+    # `review_extra` is `review_extra._discard` and has no entry.
     where = _qualified(tree)
-    _unused = {}
-    funcs = []
-
-    def collect(node, depth):
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                funcs.append((depth, child))
-                collect(child, depth + 1)
-            else:
-                collect(child, depth)
-
-    collect(tree, 0)
-    for _, fn in sorted(funcs, key=lambda x: x[0]):
-        for child in ast.walk(fn):
-            where[id(child)] = fn.name
 
     aliases = _aliases(tree)
+    os_names = _os_names(tree)
     sites = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not _is_mutation(node, aliases):
+        if not isinstance(node, ast.Call) or not _is_mutation(node, aliases, os_names):
             continue
         text = ast.get_source_segment(src, node) or ""
         sites.append((node.lineno, where.get(id(node), "<module>"), text))
 
-    # Keyed by QUALIFIED path, LINE and call, so a nested helper sharing a name
-    # with a module-level one cannot inherit its entry, and two identical calls
-    # in the same function are two sites rather than one.
     # The key is (qualified function path, call text, which occurrence). A
     # nested helper has its own path so it cannot inherit a module-level
     # entry's answer, and two identical calls in one function are two sites
     # rather than one -- both shapes walked past round 11's version, which
     # keyed on the bare name.
     seen = {}
+    keyed = []
     unlisted = []
     for lineno, func, text in sites:
         base = f"{func}: {text}"
         n = seen.get(base, 0)
         seen[base] = n + 1
         key = base if n == 0 else f"{base} #{n}"
+        keyed.append((lineno, func, text, key))
         if key not in INVENTORY:
             unlisted.append((lineno, key))
 
     print(f"{SOURCE.name}: {len(sites)} filesystem mutations on shared "
           f"recovery state, {len(sites) - len(unlisted)} inventoried\n")
-    for lineno, func, text in sites:
-        key = f"{func}: {text}"
+    # The listing marks each site by the SAME key the decision used. Round 12's
+    # version recomputed a key without the occurrence suffix here, so the second
+    # of two identical calls printed as inventoried while being counted
+    # unaudited -- a readout that disagrees with the verdict it is printed under.
+    for lineno, func, text, key in keyed:
         mark = "  " if key in INVENTORY else "!!"
         one_line = " ".join(text.split())
         print(f"{mark} {SOURCE.name}:{lineno:<5} {func}: {one_line[:70]}")
