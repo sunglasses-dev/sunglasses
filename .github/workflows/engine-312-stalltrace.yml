@@ -72,11 +72,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: install
+      # THE SAME INSTALL THE INTEGRITY LEG DOES, not a lighter one. My first
+      # version installed the package and pytest only, and the run died at
+      # collection with ModuleNotFoundError: yaml -- PYTEST_EXIT=2, no suite, and
+      # therefore zero dumps. Zero dumps from a suite that never ran reads
+      # exactly like zero dumps from a suite with no stall. Step (1) is what
+      # told those apart, and this step is what stops it happening again: this
+      # has to be the SAME suite whose 41 waits were counted, which means the
+      # same dependencies, native tools included.
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .
-          python -m pip install pytest
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      - name: Install package + dev + media deps
+        run: |
+          python -m pip install --upgrade 'pip==26.2.1'
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest pyyaml "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
+          python -c "import yaml, pytest; print('yaml and pytest import OK')"
 
       # The same nine standing exclusions the integrity leg carries, so this is
       # the suite whose 41 waits were counted and not a different one.
