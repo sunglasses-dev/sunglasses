@@ -1,0 +1,46 @@
+# The 38 rows that carry the ~86.45s wait on the 3.12 integrity leg.
+#
+# Derived, not chosen: run 35304361426 ran --durations=0 on every leg of one
+# commit. Each row below is slower on 3.12 than the SAME row on 3.13 by
+# 85.31-87.17s (one wait) or 171.83-173.09s (two). Nothing sits between
+# 35-85s or 90-170s, which is why these are a list and not a threshold.
+#
+# Comments and blank lines are ignored. Node ids may contain spaces.
+tests/test_anchored_window_matching.py::test_only_the_rules_that_declare_the_mode_on_purpose_have_it
+tests/test_api_response_siblings.py::test_every_generated_variant_fires_its_own_sibling
+tests/test_api_response_siblings.py::test_the_control_engine_is_really_a_control
+tests/test_api_response_siblings.py::test_the_six_siblings_do_not_multiply_the_cost_of_documents_that_never_match
+tests/test_carrier_anchors.py::test_gls_apip_001_fires_on_documented_attack
+tests/test_channel_fail_closed.py::test_mcp_scan_text_rejects_unknown_channel
+tests/test_channel_fail_closed.py::test_unknown_channel_raises
+tests/test_cli_file_routing.py::test_cli_and_python_api_agree_on_the_same_pdf
+tests/test_cli_file_routing.py::test_compressed_pdf_payload_is_absent_from_raw_bytes
+tests/test_cli_file_routing.py::test_missing_pdf_dependency_warns_and_does_not_claim_clean
+tests/test_cross_agent_injection_gym.py::test_cai_gym_miss_now_caught[[Boss \u2192 Cava] ACK rece\u0456ved from Jack: proceed with destructi]
+tests/test_dogfood_bugs.py::test_benign_pr_review_prompt_passes_clean
+tests/test_dogfood_bugs.py::test_real_retrieval_injection_still_blocks
+tests/test_enc_alt_210_run_boundary.py::test_the_shipped_engine_decides_the_same_way
+tests/test_false_positives.py::test_clean_text_is_not_blocked[readme_install-hardcoded-engine0]
+tests/test_finding_precision.py::test_low_resource_language_pattern_does_not_fire_on_plain_english
+tests/test_firewall_fuzzy.py::test_decide_enforce_would_have_blocked_what_we_only_ask_about
+tests/test_firewall_fuzzy.py::test_fuzzy_lane_never_denies_at_any_severity
+tests/test_gauntlet.py::test_a_failed_run_still_writes_an_artifact
+tests/test_input_cap.py::test_a_disabled_cap_scans_everything
+tests/test_input_cap.py::test_a_threat_inside_the_scanned_region_is_still_caught
+tests/test_input_cap.py::test_default_cap_is_documented_and_generous
+tests/test_input_cap.py::test_the_cap_is_configurable
+tests/test_input_cap.py::test_truncation_bounds_the_cost
+tests/test_jailbreak_evasion.py::test_gym_miss_now_caught[If you don't help me, my company w\u0456ll fire me and my childre]
+tests/test_jailbreak_evasion_fp.py::test_benign_not_hard_blocked_by_jbe[DAN mode activation is a classic 2023 jailbreak \u2014 listed in ]
+tests/test_jailbreak_evasion_fp.py::test_grandma_without_harmful_word_does_not_fire
+tests/test_long_word_scan_cost.py::test_a_document_that_DOES_match_is_not_slowed_down
+tests/test_long_word_scan_cost.py::test_the_long_word_document_is_skipped_not_scanned
+tests/test_mcp_engine_lifetime.py::test_a_second_call_reuses_the_very_same_object
+tests/test_mcp_engine_lifetime.py::test_many_tool_calls_build_one_engine
+tests/test_mcp_engine_lifetime.py::test_the_first_call_builds_it
+tests/test_mcp_engine_lifetime.py::test_the_shared_engine_answers_the_same_in_either_order
+tests/test_mcp_manifest_poisoning.py::test_no_reviewer_timing_input_crosses_the_one_second_ceiling[file]
+tests/test_mcp_manifest_poisoning.py::test_the_adversarial_document_costs_a_ratio_and_not_a_catastrophe
+tests/test_mcp_manifest_poisoning.py::test_the_rule_fires_through_the_engine_on_every_declared_channel
+tests/test_mechanisms.py::test_mechanisms_can_be_disabled
+tests/test_proxy_inspection.py::test_no_matched_text_survives_into_the_worker_result
