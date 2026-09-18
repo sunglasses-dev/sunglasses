@@ -56,13 +56,17 @@ CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=tr
 # The integrity matrix's full-suite command, pinned as ONE exact string so
 # nothing positional can be smuggled in beside it.
 #
-# 2026-09-17: `--durations=25` added DELIBERATELY. The 3.12 leg is the slowest
-# in 7 of 8 full-matrix runs (median 135 min against 61-91 elsewhere) and the
-# step was bare `pytest -q`, so our slowest leg produced no per-test timing at
-# all. This gate exists to stop an UNREVIEWED shape change; a reviewed one
-# updates the assertion here, in the same commit, with its reason -- which is
-# what this line is.
-INTEGRITY_SUITE_CMD = "pytest -q --durations=25"
+# 2026-09-17: `--durations=25` added DELIBERATELY, then widened to
+# `--durations=0` the same day. =25 proved the 3.12 leg's excess is a fixed
+# ~94s wait repeated many times (its rows are quantised at 94.1-94.9s on the
+# `setup` AND `call` of tiny unrelated tests) but it cannot COUNT them: 22 of
+# its 25 rows are already at that ceiling, so the count is an extrapolation
+# (3789s excess / 94.3s ~= 40) rather than a reading. =0 prints every row and
+# the next full-matrix run states the number and names the tests. This gate
+# exists to stop an UNREVIEWED shape change; a reviewed one updates the
+# assertion here, in the same commit, with its reason -- which is what this
+# line is.
+INTEGRITY_SUITE_CMD = "pytest -q --durations=0"
 
 CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
 COVERAGE_JOB_KEYS = {"needs", "if", "runs-on", "timeout-minutes", "env", "steps"}
