@@ -2442,6 +2442,194 @@ def test_a_killed_forget_does_not_leave_an_alias_per_death_with_a_reused_pid(
             "%d aliases for one held file" % len(aliases))
 
 
+_DEATH_BETWEEN_LOCK_AND_RENAME = """
+import os, pathlib, signal, sys
+sys.path.insert(0, %r)
+from sunglasses import install as inst
+mine = os.getpid()
+def die(self, dst):
+    # the owner lock is already held here; die before the alias is published
+    os.kill(mine, signal.SIGKILL)
+inst.pathlib.Path.rename = die
+inst._forget_take(pathlib.Path(sys.argv[1]), "an-older-take")
+"""
+
+
+def test_recovery_sweeps_the_lock_files_a_run_of_deaths_leaves(
+        cfg, home, artifact, tmp_path):
+    """R17-A-COLLECTOR-NOBODY-CALLS-BOUNDS-NOTHING.
+
+    Round 16 turned a retained alias into a stray lock file, which is only an
+    improvement if something removes it. The orphan sweep had ONE caller, the
+    contested branch of a forget, so a run of deaths with nothing completing
+    between them never reached it: eight deaths left eight lock files. That is
+    the round-14 finding wearing a different file type.
+
+    The first version of this row called the sweep directly and passed, which
+    proved only that the sweep works when something calls it. It drives the
+    path a machine that has been crashing actually takes instead -- recovery.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": inst._digest_file(held)}),
+        encoding="utf-8")
+    retained.unlink()
+
+    driver = tmp_path / "death_between.py"
+    driver.write_text(_DEATH_BETWEEN_LOCK_AND_RENAME % str(
+        pathlib.Path(inst.__file__).resolve().parents[1]), encoding="utf-8")
+
+    strays = []
+    for _ in range(8):
+        done = subprocess.run(
+            [sys.executable, "-B", str(driver), str(note)],
+            env=dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
+                     PYTHONDONTWRITEBYTECODE="1"),
+            capture_output=True, timeout=30)
+        assert done.returncode == -signal.SIGKILL, (
+            "not killed between the owner lock and the rename: rc=%r %r"
+            % (done.returncode, done.stderr[-300:]))
+        assert not list(records.glob("github.taking*.forgetting-*")), (
+            "an alias was published despite dying before the rename")
+        strays.append(len(list(records.glob("*.forgetlock.forgetting-*.owner"))))
+
+    assert strays[-1] == 8, (
+        "SETUP: the deaths did not each leave a lock file, so this row is not "
+        "measuring accumulation: %r" % (strays,))
+    inst._reclaim_taken(home, "github")
+    left = list(records.glob("*.forgetlock.forgetting-*.owner"))
+    assert not left, (
+        "recovery ran and the lock files survived it: series=%r left=%r"
+        % (strays, [x.name for x in left]))
+
+
+def test_a_network_filesystem_is_never_trusted_to_prove_an_owner_ended(
+        cfg, home, artifact, monkeypatch):
+    """R17-A-LOCK-IS-ONLY-AS-WIDE-AS-ITS-KERNEL.
+
+    `flock` may be enforced among the processes on ONE host and not across
+    hosts -- NFS without a lock daemon, and `SUNGLASSES_HOME` can sit on it.
+    There the collector's own lock is granted while a live owner on another
+    host holds it, and the same-process self-test is refused, because local
+    state knows about it. The self-test then reports "enforced", the lock reads
+    free, and a live owner's alias is collected: a wrong delete.
+
+    Cross-host enforcement cannot be proven from one host, so the product does
+    not try. It proves LOCALITY by filesystem type and refuses otherwise, and
+    an unrecognised type fails closed. The shim below is a shim and says so.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    alias = records / "github.taking.forgetting-424242-2"
+    alias.write_text("{}", encoding="utf-8")
+
+    keeping = inst._hold_owner_file(alias)
+    assert keeping is not None, "SETUP: this platform took no owner lock"
+    try:
+        real_flock = inst.fcntl.flock
+        exclusive = []
+
+        def local_only(fd, op):
+            if op & inst.fcntl.LOCK_EX:
+                exclusive.append(op)
+                if len(exclusive) == 1:
+                    return None     # granted: a remote holder is invisible
+                raise OSError("second exclusive refused by local state")
+            return real_flock(fd, op)
+
+        monkeypatch.setattr(inst, "_filesystem_type", lambda p: "nfs")
+        monkeypatch.setattr(inst.fcntl, "flock", local_only)
+        assert inst._alias_owner_is_gone(alias) is False, (
+            "a live owner on a network filesystem was read as gone")
+    finally:
+        monkeypatch.undo()
+        inst._release_owner_file(alias, keeping)
+
+    # AND AN UNKNOWN TYPE FAILS CLOSED, because an unfamiliar filesystem is
+    # exactly where a surprise lives.
+    monkeypatch.setattr(inst, "_filesystem_type", lambda p: None)
+    assert inst._lock_enforcement_is_provable(records) is False
+
+
+def test_a_forged_owner_identity_record_is_not_believed(
+        cfg, home, artifact):
+    """R16 (b), driven rather than described: the record inside the owner file
+    must name the file it is inside. A record naming anything else means the
+    file was replaced, and a replacement is UNPROVEN, which retains."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    alias = records / "github.taking.forgetting-424242-3"
+    alias.write_text("{}", encoding="utf-8")
+    owner = inst._owner_file(alias)
+    elsewhere = records.stat()
+    owner.write_text("%s:%s" % (elsewhere.st_dev, elsewhere.st_ino),
+                     encoding="utf-8")
+    assert inst._alias_owner_is_gone(alias) is False, (
+        "a forged identity record was accepted as proof the owner had ended")
+
+
+def test_a_reclaimed_owner_file_is_truncated_and_re_identified(
+        cfg, home, artifact):
+    """A dead predecessor's lock file may be reused, and must not keep its
+    identity: the record has to name the file as it is now, or the next reader
+    would refuse a file that is genuinely ours."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    alias = records / "github.taking.forgetting-424242-5"
+    alias.write_text("{}", encoding="utf-8")
+    owner = inst._owner_file(alias)
+    owner.write_text("99999:88888 left by a dead predecessor", encoding="utf-8")
+
+    keeping = inst._hold_owner_file(alias)
+    assert keeping is not None, "a free stale lock file was not reclaimed"
+    try:
+        now = owner.stat()
+        assert owner.read_text(encoding="utf-8").strip() == (
+            "%s:%s" % (now.st_dev, now.st_ino)), (
+            "a reclaimed lock file kept its predecessor's identity")
+    finally:
+        inst._release_owner_file(alias, keeping)
+
+
+def test_the_sweep_cannot_take_a_lock_file_whose_alias_is_about_to_appear(
+        cfg, home, artifact):
+    """The window ordering (a) opens: between the owner lock and the rename
+    there is a lock file with no alias, which is exactly what the orphan sweep
+    looks for. It must not take it -- the lock is held, and that is the whole
+    answer."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": inst._digest_file(held)}),
+        encoding="utf-8")
+
+    private = inst._unique_name(lambda k: note.with_name(
+        "%s.forgetting-%d-%x" % (note.name, os.getpid(), k)))
+    keeping = inst._hold_owner_file(private)
+    assert keeping is not None, "SETUP: no owner lock taken"
+    try:
+        assert not private.exists(), "SETUP: the alias already exists"
+        inst._collect_orphaned_owner_files(records)
+        assert inst._owner_file(private).is_file(), (
+            "the sweep took a lock file whose alias was about to be published")
+    finally:
+        inst._release_owner_file(private, keeping)
+
+
 def test_a_forged_marker_does_not_license_an_entry_only_restore(
         cfg, home, artifact):
     """R11-NO-FIELD-DECIDES. Round 10 let a record carry a field that meant

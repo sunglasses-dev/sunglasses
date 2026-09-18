@@ -43,6 +43,7 @@ rather than leaking a traceback, duplicate JSON keys are rejected instead of
 silently collapsed, and execution options the entry carries are preserved.
 """
 import contextlib
+import ctypes
 import errno
 import hashlib
 import itertools
@@ -275,6 +276,19 @@ except ImportError:                                    # pragma: no cover - posi
 # still runs and the narrow race that needs the lock stays open, and that is a
 # stated limitation with a control on it rather than a hidden one.
 LOCKING = "flock" if fcntl is not None else None
+
+# AND HOW WIDE THAT LOCK REACHES, stated in the same breath and for the same
+# reason. `flock` is enforced by the kernel that owns the file. Where
+# `SUNGLASSES_HOME` sits on a filesystem served from another machine, the lock
+# may be enforced among the processes on THIS host and not across hosts -- NFS
+# without a lock daemon is the ordinary case -- and a collector there can be
+# granted a lock a live owner elsewhere is holding. That cannot be proven from
+# one host without a shared lock manager, so nothing here pretends to: the
+# recovery collector proves LOCALITY by filesystem type instead, and refuses to
+# act on a free lock anywhere it cannot (`_lock_enforcement_is_provable`). The
+# cost is leftovers on a network home, which is the same bargain as the line
+# above: a stated limitation with a control on it rather than a hidden one, and
+# never a wrong delete.
 
 # Bound once, as an ATTRIBUTE and not a computed lookup: the package forbids
 # `getattr(os, ...)` (a reader in disguise, ASTRA E33/E34) and the repo guard
@@ -880,6 +894,109 @@ def _release_owner_file(private, fh):
         pass
 
 
+# WHERE flock IS ENFORCED BETWEEN EVERY PROCESS THAT CAN REACH A FILE, and
+# where it is not. This list is the whole of the claim and lives in one place
+# on purpose (R-177-R17 (b)).
+#
+# On these, the kernel that owns the file owns the lock, so an exclusive lock
+# excludes every process on the machine and there is no second machine.
+_FS_LOCK_IS_LOCAL = frozenset({
+    "apfs", "hfs", "hfsplus", "ext2", "ext3", "ext4", "xfs", "btrfs",
+    "tmpfs", "zfs", "ufs", "f2fs",
+})
+# On these the file is served from somewhere else, and `flock` may be enforced
+# only among the processes on THIS host -- which is exactly the case a
+# same-process self-test cannot see, because the holder we would be excluding
+# is on another machine.
+_FS_LOCK_IS_NOT_PROVABLE = frozenset({
+    "nfs", "nfs4", "smbfs", "cifs", "smb3", "afpfs", "webdav", "ftp",
+    "9p", "afs", "gfs2", "ocfs2", "lustre", "glusterfs", "ceph", "sshfs",
+})
+
+
+def _filesystem_type(path):
+    """The name of the filesystem holding `path`, or None if we cannot tell.
+
+    None is not an error to route around: `_lock_enforcement_is_provable`
+    treats it as unprovable and the collector then refuses, which is the point.
+    """
+    try:
+        target = str(pathlib.Path(path).resolve())
+    except OSError:
+        return None
+    if sys.platform == "darwin":
+        try:
+            libc = ctypes.CDLL(None, use_errno=True)
+            # NAMED, NOT COMPUTED. The package guard
+            # `test_package_reads_no_undeclared_environment_variables` refuses
+            # `getattr(obj, <variable>)` anywhere in the wheel -- a computed
+            # lookup is a reader in disguise (ASTRA E33/E34) -- and the first
+            # cut of this loop tried three symbol names that way. It was green
+            # in tests/proxy and RED in the receipt, which is what the receipt
+            # is for. `statfs64` is the 64-bit-inode entry point on every macOS
+            # this package supports and `statfs` is its alias there; the old
+            # `statfs$INODE64` shim belongs to the 32-bit era and cannot be
+            # written as an attribute anyway.
+            try:
+                fn = libc.statfs64
+            except AttributeError:
+                try:
+                    fn = libc.statfs
+                except AttributeError:
+                    return None
+            buf = ctypes.create_string_buffer(4096)
+            if fn(os.fsencode(target), buf) != 0:
+                return None
+            # `f_fstypename` sits at byte 72 of `struct statfs`; verified on
+            # this platform against `mount` rather than taken from the header.
+            return buf.raw[72:88].split(b"\0")[0].decode("ascii", "replace") or None
+        except Exception:
+            return None
+    try:
+        # Linux: the mount table names the type outright, so no struct layout
+        # has to be guessed. Longest mount point that is a prefix wins.
+        best, kind = -1, None
+        with open("/proc/self/mountinfo", encoding="utf-8") as fh:
+            for line in fh:
+                parts = line.split(" - ")
+                if len(parts) < 2:
+                    continue
+                left, right = parts[0].split(), parts[1].split()
+                if len(left) < 5 or not right:
+                    continue
+                point = left[4]
+                if (target == point or target.startswith(
+                        point.rstrip("/") + "/")) and len(point) > best:
+                    best, kind = len(point), right[0]
+        return kind
+    except OSError:
+        return None
+
+
+def _lock_enforcement_is_provable(path):
+    """Whether a free lock on `path` can mean the writer has ended.
+
+    R17-A-LOCK-IS-ONLY-AS-WIDE-AS-ITS-KERNEL (T10's own round-16 probe, a shim
+    of a filesystem that enforces `flock` host-locally and not across hosts --
+    NFS without a lock daemon is the ordinary one, and `SUNGLASSES_HOME` can sit
+    on it). There the collector's own lock is GRANTED while a live owner on
+    another host holds it, and the same-process self-test below is REFUSED,
+    because local state knows about it. The self-test then reports "enforced",
+    the lock reads free, and a live owner's alias is collected. That is a wrong
+    delete, which is the one outcome this whole line of work refuses.
+
+    Cross-host enforcement cannot be proven from one host without a shared lock
+    manager, so this does not try. It proves LOCALITY instead: on a filesystem
+    whose kernel owns the file there is no other host to be wrong about. A type
+    we do not recognise fails closed, because an unknown filesystem is exactly
+    where a surprise lives.
+    """
+    kind = _filesystem_type(path)
+    if kind is None:
+        return False
+    return kind.lower() in _FS_LOCK_IS_LOCAL
+
+
 def _lock_is_enforced(owner):
     """Whether a lock we are ALREADY holding excludes a second one.
 
@@ -954,6 +1071,12 @@ def _alias_owner_is_gone(private):
             # honours locks that must fail, and if it succeeds the answer here
             # is worth nothing. An instrument that self-tests at the moment of
             # use, rather than a platform check written once and believed.
+            # R17: locality first, then the no-op-flock self-test. The type
+            # check answers "could another host be holding this", which the
+            # self-test cannot; the self-test answers "does this kernel
+            # actually enforce", which the type check cannot.
+            if not _lock_enforcement_is_provable(owner.parent):
+                return False
             if not _lock_is_enforced(owner):
                 return False
             actual = _owner_identity(fd)
@@ -1026,6 +1149,7 @@ def _collect_discharged_notes(d, held_name):
                 spent.unlink()
             except OSError:
                 pass
+    _collect_orphaned_owner_files(d)
 
 
 def _collect_stale_aliases(d, private, intent):
@@ -1549,6 +1673,14 @@ def _reclaim_taken(home, name):
                 # the one we used and any alias of it a killed forget left --
                 # answers for a file that is no longer there.
                 _collect_discharged_notes(d, held_named)
+                # R17-A-COLLECTOR-NOBODY-CALLS-BOUNDS-NOTHING. The orphan sweep
+                # used to have ONE caller, the contested branch of a forget, so
+                # a run of deaths with nothing completing between them never
+                # reached it and the stray lock files grew with the crash count
+                # -- the round-14 finding wearing a different file type. It runs
+                # on the recovery path too now, which is the path a machine that
+                # has been crashing actually takes.
+                _collect_orphaned_owner_files(d)
                 return True
         except (ConfigConflict, ConfigIOError) as e:
             refusal = refusal or e
