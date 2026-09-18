@@ -17,6 +17,50 @@ Quick FYI: an audit on May 6, 2026 surfaced some historical gaps in this project
 - Pre-flight gate blocks any new ship that would skip a patch number.
 - Daily 6 AM PT integrity check audits PyPI ↔ git tags ↔ CHANGELOG ↔ live site and surfaces drift before it builds up.
 
+## 2026-09-18 — the pattern DB said 1546 and the product shipped 1554
+
+**No pattern changed. This is a bookkeeping correction, recorded because a
+number two sources disagree on is a number we cannot say out loud.**
+
+The live site and `stats/current.json` said **1554** patterns; the pattern
+database said **1546** shipped. The released `v0.5.9` package carries 1554
+pattern ids, so the site was right and the database was behind. The difference
+was exactly eight ids, all of them the tool-result credential siblings added in
+v0.5.9 (#170):
+
+`GLS-SD-001-API`, `GLS-SD-002-API`, `GLS-SD-003-API`, `GLS-SD-004-API`,
+`GLS-SD-006-API`, `GLS-SD-007-API`, `GLS-SD-008-API`, `GLS-SD-009-API`
+
+All eight were present in the database as `staged` and had never been flipped to
+`shipped`. They were therefore live in the product AND still counted among the
+patterns "staged and can ship today" — queued to ship a second time.
+
+**Which release, measured rather than read from a changelog:** ids per tag are
+v0.5.7 **1540**, v0.5.8 **1546**, v0.5.9 **1554**, and the database's shipped
+figure was *exactly* v0.5.8's total. This is not a problem with `-API` siblings
+in general: the six siblings v0.5.8 introduced are all `shipped` in the database.
+It is the v0.5.9 flip that did not run.
+
+**Root cause.** #170 added those patterns through the ordinary pull request
+lane, and the ship step's `staged -> shipped` flip only covers the
+pattern-bundle lane, which reads a ship plan. A pattern that arrives by pull
+request is in the released package and is never named in that plan, so the
+database can drift every time a pattern ships that way — silently, because
+nothing compares the two.
+
+**Proposed durable fix, not implemented here:** the ship step should derive the
+shipped id set from the released package's own id list rather than from the ship
+plan, because the package is what a user installs and is therefore the source of
+truth. That is a change to the ship manual and is a decision, not a patch.
+
+**Receipt after the correction:** `ship-inventory.py --verify` reads shipped
+**1554** and staged **1474**; none of the eight remains in "can ship today"; and
+a diff of the released package's ids against the database's shipped ids is empty
+in both directions. The database file was backed up before the change.
+
+The `readme-truth` key is deliberately untouched: the site already said 1554, so
+nothing that `publish.sh` reads had to move.
+
 ## Allowlist (machine-readable — integrity check parses these)
 
 PyPI versions accepted as not-published:
