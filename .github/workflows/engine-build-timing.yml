@@ -102,9 +102,16 @@ jobs:
           t1 = time.perf_counter()
           engine = SunglassesEngine()
           t2 = time.perf_counter()
-          rules = getattr(engine, "patterns", None) or getattr(engine, "rules", None) or []
+          # THE READER HAS TO PROVE IT BUILT SOMETHING. The first version of
+          # this step asked for `.patterns`/`.rules`, which are not attributes
+          # of this object, and printed `rules=0` for a fully loaded engine --
+          # a timing of an apparently EMPTY engine, which is exactly the
+          # evidence you would use to say construction is cheap. It is
+          # `pattern_count`, and a zero here fails the job.
+          count = engine.pattern_count
+          assert count > 0, f"engine built with {count} patterns -- timing nothing"
           print(f"RESULT construct import={t1 - t0:8.3f}s "
-                f"build={t2 - t1:8.3f}s total={t2 - t0:8.3f}s rules={len(rules)}")
+                f"build={t2 - t1:8.3f}s total={t2 - t0:8.3f}s patterns={count}")
           PY
           done
 
@@ -148,6 +155,11 @@ jobs:
           print(s.getvalue())
           PY
 
+      # THE RUNNER IS NOT A CONSTANT. The first run of this workflow put 3.12
+      # on an Intel Xeon 6973P-C and 3.11/3.13 on AMD EPYC 7763, so a
+      # cross-leg comparison carries a hardware difference nobody chose. It
+      # cannot manufacture a quantised 86s wait, but it can move a 3s build by
+      # a second, and a reader of the table needs to see which box it was.
       - name: environment receipt
         run: |
           echo "python : $("$RUNNER_TEMP/venv/bin/python" -V 2>&1)"
