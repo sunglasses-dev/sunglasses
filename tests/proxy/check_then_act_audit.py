@@ -156,6 +156,13 @@ INVENTORY = {
         "Our own records directory, narrowed at creation.",
     # Round 14's two collectors. Both remove a NOTE and never held bytes, and
     # each answers for itself rather than sharing one entry.
+    # Round 18 splits this site: a PUBLIC note is removed as before, and an
+    # ALIAS only under its owner's lock, so the two are two sites.
+    "_collect_discharged_notes: spent.unlink() #1":
+        "An alias whose held file is gone, removed while this call holds its "
+        "owner's lock -- the proof and the act in one place (R-177-R18).",
+    "_collect_discharged_notes: _owner_file(spent).unlink()":
+        "That alias's lock file, removed with it and under the same lock.",
     "_collect_discharged_notes: spent.unlink()":
         "A note whose held file is no longer there. Recovery put those bytes "
         "back at the canonical name, so the note answers for a file that does "
@@ -176,13 +183,13 @@ INVENTORY = {
         "lock itself proved dead.",
     # Round 16: the owner file is created and locked BEFORE the alias exists,
     # and it records the identity of what was locked.
-    "_hold_owner_file: os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)":
+    "_take_owner_file: os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)":
         "THE owner file's creation, and O_EXCL is the point: only this pid and "
         "serial build this name, so an exclusive create is the claim.",
-    "_hold_owner_file: os.open(str(owner), os.O_RDWR)":
+    "_take_owner_file: os.open(str(owner), os.O_RDWR)":
         "Reopening a name only a dead predecessor of ours can have left. It is "
         "reused only after its lock proves free.",
-    "_hold_owner_file: os.ftruncate(fd, 0)":
+    "_take_owner_file: os.ftruncate(fd, 0)":
         "Emptying that reclaimed file before it records our own identity; it "
         "is ours exclusively at that point, by the lock above.",
     "_finish_owner_file: os.write(fd, _owner_identity(fd).encode(\"ascii\"))":

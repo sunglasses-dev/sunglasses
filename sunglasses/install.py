@@ -820,6 +820,27 @@ def _hold_owner_file(private):
     if LOCKING is None:
         return None
     owner = _owner_file(private)
+    for _attempt in range(8):
+        taken = _take_owner_file(owner)
+        if taken is not _RECLAIM_RETRY:
+            return taken
+    return None
+
+
+_RECLAIM_RETRY = object()
+
+
+def _take_owner_file(owner):
+    """One attempt: create it exclusively, or reclaim a dead predecessor's.
+
+    R18-A-LOCK-ON-AN-UNLINKED-INODE-OWNS-NOTHING (ruling R-177-R18 (2)). The
+    reclaim path opens a name and locks what it found, and a sweep may unlink
+    that name in between -- leaving us holding an exclusive lock on an inode no
+    path leads to, while the next caller creates a fresh file at the same name
+    and locks that. Two writers, two locks, one name, and neither is wrong about
+    its own descriptor. So after locking we ask whether the NAME still resolves
+    to what we locked, and if it does not we start again rather than trust it.
+    """
     try:
         fd = os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
@@ -837,10 +858,15 @@ def _hold_owner_file(private):
             os.close(fd)
             return None
         try:
+            here = os.fstat(fd)
+            there = owner.stat()
+            if (here.st_dev, here.st_ino) != (there.st_dev, there.st_ino):
+                os.close(fd)
+                return _RECLAIM_RETRY
             os.ftruncate(fd, 0)
         except OSError:
             os.close(fd)
-            return None
+            return _RECLAIM_RETRY
         return _finish_owner_file(fd, locked=True)
     except OSError:
         return None
@@ -879,18 +905,28 @@ def _release_owner_file(private, fh):
     """
     if fh is None:
         return
+    # R18-A-CLEANUP-THAT-RAISES-DESTROYS-THE-ERROR-IT-WAS-CLEANING-UP. This runs
+    # in a `finally`, so ANY exception escaping it replaces whatever was already
+    # propagating -- the caller's real failure disappears and the traceback
+    # blames the cleanup. `except OSError` was too narrow and the reviewer's
+    # `test_C4_precommit_fault_atomic_no_success[write]` and `[flush]` proved it:
+    # their fault injection hands back an object with no `.close()`, the
+    # AttributeError escaped, and the child died with the atomicity assertion
+    # never reached. A real `open` always returns a closeable file, so this was
+    # unreachable in production -- and a cleanup path whose safety depends on
+    # nobody ever handing it something unexpected is not a safe cleanup path.
     try:
         fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
-    except OSError:
+    except Exception:
         pass
     try:
         fh.close()
-    except OSError:
+    except Exception:
         pass
     try:
         if not private.exists():
             _owner_file(private).unlink()
-    except OSError:
+    except Exception:
         pass
 
 
@@ -1101,6 +1137,56 @@ def _alias_owner_is_gone(private):
             pass
 
 
+@contextlib.contextmanager
+def _owner_proven_gone(private):
+    """Hold the proof while the removal happens, or yield nothing.
+
+    R18-A-CHECK-YOU-STOPPED-HOLDING-IS-A-CHECK-YOU-DID-NOT-MAKE (ASTRA round 17,
+    `test_R17_ORPHAN_RECLAIM_BETWEEN_FREE_CHECK_AND_UNLINK` and
+    `..._REAL_PROCESS`). Round 17 asked `_alias_owner_is_gone`, which takes the
+    lock, answers, and RELEASES it -- and then the caller unlinked on the
+    strength of that answer. Between the two a new owner reclaims the same file
+    with a real kernel lock, and the sweep deletes a live owner's coordination
+    file. The reviewer's sentence is the rule: merely repeating an unlocked
+    check does not close it.
+
+    So the proof and the act are one thing. The exclusive lock taken here IS the
+    claim that the writer has ended, it is still held while the caller removes
+    the file, and it is dropped afterwards. Nothing that happens outside this
+    block may act on what was learned inside it.
+    """
+    fh = None
+    if LOCKING is not None:
+        owner = _owner_file(private)
+        try:
+            fh = owner.open("r+b")
+        except OSError:
+            fh = None
+        if fh is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                try:
+                    fh.close()
+                except OSError:
+                    pass
+                fh = None
+    try:
+        yield fh
+    finally:
+        # Same rule as `_release_owner_file`: a cleanup in a `finally` never
+        # raises, or it destroys the error it was cleaning up after.
+        if fh is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                fh.close()
+            except Exception:
+                pass
+
+
 def _collect_orphaned_owner_files(d):
     """Owner files whose alias never appeared, left by a death before the rename.
 
@@ -1114,12 +1200,19 @@ def _collect_orphaned_owner_files(d):
             owner.name[:-len(".owner")].replace(".forgetlock.", ".taking.", 1))
         if alias.exists():
             continue
+        # A PRE-FILTER AND NOTHING MORE. Its answer is never what authorises
+        # the removal below -- that is the whole of round 17's finding.
         if not _alias_owner_is_gone(alias):
             continue
-        try:
-            owner.unlink()
-        except OSError:
-            pass
+        with _owner_proven_gone(alias) as proof:
+            if proof is None:
+                continue          # reclaimed since the pre-filter: not ours
+            if alias.exists():
+                continue          # published since: it has an owner again
+            try:
+                owner.unlink()
+            except OSError:
+                pass
 
 
 def _collect_discharged_notes(d, held_name):
@@ -1144,9 +1237,25 @@ def _collect_discharged_notes(d, held_name):
     # which reads like the audit escape coming back and is nothing of the kind.
     for spent in sorted(d.glob("*.taking*")):
         note = _read_note(spent)
-        if note is not None and note.get("held") == held_name:
+        if note is None or note.get("held") != held_name:
+            continue
+        if ".forgetting-" not in spent.name:
+            try:                    # a public note, owned by nobody privately
+                spent.unlink()
+            except OSError:
+                pass
+            continue
+        # R-177-R18 (3): an ALIAS is removed only while its owner's lock is
+        # held, here as everywhere else, whatever else says it is spent.
+        with _owner_proven_gone(spent) as proof:
+            if proof is None:
+                continue
             try:
                 spent.unlink()
+            except OSError:
+                pass
+            try:
+                _owner_file(spent).unlink()
             except OSError:
                 pass
     _collect_orphaned_owner_files(d)
@@ -1200,16 +1309,20 @@ def _collect_stale_aliases(d, private, intent):
         if (note.get("held"), note.get("sha256"),
                 note.get("owner")) != identity:
             continue
+        # A PRE-FILTER, and its answer authorises nothing (R-177-R18 (1)).
         if not _alias_owner_is_gone(alias):
             continue
-        try:
-            alias.unlink()
-        except OSError:
-            pass
-        try:
-            _owner_file(alias).unlink()
-        except OSError:
-            pass
+        with _owner_proven_gone(alias) as proof:
+            if proof is None:
+                continue          # reclaimed since the pre-filter
+            try:
+                alias.unlink()
+            except OSError:
+                pass
+            try:
+                _owner_file(alias).unlink()
+            except OSError:
+                pass
     _collect_orphaned_owner_files(d)
 
 
