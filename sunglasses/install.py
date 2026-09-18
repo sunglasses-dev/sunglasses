@@ -749,46 +749,140 @@ def _owner_pid_of_alias(private):
 
 
 # The private names THIS process is holding right now, by path. Membership is
-# the only exact answer to "is that alias mine": see `_alias_owner_is_gone`.
+# the exact answer to "is that alias mine" WITHIN this process, including one
+# taken by another thread; across processes the owner file below decides.
 _HELD_PRIVATELY: set = set()
 
 
+def _owner_file(private):
+    """The file whose lock says whether the alias's owner is still running.
+
+    DELIBERATELY NOT `<alias>.owner`. Every scan that looks for notes globs on
+    `.taking`, and `_reclaim_taken` reads what it finds and turns an unreadable
+    one into a refusal; the reviewer's own bound control counts
+    `focus.taking*.forgetting-*` as private notes and requires that set to be
+    empty after recovery. A lock file wearing a note's name would have been
+    counted as a note by both, so the name drops `.taking` and carries a marker
+    of its own instead.
+    """
+    return private.with_name(
+        private.name.replace(".taking.", ".forgetlock.", 1) + ".owner")
+
+
+def _hold_owner_file(private):
+    """Take an exclusive lock that this process holds for the whole forget.
+
+    R15-OWNERSHIP-IS-AN-INCARNATION-NOT-A-PID (ASTRA round 14,
+    `test_R14_LIVE_REUSED_PID_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND[distinct]`).
+    Round 14 asked the operating system whether a pid was alive. The reviewer's
+    driver answered yes for every dead owner's pid -- which is what pid reuse
+    looks like from inside -- and the collector then kept all eight aliases.
+    He is right, and the sentence is worth keeping: **a liveness answer for
+    another pid is not proof that the current occupant wrote the alias.** A pid
+    names a slot, not an incarnation.
+
+    A lock names the incarnation. The kernel drops this one when the process
+    that took it ends, however it ends, and hands it to nobody else in the
+    meantime. So "can I take this lock" is a question about the writer of this
+    file rather than about whoever now holds a number.
+
+    Returns the open file object to keep, or None when this platform has no
+    locking at all -- see `_collect_stale_aliases`, which then refuses to
+    collect rather than guess.
+    """
+    if LOCKING is None:
+        return None
+    owner = _owner_file(private)
+    try:
+        fh = owner.open("a+")
+    except OSError:
+        return None
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        try:
+            fh.close()
+        except OSError:
+            pass
+        return None
+    return fh
+
+
+def _release_owner_file(private, fh):
+    """Drop the lock, and the file ONLY IF THE ALIAS IT ANSWERS FOR IS GONE.
+
+    The owner file's lifetime is the alias's, not this call's. A first cut
+    removed it unconditionally here, and a control of our own caught what that
+    costs: a contested forget that COMPLETES leaves its alias behind on purpose
+    -- that is the whole of round 12 -- and removing the owner file with it left
+    an alias no later collector could ever prove dead, because the evidence of
+    the incarnation went with it. The bound would have come back by a quieter
+    road than the one the reviewer drove, on the ordinary path rather than under
+    a kill.
+
+    Left unlocked beside a kept alias, the file says exactly what it should: the
+    writer has finished, take the lock and find out.
+    """
+    if fh is None:
+        return
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        fh.close()
+    except OSError:
+        pass
+    try:
+        if not private.exists():
+            _owner_file(private).unlink()
+    except OSError:
+        pass
+
+
 def _alias_owner_is_gone(private):
-    """Whether the process that took this note privately has ended.
+    """Whether the incarnation that took this note privately has ended.
 
-    R14-A-PID-IS-NOT-AN-IDENTITY (ASTRA round 13,
-    `test_R13_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND[reused]`). The first cut
-    asked "is this pid alive, and is it mine", and the reused-pid row is built
-    to defeat exactly that: the new process reports the SAME pid the dead owner
-    wrote into the name, so its predecessor's alias read as its own and was
-    kept forever. A pid tells you which process is running now; it does not
-    tell you which process wrote a name.
+    Three answers, in order, and only the last one is about another process:
 
-    What does: a pid is unique among LIVE processes, so an alias carrying our
-    own pid belongs either to us or to somebody who has ended. Which of the two
-    is not a guess -- this process knows exactly which private names it is
-    holding, including one held by another thread, so the set answers it.
+    * it is in OUR hands, including another thread's -- not gone;
+    * this platform cannot lock, so nothing here can be proven -- not gone, and
+      the caller refuses to collect at all (the declared `flock`/`None` limit,
+      growth acknowledged rather than a wrong delete);
+    * the owner file's lock is FREE -- the writer's incarnation has ended,
+      because the kernel holds that lock for exactly as long as the process
+      that took it lives and gives it to no successor.
 
-    Conservative in the only direction that matters: anything not proven gone
-    counts as live. Keeping a note we could have removed costs a leftover; the
-    opposite costs the inverse.
+    An alias with no owner file beside it was written before this mechanism
+    existed, or its owner never got as far as taking the lock. Neither is
+    evidence of death, so it is kept.
     """
     if private in _HELD_PRIVATELY:
         return False
-    pid = _owner_pid_of_alias(private)
-    if pid is None:
+    if LOCKING is None:
         return False
-    if pid == os.getpid():
-        # Ours by pid and not in our hands, so it was written by whoever held
-        # this pid before us. Two live processes cannot share it.
-        return True
+    owner = _owner_file(private)
+    if not owner.is_file():
+        return False
     try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return True
+        fh = owner.open("a+")
     except OSError:
         return False
-    return False
+    try:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False          # somebody is still holding it: alive
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        return True
+    finally:
+        try:
+            fh.close()
+        except OSError:
+            pass
 
 
 def _collect_discharged_notes(d, held_name):
@@ -851,6 +945,11 @@ def _collect_stale_aliases(d, private, intent):
     """
     if intent is None:
         return
+    # R15: with no locking there is no evidence of an incarnation, so nothing
+    # here can be proven dead. Refusing to collect leaves growth we have
+    # declared; collecting on a guess removes somebody's only route back.
+    if LOCKING is None:
+        return
     identity = (intent.get("held"), intent.get("sha256"), intent.get("owner"))
     if identity[0] is None:
         return
@@ -867,6 +966,10 @@ def _collect_stale_aliases(d, private, intent):
             continue
         try:
             alias.unlink()
+        except OSError:
+            pass
+        try:
+            _owner_file(alias).unlink()
         except OSError:
             pass
 
@@ -900,9 +1003,11 @@ def _forget_take(taking, owner):
     except OSError:
         return
     _HELD_PRIVATELY.add(private)
+    held_open = _hold_owner_file(private)
     try:
         return _forget_held(taking, private, owner)
     finally:
+        _release_owner_file(private, held_open)
         _HELD_PRIVATELY.discard(private)
 
 

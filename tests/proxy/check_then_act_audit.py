@@ -165,6 +165,24 @@ INVENTORY = {
         "that has ended. Our own alias names the same held file with the same "
         "digest and cannot be collected by anyone while we live, so the route "
         "back is never empty.",
+    # Round 15's owner files. The lock inside one is what proves an incarnation
+    # ended; these two sites are that file's disposal.
+    "_release_owner_file: _owner_file(private).unlink()":
+        "Our own lock file, removed only once the alias it answers for is "
+        "gone. While the alias stays the file stays, or no later collector "
+        "could prove its writer had ended.",
+    "_collect_stale_aliases: _owner_file(alias).unlink()":
+        "The lock file of an alias we have just collected, whose owner that "
+        "lock itself proved dead.",
+    # NOT A FILESYSTEM MUTATION AT ALL, and inventoried BECAUSE the walk cannot
+    # prove that. `replace` is in MUTATORS for `os.replace` and `Path.replace`;
+    # this is `str.replace` on a name, and an AST cannot type the receiver. The
+    # audit's own rule is that whatever it cannot prove harmless gets an entry
+    # rather than an exemption, so it gets one -- with a reason a reader checks
+    # in a line -- instead of the code being contorted to dodge the walker.
+    "_owner_file: private.name.replace(\".taking.\", \".forgetlock.\", 1)":
+        "A string method building a name. It touches no filesystem; the walker "
+        "cannot type the receiver, so this is listed rather than exempted.",
 }
 
 

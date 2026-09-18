@@ -1959,7 +1959,9 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
     # have been dealt with. A delayed claimant can win the freed name having
     # moved nothing. The old note stays, under a name reclaim scans, until its
     # bytes are answered for.
-    kept = list(records.glob("*.forgetting-*"))
+    # `github.taking*`, not `*`: round 15 puts a lock file beside each kept
+    # alias and `*.forgetting-*` matches that too. This row means the NOTE.
+    kept = list(records.glob("github.taking*.forgetting-*"))
     assert kept, "a note was discarded on a name contest, answering for nothing"
     assert json.loads(read(kept[0]))["held"] == "somebody-elses"
 
@@ -2002,7 +2004,9 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
     # about the same bytes at the same moment -- both then delete and the held
     # file is named by nothing. A note we did not author is never ours to
     # remove, whatever its bytes look like; leftovers are the sweep's job.
-    kept = list(records.glob("*.forgetting-*"))
+    # `github.taking*`, not `*`: round 15 puts a lock file beside each kept
+    # alias and `*.forgetting-*` matches that too. This row means the NOTE.
+    kept = list(records.glob("github.taking*.forgetting-*"))
     assert kept, "a note this cleanup did not author was deleted"
 
 
@@ -2061,7 +2065,7 @@ def test_contested_forgets_keep_every_held_file_named(
              "owner": "take-%d" % n,
              "sha256": inst._digest_file(held)}), encoding="utf-8")
         inst._forget_take(note, "an-older-take")
-        counts.append(len(list(records.glob("*.forgetting-*"))))
+        counts.append(len(list(records.glob("github.taking*.forgetting-*"))))
     monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
 
     assert len(contests) >= rounds, (
@@ -2086,10 +2090,20 @@ def test_contested_forgets_keep_every_held_file_named(
     # times a forget was contested. The series is reported on failure because
     # its SHAPE is the finding -- flat meant loss, rising by one per held file
     # is the bound.
-    kept = list(records.glob("*.forgetting-*"))
+    # COUNTED PRECISELY, and the owner files counted separately rather than
+    # globbed away. Round 15 puts a lock file beside each kept alias, so the
+    # first glob here (`*.forgetting-*`) started matching two files per alias
+    # and read as 48 notes for 24 held files. That was this control's arithmetic
+    # and not the product's retention -- but narrowing the glob and saying
+    # nothing would hide a real per-alias cost, so both are bounded.
+    kept = list(records.glob("github.taking*.forgetting-*"))
+    owners = list(records.glob("github.forgetlock.forgetting-*.owner"))
     assert len(kept) <= len(held_files), (
         "the kept-note set outgrew the evidence it answers for: %d notes for "
         "%d held files, counts %r" % (len(kept), len(held_files), counts))
+    assert len(owners) <= len(kept), (
+        "owner files outgrew the aliases they answer for: %d owners for %d "
+        "aliases" % (len(owners), len(kept)))
 
     # AND THE EVIDENCE CLEARS. A bound that only says "no more notes than held
     # files" is still a leak if nothing ever discharges a held file. Recovery
@@ -2100,7 +2114,7 @@ def test_contested_forgets_keep_every_held_file_named(
     assert inst._reclaim_taken(home, "github"), (
         "recovery could not use any of the notes the contested forgets kept")
     assert retained.is_file(), "recovery did not put the bytes back"
-    assert len(list(records.glob("*.forgetting-*"))) < len(kept), (
+    assert len(list(records.glob("github.taking*.forgetting-*"))) < len(kept), (
         "recovery put bytes back without spending the note that named them")
 
 
@@ -2184,6 +2198,139 @@ def test_a_killed_forget_does_not_leave_an_alias_per_death(
 
     assert all(a <= h for a, h in series), (
         "private aliases outgrew the held files they answer for: %r" % (series,))
+
+
+_KILLED_FORGET_PID_ANSWERS_ALIVE = """
+import os, pathlib, signal, sys
+sys.path.insert(0, %r)
+from sunglasses import install as inst
+
+# THE DEAD OWNER'S PID IS HANDED TO A LIVE PROCESS. We cannot choose which pid
+# the kernel reuses, so this reproduces what reuse looks like FROM INSIDE the
+# collector: while it is deciding, a liveness question about any pid is
+# answered by a process that really is alive -- our own parent. Round 14 asked
+# exactly that question and kept every alias.
+_real_collect = inst._collect_stale_aliases
+def _collect_with_every_pid_alive(*a, **kw):
+    real_kill = os.kill
+    def answers_alive(pid, sig):
+        if sig == 0:
+            return real_kill(os.getppid(), 0)
+        return real_kill(pid, sig)
+    os.kill = answers_alive
+    try:
+        return _real_collect(*a, **kw)
+    finally:
+        os.kill = real_kill
+inst._collect_stale_aliases = _collect_with_every_pid_alive
+
+mine = os.getpid()
+note = pathlib.Path(sys.argv[1])
+real_link = os.link
+def link_then_die(src, dst, *a, **kw):
+    out = real_link(src, dst, *a, **kw)
+    os.kill(mine, signal.SIGKILL)
+    return out
+os.link = link_then_die
+inst._forget_take(note, "an-older-take")
+"""
+
+
+def test_a_dead_owners_pid_answering_alive_does_not_keep_its_alias(
+        cfg, home, artifact, tmp_path):
+    """R15-OWNERSHIP-IS-AN-INCARNATION-NOT-A-PID (ASTRA round 14,
+    `test_R14_LIVE_REUSED_PID_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND[distinct]`).
+
+    Round 14 decided an alias was collectable by asking the operating system
+    whether its owner's pid was alive. The reviewer answered yes for every dead
+    owner -- which is what pid reuse looks like from inside the collector -- and
+    all eight aliases were kept again. **A liveness answer for another pid is
+    not proof that the current occupant wrote the alias.** A pid names a slot.
+
+    A lock names the incarnation: the kernel holds it for exactly as long as the
+    process that took it lives, and hands it to no successor. So this row kills
+    eight owners, makes every pid question answer ALIVE while the collector
+    decides, and requires the aliases to be collected anyway.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "owner": "an-interrupted-take", "sha256": inst._digest_file(held)}),
+        encoding="utf-8")
+
+    driver = tmp_path / "killed_forget_pid_alive.py"
+    driver.write_text(_KILLED_FORGET_PID_ANSWERS_ALIVE % str(
+        pathlib.Path(inst.__file__).resolve().parents[1]), encoding="utf-8")
+
+    for _ in range(8):
+        done = subprocess.run(
+            [sys.executable, "-B", str(driver), str(note)],
+            env=dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
+                     PYTHONDONTWRITEBYTECODE="1"),
+            capture_output=True, timeout=30)
+        assert done.returncode == -signal.SIGKILL, (
+            "the forget was not killed at the boundary this row is about: "
+            "rc=%r %r" % (done.returncode, done.stderr[-300:]))
+        aliases = list(records.glob("github.taking*.forgetting-*"))
+        assert len(aliases) <= 1, (
+            "a pid answering ALIVE kept a dead owner's alias: %d aliases for "
+            "one held file" % len(aliases))
+
+    # AND THE ROUTE SURVIVED ALL OF IT. Collecting is only correct while the
+    # held file stays named by something that can put it back.
+    named = set()
+    for q in records.glob("github.taking*"):
+        entry = inst._read_note(q)
+        if entry is None:
+            continue
+        body = records / entry["held"]
+        if body.is_file() and inst._digest_file(body) == entry["sha256"]:
+            named.add(body.name)
+    assert held.name in named, "the held file ended up named by no valid note"
+
+
+def test_a_live_siblings_alias_is_never_collected(cfg, home, artifact):
+    """The other side of R15, and the one a careless repair breaks.
+
+    "Collect the aliases of dead owners" is only safe if a LIVE owner's alias is
+    untouchable, or the cure removes somebody's only route back while they are
+    still using it. Here the owner is this process, holding its own alias
+    exactly as a forget does; the collector must decline.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    intent = {"canonical": retained.name, "held": held.name,
+              "owner": "a-live-take", "sha256": inst._digest_file(held)}
+
+    alias = records / "github.taking.forgetting-424242-1"
+    alias.write_text(json.dumps(intent), encoding="utf-8")
+    keeping = inst._hold_owner_file(alias)
+    assert keeping is not None, "SETUP: this platform took no owner lock"
+    try:
+        mine = records / "github.taking.forgetting-424242-2"
+        mine.write_text(json.dumps(intent), encoding="utf-8")
+        inst._collect_stale_aliases(records, mine, intent)
+        assert alias.is_file(), (
+            "the alias of an owner that is still running was collected")
+    finally:
+        inst._release_owner_file(alias, keeping)
+
+    # Once that owner ends, the same alias IS collectable -- otherwise the
+    # first half of this row would pass on a collector that never collects.
+    mine2 = records / "github.taking.forgetting-424242-3"
+    mine2.write_text(json.dumps(intent), encoding="utf-8")
+    inst._collect_stale_aliases(records, mine2, intent)
+    assert not alias.is_file(), (
+        "the alias stayed after its owner released the lock, so the first "
+        "assertion above proves nothing")
 
 
 def test_a_killed_forget_does_not_leave_an_alias_per_death_with_a_reused_pid(
