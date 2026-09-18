@@ -2452,11 +2452,20 @@ class Session:
         give-back that restored the obligation and left delivery held would
         hand back something nobody could ever take again -- the client owed an
         answer no writer is permitted to send.
+
+        R-168-R13/(2), ASTRA OW03 + OW07. THE FINAL CHECK COMES FIRST. Round 12
+        discarded delivery and only then asked whether the id was already
+        answered, so a give-back for a FINAL answer left the obligation alone
+        -- correctly -- while still releasing delivery. `take_delivery` then
+        succeeded for an id whose bytes had already reached the client, and a
+        stale local writer sent a second response. Nothing is given back for an
+        id that has been answered: not the obligation, and not delivery.
         """
         with self._settlement:
+            if token in self._answered_final:
+                return
             self._delivering.discard(token)
-            if token not in self._answered_final:
-                self._unanswered.add(token)
+            self._unanswered.add(token)
 
     def unanswered_clients(self):
         """Every outstanding obligation, FOR LOOKING AT. Grants nothing.
@@ -2521,7 +2530,9 @@ class Session:
         delivery ownership, which is where this shape comes from.
         """
         with self._settlement:
-            for token in self._unanswered:
+            # A COPY, because `_take_delivery` discards from `_unanswered` and
+            # we no longer return on the first candidate.
+            for token in list(self._unanswered):
                 if token[0] == origin:
                     # TAKEN, NOT CONFIRMED. The caller has committed to
                     # answering this obligation and nobody else may take it,
@@ -2529,8 +2540,24 @@ class Session:
                     # gives the obligation back through `owe_again` exactly as
                     # the release path does (XU05). Marking it final here made
                     # the take permanent and lost the answer.
-                    self._unanswered.discard(token)
-                    return token
+                    #
+                    # R-168-R13/(1), ASTRA OW01 + OW02. THROUGH THE SAME SINGLE
+                    # ACQUIRE as the other two takers. Round 12 removed the
+                    # obligation here by hand and never entered `_delivering`,
+                    # so the payer held the obligation while still looking
+                    # unowned to anything asking about delivery -- and round 12
+                    # had also removed the second-obligation check that used to
+                    # stop the local writer. Pause the writer at its acquire,
+                    # let the payer take, release it at any of the payer's
+                    # three boundaries: TWO responses for one admitted request,
+                    # 3 of 3 crossings, where b707bf2 passed 3 of 3. A taker of
+                    # either half owns both, and that has to include this one.
+                    if self._take_delivery(token):
+                        return token
+                    # Somebody already owns delivery for this id; it is not
+                    # ours to pay. Keep looking rather than reporting the whole
+                    # table empty.
+                    continue
             return None
 
     def closed_with(self):

@@ -34,12 +34,17 @@ def test_MS01_refusal_admission_same_id(tmp_path,origin):
 
 @pytest.mark.parametrize('point',['take','record'])
 def test_MS02_withhold_close(tmp_path,point):
- s,rt,out=build(tmp_path)
+ s,rt,out=build(tmp_path);hit=[]
  if point=='take':
-  orig=s.take_obligation
+  # R-168-R13/(5), ASTRA OW08. THE HOOK FOLLOWS THE CALL. This drove the close
+  # from take_obligation, which _withhold stopped calling when round 12 folded
+  # the two sets, so the hook never fired and this row passed against nothing
+  # while the file's 52-pass total never moved. It hooks the call _withhold
+  # actually makes, and asserts it fired.
+  orig=s.take_delivery
   def hook(tok):
-   result=orig(tok);s._close('OVER_BUDGET','review',rule='S3',budget='content_bytes');return result
-  s.take_obligation=hook
+   result=orig(tok);hit.append(True);s._close('OVER_BUDGET','review',rule='S3',budget='content_bytes');return result
+  s.take_delivery=hook
  else:
   orig=rt._record
   def hook(event,**kw):
@@ -48,6 +53,7 @@ def test_MS02_withhold_close(tmp_path,point):
   rt._record=hook
  rt.client_frame(wire(1));rt.pump_upstream(b'');final(tmp_path,s,rt,out)
  assert len(out)==1;assert not s._core.owed();assert not s.unanswered_clients()
+ if point=='take':assert hit, 'MS02[take] hook never fired'
 
 @pytest.mark.parametrize('mode',['none','activation','delivery'])
 def test_MS03_list_refusals(tmp_path,monkeypatch,mode):
