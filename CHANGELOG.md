@@ -3,6 +3,104 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.0] — UNRELEASED
+
+> **DRAFT.** Entries above the PENDING block describe work already merged to
+> `main` and were written from each merged pull request body, not from memory.
+> Entries in the PENDING block describe work that is open and **must not be
+> described as shipped until its pull request merges**; on ship day they move up
+> and lose the marker, or they leave with the release.
+
+### Changed
+
+- **`GLS-ENC-ALT-210` stops trying a match inside a base64 run.** (#181) The
+  rule's second branch paired a long base64-ish run with a nearby `decode` or
+  `base64` literal. On a document that CONTAINS that literal — the common case,
+  since the literal is what the rule looks for — the prefilter correctly cannot
+  skip the rule, and the engine then tried a match start at every position
+  inside the run. Measured before and after on the same documents: 16,000 bytes
+  went from 74.5691 s to 0.0096 s, and the growth ratio from about 4.0x per
+  doubling to about 2.0x, so 1 MiB finishes at 0.6297 s where it previously did
+  not finish at all. This was the last open row of the slow-rule backlog.
+
+### Continuous integration
+
+Three of these change no shipped code and are listed so the release accounts for
+what moved.
+
+- **The integrity matrix reports its slowest rows.** (#187) The 3.12 leg was the
+  slowest in 7 of 8 full-matrix runs and its step was a bare `pytest -q`, so the
+  one leg most in need of explanation produced no per-test timing at all.
+  Medians over n=8 runs each: 3.9 91 · 3.10 88 · 3.11 61 · **3.12 135** · 3.13
+  76 · 3.14 67 minutes. It is not install: on one run, same commit and same
+  queue, the suite step was 137 min on 3.12 against 74 on 3.13 while setup,
+  checkout and install were 0–1 min on every leg.
+- **The 3.12 leg is counted, not extrapolated.** (#188) `--durations=25` proved
+  the excess is a FIXED WAIT rather than slow code — 3.12's rows quantised at
+  94.1–94.9 s on the `setup` AND the `call` of tiny unrelated tests, with the
+  ~188 s rows being two waits back to back, while 3.13's slowest rows are real
+  work with a normal spread. `--durations=0` replaces the estimate with a count.
+- **The engine build is timed where the slow leg lives.** (#189) Against the
+  3.13 leg of the same commit: **41 waits on 3.12**, the wait itself **86.45 s**
+  with a spread of 1.86 s, explaining **3543 s of a 3809 s excess — 93%**.
+  3.9, 3.10, 3.11 and 3.14 carry zero waits each. Every site carrying a wait
+  builds a fresh engine over the whole pattern database, and the source sites
+  count 41 against 41 waits. **Stated as a lead and not as a finding**: the same
+  comparison on a laptop came back +3% against +85% on CI with identical
+  `pip freeze`, so the interpreter does not explain it and the environment does.
+
+### Documentation
+
+- **The sixty-seconds demo is a recording, and the MCP registry manifest
+  ships.** (#186) A 17-second recording of `demo/sixty-seconds.sh` against the
+  released 0.5.9 with real output: a clean file passes, a vendor brief is
+  blocked with six findings, an archive we do not extract comes back INCOMPLETE,
+  a missing file exits 2. `server.json` describes the MCP server that already
+  ships, and the README carries the registry ownership marker so the PyPI long
+  description proves the namespace. **Nothing is published by that change**:
+  the registry ownership check reads the marker from the released package, so
+  publishing waits for the first PyPI release that carries it — which is this
+  one.
+
+### Tests
+
+- **Two skips claimed a missing requirement and neither claim was true.** (#183)
+  Two UNCONDITIONAL skips sat in the proxy round-2 suite. A head-independent skip
+  is a check that skips itself: invisible in a summary line and reading as a
+  pass. Both rows were run unskipped before anything was decided, and both
+  failed for reasons other than the one the skip gave. One was rewritten and
+  closes a real gap — a refusal enforced at two call sites with no test anywhere
+  in the suite — and the other was deleted with its reason left in the file,
+  because it asserted a property of a pure function that needs context the
+  function does not have. A second reading then found the same fault one `if`
+  away, in a claim this project had made about its own coverage, and added the
+  row rather than softening the claim.
+
+### PENDING — open, not shipped, and not to be described as shipped
+
+Each line names its pull request. None of this is in `main` at the time of
+writing; anything still open on ship day leaves the release with its entry.
+
+- **PENDING (#168)** — the result direction, and an optional seam.
+- **PENDING (#177)** — proxy install and uninstall, a transaction that can
+  refuse.
+- **PENDING (#180)** — the doctor: R2 and R3 reconciled onto the installer.
+- **PENDING (#182)** — the route commands, and that they ship inert.
+- **PENDING (#185)** — a close says WHICH fault, from a fixed vocabulary.
+
+### Not claimed in this release
+
+Carried forward from 0.5.9 and still true at the time of writing.
+
+- General inspection of tool results. What ships is the credential lane on
+  `api_response` for eight formats, and `GLS-SD-010` stays open in that
+  direction.
+- Proxy mediation as a supported surface, or any comparison against other tools.
+  **No page, post or release note may describe proxy mediation as supported
+  until an entry point ships that routes through it** — which no merged change
+  in this release does.
+
+
 ## [0.5.9] — 2026-09-16
 
 ### Added
