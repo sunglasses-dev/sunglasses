@@ -53,6 +53,21 @@ FAST_IGNORES = {"tests/test_v056_matrix.py", "tests/test_repair_v056.py",
 CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=true  # event=$EVENT: not a pull request, the matrix always runs"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\n# Judge with the classifier from the protected branch, never with the\n# copy inside the PR under judgement (T8 review, 2026-09-10): a PR\n# that edits scripts/ci_classify.py must not be able to classify\n# itself as documentation. actions/checkout with fetch-depth: 0 makes\n# origin/main available. If main has no classifier yet, fail to FULL.\nif ! git show origin/main:scripts/ci_classify.py > "$RUNNER_TEMP/ci_classify.py" 2>/dev/null; then\n  echo "full=true  # origin/main has no scripts/ci_classify.py; defaulting to FULL"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\npython "$RUNNER_TEMP/ci_classify.py" --base "$BASE" --head "$HEAD"\n'
 # Approved shape of the coverage job (ASTRA round 3, R3-2): one plain shell
 # step, no step-level env/shell/if/with, job env = exactly the four bindings.
+# The integrity matrix's full-suite command, pinned as ONE exact string so
+# nothing positional can be smuggled in beside it.
+#
+# 2026-09-17: `--durations=25` added DELIBERATELY, then widened to
+# `--durations=0` the same day. =25 proved the 3.12 leg's excess is a fixed
+# ~94s wait repeated many times (its rows are quantised at 94.1-94.9s on the
+# `setup` AND `call` of tiny unrelated tests) but it cannot COUNT them: 22 of
+# its 25 rows are already at that ceiling, so the count is an extrapolation
+# (3789s excess / 94.3s ~= 40) rather than a reading. =0 prints every row and
+# the next full-matrix run states the number and names the tests. This gate
+# exists to stop an UNREVIEWED shape change; a reviewed one updates the
+# assertion here, in the same commit, with its reason -- which is what this
+# line is.
+INTEGRITY_SUITE_CMD = "pytest -q --durations=0"
+
 CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
 COVERAGE_JOB_KEYS = {"needs", "if", "runs-on", "timeout-minutes", "env", "steps"}
 COVERAGE_STEP_KEYS = {"name", "run"}
@@ -267,8 +282,9 @@ def check_workflow(doc) -> list[str]:
         if job.get("continue-on-error"):
             p.append(f"job {name} has continue-on-error")
     # The matrix's own full-suite step must exist and be the canonical command.
-    if "pytest -q" not in [r.strip() for r in integ_runs]:
-        p.append("integrity job must run the full suite as exactly `pytest -q`")
+    if INTEGRITY_SUITE_CMD not in [r.strip() for r in integ_runs]:
+        p.append(f"integrity job must run the full suite as exactly "
+                 f"`{INTEGRITY_SUITE_CMD}`")
     # Effective matrix: exactly six versions, no include/exclude, fail-fast off.
     strat = integrity.get("strategy") or {}
     if set(strat.keys()) - {"fail-fast", "matrix"} or strat.get("fail-fast") is not False:
@@ -493,7 +509,7 @@ def test_control_classifier_output_bound_to_wrong_step_or_inputs():
 
 def _full_suite_step(d):
     for st in d["jobs"]["integrity"]["steps"]:
-        if st.get("run", "").strip() == "pytest -q":
+        if st.get("run", "").strip() == INTEGRITY_SUITE_CMD:
             return st
     raise AssertionError("full suite step not found")
 

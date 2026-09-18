@@ -403,7 +403,20 @@ jobs:
       # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above
       # only cover ~4 test families; major families ran local-only until now.
       - name: Full test suite
-        run: pytest -q
+        # --durations=0 (2026-09-17, second reading). --durations=25 was
+        # added this morning and answered the first question: the 3.12 leg
+        # is the slowest in 7 of 8 full-matrix runs (median 135 min against
+        # 61-91 for every other interpreter) and the excess is a fixed ~94s
+        # wait, not slow work -- run 35291331593 put the same commit at
+        # 8248s on 3.12 and 4459s on 3.13, and 3.12's rows are quantised at
+        # 94.1-94.9s on the `setup` AND `call` of tiny unrelated tests. A
+        # truncated list cannot COUNT those waits, because 22 of its 25 rows
+        # are already sitting at the ceiling; the estimate 3789s / 94.3s ~= 40
+        # is arithmetic, not a measurement. =0 prints every row, so the next
+        # full-matrix run says exactly how many tests wait and which ones,
+        # which is the difference between a suspicion and a fix. The cost is
+        # log lines on a job that already runs for over two hours.
+        run: pytest -q --durations=0
 
   coverage:
     # The single check merge automation may rely on. always() so a skipped or
