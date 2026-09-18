@@ -1,0 +1,175 @@
+name: engine-312-stalltrace
+
+# WO R-CI-312-FAULTHANDLER (T9, 2026-09-18). CI-only.
+#
+# WHAT IS KNOWN, so nobody re-derives it (CI_312_LEG.md §6-10):
+#   * The 3.12 integrity leg carries 41 fixed waits against the 3.13 leg of the
+#     same commit. MEASURED TWICE, on two commits and two days: 35 single and 3
+#     double both times.
+#   * The COUNT is invariant, the DURATION is not -- 86.45s then 82.44s. A
+#     hardcoded timeout does not drift 4%; a fixed amount of machine work does.
+#   * It is NOT engine CPU: #189 measured construction at 2-3.7s on every
+#     interpreter, and the spread there tracks the runner, not the version.
+#   * It is NOT reproducible from the 38 affected rows alone: #190 traced
+#     exactly those rows and the stall did not occur (slowest 51.23s).
+#
+# So three instruments have failed to name it, each for a stated reason, and
+# what none of them could ask is WHERE THE INTERPRETER IS STANDING when it
+# waits. `faulthandler.dump_traceback_later(60, repeat=True)` answers exactly
+# that: every 60 seconds without progress it prints every thread's Python
+# stack, which names the LINE rather than the syscall, and shows a wait on a
+# child as the parent parked in `wait4`/`communicate`.
+#
+# THE ACCEPTANCE IS A READING, NOT A NUMBER. The 41 dumps, the line each parks
+# on, and whether the parent is in a child wait. Then 3.13 armed identically
+# with ZERO dumps, which is what makes the 3.12 dumps mean something.
+#
+# THE DUMPS GO TO A FILE, and that is not a style choice. `sys.stderr` is
+# replaced by pytest's capture object, and even a dup of fd 2 is redirected
+# afterwards by pytest's fd-level capture -- I measured both, the timer fired,
+# the stack was written, and nothing reached the log. That reads exactly like
+# "no stall occurred". `-s` would also work and is rejected: turning capture off
+# for a two-hour suite changes what the run does, and an instrument that
+# perturbs the thing it measures is the wrong instrument for a timing mystery.
+#
+# It costs nothing when unarmed. With SUNGLASSES_STALL_TRACE unset the conftest
+# block does not execute, so every other run -- local, the fast lane, the other
+# five matrix legs -- is byte-for-byte what it was.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/engine-312-stalltrace.yml'
+      - 'conftest.py'
+
+permissions: read-all
+
+concurrency:
+  group: engine-312-stalltrace-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  stalltrace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the leg with the waits. 3.13 is armed IDENTICALLY and is
+        # expected to produce zero dumps; a dump on both legs would mean the
+        # threshold found how this suite waits in general, not what makes this
+        # leg slow.
+        python-version: ['3.12', '3.13']
+    env:
+      SUNGLASSES_STALL_TRACE: '1'
+      SUNGLASSES_STALL_SECONDS: '60'
+      SUNGLASSES_STALL_FILE: ${{ github.workspace }}/stall-trace-${{ matrix.python-version }}.txt
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # THE SAME INSTALL THE INTEGRITY LEG DOES, not a lighter one. My first
+      # version installed the package and pytest only, and the run died at
+      # collection with ModuleNotFoundError: yaml -- PYTEST_EXIT=2, no suite, and
+      # therefore zero dumps. Zero dumps from a suite that never ran reads
+      # exactly like zero dumps from a suite with no stall. Step (1) is what
+      # told those apart, and this step is what stops it happening again: this
+      # has to be the SAME suite whose 41 waits were counted, which means the
+      # same dependencies, native tools included.
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      - name: Install package + dev + media deps
+        run: |
+          python -m pip install --upgrade 'pip==26.2.1'
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest pyyaml "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
+          python -c "import yaml, pytest; print('yaml and pytest import OK')"
+
+      # The same nine standing exclusions the integrity leg carries, so this is
+      # the suite whose 41 waits were counted and not a different one.
+      - name: the full suite, armed
+        run: |
+          set +e
+          python -m pytest -q -p no:cacheprovider --durations=0 \
+            --deselect "tests/test_repair_v056.py::test_h1_later_frame_qr_is_a_threat_not_a_clean_complete_scan[console-script]" \
+            --deselect "tests/test_repair_v056.py::test_h2_corrupt_exif_is_incomplete_not_clean_and_complete[console-script-short-ifd.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h2_corrupt_exif_is_incomplete_not_clean_and_complete[console-script-far-ifd.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h3_one_bad_byte_keeps_the_findings_and_reports_the_loss[console-script-ascii_bad_tail.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h3_one_bad_byte_keeps_the_findings_and_reports_the_loss[console-script-ascii_bad_prefix.jpg]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-later_component]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-byte_metadata]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-converter_failed]" \
+            2>&1 | tee pytest-${{ matrix.python-version }}.txt
+          echo "PYTEST_EXIT=${PIPESTATUS[0]}"
+          set -e
+
+      # (1) DID IT ARM, AND DID IT FIRE. Printed before the reading, so an
+      # empty trace on 3.12 can be told apart from an instrument that never ran.
+      - name: (1) the instrument itself
+        if: always()
+        run: |
+          F="$SUNGLASSES_STALL_FILE"
+          echo "--- trace file:"; ls -la "$F" 2>/dev/null || echo "  NO FILE: the conftest block never executed"
+          echo "--- armed line:"; grep -m1 "stall-trace" "$F" 2>/dev/null || echo "  not armed"
+          echo "--- dumps:"; grep -c "^Timeout" "$F" 2>/dev/null || echo 0
+
+      # (2) THE READING. The line each dump parks on, and whether the parent is
+      # waiting on a child.
+      - name: (2) where the interpreter was standing
+        if: always()
+        run: |
+          python - <<'PY'
+          import collections, os, re
+          path = os.environ["SUNGLASSES_STALL_FILE"]
+          try:
+              text = open(path, errors="replace").read()
+          except FileNotFoundError:
+              print("NO TRACE FILE — nothing to read"); raise SystemExit(0)
+          dumps = text.split("Timeout (")[1:]
+          print(f"dumps: {len(dumps)}")
+          if not dumps:
+              print("ZERO DUMPS. On 3.13 that is the control passing. On 3.12 it "
+                    "means the wait did not happen in this run, NOT that it has no "
+                    "Python stack -- check step (1) for whether the timer armed.")
+              raise SystemExit(0)
+          FRAME = re.compile(r'^\s+File "(?P<file>[^"]+)", line (?P<line>\d+) in (?P<fn>\S+)', re.M)
+          tops, waits = collections.Counter(), 0
+          for d in dumps:
+              frames = FRAME.findall(d)
+              if not frames:
+                  continue
+              # the deepest frame inside this repo, not inside pytest or stdlib
+              ours = [f for f in frames if "/site-packages/" not in f[0]]
+              top = (ours or frames)[0]
+              tops[f"{os.path.basename(top[0])}:{top[1]} in {top[2]}"] += 1
+              if any(f[2] in ("wait", "wait4", "communicate", "_try_wait", "poll",
+                              "read", "recv", "acquire", "join") for f in frames):
+                  waits += 1
+          print(f"dumps whose stack contains a child-wait or blocking primitive: {waits}")
+          print("\nwhere the interpreter was standing, most common first:")
+          for where, n in tops.most_common(15):
+              print(f"  {n:4d}  {where}")
+          PY
+
+      - name: (3) the trace, kept
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stalltrace-${{ matrix.python-version }}
+          path: |
+            stall-trace-${{ matrix.python-version }}.txt
+            pytest-${{ matrix.python-version }}.txt
+          retention-days: 7
+          compression-level: 9
+
+      - name: environment receipt
+        if: always()
+        run: |
+          echo "python : $(python -V 2>&1)"
+          echo "cpu    : $(nproc) x $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
