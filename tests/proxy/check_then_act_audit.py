@@ -32,6 +32,41 @@ OS_MUTATORS = {"replace", "rename", "unlink", "remove", "link", "symlink",
 
 # "<function>: <source text>" -> why it is safe.
 INVENTORY = {
+    # Repeats. Each occurrence is its own site and answers for itself; the
+    # reviewer's duplicate-site shape is exactly this, and a single entry
+    # covering both was how it walked past round 11.
+    "_forget_take: private.unlink() #1":
+        "The discard when the held bytes ARE answered for, on a note we hold "
+        "exclusively.",
+    "_forget_take: private.unlink() #2":
+        "The discard after a successful link put the note back; the private "
+        "name is ours alone at that point.",
+    "_atomic_write: os.unlink(tmp) #1":
+        "Cleanup of our own temp on the _Changed path.",
+    "_atomic_write: os.unlink(tmp) #2":
+        "Cleanup of our own temp on the ConfigIOError path.",
+    "_atomic_write: os.fsync(fh.fileno()) #1":
+        "The re-derivation's rewrite of our own temp.",
+    "_adopt_standby: record_path.rename(rec_path) #1":
+        "Promotion of a record whose bytes did not validate, after the failed "
+        "copy has been set aside.",
+    "_discard: held.unlink() #1":
+        "Dropping our own superseded copy when the canonical slot was refilled "
+        "by whoever wrote the record beside it.",
+    "_install_locked: spare_record.rename(rec_path) #1":
+        "Promotion of the marked record when the standby bytes did not "
+        "validate.",
+    "_exclusive: open(str(lock_path), \"a+\")":
+        "The lock file itself. Creating it is not a change to recovery state; "
+        "what it protects is taken with flock immediately after.",
+    "_claim_take_note: os.open(str(taking), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)":
+        "THE atomic claim. O_EXCL is the whole mechanism: the creation is the "
+        "question and the file system answers it once.",
+    "_reclaim_one: held.rename(bytes_path)":
+        "Only after the held bytes hash to what the note recorded, on a note "
+        "that passed every part of its validation.",
+    "_atomic_write: open(tmp, \"wb\")":
+        "Our own temp file, before any rename makes it visible.",
     "_atomic_write: os.replace(tmp, str(p))":
         "Under `_exclusive`, with the re-read, the re-derivation and the "
         "comparison in the same critical section.",
@@ -116,12 +151,76 @@ INVENTORY = {
 }
 
 
+WRITE_MODES = set("wax+")
+OPEN_FLAGS = {"O_CREAT", "O_EXCL", "O_WRONLY", "O_RDWR", "O_TRUNC", "O_APPEND"}
+
+
+def _qualified(tree):
+    """id(node) -> dotted function path, innermost last."""
+    out = {}
+
+    def walk(node, path):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                here = path + [child.name]
+                for inner in ast.walk(child):
+                    out[id(inner)] = ".".join(here)
+                walk(child, here)
+            else:
+                walk(child, path)
+
+    walk(tree, [])
+    return out
+
+
+def _aliases(tree):
+    """Names bound to mutating callables by an import, e.g. `from os import
+    unlink`. Round 11 renamed one of these and the regular-expression audit did
+    not notice; an alias is the same syscall with a different label."""
+    bound = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in ("os", "shutil"):
+            for a in node.names:
+                if a.name in OS_MUTATORS or a.name in {"remove", "rmtree"}:
+                    bound[a.asname or a.name] = a.name
+    return bound
+
+
+def _is_mutation(node, aliases):
+    """Every shape that changes the filesystem, by AST rather than by name."""
+    f = node.func
+    if isinstance(f, ast.Attribute):
+        if isinstance(f.value, ast.Name) and f.value.id == "os":
+            if f.attr == "open":
+                for arg in node.args[1:]:
+                    for sub in ast.walk(arg):
+                        if isinstance(sub, ast.Attribute) and sub.attr in OPEN_FLAGS:
+                            return True
+                return False
+            return f.attr in OS_MUTATORS
+        return f.attr in MUTATORS
+    if isinstance(f, ast.Name):
+        if f.id in aliases:
+            return True
+        if f.id == "open":
+            mode = ""
+            for arg in node.args[1:]:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    mode = arg.value
+            for kw in node.keywords:
+                if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                    mode = kw.value.value or ""
+            return bool(set(mode) & WRITE_MODES)
+    return False
+
+
 def main():
     src = SOURCE.read_text(encoding="utf-8")
     tree = ast.parse(src)
     # Innermost function wins: a nested helper is its own site, and reporting
     # it under the enclosing function would let two different sites share a key.
-    where = {}
+    where = _qualified(tree)
+    _unused = {}
     funcs = []
 
     def collect(node, depth):
@@ -137,21 +236,29 @@ def main():
         for child in ast.walk(fn):
             where[id(child)] = fn.name
 
+    aliases = _aliases(tree)
     sites = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-            continue
-        attr = node.func.attr
-        is_os = (isinstance(node.func.value, ast.Name)
-                 and node.func.value.id == "os" and attr in OS_MUTATORS)
-        if attr not in MUTATORS and not is_os:
+        if not isinstance(node, ast.Call) or not _is_mutation(node, aliases):
             continue
         text = ast.get_source_segment(src, node) or ""
         sites.append((node.lineno, where.get(id(node), "<module>"), text))
 
+    # Keyed by QUALIFIED path, LINE and call, so a nested helper sharing a name
+    # with a module-level one cannot inherit its entry, and two identical calls
+    # in the same function are two sites rather than one.
+    # The key is (qualified function path, call text, which occurrence). A
+    # nested helper has its own path so it cannot inherit a module-level
+    # entry's answer, and two identical calls in one function are two sites
+    # rather than one -- both shapes walked past round 11's version, which
+    # keyed on the bare name.
+    seen = {}
     unlisted = []
     for lineno, func, text in sites:
-        key = f"{func}: {text}"
+        base = f"{func}: {text}"
+        n = seen.get(base, 0)
+        seen[base] = n + 1
+        key = base if n == 0 else f"{base} #{n}"
         if key not in INVENTORY:
             unlisted.append((lineno, key))
 

@@ -1928,8 +1928,53 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
     assert published, "the put-back window was never reached"
     assert json.loads(read(note))["held"] == "the-new-owners", (
         "the put-back overwrote a note published while it held the old one")
+    # ROUND 12 CORRECTS WHAT THIS ROW USED TO ASSERT. It used to require the
+    # private note to be gone, which is the defect the reviewer found: EEXIST
+    # says somebody holds a NAME, not that the bytes the old note points at
+    # have been dealt with. A delayed claimant can win the freed name having
+    # moved nothing. The old note stays, under a name reclaim scans, until its
+    # bytes are answered for.
+    kept = list(records.glob("*.forgetting-*"))
+    assert kept, "a note was discarded on a name contest, answering for nothing"
+    assert json.loads(read(kept[0]))["held"] == "somebody-elses"
+
+
+def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
+        cfg, home, artifact, monkeypatch):
+    """The other side of R12: a note IS spent once what it points at is back at
+    the canonical name. Keeping it then would leave reclaim chasing bytes that
+    are already where they belong."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained = _paths(home)
+    records = retained.parent
+    note = records / "github.taking"
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(read(retained))
+    note.write_text(json.dumps(
+        {"canonical": retained.name, "held": held.name,
+         "sha256": inst._digest_file(held)}), encoding="utf-8")
+
+    real_read_text = pathlib.Path.read_text
+    published = []
+
+    def a_new_owner_claims_the_name(self, *a, **kw):
+        out = real_read_text(self, *a, **kw)
+        if ".forgetting-" in self.name and not published:
+            published.append(True)
+            note.write_text(json.dumps(
+                {"canonical": retained.name, "held": "the-new-owners",
+                 "sha256": "1" * 64}), encoding="utf-8")
+        return out
+
+    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    inst._forget_take(note, "an-older-take")
+    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+
+    assert published
+    # The canonical retained copy is present and hashes to what the old note
+    # recorded, so those bytes are answered for and the note is spent.
     assert not list(records.glob("*.forgetting-*")), (
-        "the stale note was left lying in the records directory")
+        "a note whose bytes are already back was kept")
 
 
 def test_a_forged_marker_does_not_license_an_entry_only_restore(
@@ -1999,3 +2044,56 @@ def test_the_standby_that_describes_the_live_file_is_the_one_adopted(
     inst.uninstall(cfg, "github", home=home)
     assert read(cfg) == original, (
         "a stale standby was adopted ahead of the one describing the live file")
+
+
+def test_evidence_swapped_after_the_gate_does_not_license_the_restore(
+        cfg, home, artifact, monkeypatch):
+    """R12-AUTHORISE-AT-THE-MOMENT-OF-USE. The gate that decides an entry-only
+    restore is worth attempting runs before everything between it and the
+    write. Evidence read then can be swapped after, so what licenses the write
+    is taken again immediately before it, on one fresh descriptor. A check
+    whose answer is carried across other work is a check about the past."""
+    original = read(cfg)
+    real_write = inst._atomic_write
+    ended = []
+
+    def corrupt_the_standby(target, data):
+        if not ended:
+            ended.append(True)
+            _, _, pending_path, retained = inst._record_paths(home, "github")
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            out = real_write(target, data)
+            for standby in (home / "proxy" / "installs").glob("*.standby"):
+                standby.write_bytes(b'{"not": "the original"}')
+            return out
+        raise inst.ConfigIOError("the rollback write cannot happen")
+
+    monkeypatch.setattr(inst, "_atomic_write", corrupt_the_standby)
+    with pytest.raises(inst.ConfigConflict):
+        inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+
+    records = home / "proxy" / "installs"
+    set_aside = next(records.glob("*.failed-*"))
+    real_gate = inst._failed_copy_is_present
+    swapped = []
+
+    def swap_after_the_gate(*a, **kw):
+        answer = real_gate(*a, **kw)
+        if answer and not swapped:
+            swapped.append(True)
+            set_aside.write_bytes(b'{"swapped after the gate said yes":true}')
+        return answer
+
+    monkeypatch.setattr(inst, "_failed_copy_is_present", swap_after_the_gate)
+    with pytest.raises(inst.ConfigConflict):
+        inst.uninstall(cfg, "github", home=home)
+    monkeypatch.setattr(inst, "_failed_copy_is_present", real_gate)
+
+    assert swapped, "the gate was never reached"
+    assert read(cfg) != original, "the fixture never published a wrapper"
+    assert inst.classify(json.loads(read(cfg))["mcpServers"]["github"],
+                         artifact=artifact) == "WRAPPED", (
+        "a restore was licensed by evidence that had already been swapped")

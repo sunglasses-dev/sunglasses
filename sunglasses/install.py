@@ -48,6 +48,7 @@ import hashlib
 import json
 import os
 import pathlib
+import stat
 import sys
 import tempfile
 import time
@@ -571,6 +572,47 @@ def _records_dir(home, name):
     return (d, *rest)
 
 
+def _read_note(path):
+    """A note's contents, or None when it is not one."""
+    try:
+        intent = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(intent, dict):
+        return None
+    held = intent.get("held")
+    sha = intent.get("sha256")
+    if not isinstance(held, str) or not held or not _is_digest(sha):
+        return None
+    return intent
+
+
+def _held_bytes_are_answered_for(private, *, d):
+    """Whether the bytes `private` names have been dealt with by somebody.
+
+    Two ways, and no third: they are back at the canonical name with the digest
+    the note recorded, or another VALID note names the same held file. A
+    claimant that holds a name while carrying no content and having moved
+    nothing is not an answer -- that is the whole of round 11's blocker.
+    """
+    mine = _read_note(private)
+    if mine is None:
+        return True                     # nothing to lose
+    canonical = d / mine.get("canonical", "")
+    try:
+        if canonical.is_file() and _digest_file(canonical) == mine["sha256"]:
+            return True
+    except OSError:
+        pass
+    for other in sorted(d.glob("*.taking*")):
+        if other == private:
+            continue
+        theirs = _read_note(other)
+        if theirs and theirs["held"] == mine["held"]:
+            return True
+    return False
+
+
 def _note_is_live(taking, *, d):
     """True when a take note still answers for bytes that are still there."""
     try:
@@ -667,13 +709,23 @@ def _forget_take(taking, held_name):
     # way the claim does, and loses gracefully: if a new owner is there, ITS
     # note stands and the one we are holding is stale -- whatever it referred
     # to has already been dealt with by whoever moved it on.
+    # R12-A-NAME-CONTEST-IS-NOT-PROOF (ASTRA round 11,
+    # `R11_REAL_TWO_FORGETS_ONE_DELAYED_CLAIM`). Round 11 treated EEXIST as
+    # proof that the note being held was stale. It is not: a delayed claimant
+    # can win the freed name having moved NO bytes, and the note discarded on
+    # that EEXIST was the only thing naming the held inverse. A note is
+    # discarded only when what it points at has been DEALT WITH -- the held
+    # bytes are back at the canonical name, or another VALID note names the
+    # same held file -- and never merely because somebody else holds a name.
     try:
         os.link(str(private), str(taking))
     except FileExistsError:
-        try:
-            private.unlink()
-        except OSError:
-            pass
+        if _held_bytes_are_answered_for(private, d=taking.parent):
+            try:
+                private.unlink()
+            except OSError:
+                pass
+        # Otherwise it stays, under a name `_reclaim_taken` scans.
         return
     except OSError:
         return
@@ -683,40 +735,70 @@ def _forget_take(taking, held_name):
         pass
 
 
-def _failed_copy_is_present(record, name, *, home):
-    """Whether the state that licenses an entry-only restore is ON DISK.
+def _open_set_aside(record, name, *, home):
+    """The set-aside copy, opened ONCE, or None.
 
-    R11-NO-FIELD-DECIDES (ASTRA round 10, `R10_FORGED_MARKER_REFUSES`). Round 10
-    let a record carry `inverse_unusable` and treated it as permission, so
-    editing that field into an ordinary record and corrupting the retained copy
-    turned a refusal into a silent entry-only restore. A record is not a
-    capability. What licenses the fallback is a state nobody can write by
-    editing one key: a copy this transaction SET ASIDE because it failed, still
-    on disk, still hashing to the failure that was recorded at the time -- and
-    a canonical retained copy that is genuinely absent or does not match.
+    R12-ONE-DESCRIPTOR (ASTRA round 11, `R11_FAILED_STATE_VALIDATION`). Round 11
+    asked `is_file()` and then digested by path: `is_file` follows a symlink, so
+    a link planted at that name answered for a file somewhere else, and the two
+    opens meant the thing checked and the thing used could differ. Everything
+    below happens on ONE descriptor: no-follow open, `fstat` for "regular file",
+    and the digest read from that same descriptor. Containment is checked on the
+    real path before the open, so a link cannot walk out of the records
+    directory between the check and the read either.
     """
     failed_name = record.get("failed_bytes_name")
     failed_sha = record.get("failed_bytes_sha256")
     if not isinstance(failed_name, str) or not _is_digest(failed_sha):
-        return False
-    d, _, _, bytes_path = _record_paths(home, name)
+        return None
+    d, _, _, _ = _record_paths(home, name)
     failed = d / failed_name
-    if failed.name != failed_name or not failed.is_file():
-        return False
+    if failed.name != failed_name:
+        return None
     try:
-        if _digest_file(failed) != failed_sha:
-            return False
+        if os.path.realpath(str(failed.parent)) != os.path.realpath(str(d)):
+            return None
+        fd = os.open(str(failed), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            os.close(fd)
+            return None
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    except OSError:
+        os.close(fd)
+        return None
+    os.close(fd)
+    data = b"".join(chunks)
+    if _digest_bytes(data) != failed_sha:
+        return None
+    return data
+
+
+def _failed_copy_is_present(record, name, *, home):
+    """Whether the state that licenses an entry-only restore is ON DISK.
+
+    R11-NO-FIELD-DECIDES (ASTRA round 10, `R10_FORGED_MARKER_REFUSES`). A record
+    is not a capability: what licenses the fallback is a copy this transaction
+    SET ASIDE because it failed, still on disk, still hashing to the failure
+    recorded at the time, and a canonical copy genuinely absent or mismatched.
+    """
+    if _open_set_aside(record, name, home=home) is None:
         return False
-    # And the canonical copy really is unusable, checked here rather than
-    # inherited from whoever wrote the record.
+    _, _, _, bytes_path = _record_paths(home, name)
     if not bytes_path.exists():
         return True
     try:
         return _digest_file(bytes_path) != record.get("file_sha_before")
     except OSError:
         return True
-
 
 def _set_aside_failed(standby_bytes, name, *, records):
     """Keep a copy that failed its digest, under a name of its own."""
@@ -793,7 +875,9 @@ def _adopt_standby(home, name, target):
         live = _read_bytes(target)
     except ConfigIOError:
         return False
-    for record_path, standby_bytes in _standby_pairs(home, name):
+    for exhausted, (record_path, standby_bytes) in [
+            (False, pair) for pair in _standby_pairs(home, name)] + [
+            (True, pair) for pair in _standby_pairs(home, name)]:
         try:
             claim = json.loads(record_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -821,6 +905,14 @@ def _adopt_standby(home, name, target):
         try:
             usable = _digest_file(standby_bytes) == before
         except OSError:
+            continue
+        if not usable and not exhausted:
+            # R12-PREFER-A-PAIR-THAT-VALIDATES (ASTRA round 11,
+            # `R11_TWO_MATCHING_PAIRS[first_bytes_wrong]`). Two pairs can
+            # describe the live file, and round 11 took the first and fell
+            # straight to entry-only while a byte-exact inverse sat beside it.
+            # Entry-only is what is left when nothing validates, not what
+            # happens to be first.
             continue
         if not usable:
             # The bytes are not an inverse and promoting them would write
@@ -861,23 +953,34 @@ def _adopt_standby(home, name, target):
 def _reclaim_taken(home, name):
     """Put back bytes a cleanup took and then never answered for.
 
-    Only ever from the note the cleanup wrote before it moved them, and only
-    when the held file still hashes to what that note recorded. A `.discarding-`
+    Only ever from a note the cleanup wrote before it moved them, and only when
+    the held file still hashes to what that note recorded. A `.discarding-`
     file on its own proves nothing: the name is a convention, and trusting a
-    convention is how a leftover becomes the thing we restore a user's config
-    from.
+    convention is how a leftover becomes the thing we restore a config from.
+
+    EVERY note is tried, not just the first (ASTRA round 11). Round 11 took the
+    first name it found, refused on its empty content, and left a valid private
+    note beside it holding the only route back.
     """
     d, _, _, bytes_path = _record_paths(home, name)
     if bytes_path.exists():
         return False
-    # Every note, not only the canonical name: one held privately by a process
-    # that ended mid-forget is still recovery material, and it is named so that
-    # this scan finds it.
-    notes = [d / f"{name}.taking"] + sorted(
-        q for q in d.glob(f"{name}.taking.*") if q.is_file())
-    taking = next((q for q in notes if q.is_file()), None)
-    if taking is None:
-        return False
+    notes = [q for q in [d / f"{name}.taking"] + sorted(
+        d.glob(f"{name}.taking.*")) if q.is_file()]
+    refusal = None
+    for taking in notes:
+        try:
+            if _reclaim_one(taking, name, d=d, bytes_path=bytes_path):
+                return True
+        except (ConfigConflict, ConfigIOError) as e:
+            refusal = refusal or e
+    if refusal is not None:
+        raise refusal
+    return False
+
+
+def _reclaim_one(taking, name, *, d, bytes_path):
+    """One note: validate every part of it, then put its bytes back."""
     try:
         intent = json.loads(taking.read_text(encoding="utf-8"))
     except OSError as e:
@@ -886,14 +989,6 @@ def _reclaim_taken(home, name):
         raise ConfigConflict(
             f"the take note at {taking} is not readable JSON, so the bytes it "
             f"refers to cannot be trusted: {e}") from None
-
-    # R9-NOTE-SHAPE (ASTRA round 8, `R8_NOTE_VALIDATION[list]` and `[null]`).
-    # `json.loads` returns whatever the file says, and a list or a null reached
-    # `.get` as an AttributeError through the public uninstall. A note is
-    # recovery material: every part of it is checked before any of it is used,
-    # and a note that fails those checks is a typed refusal, never a traceback
-    # and never a silent skip that leaves the caller to fail later for a
-    # different reason.
     if not isinstance(intent, dict):
         raise ConfigConflict(
             f"the take note at {taking} is a {type(intent).__name__} and not an "
@@ -907,13 +1002,6 @@ def _reclaim_taken(home, name):
         raise ConfigConflict(
             f"the take note at {taking} does not carry a sha256 digest, so "
             f"nothing it points at can be checked against it")
-    # R10-TAKE-NAMES-A-TAKE (ASTRA round 9,
-    # `R9_STANDBY_NOT_RECLAIMED_BY_TAKE_NOTE`). A note names bytes a CLEANUP
-    # moved, and a cleanup only ever moves the canonical retained original to a
-    # `.discarding-` name. A standby is a different thing with a different
-    # lifecycle, and a note pointing at one is either confused or forged;
-    # either way promoting it would install one transaction's spare copy as
-    # another's retained original.
     if not held_name.startswith(f"{name}.original.discarding-"):
         raise ConfigConflict(
             f"the take note at {taking} names {held_name}, which is not bytes a "
@@ -937,7 +1025,6 @@ def _reclaim_taken(home, name):
             f"cannot put back the bytes {taking} named: {e}") from e
     _forget_take(taking, held_name)
     return True
-
 
 def _discard(*paths):
     """Remove our own transaction files, and NEVER one that is in use.
@@ -1752,6 +1839,12 @@ def _uninstall_locked(config_path, name, *, home):
         # standby whose bytes had already failed: there the bytes were never
         # this record's to begin with, and refusing would leave a wrapper that
         # nothing can undo.
+        # A GATE, not the authority. It decides whether an entry-only restore
+        # is worth attempting at all; what licenses the write is taken again
+        # below, on one fresh descriptor, immediately before the write. Both
+        # exist on purpose and they are not redundant: this one refuses a
+        # record that never had a set-aside copy, and that one refuses evidence
+        # swapped after this ran.
         if not _failed_copy_is_present(record, name, home=home):
             raise e.conflict from None
         # Only THIS failure is survivable. A record that points outside its own
@@ -1787,6 +1880,17 @@ def _uninstall_locked(config_path, name, *, home):
         servers[name] = record["original_entry"]
     else:
         del servers[name]
+    if retained_failure is not None:
+        # R12-AUTHORISE AT THE MOMENT OF USE (ASTRA round 11,
+        # `R11_FAILED_STATE_VALIDATION[replaced_after_check]`). The gate above
+        # ran before everything between here and there; the evidence it read can
+        # be swapped afterwards. So the authorisation is taken again, on one
+        # fresh descriptor, immediately before the write it authorises -- a
+        # check whose answer is carried across other work is a check about the
+        # past.
+        if _open_set_aside(record, name, home=home) is None:
+            raise retained_failure
+
     _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
 
     # R10a-KEEP-WHAT-FAILED. An entry-only restore that happened BECAUSE the

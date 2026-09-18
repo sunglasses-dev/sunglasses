@@ -23,6 +23,7 @@ Two standing rules this file enforces on itself:
 """
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -264,10 +265,14 @@ MUTATIONS = [
      '        os.link(str(private), str(taking))',
      '        private.rename(taking)',
      'test_a_put_back_loses_to_a_new_owner_of_the_name'),
+    # ANCHORED ON THE POINT-OF-USE CHECK, not the gate above it. Round 12 added
+    # a second authorisation immediately before the write, so disabling the
+    # first one alone changes nothing and the mutant survived its own control --
+    # correctly. The authority is where the decision is acted on.
     ('R11-NO-FIELD', 'a record field decides that an entry-only restore is allowed',
-     '        if not _failed_copy_is_present(record, name, home=home):',
-     '        if False:',
-     'test_a_forged_marker_does_not_license_an_entry_only_restore'),
+     '        if _open_set_aside(record, name, home=home) is None:\n            raise retained_failure',
+     '        if False:\n            raise retained_failure',
+     'test_evidence_swapped_after_the_gate_does_not_license_the_restore'),
     ('R11-ADOPT-CURRENT', 'the oldest standby pair is adopted instead of the live one',
      '        if not _is_digest(after) or after != _digest_bytes(live):',
      '        if False:',
@@ -356,6 +361,14 @@ def _why_it_failed(stdout, control):
     for marker in _NOT_BEHAVIOURAL:
         if marker in fired:
             return marker
+    # R12: a BARE assertion with no message, on an empty container or a falsy
+    # constant, is a row checking its own bookkeeping -- `assert fired`,
+    # `assert hit`, `assert published`. Nothing about the product is stated, so
+    # a mutant that empties that flag has not been killed by anything. The
+    # reviewer wrote `E       assert []` and round 11 counted it as a kill.
+    bare = fired[1:].strip()
+    if re.fullmatch(r"assert (\[\]|\{\}|\(\)|False|None|0|''|\"\")", bare):
+        return "bare setup assertion"
     return None
 
 
