@@ -971,20 +971,18 @@ class Route:
 
     def _withhold(self, request_id, reason, rule, *, attempt=None,
                   settlement=None, result=None, budget=None):
-        # R-179-R5/(3). CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A withheld
-        # request is never forwarded, so a response carrying its id is
-        # unsolicited -- but only if the item has stopped being pending by the
-        # time that response arrives. Claiming after the write left a window in
-        # which upstream could answer a request it had never seen.
-        if attempt is not None and attempt.request_id == request_id:
-            self.session.claim_for_local_answer(attempt.token)
-            # R-179-R7/(d). AND TAKE DELIVERY, before a byte is written. A
-            # close walking its retained obligations answers what nobody is
-            # delivering; if it got here first, this writer has nothing to
-            # write and says nothing rather than putting a second frame on the
-            # wire for one request.
-            if not self.session.take_delivery(attempt.token):
-                return
+        # R-168-R12/(b). THE BODY IS BUILT FIRST so the two cases can be one
+        # if/else and the take can sit at the top level, where it plainly
+        # dominates the write. Before this the take lived inside the claim
+        # branch and the write sat outside it, dominating only because the
+        # other path happened to return -- true, but invisible to any
+        # analysis that does not model returns, and ASTRA's GA01 is exactly
+        # a take hidden in a branch. Making the code obviously correct beats
+        # making the gate clever enough to follow it.
+        #
+        # Building the body earlier costs nothing: it is pure construction
+        # from the arguments, and every claim and take still happens before
+        # a single byte is written, which is what #179 requires.
         result = result or {}
         body = envelope.withheld(
             request_id=request_id,
@@ -1017,24 +1015,25 @@ class Route:
         # there is no attempt to own one. The client still gets the frame #179
         # writes here, and the receipt still says the settlement was refused.
         if attempt is None or attempt.request_id != request_id:
-            self._to_client(body)  # to-client-exempt: nobody owns this item, so there is no obligation to take; the sibling branch below does take, which is why source order alone would credit this path wrongly
+            self._to_client(body)  # to-client-exempt: nobody owns this item, so there is no obligation to take, and this branch returns before the take below
             # NO ATTEMPT, NO SETTLEMENT -- the typed refusal, verbatim from
             # #179's reasoning below.
             self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
                          reason="no_attempt", forwarded=False)
             return
-        # R-168-R11/F1 (ASTRA MS04, MS10). THE CARRIED TOKEN, and a fresh
-        # lookup here is the defect. `obligation_for` re-derives the CURRENT
-        # generation, and its own docstring says a caller answering something
-        # that may have finished must carry its own token instead. By this line
-        # we HAVE claimed: the claim removed the identity from `_pending`, and
-        # #179 permits a new generation to be admitted the moment it is free.
-        # So the lookup returned the NEWER obligation and this refusal paid it:
-        # three wire responses for two admitted requests, with the older
-        # attempt's own obligation left unpaid.
-        owed = attempt.token
-        if not self.session.take_obligation(owed):
+        # R-179-R5/(3). CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A
+        # withheld request is never forwarded, so a response carrying its id
+        # is unsolicited -- but only if the item has stopped being pending by
+        # the time that response arrives.
+        self.session.claim_for_local_answer(attempt.token)
+        # R-179-R7/(d) + R-168-R12/(a). THE SINGLE ACQUIRE, over both sets,
+        # before a byte moves. It keeps the name `take_delivery` because
+        # reviewer controls hook that attribute to drive the reuse race; the
+        # plumbing gives way, not the control.
+        if not self.session.take_delivery(attempt.token):
             return
+        # Already acquired above, in the claim branch, as one operation.
+        owed = attempt.token
         self._to_client(body)
         self._answered(owed, final=True)
         # T6.R1. The held item is settled here and not merely answered, so the

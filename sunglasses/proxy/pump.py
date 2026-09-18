@@ -1222,10 +1222,24 @@ class Session:
             return self._take_delivery(token)
 
     def _take_delivery(self, token):
-        """Call under `_settlement`."""
+        """Call under `_settlement`. THE single acquire, over BOTH sets.
+
+        R-168-R12/(a), ASTRA LC01 + LC03. Delivery and the obligation used to be
+        separate sets, so a writer could own one and look unowned to whatever
+        asked about the other. The teardown asks here, saw the successful list
+        as nobody's, and retained a second response for a request already
+        answered -- one answer for the first request and TWO for the second, on
+        a real pipe, 3 of 3 crossings. Two sets meant two answers.
+
+        Both public entry points land here, so a taker of either is the owner of
+        both. `take_delivery` keeps its name and its meaning because reviewer
+        controls hook that attribute to drive the race; the plumbing gives way,
+        not the control.
+        """
         if token in self._delivering:
             return False
         self._delivering.add(token)
+        self._unanswered.discard(token)
         return True
 
     def settle_attempt(self, token, reason, rule):
@@ -2433,9 +2447,16 @@ class Session:
         failure cannot pay an id whose frame is already on its way; if that
         authorisation then fails the bytes never moved and the client is owed
         again. But only if nothing has ever reached them for this id.
+
+        R-168-R12/(a). RELEASES DELIVERY TOO, now that taking acquires it. A
+        give-back that restored the obligation and left delivery held would
+        hand back something nobody could ever take again -- the client owed an
+        answer no writer is permitted to send.
         """
-        if token not in self._answered_final:
-            self._unanswered.add(token)
+        with self._settlement:
+            self._delivering.discard(token)
+            if token not in self._answered_final:
+                self._unanswered.add(token)
 
     def unanswered_clients(self):
         """Every outstanding obligation, FOR LOOKING AT. Grants nothing.
@@ -2466,12 +2487,24 @@ class Session:
 
         A caller that is refused here writes nothing. It has not failed; it has
         learned that this obligation is someone else's to discharge.
+
+        R-168-R12/(a), ASTRA LC01 + LC03. ONE OWNERSHIP SET. This used to take
+        only the obligation while `take_delivery` kept a SEPARATE set, so a
+        writer could own the obligation and still look unowned to anything
+        asking about delivery. The teardown asks `_take_delivery`, saw the
+        successful list as nobody's, and retained a second response for a
+        request that had already been answered: one answer for the first
+        request and TWO for the second, on a real pipe, in 3 of 3 crossings.
+        Two sets meant two answers.
+
+        So a taker of one is the owner of the other, acquired in the same
+        critical section. A caller refused here writes nothing, whichever half
+        was already somebody else's.
         """
         with self._settlement:
             if token not in self._unanswered:
                 return False
-            self._unanswered.discard(token)
-            return True
+            return self._take_delivery(token)
 
     def take_next_unanswered(self, *, origin=ORIGIN_CLIENT):
         """Take ONE outstanding obligation, or None. The only way to get one.
