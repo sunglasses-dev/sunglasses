@@ -1,0 +1,107 @@
+name: engine-312-patch-bisect
+
+# WO from T9, 2026-09-18: measurement by intervention. The local no-repro (WO-2,
+# +3%) was taken on Python 3.12.12; the runner's 3.12 leg is 3.12.14. So the
+# difference may be the RUNNER's patch release rather than 3.12 the language,
+# and one run settles it.
+#
+#   waits vanish on 3.12.12  ->  a regression in .13/.14, and the fix is a pin
+#                                plus a sentence
+#   waits stay on 3.12.12    ->  the patch version is eliminated and the cause
+#                                is in our scan path
+#
+# A MATCHED PAIR, NOT A PIN, and that is a deliberate deviation from the WO as
+# written. Pinning the shipped matrix to 3.12.12 would edit
+# pattern-integrity.yml, whose version list is a reviewed contract asserted in
+# tests/test_ci_gate.py -- so the experiment would change the thing it is
+# measuring and need a gate edit in the same commit. Running BOTH patches here
+# instead keeps the contract untouched and is a better experiment: the two legs
+# differ in exactly one variable, which is the method that produced every other
+# number in CI_312_LEG.md.
+#
+# What it is looking for, from §7 and §10: 35 rows ~82-86s slower and 3 rows at
+# twice that, against the other leg. 41 waits, twice, on two commits.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/engine-312-patch-bisect.yml'
+
+permissions: read-all
+
+concurrency:
+  group: engine-312-patch-bisect-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # The one variable. Everything else is identical by construction.
+        python-version: ['3.12.12', '3.12.14']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: the interpreter, exactly
+        run: python -VV
+
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      - name: Install package + dev + media deps
+        run: |
+          python -m pip install --upgrade 'pip==26.2.1'
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest pyyaml "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
+          python -c "import yaml, pytest; print('yaml and pytest import OK')"
+
+      # The same nine standing exclusions the integrity leg carries, so this is
+      # the suite whose 41 waits were counted and not a different one.
+      - name: the full suite, every duration
+        run: |
+          set +e
+          python -m pytest -q -p no:cacheprovider --durations=0 \
+            --deselect "tests/test_repair_v056.py::test_h1_later_frame_qr_is_a_threat_not_a_clean_complete_scan[console-script]" \
+            --deselect "tests/test_repair_v056.py::test_h2_corrupt_exif_is_incomplete_not_clean_and_complete[console-script-short-ifd.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h2_corrupt_exif_is_incomplete_not_clean_and_complete[console-script-far-ifd.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h3_one_bad_byte_keeps_the_findings_and_reports_the_loss[console-script-ascii_bad_tail.jpg]" \
+            --deselect "tests/test_repair_v056.py::test_h3_one_bad_byte_keeps_the_findings_and_reports_the_loss[console-script-ascii_bad_prefix.jpg]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-later_component]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-byte_metadata]" \
+            --deselect "tests/test_v056_matrix.py::test_cli_cell[cli_console-converter_failed]" \
+            2>&1 | tee durations-${{ matrix.python-version }}.txt
+          echo "PYTEST_EXIT=${PIPESTATUS[0]}"
+          set -e
+
+      - name: the slowest rows, for the matched-pair diff
+        if: always()
+        run: |
+          echo "--- summary:"; grep -E "passed|failed" durations-${{ matrix.python-version }}.txt | tail -1
+          echo "--- rows at or above 60s:"
+          grep -E "^[0-9]+\.[0-9]+s +(setup|call|teardown)" durations-${{ matrix.python-version }}.txt \
+            | awk '$1+0 >= 60' | head -50
+          echo "--- count at or above 60s:"
+          grep -cE "^(6[0-9]|[7-9][0-9]|[0-9]{3,})\.[0-9]+s +(setup|call|teardown)" durations-${{ matrix.python-version }}.txt || true
+
+      - name: durations, kept
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: durations-${{ matrix.python-version }}
+          path: durations-${{ matrix.python-version }}.txt
+          retention-days: 7
+
+      - name: environment receipt
+        if: always()
+        run: |
+          echo "python : $(python -VV 2>&1 | head -1)"
+          echo "cpu    : $(nproc) x $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
