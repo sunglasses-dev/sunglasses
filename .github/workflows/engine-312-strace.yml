@@ -1,0 +1,197 @@
+name: engine-312-strace
+
+# WO R-CI-312-STRACE (T9, 2026-09-18 07:46). CI-only, no product change.
+#
+# WHAT IS ALREADY KNOWN, so nobody re-derives it (CI_312_LEG.md §6-8):
+#   * 3.12 carries 41 fixed waits of 86.45s (spread 1.86s) against the 3.13 leg
+#     of the SAME commit -- 3543s of a 3809s excess. 3.9/3.10/3.11/3.14: zero.
+#   * The waits sit on the `setup` AND the `call` of 38 unrelated rows, listed
+#     in .github/engine-312-stall-rows.txt, derived from a matched-pair diff.
+#   * It is NOT engine construction: #189 measured that at 2-3.7s on every
+#     interpreter, and the spread there tracks the runner CPU rather than the
+#     Python version.
+#   * The profile of what those rows share is `re.compile` x3071 -- CPU-bound
+#     work, which scales smoothly with the machine. CPU work cannot produce a
+#     QUANTISED 86.45s wait with a 1.86s spread.
+#
+# So the thing is a BLOCKING WAIT ON A FIXED TIMEOUT, and the only open
+# questions are which syscall and whose process. strace answers both in one
+# run: `-T` prints each call's duration, `-f` follows children, and the pid on
+# the line says parent or child.
+#
+# READ THE TRACE FIRST, THEN THE MECHANISM. This job prints evidence and draws
+# no conclusion; the analysis belongs in CI_312_LEG.md §9 after the trace
+# exists, not in a comment written before it.
+#
+# THE NEGATIVE CONTROL IS THE POINT. The identical job runs on 3.13, where the
+# expected answer is ZERO calls over the threshold. A filter that finds a long
+# syscall on both legs has found how tests wait, not what makes this one slow.
+#
+# AND THE RUN HAS TO PROVE IT REPRODUCED. 38 rows in isolation are not the
+# suite that produced them, and the wait may need context this job does not
+# recreate. So it also prints --durations=0 for exactly these rows: if no row
+# takes ~86s, an empty trace means THE STALL DID NOT HAPPEN, not that strace
+# saw nothing. Those two outcomes need different next steps and a reader who
+# cannot tell them apart will pick the wrong one.
+#
+# workflow_dispatch plus pull_request filtered to its own two files: it runs on
+# the PR that introduces it and on demand after that, never on every PR.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/engine-312-strace.yml'
+      - '.github/engine-312-stall-rows.txt'
+
+permissions: read-all
+
+concurrency:
+  group: engine-312-strace-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the leg with the waits; 3.13 is the control and must come
+        # back with zero.
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: install strace
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq strace
+          strace -V | head -1
+
+      - name: install the test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest
+          python -m pip list
+
+      # The rows, read from the file rather than pasted into a command line:
+      # several node ids contain spaces inside their parametrisation brackets,
+      # and a shell split on those produces "no tests ran" rather than an
+      # error. pytest.main() takes them as a list and never splits them.
+      - name: the 38 rows exist on this tree
+        run: |
+          python - <<'PY'
+          import pathlib, subprocess, sys
+          rows = [l.strip() for l in
+                  pathlib.Path(".github/engine-312-stall-rows.txt").read_text().splitlines()
+                  if l.strip() and not l.startswith("#")]
+          print(f"rows listed: {len(rows)}")
+          out = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q", *rows],
+                               capture_output=True, text=True)
+          print(out.stdout[-2000:])
+          assert out.returncode == 0, "a listed row does not exist on this tree"
+          PY
+
+      # THE MEASUREMENT. -f follows children, -T times every call, and the
+      # trace goes to a file because it is far too large to read inline.
+      - name: run the 38 rows under strace
+        run: |
+          python - <<'PY' > "$RUNNER_TEMP/rows.txt"
+          import pathlib
+          for l in pathlib.Path(".github/engine-312-stall-rows.txt").read_text().splitlines():
+              if l.strip() and not l.startswith("#"):
+                  print(l.strip())
+          PY
+          cat > "$RUNNER_TEMP/driver.py" <<'PY'
+          import pathlib, sys, pytest
+          rows = [l.rstrip("\n") for l in
+                  pathlib.Path(sys.argv[1]).read_text().splitlines() if l.strip()]
+          sys.exit(pytest.main(["-p", "no:cacheprovider", "-q", "--durations=0", *rows]))
+          PY
+          set +e
+          strace -f -T -o "$RUNNER_TEMP/trace.txt" \
+            python "$RUNNER_TEMP/driver.py" "$RUNNER_TEMP/rows.txt" \
+            2>&1 | tee "$RUNNER_TEMP/pytest.txt"
+          echo "PYTEST_EXIT=${PIPESTATUS[0]}"
+          set -e
+          ls -la "$RUNNER_TEMP/trace.txt"
+
+      # DID IT REPRODUCE? Printed BEFORE the trace filter, deliberately, so the
+      # trace is read knowing whether there was anything to catch.
+      - name: (1) did the wait happen at all on this leg
+        run: |
+          echo "--- every row at or above 60s, from pytest's own durations ---"
+          grep -E "^[0-9]+\.[0-9]+s +(setup|call|teardown)" "$RUNNER_TEMP/pytest.txt" \
+            | awk '$1+0 >= 60 {print}' || true
+          echo "--- row count at or above 60s ---"
+          grep -cE "^(6[0-9]|[7-9][0-9]|[0-9]{3,})\.[0-9]+s +(setup|call|teardown)" \
+            "$RUNNER_TEMP/pytest.txt" || true
+          echo "--- pytest summary ---"
+          tail -3 "$RUNNER_TEMP/pytest.txt"
+
+      # (2) THE ANSWER, if there is one. -T writes the duration as <seconds> at
+      # end of line; anything at or over 60s is the wait, and the pid in column
+      # one says whether it is the test process or a child it spawned.
+      - name: (2) every syscall that blocked 60s or longer
+        run: |
+          python - <<'PY'
+          import os, re, collections
+          path = os.environ["RUNNER_TEMP"] + "/trace.txt"
+          # TWO LINE SHAPES, and both were proven against real strace output
+          # before this job was allowed to depend on them.
+          #   "<pid> syscall(args) = rc <duration>"
+          #   "<pid> <... syscall resumed>...) = rc <duration>"
+          # The second matters: under -f a call that BLOCKS is printed
+          # unfinished and then resumed, and the duration is on the resumed
+          # line -- so a parser that only knows the first shape misses exactly
+          # the long waits this job exists to find. The return value is
+          # `(.+?)` and not `(\S+)` for the same reason: `= -1 EINPROGRESS`
+          # has a space in it, and a connect() timeout is the single most
+          # likely candidate here. Both misses would print "over 60s: 0" and
+          # read precisely like a clean negative control.
+          CALL = re.compile(r"^(\d+)\s+(\w+)\((.*)\)\s*=\s*(.+?)\s*<([\d.]+)>\s*$")
+          RESUMED = re.compile(r"^(\d+)\s+<\.\.\.\s+(\w+)\s+resumed>(.*?)\s*=\s*(.+?)\s*<([\d.]+)>\s*$")
+          hits, total, parsed = [], 0, 0
+          for raw in open(path, errors="replace"):
+              total += 1
+              m = CALL.match(raw.rstrip("\n")) or RESUMED.match(raw.rstrip("\n"))
+              if not m:
+                  continue
+              parsed += 1
+              pid, call, args, rc, dur = m.groups()
+              if float(dur) >= 60.0:
+                  hits.append((float(dur), call, pid, args[:120], rc))
+          print(f"trace lines {total}, parsed {parsed}, over 60s: {len(hits)}")
+          if not hits:
+              print("NONE. Either the wait did not happen on this leg (check step 1) "
+                    "or it is not a single blocking syscall.")
+          for dur, call, pid, args, rc in sorted(hits, reverse=True):
+              print(f"  {dur:9.3f}s  {call:12s} pid={pid:<8s} rc={rc:<8s} {args}")
+          by = collections.Counter(h[1] for h in hits)
+          if by:
+              print("\nby syscall:", dict(by))
+              pids = collections.Counter(h[2] for h in hits)
+              print("by pid    :", dict(pids), "  (one pid = the test process; several = children)")
+          PY
+
+      - name: (3) the trace, kept
+        uses: actions/upload-artifact@v4
+        with:
+          name: strace-${{ matrix.python-version }}
+          path: |
+            ${{ runner.temp }}/trace.txt
+            ${{ runner.temp }}/pytest.txt
+          retention-days: 7
+          compression-level: 9
+
+      - name: environment receipt
+        run: |
+          echo "python : $(python -V 2>&1)"
+          echo "kernel : $(uname -srm)"
+          echo "cpu    : $(nproc) x $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
