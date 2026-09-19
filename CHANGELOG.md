@@ -68,6 +68,28 @@ All notable changes to Sunglasses are documented here.
   exactly that field twice. It remains on the object for logs and exceptions
   and is excluded from `Cause.as_receipt` by name.
 
+- **`install` wires the module form, because the path form could not import
+  itself.** (#201) Until this change, `sunglasses install` wrote a wrapper that
+  ran the entry point BY FILE PATH — `<python> …/sunglasses/proxy/__main__.py
+  -- <server>`. Run that way the file has no package context, so its
+  `from .commands import main` raises and **the wrapped server exited 1 before
+  a single message crossed**. Every server an install had wired was dead on
+  arrival. It writes `-m sunglasses.proxy` now, and uninstall still restores
+  the configuration file byte for byte.
+
+  **Measured end to end on the merged tree**, in an isolated `HOME`, driving
+  exactly the command install wrote rather than one retyped by hand:
+  `initialize` answered · `tools/list` withheld `APPROVAL_REQUIRED` with a
+  capture written · `proxy approve` at a terminal exits 0 · `tools/list` then
+  returns the real tool list · a call carrying an AWS key id and secret is
+  withheld `PROHIBITED_SECRET` · a benign call returns its real result.
+
+  **The approval ids are still only in the capture filename.** Nothing in the
+  withheld message names the server id or the snapshot sha, so the gate is
+  reachable and undiscoverable: a user who does not look inside the state
+  directory will not find what to approve. A change putting the ids in the
+  `APPROVAL_REQUIRED` payload is open.
+
 - **An install and uninstall that is a transaction, and a doctor that can judge
   it.** (#177, #180, #195) `sunglasses install <server> --config <path>` wires
   an existing MCP server entry to run through the proxy, and uninstall restores
@@ -162,12 +184,6 @@ Each line names its pull request. None of this is in `main` at the time of
 writing; anything still open on ship day leaves the release with its entry.
 
 - **PENDING (#182)** — the route commands, and that they ship inert.
-- **PENDING (#201)** — install wires the MODULE form. Until it merges, the
-  command `sunglasses install` writes runs the entry point by FILE PATH, which
-  breaks its relative import, so the wrapped server exits 1 before any message
-  crosses. The mediation described under *What the proxy enforces* is what the
-  proxy does when started as `python -m sunglasses.proxy`; this is the change
-  that makes install produce that form.
 
 #168, #177, #180 and #195 have merged since this block was written and their
 entries have moved up out of it.
