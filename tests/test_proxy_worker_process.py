@@ -161,12 +161,28 @@ def test_a_flooding_worker_is_stopped_rather_than_read_to_the_end(tmp_path):
 def test_the_stdout_bound_is_the_named_number(size, expected):
     """One under and one well over, with the limit supplied so the test does
     not have to write a megabyte to prove a megabyte."""
-    result = {"binding": BINDING, "accepted": True, "status": "complete",
-              "inspection_complete": True, "decision": "allow",
-              "inspected_utf8_bytes": 0, "observed_content_bytes": 0,
-              "elapsed_ms": 1, "findings": [],
-              "pad": "x" * size}
-    out = worker_process.run({"params": {}}, argv=_ok_worker(result),
+    # THE CHILD MAKES ITS OWN PADDING. This used to build the 400 KB pad here
+    # and hand it to `_ok_worker`, which interpolates the payload into a
+    # `python -c` BODY -- one argv argument of 400 KB. Linux caps a SINGLE
+    # argument at MAX_ARG_STRLEN, 131072 bytes, so the exec failed with OSError
+    # Errno 7 before the child ever ran; macOS has no equivalent per-argument
+    # cap, which is why the archive receipt was green and every Linux leg was
+    # red. The product never does this -- `worker_process.run` writes the
+    # request to the child's stdin, which `test_the_payload_reaches_the_child_
+    # on_stdin` asserts -- so the 400 KB crossing argv was this test's own
+    # stand-in worker and nothing else.
+    #
+    # The row's subject is unchanged: a real child, a stdout larger than the
+    # named limit, and the status that follows. Only `size` crosses argv now,
+    # as an integer literal.
+    body = (
+        "import sys,json;sys.stdin.read();"
+        "r={'binding':%r,'accepted':True,'status':'complete',"
+        "'inspection_complete':True,'decision':'allow',"
+        "'inspected_utf8_bytes':0,'observed_content_bytes':0,"
+        "'elapsed_ms':1,'findings':[],'pad':'x'*%d};"
+        "print(json.dumps(r))" % (BINDING, size))
+    out = worker_process.run({"params": {}}, argv=_script(body),
                              binding=BINDING, stdout_limit=200_000)
     assert out["status"] == expected
 

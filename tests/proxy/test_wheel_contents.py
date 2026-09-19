@@ -58,7 +58,18 @@ def wheel_members(tmp_path_factory):
         ".git", "build", "dist", "*.egg-info", "__pycache__", ".pytest_cache"))
     out = tmp_path_factory.mktemp("wheel")
     build = subprocess.run(
-        [sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-build-isolation",
+        # BUILD ISOLATION IS BACK ON (T9 ruling, 2026-09-18). With
+        # `--no-build-isolation` pip must find the backend in the CURRENT
+        # environment, and on the runner it cannot: `BackendUnavailable: Cannot
+        # import 'setuptools.build_meta'`. Metadata preparation finished `done`
+        # first, so packaging was never the problem -- the build ENVIRONMENT
+        # was. This row's subject is WHAT THE WHEEL CARRIES, not how the build
+        # environment is provisioned, and the docstring above justifies the
+        # clean copy and `--no-cache-dir` without ever claiming isolation-off
+        # was deliberate. The alternative -- keep it and skip when setuptools
+        # is absent -- is the check that skips itself: green forever on any
+        # runner that never has it. No skips.
+        [sys.executable, "-m", "pip", "wheel", "--no-deps",
          "--no-cache-dir", "-w", str(out), str(source)],
         capture_output=True, text=True, timeout=900)
     assert build.returncode == 0, (
