@@ -21,13 +21,83 @@ Two standing rules this file enforces on itself:
 
     python3 tests/proxy/mutate_install.py
 """
+import atexit
+import hashlib
 import os
 import pathlib
+import shutil
+import tempfile
 import subprocess
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET = ROOT / "sunglasses" / "proxy" / "doctor.py"
+# THE TREE THIS MUTATES IS A PRIVATE COPY, and that is the whole of this block.
+#
+# Until 2026-09-19 the harness rewrote `sunglasses/proxy/doctor.py` IN PLACE. Two things
+# followed, and both were paid for on the same night:
+#
+#   * a kill STRANDS A MUTANT. Interrupt the run between the write and the
+#     restore -- a platform budget cut, a Ctrl-C, an OOM -- and the working tree
+#     keeps a mutated product. The next battery then refuses with BASELINE IS
+#     RED, and that is the LUCKY case; the unlucky one is a reader that trusts
+#     the file.
+#   * it rewrites a tree OTHER PROCESSES READ. A reviewer working in the same
+#     directory saw a mutated product mid-review and its round was void.
+#
+# So: copy the tree once, mutate the copy, point pytest at the copy. The real
+# source is opened for reading and never for writing, and `_assert_source_untouched`
+# proves that rather than asserting it in a comment.
+SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[2]
+SOURCE_TARGET = SOURCE_ROOT / "sunglasses/proxy/doctor.py"
+
+
+def _digest(path):
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+_SOURCE_DIGEST_AT_START = _digest(SOURCE_TARGET)
+
+
+def _assert_source_untouched(when):
+    """Refuse LOUDLY if the real product moved while we ran.
+
+    A silent mismatch is how the in-place version did its damage: nothing said
+    anything until a later run found a red baseline and had to work backwards.
+    """
+    now = _digest(SOURCE_TARGET)
+    if now != _SOURCE_DIGEST_AT_START:
+        raise SystemExit(
+            f"REFUSING: {SOURCE_TARGET} changed {when} this battery "
+            f"({_SOURCE_DIGEST_AT_START[:16]} -> {now[:16]}). This harness "
+            f"mutates a private copy and must never write the source tree.")
+
+
+def _sweep_abandoned_copies(prefix, keep_hours=6):
+    """Remove OUR OWN older copies, because an uncatchable kill skips `atexit`.
+
+    The copy costs about 18 MB. A kill -9 -- which is exactly the case this
+    harness now survives -- leaves it behind, so without this the fix trades a
+    corrupted source tree for an unbounded pile of temp trees. The age floor is
+    what keeps a CONCURRENT battery safe: a run younger than `keep_hours` is
+    never touched, so two harnesses can run at once without eating each other.
+    """
+    import time
+    root = pathlib.Path(tempfile.gettempdir())
+    cutoff = time.time() - keep_hours * 3600
+    for stale in root.glob(prefix + "*"):
+        try:
+            if stale.is_dir() and stale.stat().st_mtime < cutoff:
+                shutil.rmtree(stale, ignore_errors=True)
+        except OSError:
+            pass
+
+_sweep_abandoned_copies("mutate-doctor-")
+_WORK = pathlib.Path(tempfile.mkdtemp(prefix="mutate-doctor-")) / "tree"
+shutil.copytree(SOURCE_ROOT, _WORK,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"))
+atexit.register(shutil.rmtree, _WORK.parent, True)
+
+ROOT = _WORK
+TARGET = ROOT / "sunglasses/proxy/doctor.py"
 SUITE = "tests/proxy/test_doctor_reconciled.py tests/proxy/test_doctor_selftest.py"
 
 # (id, the defect, old source, mutated source, the control that must fail)
@@ -113,6 +183,7 @@ def run():
 
 
 def main():
+    _assert_source_untouched("before the baseline")
     original = TARGET.read_text()
 
     base = run()
@@ -148,6 +219,7 @@ def main():
             survived.append((mid, why, "survived"))
 
     assert TARGET.read_text() == original, "target not restored"
+    _assert_source_untouched("after the last mutant")
     print(f"\nkilled {len(killed)}/{len(MUTATIONS)}")
     if survived:
         print("\nSURVIVORS (each one is a gap):")
