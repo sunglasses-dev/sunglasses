@@ -750,7 +750,8 @@ class Session:
             breach = bounds.check_deadline(
                 "frame_assembly", elapsed_ms=(now - partial_since) * 1000)
             if breach:
-                self._close(breach.reason, breach.detail, rule=breach.rule)
+                self._close(breach.reason, breach.detail, rule=breach.rule,
+                            kind=breach.kind)
                 return breach
 
         for identity, admitted in list(self._admitted_at.items()):
@@ -759,7 +760,8 @@ class Session:
             breach = bounds.check_deadline(
                 "upstream_response", elapsed_ms=(now - admitted) * 1000)
             if breach:
-                self._close(breach.reason, breach.detail, rule=breach.rule)
+                self._close(breach.reason, breach.detail, rule=breach.rule,
+                            kind=breach.kind)
                 return breach
         return None
     def _reserve(self, identity):
@@ -1048,7 +1050,7 @@ class Session:
             over = bounds.check_content(selector.content_bytes(frame["result"]))
             if over:
                 self._close(over.reason, over.detail, rule=over.rule,
-                            budget=over.budget)
+                            budget=over.budget, kind=over.kind)
                 return None
 
         # THE INSPECTION HAPPENS HERE, and the position is the whole repair.
@@ -2224,7 +2226,7 @@ class Session:
             self._close("INTERNAL_FAULT",
                         "authority kept moving while an answer was being "
                         "prepared, so no decision could be spent",
-                        rule="S3")
+                        rule="S3", kind="DECISION_AUTHORITY_MOVED")
             return b""
         return raw
 

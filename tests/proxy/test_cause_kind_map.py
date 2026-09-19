@@ -112,6 +112,15 @@ def test_one_fault_one_kind_wherever_the_code_is_standing():
         "ID_REUSED_WHILE_SETTLING": 2,     # client and upstream, same fault
         "ID_REUSED_WHILE_PENDING": 2,      # client and upstream, same fault
         "UPSTREAM_EXIT_WITH_PENDING": 2,   # two sites, two sentences, one fault
+        # A frame that ended without its terminator, from either direction:
+        # pump.py reads it of the upstream (MALFORMED_UPSTREAM, "the last frame
+        # ended without its terminator") and serve.py of the client
+        # (MALFORMED_CLIENT, "the client stopped in the middle of a frame").
+        # Same fault, opposite origins, which is the ID_REUSED_WHILE_* shape
+        # two lines up -- the REASON carries the direction and the kind carries
+        # the fault. Found by this row when the serve.py site was wired, which
+        # is the row working rather than the row being edited around.
+        "FRAME_UNTERMINATED": 2,
     }
     for kind, sites in shared.items():
         if len(sites) > 1:
@@ -123,12 +132,67 @@ def test_one_fault_one_kind_wherever_the_code_is_standing():
 
 
 @pytest.mark.parametrize("module,attribute", [
-    ("framing", "kind"), ("handshake", "kind"),
+    ("framing", "kind"), ("handshake", "kind"), ("bounds", "kind"),
 ])
 def test_the_results_that_carry_a_reason_also_carry_a_kind(module, attribute):
     """The kind is produced where the REASON is produced. A site that takes one
     from a result must be able to take the other from the same object."""
     import importlib
     loaded = importlib.import_module(f"sunglasses.proxy.{module}")
-    holder = {"framing": "Frame", "handshake": "Negotiation"}[module]
+    holder = {"framing": "Frame", "handshake": "Negotiation",
+              "bounds": "Breach"}[module]
     assert attribute in getattr(loaded, holder).__slots__
+
+
+def test_the_only_reason_that_closes_without_a_kind_is_over_budget():
+    """The one fault whose result deliberately carries no kind, named BY FAULT.
+
+    `bounds.Breach` reaches a close site through several reasons, and
+    OVER_BUDGET is the one that carries `kind=None` on purpose: `budget`
+    already names which limit broke and it reaches the receipt, so a kind would
+    describe the same thing twice. framing.py records the identical decision
+    for its own OVER_BUDGET returns.
+
+    THIS ROW EXISTS SO THE EXEMPTION IS A STATEMENT ABOUT A FAULT AND NOT ABOUT
+    A PLACE. Written as "pump.py:1050 may pass None" it would go stale the
+    moment a line moved, say nothing about a second over-budget close added
+    elsewhere, and excuse any future kindless close that landed on that line.
+
+    EVERY CONSTRUCTOR IS READ, NOT WHETHER THE REASON APPEARS SOMEWHERE. The
+    first draft asserted `"OVER_BUDGET" in kindless`, and a control that gave
+    check_content's OVER_BUDGET a kind PASSED -- check_frame's is also
+    kindless, so the membership held while the fact it stood for had stopped
+    being true. A set says a reason exists kindless SOMEWHERE; the exemption
+    is that it is kindless EVERYWHERE.
+    """
+    source = ast.parse((PACKAGE / "bounds.py").read_text())
+    kinds_by_reason = {}
+    for node in ast.walk(source):
+        if not (isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "Breach"
+                and node.args):
+            continue
+        reason = node.args[0]
+        if not (isinstance(reason, ast.Constant) and isinstance(reason.value, str)):
+            continue
+        kind = next((k.value for k in node.keywords if k.arg == "kind"), None)
+        value = kind.value if isinstance(kind, ast.Constant) else kind
+        kinds_by_reason.setdefault(reason.value, set()).add(value)
+
+    assert kinds_by_reason.get("OVER_BUDGET") == {None}, (
+        f"every OVER_BUDGET breach must carry kind=None and these carry "
+        f"{sorted(map(str, kinds_by_reason.get('OVER_BUDGET', ())))}; if one "
+        f"gaining a kind is deliberate, this row and the paragraph in "
+        f"bounds.py both have to say so")
+
+    # Reasons that never reach a close site are not exempt, they are simply
+    # not there yet: if one is wired to a close later it needs a kind before
+    # it arrives, not a line added here.
+    NEVER_CLOSES = {"OVERLOADED", "APPROVAL_REQUIRED"}
+    for reason, kinds in sorted(kinds_by_reason.items()):
+        if reason == "OVER_BUDGET" or reason in NEVER_CLOSES:
+            continue
+        assert None not in kinds, (
+            f"{reason} produces a close with no kind. Only OVER_BUDGET is "
+            f"exempt, and only because `budget` already carries the fact")
+    assert kinds_by_reason.get("SCAN_DEADLINE") == {"DEADLINE_EXPIRED"}

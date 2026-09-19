@@ -127,6 +127,25 @@ CAUSE_KINDS = frozenset({
     # inherit -- the site my first enumeration grouped with the pass-through
     # ones and got wrong.
     "CLIENT_RESPONSE_UNSOLICITED",
+    # R-185-R4-VOCAB. The close sites that arrived AFTER this catalog was
+    # first written -- #168's result direction, #177's install lane and #179's
+    # admission bound -- and were found by this PR's own map guard going red
+    # on the rebase, not by anybody reading the diff. A vocabulary that stops
+    # covering the code is the reason catalog's problem all over again.
+    #
+    # `bounds.check_deadline` produces the reason for two pump sites and one
+    # in serve.py, so it produces the kind too, and all three pass it through:
+    # ONE FAULT, ONE KIND, and a deadline that expired is one fault whichever
+    # row's clock ran out. `detail` already names which.
+    "DEADLINE_EXPIRED",
+    # serve.py's watchdog thread died, so nothing is measuring the scan.
+    "WATCHDOG_FAILED",
+    # pump.py: authority moved while an answer was being prepared and no
+    # decision could be spent. The only INTERNAL_FAULT that closes.
+    "DECISION_AUTHORITY_MOVED",
+    # route.py: the receipt log could not be written, so the session cannot
+    # say what it did. A resource fault, not a protocol one.
+    "RECEIPT_WRITE_FAILED",
 })
 
 

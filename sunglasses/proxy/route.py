@@ -1324,7 +1324,7 @@ class Route:
                 REASON_RECEIPT_IO_ERROR,
                 "the receipt log could not be written, so the session cannot "
                 "say what it did",
-                rule=RULE_RESOURCE)
+                rule=RULE_RESOURCE, kind="RECEIPT_WRITE_FAILED")
         return not stop.stopped
 
     def _token(self, request_id, attempt=None, *, token=None):
