@@ -1042,7 +1042,15 @@ def test_a_command_that_merely_names_a_python_is_unverified_not_wrapped(
     resolved = str(pathlib.Path(artifact).resolve())
     entry = {
         "command": str(shim),
-        "args": [resolved, "--", "npx", "-y", "@modelcontextprotocol/server-github"],
+        # THE LAUNCH FORM MATTERS HERE, and not as housekeeping. `classify`
+        # checks argv BEFORE it judges the command, so an entry carrying the
+        # old `[artifact_path, "--"]` shape is refused for its ARGV and the
+        # command check this row exists for is never reached: the assertion
+        # still passes, for the wrong reason, and the F2-EXACT mutation that
+        # loosens `_could_execute` survives untouched. The mutation battery
+        # caught exactly that. Build the argv the product writes.
+        "args": [*inst.LAUNCH, "--", "npx", "-y",
+                 "@modelcontextprotocol/server-github"],
         inst.MARKER: {"artifact": resolved,
                       "sha256": inst._digest_file(artifact),
                       "command": str(shim)},

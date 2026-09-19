@@ -57,6 +57,22 @@ import time
 
 MARKER = "x-sunglasses"
 
+# THE LAUNCH FORM. `-m sunglasses.proxy`, never the artifact's path.
+#
+# Until 2026-09-19 a wrapper was written as `<python> <…>/proxy/__main__.py --
+# <server>`, and that config could not start: a file run BY PATH gets no
+# package context, so `__main__.py`'s `from .commands import main` raises
+# `ImportError: attempted relative import with no known parent package`. Every
+# install produced an entry whose first tool call died on import, measured end
+# to end against a real MCP client. The module form is what the entry point
+# documents itself as and what every probe of the mediator has driven.
+#
+# The IDENTITY MODEL IS UNCHANGED, deliberately: `-m sunglasses.proxy` executes
+# that same `proxy/__main__.py`, so the marker still records that file's path
+# and sha256 and `classify` still re-derives the digest from it. What moved is
+# only the shape of argv, which is why the assertion below moved with it.
+LAUNCH = ("-m", "sunglasses.proxy")
+
 # The five fields T10.R4 names. A record may carry more, never fewer.
 RECORD_FIELDS = ("original_entry", "installed_entry", "file_sha_before",
                  "file_sha_after", "original_bytes_path")
@@ -2267,7 +2283,7 @@ def classify(entry, *, artifact):
     if command != meta.get("command") or not _could_execute(command):
         return "UNVERIFIED"
     args = entry.get("args")
-    if not isinstance(args, list) or args[:2] != [resolved, "--"]:
+    if not isinstance(args, list) or args[:3] != [*LAUNCH, "--"]:
         return "UNVERIFIED"
     return "WRAPPED"
 
@@ -2341,7 +2357,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         wrapper = {k: v for k, v in original_entry.items()
                    if k not in ("command", "args")}
         wrapper["command"] = sys.executable
-        wrapper["args"] = [resolved, "--", original_entry["command"],
+        wrapper["args"] = [*LAUNCH, "--", original_entry["command"],
                            *(original_entry.get("args") or [])]
         wrapper[MARKER] = {"artifact": resolved, "sha256": digest,
                            "command": sys.executable}
