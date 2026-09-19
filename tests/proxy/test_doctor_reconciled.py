@@ -111,16 +111,37 @@ def test_artifact_identity_is_the_proxy_entry_point_not_the_interpreter(artifact
     assert sha == hashlib.sha256(artifact.read_bytes()).hexdigest()
 
 
-def test_a_build_with_no_entry_point_verifies_nothing(cfg, artifact):
-    """This branch HAS no proxy/__main__.py, which is the real situation and
-    not an error to raise at a reader. Nothing can be WRAPPED against an
-    artifact that is not there."""
+def test_a_build_with_no_entry_point_verifies_nothing(cfg, monkeypatch):
+    """Nothing can be WRAPPED against an artifact that is not there.
+
+    THE ABSENCE IS CONSTRUCTED, NOT BORROWED FROM THE TREE. This row first read
+    `artifact_path()` on whatever the checkout happened to contain and asserted
+    `present is False`, which was true only while no build shipped
+    `proxy/__main__.py`. #168 added that file, the premise became false, and the
+    row failed for a reason that said nothing about the doctor. Worse, the
+    NO-ARTIFACT mutation rewrites the `except ArtifactUnresolved` return, so
+    once the artifact resolved that branch stopped executing and the mutation
+    became unreachable -- a control that cannot fire. Raising the refusal here
+    puts the false branch back under the row's own control."""
+    def unresolved():
+        raise inst.ArtifactUnresolved("constructed by this row")
+    monkeypatch.setattr(inst, "resolve_artifact", unresolved)
+
     path, present = doctor.artifact_path()
     assert present is False
     assert path.name == "__main__.py"
     entries, unreadable = doctor.read_sources(sources=[("project", cfg)])
     assert unreadable == []
     assert [e.state for e in entries] == ["DIRECT"]
+
+
+def test_a_build_WITH_an_entry_point_resolves_it(artifact, monkeypatch):
+    """The companion, so the pair covers both branches rather than whichever
+    one the checkout happens to produce."""
+    monkeypatch.setattr(inst, "resolve_artifact", lambda: artifact)
+    path, present = doctor.artifact_path()
+    assert present is True
+    assert path == artifact
 
 
 # ────────────────────────────────────────────── 3 · one parser
