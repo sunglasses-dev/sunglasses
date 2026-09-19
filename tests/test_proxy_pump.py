@@ -937,9 +937,21 @@ def test_a_server_answering_inside_the_deadline_is_not_disturbed():
     # From the ADMISSION time the session recorded, not from now: `now` is
     # already later than the admission, so anchoring there would test one
     # sliver past the limit and call the boundary a breach.
-    admitted = session._admitted_at[pump.key("client", 41)]
+    #
+    # THE ADMISSION IS PINNED, and that is the point of this row rather than a
+    # convenience. `sweep_deadlines` computes `(now - admitted) * 1000`, and
+    # with `admitted` left at whatever `time.monotonic()` returned, that
+    # round-trip does not always give back the bound exactly: at small
+    # monotonic values -- a freshly booted CI runner -- `(a + 60.0) - a` can
+    # round UP, `elapsed_ms` lands at 60000.00000000001, and the strictly
+    # greater comparison in `check_deadline` calls the boundary a breach.
+    # Measured: about 19% of the time at 10-100 s of uptime, and 0% above
+    # 1e5 s, which is exactly why this row passed on a developer machine and
+    # failed on CI. Pinning to 0.0 makes `(60.0 - 0.0) * 1000` exact on every
+    # machine and still drives the real `sweep_deadlines` path.
+    session._admitted_at[pump.key("client", 41)] = 0.0
     assert session.sweep_deadlines(
-        now=admitted + bounds.UPSTREAM_RESPONSE_MS / 1000) is None
+        now=bounds.UPSTREAM_RESPONSE_MS / 1000) is None
     assert session.closed_with() is None
 
 
