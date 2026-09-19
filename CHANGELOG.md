@@ -42,6 +42,32 @@ All notable changes to Sunglasses are documented here.
   source for the README section of the same name. **This is the credential lane
   and nothing wider** — see *Not claimed in this release*.
 
+- **A close says WHICH fault, from a fixed vocabulary.** (#185) Two
+  `(reason, rule)` pairs covered twelve of this package's close sites --
+  `MALFORMED_UPSTREAM`/`S5` eight times, `MALFORMED_CLIENT`/`S5` four -- so a
+  receipt could say a protocol fault ended the session and never which one. "A
+  response arrived that nobody asked for" and "the response does not fit the
+  request it claims to answer" are different server defects, one `if` apart,
+  and until now they produced byte-identical receipts.
+
+  Closes now carry a `cause_kind` from a **closed catalog of 24**, written in
+  `session.py` and pinned in the tests, carrying nothing the peer supplied so a
+  receipt can be compared to a fixture byte for byte. The kind is produced
+  where the REASON is produced -- `framing.Frame`, `handshake.Negotiation` and
+  `bounds.Breach` each carry one -- so a site that takes a reason from a result
+  takes the kind from the same object and never chooses one for a fault it did
+  not diagnose. The one documented exemption is `OVER_BUDGET`, which carries no
+  kind because `budget` already names which limit broke.
+
+  Current numbers, read from the tree: **26 close sites**, 14 supplying a
+  distinct literal kind and 8 passing one through; **24 distinct kinds
+  reachable at a close**; and **zero catalog entries nothing can produce**.
+
+  `detail` stays out of evidence: it is prose, it is built around whatever the
+  situation contained, and the frame receipt leaked peer material through
+  exactly that field twice. It remains on the object for logs and exceptions
+  and is excluded from `Cause.as_receipt` by name.
+
 - **An install and uninstall that is a transaction, and a doctor that can judge
   it.** (#177, #180, #195) `sunglasses install <server> --config <path>` wires
   an existing MCP server entry to run through the proxy, and uninstall restores
@@ -117,13 +143,31 @@ what moved.
   away, in a claim this project had made about its own coverage, and added the
   row rather than softening the claim.
 
+- **The three CI reruns in this release were test defects, not product
+  flakiness.** (#196, #197, #198) A deadline row anchored on a live clock and
+  relied on `(anchor + limit) - anchor` returning the limit exactly; it does
+  not at small `time.monotonic()` values, so the row was green on a developer
+  machine and red on a freshly booted runner. A growth gate divided one
+  sub-millisecond timing by another and read the noise as growth; it compares
+  the cleanest of three PAIRED ratios now, with the gate itself untouched. And
+  five rows asserted a wall-clock bound beside an outcome that already proved
+  the property, with 21x to 500x of margin on an idle box — they assert the
+  recorded outcome now, and the anti-hang bound is armed around the blocking
+  call rather than checked after it, because an assertion written after a call
+  that never returns is never reached. No shipped code changed in any of them.
+
 ### PENDING — open, not shipped, and not to be described as shipped
 
 Each line names its pull request. None of this is in `main` at the time of
 writing; anything still open on ship day leaves the release with its entry.
 
 - **PENDING (#182)** — the route commands, and that they ship inert.
-- **PENDING (#185)** — a close says WHICH fault, from a fixed vocabulary.
+- **PENDING (#201)** — install wires the MODULE form. Until it merges, the
+  command `sunglasses install` writes runs the entry point by FILE PATH, which
+  breaks its relative import, so the wrapped server exits 1 before any message
+  crosses. The mediation described under *What the proxy enforces* is what the
+  proxy does when started as `python -m sunglasses.proxy`; this is the change
+  that makes install produce that form.
 
 #168, #177, #180 and #195 have merged since this block was written and their
 entries have moved up out of it.
