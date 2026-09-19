@@ -159,10 +159,15 @@ def test_a_collector_that_never_consumes_does_not_stall_the_reader():
         done.set()
 
     thread = threading.Thread(target=drive, daemon=True)
-    started = time.monotonic()
     thread.start()
+    # `done.wait(5)` IS the bound and the anti-hang guard in one: it returns
+    # False rather than blocking, and False is the failure this row exists to
+    # report. The line that used to follow it re-measured the same five
+    # seconds with a wall clock and could only disagree on the razor edge
+    # where the wait returned at 4.999 s and the clock read 5.001 -- a second
+    # assertion of an already-asserted fact, which can fail without anything
+    # being wrong.
     assert done.wait(5), "the reader blocked with nobody taking the pages"
-    assert time.monotonic() - started < 5
 
 
 def test_the_pages_are_all_there_when_the_collector_does_come_for_them():
