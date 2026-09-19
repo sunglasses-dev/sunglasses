@@ -24,9 +24,14 @@ proving the sharing is safe and keeping it that way:
 the question here is about calls. A comment, a docstring or a string literal
 naming the class is not a compile; a helper three files away that builds one is.
 """
+import atexit
+import collections
 import contextlib
+import os
+import re
 import signal
 import threading
+import time
 
 import pytest
 
@@ -91,6 +96,64 @@ def fails_rather_than_hangs():
     mechanism that actually exists for sharing this.
     """
     return _fails_rather_than_hangs
+
+
+# ── EVERY re.compile, TIMED, WHEN ASKED AND NEVER OTHERWISE ────────────────
+#
+# The question (CI_312_LEG.md §12): the 3.12 integrity leg carries 41 fixed
+# waits against 3.13 on the same commit, counted twice, and the patch version
+# is eliminated. Construction is where the frames land (§11), and on the box
+# construction is 71% `re.compile` -- 3,075 calls over 2,986 distinct sources
+# against a 512-entry cache, so nearly everything recompiles every time.
+#
+# That is a MULTIPLIER, not an answer. Locally 3.12 and 3.13 build within 4%,
+# so this box cannot say why CI differs. But if per-compile cost is what
+# differs on that runner, it is multiplied by 3,075 per construction. This
+# measures exactly that, on both legs, and the 3.13 leg is the control: a
+# difference visible on both is not the 3.12 gap.
+#
+# A FILE, NOT A STREAM. #193 measured that pytest replaces sys.stderr and
+# redirects a dup of fd 2 as well, so a diagnostic written to either is lost
+# and reads afterwards exactly like "nothing happened".
+#
+# The wrapper is a perf_counter pair around the original call and nothing else.
+# Its own overhead is reported in the artifact rather than asserted to be
+# small, so a reader can subtract it instead of trusting it.
+if os.environ.get("SUNGLASSES_COMPILE_TIMER"):  # pragma: no cover - CI only
+    _TIMER_PATH = os.environ["SUNGLASSES_COMPILE_TIMER"]
+    _TOTALS = collections.Counter()
+    _COUNTS = collections.Counter()
+    _WALL = {"in_compile": 0.0, "calls": 0}
+    _original_compile = re.compile
+
+    def _timed_compile(pattern, flags=0):
+        start = time.perf_counter()
+        try:
+            return _original_compile(pattern, flags)
+        finally:
+            spent = time.perf_counter() - start
+            key = pattern if isinstance(pattern, str) else repr(pattern)
+            _TOTALS[key[:200]] += spent
+            _COUNTS[key[:200]] += 1
+            _WALL["in_compile"] += spent
+            _WALL["calls"] += 1
+
+    re.compile = _timed_compile
+
+    @atexit.register
+    def _dump_compile_times():  # pragma: no cover - CI only
+        with open(_TIMER_PATH, "w") as handle:
+            handle.write(f"python {os.sys.version.split()[0]}\n")
+            handle.write(f"re._MAXCACHE {getattr(re, '_MAXCACHE', '?')}\n")
+            handle.write(f"total re.compile calls {_WALL['calls']}\n")
+            handle.write(f"distinct sources {len(_TOTALS)}\n")
+            handle.write(f"seconds inside re.compile {_WALL['in_compile']:.3f}\n")
+            handle.write("\n-- top 50 sources by TOTAL seconds --\n")
+            handle.write(f"{'total_s':>9} {'calls':>7} {'per_call_ms':>12}  source\n")
+            for source, total in _TOTALS.most_common(50):
+                n = _COUNTS[source]
+                handle.write(f"{total:9.3f} {n:7d} {1000 * total / n:12.4f}  "
+                             f"{source[:110]!r}\n")
 
 
 @pytest.fixture
