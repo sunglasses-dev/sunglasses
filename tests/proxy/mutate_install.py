@@ -98,7 +98,7 @@ MUTATIONS = [
      '    if not isinstance(meta, dict):\n        return "WRAPPED" if "sunglasses" in repr(entry) else "DIRECT"',
      'test_a_command_that_merely_names_us_is_not_wrapped'),
     ('C6-ARGV', 'WRAPPED without checking the argv that would run',
-     '    if not isinstance(args, list) or args[:2] != [resolved, "--"]:\n        return "UNVERIFIED"',
+     '    if not isinstance(args, list) or args[:3] != [*LAUNCH, "--"]:\n        return "UNVERIFIED"',
      '    if False:\n        return "UNVERIFIED"',
      'test_wrapped_requires_the_entry_to_actually_launch_the_artifact'),
     ('R5-RETAINED', 'retained bytes are restored without validating their digest',
