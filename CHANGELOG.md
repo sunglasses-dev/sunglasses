@@ -11,6 +11,47 @@ All notable changes to Sunglasses are documented here.
 > described as shipped until its pull request merges**; on ship day they move up
 > and lose the marker, or they leave with the release.
 
+### Added
+
+- **A local MCP proxy that mediates a stdio session, and what it actually
+  enforces.** (#168, #177, #180, #195) `python -m sunglasses.proxy -- <server
+  command>` runs your MCP server as a child process and sits between it and
+  your client. **The behaviour has two states and they are not alike.**
+
+  **Before a human approves the server, nothing is inspected.** Every
+  `tools/list` and `tools/call` is refused first, with `reason_code:
+  APPROVAL_REQUIRED`, `status: not_run` and `inspected_utf8_bytes: 0`. The call
+  is never forwarded, so nothing is scanned and nothing reaches the server.
+  **Installing the proxy is not protection on its own.** Approval is recorded
+  by `python -m sunglasses.proxy approve <server-id> --snapshot <sha>`, which
+  **refuses from a pipe** — it records that a person viewed the tool
+  descriptors, and a pipe cannot look, so it must be run at an interactive
+  terminal.
+
+  **Once approved, it inspects both directions in the credential lane and
+  withholds what the engine blocks**, returning a typed `SUNGLASSES_WITHHELD`
+  JSON-RPC error carrying the reason code, the rule, the bytes inspected and
+  the rule ids. A credential in a tool RESULT is withheld from the client
+  (`GLS-SD-001-API`, `GLS-SD-003-API` — the tool-result channel); a credential
+  in a tool CALL does not reach the server, which is verified by reading the
+  receiving server's own input rather than by asking the proxy; benign traffic
+  passes, with `tools/list` returning the real list.
+
+  Every sentence above was produced by driving the shipped entry point with
+  real pipes against the package's own echo server, and the transcripts are the
+  source for the README section of the same name. **This is the credential lane
+  and nothing wider** — see *Not claimed in this release*.
+
+- **An install and uninstall that is a transaction, and a doctor that can judge
+  it.** (#177, #180, #195) `sunglasses install <server> --config <path>` wires
+  an existing MCP server entry to run through the proxy, and uninstall restores
+  the file byte for byte. The completed record cannot be half-published and the
+  writer cannot be aimed at a path it was not given. See
+  [docs/proxy-install-transaction.md](docs/proxy-install-transaction.md) and
+  [docs/proxy-doctor.md](docs/proxy-doctor.md) for what install and uninstall
+  do to your configuration file; what the proxy ENFORCES once wired is the
+  entry above.
+
 ### Changed
 
 - **`GLS-ENC-ALT-210` stops trying a match inside a base64 run.** (#181) The
@@ -81,12 +122,11 @@ what moved.
 Each line names its pull request. None of this is in `main` at the time of
 writing; anything still open on ship day leaves the release with its entry.
 
-- **PENDING (#168)** — the result direction, and an optional seam.
-- **PENDING (#177)** — proxy install and uninstall, a transaction that can
-  refuse.
-- **PENDING (#180)** — the doctor: R2 and R3 reconciled onto the installer.
 - **PENDING (#182)** — the route commands, and that they ship inert.
 - **PENDING (#185)** — a close says WHICH fault, from a fixed vocabulary.
+
+#168, #177, #180 and #195 have merged since this block was written and their
+entries have moved up out of it.
 
 ### Not claimed in this release
 
