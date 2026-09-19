@@ -209,12 +209,23 @@ def test_uninstall_refuses_when_the_entry_is_no_longer_ours(cfg, home, artifact)
 # ---------------------------------------------------------------------- R6
 
 def test_interrupted_write_leaves_the_original_intact(cfg, home, artifact, monkeypatch):
-    """C4. No half-written JSON, no success return, original byte-intact."""
+    """C4. No half-written JSON, no success return, original byte-intact.
+
+    INSTRUMENT: the injection is keyed on the TARGET, and it has to be. The
+    completed record is now published by rename too, so a blanket `os.replace`
+    failure is answered by the RECORD path converting it to ConfigIOError, and
+    this control then passes whatever `_atomic_write` does with its own errors.
+    The C4-WRITE mutation, which makes an interrupted write return instead of
+    raise, went red under a blanket injection but not through THIS test, which
+    is a control passing for the wrong reason. Keyed here, the only thing that
+    can raise is the target write, which is what the control is about."""
     before = read(cfg)
     real = inst.os.replace
 
     def boom(src, dst):
-        raise OSError("interrupted")
+        if str(dst) == str(cfg):
+            raise OSError("interrupted")
+        return real(src, dst)
 
     monkeypatch.setattr(inst.os, "replace", boom)
     with pytest.raises(inst.ConfigIOError):
@@ -227,7 +238,11 @@ def test_interrupted_write_leaves_the_original_intact(cfg, home, artifact, monke
 
 
 def test_interrupted_write_leaves_no_temp_file_behind(cfg, home, artifact, monkeypatch):
-    monkeypatch.setattr(inst.os, "replace", lambda s, d: (_ for _ in ()).throw(OSError()))
+    # Keyed on the target for the same reason as the control above.
+    _real_replace = inst.os.replace
+    monkeypatch.setattr(inst.os, "replace", lambda s, d: (
+        (_ for _ in ()).throw(OSError()) if str(d) == str(cfg)
+        else _real_replace(s, d)))
     with pytest.raises(inst.ConfigIOError):
         inst.install(cfg, "github", artifact=artifact, home=home)
     # By property, not by position: the temp files are the ones we name, and
@@ -612,14 +627,17 @@ def test_a_failed_record_write_restores_the_target(cfg, home, artifact, monkeypa
     uninstall refused because no record existed. Replace and record are one
     recoverable transaction."""
     before = read(cfg)
-    real = pathlib.Path.write_text
+    # INSTRUMENT: the completed record is now published by rename, so the fault
+    # is injected at the publication rather than at `Path.write_text`. The
+    # assertions are unchanged.
+    real = inst._publish_atomically
 
-    def write_text(p, *a, **kw):
-        if p.name == "github.json":
-            raise OSError("injected")
-        return real(p, *a, **kw)
+    def publish(path, data, *, what):
+        if pathlib.Path(path).name == "github.json":
+            raise inst.ConfigIOError("injected")
+        return real(path, data, what=what)
 
-    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+    monkeypatch.setattr(inst, "_publish_atomically", publish)
 
     with pytest.raises(inst.ConfigIOError):
         inst.install(cfg, "github", artifact=artifact, home=home)
@@ -803,15 +821,17 @@ def test_a_half_written_journal_is_removed_not_left_behind(cfg, home, artifact, 
     """C4-PENDING-PARTIAL. A half-written journal is worse than none: it is
     unparseable recovery material the next run has to refuse."""
     before = read(cfg)
-    real = pathlib.Path.write_text
+    # INSTRUMENT: the journal is now written through the no-follow writer, so
+    # the half-write is injected there. The assertions are unchanged.
+    real = inst._write_private
 
-    def write_text(p, text, *a, **kw):
-        if p.name == "github.pending":
-            real(p, text[: len(text) // 2], *a, **kw)
-            raise OSError("injected")
-        return real(p, text, *a, **kw)
+    def write_private(path, data, *, what):
+        if pathlib.Path(path).name == "github.pending":
+            real(path, data[: len(data) // 2], what=what)
+            raise inst.ConfigIOError("injected")
+        return real(path, data, what=what)
 
-    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+    monkeypatch.setattr(inst, "_write_private", write_private)
     with pytest.raises(inst.ConfigIOError):
         inst.install(cfg, "github", artifact=artifact, home=home)
 
@@ -827,21 +847,27 @@ def test_a_failed_rollback_keeps_the_only_way_back(cfg, home, artifact, monkeypa
     the target is still wrapped and the retained bytes are the only route to the
     user's original. Round 2 deleted them, stranding it permanently."""
     before = read(cfg)
-    real_write, real_replace = pathlib.Path.write_text, inst.os.replace
-    calls = {"n": 0}
+    # INSTRUMENT, and the count had to go. Publishing the record by rename adds
+    # an `os.replace`, so "the second replace" stopped meaning the rollback and
+    # started meaning the record. Keyed on the DESTINATION now, which is what it
+    # should always have been and which survives the next writer too. The
+    # assertions are unchanged.
+    real_publish, real_replace = inst._publish_atomically, inst.os.replace
+    target_replaces = {"n": 0}
 
-    def write_text(p, *a, **kw):
-        if p.name == "github.json":
-            raise OSError("injected")
-        return real_write(p, *a, **kw)
+    def publish(path, data, *, what):
+        if pathlib.Path(path).name == "github.json":
+            raise inst.ConfigIOError("injected")
+        return real_publish(path, data, what=what)
 
     def replace(src, dst):
-        calls["n"] += 1
-        if calls["n"] == 2:                       # the rollback
-            raise OSError("injected")
+        if str(dst) == str(cfg):
+            target_replaces["n"] += 1
+            if target_replaces["n"] == 2:         # the rollback, by name
+                raise OSError("injected")
         return real_replace(src, dst)
 
-    monkeypatch.setattr(pathlib.Path, "write_text", write_text)
+    monkeypatch.setattr(inst, "_publish_atomically", publish)
     monkeypatch.setattr(inst.os, "replace", replace)
     with pytest.raises(inst.ConfigIOError):
         inst.install(cfg, "github", artifact=artifact, home=home)

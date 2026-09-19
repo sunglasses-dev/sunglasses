@@ -33,9 +33,12 @@ TARGET = ROOT / "sunglasses" / "install.py"
 # needs a real second process, and that machinery lives in the CLI file. A
 # mutation harness that runs one file cannot kill a mutant whose only control
 # is in the other: R7-LOCK came back "red but NOT by its control" until this
-# line was a list, and red-by-the-wrong-control is a survivor.
+# line was a list, and red-by-the-wrong-control is a survivor. The atomic
+# storage file joins it for the same reason -- ATOMIC-PUBLISH and NOFOLLOW have
+# their only controls there.
 SUITE = ["tests/proxy/test_install_transaction.py",
-         "tests/proxy/test_install_cli.py"]
+         "tests/proxy/test_install_cli.py",
+         "tests/proxy/test_install_atomic_storage.py"]
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
@@ -312,6 +315,15 @@ MUTATIONS = [
      '            if _digest_bytes(current) != expect_sha:',
      '            if False:',
      'test_a_declared_write_refuses_when_the_target_changed_underneath'),
+    # ── The deferred row (R-177-R5a): one mutation per new guard ───────────
+    ('ATOMIC-PUBLISH', 'the completed record is written straight to its own name',
+     '    tmp = _temp_beside(path)\n    _write_private(tmp, data, what=f"the temporary {what}")',
+     '    tmp = _temp_beside(path)\n    _write_private(path, data, what=f"the temporary {what}")\n    tmp = path',
+     'test_a_killed_completion_never_publishes_an_unparseable_record'),
+    ('NOFOLLOW', 'the writer follows a symlink at one of our own names',
+     '                       os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,',
+     '                       os.O_WRONLY | os.O_CREAT | os.O_TRUNC,',
+     'test_the_retained_writer_itself_refuses_a_symlink'),
     ('F2-EXACT', 'a command that merely names a python verifies a route',
      '    return isinstance(command, str) and command == sys.executable',
      '    return isinstance(command, str) and (command == sys.executable or pathlib.Path(command).name.lower().startswith("python"))',
