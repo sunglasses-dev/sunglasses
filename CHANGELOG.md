@@ -68,6 +68,19 @@ All notable changes to Sunglasses are documented here.
   exactly that field twice. It remains on the object for logs and exceptions
   and is excluded from `Cause.as_receipt` by name.
 
+- **The route commands, documented, and what they do NOT do.** (#182) `install`
+  wraps an existing MCP server entry so its launch path goes through the proxy
+  and says `Wrapped '<name>'`; `uninstall` reads that record and restores the
+  original **byte-identical**; `doctor` reports whether a route is genuinely
+  wired. The README section carries the sentence that matters most —
+  **"Wrapped is not the same as protected"** — because a successful `install`
+  moves the launch path and nothing else: the approval gate still refuses until
+  a human approves that server's snapshot at an interactive terminal.
+
+  The help strings ship with the same discipline. `doctor` distinguishes "I
+  looked and nothing is protected" from "I could not look", which are different
+  facts and the second one is where a person gets hurt by assuming the first.
+
 - **`install` wires the module form, because the path form could not import
   itself.** (#201) Until this change, `sunglasses install` wrote a wrapper that
   ran the entry point BY FILE PATH — `<python> …/sunglasses/proxy/__main__.py
@@ -180,13 +193,9 @@ what moved.
 
 ### PENDING — open, not shipped, and not to be described as shipped
 
-Each line names its pull request. None of this is in `main` at the time of
-writing; anything still open on ship day leaves the release with its entry.
-
-- **PENDING (#182)** — the route commands, and that they ship inert.
-
-#168, #177, #180 and #195 have merged since this block was written and their
-entries have moved up out of it.
+**Empty.** Every change described above is in `main`. The block stays in the
+file because the next release will need it, and because a reader should be able
+to see that it was checked rather than quietly deleted.
 
 ### Not claimed in this release
 

@@ -700,9 +700,8 @@ record and puts the original back **byte-identical**, exiting `0`.
 launch path now goes through us and nothing more: out of the box the wrapped
 server enforces nothing, because the proxy's approval gate refuses until a human
 has approved that server's tool snapshot at an interactive terminal. What it
-inspects once approved is described under the proxy enforcement heading, which
-lands with that documentation, and is measured there rather than inferred from
-the fact that a wrap succeeded.
+inspects once approved is described under [What the proxy enforces](#what-the-proxy-enforces),
+and is measured there rather than inferred from the fact that a wrap succeeded.
 
 Content you route through the CLI, the Claude Code hook or the MCP server is
 scanned. Server responses arrive with 0.6.0.
