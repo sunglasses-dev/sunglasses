@@ -982,6 +982,12 @@ def test_no_reviewer_timing_input_crosses_the_one_second_ceiling(default_engine,
 # noise margin. The linear inputs keep the growth gate, which is where growth is
 # the property worth guarding, and the quadratic one gets CEILINGS, which are
 # stable, plus the 1 s ceiling above that every row already passes.
+# How many times the growth gate measures each doubling before believing it.
+# Three, matching `test_enc_alt_210_run_boundary`, which already takes the best
+# of three for the same reason. The cost is three scans per doubling instead of
+# one on inputs of 1-8 KB; measured at about 0.2 s added to this row.
+GROWTH_TRIALS = 3
+
 QUADRATIC_BY_DESIGN = "dense_keys_with_anchors"
 DISCLOSED_TAIL_CEILING = {4000: 0.35, 4096: 0.35, 8000: 1.00}
 
@@ -1004,12 +1010,32 @@ def test_the_linear_reviewer_inputs_stay_linear(default_engine, channel):
         for small, large in zip(ordered, ordered[1:]):
             if large != small * 2:
                 continue
-            a = max(_seconds_engine(default_engine, sizes[small], channel), 1e-5)
-            b = _seconds_engine(default_engine, sizes[large], channel)
+            # THE RATIO IS MEASURED THREE TIMES AND THE CLEANEST PAIR IS
+            # TAKEN, because noise inflates this gate from BOTH directions: a
+            # numerator that caught a scheduling stall, or a denominator that
+            # happened to run clean. Both sides are timed inside the same
+            # repetition and the repetitions are compared as ratios, so a rep
+            # where either side was disturbed is discarded whole.
+            #
+            # Measured, same box, worst doubling over 6 reps with 8 of 16 cores
+            # busy: one measurement each side 2.12x, min-of-3 on each side
+            # INDEPENDENTLY 2.15x, this 2.07x. Taking min() of the denominator
+            # on its own makes the ratio LARGER -- the obvious "best of N on
+            # both sides" is not symmetric and half of it works against the row.
+            #
+            # The gate is NOT moved. 2.5x is the property; this only stops the
+            # row reporting measurement noise as growth.
+            trials = []
+            for _ in range(GROWTH_TRIALS):
+                a = max(_seconds_engine(default_engine, sizes[small], channel), 1e-5)
+                b = _seconds_engine(default_engine, sizes[large], channel)
+                trials.append((b / a, a, b))
+            growth, a, b = min(trials)
             seen += 1
-            if b / a > MOST_GROWTH_PER_DOUBLING:
+            if growth > MOST_GROWTH_PER_DOUBLING:
                 bad.append(f"{label} {small}->{large} on {channel}: "
-                           f"{a:.4f}s -> {b:.4f}s, {b / a:.2f}x")
+                           f"{a:.4f}s -> {b:.4f}s, {growth:.2f}x "
+                           f"(cleanest of {GROWTH_TRIALS})")
     assert seen >= 4, f"only {seen} doublings compared; the fixture lost its sizes"
     assert bad == [], (
         f"growth over {MOST_GROWTH_PER_DOUBLING}x per doubling:\n  " + "\n  ".join(bad))
