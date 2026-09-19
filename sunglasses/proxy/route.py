@@ -152,7 +152,14 @@ class Route:
             # A response arriving from the client correlates to an upstream
             # REQUEST, which T2.R15 never let through, so there is nothing it
             # can be an answer to.
-            self._close(framing.MALFORMED_CLIENT, RULE_PROTOCOL, None)
+            # Its own kind: this frame PARSED, so there is no parse fault to
+            # inherit. The client sent a response, and a response from the
+            # client can only answer an upstream request, which T2.R15 never
+            # let through. My enumeration missed this site because I grouped it
+            # with the ones that take their reason from a parse result; it
+            # takes the reason but not the fault.
+            self._close(framing.MALFORMED_CLIENT, RULE_PROTOCOL, None,
+                        kind="CLIENT_RESPONSE_UNSOLICITED")
             return
 
         if "id" in message:
@@ -1034,6 +1041,12 @@ class Route:
             return
         # Already acquired above, in the claim branch, as one operation.
         owed = attempt.token
+        # R-CLOSE-KIND-R3/(1). The cause is committed BEFORE the bytes, so a
+        # close that wins the race while `_to_client` is paused inside the sink
+        # settles this item with the cause the client was actually told. The
+        # settlement itself still happens after the write, because #179's bound
+        # row requires an answer mid-write to stay outstanding.
+        self.session.commit_local_cause(attempt.token, reason, rule)
         self._to_client(body)
         self._answered(owed, final=True)
         # T6.R1. The held item is settled here and not merely answered, so the
@@ -1059,7 +1072,7 @@ class Route:
             budget=frame.budget, accepted=False, status="not_run",
             inspection_complete=False, inspected_utf8_bytes=0,
             observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog))
-        self._close(frame.reason, frame.rule, frame.budget)
+        self._close(frame.reason, frame.rule, frame.budget, kind=frame.kind)
 
     def _answer_close(self, closed, request_id):
         reason, rule = closed
@@ -1158,13 +1171,13 @@ class Route:
             return None
         return record.get("snapshot_sha256")
 
-    def _close(self, reason, rule, budget):
+    def _close(self, reason, rule, budget, *, kind):
         # pump.Session owns the teardown and exposes it privately. A public
         # close belongs on Session and is owed, and it is not added here
         # because that module is under review and this is not the change to
         # put in front of it.
         self.session._close(reason, "the client frame could not be trusted",
-                            rule=rule, budget=budget)
+                            rule=rule, budget=budget, kind=kind)
 
     def _answered_for(self, raw, owed=None):
         """Confirm the obligation a released frame answered: the bytes MOVED.
@@ -1311,7 +1324,7 @@ class Route:
                 REASON_RECEIPT_IO_ERROR,
                 "the receipt log could not be written, so the session cannot "
                 "say what it did",
-                rule=RULE_RESOURCE)
+                rule=RULE_RESOURCE, kind="RECEIPT_WRITE_FAILED")
         return not stop.stopped
 
     def _token(self, request_id, attempt=None, *, token=None):

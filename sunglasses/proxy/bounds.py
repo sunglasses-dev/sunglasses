@@ -55,10 +55,10 @@ class Breach:
     """
 
     __slots__ = ("reason", "rule", "budget", "detail", "inspection_complete",
-                 "bound")
+                 "bound", "kind")
 
     def __init__(self, reason=None, rule=None, budget=None, detail=None,
-                 inspection_complete=None, bound=None):
+                 inspection_complete=None, bound=None, kind=None):
         self.reason = reason
         self.rule = rule
         self.budget = budget
@@ -71,6 +71,21 @@ class Breach:
         # prose is what receipts exclude by name. R6 has two limits under one
         # reason, so without this a receipt cannot say which one fired.
         self.bound = bound
+        # R-CLOSE-KIND. WHICH fault, for the sites that close on a breach.
+        # Produced HERE, where the reason is produced, exactly as `framing.py`
+        # and `handshake.py` produce theirs: a caller that takes the reason
+        # from this object can take the kind from the same object, and a kind
+        # chosen by a caller that did not diagnose the fault is a field that
+        # can lie.
+        #
+        # THE OVER_BUDGET RETURNS CARRY None, DELIBERATELY, and it is the same
+        # decision framing.py already records for its own: `budget` names which
+        # limit broke and reaches the receipt, so a kind would describe the
+        # same thing twice. The exemption is asserted by REASON in
+        # tests/proxy/test_cause_kind_map.py rather than by close-site
+        # location, so it stays a statement about a fault and not about a
+        # place a fault happens to be closed from.
+        self.kind = kind
 
     def __bool__(self):
         return self.reason is not None
@@ -138,7 +153,7 @@ def check_deadline(name, *, elapsed_ms):
     limit = DEADLINES[name]
     if elapsed_ms <= limit:
         return _OK
-    return Breach("SCAN_DEADLINE", "S3",
+    return Breach("SCAN_DEADLINE", "S3", kind="DEADLINE_EXPIRED",
                   detail=f"{name} took {elapsed_ms} ms against a {limit} ms limit")
 
 

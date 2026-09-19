@@ -1250,7 +1250,7 @@ def test_a_payer_whose_write_fails_gives_the_obligation_back(tmp_path):
 TOKEN_ENTRY_POINTS = ("take_obligation", "answered_on_the_wire", "owe_again",
                       "take_delivery", "_take_delivery",
                       "claim_for_local_answer", "settle_attempt",
-                      "settle_from", "cancel")
+                      "settle_from", "cancel", "commit_local_cause")
 
 
 def test_the_token_entry_point_inventory_is_complete():
@@ -1366,6 +1366,13 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
                         token=foreign)
     assert mine in session._core.owed(), (
         f"{dimension}: settle_from settled MY item")
+
+    # `commit_local_cause` (R-CLOSE-KIND-R3) records how an answer ends before
+    # its bytes move, so a foreign token must not commit a cause for my item --
+    # that would make a close settle MINE with somebody else's reason.
+    session.commit_local_cause(foreign, "UNINSPECTED_METHOD", "S1")
+    assert mine not in session._committed_cause, (
+        f"{dimension}: commit_local_cause committed a cause for MY item")
 
     # `cancel` retires an id for the rest of the session.
     session.cancel(foreign_id, origin=foreign_origin, token=foreign)

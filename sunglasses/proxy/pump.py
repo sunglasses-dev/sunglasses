@@ -488,6 +488,27 @@ class Session:
         self._yielded_obligation = None
         # identity -> the Cause this item settles with, when it is not CLEAN.
         self._settling_cause: dict = {}
+        # R-CLOSE-KIND-R3/(1). THE CAUSE A LOCAL WRITER HAS COMMITTED TO, by
+        # TOKEN, before a byte of its answer moves.
+        #
+        # `_to_client` can block inside the sink, and while a withhold was
+        # paused there a legitimate close terminalised the item with ITS cause.
+        # The withhold's own settlement then arrived at a core that had already
+        # ended and left it alone, so the client held a frame saying
+        # APPROVAL_REQUIRED while the receipt said MALFORMED_UPSTREAM: one item,
+        # two accounts of how it ended, and nothing raised.
+        #
+        # Settling early instead is not the fix -- #179's row
+        # `test_a_locally_claimed_answer_still_counts_against_the_bound` says an
+        # answer mid-write must still count against the outstanding bound, and
+        # settling releases the correlation. So the CAUSE is committed here
+        # while the CORRELATION stays outstanding, and the close settles a
+        # committed item with the cause its wire frame carries.
+        #
+        # BY TOKEN, because a claim outlives the correlation it describes: this
+        # is a spanning table and `warroom/r168-followups/key_shape_audit.py`
+        # governs it as one.
+        self._committed_cause: dict = {}
         # T8.R6's second half, written by whoever owns the write queue.
         self.queued_bytes = 0
         # AR11, T8.R5. When each item was admitted, so the upstream-response
@@ -533,7 +554,8 @@ class Session:
             # refusal, because a client that knows to send this is not making
             # an ordinary mistake.
             self._close("MALFORMED_CLIENT",
-                        "the client used the proxy's control id namespace")
+                        "the client used the proxy's control id namespace",
+                        kind="ID_NAMESPACE_CLAIMED")
             return False
         identity = key(origin, request_id)
         # R-179-R3/XE02. A NEW ATTEMPT OWNS ITS OWN REFUSAL STATE. Round 2 kept
@@ -563,11 +585,13 @@ class Session:
             if origin == ORIGIN_CLIENT:
                 self._close("MALFORMED_CLIENT",
                             "the client reused an id whose previous request is "
-                            "still being answered")
+                            "still being answered",
+                            kind="ID_REUSED_WHILE_SETTLING")
             else:
                 self._close("MALFORMED_UPSTREAM",
                             "upstream reused an id whose previous request is "
-                            "still being answered")
+                            "still being answered",
+                            kind="ID_REUSED_WHILE_SETTLING")
             return False
         if identity in self._tombstones:
             # A cancelled id is refused for the rest of the session. The request
@@ -576,10 +600,12 @@ class Session:
         if identity in self._pending:
             if origin == ORIGIN_CLIENT:
                 self._close("MALFORMED_CLIENT",
-                            "the client reused an id that was already pending")
+                            "the client reused an id that was already pending",
+                            kind="ID_REUSED_WHILE_PENDING")
             else:
                 self._close("MALFORMED_UPSTREAM",
-                            "upstream reused an id that was already pending")
+                            "upstream reused an id that was already pending",
+                            kind="ID_REUSED_WHILE_PENDING")
             return False
         # T6.R6 stores an id with its GENERATION. A cancelled id is tombstoned
         # for the session, but a COMPLETED one may legitimately be used again,
@@ -724,7 +750,8 @@ class Session:
             breach = bounds.check_deadline(
                 "frame_assembly", elapsed_ms=(now - partial_since) * 1000)
             if breach:
-                self._close(breach.reason, breach.detail, rule=breach.rule)
+                self._close(breach.reason, breach.detail, rule=breach.rule,
+                            kind=breach.kind)
                 return breach
 
         for identity, admitted in list(self._admitted_at.items()):
@@ -733,7 +760,8 @@ class Session:
             breach = bounds.check_deadline(
                 "upstream_response", elapsed_ms=(now - admitted) * 1000)
             if breach:
-                self._close(breach.reason, breach.detail, rule=breach.rule)
+                self._close(breach.reason, breach.detail, rule=breach.rule,
+                            kind=breach.kind)
                 return breach
         return None
     def _reserve(self, identity):
@@ -1001,13 +1029,15 @@ class Session:
             # waiting for it, and T7.R1 makes that a protocol fault.
             self._close("MALFORMED_UPSTREAM" if origin == ORIGIN_UPSTREAM
                         else "MALFORMED_CLIENT",
-                        "a response arrived for an id that is not pending")
+                        "a response arrived for an id that is not pending",
+                        kind="RESPONSE_NOT_PENDING")
             return None
 
         if frame is not None and not self._shape_matches(identity, frame):
             self._close("MALFORMED_UPSTREAM",
                         "the response shape does not match the request it "
-                        "claims to answer")
+                        "claims to answer",
+                        kind="RESPONSE_SHAPE_MISMATCH")
             return None
 
         # T802, T8.R2. The content bound existed in the table and nothing
@@ -1020,7 +1050,7 @@ class Session:
             over = bounds.check_content(selector.content_bytes(frame["result"]))
             if over:
                 self._close(over.reason, over.detail, rule=over.rule,
-                            budget=over.budget)
+                            budget=over.budget, kind=over.kind)
                 return None
 
         # THE INSPECTION HAPPENS HERE, and the position is the whole repair.
@@ -1158,6 +1188,18 @@ class Session:
                 return False
         return True
 
+    def commit_local_cause(self, token, reason, rule):
+        """R-CLOSE-KIND-R3/(1). Say how this answer ends BEFORE it is written.
+
+        The receipt has to agree with the wire, and the wire is committed the
+        moment the bytes leave. A close that wins the race mid-write must
+        therefore settle this item with the cause the client was told, not with
+        its own: the close is why the session is ending, it is not a second
+        opinion about how this one request ended.
+        """
+        with self._settlement:
+            self._committed_cause[token] = (reason, rule)
+
     def claim_for_local_answer(self, token):
         """This attempt is being answered HERE; upstream can no longer answer it.
 
@@ -1257,6 +1299,7 @@ class Session:
         stale. None is a REFUSAL and not a silent no-op: the caller wrote a
         frame for an item it no longer owns, and it needs to know that.
         """
+        self._committed_cause.pop(token, None)
         identity = token[:-1]
         with self._settlement:
             # POP ONLY WHAT THIS ATTEMPT OWNS. `_pending` is keyed by identity
@@ -1429,6 +1472,7 @@ class Session:
             # because `cancel` is a normal operation and a session that has just
             # decided to shut down should not also crash its caller.
             self._close("OVERLOADED", "the tombstone table overflowed",
+                        kind="TOMBSTONE_TABLE_FULL",
                         rule="S3")
 
     # ── the process behind the pipe ────────────────────────────────────────
@@ -1475,7 +1519,8 @@ class Session:
         # teardown rather than beside it. Doing it twice was how the close
         # could be claimed before anything had actually been stopped.
         self._close("MALFORMED_UPSTREAM",
-                    "the upstream process exited with calls still pending")
+                    "the upstream process exited with calls still pending",
+                    kind="UPSTREAM_EXIT_WITH_PENDING")
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream, inspect=None, gate=None):
@@ -1544,7 +1589,8 @@ class Session:
                 # client a truncated message as a complete answer, and the one
                 # place that is certain to happen is a server dying mid write.
                 self._close("MALFORMED_UPSTREAM",
-                            "the last frame ended without its terminator")
+                            "the last frame ended without its terminator",
+                            kind="FRAME_UNTERMINATED")
                 yield from self._drain_refusals()
                 return
             parsed = framing.parse_frame(raw, origin=ORIGIN_UPSTREAM)
@@ -1553,7 +1599,7 @@ class Session:
                 # broke, and an answer that says OVER_BUDGET without saying
                 # which one cannot be graded against a fixture.
                 self._close(parsed.reason, parsed.detail, rule=parsed.rule,
-                            budget=parsed.budget)
+                            budget=parsed.budget, kind=parsed.kind)
                 yield from self._drain_refusals()
                 return
             message = parsed.message
@@ -1587,6 +1633,34 @@ class Session:
                 if not handshake.notification_supported(method):
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=False)
+                    continue
+                # R-CLOSE-KIND-R3/(2). AN INVALIDATED SESSION FORWARDS NOTHING,
+                # AND A NOTIFICATION IS NOT AN EXCEPTION.
+                #
+                # Invalidation means the descriptors moved, so every frame of
+                # this generation is now something a server nobody approved has
+                # said. Responses are covered -- they have an id, so the record
+                # gate reaches them -- and a notification has no id, so it went
+                # out regardless: the one frame shape that could still cross
+                # after we had decided nothing may. Measured on bb7607b,
+                # 07c5c67 and cf294f5 before it was written down; all three
+                # forwarded it.
+                #
+                # Dropped with a receipt and NEVER a response, because a
+                # notification has no id to answer in, and the receipt carries
+                # WHICH invalidation stopped it -- a drop that cannot say why
+                # is indistinguishable from a frame we simply lost.
+                if self._invalidated_as:
+                    # `reason_code`, not a new field name. `receipts._clean`
+                    # DROPS any name outside PERMITTED_FIELDS silently, so an
+                    # invented field would vanish on the way to disk and every
+                    # in-memory assertion would still pass -- the same trap
+                    # R-CLOSE-KIND measured for `cause_kind`. `reason_code` is
+                    # permitted AND value-checked, and the invalidation cause
+                    # is a reason code from our own vocabulary.
+                    self._core._emit("NOTIFICATION_DROPPED", None,
+                                     supported=True,
+                                     reason_code=self._invalidated_as)
                     continue
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
@@ -1758,7 +1832,8 @@ class Session:
         # T7.R1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
             self._close("MALFORMED_UPSTREAM",
-                        "upstream exited with calls still pending")
+                        "upstream exited with calls still pending",
+                        kind="UPSTREAM_EXIT_WITH_PENDING")
         # T4.R7 and T6.R1. The client is WAITING, whoever closed the session
         # and whenever. Recording the fault and saying nothing leaves it
         # waiting for ever on a session that has already decided it is over, so
@@ -1791,14 +1866,15 @@ class Session:
             # client is told nothing, and the exception surfaces wherever the
             # caller happens to be standing.
             self._close("MALFORMED_UPSTREAM",
-                        "the initialize result is not a result object")
+                        "the initialize result is not a result object",
+                        kind="INITIALIZE_RESULT_SHAPE")
             return None
         negotiated = handshake.negotiate(result)
         if not negotiated.ok:
             self._close(negotiated.reason,
                         "the server offered a protocol version outside the "
                         "frozen set",
-                        rule="S3")
+                        rule="S3", kind=negotiated.kind)
             return None
 
         filtered = handshake.advertise(result.get("capabilities") or {})
@@ -2072,7 +2148,7 @@ class Session:
             self._close("INTERNAL_FAULT",
                         "a handoff arrived for a record another generation "
                         "owns, so admission's refusal did not hold",
-                        rule="S3")
+                        rule="S3", kind="HANDOFF_GENERATION_MISMATCH")
             return b""
         if withheld is None and self._handoff_record is not None:
             # R-168-R8/F1. THE HANDOFF IS THE SINGLE RECORDER, and round 7 made
@@ -2150,7 +2226,7 @@ class Session:
             self._close("INTERNAL_FAULT",
                         "authority kept moving while an answer was being "
                         "prepared, so no decision could be spent",
-                        rule="S3")
+                        rule="S3", kind="DECISION_AUTHORITY_MOVED")
             return b""
         return raw
 
@@ -2258,8 +2334,19 @@ class Session:
             self._settling.discard(identity)
             self._settling_key.pop(identity, None)
 
-    def _close(self, reason, detail, rule="S5", budget=None):
+    def _close(self, reason, detail, rule="S5", budget=None, *, kind=None):
         """Tear down once, supervise the processes, and RETAIN what is owed.
+
+        `kind` DEFAULTS TO NONE AND THE TEST IS THE GATE (R-CLOSE-KIND). Making
+        it required looked like the stronger guarantee and was measured before
+        it shipped: it breaks six of the reviewer's controls -- including the
+        acceptance file for another PR -- and 21 of our own rows, all with
+        TypeError, because a control drives a close positionally to prove what
+        happens when one lands mid-flight. A TypeError that fires only in a
+        harness is not a guarantee, it is a broken instrument. The AST map test
+        in `tests/proxy/test_cause_kind_map.py` asserts that every `_close`
+        call site IN THIS PACKAGE supplies a kind, so a new site without one
+        fails by name, and an external control that drives a close still runs.
 
         Two things were missing and they were the same mistake twice.
 
@@ -2288,7 +2375,7 @@ class Session:
                 # still up, and the one thing worse than a failed kill is a
                 # failed kill nobody tries again.
                 self._core.teardown(
-                    Cause(reason, rule, budget=budget, detail=detail),
+                    Cause(reason, rule, budget=budget, detail=detail, kind=kind),
                     stop_processes=self._stop_processes())
                 return
             self._closed = (reason, rule)
@@ -2356,8 +2443,18 @@ class Session:
             # a later admission (RC17).
             self._settling.clear()
             self._settling_key.clear()
+            # R-CLOSE-KIND-R3/(1). Captured BEFORE the tables are cleared,
+            # settled BELOW rather than here: the settlement takes the core's
+            # lock and taking it under ours is the nesting the reader avoids.
+            committed = [(core_key, self._committed_cause[core_key])
+                         for _identity, core_key in owed
+                         if core_key in self._committed_cause]
             self._claimed.clear()
-        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail),
+        # The core settles FIRST WINS, so committing these before the teardown
+        # is what makes the receipt agree with the frame the client already has.
+        for core_key, (own_reason, own_rule) in committed:
+            self._core.settle(core_key, Cause(own_reason, own_rule))
+        self._core.teardown(Cause(reason, rule, budget=budget, detail=detail, kind=kind),
                             stop_processes=self._stop_processes())
 
     def _stop_processes(self):

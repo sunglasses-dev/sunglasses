@@ -312,7 +312,7 @@ def _watchdog(session, log, writing_since, done, child, interval=0.1):
             pass
         session._close("SCAN_EXCEPTION",
                        f"the watchdog stopped: {type(failure).__name__}",
-                       rule="S3")
+                       rule="S3", kind="WATCHDOG_FAILED")
     # Whatever ended the loop, the session is over. RELEASE THE MAIN THREAD
     # FIRST and let it do the stopping: its teardown already closes the child
     # and stops the group, and doing it here as well put a second kill grace in
@@ -341,7 +341,8 @@ def _sweep_until_done(session, log, writing_since, done, interval):
                           rule=stalled.rule)
             except Exception:
                 pass
-            session._close(stalled.reason, stalled.detail, rule=stalled.rule)
+            session._close(stalled.reason, stalled.detail, rule=stalled.rule,
+                           kind=stalled.kind)
             return
 
 
@@ -369,7 +370,8 @@ def _drain_client(engine, session, stdin, done):
         # session says so rather than exiting zero on a truncated request.
         if tail and not session.closed_with():
             session._close("MALFORMED_CLIENT",
-                           "the client stopped in the middle of a frame")
+                           "the client stopped in the middle of a frame",
+                           kind="FRAME_UNTERMINATED")
     except Exception:
         pass
     finally:
