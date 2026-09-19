@@ -101,13 +101,22 @@ def test_the_harness_actually_reaches_the_cli(tmp_path):
     """Guard on the guard: if this fails, every other test in this file is
     asserting against a process that died on import.
 
-    Asserts on help text only our CLI emits. Round 1 asserted `returncode == 0`
+    Asserts on output only our CLI emits. Round 1 asserted `returncode == 0`
     and "No module named" absent, which an empty `sys.exit(0)` satisfies.
+
+    ANCHORED ON THE SUBCOMMAND NAMES, NOT ON HELP PROSE. This row used to assert
+    the `install` help string, and a correction to that string's WORDING broke
+    the guard while the harness was working perfectly -- the guard reported on
+    the sentence rather than on the thing it exists to prove. Command names are
+    a contract and change deliberately; help prose is written to be rewritten.
+    An empty `sys.exit(0)` still fails this, which is the failure it was built
+    for.
     """
     r = sg("--help", cwd=tmp_path, home=tmp_path / "h")
     assert r.returncode == 0, r.stderr
     assert "No module named" not in r.stderr
-    assert "Wrap an MCP server entry" in r.stdout
+    for command in ("firewall-hook", "install", "uninstall"):
+        assert command in r.stdout, f"{command} missing from --help"
 
 
 @pytest.fixture
