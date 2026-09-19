@@ -24,9 +24,73 @@ proving the sharing is safe and keeping it that way:
 the question here is about calls. A comment, a docstring or a string literal
 naming the class is not a compile; a helper three files away that builds one is.
 """
+import contextlib
+import signal
+import threading
+
 import pytest
 
 from sunglasses.engine import SunglassesEngine
+
+
+@contextlib.contextmanager
+def _fails_rather_than_hangs(seconds):
+    """Bound a BLOCKING call, so a row that would hang fails instead.
+
+    A wall-clock assertion written after the call cannot do this, and that is
+    not a nitpick -- it is the whole difference. `assert elapsed < N` only runs
+    once the call has already returned, so against a genuinely stuck operation
+    it is never reached and the row hangs until something outside kills it.
+    Measured while writing this: a row whose deadline was mutated away sat for
+    180 s with a 60 s "backstop" two lines below it, untouched.
+
+    So the bound is armed BEFORE the call and interrupts it. The number is a
+    hang guard and nothing else -- it is not a performance assertion, and it is
+    set far above anything a loaded runner produces, because the thing these
+    rows prove is the RECORDED OUTCOME and a clock next to that outcome can
+    only add a way to fail while the outcome is right.
+
+    SIGALRM and the main thread are required rather than optional. A guard
+    that quietly becomes a no-op where it cannot arm is a check that skips
+    itself, which is worse than no check: every row using it would keep
+    passing and none of them would be bounded. The proxy suites that use this
+    already require POSIX process groups, so there is no platform where the
+    rows run and the guard could not.
+    """
+    if not hasattr(signal, "SIGALRM"):
+        raise RuntimeError(
+            "fails_rather_than_hangs needs SIGALRM; refusing to run unbounded "
+            "rather than pass an unguarded row")
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError(
+            "fails_rather_than_hangs must arm on the main thread; refusing to "
+            "run unbounded rather than pass an unguarded row")
+
+    def fire(_signum, _frame):
+        raise TimeoutError(
+            f"blocked for more than {seconds}s; the operation this row bounds "
+            f"did not return, so the deadline it exists to prove never fired")
+
+    previous = signal.signal(signal.SIGALRM, fire)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+@pytest.fixture
+def fails_rather_than_hangs():
+    """The guard above, as a fixture.
+
+    A fixture rather than an import because `from conftest import ...` does not
+    mean what it looks like: with a `conftest.py` in `tests/` as well, the name
+    resolves to the NEARER one and the import fails at collection. pytest
+    injects fixtures by name from the whole conftest chain, which is the
+    mechanism that actually exists for sharing this.
+    """
+    return _fails_rather_than_hangs
 
 
 @pytest.fixture

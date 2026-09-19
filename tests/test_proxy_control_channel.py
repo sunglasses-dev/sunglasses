@@ -82,7 +82,18 @@ def test_the_answer_the_reader_dropped_in_is_what_comes_back():
     assert [t["name"] for t in result["tools"]] == ["echo", "read"]
 
 
-def test_a_server_that_never_answers_is_a_deadline_and_not_a_hang():
+# The anti-hang bound is ARMED AROUND the blocking call by
+# `fails_rather_than_hangs` (conftest), not asserted after it. These rows prove
+# a deadline FIRES and the recorded outcome is what proves it; a wall-clock
+# number beside that outcome only adds a way to fail while the outcome is
+# right. The numbers here were 3 s against operations bounded at 100 ms, a 30x
+# margin on an idle box that still reran on a loaded runner, because the
+# failure is the tail and not the mean.
+HANG_GUARD_S = 60
+
+
+def test_a_server_that_never_answers_is_a_deadline_and_not_a_hang(
+        fails_rather_than_hangs):
     """The thread serving the client's call is the one waiting here."""
     session = pump.Session()
     _written, write = _sink()
@@ -90,9 +101,17 @@ def test_a_server_that_never_answers_is_a_deadline_and_not_a_hang():
                               deadline_ms=100)
     request_id = control.send("tools/list", {})
     started = time.monotonic()
-    with pytest.raises(channel.ControlTimeout):
-        control.await_answer(request_id)
-    assert time.monotonic() - started < 3
+    with fails_rather_than_hangs(HANG_GUARD_S):
+        with pytest.raises(channel.ControlTimeout):
+            control.await_answer(request_id)
+    waited = time.monotonic() - started
+    # THE DEADLINE FIRED: ControlTimeout above is the recorded outcome, and
+    # this says it fired BECAUSE THE DEADLINE ELAPSED rather than instantly
+    # for some unrelated reason. A lower bound is the one direction load
+    # cannot break -- a busy box makes this larger, never smaller.
+    assert waited >= 0.100, (
+        f"it raised ControlTimeout after {waited:.3f}s against a 100 ms "
+        f"deadline, so something other than the deadline ended the wait")
 
 
 def test_an_answer_that_arrives_while_we_are_waiting_is_picked_up():
@@ -147,7 +166,8 @@ def test_the_pager_drives_a_whole_list_through_one_channel():
     assert len(pages) == 2 and pages[0]["nextCursor"] == "p2"
 
 
-def test_a_closed_session_stops_the_channel_rather_than_waiting_it_out():
+def test_a_closed_session_stops_the_channel_rather_than_waiting_it_out(
+        fails_rather_than_hangs):
     """A session that has torn down will never deliver an answer, so waiting
     for the deadline is a guaranteed wait for nothing."""
     session = pump.Session()
@@ -157,9 +177,20 @@ def test_a_closed_session_stops_the_channel_rather_than_waiting_it_out():
     request_id = control.send("tools/list", {})
     session._close("MALFORMED_UPSTREAM", "the server went away")
     started = time.monotonic()
-    with pytest.raises(channel.ControlTimeout):
-        control.await_answer(request_id)
-    assert time.monotonic() - started < 3, "it waited out a dead session"
+    with fails_rather_than_hangs(HANG_GUARD_S):
+        with pytest.raises(channel.ControlTimeout):
+            control.await_answer(request_id)
+    waited = time.monotonic() - started
+    # THE UPPER BOUND IS THE PROPERTY HERE, and that is why this row keeps one
+    # where the others drop theirs: the claim is that a closed session
+    # SHORT-CIRCUITS the wait, and ControlTimeout alone would also be raised
+    # by simply waiting the full 30 s. So the number is expressed against the
+    # deadline it has to beat rather than as an absolute 3 s: anything under
+    # half of it proves the short circuit, and half of 30 s is twenty times
+    # the old margin.
+    assert waited < (30000 / 1000) / 2, (
+        f"it waited {waited:.2f}s of its own 30 s deadline; a closed session "
+        f"must end the wait rather than be waited out")
 
 
 def test_an_error_answer_is_a_fault_and_never_a_result():

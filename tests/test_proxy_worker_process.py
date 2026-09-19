@@ -77,18 +77,34 @@ def test_the_payload_reaches_the_child_on_stdin():
     assert out["seen"] > 0
 
 
+# The anti-hang bound is ARMED AROUND the blocking call by
+# `fails_rather_than_hangs` (conftest), not asserted after it. What proves
+# these rows is the RECORDED OUTCOME -- `status: deadline`, `status:
+# exception`, the child being gone. The old numbers were 5 s and 10 s against
+# operations bounded at 200 ms and 5 s: a 20-125x margin on an idle box, and
+# they reran anyway, because the failure is the tail and not the mean.
+HANG_GUARD_S = 60
+
+
 # ── T8.R4 · the deadline is a kill ───────────────────────────────────────
 
-def test_a_worker_past_the_deadline_is_killed_and_not_merely_abandoned(tmp_path):
+def test_a_worker_past_the_deadline_is_killed_and_not_merely_abandoned(
+        tmp_path, fails_rather_than_hangs):
     """The property is that the PROCESS is gone, not that the call returned."""
     marker = tmp_path / "pid"
     hang = _script(
         f"import os,sys,time;open({str(marker)!r},'w').write(str(os.getpid()));"
         "sys.stdin.read();time.sleep(300)")
     started = time.monotonic()
-    out = worker_process.run({"params": {}}, argv=hang, binding=BINDING,
-                             timeout_ms=200)
-    assert time.monotonic() - started < 5
+    with fails_rather_than_hangs(HANG_GUARD_S):
+        out = worker_process.run({"params": {}}, argv=hang, binding=BINDING,
+                                 timeout_ms=200)
+    waited = time.monotonic() - started
+    # THE DEADLINE FIRED, and `status: deadline` below is what says so. This
+    # says it fired because the 200 ms deadline elapsed and not instantly for
+    # another reason; a lower bound is the direction load cannot break.
+    assert waited >= 0.200, (
+        f"it reported a deadline after {waited:.3f}s against a 200 ms bound")
     assert out["status"] == "deadline"
     assert out["accepted"] is False
     pid = int(marker.read_text())
@@ -143,16 +159,44 @@ def test_the_deadline_is_the_named_number(sleep_ms, expected):
 
 # ── T8.R7 · the stdout bound is enforced while reading ───────────────────
 
-def test_a_flooding_worker_is_stopped_rather_than_read_to_the_end(tmp_path):
+def test_a_flooding_worker_is_stopped_rather_than_read_to_the_end(
+        tmp_path, fails_rather_than_hangs):
     """Reading a gigabyte to discover it was over a megabyte performs the
     fault in the act of checking for it."""
     flood = _script("import sys;sys.stdin.read();\n"
                     "w=sys.stdout.write\n"
                     "while True: w('x'*65536)")
     started = time.monotonic()
-    out = worker_process.run({"params": {}}, argv=flood, binding=BINDING,
-                             stdout_limit=200_000, timeout_ms=5_000)
-    assert time.monotonic() - started < 10
+    with fails_rather_than_hangs(HANG_GUARD_S):
+        out = worker_process.run({"params": {}}, argv=flood, binding=BINDING,
+                                 stdout_limit=200_000, timeout_ms=5_000)
+    waited = time.monotonic() - started
+    # THIS ROW KEEPS A CLOCK, and it is the only one of the five that has to.
+    #
+    # I tried to remove it on the theory that `status` distinguishes the two
+    # mechanisms -- stdout bound versus deadline -- and MEASURED that it does
+    # not. Driving the same call with the limit raised to 10 GB so the read
+    # runs to the deadline instead:
+    #
+    #     stdout_limit=200_000      0.06 s   status=exception  observed=0
+    #     stdout_limit=10_000_000_000  3.02 s   status=exception  observed=0
+    #
+    # Identical results. `accepted`, `inspection_complete`,
+    # `observed_content_bytes` and `inspected_utf8_bytes` all match too, so
+    # NOTHING THE PRODUCT RECORDS SAYS WHICH BOUND STOPPED THE READ. The
+    # elapsed time is the only signal that exists, which makes the bound
+    # load-bearing here rather than decorative -- without it this row passes
+    # on a build whose stdout limit does nothing.
+    #
+    # The number comes from that measured separation, 0.06 s against 3.02 s,
+    # and sits between them with about 20x over the working case rather than
+    # being a round number someone liked. A product that recorded which bound
+    # fired would let this become an outcome assertion like the others; that
+    # is filed, not fixed here, because this is a test-only change.
+    assert waited < 1.5, (
+        f"the read took {waited:.2f}s against a 5 s deadline; the stdout "
+        f"bound is what is supposed to stop it, and at this duration the "
+        f"deadline did")
     assert out["status"] == "exception"
     assert out["accepted"] is False
 
