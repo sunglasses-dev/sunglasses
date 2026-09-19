@@ -51,3 +51,41 @@ def pytest_report_header(config):
             f"{verdict}",
             "tree: CI tests refs/pull/N/merge, so a run on a HEAD that does not "
             "contain origin/main is not evidence about what CI will run"]
+
+
+# ASTRA's artifact controls (tests/proxy/test_artifact_review.py) read their
+# payload specimens out of the review layout, `tests/stack/tests/...`, so that
+# path is a symlink back to this suite's own file. Collecting it twice is an
+# import-file-mismatch, and the controls are vendored unchanged, so the
+# directory is skipped here rather than the control being edited.
+# `stack/` is that, and `source/` is the same shape: the review layout resolves
+# this suite's sources at the paths ASTRA's controls were written against.
+#
+# Both are TRACKED, as per-FILE symlinks rather than a directory symlink. That
+# matters twice. A directory symlink pointing back at its own parent is a cycle
+# for anything that walks the tree; and leaving them untracked is the defect
+# that made #164's CI produce 67 red rows carrying no product signal, because a
+# path that exists only in one worktree exists nowhere that matters.
+# `test_controls_v6.py` loads through `source/` and would fail all seventeen of
+# its rows in CI without them.
+#
+# The glob stays, because the targets are collected under their real names and
+# collecting them again through here is an import-file-mismatch.
+collect_ignore_glob = ["stack/*", "source/*"]
+
+
+# Child PROCESSES this suite spawns must be able to import the package.
+# `python -m sunglasses.proxy` works because -m puts the working directory on
+# sys.path, but `python tests/scripts/artifact_peer.py` puts only the SCRIPT's
+# directory there, so a peer that imports sunglasses dies on ImportError with
+# its stderr pointed at DEVNULL by the proxy that spawned it. The failure then
+# looks like the proxy never sending anything, which is a long way from the
+# cause. Exported here rather than in each control, because the controls are
+# vendored unchanged.
+import os as _os
+import pathlib as _pathlib
+
+_ROOT = str(_pathlib.Path(__file__).resolve().parents[1])
+if _ROOT not in _os.environ.get("PYTHONPATH", "").split(_os.pathsep):
+    _os.environ["PYTHONPATH"] = _os.pathsep.join(
+        [_ROOT] + [p for p in _os.environ.get("PYTHONPATH", "").split(_os.pathsep) if p])

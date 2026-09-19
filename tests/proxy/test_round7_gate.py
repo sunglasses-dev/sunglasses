@@ -2,7 +2,7 @@ import ast,contextlib,inspect,json,os,signal,subprocess,sys,threading,time
 from pathlib import Path
 import pytest
 from sunglasses.proxy import pump
-# Moved from scripts/ to tests/proxy/ at the #166 rebase (T9 ruling): every
+# Moved from scripts/ to tests/proxy/ at the #168 rebase (T9 ruling): every
 # other vendored control lives here, and archive-suite and CI collect this
 # directory. parents[2] keeps R at the REPOSITORY ROOT, which is what it was
 # in scripts/ -- a relocation must not quietly move where a control reads its

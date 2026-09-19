@@ -37,6 +37,25 @@ SNAPSHOT = "a" * 64
 TOOL_SHA = "b" * 64
 
 
+def _tool(name="read_text_file"):
+    return {"name": name, "description": f"the {name} descriptor",
+            "inputSchema": {"type": "object"}}
+
+
+def _capture(*names, sha=SNAPSHOT, pages=None):
+    """A capture in the shape `approve` actually reads.
+
+    `tools_by_name` is what the RECORD is built from and what the human saw;
+    `pages` is what the pins are derived from. They are separate keys in the
+    stored file, which is exactly why the two invariants below are worth
+    asserting: nothing in the file format forces them to agree.
+    """
+    return {"sha256": sha,
+            "tools_by_name": {n: {"descriptor_sha256": TOOL_SHA} for n in names},
+            "pages": [{"tools": [_tool(n) for n in
+                                 (names if pages is None else pages)]}]}
+
+
 def _record(**over):
     body = {"server_identity": SERVER, "snapshot_sha256": SNAPSHOT,
             "approved_at": "2026-09-14T00:00:00Z", "approved_by": "human",
@@ -112,12 +131,73 @@ def test_approved_delivers_a_list_only_when_the_snapshot_matches(store):
 
 
 def test_an_approved_call_needs_the_tool_and_its_descriptor_sha(store):
-    store.capture(SNAPSHOT, payload={"tools": []})
+    """The capture has to NAME the tool now.
+
+    This used to approve `payload={"tools": []}` and still expect the call
+    through, which worked only because `approve` invented a `read_text_file`
+    entry whenever the capture had no tools. T505 removed that invention, so an
+    empty capture is now a true statement about a server with no tools and the
+    call is refused. Naming the tool is what makes the positive half of this
+    test mean "approved", instead of meaning "we made one up".
+    """
+    store.capture(SNAPSHOT, payload=_capture("read_text_file"))
     store.approve(snapshot_sha256=SNAPSHOT, viewed=True)
     _attempt(store)
     assert store.may_call("read_text_file", TOOL_SHA) is None
     assert store.may_call("read_text_file", "e" * 64) == "DESCRIPTOR_CHANGED"
     assert store.may_call("write_file", TOOL_SHA) == "DESCRIPTOR_CHANGED"
+
+
+def test_a_tool_the_record_never_named_is_never_pinned(store, tmp_path):
+    """Invariant 2 of the approving-pins ruling (T9, 09-14 08:34).
+
+    Approving pins the descriptors, and a pin is what makes `check_pin` read
+    clean. So a pin written for a tool the approval record does NOT name opens
+    the gate for a tool no human ever saw, with a clean receipt attached. The
+    two halves of a capture are separate keys and nothing in the format forces
+    them to agree, so `_write_pins` has to enforce it.
+    """
+    store.capture(SNAPSHOT, payload=_capture(
+        "read_text_file", pages=["read_text_file", "shadow_tool"]))
+    store.approve(snapshot_sha256=SNAPSHOT, viewed=True)
+    pinned = json.loads((tmp_path / "pins.json").read_text())["tools"]
+    assert any(name.endswith("__read_text_file") for name in pinned)
+    assert not any(name.endswith("__shadow_tool") for name in pinned), pinned
+
+
+def test_pins_come_only_from_the_capture_the_record_names(store, tmp_path):
+    """Invariant 1 of the same ruling.
+
+    A second capture on disk is an ordinary thing: every `list_changed` writes
+    one. Approving sha A must pin A's descriptors and nothing else, or a
+    capture the human declined would be pinned by the approval of one they
+    accepted.
+    """
+    other = "f" * 64
+    store.capture(other, payload=_capture("declined_tool", sha=other))
+    store.capture(SNAPSHOT, payload=_capture("read_text_file"))
+    store.approve(snapshot_sha256=SNAPSHOT, viewed=True)
+    pinned = json.loads((tmp_path / "pins.json").read_text())["tools"]
+    assert any(name.endswith("__read_text_file") for name in pinned)
+    assert not any(name.endswith("__declined_tool") for name in pinned), pinned
+
+
+def test_a_failed_reactivation_of_a_live_approval_remembers_why(store):
+    """T5.R4, the positive half of retirement.
+
+    Clearing the admission alone makes the next call read APPROVAL_REQUIRED,
+    which describes a server nobody ever approved and hides that THIS one
+    changed underneath an approval that existed. The provenance has to outlive
+    the activation, or the state reported is a quieter, wronger one.
+    """
+    store.capture(SNAPSHOT, payload=_capture("read_text_file"))
+    store.approve(snapshot_sha256=SNAPSHOT, viewed=True)
+    assert _attempt(store).activated
+    assert store.state() == approvals.APPROVED
+    again = _attempt(store, server_identity="fs-someone-else")
+    assert not again.activated and again.provenance == "DESCRIPTOR_CHANGED"
+    assert store.state() == approvals.INVALIDATED
+    assert store.may_call("read_text_file", TOOL_SHA) == "DESCRIPTOR_CHANGED"
 
 
 # ── T5.R3: all four conditions, each one alone ────────────────────────────

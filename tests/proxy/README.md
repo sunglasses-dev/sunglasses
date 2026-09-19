@@ -443,3 +443,158 @@ to re-issue his selectors in a form that does NOT depend on the yield's
 syntactic shape: three of his instruments have now broken on ruled lines. An ast
 walk for the yield whose value calls `_handoff_notification` is one, and marking
 the delivery line explicitly would be another.
+## RC03 against T410: the refusal's data shape, measured both ways
+
+Two of ASTRA's own control sets disagree about one object, and the
+disagreement is exact rather than a matter of degree. Neither file has been
+edited.
+
+`test_review_core.py::test_RC03_refusal_preserves_per_item_first_cause` asserts
+
+    json.loads(out[0])['error']['data'] == {'reason_code': reason, 'rule': rule}
+
+by EQUALITY, so the data may carry those two members and nothing else.
+
+`test_stack_independent.py::test_T410_actual_pump_refusal_uses_full_envelope`
+asserts
+
+    set(json.loads(out[0])['error']['data']) == set(envelope.withheld(**error_fields())['error']['data'])
+
+which is the ten-member set T4.R7 names: reason_code, rule, budget, accepted,
+status, inspection_complete, inspected_utf8_bytes, observed_content_bytes,
+elapsed_ms, rule_ids.
+
+No implementation satisfies both. Measured on this head, PYTHONDONTWRITEBYTECODE=1
+with `__pycache__` cleared:
+
+    pump builds its own two-field data   RC03 3/3 pass    T410 fails
+      (core head 2f17e13, tests/proxy green at 391 passed)
+    pump builds envelope.withheld        RC03 3/3 fail    T410 passes
+      (this head; the three are the SCAN_EXCEPTION-S3, REQUEST_CANCELLED-S6
+       and DESCRIPTOR_CHANGED-S4 rows)
+
+The implementation here takes the second, for three reasons that are about the
+contract rather than about which control is newer.
+
+1. T4.R7 states the data shape as a literal, and it is the ten members. RC03's
+   equality is narrower than the row it is testing under.
+2. RC03's SUBJECT is the per-item first cause: that a session-wide
+   MALFORMED_UPSTREAM does not rewrite an item that already settled S3, S4 or
+   S6. Under the envelope every one of its three rows still carries exactly
+   the reason_code and rule it asserts. What fails is only the `==`, which
+   pins members RC03 is not about.
+3. The envelope module exists so the wire object has ONE constructor. A second
+   construction beside it is the failure it was written to prevent, and it is
+   the failure that was actually present: the frozen reason catalog, the frozen
+   statuses, the catalog-only bounded rule_ids and the `**ignored` that
+   swallows a caller's detail string all applied to the copy that was not on
+   the wire.
+
+A refusal that cannot say whether any bytes were inspected also cannot be
+compared to a fixture, which is the property T0.R2's grading depends on.
+
+### R-RC03-1, the ruling (T9, 2026-09-14 10:00)
+
+T4.R7's ten-member data WINS. RC03 is split in place, the way R-W03-2 split the
+seventeen:
+
+  1. `test_RC03_refusal_preserves_per_item_first_cause` keeps its substantive
+     assertions unchanged and live -- the per-item first cause reaches both the
+     settlement and the wire -- and now reads `reason_code` and `rule` by
+     member instead of pinning the whole object;
+  2. `test_RC03_two_member_data_tripwire` carries the withdrawn equality as its
+     own `xfail(strict=True)`. If the refusal ever shrinks back to two members
+     that XPASSes and the suite goes red, so the clause still watches what it
+     was written for;
+  3. `test_RC03_positive_control_ten_members_and_their_values` asserts the ten
+     members AND their values, per row. The values half is the point: an
+     envelope carrying all ten while claiming a complete, finished inspection
+     over bytes nobody read passes any test that only checks which keys are
+     present. That exact mutant survived my first pass on T410 and this control
+     is what kills it.
+
+`test_review_core.py` is 20 passed, 3 xfailed, zero failed on this head.
+ASTRA versions this as v7 in the stack round.
+
+### Running the round-4 controls in a fresh worktree
+
+`test_round4_edges.py` writes its observations to `tests/evidence/rc11` with a
+non-recursive `mkdir(exist_ok=True)`, so a worktree without `tests/evidence`
+fails all fourteen with `FileNotFoundError` before a single assertion runs.
+That is a harness fact, not a product one: on #166 the same controls went from
+14 failed to 133 passed with the directory created and `pump.py` byte-identical
+to the core head either way. `mkdir -p tests/evidence` before the first run.
+
+---
+
+## T903's id_token, checked structurally and not by its grammar
+
+T903 requires that a permitted receipt field's VALUE be validated, not only its
+name. Four of the five are checked against a vocabulary we define: `reason_code`
+against the frozen reason catalog, `status` against the worker statuses,
+`method` against the known methods, `rule_ids` against the engine rule-id
+grammar. The fifth is checked only for being a string.
+
+The stronger rule is available and is not applied. `session._item_token`
+produces sixteen lowercase hex characters, so matching that grammar would also
+refuse a PEER-SUPPLIED id passed under this field name, which is the actual
+risk the field carries: a raw JSON-RPC id is peer text, and a receipt is read
+as a record of what happened.
+
+It is not applied because ASTRA's own T904 control writes
+`log.record_or_stop('HOLD_ENTERED', id_token='review')`. Measured both ways on
+this head:
+
+    id_token must match the 16-hex grammar   T903 passes, T904 FAILS
+    id_token must be a string                T903 passes, T904 passes
+
+Tightening it would fail a control rather than a defect, and the controls are
+vendored unchanged. The structural check still keeps the shape T903 sends
+(`{'raw': <marker>}`) out of the evidence, which is what that row asserts.
+
+### R-T903-1, the ruling (T9, 2026-09-14 10:24)
+
+The MINTED grammar is enforced. T904 is split the way R-RC03-1 split RC03:
+
+  1. `test_T904_actual_append_io_failure_stops` keeps its body and carries a
+     `xfail(strict=True)`, so the withdrawn `id_token='review'` line is a
+     tripwire rather than a deletion;
+  2. `test_T904_positive_append_io_failure_stops_with_a_minted_token` holds the
+     substantive assertion -- a write that fails produces a Stop rather than
+     raising past `record_or_stop` -- with a token of the shape
+     `session._item_token` actually produces, and also asserts the reason and
+     that the Stop does not claim durability.
+
+Our own fixtures followed the repair: they used short tags like "t1", which the
+log now refuses, and rightly. `tests/test_proxy_receipts.py` mints them through
+one `token()` helper so the reason is visible at every use.
+
+Measured on this head: tests/proxy/test_stack_independent.py 55 passed, 1
+xfailed; our three receipt suites 190 passed. ASTRA versions this as v7
+alongside R-RC03-1.
+
+
+---
+
+## Method note: a hang is a kill, and the timeout has to be real
+
+The deadline rows (AR10, AR11, AR13) changed how the mutation harness has to
+score. A mutant that removes a deadline does not make the suite FAIL, it makes
+the suite WAIT -- which is the defect itself -- so the harness counts a timeout
+as KILLED. Reporting it as a survivor would be backwards.
+
+That is only sound while the timeout is a real bound. A harness with no
+timeout, or with one long enough never to fire, has the same bug in the other
+direction: it would sit through the hang and eventually report whatever the
+runner did on the way out. The per-run timeout is set to 180 s against a
+baseline that completes in about 33 s, and the first deadline mutant (`WD-a`)
+is the standing proof that it fires -- it is scored KILLED by timeout, not by a
+failing assertion, on every run.
+
+The harness also keeps its pristine copy of each source ON DISK with a
+`--restore` flag, not only in the process's memory. Two runs were killed
+mid-iteration today -- one by a peer's `pkill -9 -f pytest` matching our proxy
+children through their pytest tmpdir path, one by a mutant-induced hang -- and
+an in-memory copy dies with the process that holds it, leaving a mutant on disk
+to poison the next baseline. That happened once and cost a false result before
+the copy was moved to disk.

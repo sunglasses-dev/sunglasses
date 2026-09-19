@@ -124,11 +124,10 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
         result = engine.scan(text, channel=channel)
     except TimeoutError:
         # T4.R3 names this one separately: an engine TIMEOUT is `deadline`, not
-        # `exception`. Both were landing in the generic branch below, so a scan
-        # that ran out of time settled SCAN_EXCEPTION -- "the scanner broke"
-        # where "the scanner did not finish in the budget" is the fact. They
-        # are different things to whoever reads the receipt, and only one of
-        # them is a reason to distrust the scanner.
+        # `exception`. Both landed in the generic branch, so a scan that ran out
+        # of time recorded "the scanner broke" for "the scanner did not finish
+        # in the budget" -- different facts, and only one is a reason to
+        # distrust the scanner.
         return _result(binding, accepted=False, status=STATUS_DEADLINE,
                        inspection_complete=False, decision=DECISION_REVIEW,
                        inspected=0, observed=content_bytes, elapsed=0,

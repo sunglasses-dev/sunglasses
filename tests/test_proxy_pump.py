@@ -21,7 +21,9 @@ Rows covered by this slice:
   T7.R1  upstream exit with pending calls is an S5 trigger
   T7.R2  never resynchronise; a clean frame after the fault is discarded
 """
+import io
 import json
+import time
 
 import pytest
 
@@ -812,3 +814,285 @@ def test_a_handoff_for_another_generations_record_faults_the_session():
     assert session._settling_key.get(identity, theirs) == theirs or \
         identity not in session._settling, (
         "the other generation's record was not discharged by this reader")
+# ── T410: the refusal the client actually gets is the envelope, not a lookalike
+
+ENVELOPE_DATA = {"reason_code", "rule", "budget", "accepted", "status",
+                 "inspection_complete", "inspected_utf8_bytes",
+                 "observed_content_bytes", "elapsed_ms", "rule_ids"}
+
+
+def test_the_refusal_the_pump_writes_is_the_envelope():
+    """T410. `envelope.withheld` exists because the refusal is the one
+    structure an adversary is guaranteed to read, and the pump builds its own
+    two-field dictionary beside it.
+
+    A second construction of the same wire object is the failure mode the
+    envelope module was written to prevent: every rule it enforces (the frozen
+    reason catalog, the bounded rule_ids, `**ignored` swallowing a caller's
+    detail string) applies to the copy that is NOT used, and the one on the
+    wire is governed by nothing. The fields also have to be there for a
+    receipt to be gradeable at all -- a refusal that cannot say whether any
+    bytes were inspected cannot be compared to a fixture.
+    """
+    from sunglasses.proxy import envelope
+
+    session = pump.Session()
+    session.admit_request(1, method="ping", origin="client")
+    out = list(session.read_upstream(b""))
+    assert out, "the fault produced no client frame at all"
+    written = json.loads(out[0])
+    assert set(written["error"]["data"]) == ENVELOPE_DATA
+    assert written["error"]["data"]["reason_code"] in envelope.REASONS
+
+
+def test_an_over_budget_refusal_names_the_budget_that_broke():
+    """T410's other half. The envelope REFUSES an OVER_BUDGET that cannot say
+    which bound broke, and refuses a budget on any reason that has none, so the
+    pair has to travel together from the close to the wire.
+
+    Dropping the budget on the way left every field-set assertion green, which
+    means the plumbing was covered by nothing: a breach nobody can attribute to
+    a bound is a receipt that cannot be graded, and the row bounds four
+    different things.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    over = json.dumps({"jsonrpc": "2.0", "id": 41,
+                       "result": {"content": [{"type": "text",
+                                               "text": "x" * 5_000_000}]}})
+    out = list(session.read_upstream(over.encode() + b"\n"))
+    assert session.closed_with() == ("OVER_BUDGET", "S3")
+    assert len(out) == 1
+    data = json.loads(out[0])["error"]["data"]
+    assert data["reason_code"] == "OVER_BUDGET"
+    assert data["budget"] == "frame"
+
+
+def test_a_refusal_does_not_claim_a_scan_that_never_happened():
+    """T410's values, not only its field names.
+
+    A fault the pump found is a fault found BEFORE any scan, so the refusal
+    must say so: not accepted, `not_run`, inspection not complete, nothing
+    inspected. An envelope carrying every required member and claiming a
+    complete finished inspection over bytes nobody read is the exact lie the
+    module exists to prevent, and it passes any test that only checks which
+    keys are present.
+    """
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    out = list(session.read_upstream(b"{not json\n"))
+    assert len(out) == 1
+    data = json.loads(out[0])["error"]["data"]
+    assert data["accepted"] is False
+    assert data["status"] == "not_run"
+    assert data["inspection_complete"] is False
+    assert data["inspected_utf8_bytes"] == 0
+    assert data["observed_content_bytes"] == 0
+    assert data["rule_ids"] == []
+
+
+# ── T801 to T803: the bounds the table stated and nothing was asking for ───
+
+def test_a_clean_upstream_exit_of_zero_stays_zero():
+    """T803's positive half. Propagating the child's status must not turn a
+    successful run into a failure; only a non-zero code and a teardown do
+    that."""
+    import subprocess
+    import sys
+
+    child = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
+    assert child.wait(timeout=5) == 0
+    session = pump.Session(upstream=child, pgid=child.pid)
+    list(session.read_upstream(io.BytesIO()))
+    session._watcher.join(2)
+    assert session.closed_with() is None
+    assert session._core.exit_code() == 0
+
+
+# ── AR10, AR11: the deadlines, which the table stated and nobody asked ─────
+
+def test_a_server_that_never_answers_does_not_hold_the_session_for_ever():
+    """AR11, T8.R5. `bounds.check_deadline` held this number since the slice
+    that wrote it and nothing asked it anything, so a server could keep a
+    request open as long as it liked. A mediator that can be made to wait
+    indefinitely can be taken out of the path by doing nothing at all."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert session.sweep_deadlines() is None
+    breach = session.sweep_deadlines(
+        now=time.monotonic() + bounds.UPSTREAM_RESPONSE_MS / 1000 + 1)
+    assert breach and breach.reason == "SCAN_DEADLINE"
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+
+
+def test_a_server_answering_inside_the_deadline_is_not_disturbed():
+    """The positive half, or the row above is satisfied by closing every
+    session. The bound is checked AFTER the limit, never at it."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    # From the ADMISSION time the session recorded, not from now: `now` is
+    # already later than the admission, so anchoring there would test one
+    # sliver past the limit and call the boundary a breach.
+    admitted = session._admitted_at[pump.key("client", 41)]
+    assert session.sweep_deadlines(
+        now=admitted + bounds.UPSTREAM_RESPONSE_MS / 1000) is None
+    assert session.closed_with() is None
+
+
+def test_a_frame_that_never_finishes_arriving_is_a_deadline():
+    """AR10, T8.R3. A server that sends half a frame and stops is not slow, it
+    is holding the pipe open, and the reader is blocked in a read that will
+    never return."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    began = time.monotonic() - bounds.FRAME_ASSEMBLY_MS / 1000 - 1
+    breach = session.sweep_deadlines(partial_since=began)
+    assert breach and breach.reason == "SCAN_DEADLINE"
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+
+
+def test_a_settled_request_no_longer_counts_against_the_response_deadline():
+    """An item that has been answered is not waiting on anybody, and leaving it
+    in the clock's view would close healthy sessions on the age of work that
+    finished."""
+    from sunglasses.proxy import bounds
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    assert list(session.read_upstream(wire(response(41))))
+    assert session.sweep_deadlines(
+        now=time.monotonic() + bounds.UPSTREAM_RESPONSE_MS / 1000 + 10) is None
+    assert session.closed_with() is None
+
+
+def test_the_refusal_signature_is_the_three_the_row_names(): 
+    """A reviewer wraps this method to audit what crosses the boundary, and
+    seventeen of ASTRA's v6 controls do exactly that with the three arguments
+    T4.R7 names. Threading a fourth through it broke all seventeen at once, on
+    a TypeError, before a single assertion ran -- a change to how we carry an
+    internal value taking out an entire control set.
+
+    The shape of a refusal is this method's business; who is waiting for it and
+    what their cause named is the table's.
+    """
+    import inspect
+
+    parameters = list(
+        inspect.signature(pump.Session._client_refusal).parameters)
+    assert parameters == ["self", "identity", "reason", "rule"]
+
+
+def test_a_subclass_can_wrap_the_refusal_with_those_three():
+    """The property behind the signature, asserted by doing it rather than by
+    describing it."""
+    seen = []
+
+    class Audit(pump.Session):
+        def _client_refusal(self, identity, reason, rule):
+            raw = super()._client_refusal(identity, reason, rule)
+            seen.append(json.loads(raw))
+            return raw
+
+    session = Audit()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    list(session.read_upstream(b"{not json\n"))
+    assert seen and seen[0]["error"]["data"]["reason_code"]
+
+
+def test_a_refusal_names_the_item_s_own_budget_not_the_session_s():
+    """RC03's per-item first cause, carried all the way to the wire.
+
+    A session-wide close does not rewrite an item that already settled for its
+    own reason, and the budget travels with that reason: an item recorded
+    OVER_BUDGET/content must not be told, at teardown, that no bound broke.
+    The envelope refuses an OVER_BUDGET that cannot name which one, so losing
+    it here does not merely mislabel the receipt -- it makes the refusal
+    unbuildable.
+    """
+    from sunglasses.proxy.session import Cause
+
+    session = pump.Session()
+    assert session.admit_request(41, method="tools/call", origin="client")
+    identity = pump.key("client", 41)
+    session._core.record(session._core_key(identity),
+                         Cause("OVER_BUDGET", "S3", budget="content"))
+    session._close("MALFORMED_UPSTREAM", "review controlled close")
+    frames = list(session._drain_refusals())
+    assert len(frames) == 1
+    data = json.loads(frames[0])["error"]["data"]
+    assert data["reason_code"] == "OVER_BUDGET"
+    assert data["budget"] == "content"
+
+
+# ── RC20 and AR10: the deadline stamp belongs under the admission lock ──────
+#
+# Written at the #168 rebase (T9 ruling, 2026-09-14). RC20 put admission's test
+# and insert under one lock so nothing can move an entry between deciding and
+# recording. AR10 added `_admitted_at` as a third table that the same insert
+# writes, and the rebase had to decide whether it goes inside the lock or after
+# it. Outside, the markers resolve and the module compiles, and the window RC20
+# exists to close is reopened for that one table.
+#
+# This control exists because the obvious assertion cannot catch that. Anything
+# checked AFTER `admit_request` returns is true either way -- by then the stamp
+# is written. The observation has to happen at the instant the lock is released.
+
+
+class _LockThatReadsTheTablesOnRelease:
+    """A stand-in for `_settlement` that snapshots the admission tables at each
+    release. Delegates everything to the real lock; it only watches."""
+
+    def __init__(self, real, read_tables):
+        self._real = real
+        self._read_tables = read_tables
+        self.releases: list = []
+
+    def __enter__(self):
+        return self._real.__enter__()
+
+    def __exit__(self, *exc_info):
+        self.releases.append(self._read_tables())
+        return self._real.__exit__(*exc_info)
+
+    def acquire(self, *a, **k):
+        return self._real.acquire(*a, **k)
+
+    def release(self):
+        return self._real.release()
+
+    def locked(self):
+        return self._real.locked()
+
+
+def test_the_deadline_stamp_is_written_under_the_admission_lock():
+    """RC20 + AR10. When admission commits, every table that insert writes must
+    already agree, measured where the lock is released rather than after the
+    call returns."""
+    session = pump.Session()
+    identity = pump.key("client", 41)
+    watcher = _LockThatReadsTheTablesOnRelease(
+        session._settlement,
+        lambda: {
+            "pending": identity in session._pending,
+            "generation": identity in session._generation,
+            "stamped": identity in session._admitted_at,
+        },
+    )
+    session._settlement = watcher
+
+    assert session.admit_request(41, method="tools/call", origin="client")
+
+    assert watcher.releases, "admission never took the settlement lock"
+    committed = watcher.releases[0]
+    assert committed["pending"], "the entry was not recorded under the lock"
+    assert committed["generation"], "the generation was not recorded under the lock"
+    assert committed["stamped"], (
+        "`_admitted_at` was written OUTSIDE the lock RC20 exists to hold. "
+        "Between the release and the stamp an admitted entry has no deadline, "
+        "which is the between-deciding-and-recording window, one table wide."
+    )

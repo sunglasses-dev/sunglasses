@@ -46,7 +46,7 @@ BLOCKING_SEVERITIES = frozenset({"high", "critical"})
 
 _BINDING_FIELDS = ("digest", "channel", "generation", "invocation_token")
 _COUNTERS = ("inspected_utf8_bytes", "observed_content_bytes", "elapsed_ms")
-_BYTE_COUNTERS = ("inspected_utf8_bytes", "observed_content_bytes")
+_BYTE_COUNTERS = frozenset({"inspected_utf8_bytes", "observed_content_bytes"})
 
 
 class Invalid(ValueError):
@@ -60,25 +60,21 @@ def _typed(value, kind):
     the same trap runs the other way: `isinstance(True, int)` is True, so a bool
     passes a naive number check and `inspected_utf8_bytes: True` would read as 1.
 
-    An earlier version carried an `int` branch as well. Nothing called it, and a
-    mutation that removed its bool guard killed no test, which is how I found
-    out. Dead code in a validator is a place for a future bug to hide behind a
-    passing suite, so it is gone rather than left for a caller that may never
-    arrive.
+    An earlier version carried an `int` branch, nothing called it, a mutation
+    that removed its bool guard killed no test, and it was deleted as dead code
+    "rather than left for a caller that may never arrive". The caller arrived:
+    T403 makes the byte counters whole numbers, because 19.5 bytes were not
+    inspected by anything. It is back WITH the bool guard the mutation found
+    missing, and this paragraph stays as the record that removing it was the
+    right call on the evidence available and still turned out to be wrong.
     """
     if kind is bool:
         return isinstance(value, bool)
+    if kind is int:
+        return isinstance(value, int) and not isinstance(value, bool)
     if kind is float:
         return (isinstance(value, (int, float))
                 and not isinstance(value, bool))
-    if kind is int:
-        # The int branch is BACK, and the docstring above says it was removed
-        # for being dead. It is not dead now: T4.R1 declares the two byte
-        # counters as integers and AT01 caught the validator taking 9.5 for
-        # one. The bool guard is the same trap in the same place -- True is an
-        # int -- and AT07 already drives True and False through every counter,
-        # so the guard has a control this time.
-        return isinstance(value, int) and not isinstance(value, bool)
     raise AssertionError(f"_typed has no rule for {kind!r}")
 
 
@@ -98,10 +94,17 @@ def validate(result, *, binding, held_content_bytes, catalog):
     for field in _BINDING_FIELDS:
         if field not in got:
             raise Invalid(f"binding is missing {field}")
-        if type(got[field]) is not type(binding[field]) or got[field] != binding[field]:
+        if (type(got[field]) is not type(binding[field])
+                or got[field] != binding[field]):
             # A result bound to a different message is not this item's answer,
             # however well formed it is. Accepting it settles one message with
             # another message's scan.
+            #
+            # T404. The TYPE is part of the comparison for the same reason it
+            # is part of an id: `True == 1` and `1.0 == 1` in Python, so a
+            # binding carrying a bool or a float where the generation is an int
+            # compares equal to one it is not, and a worker can claim an
+            # invocation it was never given by sending the number differently.
             raise Invalid(
                 f"binding {field} is {got[field]!r} and this item's is "
                 f"{binding[field]!r}; the result belongs to another invocation")
@@ -115,19 +118,31 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             f"inspection_complete is {result.get('inspection_complete')!r}, "
             f"not a boolean")
+    # T402. `status: complete` and `inspection_complete: false` is a scan
+    # saying it finished and did not finish. The pair was checked in one
+    # direction only, so a result carrying a finding could claim completion
+    # while admitting it had not read everything, and T4.R4 would then settle
+    # it as a complete inspection.
+    if (result.get("status") == STATUS_COMPLETE
+            and result.get("inspection_complete") is not True):
+        raise Invalid(
+            "status is complete while inspection_complete is false; a scan "
+            "cannot have finished and not finished")
+
     decision = result.get("decision")
     if not isinstance(decision, str) or decision not in DECISIONS:
         raise Invalid(f"decision {decision!r} is not one of {sorted(DECISIONS)}")
 
     for counter in _COUNTERS:
         value = result.get(counter)
+        # T403 applies to the BYTE counters. 19.5 bytes were not inspected by
+        # anything, and a fractional count cannot be compared to the byte
+        # totals T4.R2 checks it against. `elapsed_ms` is a DURATION and half a
+        # millisecond is an ordinary measurement, so it stays a finite number:
+        # applying the byte rule to it was me over-reading the row.
         if counter in _BYTE_COUNTERS:
-            # T4.R1 declares these `int>=0`. A float passed the number check and
-            # 9.5 bytes is a description of something that did not happen -- and
-            # `inspected <= observed <= held` then compares fictions. elapsed_ms
-            # is declared `number`, so it keeps the wider check.
             if not _typed(value, int):
-                raise Invalid(f"{counter} is {value!r}, not an integer")
+                raise Invalid(f"{counter} is {value!r}, not a whole number")
         elif not _typed(value, float):
             raise Invalid(f"{counter} is {value!r}, not a number")
         if value < 0:
@@ -145,16 +160,26 @@ def validate(result, *, binding, held_content_bytes, catalog):
             if field not in finding:
                 raise Invalid(f"a finding is missing {field}")
         # AT11. `x in frozenset` RAISES TypeError when x is unhashable, and
-        # TypeError is not Invalid: it goes straight past the caller's
-        # `except Invalid` and out of the reader. The peer chooses these bytes,
-        # so a list where a string belongs is a reachable state, not a
-        # theoretical one. A non-string is refused before anything hashes it.
+        # TypeError is not Invalid: it goes past the caller's `except Invalid`
+        # and out of the reader, on bytes a peer chooses.
         if not isinstance(finding["severity"], str) or \
                 finding["severity"] not in SEVERITIES:
             raise Invalid(f"severity {finding['severity']!r} is not known")
         if not isinstance(finding["source"], str) or \
                 finding["source"] not in SOURCES:
             raise Invalid(f"source {finding['source']!r} is not known")
+        # T405. When the catalog says which LANE an id belongs to, the
+        # finding's own `source` has to agree. `GLS-SD-001` is an engine id, so
+        # a helper claiming it is a deterministic lane asserting an engine
+        # detection, and T4.R4(7) would read that as the engine having found a
+        # secret. One check, one thing: the id names its lane, the worker does
+        # not get to reassign it.
+        if isinstance(catalog, dict) and finding["rule_id"] in catalog:
+            if catalog[finding["rule_id"]] != finding.get("source"):
+                raise Invalid(
+                    f"rule id {finding['rule_id']!r} belongs to the "
+                    f"{catalog[finding['rule_id']]!r} lane and the finding "
+                    f"claims {finding.get('source')!r}")
         if not isinstance(finding["rule_id"], str) or finding["rule_id"] not in catalog:
             # T4.R6. A worker cannot confer authority on itself by naming a rule.
             raise Invalid(
@@ -184,15 +209,6 @@ def validate(result, *, binding, held_content_bytes, catalog):
         raise Invalid(
             f"accepted is false with status {status!r}; an unaccepted result is "
             f"not a verdict whatever it claims")
-    if status == STATUS_COMPLETE and not result["inspection_complete"]:
-        # T4.R2, the other direction, and it was the one missing. A result that
-        # says the scan RAN TO THE END while also saying the inspection did not
-        # finish is not a verdict; accepting it let the settlement report
-        # inspection_complete TRUE for it, inventing the completeness the
-        # worker itself had denied.
-        raise Invalid(
-            "status is complete with inspection_complete false; a scan cannot "
-            "have finished and not finished")
     return result
 
 

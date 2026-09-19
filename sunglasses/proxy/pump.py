@@ -19,8 +19,9 @@ the next newline, so reading stops rather than resumes.
 from __future__ import annotations
 
 import threading
+import time
 
-from . import bounds, framing, handshake, supervisor
+from . import bounds, envelope, framing, handshake, selector, supervisor
 from .session import Cause, Session as CoreSession, Settled
 
 class Attempt:
@@ -124,6 +125,13 @@ CONTROL_PREFIX = "sg-"
 
 # T6.R6. Bounded, because a tombstone table that grows with the session is a
 # memory bound a peer controls.
+# R-168-R6/F1. How many times an answer may be re-derived because an
+# authority landed while it was being prepared. The precedence allows two
+# changes (None -> DESCRIPTOR_CHANGED -> REQUEST_CANCELLED) and each is
+# terminal once accepted, so this is slack above the reachable maximum
+# rather than a guess; exhausting it is an INTERNAL_FAULT and never a
+# stale answer delivered quietly.
+_REDERIVE_LIMIT = 8
 TOMBSTONE_LIMIT = 10_000
 
 
@@ -325,6 +333,21 @@ class UnsupervisedUpstream(RuntimeError):
     """Strict mode was asked to read from a pipe with no process behind it."""
 
 
+class _Replaced:
+    """What the inspection seam decided should cross INSTEAD of the original.
+
+    A tiny wrapper rather than a bare bytes value because the reader has to
+    tell "deliver this instead" apart from "deliver the original", and an
+    ordinary frame is already a dict. `frame` may be None, which means the item
+    is settled and NOTHING crosses.
+    """
+
+    __slots__ = ("frame",)
+
+    def __init__(self, frame):
+        self.frame = frame
+
+
 class Session:
     """The correlation table, the tombstones, and the decision to stop reading."""
 
@@ -346,6 +369,10 @@ class Session:
         # T6.R1. Who is still owed one answer, retained across the close that
         # discovered the fault so the reader can deliver it on the way out.
         self._owed_refusals: list = []
+        # identity -> the budget its recorded cause names, or None. Read by
+        # `_client_refusal`, which the envelope requires to name a bound for
+        # OVER_BUDGET and to name none for anything else.
+        self._budget_for: dict = {}
         # One settlement owner. The reader and the watcher both reach the debt
         # and only one of them may be holding it at a time.
         self._settlement = threading.Lock()
@@ -357,8 +384,119 @@ class Session:
         # park the watcher's close behind the reader, and the close is what
         # stops the processes -- so the window is CLOSED BY A RECORD instead.
         self._settling: set = set()
+        # R-168-R3. The release gate the READER consults at the handoff. It
+        # lives here rather than in `_handoff`'s signature so that a control
+        # substituting that method with a three-argument stub still works.
+        self._handoff_decide = None
+        self._handoff_frame = None
+        self._handoff_record = None
+        # R-168-R4a. AUTHORITY STATE, BEHIND ITS OWN SHORT LOCK.
+        #
+        # A cancellation or a descriptor invalidation is an authority that must
+        # still win while a reader is parked at the handoff. Round 3 put the
+        # reader's CHECK inside the settlement lock and left the WRITERS
+        # outside it, so the check just moved the window. Putting the writers
+        # under the settlement lock instead was measured and is worse: the
+        # reviewer's instrument pauses the reader INSIDE that lock and requires
+        # a writer to complete during the pause, so a writer that needs the
+        # same lock times out -- four of six rows failed with "action
+        # incomplete" rather than with a wrong answer.
+        #
+        # So the writers never wait on a reader. They record and bump an EPOCH
+        # here, atomically; the reader decides from recorded state, builds its
+        # frame outside, and re-reads the epoch in the critical section that
+        # discharges the record. A moved epoch means re-derive before
+        # discharging. The decision that reaches the wire and the discharge are
+        # atomic with respect to the recorded state, which is the ownership
+        # that matters and the one a wire can prove.
+        # REENTRANT, and the reason is the re-derivation below: the reader
+        # holds this lock across the final decision so that no writer can land
+        # between it and the discharge, and the decision it re-runs reads
+        # authority through `cancellation_accepted` and `authority_state`,
+        # which take this same lock. A plain Lock deadlocks the reader on
+        # itself there; an RLock lets the owner re-enter and still blocks every
+        # other thread, which is the exclusion the property needs.
+        self._authority_lock = threading.RLock()
+        self._cancelled_ids: set = set()
+        self._invalidated_as = None
+        # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
+        #
+        # Round 4 claimed the decision and the discharge were atomic because
+        # they are adjacent lines. They are not: the reader releases this lock
+        # when the decision returns and takes the settlement owner only, which
+        # the writers do not need. ASTRA's XD01 measured the window six ways --
+        # a cancellation completing there still lost.
+        #
+        # ADJACENT LINES ARE NOT ATOMICITY. What closes the window is a stamp:
+        # every authority READ records the epoch it saw, and the discharge
+        # refuses to spend a decision derived from an older one. The stamp is
+        # taken at the READ and not before the call, which is the difference
+        # between this and the epoch round 3 proposed: a writer that lands
+        # BEFORE the decision reads is already visible to it and needs no
+        # re-derivation, so the re-derivation fires exactly when the decision
+        # is actually stale.
+        self._authority_epoch = 0
+        self._authority_observed = None
         # RC17. identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
+        # R-168-R6/F2. CLIENT IDS ADMITTED AND NOT YET ANSWERED ON THE WIRE.
+        #
+        # Kept HERE and not on the route because admission is the session's
+        # event however the caller reached it -- the reviewer's controls admit
+        # straight through this method -- and kept apart from every other table
+        # because it has to OUTLIVE retirement. The release paths retire the
+        # record and THEN fail to authorise, and at that moment `_pending`,
+        # `_settling` and the core all agree there is nothing outstanding while
+        # the client has received no bytes at all. Retirement is not answering;
+        # a frame reaching the sink is.
+        # R-168-R8/F2. BY IDENTITY, and round 6 held bare request ids. The
+        # session's own tables key on `key(origin, request_id)` -- which
+        # carries the JSON TYPE -- precisely because 1 and 1.0 are different
+        # ids to a peer and the same key to Python: `{1, 1.0}` is `{1}`. Two
+        # clients waiting, one recorded as owed, and the second never answered.
+        # Third time in two days that I used a weaker key than the session's
+        # own identity shape.
+        # R-168-R9. TOKENS, not identities, and this is the FOURTH round of one
+        # mistake. `_claimed[identity]` on #179, `_unanswered` by bare id here,
+        # `settle_from` comparing one element of a token, and now these two.
+        #
+        # The rule is sharper than "always use the token", and the sharp form
+        # is what stops the next one. A table describing the LIVE correlation
+        # may be keyed by identity: admission refuses an id already pending or
+        # settling, so only one generation is ever live and the identity cannot
+        # be ambiguous -- `_pending`, `_settling`, `_generation` are right as
+        # they are. A table whose entries OUTLIVE the correlation must carry
+        # the generation, because its entries span generations by construction.
+        #
+        # These two outlive it on purpose: an obligation stands until a frame
+        # reaches the sink, which is after retirement, and a finished answer is
+        # remembered for ever. Keyed by identity, a COMPLETED generation spoke
+        # for a live one -- it consumed the new obligation's take and, through
+        # `_answered_final`, refused to let it be restored. Two admitted
+        # requests, one response.
+        self._unanswered: set = set()
+        self._answered_final: set = set()
+        # R-168-R9/(a). WHICH obligation the frame just yielded discharges.
+        #
+        # The consumer cannot work it out from the frame: an id can have two
+        # unanswered tokens at once -- a finished generation whose frame never
+        # reached the sink, and a live one -- and that ambiguity IS the defect.
+        # So the reader, which owns `record_key`, says. Set under the owner
+        # immediately before each yield and read by the consumer immediately
+        # after it, on the one thread that does both; `pump_upstream` is a
+        # `for` loop over this generator, so there is no window between them.
+        self._yielded_obligation = None
+        # identity -> the Cause this item settles with, when it is not CLEAN.
+        self._settling_cause: dict = {}
+        # T8.R6's second half, written by whoever owns the write queue.
+        self.queued_bytes = 0
+        # AR11, T8.R5. When each item was admitted, so the upstream-response
+        # deadline has something to measure. A bound with no clock behind it is
+        # a number in a table.
+        self._admitted_at: dict = {}
+        # AR10. One cell, written by the reader and read by the watchdog:
+        # when an incomplete frame first appeared in the buffer, or None.
+        self.partial_frame_since: list = [None]
         # R-179-R7. EVERY OUTSTANDING LOCAL CLAIM, BY ITS FULL ATTEMPT TOKEN.
         #
         # Round 6 keyed this by IDENTITY, which is the id-only key this PR has
@@ -516,6 +654,23 @@ class Session:
                                        Cause(breach.reason, breach.rule))
             else:
                 self._pending[identity] = method
+                # MERGE, #168 r9 onto #179. These two writes were r9's and sat
+                # here unconditionally. They belong INSIDE the else: an
+                # obligation is owed for an ADMITTED request, and
+                # `bounds.check_admission` is origin-independent, so a client at
+                # the outstanding cap takes the breach branch below. Recorded
+                # unconditionally, an overload-refused client request would owe a
+                # wire answer for ever -- `_pending` is never set, the core never
+                # admits it, no frame is ever generated for it, and `_unanswered`
+                # outlives retirement by design, so nothing would discharge it.
+                #
+                # Keyed on the CARRIED `reserved`, not on a fresh
+                # `_core_key(identity)`. Same tuple here, and it is the token this
+                # entry belongs to rather than whatever "current" says later --
+                # #179's own rule for anything that outlives its correlation.
+                self._admitted_at[identity] = time.monotonic()
+                if origin == ORIGIN_CLIENT:
+                    self._unanswered.add(reserved)
         if breach:
             # OUTSIDE the lock: the settlement below takes the core's lock, and
             # taking the core's under ours is the nesting the reader avoids.
@@ -540,6 +695,47 @@ class Session:
             return False
         return True
 
+
+    def sweep_deadlines(self, *, partial_since=None, now=None):
+        """AR10 and AR11, T8.R3 and T8.R5. The deadlines, actually applied.
+
+        `bounds.check_deadline` has held these numbers since the slice that
+        wrote it and nothing asked it anything, so a server could hold a
+        request for ever or stop halfway through a frame and the session would
+        wait as long as the server liked. A mediator that can be made to wait
+        indefinitely is a mediator that can be removed from the path by doing
+        nothing.
+
+        Called from a watchdog rather than from the reader, because the reader
+        is BLOCKED in exactly the cases that matter. Returns the breach it
+        closed on, or None.
+
+        `partial_since` is when the reader last had an incomplete frame in its
+        buffer, or None when it does not. That is the frame-assembly clock, and
+        only the reader can know it.
+        """
+        if self._closed:
+            return None
+        now = time.monotonic() if now is None else now
+
+        partial_since = (self.partial_frame_since[0] if partial_since is None
+                         else partial_since)
+        if partial_since is not None:
+            breach = bounds.check_deadline(
+                "frame_assembly", elapsed_ms=(now - partial_since) * 1000)
+            if breach:
+                self._close(breach.reason, breach.detail, rule=breach.rule)
+                return breach
+
+        for identity, admitted in list(self._admitted_at.items()):
+            if identity not in self._pending or identity[0] != ORIGIN_CLIENT:
+                continue
+            breach = bounds.check_deadline(
+                "upstream_response", elapsed_ms=(now - admitted) * 1000)
+            if breach:
+                self._close(breach.reason, breach.detail, rule=breach.rule)
+                return breach
+        return None
     def _reserve(self, identity):
         """Burn a generation for THIS attempt and return its core key.
 
@@ -624,12 +820,164 @@ class Session:
     def expects(self, request_id, *, origin):
         return key(origin, request_id) in self._pending
 
+    def accept_cancellation(self, request_id, *, origin):
+        """Record a cancellation as AUTHORITATIVE, and never wait on a reader.
+
+        The writer takes ITS OWN lock and never the reader's, which is what
+        lets a cancellation complete while a reader is parked at the handoff --
+        the thing the reviewer's XB03 requires and the thing a writer under the
+        settlement lock cannot do.
+        """
+        with self._authority_lock:
+            self._cancelled_ids.add(key(origin, request_id))
+            self._authority_epoch += 1
+
+    def accept_invalidation(self, reason):
+        """T5.R4. The descriptors moved; every undelivered answer of this
+        generation is from a server nobody approved."""
+        with self._authority_lock:
+            self._invalidated_as = reason
+            self._authority_epoch += 1
+
+    def cancellation_accepted(self, request_id, *, origin):
+        """Is THIS id's cancellation accepted? Asked with the session's own key.
+
+        The first wiring of this compared the route's `_typed(id)` against the
+        identities stored here, which are `key(origin, id)` triples: the shapes
+        never matched, so every lookup said no and two of my own rows went red
+        with the original crossing. Comparing keys is the session's job because
+        the key is the session's shape.
+        """
+        with self._authority_lock:
+            self._observe_authority()
+            return key(origin, request_id) in self._cancelled_ids
+
+    def authority_state(self):
+        """The cancelled ids and the invalidation, read TOGETHER under one lock.
+
+        Read separately a caller could take one that is newer than the other,
+        which is the same class of bug as the one this round is about, one
+        level down.
+
+        THE EPOCH IS BACK, AND THIS DOCSTRING IS WHY. Round 4 said here that
+        there was no window to validate, because the decision is taken inside
+        the settlement owner on the line before the discharge and "nothing can
+        move between them". That is false and it was measured: this lock is
+        released when this call returns, the writers never take `_settlement`,
+        and ASTRA's XD01 completed a cancellation in that window six times --
+        the reader delivered the original every time. I argued the epoch out of
+        round 4 on that sentence, so the sentence is kept above its correction:
+        ADJACENT LINES ARE NOT ATOMICITY, and an argument is not a measurement.
+
+        The read STAMPS the epoch it saw (`_observe_authority`), and the
+        discharge refuses to spend a decision derived from an older one.
+        """
+        with self._authority_lock:
+            self._observe_authority()
+            return frozenset(self._cancelled_ids), self._invalidated_as
+
+    def _observe_authority(self):
+        """Record the epoch THIS decision was derived from. Under the lock.
+
+        The EARLIEST read wins, because a decision that read the cancelled set
+        at one epoch and the invalidation at a later one is internally
+        inconsistent and has to be re-derived just as surely as a stale one.
+        `None` means no authority was read at all -- the gate returned on a
+        recorded fault or on a missing id -- and a decision that never asked
+        cannot have asked too early.
+        """
+        if self._authority_observed is None or \
+                self._authority_epoch < self._authority_observed:
+            self._authority_observed = self._authority_epoch
+
+    def release_decision(self, request_id, *, origin=ORIGIN_CLIENT):
+        """May this crossing go as it is, or what replaces it. THE one answer.
+
+        R-168-R6/F1. The policy moved here because every input it reads is
+        already the session's: the recorded terminal cause, the cancelled set,
+        the invalidation and the epoch that dates all three. `Route._release_gate`
+        keeps its name and its signature -- reviewer controls wrap that
+        attribute and count its calls -- and is now the adapter that calls this.
+        One implementation, two entry points, and not a copy: the retirement
+        below re-derives through THIS, so it can take a fresh decision without
+        spending a gate call that XE02_rederive_writer counts.
+
+        Precedence, unchanged and asserted by XB04: a recorded S3 fault is
+        terminal and no authority overrides it; then cancellation; then the
+        invalidation. `None` lets the crossing through.
+        """
+        identity = key(origin, request_id)
+        with self._authority_lock:
+            self._observe_authority()
+            recorded = self.recorded_terminal(request_id, origin=origin)
+            if recorded is not None and recorded.rule == "S3":
+                return None
+            if identity in self._cancelled_ids:
+                return "REQUEST_CANCELLED"
+            if self._invalidated_as:
+                return "DESCRIPTOR_CHANGED"
+            return None
+
+    def _final_decision(self, request_id, decided):
+        """The decision that actually reaches the wire, taken UNDER the lock.
+
+        Called from inside the settlement owner, at the discharge. If authority
+        moved after the decision read it, the decision is re-derived HERE,
+        while this lock is held, so nothing can move between the re-derivation
+        and the discharge that follows it. That is the shared ordering round 4
+        claimed from adjacency and did not have.
+
+        The callback is re-entered at most ONCE, and only when the epoch says
+        it must be: the reviewer's XG01 counts the calls, and a control that
+        drives its writer INTO the decision is already accounted for by the
+        stamp -- that decision read the new epoch and is not stale.
+        """
+        with self._authority_lock:
+            observed = self._authority_observed
+            if observed is None or observed == self._authority_epoch:
+                return decided
+            # Stale: an authority landed between the read and this point, and
+            # on this head that is the whole of XD01. Re-derive through the
+            # SAME callback, so the recorded-fault precedence and the reason
+            # mapping stay in one place rather than being restated here.
+            if self._handoff_decide is None:
+                return decided
+            return self._handoff_decide(request_id)
+
+    def recorded_terminal(self, request_id, *, origin):
+        """The cause this item is ALREADY settled with, or None.
+
+        R-168-R4a/XB04. T4.R4 Rule A: an earlier independent S3 fault is
+        terminal. Rule B lets a hold beat a NORMAL completion, not a recorded
+        fault. A worker that returned an invalid completion settles
+        SCAN_EXCEPTION before the handoff, and a cancellation arriving after
+        that must not overwrite it -- the client would be told its request was
+        cancelled while the receipt says the scan faulted, and the two answers
+        disagree about what happened.
+
+        Read from the RECORD, not from the route's flags, which is the half
+        round 3 was missing: the gate saw only the id.
+        """
+        identity = key(origin, request_id)
+        record_key = self._settling_key.get(identity) or self._core_key(identity)
+        return self._core.settled_as(record_key)
+
+    def is_settling(self, request_id, *, origin):
+        """The item has left `_pending` and its answer has NOT yet crossed.
+
+        R-168-R3. `expects` reads one table, and a caller asking "is this still
+        ours?" during a handoff got False -- so a cancellation arriving in that
+        window was treated as though the client had already been answered. It
+        had not been: the frame is still in the reader's hands.
+        """
+        return key(origin, request_id) in self._settling
+
     def expected_method(self, request_id, *, origin):
         return self._pending.get(key(origin, request_id))
 
     # ── responses ───────────────────────────────────────────────────────────
     def deliver_response(self, *, origin, request_id, frame=None,
-                         defer_retire=False):
+                         defer_retire=False, inspect=None, raw=None):
         """T6.R1 and T6.R2. One answer, to the right owner, or the session ends.
 
         A response from upstream answers a CLIENT request; that is the direction
@@ -662,6 +1010,42 @@ class Session:
                         "claims to answer")
             return None
 
+        # T802, T8.R2. The content bound existed in the table and nothing
+        # applied it, so a 262,145 byte result was forwarded to the model
+        # intact. An over-budget FRAME already closes the session here; content
+        # is the same row's other half and is treated the same way, so the
+        # bound cannot be walked around by putting the bytes one level further
+        # in.
+        if frame is not None and "result" in frame:
+            over = bounds.check_content(selector.content_bytes(frame["result"]))
+            if over:
+                self._close(over.reason, over.detail, rule=over.rule,
+                            budget=over.budget)
+                return None
+
+        # THE INSPECTION HAPPENS HERE, and the position is the whole repair.
+        #
+        # AFTER the shape check and the content bound, so a malformed result is
+        # a protocol fault before anybody inspects it -- it was answered as a
+        # finding with the session left open, which also meant the shape check
+        # could be skipped by attaching a finding.
+        #
+        # BEFORE the item moves from `_pending` into `_settling`, because the
+        # inspection needs to know which METHOD the result answers and that
+        # lives in the pending table. Reading it a few lines lower finds
+        # nothing and silently inspects nothing, which is how the first version
+        # of this repair passed two rows and stopped scanning.
+        #
+        # What the seam returns then settles through the SAME call and hands
+        # off through the SAME lock as the original would have, so the close,
+        # the cancel and the one-answer-per-id rule apply to a replacement
+        # exactly as they apply to an original.
+        verdict = inspect(raw, frame) if inspect is not None else None
+        cause = replacement = None
+        if verdict is not None:
+            replacement, reason, rule = verdict
+            cause = Cause(reason, rule)
+
         with self._settlement:
             # RC09. ONE OWNER for removing a pending entry, and it is this
             # lock. The shape check above takes real time, and an upstream that
@@ -684,8 +1068,12 @@ class Session:
             # `_settling`, records the debt, and the reader delivers nothing.
             self._settling.add(identity)
             self._settling_key[identity] = self._core_key(identity)
+        if cause is not None:
+            self._settling_cause[identity] = cause
         if not self._settle_outside_lock(identity):
             return None
+        if verdict is not None:
+            return _Replaced(replacement)
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -834,10 +1222,24 @@ class Session:
             return self._take_delivery(token)
 
     def _take_delivery(self, token):
-        """Call under `_settlement`."""
+        """Call under `_settlement`. THE single acquire, over BOTH sets.
+
+        R-168-R12/(a), ASTRA LC01 + LC03. Delivery and the obligation used to be
+        separate sets, so a writer could own one and look unowned to whatever
+        asked about the other. The teardown asks here, saw the successful list
+        as nobody's, and retained a second response for a request already
+        answered -- one answer for the first request and TWO for the second, on
+        a real pipe, 3 of 3 crossings. Two sets meant two answers.
+
+        Both public entry points land here, so a taker of either is the owner of
+        both. `take_delivery` keeps its name and its meaning because reviewer
+        controls hook that attribute to drive the race; the plumbing gives way,
+        not the control.
+        """
         if token in self._delivering:
             return False
         self._delivering.add(token)
+        self._unanswered.discard(token)
         return True
 
     def settle_attempt(self, token, reason, rule):
@@ -1054,6 +1456,10 @@ class Session:
             handle.wait()
         except Exception:                                   # pragma: no cover
             return
+        # T803. Recorded BEFORE the early return. A clean exit with a non-zero
+        # code is the case this is for, and it is precisely the case the early
+        # return used to skip.
+        self._core.record_upstream_exit(getattr(handle, "returncode", None))
         # RC15. PENDING UNION SETTLING. The watcher returned when `_pending`
         # was empty without looking at the record, so with one item mid-handoff
         # and nothing pending a child exit closed nothing: the session went on
@@ -1072,14 +1478,37 @@ class Session:
                     "the upstream process exited with calls still pending")
 
     # ── reading ─────────────────────────────────────────────────────────────
-    def read_upstream(self, stream):
+    def read_upstream(self, stream, inspect=None, gate=None):
         """Yield the frames a client should see. Stops for good at a fault.
+
+        `inspect` is the seam the result direction needs and defaults to None,
+        which is this method exactly as it was. When it is given it is called
+        BEFORE the settlement, never after, because T6.R2 allows one outcome
+        per held item and a scan that runs after delivery can only ever be a
+        second one. It returns None to deliver the original, or a triple
+        (replacement, reason, rule) to withhold: the replacement is the one
+        answer the client gets, or None for a notification, which has nowhere
+        to put an answer.
 
         T7.R2's last sentence is the whole design: never resynchronise at the
         next newline. Everything after a frame we could not trust is discarded
         WITHOUT being parsed, because parsing it is how a proxy talks itself
         into continuing.
         """
+        # The gate is the caller's, for the length of this read. Stored
+        # rather than threaded through the yield, and read under the
+        # settlement lock at the handoff.
+        # `gate` is (decide, build_frame) or None. Two callables rather
+        # than one because they run on opposite sides of the settlement
+        # lock, which is the whole of R-168-R4a.
+        # R-168-R7. THREE callables now, and a 2-tuple still works: the build
+        # is pure and repeatable, the RECORD is fallible and happens once. A
+        # caller that passes two gets no recorder and behaves as before, which
+        # keeps every control that builds its own gate tuple running.
+        decide, frame, record = (tuple(gate) + (None,) * 3)[:3] if gate \
+            else (None, None, None)
+        self._handoff_decide, self._handoff_frame = decide, frame
+        self._handoff_record = record
         if self._strict and self._upstream is None:
             # A STARTUP ERROR, not a quieter mode. An upstream nobody supervises
             # is precisely the hang above, and a proxy that runs anyway has
@@ -1093,8 +1522,12 @@ class Session:
                                              daemon=True)
             self._watcher.start()
 
+        # AR10. The reader publishes its frame-assembly clock so a watchdog can
+        # read it while this loop is blocked, which is the only moment the
+        # deadline matters.
         for raw in framing.bounded_lines(_as_reader(stream),
-                                         framing.MAX_FRAME_BYTES):
+                                         framing.MAX_FRAME_BYTES,
+                                         partial=self.partial_frame_since):
             if self._closed:
                 # RC02/RC07. Closure can win the race with a frame that is
                 # already buffered: a watcher observes the exit, or the reader
@@ -1155,6 +1588,13 @@ class Session:
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=False)
                     continue
+                verdict = inspect(raw, message) if inspect is not None else None
+                if verdict is not None:
+                    # T2.R12. Dropped with a receipt and never a response,
+                    # because a notification has no id to answer in.
+                    self._core._emit("NOTIFICATION_DROPPED", None,
+                                     supported=True)
+                    continue
                 # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
                 # record gate that gives responses their boundary does not
@@ -1166,13 +1606,17 @@ class Session:
                 # reason: the decision rides the YIELD EXPRESSION, so it is
                 # made when the line RUNS. A statement before the yield decides
                 # too early and a close arriving in between still crosses.
+                self._yielded_obligation = None
                 yield self._handoff_notification(raw)
                 continue
 
             # T2.R6. OUR OWN control traffic, handed to the collector and never
             # yielded toward the client, who asked once and is not part of this
             # conversation. Checked before the client correlation because the
-            # two namespaces share one table and only the key tells them apart.
+            # two namespaces share one table and only the key tells them apart,
+            # and BEFORE the inspection because a page of our own tool list is
+            # not a message held on the client's behalf: the collector scans
+            # every page itself under T5.R3(c).
             #
             # The hand-off is an assignment into a dict the collector reads. It
             # CANNOT BLOCK, which is the point: the collector runs on the
@@ -1214,6 +1658,7 @@ class Session:
                 self._retire_record(identity)
                 continue
 
+
             if self.expected_method(message["id"], origin=ORIGIN_CLIENT) == \
                     "initialize" and "result" in message:
                 init_identity = key(ORIGIN_CLIENT, message["id"])
@@ -1227,6 +1672,7 @@ class Session:
                 # direct-caller retirement instead: one frame for two requests,
                 # and with no second request the watcher returned without
                 # closing and the reader forwarded after a real exit.
+                self._yielded_obligation = init_key
                 yield self._handoff(init_identity, forwarded, init_key)
                 if self._closed:
                     yield from self._drain_refusals()
@@ -1254,16 +1700,31 @@ class Session:
             record_key = self._core_key(identity)
             answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
                                            request_id=message["id"],
-                                           frame=message, defer_retire=True)
+                                           frame=message, defer_retire=True,
+                                           inspect=inspect, raw=raw)
             if answer is None:
                 yield from self._drain_refusals()
                 return
+            # ONE DELIVERY SITE, still. The seam's replacement crosses through
+            # the SAME yield as an original, which is not tidiness: RC18 puts
+            # the handoff decision IN the yield expression, and the vendored
+            # controls locate that decision by finding exactly one yield in
+            # this loop. A second one makes the instrument ambiguous and four
+            # reviewed rows fail on the instrument rather than on behaviour.
+            crossing = raw
+            if isinstance(answer, _Replaced):
+                if answer.frame is None:
+                    # Settled with nothing to deliver; the obligation still ends.
+                    self._retire_record(identity)
+                    continue
+                crossing = answer.frame
             # RC18/RC19/RC19b. The obligation ends HERE, under the lock, and
             # the yield happens only if this call says the close did not win.
             # The decision is IN the expression, so it is made when this line
             # runs rather than before it. None means the close won and nothing
             # crosses; consumers skip it.
-            yield self._handoff(identity, raw, record_key)
+            self._yielded_obligation = record_key
+            yield self._handoff(identity, crossing, record_key)
             if self._closed:
                 yield from self._drain_refusals()
                 return
@@ -1371,9 +1832,14 @@ class Session:
         stdin = getattr(handle, "stdin", None) if handle is not None else None
         if stdin is None:
             return
-        body = {"jsonrpc": "2.0", "id": request_id,
-                "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
-                          "data": {"reason_code": reason, "rule": rule}}}
+        # T410. The same single constructor. A refusal going UP the pipe is
+        # the same wire object as one going down, and a second way of building
+        # it is a second set of rules to keep in step.
+        body = envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            rule_ids=(), catalog=frozenset())
         try:
             stdin.write((_json.dumps(body, separators=(",", ":"))
                          + "\n").encode("utf-8"))
@@ -1383,16 +1849,38 @@ class Session:
                              reason="write_failed")
 
     def _client_refusal(self, identity, reason, rule):
-        """One JSON-RPC error to the client, in the id it used."""
+        """One JSON-RPC error to the client, in the id it used.
+
+        T410. Built by `envelope.withheld` and by nothing else. This used to
+        assemble its own `{reason_code, rule}` beside the envelope module,
+        which is the exact failure that module was written to prevent: every
+        rule it enforces -- the frozen reason catalog, the frozen statuses, the
+        catalog-only bounded rule_ids, `**ignored` swallowing a caller's detail
+        string -- applied to the construction that was NOT on the wire, and the
+        one that was answered to nothing.
+
+        The counters are zero and the status is `not_run` because that is what
+        is true: a fault the pump found is a fault found BEFORE any scan, so no
+        bytes were inspected. Saying so is what makes the refusal comparable to
+        a fixture; a refusal that cannot state whether anything was looked at
+        cannot be graded at all.
+        """
         import json as _json
 
-        _origin, _type_name, request_id = identity[0], identity[1], identity[2]
-        return (_json.dumps({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "error": {"code": -32070, "message": "SUNGLASSES_WITHHELD",
-                      "data": {"reason_code": reason, "rule": rule}},
-        }, separators=(",", ":")) + "\n").encode()
+        request_id = identity[2]
+        # The budget is LOOKED UP rather than passed in. It belongs to the
+        # cause recorded for this item, and threading it through the signature
+        # broke every reviewer subclass that wraps this method with the three
+        # arguments the row names -- seventeen of ASTRA's v6 controls at once,
+        # on a TypeError, before a single assertion ran. The shape of a refusal
+        # is this method's business; who is waiting for it is the table's.
+        budget = self._budget_for.get(identity)
+        body = envelope.withheld(
+            request_id=request_id, reason_code=reason, rule=rule,
+            accepted=False, status="not_run", inspection_complete=False,
+            inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+            rule_ids=(), catalog=frozenset(), budget=budget)
+        return (_json.dumps(body, separators=(",", ":")) + "\n").encode()
 
     # ── outcome ─────────────────────────────────────────────────────────────
 
@@ -1424,7 +1912,19 @@ class Session:
             # being right, and it is written down here rather than covered by a
             # test that would have to reach a state the admission rule forbids.
             core_key = self._settling_key.get(identity, core_key)
-            self._core.settle(core_key, Cause("CLEAN", "S1"))
+            # RD03/RD04/RD07/RD08. The cause is a PARAMETER because the result
+            # direction settles some items as refusals, and it has to do that
+            # through this path rather than beside it. A seam that settled on
+            # its own skipped the ownership this function completes, and the
+            # close, the cancel and the second-answer rule all hang off that.
+            # RD03/RD04/RD07/RD08. The cause travels WITH the record, the way
+            # `_settling_key` does, rather than as a parameter: the result
+            # direction settles some items as refusals and has to do it through
+            # this path, and every control that wraps this method takes the one
+            # argument it has always taken.
+            self._core.settle(core_key,
+                              self._settling_cause.pop(identity, None)
+                              or Cause("CLEAN", "S1"))
         except Settled:
             # The teardown answered it first. `Settled` means a caller settled
             # an item twice, which is normally its own ordering bug, and this
@@ -1508,39 +2008,61 @@ class Session:
         with self._settlement:
             if self._closed:
                 # The close won, so NOTHING CROSSES and the retained refusal it
-                # recorded is this client's one answer.
-                #
-                # Empty bytes rather than None, and the difference is not
-                # cosmetic: a consumer writes what the reader yields, and on a
-                # byte stream `b""` IS nothing -- it writes zero bytes and
-                # needs no special case. `None` would make every consumer,
-                # including a reviewer's, carry a check it never needed before,
-                # and one that forgets it gets a TypeError in place of a
-                # refusal.
+                # recorded is this client's one answer. `b""` and not None: a
+                # consumer writes what the reader yields, and on a byte stream
+                # zero bytes IS nothing -- it needs no special case.
                 return b""
-            # RC25/RC26, and it is a TRIPWIRE rather than a tolerance.
-            #
-            # Discharging here a record THIS reader did not create would answer
-            # one reader's frame by cancelling another reader's debt. The
-            # production path cannot reach that today: admission refuses an
-            # identity while it is in `_settling`, and the record is created and
-            # handed off inside that window, so no reuse can intervene.
-            #
-            # Which is exactly why the mismatch must FAULT and not be absorbed.
-            # A guard that quietly tolerates a state the code calls impossible
-            # is a check that skips itself: it would run green forever while the
-            # invariant it depends on rotted underneath it. If admission's
-            # refusal ever stops holding, the session stops and says so.
-            #
-            # S3, not S5: the peer has violated nothing, our own invariant has.
-            # PRESENT and owned by another generation. An ABSENT record is
-            # the ordinary idempotent case, never a fault -- the same reading
-            # `_retire_record` takes, where a missing record calls through.
             standing = self._settling_key.get(identity)
             mismatch = standing is not None and standing != record_key
+            # R-168-R4a. THE DECISION IS TAKEN HERE, INSIDE THE OWNER, AFTER
+            # the line above and immediately before the discharge, and it is a
+            # DECISION ONLY -- a reason or nothing. Three constraints meet at
+            # this point and only this shape satisfies all three.
+            #
+            # A close racing the handoff must be BLOCKED by the owner while
+            # this runs (XC01 measures exactly that, `not done.wait(.03)`), so
+            # the decision cannot move outside the lock.
+            #
+            # A cancellation or invalidation completing while a reader is
+            # parked at the line above must still win (XB03), so the WRITERS
+            # cannot need this lock: they record under their own and this read
+            # sees it because it happens after the pause, not before.
+            #
+            # And nothing here may write a receipt, because a failed write
+            # answers by calling `_close`, which takes this same non-reentrant
+            # lock (XB06 deadlocked on exactly that). So the FRAME is built
+            # below, outside, from a decision already taken.
+            self._authority_observed = None
+            withheld = (self._handoff_decide(identity[2])
+                        if self._handoff_decide is not None else None)
+            observed = self._authority_observed
             if not mismatch:
                 self._settling.discard(identity)
-                self._settling_key.pop(identity, None)
+                # R-168-R5. THE ORDERING, DEMONSTRATED RATHER THAN ARGUED.
+                # The decision above read authority and let go of it; this
+                # block takes it back, re-derives if the epoch moved while the
+                # reader was between the two, and updates the tables before
+                # releasing it. A writer landing in the window either is
+                # visible to the decision (it arrived before the read) or moves
+                # the epoch (it arrived after), and the second case is the one
+                # round 4 lost six times.
+                with self._authority_lock:
+                    withheld = self._final_decision(identity[2], withheld)
+                    # The epoch the decision that leaves this block was derived
+                    # from, carried to the retirement with the frame built from
+                    # it. R-168-R6/F1.
+                    observed = self._authority_observed
+                    if withheld is not None and self._handoff_frame is not None:
+                        # STILL OWED. The frame below is built by fallible
+                        # code -- it writes a receipt, and a receipt that
+                        # cannot be written closes the session -- so the
+                        # obligation is put back and stays on the books until
+                        # the frame exists. Round 4 removed it here and the
+                        # close that followed found nothing to retain, so the
+                        # client got no answer at all (XD03).
+                        self._settling.add(identity)
+                    else:
+                        self._settling_key.pop(identity, None)
         if mismatch:
             # OUTSIDE the lock. `_close` takes `_settlement` itself and it is
             # not reentrant, so faulting inside the block would deadlock the
@@ -1552,7 +2074,139 @@ class Session:
                         "owns, so admission's refusal did not hold",
                         rule="S3")
             return b""
+        if withheld is None and self._handoff_record is not None:
+            # R-168-R8/F1. THE HANDOFF IS THE SINGLE RECORDER, and round 7 made
+            # it the single recorder only for the AUTHORITY answer. Two shapes
+            # were left over.
+            #
+            # The inspection seam built its replacement through
+            # `_withhold_result`, which recorded -- so a finding, or an
+            # invalidation seen before the scan, wrote a terminal the handoff
+            # then superseded, and the receipt named a different outcome from
+            # the frame (XS02, XS17). That recorder is silent now.
+            #
+            # And a crossing with NO authority replacement wrote no terminal at
+            # all, so a clean answer and a PROHIBITED_CONTENT refusal both
+            # reached the client with nothing in the receipt saying the item
+            # had ended (XS13).
+            #
+            # This method's docstring calls itself the single point where an
+            # obligation ends; the terminal belongs where the obligation does.
+            # It is taken from the cause the item was actually settled with, so
+            # the receipt cannot disagree with the frame.
+            settled = self._core.settled_as(record_key)
+            self._handoff_record(identity[2],
+                                 settled.reason if settled is not None
+                                 else "CLEAN",
+                                 settled.rule if settled is not None else "S1",
+                                 settled is None or settled.reason == "CLEAN")
+        if withheld is not None and self._handoff_frame is not None:
+            # OUTSIDE the owner, because building the frame writes a receipt
+            # and a failed write answers by calling `_close`, which takes this
+            # same non-reentrant lock (XB06 deadlocked on exactly that).
+            #
+            # R-168-R6/F1. AND IN A BOUNDED LOOP, because an authority accepted
+            # during the build invalidates the frame just built. The bound is
+            # not arbitrary: the precedence is recorded-S3 > cancellation >
+            # invalidation, and each is terminal once accepted, so the answer
+            # can move at most from None to DESCRIPTOR_CHANGED to
+            # REQUEST_CANCELLED -- two changes. The cap is larger than that and
+            # exhausting it is a FAULT rather than a stale answer quietly
+            # delivered, because a decision that will not hold still long
+            # enough to be spent is a session that cannot promise one answer.
+            for _ in range(_REDERIVE_LIMIT):
+                frame = self._handoff_frame(identity[2], withheld)
+                outcome, again, observed = self._retire_prepared(
+                    identity, record_key, observed, withheld)
+                if outcome == "retired":
+                    # R-168-R7. THE RECORD HAPPENS HERE, once, and only now.
+                    # The decision can no longer move -- the retirement took
+                    # `_authority_lock` to establish that -- so this writes the
+                    # answer that actually crosses. Recording per BUILD left a
+                    # SETTLED row for every superseded decision, and a
+                    # superseded decision is not a settlement: the item settles
+                    # once and the receipt has to say so once, or #185's verify
+                    # and every reader shaped like XB04 disagree with the wire.
+                    if self._handoff_record is not None and \
+                            not self._handoff_record(identity[2], withheld):
+                        # The receipt could not be written. Nothing crosses;
+                        # the client's one answer is the bounded refusal the
+                        # route's payer has already sent, because the id stays
+                        # unanswered on the wire until a frame reaches it.
+                        return b""
+                    return frame
+                if outcome == "lost":
+                    # A close completed while the frame was being prepared. It
+                    # found the record still owed, recorded the debt, and pays
+                    # it on the way out; handing this frame over as well would
+                    # be T6.R1's one answer becoming two.
+                    return b""
+                withheld = again
+                if withheld is None:
+                    # Authority moved and the new answer is "let it through",
+                    # which cannot happen while the sets only grow -- but if it
+                    # ever does, the original is what the decision now asks for.
+                    return raw
+            self._close("INTERNAL_FAULT",
+                        "authority kept moving while an answer was being "
+                        "prepared, so no decision could be spent",
+                        rule="S3")
+            return b""
         return raw
+
+    def _retire_prepared(self, identity, record_key, observed, prepared):
+        """End the obligation once the frame for it EXISTS, or say why not.
+
+        R-168-R5. `_retire_record` cannot be reused here and the difference is
+        the return value: this caller has a frame in its hand and has to be
+        told whether it is still allowed to hand it over. Reading `_closed` in
+        a second acquisition after retiring would put the two reads either side
+        of a lock release, which is the shape this whole round is about.
+
+        R-168-R6/F1. AND THE EPOCH IS RE-VALIDATED HERE, because round 5's
+        protection ended too early. The epoch guarded the decision only until
+        `_authority_lock` was released; the frame is then built by fallible
+        code, and a cancellation accepted DURING that build -- including one
+        released by the re-derivation lock itself -- was invisible to this
+        retirement, which spent the stale DESCRIPTOR_CHANGED frame. The item
+        was still in `_settling` the whole time, so the route's own `_cancel`
+        had correctly left the answer to this gate.
+
+        The re-derivation goes through `release_decision` and NOT through the
+        route's gate: XE02_rederive_writer asserts exactly two gate calls and
+        this is the third derivation.
+
+        Returns `("retired", None, None)` when the frame stands, `("lost",
+        None, None)` when the close or a later generation won and nothing may
+        cross, or `("rederive", withheld, observed)` when the answer itself
+        changed and the caller must build it again. `prepared` is the decision
+        the frame in the caller's hand was built from.
+        """
+        with self._settlement:
+            if self._closed:
+                return ("lost", None, None)
+            if self._settling_key.get(identity, record_key) != record_key:
+                # A later generation owns this record now. Leave it owed; the
+                # reader that created it is the one that may retire it.
+                return ("lost", None, None)
+            with self._authority_lock:
+                if self._authority_epoch != observed:
+                    # THE DECISION IS COMPARED, NOT THE EPOCH, and the first
+                    # draft compared the epoch: every rebuild let the writer
+                    # move it again, so the answer was re-derived to the SAME
+                    # value forever and the loop hit its cap and closed
+                    # INTERNAL_FAULT on a session that had the right answer in
+                    # hand. An epoch that moved says the decision MIGHT be
+                    # stale; only the decision says whether it is.
+                    self._authority_observed = None
+                    again = self.release_decision(identity[2],
+                                                  origin=identity[0])
+                    if again != prepared:
+                        return ("rederive", again, self._authority_observed)
+                    observed = self._authority_observed
+                self._settling.discard(identity)
+                self._settling_key.pop(identity, None)
+                return ("retired", None, None)
 
     def _handoff_notification(self, raw):
         """T7.R2 and RC28. A notification crosses only while the session lives.
@@ -1681,11 +2335,21 @@ class Session:
                 # gets one frame either way.
                 if not self._take_delivery(core_key):
                     continue
+                # MERGE: `core_key` and not `self._core_key(identity)` -- the
+                # loop already carries the record's own key, and re-deriving it
+                # here is the re-read #179 removed.
                 own = self._core.terminal_cause(core_key)
-                self._owed_refusals.append(
-                    (identity,
-                     own.reason if own is not None else reason,
-                     own.rule if own is not None else rule))
+                # The budget travels with the reason it belongs to. The
+                # envelope refuses an OVER_BUDGET that cannot name which bound
+                # broke, and refuses a budget on any reason that has none, so
+                # carrying the pair together is what lets either be built.
+                if own is not None:
+                    self._owed_refusals.append(
+                        (identity, own.reason, own.rule))
+                    self._budget_for[identity] = getattr(own, "budget", None)
+                else:
+                    self._owed_refusals.append((identity, reason, rule))
+                    self._budget_for[identity] = budget
             self._pending.clear()
             # The debt above is now recorded for both tables, so the record has
             # done its job and must not keep the watcher awake (RC15) or block
@@ -1720,11 +2384,181 @@ class Session:
                 if not self._owed_refusals:
                     return
                 identity, reason, rule = self._owed_refusals.pop(0)
+            # The retained refusal discharges the obligation the close kept,
+            # under the token that close recorded it with.
+            owed = self._settling_key.get(identity) or self._core_key(identity)
+            self._yielded_obligation = owed
+            # R-168-R9. AND IT IS A TERMINAL, so it is recorded like one. The
+            # drain does not pass through `_handoff`, so round 8's single
+            # recorder never saw it and a retained refusal crossed with nothing
+            # in the receipt saying the item had ended (XU15) -- the same hole
+            # round 8 closed for the ordinary crossing, in the one path that
+            # only runs when something has already gone wrong. Pre-existing
+            # before round 8 as well; measured on `bb7607b` and `07c5c67`.
+            if self._handoff_record is not None:
+                self._handoff_record(identity[2], reason, rule, False)
             yield self._client_refusal(identity, reason, rule)
 
     def control_answer(self, request_id):
         """The frame a proxy-owned request got, or None while it is unanswered."""
         return self._control_answers.get(key(ORIGIN_PROXY, request_id))
+
+    def obligation_for(self, request_id, *, origin=ORIGIN_CLIENT):
+        """The token of the LIVE attempt under this id.
+
+        For a caller answering the item that is still pending -- a local
+        withhold, a cancellation -- where the live generation is unambiguous
+        because admission refuses an id that is already pending or settling.
+        A caller answering something that may have finished must carry its own
+        token instead; that is what `obligation_of_last_yield` is for.
+        """
+        return self._core_key(key(origin, request_id))
+
+    def obligation_of_last_yield(self):
+        """The token the frame just yielded discharges, or None for a frame
+        that discharges nothing (a notification, or the reader saying nothing
+        crosses)."""
+        return self._yielded_obligation
+
+    def answered_on_the_wire(self, token, *, final=False):
+        """This id's answer is committed to the sink, or has reached it.
+
+        R-168-R8/F3. TAKING IS REVERSIBLE, CONFIRMING IS NOT, and collapsing
+        the two paid one client twice. The payer wrote a bounded refusal
+        straight to the sink -- bytes gone, client answered -- and then the
+        close drained a retained refusal for the same id whose authorisation
+        failed, `owe_again` put the id back, and the payer answered it a second
+        time. An id whose frame has actually MOVED is never owed again; an id
+        we merely committed to may be.
+        """
+        # THE CONFIRMATION NAMES THE GENERATION IT CONFIRMS. Clearing at
+        # admission is not enough: a LATE confirmation for the first generation
+        # arrives after the second is admitted, and keyed by identity it
+        # discarded the new generation's obligation (XU13). A token can only
+        # ever confirm its own attempt.
+        self._unanswered.discard(token)
+        if final:
+            self._answered_final.add(token)
+
+    def owe_again(self, token):
+        """Give back an obligation we committed to and did not discharge.
+
+        Delivery is taken BEFORE the authorisation, so a concurrent receipt
+        failure cannot pay an id whose frame is already on its way; if that
+        authorisation then fails the bytes never moved and the client is owed
+        again. But only if nothing has ever reached them for this id.
+
+        R-168-R12/(a). RELEASES DELIVERY TOO, now that taking acquires it. A
+        give-back that restored the obligation and left delivery held would
+        hand back something nobody could ever take again -- the client owed an
+        answer no writer is permitted to send.
+
+        R-168-R13/(2), ASTRA OW03 + OW07. THE FINAL CHECK COMES FIRST. Round 12
+        discarded delivery and only then asked whether the id was already
+        answered, so a give-back for a FINAL answer left the obligation alone
+        -- correctly -- while still releasing delivery. `take_delivery` then
+        succeeded for an id whose bytes had already reached the client, and a
+        stale local writer sent a second response. Nothing is given back for an
+        id that has been answered: not the obligation, and not delivery.
+        """
+        with self._settlement:
+            if token in self._answered_final:
+                return
+            self._delivering.discard(token)
+            self._unanswered.add(token)
+
+    def unanswered_clients(self):
+        """Every outstanding obligation, FOR LOOKING AT. Grants nothing.
+
+        R-168-R9. This used to be how the payer got its work, and reading a
+        list and then marking its entries afterwards is not a claim: a real
+        cancellation answered an id while the payer held a stale copy and the
+        id was paid twice. Claiming now happens only through
+        `take_next_unanswered`, which takes under the owner.
+
+        The method stays because reviewer controls READ it to observe the
+        table, and an instrument that can no longer see the state it is
+        grading is an instrument broken by a change it had no reason to
+        notice. Observation is safe; it is acting on an observation held
+        across a lock release that is not.
+        """
+        return list(self._unanswered)
+
+    def take_obligation(self, token):
+        """Claim THIS obligation, or say somebody else already has it.
+
+        R-168-R9/(b). THE ONE OWNERSHIP OPERATION, and every delivery path goes
+        through it -- the payer, the local withhold, the cancellation, the
+        release. Round 9's first draft had the ordinary paths CONFIRM
+        unconditionally while only the payer took, so both answered the same
+        request: the payer paid an admitted id whose ordinary answer was still
+        in flight, and the client got two frames (RS09).
+
+        A caller that is refused here writes nothing. It has not failed; it has
+        learned that this obligation is someone else's to discharge.
+
+        R-168-R12/(a), ASTRA LC01 + LC03. ONE OWNERSHIP SET. This used to take
+        only the obligation while `take_delivery` kept a SEPARATE set, so a
+        writer could own the obligation and still look unowned to anything
+        asking about delivery. The teardown asks `_take_delivery`, saw the
+        successful list as nobody's, and retained a second response for a
+        request that had already been answered: one answer for the first
+        request and TWO for the second, on a real pipe, in 3 of 3 crossings.
+        Two sets meant two answers.
+
+        So a taker of one is the owner of the other, acquired in the same
+        critical section. A caller refused here writes nothing, whichever half
+        was already somebody else's.
+        """
+        with self._settlement:
+            if token not in self._unanswered:
+                return False
+            return self._take_delivery(token)
+
+    def take_next_unanswered(self, *, origin=ORIGIN_CLIENT):
+        """Take ONE outstanding obligation, or None. The only way to get one.
+
+        R-168-R9/(b). `unanswered_clients()` handed out a SNAPSHOT and the
+        caller marked each entry afterwards, so the list outlived the owner: a
+        real cancellation answered an id while the payer was paused holding a
+        stale copy, and the payer paid it again. Two responses, one request.
+        `_paying` never helped -- it prevents recursion, not a race.
+
+        Taking is the claim. There is no reading without taking, so nothing a
+        caller holds can go stale in its hand, and a token taken or already
+        confirmed grants nothing to anyone else. Same law as R-179-R7's
+        delivery ownership, which is where this shape comes from.
+        """
+        with self._settlement:
+            # A COPY, because `_take_delivery` discards from `_unanswered` and
+            # we no longer return on the first candidate.
+            for token in list(self._unanswered):
+                if token[0] == origin:
+                    # TAKEN, NOT CONFIRMED. The caller has committed to
+                    # answering this obligation and nobody else may take it,
+                    # but the bytes have not moved: if its write raises, it
+                    # gives the obligation back through `owe_again` exactly as
+                    # the release path does (XU05). Marking it final here made
+                    # the take permanent and lost the answer.
+                    #
+                    # R-168-R13/(1), ASTRA OW01 + OW02. THROUGH THE SAME SINGLE
+                    # ACQUIRE as the other two takers. Round 12 removed the
+                    # obligation here by hand and never entered `_delivering`,
+                    # so the payer held the obligation while still looking
+                    # unowned to anything asking about delivery -- and round 12
+                    # had also removed the second-obligation check that used to
+                    # stop the local writer. Pause the writer at its acquire,
+                    # let the payer take, release it at any of the payer's
+                    # three boundaries: TWO responses for one admitted request,
+                    # 3 of 3 crossings, where b707bf2 passed 3 of 3. A taker of
+                    # either half owns both, and that has to include this one.
+                    if self._take_delivery(token):
+                        return token
+                    # Somebody already owns delivery for this id; it is not
+                    # ours to pay. Keep looking rather than reporting the whole
+                    # table empty.
+                    continue
+            return None
 
     def closed_with(self):
         return self._closed

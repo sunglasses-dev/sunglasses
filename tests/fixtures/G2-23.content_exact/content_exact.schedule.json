@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "scenario_id": "G2-23",
+  "variant": "content_exact",
+  "profile": "budget_content_exact",
+  "required_steps": [
+    {
+      "op": "freeze_limits_and_provenance",
+      "file": "limits.json"
+    },
+    {
+      "op": "calibrate_control_and_destination",
+      "source_payload": "payload.txt",
+      "same_operation": "content_exact.requests.jsonl",
+      "profile": "budget_content_exact"
+    },
+    {
+      "op": "provision_fixture_approval",
+      "snapshot": "baseline.tools-list.json",
+      "except_profiles": [
+        "pin_first_seen",
+        "pin_invalid_record",
+        "pin_snapshot_race"
+      ]
+    },
+    {
+      "op": "initialize_real_pipes",
+      "client_request": "initialize.request.jsonl",
+      "upstream_response": "initialize.response.jsonl",
+      "await_response_before_notification": "initialized.notification.jsonl"
+    },
+    {
+      "op": "execute_profile",
+      "name": "budget_content_exact",
+      "client_file": "content_exact.requests.jsonl",
+      "upstream_file": "content_exact.upstream.jsonl",
+      "auxiliary_files": [],
+      "fault": {},
+      "sequence": "Duplicate multibyte data across text and structured fields for exactly 262144 decoded content bytes; normal complete scan before deadline; original all-field equality required.",
+      "primary_id_file": "content_exact.requests.jsonl",
+      "strict_actions_required": true,
+      "profile_steps": "profile_steps"
+    },
+    {
+      "op": "probe_health_when_session_expected_open",
+      "request": "health.request.jsonl",
+      "response": "health.response.jsonl"
+    },
+    {
+      "op": "drain_and_reap",
+      "observation_grace_ms": 500
+    },
+    {
+      "op": "assert_five_layers",
+      "expected_path": "/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/fixtures/23_g3_aggregate_budget/expected.json",
+      "variant": "content_exact",
+      "route": "proxy_strict"
+    },
+    {
+      "op": "run_rejecting_mutation",
+      "mutation": "Count characters or only first text field."
+    }
+  ],
+  "unknown_operation": "INVALID",
+  "missing_barrier": "INVALID",
+  "skipped_call": "INVALID",
+  "model_visibility_without_model_input_observer": "UNOBSERVED",
+  "profile_steps": [
+    {
+      "op": "send_file",
+      "path": "content_exact.requests.jsonl",
+      "origin": "client"
+    },
+    {
+      "op": "send_file",
+      "path": "content_exact.upstream.jsonl",
+      "origin": "upstream"
+    },
+    {
+      "op": "await_primary_terminal",
+      "id_from": "content_exact.requests.jsonl",
+      "timeout_ms": 3000
+    }
+  ],
+  "limits_status": "proposed numeric defaults, to be frozen by T9 before execution; admission tests use the frozen configured N plus one"
+}

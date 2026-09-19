@@ -111,27 +111,31 @@ class Settlement:
                 f"complete={self.inspection_complete}>")
 
 
-# T7.R1/T7.R2. Which rule a recorded cause carries. Protocol faults are S5 and
-# nothing else is: the structural and resource breaches are explicitly NOT S5
-# per T7.R1, and cancellation and approval keep their own rules because those
-# are what actually happened to the item.
-# Named as literals because these causes are recorded by the SESSION, not
-# produced by this module, so they are not in the subset above; T4.R5 owns the
-# catalog they come from.
-_PROTOCOL_CAUSES = frozenset({"MALFORMED_CLIENT", "MALFORMED_UPSTREAM",
-                              "UNSUPPORTED_PROTOCOL"})
-_CAUSE_RULES = {REQUEST_CANCELLED: "S6", "APPROVAL_REQUIRED": "S4"}
+# T407. The rule a RECORDED cause carries. Rule A makes an earlier fault
+# terminal, which is right, and it was also settling every one of them as S3:
+# the reason survived and the rule did not, which files a framing fault at the
+# severity of a failed scan.
+#
+# The map follows the product rather than inventing a taxonomy. `pump._close`
+# defaults to S5 and is called with that default for exactly the two framing
+# faults, and names S3 explicitly everywhere else (OVERLOADED, and the protocol
+# version the server offered). Anything not named here is S3, which keeps the
+# default the conservative one.
+_CAUSE_RULES = {
+    "MALFORMED_UPSTREAM": "S5",
+    "MALFORMED_CLIENT": "S5",
+    REQUEST_CANCELLED: "S6",
+}
 
 
-def rule_for_cause(cause):
-    """The rule that belongs to a cause recorded before the worker answered."""
-    if cause in _PROTOCOL_CAUSES:
-        return "S5"
-    return _CAUSE_RULES.get(cause, "S3")
+def rule_for(reason):
+    """The rule that belongs to a reason, wherever the reason came from."""
+    return _CAUSE_RULES.get(reason, "S3")
 
 
 def settle(result, *, held, held_content_bytes, helper_outcome="clean",
-           independent_cause=None, known_detector_gap=False):
+           independent_cause=None, known_detector_gap=False,
+           cancellation_owned=False):
     """T4.R4(6b) through (9), for an ALREADY VALIDATED worker result.
 
     Validation is `worker.validate` and is deliberately a separate step: this
@@ -141,20 +145,18 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
     `independent_cause` is anything recorded for the item before the worker
     answered. It is passed in rather than looked up, because Rule A is about
     ORDER and only the caller holding the session knows the order.
+
+    `cancellation_owned` says whether the CLIENT cancelled this request, and is
+    passed in for the same reason: a worker reporting `cancelled` says only
+    that its scan stopped, never who stopped it, and the tombstones that answer
+    that live in the session. T406. Defaulting to False makes the quiet answer
+    the conservative one -- an unexplained abort reads as a scan that did not
+    happen rather than as a client who changed their mind.
     """
     if independent_cause is not None:
         # T4.R4 Rule A. An earlier fault is terminal, and the completion that
         # arrives afterwards does not get to relabel it.
-        #
-        # THE RULE TRAVELS WITH THE CAUSE. This returned a hardcoded S3, so an
-        # item already settled for a PROTOCOL fault came back out as a scan
-        # fault: T7.R2 says each pending item settles with the first recorded
-        # cause AND its rule -- S5 for protocol, S3 for resource or deadline,
-        # S6 or S4 where that was what happened. The reason survived and the
-        # rule did not, which reads in a receipt as the wrong kind of thing
-        # having gone wrong, and S5 is the one that means the wire is no longer
-        # trustworthy.
-        return Settlement(independent_cause, rule_for_cause(independent_cause),
+        return Settlement(independent_cause, rule_for(independent_cause),
                           accepted=result["accepted"],
                           status=result["status"], inspection_complete=False,
                           detail="an independent cause was recorded first")
@@ -180,7 +182,13 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
                   worker.STATUS_DEADLINE: SCAN_DEADLINE,
                   worker.STATUS_CANCELLED: REQUEST_CANCELLED,
                   }.get(result["status"], SCAN_EXCEPTION)
-        return Settlement(reason, "S6" if reason == REQUEST_CANCELLED else "S3",
+        # T406. S6 says the CLIENT withdrew the request, which says the bytes
+        # were never in question. A worker that stopped on its own reached no
+        # verdict about bytes that WERE in question, and that is S3. The worker
+        # cannot tell the two apart, so an unowned cancellation is not one.
+        if reason == REQUEST_CANCELLED and not cancellation_owned:
+            reason = SCAN_EXCEPTION
+        return Settlement(reason, rule_for(reason),
                           accepted=result["accepted"], status=result["status"],
                           inspection_complete=False, rule_ids=rule_ids)
 
@@ -203,11 +211,10 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
 
     # T4.R4(9). The one verdict that lets bytes through.
     #
-    # The gap disposition is CHANNEL `message` ONLY, as the rule writes it. It
-    # fired wherever the flag was set, including `api_response`, which labels
-    # an ARRIVING result as a known published miss of OURS -- a statement about
-    # our own detector coverage attached to something we never claimed to
-    # cover. An S1 on any other channel is an ordinary CLEAN.
+    # The gap disposition is CHANNEL `message` ONLY, as the rule writes it. On
+    # `api_response` it labels an ARRIVING result as a known published miss of
+    # OURS -- a statement about our own coverage attached to something we never
+    # claimed to cover.
     gap = known_detector_gap and result["binding"].get("channel") == "message"
     return Settlement(
         CLEAN, "S1", accepted=True, status=worker.STATUS_COMPLETE,

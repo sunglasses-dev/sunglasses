@@ -4,7 +4,7 @@ import pytest
 from sunglasses.proxy import pump,handshake
 from test_round4 import peer,wire
 from test_round7_gate import child_session,send,exit_child,yield_line
-# Moved from scripts/ to tests/proxy/ at the #166 rebase (T9 ruling): every
+# Moved from scripts/ to tests/proxy/ at the #168 rebase (T9 ruling): every
 # other vendored control lives here, and archive-suite and CI collect this
 # directory. parents[2] keeps R at the REPOSITORY ROOT, which is what it was
 # in scripts/ -- a relocation must not quietly move where a control reads its

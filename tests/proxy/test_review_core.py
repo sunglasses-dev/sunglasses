@@ -33,12 +33,38 @@ def test_RC02_reader_close_with_buffered_line_retains_refusal():
  assert len(out)==1
  assert json.loads(out[0])['error']['data']['reason_code']=='MALFORMED_UPSTREAM'
 
+# R-RC03-1 (T9, 2026-09-14 10:00). This control asserted the refusal data by
+# EQUALITY against two members, which contradicts T410 and T4.R7's ten. The
+# ruling is that the ten win, and RC03 is SPLIT IN PLACE rather than edited
+# away: the substantive assertions below are unchanged and live, the equality
+# becomes a strict xfail tripwire, and a positive control per row asserts the
+# ten members AND their values. Both measurements are in README.md.
+
 @pytest.mark.parametrize('reason,rule',[('SCAN_EXCEPTION','S3'),('REQUEST_CANCELLED','S6'),('DESCRIPTOR_CHANGED','S4')])
 def test_RC03_refusal_preserves_per_item_first_cause(reason,rule):
  s=session();ident=s._core_key(pump.key('client',17));s._core.record(ident,Cause(reason,rule))
  out=list(s.read_upstream(b''));actual=s.answer_for(17,origin='client')
  assert (actual.reason,actual.rule)==(reason,rule)
+ data=json.loads(out[0])['error']['data']
+ assert data['reason_code']==reason and data['rule']==rule
+
+@pytest.mark.parametrize('reason,rule',[('SCAN_EXCEPTION','S3'),('REQUEST_CANCELLED','S6'),('DESCRIPTOR_CHANGED','S4')])
+@pytest.mark.xfail(strict=True,reason='R-RC03-1: the two-member data is withdrawn; T4.R7 names ten')
+def test_RC03_two_member_data_tripwire(reason,rule):
+ s=session();ident=s._core_key(pump.key('client',17));s._core.record(ident,Cause(reason,rule))
+ out=list(s.read_upstream(b''))
  assert json.loads(out[0])['error']['data']=={'reason_code':reason,'rule':rule}
+
+@pytest.mark.parametrize('reason,rule',[('SCAN_EXCEPTION','S3'),('REQUEST_CANCELLED','S6'),('DESCRIPTOR_CHANGED','S4')])
+def test_RC03_positive_control_ten_members_and_their_values(reason,rule):
+ s=session();ident=s._core_key(pump.key('client',17));s._core.record(ident,Cause(reason,rule))
+ out=list(s.read_upstream(b''));data=json.loads(out[0])['error']['data']
+ assert set(data)=={'reason_code','rule','budget','accepted','status','inspection_complete','inspected_utf8_bytes','observed_content_bytes','elapsed_ms','rule_ids'}
+ assert (data['reason_code'],data['rule'])==(reason,rule)
+ assert data['accepted'] is False and data['inspection_complete'] is False
+ assert data['status']=='not_run'
+ assert data['inspected_utf8_bytes']==0 and data['observed_content_bytes']==0
+ assert data['rule_ids']==[] and data['budget'] is None
 
 def test_RC04_supervisor_retry_remains_possible(monkeypatch):
  s=session();calls=[]
