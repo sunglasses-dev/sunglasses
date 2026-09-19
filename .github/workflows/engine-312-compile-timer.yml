@@ -1,0 +1,107 @@
+name: engine-312-compile-timer
+
+# WO R-312-FIXTURE-SCOPE (T9, 2026-09-19). CI-only, DISPATCH-ONLY, off by
+# default. Same shape as engine-312-stalltrace (#193), which worked.
+#
+# THE HYPOTHESIS THIS TESTS, stated so a reader can refute it:
+#
+#   Engine construction makes 3,075 `re.compile` calls over 2,986 DISTINCT
+#   sources, against a CPython cache of 512. So the cache thrashes and every
+#   construction recompiles nearly everything -- measured on the box, 71% of a
+#   build is inside re.compile, and a second build in the same process costs
+#   the same as the first.
+#
+#   That is a MULTIPLIER, not an explanation. The 3.12 integrity leg carries 41
+#   fixed waits against 3.13 (CI_312_LEG.md §7, §10, counted twice), and §12
+#   eliminated the patch version. Locally 3.12 and 3.13 build within 4% of each
+#   other, so the box cannot say why CI differs. But if per-compile cost is what
+#   differs on that runner, it is multiplied by 3,075 per construction and 41
+#   constructions per leg, which is the shape of the 10x being chased.
+#
+#   So: TIME EVERY re.compile ON BOTH LEGS AND COMPARE THE DISTRIBUTIONS. If
+#   3.12's per-compile cost is higher there, this says so in one table. If the
+#   distributions match, per-compile cost is eliminated and the excess is
+#   somewhere else -- which is equally a result and is why 3.13 is armed too.
+#
+# WHAT WOULD MAKE THIS INSTRUMENT A LIAR, and how each is handled:
+#   * a lighter install than the integrity leg -- #193 died at collection with
+#     ModuleNotFoundError and produced zero dumps, which reads exactly like
+#     "no stall". Same install as the integrity leg, native tools included.
+#   * output eaten by pytest capture -- #193 measured that both stderr and a
+#     dup of fd 2 are redirected. The timer writes to a FILE and uploads it.
+#   * the timer perturbing what it measures -- it wraps re.compile with a
+#     perf_counter pair and nothing else; the overhead is counted in the
+#     artifact so a reader can subtract it rather than trust it is small.
+#
+# IT COSTS NOTHING WHEN UNARMED. With SUNGLASSES_COMPILE_TIMER unset the
+# conftest block does not execute, so every other run -- local, the fast lane,
+# the six matrix legs -- is byte-for-byte what it was. There is no `push` or
+# `pull_request` trigger on purpose: this is a question, not a gate.
+
+on:
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: engine-312-compile-timer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  timer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the leg with the waits. 3.13 is armed IDENTICALLY and is the
+        # control: a difference that appears on both legs is not the 3.12 gap.
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: the interpreter, exactly
+        run: python -VV
+
+      - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+
+      # THE SAME INSTALL THE INTEGRITY LEG DOES. A lighter one dies at
+      # collection and produces an empty artifact, which reads like a result.
+      - name: Install package + dev + media deps
+        run: |
+          python -m pip install --upgrade 'pip==26.2.1'
+          pip install -e ".[dev,media]" || { pip install -e . && pip install pytest pyyaml "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9" Pillow; }
+          python -c "import yaml, pytest; print('yaml and pytest import OK')"
+
+      # ARMED, and the cache bump turned OFF so this measures the raw
+      # per-compile cost rather than the cache's effect on it.
+      - name: the suite, with every re.compile timed
+        env:
+          SUNGLASSES_COMPILE_TIMER: "${{ runner.temp }}/compile-timer-${{ matrix.python-version }}.txt"
+          SUNGLASSES_TEST_RE_CACHE: "off"
+        run: |
+          set +e
+          python -m pytest tests -q -p no:cacheprovider 2>&1 | tail -20
+          echo "PYTEST_EXIT=${PIPESTATUS[0]}"
+          set -e
+
+      - name: the table
+        if: always()
+        run: |
+          echo "--- top of the timer artifact:"
+          head -70 "${{ runner.temp }}/compile-timer-${{ matrix.python-version }}.txt" || true
+
+      - name: timings, kept
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-timer-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/compile-timer-${{ matrix.python-version }}.txt
+          retention-days: 7
