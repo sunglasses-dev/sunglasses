@@ -38,7 +38,12 @@ def _close_sites():
     there are two. A control that miscounts is worse than no control here,
     because this file exists to count.
     """
-    for path in sorted(PACKAGE.glob("*.py")):
+    # M07. RECURSIVE. `glob("*.py")` reads the package's top level only, so a
+    # close site in a nested module was never looked at -- the reviewer added
+    # one and all ten author rows stayed green. A guard over "the package" that
+    # silently means "the top of the package" is the shape this file exists to
+    # refuse.
+    for path in sorted(PACKAGE.rglob("*.py")):
         tree = ast.parse(path.read_text())
         scope = {}
         for node in ast.walk(tree):
@@ -130,6 +135,22 @@ def test_one_fault_one_kind_wherever_the_code_is_standing():
                 f"they need different kinds")
             assert len(sites) == expected[kind], (kind, sites)
 
+    # M06, AND THIS DIRECTION IS THE ONE THAT WAS MISSING. Everything above
+    # only inspects kinds that STILL appear more than once, so SPLITTING a
+    # declared pair -- giving one of its two sites a synonym -- drops both
+    # halves to one site each and slips under every assertion. The reviewer
+    # did exactly that and all ten author rows stayed green.
+    #
+    # A declared pair is a claim that N sites share one fault. The claim is
+    # false the moment the count is anything but N, in either direction.
+    for kind, count in sorted(expected.items()):
+        actual = shared.get(kind, [])
+        assert len(actual) == count, (
+            f"{kind} is declared as {count} sites that are the same fault and "
+            f"fires at {len(actual)}: {actual}. A site that left the pair took "
+            f"a synonym for a fault that already has a word, which is the "
+            f"reason catalog's defect moved into the kind catalog")
+
 
 @pytest.mark.parametrize("module,attribute", [
     ("framing", "kind"), ("handshake", "kind"), ("bounds", "kind"),
@@ -196,3 +217,120 @@ def test_the_only_reason_that_closes_without_a_kind_is_over_budget():
             f"{reason} produces a close with no kind. Only OVER_BUDGET is "
             f"exempt, and only because `budget` already carries the fact")
     assert kinds_by_reason.get("SCAN_DEADLINE") == {"DEADLINE_EXPIRED"}
+
+
+# ---------------------------------------------------------------------------
+# R-185-R5. The four rows below each exist because a NAMED mutant walked past
+# everything above it. Each one is the assertion that mutant needed, and no
+# wider: the reviewer's M04, M05, M06 and M08.
+# ---------------------------------------------------------------------------
+
+THE_CATALOG = frozenset({
+    "ID_NAMESPACE_CLAIMED", "ID_REUSED_WHILE_SETTLING", "ID_REUSED_WHILE_PENDING",
+    "RESPONSE_NOT_PENDING", "RESPONSE_SHAPE_MISMATCH", "UPSTREAM_EXIT_WITH_PENDING",
+    "FRAME_UNTERMINATED", "INITIALIZE_RESULT_SHAPE", "TOMBSTONE_TABLE_FULL",
+    "HANDOFF_GENERATION_MISMATCH", "FRAME_INVALID_UTF8", "FRAME_JSON_CONSTANT",
+    "FRAME_DUPLICATE_KEY", "FRAME_UNPARSEABLE", "FRAME_TOP_LEVEL_NOT_OBJECT",
+    "FRAME_JSONRPC_VERSION", "FRAME_ENVELOPE_INVALID", "FRAME_ID_TYPE",
+    "PROTOCOL_VERSION_UNSUPPORTED", "CLIENT_RESPONSE_UNSOLICITED",
+    "DEADLINE_EXPIRED", "WATCHDOG_FAILED", "DECISION_AUTHORITY_MOVED",
+    "RECEIPT_WRITE_FAILED",
+})
+
+
+def test_the_catalog_is_pinned_here_not_only_validated_at_construction():
+    """M06. The catalog is a CLOSED SET, so adding to it is a decision.
+
+    `Cause` validates membership when one is constructed, which stops an
+    uncatalogued kind reaching a receipt but says nothing about the catalog
+    itself growing. The reviewer added a synonym to `CAUSE_KINDS` and used it
+    at one site; every row passed, because each one asked "is this kind in the
+    catalog" and the answer had just been made yes.
+
+    A pin costs one line per kind and turns catalog growth into an edit
+    somebody has to justify here, which is what a fixed vocabulary means.
+    """
+    assert CAUSE_KINDS == THE_CATALOG, {
+        "added without declaring": sorted(CAUSE_KINDS - THE_CATALOG),
+        "declared but gone": sorted(THE_CATALOG - CAUSE_KINDS),
+    }
+    assert len(THE_CATALOG) == 24
+
+
+def test_the_receipt_field_set_is_exactly_the_four_fixed_vocabularies():
+    """M04. `Cause.as_receipt()` is an ALLOWLIST, asserted as a whole set.
+
+    The reviewer put `detail` back into it. Nothing went red: the map rows read
+    source and never call it, and the writer's own field filter drops `detail`
+    on the way to disk, so the author's disk assertion could not see the
+    regression either. Two guards, each blind in the direction the other
+    covered, and between them a prose field back in the event stream.
+
+    This asserts the RETURNED KEYS, exactly, so a fifth field of any name fails
+    here whatever the writer would later do with it. `detail` is named
+    separately because it is the specific field that leaked peer material into
+    a receipt twice.
+    """
+    from sunglasses.proxy.session import Cause
+    cause = Cause("MALFORMED_UPSTREAM", "S5", budget=None,
+                  detail="peer-supplied prose that must never reach evidence",
+                  kind="FRAME_UNTERMINATED")
+    receipt = cause.as_receipt()
+    assert set(receipt) == {"reason_code", "rule", "budget", "cause_kind"}, receipt
+    assert "detail" not in receipt
+    assert cause.detail  # still on the object, for logs and exceptions
+    assert receipt["cause_kind"] == "FRAME_UNTERMINATED"
+
+
+def test_the_kind_is_on_the_disk_allowlist_and_the_prose_is_on_the_never_list():
+    """M05. The durable receipt keeps only what `PERMITTED_FIELDS` names.
+
+    Dropping `cause_kind` from that list leaves every in-memory assertion
+    green and silently removes the field from disk -- which is how the field
+    was discovered missing in the first place, by writing a row and reading it
+    back. The author's own disk row catches this; the map file could not, and
+    the two are different instruments that should not depend on each other.
+    """
+    from sunglasses.proxy import receipts
+    assert "cause_kind" in receipts.PERMITTED_FIELDS, (
+        "a kind the session carries but the writer drops is a change that "
+        "looks complete and alters nothing a reader ever sees")
+    assert "detail" in receipts.FORBIDDEN_FIELDS
+    assert not (receipts.PERMITTED_FIELDS & receipts.FORBIDDEN_FIELDS)
+
+
+@pytest.mark.parametrize("module,holder", [
+    ("framing", "Frame"), ("handshake", "Negotiation"), ("bounds", "Breach"),
+])
+def test_every_producer_kind_VALUE_is_in_the_catalog(module, holder):
+    """M08. A slot existing is not its values belonging to the vocabulary.
+
+    `test_the_results_that_carry_a_reason_also_carry_a_kind` asserts these
+    holders HAVE a `kind` slot. The reviewer replaced framing's UTF-8 fault
+    kind with an uncatalogued literal and every row stayed green, including
+    those producer rows: the slot was still there, and the close sites that
+    pass it through do so by attribute, so no literal appears at a call site
+    for the catalog row to read.
+
+    So the literals are read HERE, at the producer, where they are written.
+    `None` is allowed and is the documented OVER_BUDGET exemption, asserted by
+    fault one row below.
+    """
+    source = ast.parse((PACKAGE / f"{module}.py").read_text())
+    literals = []
+    for node in ast.walk(source):
+        if not isinstance(node, ast.Call):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg != "kind":
+                continue
+            if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                literals.append((node.lineno, keyword.value.value))
+    outside = sorted({v for _, v in literals} - CAUSE_KINDS)
+    assert not outside, (
+        f"{module}.py produces {outside} as a cause kind and the catalog does "
+        f"not contain it; a receipt field that is not from a fixed vocabulary "
+        f"cannot be compared to a fixture")
+    assert literals, (
+        f"no kind literal found in {module}.py -- this row would pass on a "
+        f"module that produces no kinds at all, so it asserts it found some")
