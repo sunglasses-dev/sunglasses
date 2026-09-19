@@ -24,9 +24,53 @@ proving the sharing is safe and keeping it that way:
 the question here is about calls. A comment, a docstring or a string literal
 naming the class is not a compile; a helper three files away that builds one is.
 """
+import os
+import re
+
 import pytest
 
 from sunglasses.engine import SunglassesEngine
+
+
+# ── THE REGEX CACHE THE ENGINE ASSUMES AND DOES NOT GET ────────────────────
+#
+# `engine.py:457` says "re.compile caches, so two rules sharing a source share
+# the object". That is true of two rules and false of this pattern database.
+# Measured on one default construction:
+#
+#     re.compile calls per construction   3,075
+#     DISTINCT regex sources              2,986
+#     re._MAXCACHE (CPython default)        512   <- holds 17% of them
+#
+# So the cache is full and evicting before the engine has finished building
+# once, and nothing survives to the next construction. The consequence is not
+# subtle: 71% of a build is spent inside re.compile (1.376 s of 1.948 s), and a
+# SECOND engine in the same process costs the same as the first --
+# 1.912 s then 1.938 s. The cache buys nothing at this scale.
+#
+# Raising it changes that and nothing else:
+#
+#     repeat construction, _MAXCACHE=512     1.938 s
+#     repeat construction, _MAXCACHE=4096    0.575 s   (70% faster)
+#
+# Identical on 3.12 and 3.13, and the bump was verified to take effect on
+# 3.11 through 3.14 (the cache really does grow past 512). 3.9 and 3.10 are in
+# the CI matrix and are not installed here, so the guard below is written to
+# do nothing rather than fail if the private name ever goes away.
+#
+# THIS IS A TEST-ONLY MEASURE AND NOT THE REPAIR. It sets a CPython private
+# from the suite, which is acceptable here because it changes only how fast the
+# tests build engines, and unacceptable as a product fix: the real repair is
+# for the engine to own a compiled-regex cache keyed by (source, flags) across
+# instances, and to correct that comment in the same change. Filed separately.
+#
+# ON BY DEFAULT, because a saving the suite has to opt into is a saving the
+# suite will not get. Set SUNGLASSES_TEST_RE_CACHE=off to measure without it.
+_RE_CACHE_WANTED = 4096
+if os.environ.get("SUNGLASSES_TEST_RE_CACHE", "on").strip().lower() not in (
+        "0", "off", "false", "no"):
+    if hasattr(re, "_MAXCACHE") and re._MAXCACHE < _RE_CACHE_WANTED:
+        re._MAXCACHE = _RE_CACHE_WANTED
 
 
 @pytest.fixture
