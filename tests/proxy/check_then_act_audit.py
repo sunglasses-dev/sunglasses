@@ -152,37 +152,32 @@ INVENTORY = {
         "Setting aside a copy that failed its digest; nothing claims that name.",
     "_records_dir: d.mkdir(parents=True, exist_ok=True)":
         "Idempotent creation of our own records directory.",
+    # ROUND 19 FUNNELS EVERY UNLINK-UNDER-LOCK THROUGH ONE SITE, so the
+    # per-caller entries that used to answer for each of them are gone and this
+    # one answers for all of them. That is the point of the shape: there is now
+    # exactly one place in this file where a collector removes anything, and it
+    # cannot do so without first proving the name still resolves to the inode
+    # its own descriptor holds.
+    "_release_owner_file: _owner_file(private).unlink()":
+        "Our OWN lock file, dropped by the process that created it and still "
+        "holds it, and only once the alias it answers for is gone. Not a "
+        "collector removing somebody else's name, so it is not the site below "
+        "and does not need its proof.",
+    "_unlink_under_proof: target.unlink()":
+        "The only removal any collector performs. It happens while this call "
+        "holds the owner's exclusive lock AND only after fstat of that "
+        "descriptor matches stat of the owner's name, so a name reclaimed "
+        "since the lock is left alone and recorded instead.",
     "_records_dir: os.chmod(str(d), 0o700)":
         "Our own records directory, narrowed at creation.",
     # Round 14's two collectors. Both remove a NOTE and never held bytes, and
     # each answers for itself rather than sharing one entry.
     # Round 18 splits this site: a PUBLIC note is removed as before, and an
     # ALIAS only under its owner's lock, so the two are two sites.
-    "_collect_discharged_notes: spent.unlink() #1":
-        "An alias whose held file is gone, removed while this call holds its "
-        "owner's lock -- the proof and the act in one place (R-177-R18).",
-    "_collect_discharged_notes: _owner_file(spent).unlink()":
-        "That alias's lock file, removed with it and under the same lock.",
     "_collect_discharged_notes: spent.unlink()":
         "A note whose held file is no longer there. Recovery put those bytes "
         "back at the canonical name, so the note answers for a file that does "
         "not exist and nothing can be recovered from it.",
-    "_collect_stale_aliases: alias.unlink()":
-        "A private alias of a note we are holding ourselves, left by a process "
-        "that has ended. Our own alias names the same held file with the same "
-        "digest and cannot be collected by anyone while we live, so the route "
-        "back is never empty.",
-    # Round 15's owner files. The lock inside one is what proves an incarnation
-    # ended; these two sites are that file's disposal.
-    "_release_owner_file: _owner_file(private).unlink()":
-        "Our own lock file, removed only once the alias it answers for is "
-        "gone. While the alias stays the file stays, or no later collector "
-        "could prove its writer had ended.",
-    "_collect_stale_aliases: _owner_file(alias).unlink()":
-        "The lock file of an alias we have just collected, whose owner that "
-        "lock itself proved dead.",
-    # Round 16: the owner file is created and locked BEFORE the alias exists,
-    # and it records the identity of what was locked.
     "_take_owner_file: os.open(str(owner), os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)":
         "THE owner file's creation, and O_EXCL is the point: only this pid and "
         "serial build this name, so an exclusive create is the claim.",
@@ -202,10 +197,6 @@ INVENTORY = {
         "the lock we are already holding; it opens and never writes.",
     "_alias_owner_is_gone: os.open(str(owner), os.O_RDONLY)":
         "Read-only. The collector's own look at the owner file.",
-    "_collect_orphaned_owner_files: owner.unlink()":
-        "A lock file with no alias to answer for, left by a death before the "
-        "rename, whose lock proved its writer gone.",
-    # Another string method the walker cannot type; see the entry above.
     "_collect_orphaned_owner_files: owner.name[:-len(\".owner\")].replace(\".forgetlock.\", \".taking.\", 1)":
         "A string method deriving the alias name. It touches no filesystem.",
     # NOT A FILESYSTEM MUTATION AT ALL, and inventoried BECAUSE the walk cannot

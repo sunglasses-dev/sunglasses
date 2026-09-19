@@ -2630,6 +2630,47 @@ def test_the_sweep_cannot_take_a_lock_file_whose_alias_is_about_to_appear(
         inst._release_owner_file(private, keeping)
 
 
+def test_a_retention_carries_its_reason_and_a_substituted_predicate_still_runs(
+        cfg, home, artifact, monkeypatch):
+    """R19a. A retain the record cannot see contradicts the ruling that asked
+    for the record, even when the retain itself is safe: a reader who finds an
+    empty report beside a plainly retained file will call it a claim mismatch.
+
+    AND the report must not break what it reports on. The reviewer's controls
+    SUBSTITUTE the predicate with a one-argument function and then drive a
+    collection; passing it a keyword raises TypeError, and three of his rows
+    went red the moment the report was first added. So the keyword goes only to
+    our own predicate, decided by identity rather than by catching the error.
+    """
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    _, _, retained_path = _paths(home)
+    records = retained_path.parent
+    alias = records / ("github.taking.forgetting-%d-reason" % os.getpid())
+    keeping = inst._hold_owner_file(alias)
+    assert keeping is not None, "SETUP: no owner lock"
+    keeping.close()
+
+    # A filesystem we cannot prove enforces locks: a RETAIN, and it must say so.
+    monkeypatch.setattr(inst, "_filesystem_type", lambda p: "nfs")
+    reported = inst._collect_orphaned_owner_files(records)
+    monkeypatch.undo()
+    assert inst._owner_file(alias).exists(), "an unprovable filesystem still collected"
+    assert reported and any("not provable" in r for r in reported), (
+        "the retention was not reported with its reason: %r" % (reported,))
+
+    # A ONE-ARGUMENT substitute, exactly as the reviewer's rows install it.
+    calls = []
+
+    def one_argument_predicate(path):
+        calls.append(path)
+        return False
+
+    monkeypatch.setattr(inst, "_alias_owner_is_gone", one_argument_predicate)
+    inst._collect_orphaned_owner_files(records)   # must not raise TypeError
+    monkeypatch.undo()
+    assert calls, "the substituted predicate was never called"
+
+
 def test_a_forged_marker_does_not_license_an_entry_only_restore(
         cfg, home, artifact):
     """R11-NO-FIELD-DECIDES. Round 10 let a record carry a field that meant

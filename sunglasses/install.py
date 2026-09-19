@@ -1062,7 +1062,18 @@ def _lock_is_enforced(owner):
             pass
 
 
-def _alias_owner_is_gone(private):
+def _note_retained(retained, target, why):
+    """Record a retention with its REASON, when the caller asked for one.
+
+    A bare list of names says a file was kept and not why, and the why is the
+    only part a reader can act on: an unprovable filesystem and a reclaimed
+    name call for different answers.
+    """
+    if retained is not None:
+        retained.append("%s: %s" % (target, why))
+
+
+def _alias_owner_is_gone(private, *, retained=None):
     """Whether the incarnation that took this note privately has ended.
 
     In order, and only the last two are about another process:
@@ -1083,15 +1094,31 @@ def _alias_owner_is_gone(private):
     flock says nothing either (`R15_OWNER_REPLACED_BETWEEN_OPEN_AND_FLOCK`).
     Both are answered by asking what we actually locked and whether the name
     still means it. Any disagreement is UNPROVEN, and unproven retains.
+
+    R19a-A-RETAIN-THE-RECORD-CANNOT-SEE-CONTRADICTS-THE-RULING. Ruling
+    R-177-R17 said "refuse to collect and log RETAINED", and every identity
+    refusal here happens BEFORE any unlink -- so round 19's record, written at
+    the unlink, never saw them. The outcome was safe and the report said
+    nothing: a reader finding `retained == []` beside a file that had plainly
+    been retained would call it a claim mismatch and would be right. `retained`
+    is therefore an optional out-list, KEYWORD-ONLY and defaulting to None, so
+    positional callers and the bool contract are untouched -- which matters,
+    because the reviewer's rows assert `is False` and `is True` against it.
+
+    A live owner is NOT a retention: keeping a file whose owner is running is
+    the mechanism working, not doubt about it. Only the unprovable cases are
+    recorded.
     """
     if private in _HELD_PRIVATELY:
         return False
     if LOCKING is None:
+        _note_retained(retained, private, "no locking on this platform")
         return False
     owner = _owner_file(private)
     try:
         fd = os.open(str(owner), os.O_RDONLY)
     except OSError:
+        _note_retained(retained, private, "no owner file to prove anything with")
         return False
     try:
         try:
@@ -1112,16 +1139,24 @@ def _alias_owner_is_gone(private):
             # self-test cannot; the self-test answers "does this kernel
             # actually enforce", which the type check cannot.
             if not _lock_enforcement_is_provable(owner.parent):
+                _note_retained(retained, private,
+                               "lock enforcement not provable on this filesystem")
                 return False
             if not _lock_is_enforced(owner):
+                _note_retained(retained, private,
+                               "this filesystem does not enforce the lock")
                 return False
             actual = _owner_identity(fd)
             recorded = os.read(fd, 128).decode("ascii", "replace").strip()
             if recorded != actual:
-                return False                  # not the file that was locked
+                _note_retained(retained, private,
+                               "owner file is not the one its record names")
+                return False
             after = owner.stat()
             if f"{after.st_dev}:{after.st_ino}" != actual:
-                return False                  # the name moved while we held it
+                _note_retained(retained, private,
+                               "owner name reclaimed while we held the lock")
+                return False
         except OSError:
             return False
         finally:
@@ -1135,6 +1170,39 @@ def _alias_owner_is_gone(private):
             os.close(fd)
         except OSError:
             pass
+
+
+def _unlink_under_proof(fh, target, *, owner, retained):
+    """Remove `target` ONLY while `fh` is still the file `owner` names.
+
+    R19-A-LOCKED-DESCRIPTOR-AUTHORISES-ONE-NAME (ASTRA round 18,
+    `test_R18_COLLECTOR_OPEN_UNLINK_RECREATE_LOCKED_INODE`). Round 18 closed the
+    check-then-act gap by holding the lock across the removal, and left a
+    smaller one of the same shape INSIDE it: collector A opens the owner file
+    (inode X) and has not locked yet; collector B locks, unlinks the NAME, and a
+    replacement owner claims that name (inode Y); A resumes, locks its fd --
+    which succeeds, because X is free now -- and unlinks the NAME, deleting the
+    replacement's live coordination file. A's lock was real and A's inode was
+    dead; the name had simply stopped being theirs.
+
+    So a locked descriptor authorises removing exactly one thing: the name that
+    still resolves to its own inode. This is asked IMMEDIATELY before each
+    unlink, and a mismatch is never a reason to try harder -- it is a reason to
+    leave the file alone and say so.
+    """
+    try:
+        here = os.fstat(fh.fileno())
+        there = owner.stat()
+    except OSError:
+        return False
+    if (here.st_dev, here.st_ino) != (there.st_dev, there.st_ino):
+        retained.append(str(target))
+        return False
+    try:
+        target.unlink()
+    except OSError:
+        pass
+    return True
 
 
 @contextlib.contextmanager
@@ -1187,6 +1255,31 @@ def _owner_proven_gone(private):
                 pass
 
 
+# Our own predicate, kept by identity. See `_ask_owner_is_gone`.
+_OUR_OWNER_PREDICATE = _alias_owner_is_gone
+
+
+def _ask_owner_is_gone(private, retained):
+    """Ask the predicate, and ask for a reason ONLY if it is still ours.
+
+    R19a, and the reason is a lesson rather than a nicety. The out-list is
+    keyword-only so that callers INTO this module are unaffected -- but the
+    reviewer's controls do something else: they SUBSTITUTE the predicate with a
+    one-argument function and then drive a collection. Passing a keyword to
+    that raises TypeError, and three of his rows went red the moment the report
+    was added. A report is never worth breaking the thing it reports on.
+
+    So: identity, not exception handling. If the predicate is the one this
+    module defined, it can be asked for reasons; if somebody has replaced it,
+    it is called exactly as they wrote it and the collection still runs,
+    reasonless and correct.
+    """
+    predicate = _alias_owner_is_gone
+    if predicate is _OUR_OWNER_PREDICATE:
+        return predicate(private, retained=retained)
+    return predicate(private)
+
+
 def _collect_orphaned_owner_files(d):
     """Owner files whose alias never appeared, left by a death before the rename.
 
@@ -1195,6 +1288,7 @@ def _collect_orphaned_owner_files(d):
     different name -- so the same collector removes it, under the same proof:
     the lock is takeable and the file is the one its own content names.
     """
+    retained: list = []
     for owner in sorted(d.glob("*.forgetlock.forgetting-*.owner")):
         alias = owner.with_name(
             owner.name[:-len(".owner")].replace(".forgetlock.", ".taking.", 1))
@@ -1202,17 +1296,15 @@ def _collect_orphaned_owner_files(d):
             continue
         # A PRE-FILTER AND NOTHING MORE. Its answer is never what authorises
         # the removal below -- that is the whole of round 17's finding.
-        if not _alias_owner_is_gone(alias):
+        if not _ask_owner_is_gone(alias, retained):
             continue
         with _owner_proven_gone(alias) as proof:
             if proof is None:
                 continue          # reclaimed since the pre-filter: not ours
             if alias.exists():
                 continue          # published since: it has an owner again
-            try:
-                owner.unlink()
-            except OSError:
-                pass
+            _unlink_under_proof(proof, owner, owner=owner, retained=retained)
+    return retained
 
 
 def _collect_discharged_notes(d, held_name):
@@ -1226,9 +1318,10 @@ def _collect_discharged_notes(d, held_name):
     is what makes it safe to act on where round 12's discard was not.
     """
     if not held_name:
-        return
+        return retained
+    retained: list = []
     if (d / held_name).exists():
-        return
+        return retained
     # The loop variable is NOT `q`, and that is not a style choice. Round 12's
     # hashed `R12_AUDIT_NEW_SHAPES[qualified_site_relocation]` locates the real
     # `_discard` site by asserting that `                q.unlink()` appears in
@@ -1250,15 +1343,11 @@ def _collect_discharged_notes(d, held_name):
         with _owner_proven_gone(spent) as proof:
             if proof is None:
                 continue
-            try:
-                spent.unlink()
-            except OSError:
-                pass
-            try:
-                _owner_file(spent).unlink()
-            except OSError:
-                pass
-    _collect_orphaned_owner_files(d)
+            owner = _owner_file(spent)
+            if _unlink_under_proof(proof, spent, owner=owner, retained=retained):
+                _unlink_under_proof(proof, owner, owner=owner, retained=retained)
+    retained.extend(_collect_orphaned_owner_files(d))
+    return retained
 
 
 def _collect_stale_aliases(d, private, intent):
@@ -1290,16 +1379,17 @@ def _collect_stale_aliases(d, private, intent):
     sorting first WAS the oldest dead alias, so every death kept its own and
     the count grew exactly as before. The control said so on the first run.
     """
+    retained: list = []
     if intent is None:
-        return
+        return retained
     # R15: with no locking there is no evidence of an incarnation, so nothing
     # here can be proven dead. Refusing to collect leaves growth we have
     # declared; collecting on a guess removes somebody's only route back.
     if LOCKING is None:
-        return
+        return retained
     identity = (intent.get("held"), intent.get("sha256"), intent.get("owner"))
     if identity[0] is None:
-        return
+        return retained
     for alias in sorted(d.glob("*.taking*")):
         if alias == private or ".forgetting-" not in alias.name:
             continue
@@ -1310,20 +1400,16 @@ def _collect_stale_aliases(d, private, intent):
                 note.get("owner")) != identity:
             continue
         # A PRE-FILTER, and its answer authorises nothing (R-177-R18 (1)).
-        if not _alias_owner_is_gone(alias):
+        if not _ask_owner_is_gone(alias, retained):
             continue
         with _owner_proven_gone(alias) as proof:
             if proof is None:
                 continue          # reclaimed since the pre-filter
-            try:
-                alias.unlink()
-            except OSError:
-                pass
-            try:
-                _owner_file(alias).unlink()
-            except OSError:
-                pass
-    _collect_orphaned_owner_files(d)
+            owner = _owner_file(alias)
+            if _unlink_under_proof(proof, alias, owner=owner, retained=retained):
+                _unlink_under_proof(proof, owner, owner=owner, retained=retained)
+    retained.extend(_collect_orphaned_owner_files(d))
+    return retained
 
 
 def _forget_take(taking, owner):
