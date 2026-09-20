@@ -97,11 +97,54 @@ All notable changes to Sunglasses are documented here.
   returns the real tool list · a call carrying an AWS key id and secret is
   withheld `PROHIBITED_SECRET` · a benign call returns its real result.
 
-  **The approval ids are still only in the capture filename.** Nothing in the
-  withheld message names the server id or the snapshot sha, so the gate is
-  reachable and undiscoverable: a user who does not look inside the state
-  directory will not find what to approve. A change putting the ids in the
-  `APPROVAL_REQUIRED` payload is open.
+  **The approval ids reached the payload in #204**, below. When this entry was
+  written they were only in the capture filename, so the gate was reachable and
+  undiscoverable.
+
+- **The approval a user could not reach.** (#204) Three state roots disagreed
+  and nothing said so: `install` wrote its records under `$SUNGLASSES_HOME`, the
+  proxy wrote captures and approvals under `Path.home()/.sunglasses/proxy`, and
+  **`proxy approve` defaulted its own `--state-root` to the CURRENT DIRECTORY**.
+  So `approve` looked where nothing had been written, refused with "no stored
+  capture" — a true statement about the wrong directory — and the refusal it
+  answered named neither of the two values the command needs. The flow was
+  never broken. It was unreachable.
+
+  `proxy approve` now defaults to the proxy's own state root, with
+  `--state-root` kept as the explicit override. `serve.state_root()` itself is
+  unchanged and still takes an argument rather than reading an environment
+  variable, because a variable that relocates the approval store is a switch
+  anything in the process tree could flip.
+
+  **`APPROVAL_REQUIRED` now carries `server_id` and `snapshot_sha256`**, so the
+  approve command can be built from the refusal the client already received
+  instead of by listing a directory. They are carried for that reason only,
+  validated as plain digests, and refused on any other reason rather than
+  dropped in silence.
+
+  **`install` prints what happens next** — where the snapshot is written after
+  the client's first tool listing, and the exact approve command — and makes no
+  protection claim: a wrap means the launch path goes through us and nothing
+  about what is enforced. **Once approved**, what the proxy inspects is the
+  entry at the top of this section.
+
+  Proven by `tests/proxy/test_wrapped_route_end_to_end.py`, which installs,
+  reads the two ids out of the refusal, approves **at a real terminal** — the
+  gate refuses a pipe by design — and then gets its call forwarded, with a
+  credential in a tool result still withheld. The forwarded call and the
+  withheld credential are each other's control: without the second, the first
+  is satisfied by a proxy that forwards everything.
+
+- **The admission bound the contract had always declared, asked for the first
+  time.** (#179) `bounds.check_admission` had implemented T8.R6's two caps — 8
+  outstanding correlations and 16 MiB queued — since it was written, and
+  **nothing called it**, so the pump admitted a ninth correlation and the row
+  was a table entry rather than a bound. The pump asks it now.
+
+  The cap counts CLIENT correlations only. An upstream request that a chatty
+  server holds open does not consume the client's window, which the control for
+  it proves by holding an upstream correlation open and then admitting the
+  client's full eight.
 
 - **An install and uninstall that is a transaction, and a doctor that can judge
   it.** (#177, #180, #195) `sunglasses install <server> --config <path>` wires
