@@ -148,9 +148,23 @@ if os.environ.get("SUNGLASSES_COMPILE_TIMER"):  # pragma: no cover - CI only
             handle.write(f"total re.compile calls {_WALL['calls']}\n")
             handle.write(f"distinct sources {len(_TOTALS)}\n")
             handle.write(f"seconds inside re.compile {_WALL['in_compile']:.3f}\n")
-            handle.write("\n-- top 50 sources by TOTAL seconds --\n")
+            # HOW MANY SOURCES THE TABLE CARRIES, and why it is settable.
+            # The first run answered "is 3.12 slower to compile" with a top-50
+            # table: 4.52x overall, every shared source at least 3x. It could
+            # NOT answer "which construct", because a table selected by TOTAL
+            # SECONDS is biased toward expensive patterns, and a construct
+            # comparison drawn from it compares costly things with costly
+            # things. That question needs the whole distribution.
+            #
+            # Default stays 50 so the ordinary artifact stays readable. `0` or
+            # `all` writes every source -- about 3,400 rows, a few hundred KB.
+            want = os.environ.get("SUNGLASSES_COMPILE_TIMER_TOP", "50").strip().lower()
+            limit = None if want in ("0", "all") else int(want)
+            shown = _TOTALS.most_common() if limit is None else _TOTALS.most_common(limit)
+            handle.write(f"\n-- {'ALL' if limit is None else 'top ' + str(limit)} "
+                         f"sources by TOTAL seconds ({len(shown)} rows) --\n")
             handle.write(f"{'total_s':>9} {'calls':>7} {'per_call_ms':>12}  source\n")
-            for source, total in _TOTALS.most_common(50):
+            for source, total in shown:
                 n = _COUNTS[source]
                 handle.write(f"{total:9.3f} {n:7d} {1000 * total / n:12.4f}  "
                              f"{source[:110]!r}\n")

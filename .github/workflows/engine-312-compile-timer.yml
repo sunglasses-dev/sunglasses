@@ -40,6 +40,16 @@ name: engine-312-compile-timer
 
 on:
   workflow_dispatch:
+    inputs:
+      top:
+        description: >-
+          How many sources the artifact table carries. 50 keeps it readable;
+          `all` writes every source (~3,400 rows) and is what the CONSTRUCT
+          question needs -- a table selected by total seconds is biased toward
+          expensive patterns, so a construct comparison drawn from the head
+          compares costly things with costly things.
+        required: false
+        default: "50"
 
 permissions: read-all
 
@@ -85,6 +95,7 @@ jobs:
       - name: the suite, with every re.compile timed
         env:
           SUNGLASSES_COMPILE_TIMER: "${{ runner.temp }}/compile-timer-${{ matrix.python-version }}.txt"
+          SUNGLASSES_COMPILE_TIMER_TOP: "${{ inputs.top || '50' }}"
           SUNGLASSES_TEST_RE_CACHE: "off"
         run: |
           set +e
