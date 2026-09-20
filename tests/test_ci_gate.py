@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -688,3 +689,132 @@ def test_control_decide_uses_pr_copy_of_classifier(tmp_path):
     doc = _mutate(m)
     assert check_workflow(doc), "template check must reject the PR-copy invocation"
     assert any("tampered" in b for b in decide_behaviour_holds(doc, tmp_path)), "executed check must see the tampered PR classify itself as docs"
+
+
+# ---------------------------------------------------------------------------
+# The `network` marker (2026-09-20). `tests/proxy/test_wheel_contents.py` builds
+# the wheel, so pip must reach a package index. An offline reviewer therefore
+# gets five errors that have nothing to do with the change under review, and on
+# 2026-09-20 one spent its whole budget classifying them.
+#
+# The marker lets that runner say `-m "not network"` and be TOLD what it gave
+# up. It is only safe while two things stay true, so both are measured here
+# rather than remembered: the marker is registered with its reason, and NOTHING
+# in CI filters it out. A marker that quietly became a default skip would be the
+# check that skips itself, which is the hazard that row's own docstring exists
+# to refuse.
+
+
+def _collect(*args):
+    """Run pytest's own COLLECTION and return (collected, deselected).
+
+    Collection, not a grep over the source: a mark applied through a decorator,
+    a module-scope `pytestmark` or a conftest all read differently in the text
+    and identically to the runner, and the runner is what decides.
+    """
+    import subprocess
+    out = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q",
+         "-p", "no:cacheprovider", *args],
+        cwd=str(ROOT), capture_output=True, text=True, timeout=300)
+    text = out.stdout + out.stderr
+    collected = re.search(r"(\d+) tests? collected", text)
+    deselected = re.search(r"\((\d+) deselected\)|(\d+) deselected", text)
+    return (int(collected.group(1)) if collected else 0,
+            int(next(g for g in deselected.groups() if g)) if deselected else 0)
+
+
+def test_the_network_marker_is_registered_and_says_why():
+    ini = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+    assert "\n    network:" in ini, (
+        "the network marker is not registered in pytest.ini, so `-m \"not "
+        "network\"` silently matches nothing and an unknown-mark typo cannot "
+        "be distinguished from a real mark")
+    reason = ini.split("\n    network:", 1)[1]
+    assert "wheel" in reason.lower() and "index" in reason.lower(), (
+        "the registration does not say WHY the rows need a network, which is "
+        "the only part of it a future reader needs")
+
+
+def test_the_marker_actually_deselects_the_wheel_rows():
+    """The operative behaviour, measured both directions.
+
+    Before the marker existed this file collected 5 under `-m "not network"` —
+    the deselect was a no-op and the offline reviewer got the errors anyway.
+    """
+    wheel = "tests/proxy/test_wheel_contents.py"
+    collected, deselected = _collect(wheel, "-m", "not network")
+    assert (collected, deselected) == (0, 5), (
+        f"`-m 'not network'` left {collected} rows collected and deselected "
+        f"{deselected}; the marker is not reaching every row in {wheel}")
+    collected, _ = _collect(wheel, "-m", "network")
+    assert collected == 5, (
+        f"`-m network` collects {collected} rows, not 5: the marker and the "
+        f"file have drifted apart")
+
+
+def _pytest_marker_filters(run: str):
+    """Every marker filter that belongs to a pytest invocation in `run`.
+
+    Line by line, and `python -m pytest` has its own `-m` stripped first: a
+    naive token scan flags the `-m` in `python -m pip install ... pytest ...`,
+    which is an install step and not a filter. That false positive is why this
+    is a function with its own controls rather than three lines inline.
+    """
+    found = []
+    for line in run.replace("\\\n", " ").splitlines():
+        if "pytest" not in line or line.lstrip().startswith("#"):
+            continue
+        tail = re.sub(r"^.*?\bpytest\b", "", line, count=1)
+        try:
+            tokens = shlex.split(tail, comments=True, posix=True)
+        except ValueError:
+            continue
+        if "-m" in tokens:
+            found.append(line.strip())
+    return found
+
+
+def test_ci_does_not_filter_the_network_rows_out():
+    """The control that keeps the marker from becoming a skip.
+
+    A marker is only honest while something still runs the rows. If a `-m`
+    filter ever appears in a workflow pytest command, the wheel gate is gone
+    and every run is green about a thing nobody measured.
+    """
+    document = yaml.safe_load(WF.read_text(encoding="utf-8"))
+    offenders = []
+    for job_name, job in (document.get("jobs") or {}).items():
+        for step in (job.get("steps") or []):
+            for line in _pytest_marker_filters(step.get("run") or ""):
+                offenders.append((job_name, step.get("name"), line))
+    assert not offenders, (
+        "a workflow pytest command carries a marker filter, so CI may no "
+        f"longer run the network rows: {offenders}")
+
+
+def test_control_a_marker_filter_in_ci_is_caught():
+    """Negative control: the row above must be able to fail, and must not fire
+    on an install step that merely names pytest.
+
+    Without the first half, the guard passes on any document at all. Without
+    the second, it fired on `python -m pip install ... pytest` and the guard
+    would have been loosened to make a false alarm go away.
+    """
+    document = yaml.safe_load(WF.read_text(encoding="utf-8"))
+    steps = [s for job in (document.get("jobs") or {}).values()
+             for s in (job.get("steps") or []) if "pytest" in (s.get("run") or "")]
+    assert steps, "no workflow step runs pytest, so the guard above is vacuous"
+
+    runs = [s.get("run") or "" for s in steps]
+    real = next((r for r in runs if _pytest_marker_filters(
+        re.sub(r"\bpytest\b", 'pytest -m "not network"', r, count=1))), None)
+    assert real is not None, (
+        "injecting a marker filter into a workflow pytest command did not "
+        "trip the detector, so the guard proves nothing")
+
+    installs = [r for r in runs if "-m pip install" in r]
+    assert installs, "expected at least one `python -m pip install` step"
+    for run in installs:
+        assert not _pytest_marker_filters(run), (
+            "the detector fires on an install step that only mentions pytest")
