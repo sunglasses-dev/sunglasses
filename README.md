@@ -40,11 +40,17 @@ Out of the box, every `tools/list` and `tools/call` is refused before any
 inspection runs. The client receives a typed JSON-RPC error:
 
 ```json
-{"jsonrpc":"2.0","id":2,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD",
+{"jsonrpc":"2.0","id":3,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD",
  "data":{"reason_code":"APPROVAL_REQUIRED","rule":"S4",
          "status":"not_run","inspection_complete":false,
-         "inspected_utf8_bytes":0}}}
+         "inspected_utf8_bytes":0,
+         "server_id":"40ed892fc0f0b8819c294778c492dbd0",
+         "snapshot_sha256":"26aeeb2f7c5b61aa33523967171d46c0d248cd13d612cef913b089daccae4c64"}}}
 ```
+
+**`server_id` and `snapshot_sha256` are the two values the approve command
+needs, and the refusal is where you get them.** You do not have to look inside
+the state directory to find out what to approve.
 
 `status: not_run` and `inspected_utf8_bytes: 0` are the literal truth of it:
 the call is not forwarded to the server, so nothing is scanned and nothing is
@@ -53,7 +59,7 @@ sent. **Installing the proxy does not protect anything by itself.**
 Approval is a deliberate human step and cannot be scripted:
 
 ```
-$ python -m sunglasses.proxy approve <server-id> --snapshot <sha> --state-root <path>
+$ python -m sunglasses.proxy approve <server_id> --snapshot <snapshot_sha256>
 approving records that a human viewed this capture, and this is not an
 interactive terminal, so nobody did          # exits 1, nothing is recorded
 ```
