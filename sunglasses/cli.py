@@ -2248,7 +2248,30 @@ def cmd_install(args):
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
     print(f"\n  {GREEN}Wrapped {args.name!r}{RESET} in {target}")
-    print(f"  {DIM}Undo with: sunglasses uninstall {args.name}{RESET}\n")
+    print(f"  {DIM}Undo with: sunglasses uninstall {args.name}{RESET}")
+
+    # WHAT HAPPENS NEXT, because without it the first thing the user sees is a
+    # server that answers nothing and no way to find out why. Every call through
+    # a freshly wrapped server is withheld until a human approves that server's
+    # tool snapshot at a terminal, and the two ids the approve command needs are
+    # only knowable after the client has started it once.
+    #
+    # NO PROTECTION CLAIM. This says what the commands do and what to run next;
+    # what the proxy enforces once approved is documented separately and is
+    # measured there rather than implied by a wrap succeeding.
+    from .proxy.serve import state_root
+    print()
+    print(f"  {DIM}Nothing is forwarded yet. Every call through {args.name!r} is")
+    print(f"  withheld until you approve its tool snapshot at a terminal:{RESET}")
+    print()
+    print(f"  {DIM}1. start it once from your client. The first tool listing")
+    print(f"     writes a snapshot to{RESET}")
+    print(f"     {state_root() / 'captures'}")
+    print(f"  {DIM}2. the refusal your client receives carries `server_id` and")
+    print(f"     `snapshot_sha256`. Approve that exact snapshot with:{RESET}")
+    print()
+    print("     sunglasses proxy approve <server_id> --snapshot <snapshot_sha256>")
+    print()
     sys.exit(0)
 
 
