@@ -14,7 +14,23 @@ reads its member list.
 It is deliberately NOT a skipif-when-build-tools-are-missing test. A check that
 skips itself is worse than no check (Sep-13 rule): if the wheel cannot be
 built, that is a failure of the thing this row exists to measure.
+
+THE `network` MARKER IS NOT THAT, and the difference is who decides. A skipif
+decides for everyone, invisibly, inside the row: it reads as a pass and the
+gate is gone. The marker decides nothing. It lets a runner that has no package
+index say so ON THE COMMAND LINE and be told how many rows it gave up, while
+every other runner -- CI included, with no marker filter anywhere in the
+workflow -- still builds the wheel and reads its member list.
+
+It exists because an offline reviewer hit exactly this on 2026-09-20 and had to
+spend a round classifying five name-resolution errors before it could look at
+the change it was sent to review. The errors were correct. They were also the
+whole budget.
 """
+
+# Module scope: the fixture is what needs the index, so every row that uses it
+# needs the mark, and marking them one by one is a list that goes stale the
+# next time a row is added.
 import pathlib
 import shutil
 import subprocess
@@ -22,6 +38,11 @@ import sys
 import zipfile
 
 import pytest
+
+# Module scope: the fixture is what needs the index, so every row that uses it
+# needs the mark, and marking them one by one is a list that goes stale the next
+# time a row is added.
+pytestmark = pytest.mark.network
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
