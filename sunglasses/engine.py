@@ -453,8 +453,23 @@ class SunglassesEngine:
             ch for p in self._patterns for ch in p.get("channel", []))
 
         # Build pattern index
-        # (rule id, regex entry index) -> (anchor terms, span). NOT id(rx):
-        # `re.compile` caches, so two rules sharing a source share the object.
+        # (rule id, regex entry index) -> (anchor terms, span). NOT id(rx),
+        # and the reason written here used to be "`re.compile` caches, so two
+        # rules sharing a source share the object". That is true of two rules
+        # and false of this pattern database. One construction issues 3,075
+        # `re.compile` calls over 2,986 DISTINCT sources against
+        # `re._MAXCACHE` of 512, so entries are evicted throughout and two
+        # rules with the same source usually do NOT come back with the same
+        # object.
+        #
+        # The key is still right, for a stronger reason: whether they share now
+        # depends on eviction order, which makes `id(rx)` NON-DETERMINISTIC --
+        # colliding on some runs and not others, and doing it to whichever
+        # rules happen to land near each other. CPython also reuses the id of a
+        # collected object, so a live pattern could take the id of a dead one.
+        # A key that is stable by construction beats one that is correct by
+        # luck, and an intermittent anchor-spec collision is the kind of defect
+        # that reads as flakiness rather than as a bug.
         self._anchor_spec = {}
         # (rule id, regex entry index) -> why anchored mode was refused. Read by
         # the tests, so a refusal is visible rather than a silent downgrade.
