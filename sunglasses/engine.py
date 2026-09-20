@@ -205,6 +205,13 @@ class SunglassesEngine:
     # same nine, with tests/test_channel_vocabulary_one_truth.py reading both
     # off a running server and asserting they are one set.
     #
+    # On tool_output specifically, because the name invites a bigger reading
+    # than it deserves: it is a PATTERN-SELECTION LABEL ON CALLER-SUPPLIED
+    # TEXT. The caller hands us a string and tells us it came from a tool.
+    # Nothing here fetches or inspects what a tool returns, and nothing in this
+    # package intercepts a tool result. Selecting the 622 patterns that declare
+    # the channel is the whole of it.
+    #
     # Four further names are REACHABLE but deliberately undocumented, because
     # loaded patterns declare them and valid_channels unions those in:
     # conversation, email, image_alt_text, log. Each aliases to a canonical
