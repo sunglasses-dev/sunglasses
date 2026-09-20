@@ -206,11 +206,23 @@ class SunglassesEngine:
     # off a running server and asserting they are one set.
     #
     # On tool_output specifically, because the name invites a bigger reading
-    # than it deserves: it is a PATTERN-SELECTION LABEL ON CALLER-SUPPLIED
-    # TEXT. The caller hands us a string and tells us it came from a tool.
-    # Nothing here fetches or inspects what a tool returns, and nothing in this
-    # package intercepts a tool result. Selecting the 622 patterns that declare
-    # the channel is the whole of it.
+    # than it deserves: HERE it is a PATTERN-SELECTION LABEL ON CALLER-SUPPLIED
+    # TEXT. A caller of SunglassesEngine.scan(), or of the standalone MCP
+    # server's scan_text tool, hands us a string and tells us it came from a
+    # tool. Selecting the patterns that declare the channel is the whole of it:
+    # passing this label fetches nothing and intercepts nothing.
+    #
+    # THE PACKAGE'S PROXY IS A DIFFERENT THING AND THIS COMMENT USED TO DENY IT.
+    # It said "nothing in this package intercepts a tool result", which is false
+    # on this tree: sunglasses.proxy inspects inbound upstream results through
+    # route.py `_inspect_result` -> proxy/inspection.py `scan`, and it does so on
+    # the `api_response` channel, not this one. ASTRA proved it by execution on
+    # 2026-09-20 (2/2 results reached engine inspection) after the sentence was
+    # written here as a reassurance. A false reassurance in a security product is
+    # worse than no comment, and the correct statement is narrow: passing
+    # `tool_output` to scan() installs no interception of any kind, and the proxy
+    # that does inspect results is a separate component with its own channel,
+    # its own approval gate and its own documented conditions.
     #
     # Four further names are REACHABLE but deliberately undocumented, because
     # loaded patterns declare them and valid_channels unions those in:

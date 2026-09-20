@@ -38,6 +38,59 @@ REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 PATTERN_DECLARED_ALIASES = {"conversation", "email", "image_alt_text", "log"}
 
 
+class WireError(AssertionError):
+    """The server's replies are not valid successful JSON-RPC responses."""
+
+
+def parse_replies(stdout):
+    """Replies by id, each VALIDATED as a successful JSON-RPC response.
+
+    ASTRA, round 1 on 95b5e69: the first version of this helper returned the
+    reply objects and let the assertions read `result`, so a reply carrying a
+    top-level `error` ALONGSIDE a result was accepted as successful
+    introspection. Three such wires -- error+result on scanner_info, on
+    tools/list, and on both -- left all three tests PASS. The `isError is False`
+    check below only ever inspected the nested MCP tool payload, which is a
+    different layer.
+
+    A malformed server is not a passing server, so this refuses here rather
+    than letting the vocabulary assertions speak about a wire that never
+    answered properly.
+    """
+    replies = []
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        try:
+            replies.append(json.loads(line))
+        except json.JSONDecodeError as e:
+            raise WireError(f"server emitted a line that is not JSON: {e}")
+    if not replies:
+        raise WireError("server returned nothing")
+    by_id = {}
+    for r in replies:
+        if "id" not in r:
+            continue                      # notifications carry no id
+        if "error" in r:
+            raise WireError(f"reply id={r['id']} carries a JSON-RPC error: {r['error']!r}")
+        if "result" not in r:
+            raise WireError(f"reply id={r['id']} has neither result nor error")
+        by_id[r["id"]] = r
+    return by_id
+
+
+def _channel_list(value, where):
+    """A channel vocabulary is an ARRAY OF STRINGS or it is not a vocabulary.
+
+    ASTRA's other wire finding: a dict in place of the array passed both
+    comparisons, because `set()` of a dict silently yields its keys and the
+    type is discarded.
+    """
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise WireError(f"{where} is not an array of strings: {type(value).__name__} {value!r}")
+    return set(value)
+
+
 def _ask_server(messages, timeout=180):
     """Drive a real `python -m sunglasses.mcp` over stdio and return its replies."""
     proc = subprocess.run(
@@ -47,9 +100,7 @@ def _ask_server(messages, timeout=180):
     )
     assert "Traceback (most recent call last)" not in proc.stdout + proc.stderr, (
         f"traceback over the wire:\nstdout={proc.stdout[:600]}\nstderr={proc.stderr[:600]}")
-    replies = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
-    assert replies, f"server returned nothing. stderr={proc.stderr[:600]}"
-    return {r["id"]: r for r in replies if "id" in r}
+    return parse_replies(proc.stdout)
 
 
 @pytest.fixture(scope="module")
@@ -68,13 +119,17 @@ def surfaces():
         f"the server did not answer both introspection requests: ids {sorted(replies)}")
 
     tools = {t["name"]: t for t in replies[2]["result"]["tools"]}
-    enum = tools["scan_text"]["inputSchema"]["properties"]["channel"]["enum"]
+    enum = _channel_list(
+        tools["scan_text"]["inputSchema"]["properties"]["channel"]["enum"],
+        "scan_text inputSchema enum")
 
     payload = replies[3]["result"]
     assert payload.get("isError") is False, f"scanner_info returned an error: {payload}"
     info = json.loads(payload["content"][0]["text"])
+    channels = _channel_list(info["channels"], "scanner_info channels")
 
-    return {"enum": set(enum), "info": set(info["channels"])}
+    assert enum and channels, "a published vocabulary that is empty is not a vocabulary"
+    return {"enum": enum, "info": channels}
 
 
 def test_the_two_published_surfaces_agree(surfaces):
@@ -110,3 +165,55 @@ def test_valid_channels_is_the_contract_plus_exactly_the_named_aliases():
         "Adding a channel to a pattern widens what the engine accepts. Document "
         "it in DOCUMENTED_CHANNELS, or name it in PATTERN_DECLARED_ALIASES with "
         "a reason.")
+
+
+# ── REJECTION CONTROLS ────────────────────────────────────────────────────────
+# The wire shapes ASTRA used to make the two assertions above falsely green.
+# These drive `parse_replies` / `_channel_list` directly rather than a
+# subprocess: the defect was never in the server, it was in what this file
+# accepted from one, and a control that has to boot a server to say so is a
+# slower control that proves the same thing.
+
+_GOOD_LIST = json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []}})
+_GOOD_INFO = json.dumps({"jsonrpc": "2.0", "id": 3, "result": {"content": []}})
+
+
+@pytest.mark.parametrize("name,wire", [
+    ("error alongside result on scanner_info",
+     [_GOOD_LIST, json.dumps({"jsonrpc": "2.0", "id": 3, "result": {"content": []},
+                              "error": {"code": -32603, "message": "boom"}})]),
+    ("error alongside result on tools/list",
+     [json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []},
+                  "error": {"code": -32603, "message": "boom"}}), _GOOD_INFO]),
+    ("error alongside result on both",
+     [json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []},
+                  "error": {"code": -1, "message": "x"}}),
+      json.dumps({"jsonrpc": "2.0", "id": 3, "result": {"content": []},
+                  "error": {"code": -1, "message": "x"}})]),
+    ("reply with neither result nor error",
+     [json.dumps({"jsonrpc": "2.0", "id": 2}), _GOOD_INFO]),
+    ("a line that is not JSON", ["{not json", _GOOD_INFO]),
+    ("no replies at all", []),
+])
+def test_a_malformed_wire_is_refused_not_read(name, wire):
+    """Each of these left all three vocabulary assertions PASS before the fix."""
+    with pytest.raises(WireError):
+        parse_replies("\n".join(wire))
+
+
+@pytest.mark.parametrize("bad", [
+    {"message": 1, "file": 2},          # a dict: set() takes its keys, type discarded
+    "message,file",                     # a string: set() takes its characters
+    ["message", 7],                     # a list with a non-string member
+    None,
+])
+def test_a_channel_vocabulary_must_be_an_array_of_strings(bad):
+    with pytest.raises(WireError):
+        _channel_list(bad, "control")
+
+
+def test_the_controls_accept_a_well_formed_wire():
+    """Otherwise the two controls above pass by refusing everything."""
+    ok = parse_replies("\n".join([_GOOD_LIST, _GOOD_INFO]))
+    assert set(ok) == {2, 3}
+    assert _channel_list(["message", "file"], "control") == {"message", "file"}
