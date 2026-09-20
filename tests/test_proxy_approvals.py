@@ -182,6 +182,40 @@ def test_pins_come_only_from_the_capture_the_record_names(store, tmp_path):
     assert not any(name.endswith("__declined_tool") for name in pinned), pinned
 
 
+def test_a_live_activation_does_not_outlive_the_record_it_was_granted_from(store):
+    """A REVOCATION is an edit made without asking us, and this is the only row
+    that makes it mean anything.
+
+    The other invalidation rows all reach `_blocked()` first: a corrupt or
+    duplicate-keyed record is INVALID before `may_call` compares anything, so
+    they pass whatever the comparison below does. This one replaces the record
+    with a VALID one naming a different snapshot — the shape a real revocation
+    or re-approval takes — so the cached activation is the only thing that could
+    still authorise the call.
+
+    Found by `mutate_approvals.py` GATE-REVOKED, which survived every existing
+    control: deleting the comparison changed no test result, which is what an
+    uncovered refusal looks like from the outside.
+    """
+    store.capture(SNAPSHOT, payload=_capture("read_text_file"))
+    store.approve(snapshot_sha256=SNAPSHOT, viewed=True)
+    assert _attempt(store).activated
+    assert store.may_call("read_text_file", TOOL_SHA) is None
+
+    # THE EDIT COMES FROM OUTSIDE, which is the whole point and is why
+    # `write_raw` is wrong here: writing through the store clears the cached
+    # activation, so `_blocked()` answers APPROVAL_REQUIRED and the comparison
+    # this row exists for is never reached. A revocation performed by anything
+    # else on the machine leaves the activation cached, and then the comparison
+    # against what is on disk NOW is the only thing standing between a
+    # withdrawn approval and a forwarded call.
+    record = json.loads(store._path.read_text())
+    record["snapshot_sha256"] = "f" * 64
+    store._path.write_text(json.dumps(record))
+
+    assert store.may_call("read_text_file", TOOL_SHA) == "DESCRIPTOR_CHANGED"
+
+
 def test_a_failed_reactivation_of_a_live_approval_remembers_why(store):
     """T5.R4, the positive half of retirement.
 
