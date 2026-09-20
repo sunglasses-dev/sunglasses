@@ -49,7 +49,20 @@ name: pattern-integrity
 # sha, so cancelling those would turn a gate into an absence — the one failure mode
 # this workflow was rebuilt to remove.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # PER SHA ON A PUSH, per REF on a pull request, and the difference is the
+  # whole point. GitHub keeps only ONE QUEUED run per concurrency group, so
+  # while a matrix is running, a second main merge EVICTS the first one's
+  # queued run -- it is cancelled with zero jobs ever started, which reads
+  # afterwards exactly like a run that was never triggered. Measured
+  # 2026-09-19: of the last ten main runs only TWO completed all six
+  # integrity legs, and #202's merge commit 442419b lost its run that way,
+  # taking a prediction check with it.
+  #
+  # A pull request must keep the OPPOSITE behaviour: a new push there SHOULD
+  # supersede the previous run, which is why the sha is not appended
+  # unconditionally. A PR's `github.ref` is already `refs/pull/N/merge` and
+  # is stable across pushes, so the literal keeps PR grouping byte-identical.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
