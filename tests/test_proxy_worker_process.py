@@ -171,34 +171,79 @@ def test_a_flooding_worker_is_stopped_rather_than_read_to_the_end(
         out = worker_process.run({"params": {}}, argv=flood, binding=BINDING,
                                  stdout_limit=200_000, timeout_ms=5_000)
     waited = time.monotonic() - started
-    # THIS ROW KEEPS A CLOCK, and it is the only one of the five that has to.
+    # WHICH BOUND STOPPED THE READ IS IN `status`, and this comment used to
+    # say the opposite. `run()` has always separated them:
     #
-    # I tried to remove it on the theory that `status` distinguishes the two
-    # mechanisms -- stdout bound versus deadline -- and MEASURED that it does
-    # not. Driving the same call with the limit raised to 10 GB so the read
-    # runs to the deadline instead:
+    #     return _fault(binding,
+    #                   STATUS_EXCEPTION if collected.get("over")
+    #                   else STATUS_DEADLINE)
     #
-    #     stdout_limit=200_000      0.06 s   status=exception  observed=0
-    #     stdout_limit=10_000_000_000  3.02 s   status=exception  observed=0
+    # The stdout bound reports `exception`, the deadline reports `deadline`.
+    # So `out["status"] == "exception"` below IS the mechanism assertion, and
+    # the row underneath this one -- the same call with a child that never
+    # writes -- is its control: without a row that produces `deadline` through
+    # this call shape, `exception` here is not known to mean anything.
     #
-    # Identical results. `accepted`, `inspection_complete`,
-    # `observed_content_bytes` and `inspected_utf8_bytes` all match too, so
-    # NOTHING THE PRODUCT RECORDS SAYS WHICH BOUND STOPPED THE READ. The
-    # elapsed time is the only signal that exists, which makes the bound
-    # load-bearing here rather than decorative -- without it this row passes
-    # on a build whose stdout limit does nothing.
+    # THE OLD COMMENT WAS WRONG BECAUSE THE MUTATION BEHIND IT NEVER FIRED. It
+    # raised `stdout_limit` to 10 GB expecting the read to run to the deadline
+    # instead, and read the two identical results as proof that `status` cannot
+    # tell the bounds apart. But this flood writes 10 GB in about 3.7 s, well
+    # inside the 5 s deadline, so BOTH runs tripped the stdout bound: that was
+    # one code path measured twice, which can only ever agree with itself. A
+    # mutation that does not create the condition it names proves nothing.
     #
-    # The number comes from that measured separation, 0.06 s against 3.02 s,
-    # and sits between them with about 20x over the working case rather than
-    # being a round number someone liked. A product that recorded which bound
-    # fired would let this become an outcome assertion like the others; that
-    # is filed, not fixed here, because this is a test-only change.
+    # Measured on 0a9db8e with a stimulus that does create it:
+    #
+    #     quiet child, stdout_limit=200_000    1.04 s   status=deadline
+    #     this flood,  stdout_limit=200_000    0.06 s   status=exception
+    #
+    # THE CLOCK STAYS, for a different and smaller reason than the one it used
+    # to carry: it is an anti-slow-read bound, not a mechanism discriminator.
+    # A build whose stdout limit stops the read but only after reading far too
+    # much still reports `exception` and still satisfies the assertion below,
+    # and this is what catches that. 1.5 s sits about 20x over the working
+    # case and well under the 5 s deadline, so a failure here is a slow read
+    # and not a deadline in disguise.
     assert waited < 1.5, (
         f"the read took {waited:.2f}s against a 5 s deadline; the stdout "
         f"bound is what is supposed to stop it, and at this duration the "
         f"deadline did")
     assert out["status"] == "exception"
     assert out["accepted"] is False
+
+
+def test_a_quiet_worker_past_its_deadline_reports_deadline_not_the_stdout_bound(
+        fails_rather_than_hangs):
+    """The control for the row above: the same call, the same stdout limit, a
+    child that never writes -- so the only bound left to trip is the clock."""
+    # WITHOUT THIS ROW THE ONE ABOVE IS UNFALSIFIABLE ON ITS OWN. `_fault` is
+    # reached by both bounds, so a build that collapsed them into one status
+    # would still return "exception" for the flood and the assertion up there
+    # would still pass. Driven for real -- `else STATUS_DEADLINE` changed to
+    # `else STATUS_EXCEPTION`, the edit confirmed present at the line before
+    # running -- the flood row stayed GREEN and this row went red.
+    #
+    # WHAT THIS ROW IS NOT: the only thing that catches that collapse. The same
+    # mutation also reddens three T8.R4 rows, and saying otherwise would be a
+    # claim the measurement refutes. What it is, is the only row that produces
+    # `deadline` through THIS call shape -- same binding, same
+    # stdout_limit=200_000, only the child differs -- so it is what keeps the
+    # flood row's `exception` a statement about a mechanism rather than a
+    # restating of whatever `_fault` happens to return.
+    quiet = _script("import sys,time;sys.stdin.read();time.sleep(30)")
+    started = time.monotonic()
+    with fails_rather_than_hangs(HANG_GUARD_S):
+        out = worker_process.run({"params": {}}, argv=quiet, binding=BINDING,
+                                 stdout_limit=200_000, timeout_ms=1_000)
+    waited = time.monotonic() - started
+    assert out["status"] == "deadline", (
+        f"a child that wrote nothing reported {out['status']!r}; if the stdout "
+        f"bound can report that, `exception` above names no mechanism")
+    assert out["accepted"] is False
+    # It waited for the deadline rather than falling out instantly, which is
+    # what makes "deadline" the reason and not a label on some earlier failure.
+    assert waited >= 1.0, (
+        f"it reported a deadline after {waited:.3f}s against a 1 s bound")
 
 
 @pytest.mark.parametrize("size,expected", [(64, "complete"), (400_000, "exception")])
