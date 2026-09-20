@@ -185,3 +185,41 @@ def test_the_frozen_status_set_agrees_with_the_worker():
     from sunglasses.proxy import worker
 
     assert envelope.STATUSES == worker.STATUSES
+
+# ── the two ids that make APPROVAL_REQUIRED actionable ─────────────────────
+
+def test_approval_required_carries_the_ids_the_approve_command_needs():
+    """A refusal that cannot be acted on is a refusal that wastes the reader.
+
+    `proxy approve` wants a server-id and a snapshot sha. Before this the only
+    way to learn either was to list the captures directory, which nothing tells
+    a user about. Carried HERE because this envelope is the one structure the
+    client is guaranteed to see.
+    """
+    built = _built(reason_code="APPROVAL_REQUIRED", rule="S4",
+                   server_id="abc123", snapshot_sha256="d" * 64)
+    assert built["error"]["data"]["server_id"] == "abc123"
+    assert built["error"]["data"]["snapshot_sha256"] == "d" * 64
+
+
+def test_no_other_reason_grows_the_approval_ids():
+    """They describe what to approve, so on any other reason they describe
+    nothing, and a field that describes nothing is one a reader has to rule
+    out."""
+    built = _built()
+    assert "server_id" not in built["error"]["data"]
+    assert "snapshot_sha256" not in built["error"]["data"]
+
+
+def test_approval_ids_on_a_reason_that_cannot_use_them_is_refused():
+    """Passing them with the wrong reason is a caller mistake, and silently
+    dropping it would leave the caller believing the hint went out."""
+    with pytest.raises(ValueError):
+        _built(server_id="abc123")
+
+
+def test_an_approval_id_that_is_not_a_plain_digest_is_refused():
+    """This reaches the one structure an adversary is guaranteed to read."""
+    with pytest.raises(ValueError):
+        _built(reason_code="APPROVAL_REQUIRED", rule="S4",
+               server_id="../../etc/passwd")

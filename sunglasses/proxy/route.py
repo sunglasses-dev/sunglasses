@@ -541,9 +541,35 @@ class Route:
             observed_content_bytes=result.get("observed_content_bytes", 0),
             elapsed_ms=result.get("elapsed_ms", 0),
             rule_ids=settlement.rule_ids if settlement else (),
-            catalog=self.catalog)
+            catalog=self.catalog,
+            **self._approval_hint(reason))
         return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
                 reason, rule)
+    def _approval_hint(self, reason):
+        """The two ids `proxy approve` needs, for the one reason it answers.
+
+        Without them APPROVAL_REQUIRED tells a user their call was refused and
+        nothing about what to do next: the command wants a server-id and a
+        snapshot sha, and the only way to learn either was to list the captures
+        directory. Both are already here — the server id is what the store is
+        keyed by, and the snapshot is the one the store last captured for
+        approval.
+
+        EMPTY for every other reason, so no other refusal grows a field it has
+        no use for, and empty when a value is missing rather than inventing one:
+        a hint naming the wrong snapshot is worse than no hint.
+        """
+        if reason != REASON_APPROVAL_REQUIRED:
+            return {}
+        hint = {}
+        server_id = getattr(self.approvals, "server_id", None)
+        if isinstance(server_id, str) and server_id.isalnum():
+            hint["server_id"] = server_id
+        pending = getattr(self.approvals, "pending_snapshot", None)
+        if isinstance(pending, str) and pending.isalnum():
+            hint["snapshot_sha256"] = pending
+        return hint
+
     def _withhold_refusal(self, request_id, attempt):
         """The answer to an admission that was REFUSED, and nothing else.
 
@@ -1004,7 +1030,8 @@ class Route:
             observed_content_bytes=result.get("observed_content_bytes", 0),
             elapsed_ms=result.get("elapsed_ms", 0),
             rule_ids=settlement.rule_ids if settlement else (),
-            catalog=self.catalog)
+            catalog=self.catalog,
+            **self._approval_hint(reason))
         # R-168-R9/(b). TAKE, do not assume. If this obligation is already
         # someone else's -- the payer has it, or a close drained it -- there is
         # nothing here to answer and writing anyway is the second frame.
