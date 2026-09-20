@@ -142,6 +142,26 @@ def test_uninstall_reads_the_root_the_install_wrote(homes, config, tmp_path):
     assert not record.exists()
 
 
+def test_the_root_follows_state_root_when_state_root_moves(monkeypatch,
+                                                          tmp_path):
+    """EQUALITY IS NOT DERIVATION, and the row below only proves equality.
+
+    ASTRA made this exact point reviewing the first version of this file: two
+    paths that match today also match if the second one is a hardcoded literal
+    that happens to agree, and the row cannot tell those apart. So this one
+    MOVES `state_root()` to a sentinel and requires the record paths to follow
+    it. A hardcoded root does not follow, which is the whole difference.
+    """
+    sentinel = tmp_path / "somewhere-else" / "proxy"
+    monkeypatch.setattr(serve, "state_root", lambda override=None: sentinel)
+
+    assert serve.install_records_home() == sentinel.parent
+    assert inst._record_paths(serve.install_records_home(),
+                              "github")[0] == sentinel / "installs"
+    assert inst._lock_path(serve.install_records_home(),
+                           tmp_path / "x.json").parent == sentinel / "locks"
+
+
 def test_the_roots_agree_by_construction_not_by_two_literals(monkeypatch,
                                                              tmp_path):
     """Derived from `state_root()`, so a move on either side moves both.
