@@ -69,12 +69,28 @@ def parse_replies(stdout):
         raise WireError("server returned nothing")
     by_id = {}
     for r in replies:
+        if not isinstance(r, dict):
+            raise WireError(f"a reply is not a JSON object: {type(r).__name__}")
+        # ROUND 2: the envelope was never checked. Removing `jsonrpc` entirely,
+        # or setting it to "1.0", left both vocabulary assertions green -- this
+        # helper claimed to validate a successful JSON-RPC response and did not
+        # look at the one field that says which protocol it is.
+        if r.get("jsonrpc") != "2.0":
+            raise WireError(f"reply is not JSON-RPC 2.0: jsonrpc={r.get('jsonrpc')!r}")
         if "id" not in r:
             continue                      # notifications carry no id
         if "error" in r:
             raise WireError(f"reply id={r['id']} carries a JSON-RPC error: {r['error']!r}")
         if "result" not in r:
             raise WireError(f"reply id={r['id']} has neither result nor error")
+        # ROUND 2: this was `by_id[r["id"]] = r`, so a second answer to the same
+        # request SILENTLY OVERWROTE the first and the verdict depended on which
+        # conflicting answer happened to survive dictionary insertion. A
+        # null-result answer followed by a good one passed; the same pair in the
+        # other order rejected. One request gets one answer.
+        if r["id"] in by_id:
+            raise WireError(f"the server answered id={r['id']} more than once; "
+                            "a request with two answers has no answer")
         by_id[r["id"]] = r
     return by_id
 
@@ -89,6 +105,59 @@ def _channel_list(value, where):
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise WireError(f"{where} is not an array of strings: {type(value).__name__} {value!r}")
     return set(value)
+
+
+def _schema_enum(prop, where):
+    """The enum of a JSON-Schema property that actually describes strings.
+
+    ROUND 2: only the enum was read. Changing the property's `type` to
+    "integer" left both vocabulary assertions green over the same nine STRINGS
+    -- the test asserted a published vocabulary the schema permits none of.
+
+    Extracted into its own helper because the first version of this repair lived
+    inline in the fixture, where the only thing that could exercise it was a live
+    server, so removing it reddened NOTHING. A check no control can reach is not
+    a check; that was caught by mutating each repair in turn, not by reading.
+    """
+    if not isinstance(prop, dict):
+        raise WireError(f"{where}: channel property is not an object")
+    if prop.get("type") != "string":
+        raise WireError(f"{where}: channel property does not describe strings: "
+                        f"type={prop.get('type')!r}")
+    if "enum" not in prop:
+        raise WireError(f"{where}: channel property has no enum")
+    return _channel_list(prop["enum"], f"{where} enum")
+
+
+def _text_result(payload, where):
+    """The decoded JSON of an MCP tool result's TEXT block.
+
+    ROUND 2, two findings in one place. `payload["content"][0]["text"]` read any
+    block carrying a `text` key as text content: deleting the block's `type`, or
+    setting it to "image" with no image fields, left both vocabulary assertions
+    green over a malformed MCP result.
+
+    And `payload.get("isError") is False` was a FALSE KILL -- ASTRA's only one.
+    MCP defines isError as OPTIONAL with absence meaning success, so a
+    protocol-correct server that omits it was rejected. Absence or literal False
+    is success; True or any other value is not.
+    """
+    if not isinstance(payload, dict):
+        raise WireError(f"{where}: result is not an object: {type(payload).__name__}")
+    flag = payload.get("isError", False)
+    if flag is not False:
+        raise WireError(f"{where}: isError={flag!r}; success is absence or literal false")
+    content = payload.get("content")
+    if not isinstance(content, list):
+        raise WireError(f"{where}: content is not an array: {type(content).__name__}")
+    texts = [b for b in content
+             if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)]
+    if not texts:
+        raise WireError(f"{where}: no well-formed text block in {len(content)} content block(s)")
+    try:
+        return json.loads(texts[0]["text"])
+    except json.JSONDecodeError as e:
+        raise WireError(f"{where}: text block is not JSON: {e}")
 
 
 def _ask_server(messages, timeout=180):
@@ -119,14 +188,11 @@ def surfaces():
         f"the server did not answer both introspection requests: ids {sorted(replies)}")
 
     tools = {t["name"]: t for t in replies[2]["result"]["tools"]}
-    enum = _channel_list(
-        tools["scan_text"]["inputSchema"]["properties"]["channel"]["enum"],
-        "scan_text inputSchema enum")
+    enum = _schema_enum(tools["scan_text"]["inputSchema"]["properties"]["channel"],
+                        "scan_text inputSchema")
 
-    payload = replies[3]["result"]
-    assert payload.get("isError") is False, f"scanner_info returned an error: {payload}"
-    info = json.loads(payload["content"][0]["text"])
-    channels = _channel_list(info["channels"], "scanner_info channels")
+    channels = _channel_list(_text_result(replies[3]["result"], "scanner_info")["channels"],
+                             "scanner_info channels")
 
     assert enum and channels, "a published vocabulary that is empty is not a vocabulary"
     return {"enum": enum, "info": channels}
@@ -217,3 +283,83 @@ def test_the_controls_accept_a_well_formed_wire():
     ok = parse_replies("\n".join([_GOOD_LIST, _GOOD_INFO]))
     assert set(ok) == {2, 3}
     assert _channel_list(["message", "file"], "control") == {"message", "file"}
+
+
+# ── ROUND 3 CONTROLS: the seven wires that still slipped through round 2 ──────
+# ASTRA drove 24 wires against the round-2 fixture; 7 defective ones passed BOTH
+# vocabulary assertions. Each is a row here, and the two rows at the end are the
+# false-kill guard: a protocol-correct server must still be accepted.
+
+def _env(i, result):
+    return json.dumps({"jsonrpc": "2.0", "id": i, "result": result})
+
+
+@pytest.mark.parametrize("name,wire", [
+    # one request, two answers -- the verdict used to depend on insertion order
+    ("the same id answered twice", [_env(2, {"tools": []}), _env(2, {"tools": []})]),
+    ("a null answer overwritten by a good one",
+     [_env(2, None), _env(2, {"tools": []})]),
+    # the envelope this helper claims to validate
+    ("no jsonrpc field at all",
+     [json.dumps({"id": 2, "result": {"tools": []}}), _env(3, {"content": []})]),
+    ("jsonrpc 1.0",
+     [json.dumps({"jsonrpc": "1.0", "id": 2, "result": {"tools": []}}), _env(3, {"content": []})]),
+    ("a reply that is not an object", [json.dumps(["not", "an", "object"])]),
+])
+def test_round3_envelope_wires_are_refused(name, wire):
+    with pytest.raises(WireError):
+        parse_replies("\n".join(wire))
+
+
+@pytest.mark.parametrize("name,payload", [
+    ("a content block with no type",
+     {"content": [{"text": '{"channels": ["message"]}'}], "isError": False}),
+    ("a content block typed image",
+     {"content": [{"type": "image", "text": '{"channels": ["message"]}'}], "isError": False}),
+    ("content that is an object, not an array",
+     {"content": {"type": "text", "text": "{}"}, "isError": False}),
+    ("a text block that is not JSON",
+     {"content": [{"type": "text", "text": "not json at all"}], "isError": False}),
+    ("isError true", {"content": [{"type": "text", "text": "{}"}], "isError": True}),
+    ("isError a non-bool", {"content": [{"type": "text", "text": "{}"}], "isError": "no"}),
+])
+def test_round3_malformed_tool_results_are_refused(name, payload):
+    with pytest.raises(WireError):
+        _text_result(payload, "control")
+
+
+def test_a_result_omitting_the_optional_isError_is_ACCEPTED():
+    """ASTRA's one false kill, inherited from round 1 and fixed in round 3.
+
+    MCP defines isError as optional, absence meaning success. The round-1 check
+    `payload.get("isError") is False` REQUIRED it, so a protocol-correct server
+    that omitted it was rejected. Rejecting a correct server teaches everyone to
+    ignore the gate, which is the same damage as passing a broken one.
+    """
+    got = _text_result({"content": [{"type": "text", "text": '{"channels": ["message"]}'}]},
+                       "control")
+    assert got == {"channels": ["message"]}
+
+
+def test_a_well_formed_text_result_is_accepted():
+    got = _text_result({"content": [{"type": "text", "text": '{"channels": ["file"]}'}],
+                        "isError": False}, "control")
+    assert got == {"channels": ["file"]}
+
+
+@pytest.mark.parametrize("name,prop", [
+    ("type integer over nine string names",
+     {"type": "integer", "enum": ["message", "file"]}),
+    ("no type at all", {"enum": ["message", "file"]}),
+    ("type array", {"type": "array", "enum": ["message", "file"]}),
+    ("a schema with no enum", {"type": "string"}),
+    ("not an object at all", ["message", "file"]),
+])
+def test_round3_a_schema_that_permits_none_of_its_enum_is_refused(name, prop):
+    with pytest.raises(WireError):
+        _schema_enum(prop, "control")
+
+
+def test_a_well_formed_channel_schema_is_accepted():
+    assert _schema_enum({"type": "string", "enum": ["message", "file"]},
+                        "control") == {"message", "file"}
