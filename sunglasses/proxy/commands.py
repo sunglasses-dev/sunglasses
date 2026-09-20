@@ -119,11 +119,27 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     import pathlib
 
     from . import approvals
+    from .serve import state_root
 
     snapshot = options.get("snapshot")
     if not snapshot:
         return _usage(stderr)
-    root = pathlib.Path(options.get("state-root") or ".")
+    # THE DEFAULT IS THE PROXY'S OWN ROOT, not the working directory.
+    #
+    # Until 2026-09-19 this read `or "."`, so `approve` looked for the capture
+    # under whatever directory the user happened to be standing in while the
+    # proxy had written it to `state_root()`. The command then refused with "no
+    # stored capture" — correctly, about a directory nobody had written to — and
+    # there was no way for a reader to discover the difference. Measured: the
+    # same command exits 1 from anywhere else and 0 with `--state-root` pointed
+    # at the proxy's root.
+    #
+    # `--state-root` stays the explicit override, and `state_root()` stays an
+    # ARGUMENT rather than an environment variable for the reason its own
+    # docstring gives: a variable that moves the approval store is a switch
+    # anything in the process tree could flip.
+    root = (pathlib.Path(options["state-root"]) if options.get("state-root")
+            else state_root())
     store = approvals.Store(root, server_id=server_id)
     capture = store.captures / f"{server_id}.{snapshot}.json"
     if not capture.exists():
