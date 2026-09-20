@@ -20,6 +20,33 @@ on disk to put it back exactly. `sunglasses uninstall <name>` puts it back.
 Both are also importable: `sunglasses.install.install(config_path, name,
 artifact=..., home=...)` and `.uninstall(config_path, name, home=...)`.
 
+### Where the state lives
+
+One tree, and it is the proxy's:
+
+| what | where |
+|---|---|
+| install records, retained original bytes, writer locks | `~/.sunglasses/proxy/installs`, `~/.sunglasses/proxy/locks` |
+| tool snapshots the proxy captures | `~/.sunglasses/proxy/captures` |
+| approvals recorded by `proxy approve` | `~/.sunglasses/proxy/approvals` |
+| scanner receipts, policy, pins | `$SUNGLASSES_HOME` or `~/.sunglasses` |
+
+`serve.state_root()` decides the first three, and the CLI derives install's root
+from it through `serve.install_records_home()` rather than choosing a matching
+path of its own. **`$SUNGLASSES_HOME` does not reach the proxy lane.** It
+relocates scanner state, which is what it is for; a variable that also moved the
+approval store would be a switch anything in the process tree could flip, and
+approvals read from a directory an attacker controls are approvals an attacker
+writes. For the same reason `install` has no `--state-root`: a path chosen once
+at config-write time is the same hole one layer up. `proxy approve --state-root`
+remains the explicit, per-invocation override.
+
+Until 2026-09-20 install used `$SUNGLASSES_HOME` while the proxy used
+`Path.home()`, so with the variable set the record and the capture landed in
+different trees. That is the surviving half of #204, where `proxy approve`
+defaulted to the current directory and refused with a true statement about the
+wrong place.
+
 | | |
 |---|---|
 | `install <name>` | wraps the entry · `--config` · trailing `argv` after `--` when the entry does not exist yet |
@@ -137,8 +164,9 @@ a review found the absence of them:
 
 ## Known limitations, stated rather than discovered
 
-- The writer lock lives in `SUNGLASSES_HOME`, so two transactions running under
-  different homes do not serialise against each other.
+- The writer lock lives under `serve.state_root()`, so two transactions running
+  under different `HOME` values lock different files and do not serialise
+  against each other.
 - Locking reads `flock` where it exists and `None` where it does not, because
   `fcntl` is POSIX-only while the README promises Windows.
 - Inode reuse is neither proven nor handled.

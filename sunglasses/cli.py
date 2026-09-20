@@ -2232,13 +2232,17 @@ def _install_config_path(args):
 def cmd_install(args):
     """T10.R4 — wrap one MCP server entry so its traffic runs through us."""
     from . import install as _inst
-    from .firewall import sunglasses_home
+    from .proxy.serve import install_records_home
 
     target = _install_config_path(args)
     try:
         artifact = _inst.resolve_artifact()
+        # NOT `sunglasses_home()`. The record has to land in the same tree the
+        # proxy reads, and this function prints `state_root() / "captures"` a
+        # few lines below: one message naming two different roots is how #204
+        # happened.
         _inst.install(target, args.name, artifact=artifact,
-                      home=sunglasses_home(), argv=args.argv or None)
+                      home=install_records_home(), argv=args.argv or None)
     except _inst.ArtifactUnresolved as e:
         print(f"\n  {RED}SUNGLASSES install refused{RESET} — {e}")
         print(f"  {DIM}target: {target}{RESET}\n")
@@ -2278,11 +2282,13 @@ def cmd_install(args):
 def cmd_uninstall(args):
     """T10.R5 — put the entry back, byte-exact when the file has not moved."""
     from . import install as _inst
-    from .firewall import sunglasses_home
+    from .proxy.serve import install_records_home
 
     target = _install_config_path(args)
     try:
-        res = _inst.uninstall(target, args.name, home=sunglasses_home())
+        # The same root `install` wrote to, or uninstall reports "nothing to
+        # restore" about a directory the user never used.
+        res = _inst.uninstall(target, args.name, home=install_records_home())
     except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
         print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {e}")
         print(f"  {DIM}target: {target}{RESET}\n")
