@@ -240,17 +240,37 @@ what moved.
 file because the next release will need it, and because a reader should be able
 to see that it was checked rather than quietly deleted.
 
-### Not claimed in this release
+### What this release claims about the proxy, and what it does not
 
-Carried forward from 0.5.9 and still true at the time of writing.
+0.5.9 withheld this lane entirely: no merged change then shipped an entry point
+that routed through the proxy, so nothing could describe it as supported. That
+condition is met in 0.6.0. **#201** wires the named entry to launch through
+`python -m sunglasses.proxy`, and **#204** makes the approval reachable and
+discoverable by carrying `server_id` and `snapshot_sha256` in the
+`APPROVAL_REQUIRED` refusal. The lane was then measured end to end — install,
+first call, refusal, approval at a terminal, forwarded call — rather than
+argued.
 
-- General inspection of tool results. What ships is the credential lane on
+So the restraint is lifted deliberately, and replaced by the qualification that
+has to travel with every claim:
+
+- **Proxy mediation is supported ONCE the server's tool snapshot is approved at
+  an interactive terminal.** No page, post, release note or video may state it
+  without that condition attached.
+- **Installing is not protection.** `sunglasses install` rewrites the entry and
+  exits 0; that is a wrapping, not a guarantee.
+- **Until the snapshot is approved, nothing is forwarded and nothing is
+  inspected** — `status: not_run`, `inspected_utf8_bytes: 0`.
+
+Still not claimed:
+
+- **General inspection of tool results.** What ships is the credential lane on
   `api_response` for eight formats, and `GLS-SD-010` stays open in that
-  direction.
-- Proxy mediation as a supported surface, or any comparison against other tools.
-  **No page, post or release note may describe proxy mediation as supported
-  until an entry point ships that routes through it** — which no merged change
-  in this release does.
+  direction. Naming a tool result as somewhere an attack arrives is a
+  description of the threat, not a claim about what this inspects on the way
+  back.
+- **Any comparison against another tool.** Unchanged, and it applies to every
+  outward surface.
 
 
 ## [0.5.9] — 2026-09-16
