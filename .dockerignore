@@ -1,0 +1,20 @@
+# Keep the build context to what the wheel needs: the package, its data, the
+# packaging files and README (setup.py reads it for long_description, and the
+# release gate refuses a wheel whose long_description does not match it).
+.git
+.github
+__pycache__
+**/__pycache__
+*.pyc
+build/
+dist/
+*.egg-info/
+attack-db/
+tests/
+gauntlet/
+demo/
+docs/
+incoming/
+stats/
+scripts/
+tools/
