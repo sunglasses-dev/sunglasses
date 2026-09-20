@@ -62,6 +62,11 @@ concurrency:
   # supersede the previous run, which is why the sha is not appended
   # unconditionally. A PR's `github.ref` is already `refs/pull/N/merge` and
   # is stable across pushes, so the literal keeps PR grouping byte-identical.
+  #
+  # The commit that added this paragraph exists to BE a second push: the
+  # pre-merge half of the proof is that a new push to a pull request still
+  # supersedes the previous run, and a behaviour can only be shown by
+  # causing it.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
