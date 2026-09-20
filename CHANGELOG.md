@@ -3,7 +3,7 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [0.6.0] — UNRELEASED
+## [0.6.0] — 2026-09-26
 
 > **DRAFT.** Entries above the PENDING block describe work already merged to
 > `main` and were written from each merged pull request body, not from memory.
