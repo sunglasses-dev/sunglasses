@@ -46,8 +46,15 @@ def sg(*args, cwd, home, pkgroot=None):
     "invalid choice not in stderr" passes against a process that never started.
     Three of these tests passed that way before this line existed. Installed
     versus tree, the Sep-14 lesson, inside my own harness.
+
+    `HOME` is isolated alongside `SUNGLASSES_HOME` because the install record
+    now lives under `serve.state_root()`, which is HOME-derived by design. With
+    only the variable set, every row here would write its record into the real
+    user's `~/.sunglasses` and read an empty sandbox -- which is the Sep-19
+    failure verbatim: isolate BOTH, and assert the artefact landed inside the
+    sandbox rather than trusting an empty directory.
     """
-    env = dict(os.environ, SUNGLASSES_HOME=str(home),
+    env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
                PYTHONPATH=str(pkgroot) if pkgroot else REPO,
                PYTHONDONTWRITEBYTECODE="1")
     return subprocess.run([sys.executable, "-B", "-m", "sunglasses.cli", *args],
@@ -187,7 +194,7 @@ def test_install_never_writes_outside_the_named_config(project, tmp_path_factory
     r = sg("install", "github", cwd=project, home=home, pkgroot=root)
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert (home / "proxy" / "installs" / "github.json").exists(), \
+    assert (home / ".sunglasses" / "proxy" / "installs" / "github.json").exists(), \
         "the install reported success and recorded nothing"
 
     # The named config is the ONLY file in the project that may differ.
@@ -303,7 +310,14 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
         '    "other": {"command": "other", "args": []}\n'
         '  }\n}',
         encoding="utf-8")
-    home = tmp_path / "h"
+    # The racer IS the real CLI, so its root is HOME-derived
+    # (`serve.install_records_home()`), while this process passes `home=`
+    # explicitly. The two contend on one lock only if both name the same tree,
+    # so the test builds it: HOME/.sunglasses. Setting only `SUNGLASSES_HOME`
+    # sent the racer's record into the developer's real `~/.sunglasses` and the
+    # row then failed against a lock nobody else was holding.
+    home_root = tmp_path / "h"
+    home = home_root / ".sunglasses"
     marker = tmp_path / "racer-trying"
 
     # The state a crash between the replace and the completion leaves: the
@@ -315,8 +329,8 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
     pending_path.write_text(json.dumps(rec), encoding="utf-8")
     rec_path.unlink()
 
-    env = dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(root),
-               PYTHONDONTWRITEBYTECODE="1")
+    env = dict(os.environ, HOME=str(home_root), SUNGLASSES_HOME=str(home),
+               PYTHONPATH=str(root), PYTHONDONTWRITEBYTECODE="1")
     racer = subprocess.Popen(
         [sys.executable, "-B", "-c", RACER, str(marker), str(target)],
         cwd=str(project), env=env, stdout=subprocess.PIPE,

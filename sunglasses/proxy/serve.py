@@ -84,6 +84,30 @@ def state_root(override=None):
     return pathlib.Path.home() / ".sunglasses" / "proxy"
 
 
+def install_records_home(override=None):
+    """The tree `install.py` writes its records and locks under.
+
+    DERIVED from `state_root()`, never chosen beside it. `install.py` builds
+    `<home>/proxy/installs` and `<home>/proxy/locks`; the proxy builds captures,
+    approvals and receipts under `state_root()`. Those have to be one tree.
+
+    They were not. #204 was the same disagreement one layer down -- `approve`
+    defaulted to the current directory, so it looked where nothing had been
+    written and refused with a true statement about the wrong place. The flow
+    was never broken, it was unreachable, and the half left standing was this
+    one: install read `$SUNGLASSES_HOME` while the proxy read `Path.home()`.
+
+    `$SUNGLASSES_HOME` deliberately does not reach here. It governs SCANNER
+    state -- receipts, policy, pins -- and relocating those is what it is for. A
+    variable that also moved the approval store would be a switch anything in
+    the process tree could flip, and approvals read from a directory an attacker
+    controls are approvals an attacker writes. install does not take a
+    `--state-root` either: a path chosen once at config-write time is the same
+    hole one layer up.
+    """
+    return state_root(override).parent
+
+
 def build_route(*, session, log, upstream_argv, upstream_write, client_write,
                 root=None):
     """The wiring, separated so it can be inspected without spawning anything.
