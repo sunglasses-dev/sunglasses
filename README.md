@@ -16,13 +16,78 @@
 - A Claude Code hook that blocks credential paths and policy violations before a tool runs
 
 **What is next**
-- Checking what a tool returns, not only what goes into it, through a local proxy
-- Until that lands this reads input, so a clean result is a confidence floor and not a guarantee
+- A local MCP proxy that checks what a tool RETURNS, not only what goes into it.
+  It ships in this release and it enforces **only after a human approves the
+  server at an interactive terminal** — see [What the proxy enforces](#what-the-proxy-enforces).
+  Installing it is not protection on its own.
+- Outside that lane this reads input, so a clean result is a confidence floor and not a guarantee
 
 Sunglasses is a local, open-source scanner for text and supported files. It reports what
 it matched **and what it could not read**, so you can decide what to pass onward. It
 produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
 on that result.
+
+## What the proxy enforces
+
+`python -m sunglasses.proxy -- <your server command>` runs a real MCP server as
+a child process and mediates the stdio session between it and your client.
+**What it does depends entirely on whether that server has been approved, and
+the two states are very different.**
+
+### Before approval — nothing is inspected
+
+Out of the box, every `tools/list` and `tools/call` is refused before any
+inspection runs. The client receives a typed JSON-RPC error:
+
+```json
+{"jsonrpc":"2.0","id":2,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD",
+ "data":{"reason_code":"APPROVAL_REQUIRED","rule":"S4",
+         "status":"not_run","inspection_complete":false,
+         "inspected_utf8_bytes":0}}}
+```
+
+`status: not_run` and `inspected_utf8_bytes: 0` are the literal truth of it:
+the call is not forwarded to the server, so nothing is scanned and nothing is
+sent. **Installing the proxy does not protect anything by itself.**
+
+Approval is a deliberate human step and cannot be scripted:
+
+```
+$ python -m sunglasses.proxy approve <server-id> --snapshot <sha> --state-root <path>
+approving records that a human viewed this capture, and this is not an
+interactive terminal, so nobody did          # exits 1, nothing is recorded
+```
+
+It records that a **person** looked at the server's tool descriptors. A pipe
+cannot look, so it refuses from one. Run it at a real terminal and answer the
+prompt.
+
+### After approval — both directions, in the credential lane
+
+With the snapshot approved, the mediator inspects messages in both directions
+and withholds one whose content the engine blocks, returning the reason code,
+the rule, the bytes inspected and the rule ids that fired:
+
+```json
+{"jsonrpc":"2.0","id":3,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD",
+ "data":{"reason_code":"PROHIBITED_CONTENT","rule":"S2","status":"complete",
+         "inspection_complete":true,"inspected_utf8_bytes":87,
+         "rule_ids":["GLS-SD-001-API","GLS-SD-003-API"]}}}
+```
+
+- **A credential in a tool RESULT is withheld from your client.** The `-API`
+  rules are the tool-result channel.
+- **A credential in a tool CALL does not reach the server.** Verified by reading
+  the receiving server's own input, not by asking the proxy.
+- **Ordinary traffic passes.** `tools/list` returns the real list and a benign
+  call returns its real result.
+
+### What this is not
+
+This is the credential lane on tool results and tool calls. It is **not**
+general inspection of everything a tool returns, and no comparison with any
+other tool is claimed. See *Not claimed in this release* in
+[CHANGELOG.md](CHANGELOG.md).
 
 Four exit statuses, deliberately different signals:
 
@@ -635,9 +700,8 @@ record and puts the original back **byte-identical**, exiting `0`.
 launch path now goes through us and nothing more: out of the box the wrapped
 server enforces nothing, because the proxy's approval gate refuses until a human
 has approved that server's tool snapshot at an interactive terminal. What it
-inspects once approved is described under the proxy enforcement heading, which
-lands with that documentation, and is measured there rather than inferred from
-the fact that a wrap succeeded.
+inspects once approved is described under [What the proxy enforces](#what-the-proxy-enforces),
+and is measured there rather than inferred from the fact that a wrap succeeded.
 
 Content you route through the CLI, the Claude Code hook or the MCP server is
 scanned. Server responses arrive with 0.6.0.

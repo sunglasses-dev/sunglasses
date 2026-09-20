@@ -3,6 +3,213 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.0] — UNRELEASED
+
+> **DRAFT.** Entries above the PENDING block describe work already merged to
+> `main` and were written from each merged pull request body, not from memory.
+> Entries in the PENDING block describe work that is open and **must not be
+> described as shipped until its pull request merges**; on ship day they move up
+> and lose the marker, or they leave with the release.
+
+### Added
+
+- **A local MCP proxy that mediates a stdio session, and what it actually
+  enforces.** (#168, #177, #180, #195) `python -m sunglasses.proxy -- <server
+  command>` runs your MCP server as a child process and sits between it and
+  your client. **The behaviour has two states and they are not alike.**
+
+  **Before a human approves the server, nothing is inspected.** Every
+  `tools/list` and `tools/call` is refused first, with `reason_code:
+  APPROVAL_REQUIRED`, `status: not_run` and `inspected_utf8_bytes: 0`. The call
+  is never forwarded, so nothing is scanned and nothing reaches the server.
+  **Installing the proxy is not protection on its own.** Approval is recorded
+  by `python -m sunglasses.proxy approve <server-id> --snapshot <sha>`, which
+  **refuses from a pipe** — it records that a person viewed the tool
+  descriptors, and a pipe cannot look, so it must be run at an interactive
+  terminal.
+
+  **Once approved, it inspects both directions in the credential lane and
+  withholds what the engine blocks**, returning a typed `SUNGLASSES_WITHHELD`
+  JSON-RPC error carrying the reason code, the rule, the bytes inspected and
+  the rule ids. A credential in a tool RESULT is withheld from the client
+  (`GLS-SD-001-API`, `GLS-SD-003-API` — the tool-result channel); a credential
+  in a tool CALL does not reach the server, which is verified by reading the
+  receiving server's own input rather than by asking the proxy; benign traffic
+  passes, with `tools/list` returning the real list.
+
+  Every sentence above was produced by driving the shipped entry point with
+  real pipes against the package's own echo server, and the transcripts are the
+  source for the README section of the same name. **This is the credential lane
+  and nothing wider** — see *Not claimed in this release*.
+
+- **A close says WHICH fault, from a fixed vocabulary.** (#185) Two
+  `(reason, rule)` pairs covered twelve of this package's close sites --
+  `MALFORMED_UPSTREAM`/`S5` eight times, `MALFORMED_CLIENT`/`S5` four -- so a
+  receipt could say a protocol fault ended the session and never which one. "A
+  response arrived that nobody asked for" and "the response does not fit the
+  request it claims to answer" are different server defects, one `if` apart,
+  and until now they produced byte-identical receipts.
+
+  Closes now carry a `cause_kind` from a **closed catalog of 24**, written in
+  `session.py` and pinned in the tests, carrying nothing the peer supplied so a
+  receipt can be compared to a fixture byte for byte. The kind is produced
+  where the REASON is produced -- `framing.Frame`, `handshake.Negotiation` and
+  `bounds.Breach` each carry one -- so a site that takes a reason from a result
+  takes the kind from the same object and never chooses one for a fault it did
+  not diagnose. The one documented exemption is `OVER_BUDGET`, which carries no
+  kind because `budget` already names which limit broke.
+
+  Current numbers, read from the tree: **26 close sites**, 14 supplying a
+  distinct literal kind and 8 passing one through; **24 distinct kinds
+  reachable at a close**; and **zero catalog entries nothing can produce**.
+
+  `detail` stays out of evidence: it is prose, it is built around whatever the
+  situation contained, and the frame receipt leaked peer material through
+  exactly that field twice. It remains on the object for logs and exceptions
+  and is excluded from `Cause.as_receipt` by name.
+
+- **The route commands, documented, and what they do NOT do.** (#182) `install`
+  wraps an existing MCP server entry so its launch path goes through the proxy
+  and says `Wrapped '<name>'`; `uninstall` reads that record and restores the
+  original **byte-identical**; `doctor` reports whether a route is genuinely
+  wired. The README section carries the sentence that matters most —
+  **"Wrapped is not the same as protected"** — because a successful `install`
+  moves the launch path and nothing else: the approval gate still refuses until
+  a human approves that server's snapshot at an interactive terminal.
+
+  The help strings ship with the same discipline. `doctor` distinguishes "I
+  looked and nothing is protected" from "I could not look", which are different
+  facts and the second one is where a person gets hurt by assuming the first.
+
+- **`install` wires the module form, because the path form could not import
+  itself.** (#201) Until this change, `sunglasses install` wrote a wrapper that
+  ran the entry point BY FILE PATH — `<python> …/sunglasses/proxy/__main__.py
+  -- <server>`. Run that way the file has no package context, so its
+  `from .commands import main` raises and **the wrapped server exited 1 before
+  a single message crossed**. Every server an install had wired was dead on
+  arrival. It writes `-m sunglasses.proxy` now, and uninstall still restores
+  the configuration file byte for byte.
+
+  **Measured end to end on the merged tree**, in an isolated `HOME`, driving
+  exactly the command install wrote rather than one retyped by hand:
+  `initialize` answered · `tools/list` withheld `APPROVAL_REQUIRED` with a
+  capture written · `proxy approve` at a terminal exits 0 · `tools/list` then
+  returns the real tool list · a call carrying an AWS key id and secret is
+  withheld `PROHIBITED_SECRET` · a benign call returns its real result.
+
+  **The approval ids are still only in the capture filename.** Nothing in the
+  withheld message names the server id or the snapshot sha, so the gate is
+  reachable and undiscoverable: a user who does not look inside the state
+  directory will not find what to approve. A change putting the ids in the
+  `APPROVAL_REQUIRED` payload is open.
+
+- **An install and uninstall that is a transaction, and a doctor that can judge
+  it.** (#177, #180, #195) `sunglasses install <server> --config <path>` wires
+  an existing MCP server entry to run through the proxy, and uninstall restores
+  the file byte for byte. The completed record cannot be half-published and the
+  writer cannot be aimed at a path it was not given. See
+  [docs/proxy-install-transaction.md](docs/proxy-install-transaction.md) and
+  [docs/proxy-doctor.md](docs/proxy-doctor.md) for what install and uninstall
+  do to your configuration file; what the proxy ENFORCES once wired is the
+  entry above.
+
+### Changed
+
+- **`GLS-ENC-ALT-210` stops trying a match inside a base64 run.** (#181) The
+  rule's second branch paired a long base64-ish run with a nearby `decode` or
+  `base64` literal. On a document that CONTAINS that literal — the common case,
+  since the literal is what the rule looks for — the prefilter correctly cannot
+  skip the rule, and the engine then tried a match start at every position
+  inside the run. Measured before and after on the same documents: 16,000 bytes
+  went from 74.5691 s to 0.0096 s, and the growth ratio from about 4.0x per
+  doubling to about 2.0x, so 1 MiB finishes at 0.6297 s where it previously did
+  not finish at all. This was the last open row of the slow-rule backlog.
+
+### Continuous integration
+
+Three of these change no shipped code and are listed so the release accounts for
+what moved.
+
+- **The integrity matrix reports its slowest rows.** (#187) The 3.12 leg was the
+  slowest in 7 of 8 full-matrix runs and its step was a bare `pytest -q`, so the
+  one leg most in need of explanation produced no per-test timing at all.
+  Medians over n=8 runs each: 3.9 91 · 3.10 88 · 3.11 61 · **3.12 135** · 3.13
+  76 · 3.14 67 minutes. It is not install: on one run, same commit and same
+  queue, the suite step was 137 min on 3.12 against 74 on 3.13 while setup,
+  checkout and install were 0–1 min on every leg.
+- **The 3.12 leg is counted, not extrapolated.** (#188) `--durations=25` proved
+  the excess is a FIXED WAIT rather than slow code — 3.12's rows quantised at
+  94.1–94.9 s on the `setup` AND the `call` of tiny unrelated tests, with the
+  ~188 s rows being two waits back to back, while 3.13's slowest rows are real
+  work with a normal spread. `--durations=0` replaces the estimate with a count.
+- **The engine build is timed where the slow leg lives.** (#189) Against the
+  3.13 leg of the same commit: **41 waits on 3.12**, the wait itself **86.45 s**
+  with a spread of 1.86 s, explaining **3543 s of a 3809 s excess — 93%**.
+  3.9, 3.10, 3.11 and 3.14 carry zero waits each. Every site carrying a wait
+  builds a fresh engine over the whole pattern database, and the source sites
+  count 41 against 41 waits. **Stated as a lead and not as a finding**: the same
+  comparison on a laptop came back +3% against +85% on CI with identical
+  `pip freeze`, so the interpreter does not explain it and the environment does.
+
+### Documentation
+
+- **The sixty-seconds demo is a recording, and the MCP registry manifest
+  ships.** (#186) A 17-second recording of `demo/sixty-seconds.sh` against the
+  released 0.5.9 with real output: a clean file passes, a vendor brief is
+  blocked with six findings, an archive we do not extract comes back INCOMPLETE,
+  a missing file exits 2. `server.json` describes the MCP server that already
+  ships, and the README carries the registry ownership marker so the PyPI long
+  description proves the namespace. **Nothing is published by that change**:
+  the registry ownership check reads the marker from the released package, so
+  publishing waits for the first PyPI release that carries it — which is this
+  one.
+
+### Tests
+
+- **Two skips claimed a missing requirement and neither claim was true.** (#183)
+  Two UNCONDITIONAL skips sat in the proxy round-2 suite. A head-independent skip
+  is a check that skips itself: invisible in a summary line and reading as a
+  pass. Both rows were run unskipped before anything was decided, and both
+  failed for reasons other than the one the skip gave. One was rewritten and
+  closes a real gap — a refusal enforced at two call sites with no test anywhere
+  in the suite — and the other was deleted with its reason left in the file,
+  because it asserted a property of a pure function that needs context the
+  function does not have. A second reading then found the same fault one `if`
+  away, in a claim this project had made about its own coverage, and added the
+  row rather than softening the claim.
+
+- **The three CI reruns in this release were test defects, not product
+  flakiness.** (#196, #197, #198) A deadline row anchored on a live clock and
+  relied on `(anchor + limit) - anchor` returning the limit exactly; it does
+  not at small `time.monotonic()` values, so the row was green on a developer
+  machine and red on a freshly booted runner. A growth gate divided one
+  sub-millisecond timing by another and read the noise as growth; it compares
+  the cleanest of three PAIRED ratios now, with the gate itself untouched. And
+  five rows asserted a wall-clock bound beside an outcome that already proved
+  the property, with 21x to 500x of margin on an idle box — they assert the
+  recorded outcome now, and the anti-hang bound is armed around the blocking
+  call rather than checked after it, because an assertion written after a call
+  that never returns is never reached. No shipped code changed in any of them.
+
+### PENDING — open, not shipped, and not to be described as shipped
+
+**Empty.** Every change described above is in `main`. The block stays in the
+file because the next release will need it, and because a reader should be able
+to see that it was checked rather than quietly deleted.
+
+### Not claimed in this release
+
+Carried forward from 0.5.9 and still true at the time of writing.
+
+- General inspection of tool results. What ships is the credential lane on
+  `api_response` for eight formats, and `GLS-SD-010` stays open in that
+  direction.
+- Proxy mediation as a supported surface, or any comparison against other tools.
+  **No page, post or release note may describe proxy mediation as supported
+  until an entry point ships that routes through it** — which no merged change
+  in this release does.
+
+
 ## [0.5.9] — 2026-09-16
 
 ### Added
