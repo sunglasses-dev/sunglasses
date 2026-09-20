@@ -71,6 +71,7 @@ class Store:
     def __init__(self, root, *, server_id):
         self.root = pathlib.Path(root)
         self.server_id = server_id
+        self.pending_snapshot = None
         self.approvals = self.root / "approvals"
         self.captures = self.root / "captures"
         self.approvals.mkdir(parents=True, exist_ok=True)
@@ -93,6 +94,12 @@ class Store:
         """The capture the human is shown. Approval quotes this sha."""
         (self.captures / f"{self.server_id}.{snapshot_sha256}.json").write_text(
             json.dumps(payload, sort_keys=True))
+        # REMEMBERED so a refusal can name it. `proxy approve` needs this sha,
+        # and until it appeared in the APPROVAL_REQUIRED payload the only way to
+        # learn it was to list this directory. In memory only and deliberately
+        # so: the file on disk is the record, this is just the last thing we
+        # showed, and it must not outlive the process that showed it.
+        self.pending_snapshot = snapshot_sha256
         return snapshot_sha256
 
     def approve(self, *, snapshot_sha256, viewed):

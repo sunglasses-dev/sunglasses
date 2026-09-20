@@ -72,7 +72,7 @@ def _number(value, field):
 def withheld(*, request_id, reason_code, rule, accepted, status,
              inspection_complete, inspected_utf8_bytes, observed_content_bytes,
              elapsed_ms, rule_ids=(), catalog=frozenset(), budget=None,
-             **ignored):
+             server_id=None, snapshot_sha256=None, **ignored):
     """T4.R7's envelope, and nothing else.
 
     `**ignored` is deliberate and is the point of the design. A caller with a
@@ -123,6 +123,38 @@ def withheld(*, request_id, reason_code, rule, accepted, status,
     admissible = sorted({rule_id for rule_id in (rule_ids or ())
                          if rule_id in catalog})[:MAX_RULE_IDS]
 
+    # APPROVAL_REQUIRED CARRIES THE TWO IDENTIFIERS THE FIX NEEDS, and only that
+    # reason carries them. A client told "approval required" could not act on it:
+    # `proxy approve` wants a server-id and a snapshot sha, and neither was
+    # anywhere the user could see -- they had to list the captures directory to
+    # find out. These are EXPLICIT parameters rather than something riding in on
+    # `**ignored`, because that kwarg exists precisely to stop callers widening
+    # this envelope by accident, and widening it on purpose should look
+    # different from widening it by mistake.
+    #
+    # Not secrets: the server id is a digest of the upstream argv and the cwd,
+    # the snapshot sha is a digest of descriptors the operator is about to be
+    # shown. But this is an error path a client may log, so it is stated in the
+    # PR rather than slipped in, and it is omitted for every other reason so no
+    # other refusal grows a field it has no use for.
+    approval = {}
+    if reason_code == "APPROVAL_REQUIRED":
+        for name, value in (("server_id", server_id),
+                            ("snapshot_sha256", snapshot_sha256)):
+            if value is None:
+                continue
+            if not isinstance(value, str) or not value.isalnum():
+                raise ValueError(
+                    f"{name} is {value!r}; it reaches the one structure an "
+                    f"adversary is guaranteed to read, so it is a plain "
+                    f"alphanumeric digest or it is absent")
+            approval[name] = value
+    elif server_id is not None or snapshot_sha256 is not None:
+        raise ValueError(
+            f"server_id/snapshot_sha256 were passed with reason {reason_code}, "
+            f"which cannot be answered by approving anything, so the values "
+            f"would describe nothing")
+
     return {
         "jsonrpc": "2.0",
         "id": request_id,                     # the ACTUAL id, its own JSON type
@@ -142,6 +174,7 @@ def withheld(*, request_id, reason_code, rule, accepted, status,
                                                   "observed_content_bytes"),
                 "elapsed_ms": _number(elapsed_ms, "elapsed_ms"),
                 "rule_ids": admissible,
+                **approval,
             },
         },
     }

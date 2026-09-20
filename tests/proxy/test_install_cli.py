@@ -444,3 +444,52 @@ def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
     assert "late" in servers, "the waiter published over a change it never read"
     assert inst.classify(servers["github"], artifact=entry) != "WRAPPED", (
         "the waiter resurrected a wrapper that had been undone while it waited")
+
+def test_install_says_what_happens_next_and_names_only_real_things(tmp_path, monkeypatch):
+    """The success message has to be runnable, not reassuring.
+
+    Every claim it makes is checked against the product here, because a message
+    that names a command or a directory that does not exist is worse than
+    silence: it sends the reader somewhere and they find nothing.
+
+    It must NOT make a protection claim. A wrap succeeding says the launch path
+    goes through us and nothing about what is enforced.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("SUNGLASSES_HOME", str(home))
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(RAW_CONFIG, encoding="utf-8")
+
+    r = sg("install", "github", "--config", str(cfg), cwd=tmp_path, home=home)
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+
+    # 1. it says nothing is forwarded yet, and makes no protection claim
+    assert "withheld until you approve" in out
+    for claim in ("protected", "protects", "secure", "safe"):
+        assert claim not in out.lower(), f"the message claims {claim!r}"
+
+    # 2. the captures directory it names is the one the proxy actually uses
+    from sunglasses.proxy.serve import state_root
+    assert str(state_root() / "captures") in out
+
+    # 3. the command it prints is a real command with real flags
+    assert "sunglasses proxy approve" in out
+    assert "--snapshot" in out
+    from sunglasses.proxy import commands
+    assert "approve" in commands.COMMANDS
+    assert "--snapshot" in commands.USAGE
+
+    # 4. the field names it tells the reader to look for are the ones the
+    #    refusal actually carries
+    from sunglasses.proxy import envelope
+    built = envelope.withheld(
+        request_id=1, reason_code="APPROVAL_REQUIRED", rule="S4",
+        accepted=False, status="not_run", inspection_complete=False,
+        inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+        server_id="abc123", snapshot_sha256="d" * 64)
+    for field in ("server_id", "snapshot_sha256"):
+        assert field in out, f"the message does not name {field}"
+        assert field in built["error"]["data"], f"the payload lacks {field}"

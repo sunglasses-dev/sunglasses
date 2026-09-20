@@ -145,6 +145,34 @@ def test_a_person_saying_yes_writes_the_record(tmp_path):
     assert store.read()["snapshot_sha256"] == "a" * 64
 
 
+def test_approve_finds_the_capture_from_an_unrelated_directory(tmp_path, monkeypatch):
+    """WITHOUT `--state-root`, and standing somewhere else entirely.
+
+    `--state-root` used to default to `"."`, so `approve` looked for the capture
+    under whatever directory the user happened to be in while the proxy had
+    written it to `serve.state_root()`. It then refused with "no stored capture"
+    — a true statement about a directory nobody had written to — and nothing
+    told the reader where to look instead. Measured before the fix: exit 1 from
+    any other directory, exit 0 only with the flag pointed at the proxy's root.
+
+    The proxy's root is HOME-derived, so pointing HOME at a temp dir is what
+    makes this row hermetic; `serve.state_root()` deliberately reads no
+    environment variable of its own.
+    """
+    home = tmp_path / "home"
+    (home / ".sunglasses" / "proxy").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(tmp_path / "elsewhere" if (tmp_path / "elsewhere").mkdir()
+                      or (tmp_path / "elsewhere").exists() else tmp_path)
+
+    store = _capture(home / ".sunglasses" / "proxy")
+    code = commands.main(["approve", "review-id", "--snapshot", "a" * 64],
+                         stdout=io.StringIO(), stderr=io.StringIO(),
+                         confirm=lambda: True)
+    assert code == commands.EXIT_OK
+    assert store.read()["approved_by"] == "human"
+
+
 class _Stdin:
     """A stdin that can say whether it is a terminal, because that is the whole
     question `_ask` has to answer."""
