@@ -730,9 +730,18 @@ sunglasses install github --config ~/some/other.json
 # Put it back. Byte-for-byte when the file has not changed since.
 sunglasses uninstall github
 
-# Report whether your routes are genuinely protected.
-sunglasses doctor
 ```
+
+**There is no `sunglasses doctor` command in this release.** The README showed
+one in a runnable block and argparse rejects it — the accepted commands are
+scan, check, info, firewall-hook, pin, init, receipts, demo, report, install,
+uninstall and config. What shipped is `sunglasses/proxy/doctor.py`: the R1
+judgment, R2 and R3 reconciled onto `install.py` (#180), with
+`tests/proxy/test_doctor_reconciled.py` and
+`tests/proxy/test_doctor_selftest.py` behind them. It is reachable by import
+only; no CLI path and no `python -m sunglasses.proxy doctor` subcommand exists.
+Wiring one is a product decision, not a documentation fix, so the line is
+removed rather than rewritten into a command that would still not run.
 
 `install` keeps a copy of your original config and a record of what it changed,
 under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the

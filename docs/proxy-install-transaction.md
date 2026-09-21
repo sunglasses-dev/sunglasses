@@ -1,12 +1,16 @@
 # The install/uninstall transaction
 
-> **These commands ship INERT.** The transaction described here is real and
-> tested, but the proxy entry point it wires an entry to does not ship in this
-> release, so `sunglasses install` refuses and exits 2 on every invocation.
-> Nothing here describes proxy mediation as a supported surface.
+> **What `install` does today, measured rather than remembered.** With an
+> `.mcp.json` present it rewrites the named entry to launch through the proxy in
+> its module form and exits 0; with no `.mcp.json` at the target path it refuses
+> and exits 2, naming the path. This page said the commands ship INERT and that
+> `install` "refuses and exits 2 on every invocation", which was true before
+> #195 and #201 merged and has not been true since.
 >
-> **Status: PENDING (#177).** This page describes a branch that has not merged.
-> It must not be published before the code it documents.
+> **Wiring is not approval and neither is protection.** Once wired, every call
+> is still withheld with `APPROVAL_REQUIRED` until a person approves the
+> server's tool snapshot at an interactive terminal. Source:
+> `warroom/PROXY_ENFORCEMENT_PROBE_2026-09-21.md`.
 
 Every claim below names the control that proves it. Where no control is named,
 no claim is made.
