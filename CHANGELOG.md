@@ -213,12 +213,26 @@ what moved.
   | no recognisable format | JSON-embedded | file | **allow** | **none** |
   | no recognisable format | JSON-embedded | message | **allow** | **none** |
   | no recognisable format | JSON-embedded | api_response | **allow** | **none** |
-  | no recognisable format | quoted value | file | **allow** | **none** |
+  | no recognisable format | the assignment behind a quote | file | **allow** | **none** |
+  | no recognisable format | **indented by any whitespace** | file | **allow** | **none** |
+  | no recognisable format | value quoted, assignment at line start | file | block | `GLS-SD-010` |
 
   A line anchor is not a channel property. `GLS-SD-010` misses an embedded
   `KEY=value` on **every** channel, including `file` and `message`, which it
   declares — a `.env` dump inside a JSON blob in a FILE is not matched today,
-  and no surface said so. What kept this invisible is the last column: when the
+  and no surface said so.
+
+  **And "embedded" is wider than a JSON string: INDENTATION ALONE DEFEATS IT.**
+  `    PASSWORD=hunter2` with any leading whitespace — four spaces, two, a tab —
+  is not matched, which is the commonest real shape there is: a config block, a
+  YAML mapping, an indented snippet in a document. Re-measured 2026-09-21 after
+  the first version of this table described only the JSON case.
+
+  The two quoted shapes are opposite and the first version of this row read as
+  one claim. `PASSWORD="hunter2"` — the VALUE quoted, the assignment still at
+  the line start — BLOCKS. `"PASSWORD=hunter2"` — the ASSIGNMENT behind a quote
+  — does not. It is the position of the assignment that matters, never the
+  quoting of the value. What kept this invisible is the last column: when the
   value is in a known credential format the `GLS-SD-001` family catches it
   everywhere anyway (`GLS-SD-001` on file, message and web content,
   `GLS-SD-001-API` in a tool result), so the gap only shows for an assignment
