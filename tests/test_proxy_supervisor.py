@@ -20,6 +20,36 @@ import time
 
 import pytest
 
+
+def _pid_from_marker(marker, timeout=5.0):
+    """The pid a child wrote to `marker`, waiting for CONTENT and not for the file.
+
+    THE DEFECT THIS REPLACES, measured on 2026-09-21: the caller polled
+    `os.path.exists(marker)` and then read it. `open(path, "w")` CREATES the file
+    before anything is written to it, so existence was true while the content was
+    still `""` and `int("")` raised ValueError — 1 h 9 m into the 3.14 leg,
+    blocking a PR that does not touch this file. It is a race, so it fires under
+    runner load and passes on a quiet laptop, which is the worst way for a test
+    to be wrong: it reads as someone else's bug.
+
+    Waiting for a non-empty read is the reader's half. The writer's half is in
+    the test below: write to a temp name and os.replace() onto the marker, which
+    is atomic, so after this change existence DOES imply content and the two
+    halves agree instead of racing.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            text = open(marker).read().strip()
+        except FileNotFoundError:
+            text = ""
+        if text:
+            return int(text)
+        time.sleep(0.02)
+    raise AssertionError(
+        f"no pid in {marker} within {timeout}s "
+        f"(exists={os.path.exists(marker)}); the child never finished writing")
+
 supervisor = pytest.importorskip(
     "sunglasses.proxy.supervisor",
     reason="the supervisor is the slice being specified here")
@@ -158,19 +188,24 @@ def test_the_group_is_resolved_from_the_process_not_assumed_to_be_its_pid(tmp_pa
     down with it.
     """
     marker = str(tmp_path / "grandchild.pid")
+    # The grandchild writes to a TEMP NAME and os.replace()s it onto the marker.
+    # os.replace is atomic on the same filesystem, so the marker never exists in
+    # a half-written state and "it exists" now means "it has content".
+    inner = (
+        "import os, time\n"
+        f"p = {marker!r}\n"
+        "tmp = p + '.part'\n"
+        "open(tmp, 'w').write(str(os.getpid()))\n"
+        "os.replace(tmp, p)\n"
+        "time.sleep(120)\n"
+    )
     code = (
         "import subprocess, sys, time\n"
-        f"subprocess.Popen([sys.executable, '-c', "
-        f"\"open({marker!r},'w').write(str(__import__('os').getpid()));"
-        f" import time; time.sleep(120)\"])\n"
+        f"subprocess.Popen([sys.executable, '-c', {inner!r}])\n"
         "time.sleep(120)\n"
     )
     leader = subprocess.Popen([sys.executable, "-c", code], start_new_session=True)
-    for _ in range(100):
-        if os.path.exists(marker):
-            break
-        time.sleep(0.05)
-    grandchild = int(open(marker).read())
+    grandchild = _pid_from_marker(marker)
 
     from sunglasses.proxy import supervisor as sup
     assert sup._group_of(grandchild) == leader.pid, (
@@ -191,3 +226,67 @@ def test_the_group_is_resolved_from_the_process_not_assumed_to_be_its_pid(tmp_pa
         if leader.poll() is None:
             leader.kill()
         leader.wait(timeout=5)
+
+
+# ── THE RACE THAT BLOCKED A PR IT DID NOT BELONG TO ──────────────────────────
+# 2026-09-21: `integrity (3.14)` went red 1 h 9 m in with
+# `ValueError: invalid literal for int() with base 10: ''` at the marker read,
+# on a PR whose whole delta was one unrelated test file. Five other Python legs
+# passed and a local full suite passed, because a race only fires under load.
+#
+# These two rows make the defect and its repair executable, so the next person
+# reading a red 3.14 leg has something better than "probably flaky".
+
+
+def test_the_old_marker_read_loses_to_a_slow_writer(tmp_path):
+    """RED-FIRST, against the code this change replaced.
+
+    The writer opens the file and is slow to write. The OLD reader — poll
+    os.path.exists, then int(open(...).read()) — sees the file the instant it is
+    created and reads nothing. This row asserts that the old shape FAILS, so the
+    fix below is measured against a defect that has been reproduced rather than
+    described.
+    """
+    marker = str(tmp_path / "slow.pid")
+    slow = (
+        "import os, sys, time\n"
+        f"f = open({marker!r}, 'w')\n"          # exists now, empty
+        "time.sleep(1.0)\n"                     # the window, forced open
+        "f.write(str(os.getpid())); f.flush(); f.close()\n"
+    )
+    child = subprocess.Popen([sys.executable, "-c", slow])
+    try:
+        for _ in range(100):                    # the OLD reader, verbatim
+            if os.path.exists(marker):
+                break
+            time.sleep(0.05)
+        with pytest.raises(ValueError):
+            int(open(marker).read())
+    finally:
+        child.wait(timeout=10)
+
+
+def test_the_new_marker_read_waits_for_content(tmp_path):
+    """GREEN, same writer, same window: the reader waits for a non-empty read."""
+    marker = str(tmp_path / "slow.pid")
+    slow = (
+        "import os, sys, time\n"
+        f"f = open({marker!r}, 'w')\n"
+        "time.sleep(1.0)\n"
+        "f.write(str(os.getpid())); f.flush(); f.close()\n"
+    )
+    child = subprocess.Popen([sys.executable, "-c", slow])
+    try:
+        assert _pid_from_marker(marker, timeout=10.0) == child.pid
+    finally:
+        child.wait(timeout=10)
+
+
+def test_the_reader_reports_a_writer_that_never_arrives(tmp_path):
+    """And it must not hang or read garbage when nothing is ever written.
+
+    Otherwise the repair trades a ValueError for a test that waits forever,
+    which on a runner is a killed job and no verdict at all.
+    """
+    with pytest.raises(AssertionError, match="never finished writing"):
+        _pid_from_marker(str(tmp_path / "absent.pid"), timeout=0.3)
