@@ -168,6 +168,9 @@ All notable changes to Sunglasses are documented here.
   doubling to about 2.0x, so 1 MiB finishes at 0.6297 s where it previously did
   not finish at all. This was the last open row of the slow-rule backlog.
 
+- **The install record and the capture were in different trees.** (#213)
+- **A container that answers introspection, because a registry asks the server not the README.** (#214)
+
 ### Continuous integration
 
 Three of these change no shipped code and are listed so the release accounts for
@@ -194,6 +197,11 @@ what moved.
   comparison on a laptop came back +3% against +85% on CI with identical
   `pip freeze`, so the interpreter does not explain it and the environment does.
 
+- **Name the syscall the 3.12 leg waits on.** (#190)
+- **Time every `re.compile` on the 3.12 leg, when asked.** (#200)
+- **Let the compile timer write the whole distribution, not just the head.** (#203)
+- **A main merge stops cancelling the previous commit's queued run.** (#205)
+
 ### Documentation
 
 - **The sixty-seconds demo is a recording, and the MCP registry manifest
@@ -206,6 +214,12 @@ what moved.
   the registry ownership check reads the marker from the released package, so
   publishing waits for the first PyPI release that carries it — which is this
   one.
+
+- **The 0.6.0 changelog draft, two reference pages, and a registry manifest that validates.** (#191)
+- **The 0.6.0 section was missing the change that made the proxy reachable.** (#206)
+- **The README showed a refusal without the two values it then tells you to use.** (#207)
+- **The anchor-spec key's stated reason is false at this scale.** (#209)
+- **0.6.0 claims the proxy, with the condition attached.** (#212)
 
 ### Tests
 
@@ -233,6 +247,12 @@ what moved.
   recorded outcome now, and the anti-hang bound is armed around the blocking
   call rather than checked after it, because an assertion written after a call
   that never returns is never reached. No shipped code changed in any of them.
+
+- **Mutation harnesses mutate a private copy, never the source tree.** (#199)
+- **Give the engine the regex cache its own comment assumes.** (#202)
+- **The comment said the product cannot name the bound, and it can.** (#208)
+- **Every packaging version home tracks `__version__`.** (#210)
+- **The wheel rows need a package index, and nothing said so.** (#216)
 
 ### PENDING — open, not shipped, and not to be described as shipped
 
