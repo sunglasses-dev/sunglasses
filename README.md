@@ -796,7 +796,10 @@ that cannot demonstrate mediation must never imply it.
 
 Point `--config` at a file that does not exist and `doctor` refuses and names
 it, exactly as `install` does, rather than reporting "no server entries found"
-about a file that was never there.
+about a file that was never there. An **empty** `--config` is refused too, by
+every command that takes one: `--config "$CFG"` with `CFG` unset names no file,
+and the one thing it must never do is quietly fall back to a wider source than
+the one you asked for.
 
 `install` keeps a copy of your original config and a record of what it changed,
 under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the

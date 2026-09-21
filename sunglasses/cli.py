@@ -2236,8 +2236,19 @@ def _install_config_path(args):
     writing into a real settings file once had an agent's own tool calls
     inspected by the build it was editing. A wiring command that defaults into
     HOME is the same hazard wearing a different filename.
+
+    An EMPTY `--config` is refused, never defaulted. ASTRA found this on
+    `doctor` (F1, 2026-09-21) where it only widened a read; the same line was
+    here, where the verb is EDIT, so `install <name> --config ""` resolved to
+    `./.mcp.json` and rewrote a file the operator never named. `--config "$CFG"`
+    with CFG unset is the everyday shape of it.
     """
     import pathlib as _pl
+    if args.config is not None and not args.config.strip():
+        print(f"\n  {RED}SUNGLASSES refused{RESET} — --config was given an "
+              f"empty value; it names no file")
+        print(f"  {DIM}omit --config to use ./.mcp.json, or name a file{RESET}\n")
+        sys.exit(2)
     return _pl.Path(args.config) if args.config else _pl.Path.cwd() / ".mcp.json"
 
 
@@ -2360,8 +2371,26 @@ def cmd_doctor(args, _run=None):
     # `~/.claude.json`, and a flag that appended would report on servers the
     # operator did not ask about while naming one file in the output.
     sources = None
-    if args.config:
+    if args.config is not None:
         import pathlib as _pl
+        # `is not None`, never truthiness. ASTRA F1 (round 1, 2026-09-21): `if
+        # args.config:` reads an EMPTY STRING as an omitted option, so
+        # `doctor --config ""` returned byte-identical output to the bare
+        # command -- two entries discovered from `~/.claude.json`, the file the
+        # operator had just said not to read. The everyday shape is
+        # `--config "$CFG"` with CFG unset, which is exactly the moment a user
+        # believes they have scoped the read and has instead widened it.
+        #
+        # An empty value is an explicit request that names no file. It cannot
+        # be honoured, and the one thing it must not do is fall back to a
+        # wider source, so it is refused like any other unusable explicit
+        # target.
+        if not args.config.strip():
+            print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "
+                  f"--config was given an empty value; it names no file")
+            print(f"  {DIM}omit --config to read the default sources, or name "
+                  f"a file{RESET}\n")
+            sys.exit(2)
         target = _pl.Path(args.config)
         # A path the operator NAMED and that is not there is not absence.
         #
