@@ -199,6 +199,39 @@ class SunglassesEngine:
     # The channels the public API documents. Kept even if no loaded pattern
     # currently declares one of them, so the documented contract always
     # validates. Pattern-declared channels are unioned in at init.
+    #
+    # This tuple is the ONE source for the published vocabulary: info() derives
+    # its "channels" from it and the MCP scan_text inputSchema enum states the
+    # same nine, with tests/test_channel_vocabulary_one_truth.py reading both
+    # off a running server and asserting they are one set.
+    #
+    # On tool_output specifically, because the name invites a bigger reading
+    # than it deserves: HERE it is a PATTERN-SELECTION LABEL ON CALLER-SUPPLIED
+    # TEXT. A caller of SunglassesEngine.scan(), or of the standalone MCP
+    # server's scan_text tool, hands us a string and tells us it came from a
+    # tool. Selecting the patterns that declare the channel is the whole of it:
+    # passing this label fetches nothing and intercepts nothing.
+    #
+    # THE PACKAGE'S PROXY IS A DIFFERENT THING AND THIS COMMENT USED TO DENY IT.
+    # It said "nothing in this package intercepts a tool result", which is false
+    # on this tree: sunglasses.proxy inspects inbound upstream results through
+    # route.py `_inspect_result` -> proxy/inspection.py `scan`, and it does so on
+    # the `api_response` channel, not this one. ASTRA proved it by execution on
+    # 2026-09-20 (2/2 results reached engine inspection) after the sentence was
+    # written here as a reassurance. A false reassurance in a security product is
+    # worse than no comment, and the correct statement is narrow: passing
+    # `tool_output` to scan() installs no interception of any kind, and the proxy
+    # that does inspect results is a separate component with its own channel,
+    # its own approval gate and its own documented conditions.
+    #
+    # Four further names are REACHABLE but deliberately undocumented, because
+    # loaded patterns declare them and valid_channels unions those in:
+    # conversation, email, image_alt_text, log. Each aliases to a canonical
+    # channel above. They stay reachable (dropping them would reject inputs
+    # that work today) and stay undocumented (listing them would widen the
+    # public contract). The same test pins that set, so a fifth undocumented
+    # name fails rather than arriving unnoticed. Promote-or-deprecate is a
+    # post-beta decision, not a side effect of a drift fix.
     DOCUMENTED_CHANNELS = (
         "message", "file", "api_response", "web_content", "log_memory",
         "tool_output", "agent_input", "code", "prompt",
@@ -1284,5 +1317,10 @@ class SunglassesEngine:
             "keywords_declared": self._keywords_declared,
             "keyword_entries": self._keyword_entries,
             "regex_patterns": len(self._regex_patterns),
-            "channels": ["message", "file", "api_response", "web_content", "log_memory"],
+            # DERIVED, never repeated. This was a hardcoded five-element list
+            # while DOCUMENTED_CHANNELS held nine and scan_text's inputSchema
+            # enum advertised all nine, so one server published two different
+            # vocabularies and nothing compared them. A second copy of a fact
+            # is a drift waiting for a reader.
+            "channels": list(self.DOCUMENTED_CHANNELS),
         }
