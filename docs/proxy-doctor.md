@@ -1,12 +1,5 @@
 # The doctor
 
-> **Status: PENDING (#180).** This page describes a branch that has not merged,
-> stacked on #177. It must not be published before the code it documents.
->
-> **There is no `sunglasses doctor` subcommand on this branch.** The doctor is
-> `sunglasses/proxy/doctor.py` and is reached through `doctor.run(...)`. If a
-> subcommand lands later, this page needs a line, not a rewrite.
-
 Every claim below names the control that proves it. Where no control is named,
 no claim is made.
 
