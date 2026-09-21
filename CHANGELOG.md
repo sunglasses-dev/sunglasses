@@ -281,6 +281,16 @@ has to travel with every claim:
   exits 0; that is a wrapping, not a guarantee.
 - **Until the snapshot is approved, nothing is forwarded and nothing is
   inspected** — `status: not_run`, `inspected_utf8_bytes: 0`.
+- **An approval is keyed on the SERVER, not on the tool list.** Two servers
+  exposing identical descriptors share a `snapshot_sha256` and get different
+  `server_id`s; the approval is stored against the `server_id`, so approving one
+  leaves the other refusing with `APPROVAL_REQUIRED` until it is approved at its
+  own terminal. Changing the command behind a familiar tool list does not
+  inherit an approval. Measured on `ec753bb` with both ids in the transcript.
+- **`install` edits a config and never creates one.** Aimed at a path that does
+  not exist it refuses and names the file, because a client's server list is
+  that client's file and a guessed one would sit where the client is not
+  looking. Still not protection: wrapping is not approval.
 
 Still not claimed:
 

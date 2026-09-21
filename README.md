@@ -68,6 +68,19 @@ It records that a **person** looked at the server's tool descriptors. A pipe
 cannot look, so it refuses from one. Run it at a real terminal and answer the
 prompt.
 
+**An approval belongs to one server, not to a tool list.** The snapshot hash
+covers the descriptors, and two different servers exposing the same tools have
+the same `snapshot_sha256` — but they get different `server_id`s, and the
+approval is stored against the `server_id`. Measured: two servers whose
+captures both read `snapshot_sha256` `26aeeb2f7c5b61aa…` carry the ids
+`8740fa6360ce72946fa5a99e86974e01` and `0096972d2543ec556ad9eefe9c144b05`, and
+approving the first left the second refusing with `APPROVAL_REQUIRED` until it
+was approved at its own terminal prompt.
+
+So **changing the command behind a familiar tool list does not inherit the
+approval you already gave.** A server that presents the same descriptors as one
+you trust is still a server you have not approved.
+
 ### After approval — both directions, in the credential lane
 
 With the snapshot approved, the mediator inspects messages in both directions
@@ -739,6 +752,18 @@ under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the
 copy still matches the digest taken at install time, and restores it. If the
 record or the copy is not something it can vouch for, it refuses and changes
 nothing rather than writing bytes it cannot verify.
+
+**`install` edits a config; it never creates one.** Point it at a path that does
+not exist and it refuses, naming the file:
+
+```
+SUNGLASSES install failed — cannot read /path/to/.mcp.json: [Errno 2] No such file or directory
+target: /path/to/.mcp.json
+```
+
+A client's server list is that client's file. Creating one from a guess would
+put a config where the client was not looking, and leave you wondering why
+nothing is wrapped.
 
 ### Exit codes, and why `3` is not a failure
 
