@@ -270,6 +270,15 @@ def _tool_result_json(payload, where):
     for a repeated identical text). What is refused is a block this reader
     cannot fully account for, and a set of text blocks that do not say the same
     thing.
+
+    ROUND 4 accepted `structuredContent` and did not read it, and disclosed that
+    as out of scope. It is not out of scope. `structuredContent` is the SAME
+    result in structured form and a client may read it INSTEAD of the text, so a
+    server whose structuredContent says five channels while its text says nine
+    is publishing two vocabularies -- which is the defect this entire file
+    exists to catch, arriving one layer below where it was being looked for.
+    Round 4 would have reported that as agreement. Found by the reviewer's own
+    round-4 disclosure, run through the candidate-shape probe.
     """
     _only_keys(payload, where, required=("content",),
                optional=("isError", "structuredContent", "_meta"))
@@ -325,9 +334,17 @@ def _tool_result_json(payload, where):
     for i, other in decoded[1:]:
         if other != first:
             raise WireError(
-                f"{where}: content[{first_i}] and content[{i}] publish DIFFERENT payloads. "
+                f"{where}: content[{first_i}] and content[{i}] publish DIFFERENT bodies. "
                 f"Reporting either one as the server's answer would report a "
                 f"disagreement as agreement.")
+
+    # The same rule, one layer down. Present and equal is fine; present and
+    # different is two vocabularies from one server.
+    if "structuredContent" in payload and payload["structuredContent"] != first:
+        raise WireError(
+            f"{where}: structuredContent and the text block publish DIFFERENT bodies. "
+            f"A client may read either one, so a server that disagrees with itself here "
+            f"has published two answers and this reader will not pick one.")
     return first
 
 
@@ -654,6 +671,12 @@ _TEXT_B = {"type": "text", "text": '{"channels": ["file"]}'}
      {"content": [{"type": "text", "text": "{}", "trust_me": True}]}),
     ("a result carrying an extra top-level key",
      {"content": [_TEXT_A], "shortcut": "yes"}),
+    # round 4 accepted this and called it out of scope; it is the same defect
+    # one layer down -- a client may read structuredContent instead of the text
+    ("structuredContent contradicting the text block",
+     {"content": [_TEXT_A], "structuredContent": {"channels": ["file"]}}),
+    ("structuredContent contradicting it by omission",
+     {"content": [_TEXT_A], "structuredContent": {}}),
     ("no content blocks at all", {"content": []}),
     ("no text block among the content", {"content": [{"type": "image", "data": "a",
                                                       "mimeType": "image/png"}]}),
@@ -676,6 +699,10 @@ def test_a_tool_result_outside_the_one_accepted_shape_is_refused(name, payload):
     ("the same text published twice", {"content": [_TEXT_A, _TEXT_A]}, ["message"]),
     ("result metadata alongside the content",
      {"content": [_TEXT_A], "isError": False, "_meta": {"trace": "abc"}}, ["message"]),
+    # present and EQUAL is a correct server saying the same thing twice, and
+    # refusing it would be a false kill
+    ("structuredContent agreeing with the text block",
+     {"content": [_TEXT_A], "structuredContent": {"channels": ["message"]}}, ["message"]),
 ])
 def test_a_protocol_correct_tool_result_is_accepted(name, payload, expected):
     assert _tool_result_json(payload, "control") == {"channels": expected}
