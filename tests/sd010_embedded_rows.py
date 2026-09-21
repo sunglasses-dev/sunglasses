@@ -146,16 +146,21 @@ MUST_FIRE["a_placeholder_shaped_but_real_password"] = '{"cfg":"PASSWORD=example1
 MUST_FIRE["a_redacted_looking_but_real_value"] = "config:\n    PASSWORD=xxxxxxxx\n"
 
 
-# ── what the rule still does not report ────────────────────────────
-#
-# ONE row, not three. A `${VAR}` interpolation is a REFERENCE to a secret: the
-# value is absent by construction, there is nothing in the text to leak. It must
-# be the ENTIRE value and the value must then end, so a secret cannot ride along
-# behind it -- the three evasion rows above are what enforces that.
-DISCLOSED_MISSES = {
-    "a_compose_interpolation":
-        'services:\n  app:\n    environment:\n      - "API_KEY=${API_KEY}"\n',
-}
+# The compose interpolation. It was the last DISCLOSED miss, and it is a
+# must-fire row now because the exclusion that spared it is gone. It leaks
+# nothing by itself -- `${API_KEY}` is a reference -- so reporting it is a
+# false positive we accept, for the same reason the FP corpus document is
+# accepted: the carve-out that would spare it is a switch an attacker flips.
+MUST_FIRE["a_compose_interpolation"] = (
+    'services:\n  app:\n    environment:\n      - "API_KEY=${API_KEY}"\n')
+
+# EMPTY ON PURPOSE, and it is a claim rather than an oversight: this rule does
+# not inspect the value at all, so there is no shape it declines to report.
+# Three review rounds closed value-driven exclusions as a class -- prose
+# prefixes, bracket forms, `${...}` carve-outs and a positive
+# "does this look like a secret" test were each defeated by attacker-chosen
+# bytes. Anything added back here needs to answer that first.
+DISCLOSED_MISSES = {}
 
 
 # The two shapes above that sit at a real line start, so GLS-SD-010 reaches

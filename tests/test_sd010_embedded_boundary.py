@@ -26,6 +26,7 @@ and asserts the defect is detected -- so a fixture that silently stopped
 exercising the rule cannot pass this file.
 """
 import copy
+import json
 import pathlib
 import sys
 import time
@@ -287,118 +288,81 @@ def test_the_boundary_did_not_buy_coverage_with_a_pathological_scan(engine, with
 
 # ── 6. the disclosed cost, and the document that licenses the rule ──────────
 
-@pytest.mark.parametrize("shape", sorted(rows.DISCLOSED_MISSES))
-def test_the_exclusions_cost_is_pinned_not_discovered(engine, shape):
-    """These assignments are real and this rule does not report them.
-
-    Written down as an assertion rather than as a sentence in a PR body,
-    because a sentence does not fail when the behaviour changes.
-    """
-    _, ids = _ids(engine, rows.DISCLOSED_MISSES[shape])
-    assert RULE not in ids, (
-        f"{shape} now fires. That may well be an improvement, but it is a "
-        f"change to a disclosed trade-off and it needs the comment in "
-        f"sd010_embedded_rows.py revisited, not just this line deleted.")
-
+# The parametrized disclosed-cost test lived here. DISCLOSED_MISSES is empty
+# now, so it collected nothing and pytest reported a permanent SKIP -- a check
+# that skips itself, which is worse than no check because it reads as coverage.
+# `test_nothing_is_disclosed_as_unreported` asserts the emptiness directly, and
+# fails if anything is ever declined again.
 
 FP_DOC = (pathlib.Path(__file__).resolve().parent / "fp_real_world_corpus"
           / "sunglasses-dev__env-var-docs-shapes.md")
 
 
-def test_the_fp_corpus_document_stays_clean(engine):
-    """#219 added this document to expose exactly this rule's cost.
+def test_the_fp_corpus_document_is_an_ACCEPTED_failure_with_a_written_reason(engine):
+    """#219's document now BLOCKS, and that is a decision with a reason on it.
 
-    Its own header states the terms: "A future embedded-content rule is
-    licensed by this file staying green, not by a reviewer remembering the
-    trade-off." So the licence is checked here, on the shipping engine, rather
-    than remembered.
+    Its header made staying green the licence for this rule. The licence was
+    revisited in writing rather than engineered around: every value-driven
+    exclusion that would spare this document was defeated by attacker-chosen
+    bytes across two review rounds, and a rule carrying one documented false
+    positive is worth more than a rule an attacker can silence.
 
-    Measured 2026-09-21 over the full 77-document corpus: this rule fires on 0
-    documents and flips 0 decisions. Under the same boundary WITHOUT the
-    placeholder exclusion it fired on this one and flipped it.
+    So this test no longer asserts the document is clean. It asserts the cost
+    is BOOKED -- listed on the ratchet, naming this rule, carrying a reason and
+    the ruling that put it there. A cost nobody wrote down is one the next
+    author deletes by accident.
     """
-    assert FP_DOC.exists(), f"{FP_DOC} is gone; the licence cannot be checked"
+    assert FP_DOC.exists(), f"{FP_DOC} is gone; the cost cannot be checked"
     decision, ids = _ids(engine, FP_DOC.read_text(errors="ignore"))
-    assert RULE not in ids, (
-        f"{RULE} fired on the document that licenses it. Every project README "
-        f"that documents an environment variable looks like this.")
-    assert decision == "allow", f"the document no longer scans clean: {ids}"
+    assert RULE in ids and decision == "block", (
+        f"the document no longer blocks ({decision}, {ids}). That may be an "
+        f"improvement, but it makes the KNOWN_FAILURES entry stale and the "
+        f"entry must go with it.")
+    known = json.loads((FP_DOC.parent / "KNOWN_FAILURES.json").read_text())
+    entry = known.get(FP_DOC.name)
+    assert entry, f"{FP_DOC.name} blocks but is NOT on the ratchet"
+    assert RULE in entry["patterns"], (
+        f"the ratchet entry does not name {RULE}: {entry['patterns']}")
+    assert entry.get("reason") and entry.get("ruled_by"), (
+        "an accepted false positive needs a written reason and a ruling, not "
+        "just a row")
 
 
-def test_control_removing_the_apostrophe_makes_pythons_own_repr_walk_past():
-    """The apostrophe in the boundary class is load-bearing, proven by removal.
+def test_control_any_value_exclusion_reopens_the_attacker_class():
+    """The decision this rule now rests on, stated as something that can fail.
 
-    `str(dict)` and `repr()` emit single quotes. With only `"` in the class the
-    JSON twin blocks and the Python twin does not, which is the shape the rule
-    is likeliest to meet in a real log line.
+    There is no exclusion left to mutate, so the control puts one BACK -- the
+    withdrawn prefix list, the first of the three -- and watches the evasion
+    rows go quiet. That is the whole argument for the false positive we accept:
+    any test applied to the value is a switch the attacker flips by writing the
+    tested shape around the secret.
+
+    If someone adds a carve-out here again, this is where it surfaces, with the
+    nine inputs that defeated the last three.
     """
-    narrowed = _rule_regex().replace(r"[\"'{\[,]", r"[\"{\[,]")
-    assert narrowed != _rule_regex(), "the boundary class no longer holds an apostrophe"
-    e = _mutate(**{RULE: narrowed})
-    _, ids = _ids(e, rows.MUST_FIRE["single_quoted_python_dict"])
-    assert RULE not in ids, (
-        "removing the apostrophe did NOT make the single-quoted dict walk past "
-        "the rule, so that row is not guarding the boundary class.")
-
-
-@pytest.mark.parametrize("shape", sorted(rows.PARENT_ALSO_COVERS))
-def test_the_shadowing_itself_is_pinned_on_the_consumer_surface(engine, shape):
-    """What a USER is told about the bare line start, asserted rather than assumed.
-
-    On the parent's three channels the deduped output names GLS-SD-010 alone;
-    on the three it does not declare, GLS-SD-010-EMB. If dedup, severity or the
-    parent's channel list ever changes, this is where it shows up -- and it is
-    a real behaviour change for anyone parsing our output, not an internal
-    detail.
-    """
-    text = rows.MUST_FIRE[shape]
-    for channel in ("message", "file", "code"):
-        _, ids = _ids(engine, text, channel)
-        assert ids == [PARENT], (
-            f"{shape} on {channel}: a consumer now sees {ids} rather than "
-            f"[{PARENT}] alone.")
-    for channel in ("api_response", "log_memory", "agent_input"):
-        _, ids = _ids(engine, text, channel)
-        assert ids == [RULE], (
-            f"{shape} on {channel}: a consumer now sees {ids} rather than "
-            f"[{RULE}] alone.")
-
-
-def test_control_readmitting_a_comma_terminator_reopens_the_evasion():
-    """The terminator set is load-bearing, proven by putting `,` back.
-
-    `,` `}` `]` occur INSIDE a quoted value, so accepting one as the end of the
-    value lets a `${VAR}` reference terminate early while the real secret sits
-    in the same string. That was a live evasion until review found it. This
-    re-admits the comma and watches the three brace-reference rows go quiet.
-    """
-    reopened = _rule_regex().replace(r"(?:[\"']|[\r\n]|\\[nr]|$))",
-                                     r"(?:[\"',}\]]|[\r\n]|\\[nr]|$))")
-    assert reopened != _rule_regex(), "the terminator set is not where it was"
+    rx = _rule_regex()
+    assert "(?!" not in rx, (
+        "the rule has grown a negative lookahead again. Value-driven "
+        "exclusions were closed as a class on 2026-09-21 after three of them "
+        "were defeated by attacker-chosen bytes; re-opening that needs the "
+        "nine attack rows measured, not a new token list.")
+    reopened = rx + (r"(?![ \t]*[\"']?[ \t]*"
+                     r"(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))")
     e = _mutate(**{RULE: reopened})
-    quiet = [s for s in rows.MUST_FIRE
-             if s.startswith("evasion_brace_ref")
-             and RULE not in _ids(e, rows.MUST_FIRE[s])[1]]
-    assert len(quiet) == 3, (
-        f"re-admitting the comma silenced {len(quiet)} brace-reference rows, "
-        f"expected all 3 ({quiet}). Those rows are not guarding the "
-        f"terminator set.")
-
-
-def test_control_a_prefix_placeholder_test_reopens_the_attacker_class():
-    """The whole-value requirement is what closes the attacker-chosen class.
-
-    Replacing the structural tokens with the withdrawn prefix list silences
-    every prepend evasion at once. This is the shape the rule shipped with
-    before review, kept as a control so it cannot return unnoticed.
-    """
-    prefixed = _rule_regex().replace(
-        r"(?:<[^>\r\n]*>|\$\{\w+\})[ \t]*(?:[\"']|[\r\n]|\\[nr]|$))",
-        r"(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))")
-    assert prefixed != _rule_regex(), "the exclusion is not where it was"
-    e = _mutate(**{RULE: prefixed})
-    quiet = [s for s in rows.MUST_FIRE
-             if s.startswith("evasion_") and RULE not in _ids(e, rows.MUST_FIRE[s])[1]]
+    quiet = [k for k in rows.MUST_FIRE
+             if k.startswith("evasion_") and RULE not in _ids(e, rows.MUST_FIRE[k])[1]]
     assert len(quiet) >= 3, (
-        f"a prefix test silenced only {quiet}; the evasion rows are not "
-        f"guarding the whole-value requirement.")
+        f"putting a value exclusion back silenced only {quiet}; the evasion "
+        f"rows are not guarding the class decision.")
+
+
+def test_nothing_is_disclosed_as_unreported():
+    """DISCLOSED_MISSES is empty, and that is an assertion rather than a gap.
+
+    The rule does not inspect the value, so there is no shape it declines to
+    report. If a future change adds one back, this fails and the author has to
+    say what it is and why an attacker cannot write it.
+    """
+    assert rows.DISCLOSED_MISSES == {}, (
+        f"something is being declined again: {sorted(rows.DISCLOSED_MISSES)}. "
+        f"Name the shape, and show an attacker cannot produce it.")

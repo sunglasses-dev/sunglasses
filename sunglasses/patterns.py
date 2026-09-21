@@ -2524,59 +2524,51 @@ PATTERNS = [
     #     indentation, case-SENSITIVE      1 doc           1
     #     + placeholder-value exclusion    0 docs          0   <- this rule
     #
-    # THE EXCLUSION IS STRUCTURAL, WHOLE-VALUE, AND THAT IS A SECURITY
-    # PROPERTY RATHER THAN A TUNING CHOICE. Two tokens only: an angle-bracket
-    # placeholder `<...>` and a `${IDENT}` reference. Both must be the ENTIRE
-    # value, and the value must then END -- a closing quote, or the end of the
-    # line. Nothing else suppresses this rule.
+    # THERE IS NO EXCLUSION, AND THAT IS THE FINDING RATHER THAN A SHORTCUT.
     #
-    # IT USED TO BE SEVEN PROSE WORDS AND A PREFIX TEST, and ASTRA broke it in
-    # review. `example`, `your_`, `xxx`, `changeme` and friends were matched as
-    # PREFIXES, so anyone who could influence the value prepended one to a real
-    # secret and the rule went silent:
+    # Three review rounds, three exclusions, three attacker-controlled off
+    # switches. Every version was triggered by bytes the attacker writes:
     #
-    #     {"cfg":"PASSWORD=examplehunter2x9q"}   allow   <- attacker-chosen
-    #     {"cfg":"PASSWORD=your_hunter2x9q"}     allow
-    #     {"cfg":"API_KEY=${VAR},hunter2x9q"}    allow   <- terminator gap
+    #   prose prefixes   PASSWORD=examplehunter2x9q   prepend a word
+    #   structural       API_KEY=<hunter2x9q>         wrap it in brackets
+    #                    PASSWORD=${hunter2x9q}       make it reference-shaped
+    #   terminator       API_KEY=${VAR}'hunter2x9q    close the value early
     #
-    # The terminator also accepted `,` `}` `]`, which occur INSIDE a quoted
-    # value, so a brace reference followed by a comma ended the "value" while
-    # the real secret sat in the same string. Both classes are closed here and
-    # all six inputs are must-fire fixtures.
+    # Each fix closed the costume and not the class. An exclusion on THIS rule
+    # reads the one field an attacker fully controls, so whatever shape it
+    # tests for, the attacker writes that shape around the secret. The class is
+    # closed: no token list, no bracket form, no reference carve-out.
     #
-    # THE DIFFERENCE IS NOT COSMETIC. A detection rule whose suppression an
-    # attacker can trigger is worse than one with a documented false positive.
-    # The prose words were never load-bearing: measured over the 77-document
-    # corpus, dropping all seven changes nothing (0 documents, 0 flips), because
-    # every site in the FP document is structural -- `<your key>` and two
-    # `${VAR}` interpolations.
+    # A POSITIVE TRIGGER WAS MEASURED AND DECLINED, which is worth recording so
+    # nobody re-proposes it from memory. Requiring the value to LOOK like a
+    # secret (>=8 characters with a lowercase letter and a digit) is not
+    # attacker-triggerable -- absence of evidence is not a carve-out. It still
+    # lost, on two counts measured 2026-09-21 over the 77-document corpus and
+    # a nine-input attack set:
     #
-    # WHOLE-VALUE, NOT A PREFIX, is the same law #170 applies to siblings and
-    # the same one that made this a new rule rather than a sibling. It was
-    # applied to `${IDENT}` one revision earlier and NOT to the seven tokens on
-    # the line below it, which is how the gap survived a ruling that named it.
+    #   variant                       corpus fires  flips  attacks open  rows lost
+    #   no exclusion, no trigger  <-   1 (#219 doc)   1      0 of 9        0
+    #   positive, >=8 lower+digit      0              0      1 of 9        9
+    #   positive, >=6                  0              0      1 of 9        2
     #
-    # Full 77-document sweep, engine level, channel `file`, each variant
-    # measured from scratch because each changes the predicate:
+    # The surviving attack is the interior quote: the value region ends at the
+    # first quote of EITHER kind, so `API_KEY=${VAR}'<secret>` shows the test
+    # only `${VAR}`, which carries no evidence, and the rule declines. A single
+    # quote inside a double-quoted JSON string is ordinary data, and telling
+    # the two apart needs the ENCLOSING quote, which this predicate does not
+    # track. And a positive test cannot see an all-lowercase or all-uppercase
+    # secret at all -- a residual far wider than re-encoding, which is why it
+    # is written here rather than claimed as closure. Encoding-shaped payloads
+    # are the GLS-ENC rules' lane, not this one's.
     #
-    #     variant                               fires   flips   evasions closed
-    #     no indentation                        1 doc   1       -
-    #     indentation, case-FOLDED              3 docs  2       -
-    #     indentation, case-SENSITIVE           1 doc   1       -
-    #     + prefix exclusion (withdrawn)        0 docs  0       0 of 5
-    #     + all tokens whole-value              0 docs  0       4 of 5
-    #     + STRUCTURAL whole-value  <- this     0 docs  0       5 of 5
-    #     no exclusion at all                   1 doc   1       5 of 5
-    #
-    # The all-tokens row still lets `your_<secret>` through, because the token
-    # and the secret form one word and the whole-value test is satisfied. That
-    # is why the prose words are gone rather than repaired.
-    #
-    # WHAT IS STILL NOT REPORTED, and it is now one thing rather than three:
-    # a `${VAR}` interpolation, which is a REFERENCE to a secret and carries no
-    # value to leak. `PASSWORD=example123` and `PASSWORD=xxxxxxxx` DO fire now;
-    # they were disclosed costs of the prose tokens and the prose tokens are
-    # gone. tests/test_sd010_embedded_boundary.py pins all of it.
+    # THE COST, PAID DELIBERATELY: `tests/fp_real_world_corpus/sunglasses-dev
+    # __env-var-docs-shapes.md` now blocks. #219 added that document to expose
+    # exactly this trade and its header made staying green the licence for this
+    # rule. The licence was revisited in writing rather than engineered around:
+    # a rule carrying one documented false positive is worth more than a rule
+    # an attacker can silence. It is on the KNOWN_FAILURES ratchet with that
+    # reason, so the cost is a row someone must delete on purpose, not a
+    # sentence a reviewer has to remember.
     #
     # NO KEYWORDS ON PURPOSE. The parent carries `API_KEY=` and friends as
     # keywords, which match independently of the regex; here that would fire on
@@ -2592,11 +2584,9 @@ PATTERNS = [
         "regex": [
             r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
-            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="
-            r"(?![ \t]*[\"']?[ \t]*(?:<[^>\r\n]*>|\$\{\w+\})"
-            r"[ \t]*(?:[\"']|[\r\n]|\\[nr]|$))",
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",
         ],
-        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. Only a value that is ENTIRELY an angle-bracket placeholder or a ${VAR} reference is excluded, so a real secret cannot be hidden behind a placeholder-looking prefix."
+        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. The value is not inspected at all: every exclusion tried on it was a switch an attacker could flip by writing the excluded shape around the secret, so this rule reports the assignment and accepts that documentation of an environment variable is reported too."
     },
 
     # ── GLS-SD -API siblings ─────────────────────────────────────────────────
