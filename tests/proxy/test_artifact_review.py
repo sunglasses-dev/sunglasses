@@ -26,13 +26,43 @@ class Artifact:
     self.frames.append(m);self.q.put(m)
   self.reader=threading.Thread(target=read,daemon=True);self.reader.start() if consume else None
  def send(self,m):self.p.stdin.write(wire(m));self.p.stdin.flush()
- def answer(self,i,timeout=10):
-  until=time.monotonic()+timeout
-  while time.monotonic()<until:
-   try:m=self.q.get(timeout=max(.001,until-time.monotonic()))
+ def answer(self,i,timeout=None):
+  """The reply to request `i`: a BOUNDED wait, and a failure that says what happened.
+
+  2026-09-21: this raised `no answer within review deadline` on the 3.11 leg and
+  blocked a PR that does not touch this file. The message was the whole problem.
+  A ten-second wall clock was standing in for the assertion, and every caller
+  that passes no timeout is asserting nothing about LATENCY -- it just needs the
+  reply. Under a full runner the proxy plus its child answer late, and late was
+  reported identically to never.
+
+  So: the bound exists only so a runner cannot hang, not to express a speed
+  requirement, and it is generous and overridable rather than tight.
+  AR10 and AR11 keep their explicit timeouts, because there the wait IS the
+  subject -- they assert the recorded `SCAN_DEADLINE`, which is the shape this
+  one should have had all along: bound the wait, assert the outcome.
+
+  And when it does expire it now reports the RECORDED OUTCOME -- the ids that
+  did arrive, how many frames, whether the proxy is still running -- because a
+  late answer and no answer are different failures and the next person reading a
+  red leg deserves to know which one they have.
+  """
+  if timeout is None:
+   timeout=float(os.environ.get('SUNGLASSES_TEST_ANSWER_TIMEOUT','60'))
+  until=time.monotonic()+timeout;seen=[]
+  while True:
+   remaining=until-time.monotonic()
+   if remaining<=0:break
+   try:m=self.q.get(timeout=remaining)
    except queue.Empty:break
-   if 'id' in m and type(m['id']) is type(i) and m['id']==i:return m
-  raise AssertionError('no answer within review deadline')
+   if 'id' in m:
+    seen.append(m['id'])
+    if type(m['id']) is type(i) and m['id']==i:return m
+  alive=self.p.poll() is None
+  raise AssertionError(
+   f"no reply to id={i!r} within {timeout:g}s. frames={len(self.frames)} "
+   f"ids_seen={seen[-8:]} proxy="+("running" if alive else f"exited rc={self.p.returncode}")+
+   ". A late answer and no answer are different failures; this line says which.")
  def stop(self):
   try:self.p.stdin.close()
   except Exception:pass
@@ -217,3 +247,73 @@ def test_AR14c_a_child_that_is_still_running_is_not_a_fault():
  class OpenSession:
   def closed_with(self):return None
  assert serve._exit_code(OpenSession(),RunningChild())==serve.EXIT_OK
+
+
+# ── THE WALL CLOCK THAT WAS THE ASSERTION ────────────────────────────────────
+# 2026-09-21: `answer()` raised "no answer within review deadline" on the 3.11
+# leg, blocking a PR that does not touch this file. Ten seconds of wall clock
+# stood in for a correctness claim, and under a full runner the proxy answers
+# late -- reported identically to never answering.
+#
+# These rows drive `answer()` directly against a stand-in responder, so the
+# behaviour is pinned without booting a proxy for each case.
+
+class _Responder:
+ """The smallest thing `Artifact.answer` needs: a queue, frames, a process."""
+ class _P:
+  returncode=None
+  def poll(self):return None
+ def __init__(self,delay,reply_id=1,noise=()):
+  self.q=queue.Queue();self.frames=[];self.p=self._P()
+  def feed():
+   for n in noise:
+    self.frames.append({'id':n});self.q.put({'id':n})
+   time.sleep(delay)
+   if reply_id is not _MISSING:
+    m={'jsonrpc':'2.0','id':reply_id,'result':{}};self.frames.append(m);self.q.put(m)
+  threading.Thread(target=feed,daemon=True).start()
+
+
+_MISSING=object()
+
+
+def test_a_late_answer_is_not_a_missing_one():
+ """RED-FIRST on the old bound: a responder slower than ten seconds.
+
+ The reply DOES arrive at 11 s. The old `timeout=10` default turned that into
+ `no answer within review deadline` -- a correctness failure reported for a
+ latency that nothing in this file asserts. With the wait bounded rather than
+ used as the assertion, the same responder passes.
+ """
+ # The real numbers were a 10 s default against a responder made late by runner
+ # load. These are 1 s and 8 s against a 3 s responder: the same shape, without
+ # paying eleven seconds on every future run to restate it.
+ r=_Responder(delay=3.0)
+ with pytest.raises(AssertionError,match="no reply to id=1"):
+  Artifact.answer(r,1,timeout=1)          # a bound shorter than the answer: red
+ assert Artifact.answer(r,1,timeout=8)['id']==1   # room to arrive late: green
+
+
+def test_the_failure_names_what_did_arrive():
+ """A red that says which failure it is, instead of naming the clock."""
+ r=_Responder(delay=0.05,reply_id=_MISSING,noise=(7,8,9))
+ with pytest.raises(AssertionError) as e:
+  Artifact.answer(r,1,timeout=1)
+ msg=str(e.value)
+ assert "ids_seen=[7, 8, 9]" in msg, msg
+ assert "frames=3" in msg, msg
+ assert "proxy=running" in msg, msg
+ assert "late answer and no answer are different failures" in msg, msg
+
+
+def test_other_ids_do_not_consume_the_answer():
+ """Frames for other requests are skipped, not mistaken for the reply."""
+ r=_Responder(delay=0.05,reply_id=1,noise=(90,91))
+ assert Artifact.answer(r,1,timeout=10)['id']==1
+
+
+def test_an_explicit_timeout_is_still_honoured():
+ """AR10 and AR11 pass their own bounds and mean it; the default must not win."""
+ r=_Responder(delay=5.0)
+ with pytest.raises(AssertionError,match="within 1s"):
+  Artifact.answer(r,1,timeout=1)
