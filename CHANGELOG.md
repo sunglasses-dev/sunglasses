@@ -153,8 +153,9 @@ All notable changes to Sunglasses are documented here.
   writer cannot be aimed at a path it was not given. See
   [docs/proxy-install-transaction.md](docs/proxy-install-transaction.md) and
   [docs/proxy-doctor.md](docs/proxy-doctor.md) for what install and uninstall
-  do to your configuration file; what the proxy ENFORCES once wired is the
-  entry above.
+  do to your configuration file. **Wiring is not approval and neither is
+  protection**: what the proxy enforces, and only once the server's tool
+  snapshot has been approved at an interactive terminal, is the entry above.
 
 ### Changed
 
