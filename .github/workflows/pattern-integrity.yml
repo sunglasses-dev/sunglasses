@@ -518,8 +518,21 @@ jobs:
               echo "CERTIFY OK: every leg ran and succeeded on $GITHUB_SHA"
               ;;
             false)
-              # The docs lane. Merging is fine; publishing from this tree is not,
-              # and the publisher refuses on the absence of "CERTIFY LEVEL: full".
+              # The docs lane. Merging is fine; publishing from this tree is not.
+              #
+              # This comment used to say the publisher "refuses on the absence of
+              # CERTIFY LEVEL: full". Nothing reads that string -- not
+              # sunglasses-publish.sh, not any tool or ship script (grepped
+              # 2026-09-21, zero hits outside this file). The refusal is real but
+              # it comes from somewhere else: sunglasses-publish.sh runs
+              # scripts/require_release_certification.py on the release commit and
+              # blocks on its EXIT CODE, and that script asks the API whether the
+              # full matrix ran green on that exact sha.
+              #
+              # Naming a guard that does not exist is worse than naming none: the
+              # next person to change this lane protects the wrong string and
+              # leaves the real gate unexamined. The lines below are for a HUMAN
+              # reading the run log; they are not a machine contract.
               [ "$INTEGRITY" = "skipped" ] || fail "docs lane but integrity=$INTEGRITY (expected skipped)"
               echo "CERTIFY LEVEL: docs"
               echo "CERTIFY OK for merge: documentation-only change, fast lane green on $GITHUB_SHA"
