@@ -2466,6 +2466,65 @@ PATTERNS = [
         "description": "Detects environment variable / config file secret leakage patterns."
     },
 
+    # ── GLS-SD-010-EMB — the embedded assignment GLS-SD-010 cannot reach ────
+    # A NEW RULE, not a sibling, and #170's own law is why. That block says a
+    # sibling "copies its parent predicate character for character and adds
+    # channels only", and it refused to pair GLS-SD-010 for exactly the reason
+    # this rule exists: the parent is line anchored `(?m)^KEY=`, so it cannot
+    # match where a sibling would be needed. Changing the predicate makes it a
+    # new rule with its own id, fixtures and review.
+    #
+    # WHAT THE PARENT MISSES, measured 2026-09-21 on ec753bb and recorded in
+    # warroom/SD010_ANCHOR_DIAGNOSIS_2026-09-21.md. With a value that has no
+    # recognisable credential format (a password, a DSN, an internal token), so
+    # GLS-SD-001 does not catch it anyway:
+    #
+    #     PASSWORD=hunter2            at a line start   file  BLOCK  (parent)
+    #     "  PASSWORD=hunter2"        indented 2 spaces file  allow  none
+    #     "\tPASSWORD=hunter2"        tab indented      file  allow  none
+    #     {"cfg":"PASSWORD=hunter2"}  behind a quote    file  allow  none
+    #     same, on api_response                               allow  none
+    #
+    # INDENTATION ALONE DEFEATS THE PARENT, which is the commonest real shape
+    # there is: a config block, a YAML mapping, an indented snippet. The JSON
+    # case is true and unrepresentative.
+    #
+    # THE ANCHOR BECOMES A CONTENT BOUNDARY rather than a line boundary. The
+    # line anchor encodes "an assignment at the start of a line" as a proxy for
+    # "this is a config line, not prose". In embedded content the same
+    # assignment is preceded by a delimiter instead, and a real newline has
+    # become the two characters backslash and n.
+    #
+    # A BARE SPACE IS DELIBERATELY NOT A BOUNDARY. That is the whole of what
+    # keeps `set your API_KEY= in the dashboard` out, and dropping it is how
+    # this rule becomes a documentation shredder.
+    #
+    # THE VARIANTS WERE MEASURED BEFORE ONE WAS CHOSEN, over the FP corpus:
+    #     parent  (?m)^                0 FP   misses every embedded shape
+    #     A       + \n \r escaped       0 FP   MISSES the single-assignment JSON,
+    #                                        i.e. the realistic leak; the same
+    #                                        trap in a new costume
+    #     B       A + " { [ ,          0 FP   catches all four embedded shapes
+    #     C       B + backtick > |      2 FP   every README documenting an env var
+    # B is this rule. C's two were crewAI and openai-python, both a code span.
+    #
+    # NO KEYWORDS ON PURPOSE. The parent carries `API_KEY=` and friends as
+    # keywords, which match independently of the regex; here that would fire on
+    # the documentation prose this anchor was widened to avoid. The regex is the
+    # whole predicate, which is also what makes the measured variant numbers
+    # above the rule's actual behaviour rather than one input to it.
+    {
+        "id": "GLS-SD-010-EMB",
+        "name": "Environment config secret dump (embedded)",
+        "category": "secret_detection",
+        "severity": "high",
+        "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
+        "regex": [
+            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"{\[,])(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
+        ],
+        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match."
+    },
+
     # ── GLS-SD -API siblings ─────────────────────────────────────────────────
     # Secrets arriving in the RESULT direction. Nine of the ten GLS-SD rules
     # carried no `api_response` channel, so an AWS key id, a private key or a
