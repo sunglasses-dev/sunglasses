@@ -2474,10 +2474,11 @@ PATTERNS = [
     # match where a sibling would be needed. Changing the predicate makes it a
     # new rule with its own id, fixtures and review.
     #
-    # WHAT THE PARENT MISSES, measured 2026-09-21 on ec753bb and recorded in
-    # warroom/SD010_ANCHOR_DIAGNOSIS_2026-09-21.md. With a value that has no
-    # recognisable credential format (a password, a DSN, an internal token), so
-    # GLS-SD-001 does not catch it anyway:
+    # WHAT THE PARENT MISSES, measured 2026-09-21 and recorded in
+    # warroom/SD010_ANCHOR_DIAGNOSIS_2026-09-21.md. Only with a value that has
+    # no recognisable credential format — a password, a DSN, an internal token
+    # — because GLS-SD-001 already catches formatted keys embedded or not, so on
+    # a formatted value this gap is invisible:
     #
     #     PASSWORD=hunter2            at a line start   file  BLOCK  (parent)
     #     "  PASSWORD=hunter2"        indented 2 spaces file  allow  none
@@ -2486,8 +2487,7 @@ PATTERNS = [
     #     same, on api_response                               allow  none
     #
     # INDENTATION ALONE DEFEATS THE PARENT, which is the commonest real shape
-    # there is: a config block, a YAML mapping, an indented snippet. The JSON
-    # case is true and unrepresentative.
+    # there is: a config block, a YAML mapping, an indented snippet.
     #
     # THE ANCHOR BECOMES A CONTENT BOUNDARY rather than a line boundary. The
     # line anchor encodes "an assignment at the start of a line" as a proxy for
@@ -2497,22 +2497,48 @@ PATTERNS = [
     #
     # A BARE SPACE IS DELIBERATELY NOT A BOUNDARY. That is the whole of what
     # keeps `set your API_KEY= in the dashboard` out, and dropping it is how
-    # this rule becomes a documentation shredder.
+    # this rule becomes a documentation shredder. Likewise a backtick: variant
+    # C admitted one and picked up every README that documents an env var.
     #
-    # THE VARIANTS WERE MEASURED BEFORE ONE WAS CHOSEN, over the FP corpus:
-    #     parent  (?m)^                0 FP   misses every embedded shape
-    #     A       + \n \r escaped       0 FP   MISSES the single-assignment JSON,
-    #                                        i.e. the realistic leak; the same
-    #                                        trap in a new costume
-    #     B       A + " { [ ,          0 FP   catches all four embedded shapes
-    #     C       B + backtick > |      2 FP   every README documenting an env var
-    # B is this rule. C's two were crewAI and openai-python, both a code span.
+    # THE KEY ALTERNATION IS CASE-SENSITIVE, via an inline `(?-i:...)` scope,
+    # because the engine compiles every pattern with re.IGNORECASE and offers
+    # no per-rule opt-out. This is load-bearing and was measured, not assumed.
+    # Once indentation is allowed, an indented lowercase `api_key=` inside a
+    # constructor example is the same string as an indented config line, and
+    # both SDK READMEs in the FP corpus fire. Env vars are upper case and Python
+    # keyword arguments are lower case, and that is the only thing that
+    # separates them. Full 77-document sweep, engine level, channel `file`:
+    #
+    #     variant                          rule fires on   decision flips
+    #     no indentation                   1 doc           1
+    #     indentation, case-FOLDED         3 docs          2
+    #     indentation, case-SENSITIVE      1 doc           1
+    #     + placeholder-value exclusion    0 docs          0   <- this rule
+    #
+    # THE EXCLUSION LOOKS AT THE VALUE, NOT THE KEY, and sits OUTSIDE the
+    # `(?-i:)` scope on purpose, so YOUR_KEY, XXXX and REDACTED are placeholders
+    # in any casing while the key itself must still be upper case.
+    #
+    # `${...}` IS IN THE LIST BECAUSE THE CORPUS PUT IT THERE. The exclusion was
+    # ruled as `<`, `your_`, `xxx`, `...`, `example`, `changeme`, `REDACTED`.
+    # That list greens one of the three sites in the FP document and leaves two,
+    # both of the form `- "API_KEY=${API_KEY}"` in a compose file, so the
+    # document still blocked and the refinement bought nothing. A `${VAR}`
+    # interpolation is the strongest placeholder of the set: the value is
+    # absent by construction, it is a reference to a secret rather than one.
+    #
+    # THE EXCLUSION'S OWN COST, disclosed rather than discovered in review: a
+    # real value that LOOKS like a placeholder is not blocked — `PASSWORD=
+    # example123`, `PASSWORD=xxxxxxxx`. No test of value shape can separate a
+    # placeholder from a weak real secret that resembles one, and the FP corpus
+    # is the side this rule is asked to err on. tests/test_sd010_embedded
+    # _boundary.py pins both halves so neither can change in silence.
     #
     # NO KEYWORDS ON PURPOSE. The parent carries `API_KEY=` and friends as
     # keywords, which match independently of the regex; here that would fire on
     # the documentation prose this anchor was widened to avoid. The regex is the
-    # whole predicate, which is also what makes the measured variant numbers
-    # above the rule's actual behaviour rather than one input to it.
+    # whole predicate, which is also what makes the measured numbers above the
+    # rule's actual behaviour rather than one input to it.
     {
         "id": "GLS-SD-010-EMB",
         "name": "Environment config secret dump (embedded)",
@@ -2520,9 +2546,14 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
         "regex": [
-            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"{\[,])(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
+            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"{\[,])"
+            r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="
+            r"(?![ \t]*[\"']?[ \t]*"
+            r"(?:<|\.\.\.|\u2026|your[_-]|x{3,}|example|changeme|redacted"
+            r"|\$\{\w+\}[\"']?[ \t]*(?:[\r\n,}\]]|\\[nr]|$)))",
         ],
-        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match."
+        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match, and a value that is a placeholder or a ${VAR} reference is excluded."
     },
 
     # ── GLS-SD -API siblings ─────────────────────────────────────────────────
