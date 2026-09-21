@@ -111,3 +111,47 @@ def test_the_seven_character_comparison_is_gone():
     src = SCRIPT.read_text()
     assert "[:7]" not in src
     assert "startswith(args" not in src
+
+
+# ─────────────────── 0.6.1 row 3 · the line carries the FULL sha ────────────
+#
+# WHY. Friday's ship step compares the gate's own line against an expected
+# commit, and the line printed `sha[:12]`. Twelve hex is not a commit id, so the
+# operator expanded it by hand with `git rev-parse` at exactly the moment the
+# step exists to remove hand-work — and a 12-hex prefix is the same CLASS of
+# defect as the 7-hex prefix PR #159 was opened to fix (the reviewer mined a
+# colliding commit in seven seconds). Shortening a sha for a human to read is
+# fine; shortening it in the line a machine or a tired operator compares is how
+# the collision comes back.
+#
+# The short form stays BESIDE the full one: the full sha is for comparison, the
+# short one is for reading aloud, and neither has to lose to the other.
+
+def test_the_certified_line_carries_the_full_forty_hex(api):
+    r = gate(api, CERTIFIED)
+    assert r.returncode == 0, r.stderr
+    assert CERTIFIED in r.stdout, r.stdout
+
+
+def test_the_certified_line_still_shows_a_short_form_for_humans(api):
+    """The control on the row above. Printing only the full sha would satisfy
+    it and take away the form an operator actually reads back."""
+    r = gate(api, CERTIFIED)
+    assert CERTIFIED[:12] in r.stdout, r.stdout
+
+
+def test_a_refusal_names_the_full_sha_too(api):
+    """The refuse lines had the same abbreviation. A refusal is the moment
+    someone copies the id into a search, so it is the worst place to hand them
+    a prefix."""
+    r = gate(api, OTHER)
+    assert r.returncode != 0
+    assert OTHER in (r.stdout + r.stderr), (r.stdout, r.stderr)
+
+
+def test_the_full_sha_is_not_confusable_with_the_colliding_commit(api):
+    """#159's defect, restated at the reporting layer: whatever the line prints
+    must distinguish the certified commit from the mined collision that shares
+    its prefix."""
+    r = gate(api, CERTIFIED)
+    assert COLLIDING not in r.stdout, r.stdout
