@@ -42,20 +42,96 @@ class WireError(AssertionError):
     """The server's replies are not valid successful JSON-RPC responses."""
 
 
+# ── THE READER IS AN ALLOWLIST ────────────────────────────────────────────────
+# Rounds 1, 2 and 3 all failed the same way. Each round named the defective wire
+# shapes the reviewer had found and refused those; each round the reviewer came
+# back with shapes nobody had named. Round 3's count was 8 more. A denylist of
+# wire defects is a list of the defects we have already met, so the next round's
+# score is decided by the reviewer's imagination rather than by this file.
+#
+# So round 4 inverts it. Below is the ONE shape this server is allowed to answer
+# in, stated positively and key by key. Anything else is refused BY
+# CONSTRUCTION -- including shapes neither of us has thought of, which is the
+# only part that generalises. Every key in every object is either REQUIRED,
+# explicitly OPTIONAL, or a refusal; there is no "and whatever else is there".
+#
+# That rule is borrowed on purpose. It is the same fail-closed-on-an-
+# unclassified-key rule that the worker's pattern field contract needed, for the
+# same reason: a reader that only rejects what it recognises is a reader that
+# passes what it does not.
+#
+# The cost of an allowlist is false kills, and round 3 produced two real ones
+# (a channel schema with no `type`, and one with `type: ["string"]`, both valid
+# JSON Schema permitting exactly the nine advertised names). So each allowlist
+# below is accompanied by acceptance controls, not only rejection controls, and
+# the accepted set is stated in terms of what the protocol permits rather than
+# what this server happens to emit today.
+
+
+def _only_keys(obj, where, required=(), optional=()):
+    """`obj` is an object whose keys are exactly `required` plus any `optional`.
+
+    The primitive the rest of this file is built from. An unexpected key is a
+    refusal rather than something to ignore, which is what turns each reader
+    below from a denylist into an allowlist.
+    """
+    if not isinstance(obj, dict):
+        raise WireError(f"{where}: expected an object, got {type(obj).__name__}")
+    missing = [k for k in required if k not in obj]
+    if missing:
+        raise WireError(f"{where}: missing required key(s) {missing}")
+    unknown = sorted(set(obj) - set(required) - set(optional))
+    if unknown:
+        raise WireError(
+            f"{where}: unexpected key(s) {unknown}. This reader accepts one shape and "
+            f"refuses the rest by construction; if {unknown} is legitimate, add it to "
+            f"the allowlist with a reason and a control.")
+    return obj
+
+
+def _rpc_id(value, where):
+    """The id of a reply, as an int, or a refusal.
+
+    ASTRA round 3: `id` was never examined, so an initialize reply carrying
+    `true` or `1.5` correlated to request 1 in a plain dict. JSON-RPC ids are a
+    number or a string; `True` is neither (Python's isinstance(True, int) is the
+    trap), and 1.5 is a different number from the 1 we sent. 1.0 IS the number 1
+    -- JSON does not distinguish them -- so it is accepted, and there is a
+    control for that so this does not become a third false kill.
+
+    We send integer ids, so a correlated reply carries that same integer. A
+    string "2" is a well-formed JSON-RPC id and still is not the id of the
+    request we made.
+    """
+    if isinstance(value, bool):
+        raise WireError(f"{where}: id={value!r} is a boolean, not a JSON-RPC id")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise WireError(f"{where}: id={value!r} is not the integer id this client sent")
+        return int(value)
+    raise WireError(
+        f"{where}: id={value!r} ({type(value).__name__}) is not one of the integer ids "
+        f"this client sent; a reply that does not echo the request id answers nothing")
+
+
 def parse_replies(stdout):
-    """Replies by id, each VALIDATED as a successful JSON-RPC response.
+    """Replies by id, each a successful JSON-RPC response of the ONE shape below.
 
-    ASTRA, round 1 on 95b5e69: the first version of this helper returned the
-    reply objects and let the assertions read `result`, so a reply carrying a
-    top-level `error` ALONGSIDE a result was accepted as successful
-    introspection. Three such wires -- error+result on scanner_info, on
-    tools/list, and on both -- left all three tests PASS. The `isError is False`
-    check below only ever inspected the nested MCP tool payload, which is a
-    different layer.
+    A successful response is exactly `{jsonrpc, id, result}`. Not a superset.
 
-    A malformed server is not a passing server, so this refuses here rather
-    than letting the vocabulary assertions speak about a wire that never
-    answered properly.
+    ROUND 1: this returned the raw objects, so `error` ALONGSIDE `result` read
+    as successful introspection -- three such wires left every assertion green.
+    ROUND 2: the envelope was never checked at all; removing `jsonrpc`, or
+    setting it to "1.0", stayed green, and a second answer to one id silently
+    overwrote the first, so the verdict depended on dict insertion order.
+    ROUND 3: the ids themselves were never read.
+
+    Each of those was repaired by naming the shape that had just been found.
+    Here the accepted shape is named instead, and `error`, a missing `result`, a
+    stray key and a malformed id are all refused by the same rule rather than by
+    four separate checks.
     """
     replies = []
     for line in stdout.splitlines():
@@ -67,101 +143,196 @@ def parse_replies(stdout):
             raise WireError(f"server emitted a line that is not JSON: {e}")
     if not replies:
         raise WireError("server returned nothing")
+
     by_id = {}
-    for r in replies:
+    for i, r in enumerate(replies):
+        where = f"reply {i}"
         if not isinstance(r, dict):
-            raise WireError(f"a reply is not a JSON object: {type(r).__name__}")
-        # ROUND 2: the envelope was never checked. Removing `jsonrpc` entirely,
-        # or setting it to "1.0", left both vocabulary assertions green -- this
-        # helper claimed to validate a successful JSON-RPC response and did not
-        # look at the one field that says which protocol it is.
-        if r.get("jsonrpc") != "2.0":
-            raise WireError(f"reply is not JSON-RPC 2.0: jsonrpc={r.get('jsonrpc')!r}")
+            raise WireError(f"{where} is not a JSON object: {type(r).__name__}")
+        # A notification is the one other legal thing on this stream. It carries
+        # no id and nothing here reads it, so it is skipped -- but it must still
+        # be a notification and not a response missing its id.
         if "id" not in r:
-            continue                      # notifications carry no id
-        if "error" in r:
-            raise WireError(f"reply id={r['id']} carries a JSON-RPC error: {r['error']!r}")
-        if "result" not in r:
-            raise WireError(f"reply id={r['id']} has neither result nor error")
-        # ROUND 2: this was `by_id[r["id"]] = r`, so a second answer to the same
-        # request SILENTLY OVERWROTE the first and the verdict depended on which
-        # conflicting answer happened to survive dictionary insertion. A
-        # null-result answer followed by a good one passed; the same pair in the
-        # other order rejected. One request gets one answer.
-        if r["id"] in by_id:
-            raise WireError(f"the server answered id={r['id']} more than once; "
+            _only_keys(r, f"{where} (notification)",
+                       required=("jsonrpc", "method"), optional=("params",))
+            if r["jsonrpc"] != "2.0":
+                raise WireError(f"{where}: jsonrpc={r['jsonrpc']!r}, not the string '2.0'")
+            continue
+        _only_keys(r, where, required=("jsonrpc", "id", "result"))
+        if r["jsonrpc"] != "2.0":
+            raise WireError(f"{where}: jsonrpc={r['jsonrpc']!r}, not the string '2.0'")
+        rid = _rpc_id(r["id"], where)
+        if not isinstance(r["result"], dict):
+            raise WireError(f"{where}: result is not an object: {type(r['result']).__name__}")
+        if rid in by_id:
+            raise WireError(f"the server answered id={rid} more than once; "
                             "a request with two answers has no answer")
-        by_id[r["id"]] = r
+        by_id[rid] = r
     return by_id
 
 
 def _channel_list(value, where):
     """A channel vocabulary is an ARRAY OF STRINGS or it is not a vocabulary.
 
-    ASTRA's other wire finding: a dict in place of the array passed both
-    comparisons, because `set()` of a dict silently yields its keys and the
-    type is discarded.
+    ASTRA round 1: a dict in place of the array passed both comparisons, because
+    `set()` of a dict silently yields its keys and the type is discarded.
     """
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise WireError(f"{where} is not an array of strings: {type(value).__name__} {value!r}")
+    if len(set(value)) != len(value):
+        dupes = sorted({v for v in value if value.count(v) > 1})
+        raise WireError(f"{where} publishes {dupes} more than once")
     return set(value)
 
 
-def _schema_enum(prop, where):
-    """The enum of a JSON-Schema property that actually describes strings.
+# A JSON-Schema keyword that only annotates. None of these can narrow the set of
+# values a schema permits, so a channel property may carry them and this reader
+# ignores them. Anything NOT in this set and not in the two constraining
+# keywords below is refused -- which is what makes `const`, `not`, `maxLength`,
+# `pattern`, `allOf`, `$ref` and every keyword invented after today a refusal
+# without this file having heard of them.
+_SCHEMA_ANNOTATIONS = frozenset({
+    "description", "title", "default", "examples", "$comment", "deprecated",
+    "readOnly", "writeOnly",
+})
 
-    ROUND 2: only the enum was read. Changing the property's `type` to
-    "integer" left both vocabulary assertions green over the same nine STRINGS
-    -- the test asserted a published vocabulary the schema permits none of.
 
-    Extracted into its own helper because the first version of this repair lived
-    inline in the fixture, where the only thing that could exercise it was a live
-    server, so removing it reddened NOTHING. A check no control can reach is not
-    a check; that was caught by mutating each repair in turn, not by reading.
+def _channel_enum(prop, where):
+    """The advertised channel names, from a property schema that PUBLISHES A LIST.
+
+    ROUND 2: only `enum` was read, so a property typed "integer" over nine
+    strings left both assertions green on a schema permitting none of them.
+    ROUND 3's repair required `type == "string"` literally, which fixed that and
+    created two false kills: `{"enum": [...]}` with no `type`, and
+    `{"type": ["string"], "enum": [...]}`, are both valid JSON Schema permitting
+    exactly the nine names. Round 3 also found three MORE shapes that keep
+    `type: "string"` and still permit nothing -- `const`, `not`, `maxLength`.
+
+    Denylisting those three would have been round 4 of the same mistake, so:
+    the only keywords allowed to CONSTRAIN this property are `type` and `enum`.
+    A schema carrying any other constraining keyword is refused without this
+    reader knowing what that keyword means, which is the point -- `const`,
+    `not` and `maxLength` are refused by the same rule that refuses whatever the
+    next reviewer brings.
     """
-    if not isinstance(prop, dict):
-        raise WireError(f"{where}: channel property is not an object")
-    if prop.get("type") != "string":
-        raise WireError(f"{where}: channel property does not describe strings: "
-                        f"type={prop.get('type')!r}")
-    if "enum" not in prop:
-        raise WireError(f"{where}: channel property has no enum")
-    return _channel_list(prop["enum"], f"{where} enum")
+    _only_keys(prop, f"{where}: channel property",
+               required=("enum",), optional=("type",) + tuple(_SCHEMA_ANNOTATIONS))
+    if "type" in prop and prop["type"] not in ("string", ["string"]):
+        raise WireError(
+            f"{where}: channel property does not describe strings: type={prop['type']!r}. "
+            f"Accepted: \"string\", [\"string\"], or no type at all (the enum alone "
+            f"restricts the value).")
+    names = _channel_list(prop["enum"], f"{where} enum")
+    if not names:
+        raise WireError(f"{where}: an empty enum advertises no channels")
+    if "default" in prop and prop["default"] not in names:
+        raise WireError(f"{where}: default={prop['default']!r} is not one of the "
+                        f"{len(names)} names the enum advertises")
+    return names
 
 
-def _text_result(payload, where):
-    """The decoded JSON of an MCP tool result's TEXT block.
+def _one_tool(tools, name, where):
+    """The single descriptor for `name`, or a refusal.
 
-    ROUND 2, two findings in one place. `payload["content"][0]["text"]` read any
-    block carrying a `text` key as text content: deleting the block's `type`, or
-    setting it to "image" with no image fields, left both vocabulary assertions
-    green over a malformed MCP result.
-
-    And `payload.get("isError") is False` was a FALSE KILL -- ASTRA's only one.
-    MCP defines isError as OPTIONAL with absence meaning success, so a
-    protocol-correct server that omits it was rejected. Absence or literal False
-    is success; True or any other value is not.
+    ROUND 3: the fixture built `{t["name"]: t for t in tools}`, so two
+    `scan_text` descriptors with different enums resolved to whichever came
+    last -- the same overwrite defect as the duplicate reply id, one layer down.
+    Two definitions of one tool are not a published vocabulary; they are a
+    server that has not decided.
     """
-    if not isinstance(payload, dict):
-        raise WireError(f"{where}: result is not an object: {type(payload).__name__}")
+    if not isinstance(tools, list):
+        raise WireError(f"{where}: tools is not an array: {type(tools).__name__}")
+    matches = [t for t in tools if isinstance(t, dict) and t.get("name") == name]
+    if not matches:
+        raise WireError(f"{where}: no tool named {name!r} in "
+                        f"{[t.get('name') if isinstance(t, dict) else t for t in tools]}")
+    if len(matches) > 1:
+        raise WireError(f"{where}: {len(matches)} tools named {name!r}; a tool defined "
+                        f"twice has no definition")
+    return matches[0]
+
+
+def _tool_result_json(payload, where):
+    """The decoded JSON a tool result publishes, from content blocks that all parse.
+
+    ROUND 2: `content[0]["text"]` read any block with a `text` key as text, so a
+    block with no `type`, or typed "image", was read as the payload; and
+    `isError is False` false-killed a protocol-correct server that omits the
+    optional field.
+    ROUND 3: the comprehension that replaced it silently DISCARDED malformed
+    blocks, so `{"type": "image", "text": "{}"}` -- an image block with no image
+    in it -- rode along unnoticed; and where two text blocks published different
+    channel lists, the first one won and the contradiction was reported as
+    agreement.
+
+    MCP permits several content blocks, so rejecting multiplicity would be a
+    false kill (there are acceptance controls for an image before the text, and
+    for a repeated identical text). What is refused is a block this reader
+    cannot fully account for, and a set of text blocks that do not say the same
+    thing.
+    """
+    _only_keys(payload, where, required=("content",),
+               optional=("isError", "structuredContent", "_meta"))
     flag = payload.get("isError", False)
     if flag is not False:
         raise WireError(f"{where}: isError={flag!r}; success is absence or literal false")
-    content = payload.get("content")
+
+    content = payload["content"]
     if not isinstance(content, list):
         raise WireError(f"{where}: content is not an array: {type(content).__name__}")
-    texts = [b for b in content
-             if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)]
+    if not content:
+        raise WireError(f"{where}: content is empty; a result publishing nothing "
+                        "publishes no vocabulary")
+
+    texts = []
+    for i, block in enumerate(content):
+        bw = f"{where} content[{i}]"
+        if not isinstance(block, dict):
+            raise WireError(f"{bw} is not an object: {type(block).__name__}")
+        btype = block.get("type")
+        if not isinstance(btype, str):
+            raise WireError(f"{bw}: type={btype!r} is not a string")
+        # Every block is checked against the shape its own type promises. A
+        # block that does not carry what its type requires -- or that carries a
+        # field from a different type -- is refused rather than skipped, because
+        # skipping is how an image block carrying `text` went unnoticed.
+        if btype == "text":
+            _only_keys(block, f"{bw} (text)", required=("type", "text"),
+                       optional=("annotations", "_meta"))
+            if not isinstance(block["text"], str):
+                raise WireError(f"{bw}: text is {type(block['text']).__name__}, not a string")
+            texts.append((i, block["text"]))
+        elif btype in ("image", "audio"):
+            _only_keys(block, f"{bw} ({btype})", required=("type", "data", "mimeType"),
+                       optional=("annotations", "_meta"))
+        elif btype == "resource":
+            _only_keys(block, f"{bw} (resource)", required=("type", "resource"),
+                       optional=("annotations", "_meta"))
+        else:
+            raise WireError(f"{bw}: content block type {btype!r} is not one this reader "
+                            f"accounts for")
+
     if not texts:
-        raise WireError(f"{where}: no well-formed text block in {len(content)} content block(s)")
-    try:
-        return json.loads(texts[0]["text"])
-    except json.JSONDecodeError as e:
-        raise WireError(f"{where}: text block is not JSON: {e}")
+        raise WireError(f"{where}: no text block in {len(content)} content block(s)")
+
+    decoded = []
+    for i, raw in texts:
+        try:
+            decoded.append((i, json.loads(raw)))
+        except json.JSONDecodeError as e:
+            raise WireError(f"{where} content[{i}]: text block is not JSON: {e}")
+    first_i, first = decoded[0]
+    for i, other in decoded[1:]:
+        if other != first:
+            raise WireError(
+                f"{where}: content[{first_i}] and content[{i}] publish DIFFERENT payloads. "
+                f"Reporting either one as the server's answer would report a "
+                f"disagreement as agreement.")
+    return first
 
 
 def _ask_server(messages, timeout=180):
-    """Drive a real `python -m sunglasses.mcp` over stdio and return its replies."""
+    """Drive a real `python -m sunglasses.mcp` over stdio and return its raw stdout."""
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.mcp"],
         input="".join(json.dumps(m) + "\n" for m in messages),
@@ -169,13 +340,51 @@ def _ask_server(messages, timeout=180):
     )
     assert "Traceback (most recent call last)" not in proc.stdout + proc.stderr, (
         f"traceback over the wire:\nstdout={proc.stdout[:600]}\nstderr={proc.stderr[:600]}")
-    return parse_replies(proc.stdout)
+    # Returns RAW STDOUT. Reading it is read_surfaces' job, so that the real
+    # server and a saved defective wire go through the same code.
+    return proc.stdout
+
+
+def read_surfaces(stdout):
+    """Both published channel vocabularies, read from one server's stdout.
+
+    THE WHOLE READING PATH IS THIS ONE FUNCTION, and it exists because of
+    ASTRA's round-3 finding: every helper below was unit-tested, and swapping
+    the FIXTURE's single call to the schema reader for a raw enum read left
+    33/33 green while a known-defective wire went back to passing. The repairs
+    were proven; their presence in the path that actually runs was not.
+
+    A helper control proves a helper. Only a control that drives the same
+    function the fixture drives can prove the fixture uses it. So the fixture no
+    longer reads anything itself -- it supplies stdout from a real server, and
+    the defective-wire controls supply stdout from a file. One path, two
+    sources, and cutting any call in it reddens a named row.
+    """
+    replies = parse_replies(stdout)
+    if 2 not in replies or 3 not in replies:
+        raise WireError(
+            f"the server did not answer both introspection requests: ids {sorted(replies)}")
+
+    scan_text = _one_tool(replies[2]["result"]["tools"], "scan_text", "tools/list")
+    enum = _channel_enum(scan_text["inputSchema"]["properties"]["channel"],
+                         "scan_text inputSchema")
+
+    info = _tool_result_json(replies[3]["result"], "scanner_info")
+    if not isinstance(info, dict):
+        raise WireError(f"scanner_info published a {type(info).__name__}, not an object")
+    if "channels" not in info:
+        raise WireError("scanner_info published no `channels` key")
+    channels = _channel_list(info["channels"], "scanner_info channels")
+
+    if not enum or not channels:
+        raise WireError("a published vocabulary that is empty is not a vocabulary")
+    return {"enum": enum, "info": channels}
 
 
 @pytest.fixture(scope="module")
 def surfaces():
-    """Both published channel lists, as a client receives them."""
-    replies = _ask_server([
+    """Both published channel lists, as a client receives them from the real server."""
+    return read_surfaces(_ask_server([
         {"jsonrpc": "2.0", "id": 1, "method": "initialize",
          "params": {"protocolVersion": "2024-11-05", "capabilities": {},
                     "clientInfo": {"name": "channel-truth-test", "version": "1"}}},
@@ -183,19 +392,7 @@ def surfaces():
         {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
         {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
          "params": {"name": "scanner_info", "arguments": {}}},
-    ])
-    assert 2 in replies and 3 in replies, (
-        f"the server did not answer both introspection requests: ids {sorted(replies)}")
-
-    tools = {t["name"]: t for t in replies[2]["result"]["tools"]}
-    enum = _schema_enum(tools["scan_text"]["inputSchema"]["properties"]["channel"],
-                        "scan_text inputSchema")
-
-    channels = _channel_list(_text_result(replies[3]["result"], "scanner_info")["channels"],
-                             "scanner_info channels")
-
-    assert enum and channels, "a published vocabulary that is empty is not a vocabulary"
-    return {"enum": enum, "info": channels}
+    ]))
 
 
 def test_the_two_published_surfaces_agree(surfaces):
@@ -285,81 +482,312 @@ def test_the_controls_accept_a_well_formed_wire():
     assert _channel_list(["message", "file"], "control") == {"message", "file"}
 
 
-# ── ROUND 3 CONTROLS: the seven wires that still slipped through round 2 ──────
-# ASTRA drove 24 wires against the round-2 fixture; 7 defective ones passed BOTH
-# vocabulary assertions. Each is a row here, and the two rows at the end are the
-# false-kill guard: a protocol-correct server must still be accepted.
+# ── ROUND 4 CONTROLS ─────────────────────────────────────────────────────────
+# Every wire shape any round found, as a row, in both directions.
+#
+# Rounds 1-3 each added rejection rows for the shapes just found, and each time
+# the next round brought shapes nobody had listed. The reader is now an
+# allowlist, so these rows have a different job: they are no longer the
+# definition of what is refused -- the allowlist is -- they are evidence that it
+# refuses what it should AND, just as importantly, that it still accepts a
+# protocol-correct server. Round 3 produced two false kills; an allowlist
+# written without acceptance rows produces more.
+#
+# The last row of the schema block is deliberately a keyword nobody has ever
+# sent us. It is the only row here that tests the generalisation rather than a
+# past finding: if it ever goes green, the reader has quietly become a denylist
+# again.
 
 def _env(i, result):
     return json.dumps({"jsonrpc": "2.0", "id": i, "result": result})
 
 
+_ENV_2 = _env(2, {"tools": []})
+_ENV_3 = _env(3, {"content": [{"type": "text", "text": "{}"}]})
+
+
 @pytest.mark.parametrize("name,wire", [
-    # one request, two answers -- the verdict used to depend on insertion order
-    ("the same id answered twice", [_env(2, {"tools": []}), _env(2, {"tools": []})]),
-    ("a null answer overwritten by a good one",
-     [_env(2, None), _env(2, {"tools": []})]),
-    # the envelope this helper claims to validate
-    ("no jsonrpc field at all",
-     [json.dumps({"id": 2, "result": {"tools": []}}), _env(3, {"content": []})]),
-    ("jsonrpc 1.0",
-     [json.dumps({"jsonrpc": "1.0", "id": 2, "result": {"tools": []}}), _env(3, {"content": []})]),
+    # -- one request, one answer (round 2) -------------------------------------
+    ("the same id answered twice", [_ENV_2, _ENV_2]),
+    ("a null answer overwritten by a good one", [_env(2, None), _ENV_2]),
+    # -- the envelope itself (round 2) -----------------------------------------
+    ("no jsonrpc field at all", [json.dumps({"id": 2, "result": {"tools": []}}), _ENV_3]),
+    ("jsonrpc 1.0", [json.dumps({"jsonrpc": "1.0", "id": 2, "result": {"tools": []}}), _ENV_3]),
+    ("jsonrpc as the number 2.0",
+     [json.dumps({"jsonrpc": 2.0, "id": 2, "result": {"tools": []}}), _ENV_3]),
+    ("jsonrpc null", [json.dumps({"jsonrpc": None, "id": 2, "result": {"tools": []}}), _ENV_3]),
+    ("jsonrpc an array", [json.dumps({"jsonrpc": ["2.0"], "id": 2, "result": {}}), _ENV_3]),
     ("a reply that is not an object", [json.dumps(["not", "an", "object"])]),
+    # -- result and error (round 1) --------------------------------------------
+    ("error alongside result",
+     [json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []},
+                  "error": {"code": -32603, "message": "boom"}}), _ENV_3]),
+    ("neither result nor error", [json.dumps({"jsonrpc": "2.0", "id": 2}), _ENV_3]),
+    ("result is null", [_env(2, None), _ENV_3]),
+    ("result is an array", [_env(2, []), _ENV_3]),
+    ("result is a string", [_env(2, "tools"), _ENV_3]),
+    # -- the ids (round 3) ------------------------------------------------------
+    ("an id of boolean true",
+     [json.dumps({"jsonrpc": "2.0", "id": True, "result": {"tools": []}}), _ENV_3]),
+    ("a fractional id",
+     [json.dumps({"jsonrpc": "2.0", "id": 1.5, "result": {}}), _ENV_2, _ENV_3]),
+    ("a string id where an integer was sent",
+     [json.dumps({"jsonrpc": "2.0", "id": "2", "result": {"tools": []}}), _ENV_3]),
+    # -- the allowlist generalising past any named finding ----------------------
+    ("a successful response carrying an extra top-level key",
+     [json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []}, "hint": "trust me"}),
+      _ENV_3]),
+    # -- the parser floor (round 1) --------------------------------------------
+    ("a line that is not JSON", ["{not json", _ENV_3]),
+    ("no replies at all", []),
 ])
-def test_round3_envelope_wires_are_refused(name, wire):
+def test_a_reply_outside_the_one_accepted_envelope_is_refused(name, wire):
     with pytest.raises(WireError):
         parse_replies("\n".join(wire))
 
 
-@pytest.mark.parametrize("name,payload", [
-    ("a content block with no type",
-     {"content": [{"text": '{"channels": ["message"]}'}], "isError": False}),
-    ("a content block typed image",
-     {"content": [{"type": "image", "text": '{"channels": ["message"]}'}], "isError": False}),
-    ("content that is an object, not an array",
-     {"content": {"type": "text", "text": "{}"}, "isError": False}),
-    ("a text block that is not JSON",
-     {"content": [{"type": "text", "text": "not json at all"}], "isError": False}),
-    ("isError true", {"content": [{"type": "text", "text": "{}"}], "isError": True}),
-    ("isError a non-bool", {"content": [{"type": "text", "text": "{}"}], "isError": "no"}),
+@pytest.mark.parametrize("name,wire", [
+    ("the canonical envelope", [_ENV_2, _ENV_3]),
+    # JSON does not distinguish 2 from 2.0, so a server emitting the integral
+    # float has echoed our id. Refusing it would be a third false kill.
+    ("integral float ids",
+     [json.dumps({"jsonrpc": "2.0", "id": 2.0, "result": {"tools": []}}),
+      json.dumps({"jsonrpc": "2.0", "id": 3.0,
+                  "result": {"content": [{"type": "text", "text": "{}"}]}})]),
+    ("a notification sharing the stream",
+     [json.dumps({"jsonrpc": "2.0", "method": "notifications/progress",
+                  "params": {"n": 1}}), _ENV_2, _ENV_3]),
 ])
-def test_round3_malformed_tool_results_are_refused(name, payload):
+def test_a_protocol_correct_wire_is_accepted(name, wire):
+    """Otherwise every rejection row above passes by refusing everything."""
+    got = parse_replies("\n".join(wire))
+    assert set(got) == {2, 3}
+
+
+# ── the channel property schema ──────────────────────────────────────────────
+
+@pytest.mark.parametrize("name,prop", [
+    # round 2: the enum was read without its surrounding type
+    ("type integer over string names", {"type": "integer", "enum": ["message", "file"]}),
+    ("type array", {"type": "array", "enum": ["message", "file"]}),
+    ("type a union including null", {"type": ["string", "null"], "enum": ["message"]}),
+    ("no enum at all", {"type": "string"}),
+    ("not an object at all", ["message", "file"]),
+    ("an empty enum", {"type": "string", "enum": []}),
+    ("an enum that is not strings", {"type": "string", "enum": ["message", 7]}),
+    ("a channel advertised twice", {"type": "string", "enum": ["message", "message"]}),
+    # round 3: three MORE ways to keep `type: string` and permit none of the enum
+    ("const excluding the enum",
+     {"type": "string", "enum": ["message", "file"], "const": "nothing"}),
+    ("not excluding the enum",
+     {"type": "string", "enum": ["message", "file"], "not": {"type": "string"}}),
+    ("maxLength excluding the enum",
+     {"type": "string", "enum": ["message", "file"], "maxLength": 1}),
+    ("a default that is not one of the advertised names",
+     {"type": "string", "enum": ["message", "file"], "default": "elsewhere"}),
+    # THE GENERALISATION ROW. `pattern` was never reported by any round; it is
+    # refused because it is not on the allowlist, not because anyone met it.
+    ("a constraining keyword no round has ever sent",
+     {"type": "string", "enum": ["message", "file"], "pattern": "^zzz$"}),
+])
+def test_a_channel_schema_outside_the_one_accepted_shape_is_refused(name, prop):
     with pytest.raises(WireError):
-        _text_result(payload, "control")
-
-
-def test_a_result_omitting_the_optional_isError_is_ACCEPTED():
-    """ASTRA's one false kill, inherited from round 1 and fixed in round 3.
-
-    MCP defines isError as optional, absence meaning success. The round-1 check
-    `payload.get("isError") is False` REQUIRED it, so a protocol-correct server
-    that omitted it was rejected. Rejecting a correct server teaches everyone to
-    ignore the gate, which is the same damage as passing a broken one.
-    """
-    got = _text_result({"content": [{"type": "text", "text": '{"channels": ["message"]}'}]},
-                       "control")
-    assert got == {"channels": ["message"]}
-
-
-def test_a_well_formed_text_result_is_accepted():
-    got = _text_result({"content": [{"type": "text", "text": '{"channels": ["file"]}'}],
-                        "isError": False}, "control")
-    assert got == {"channels": ["file"]}
+        _channel_enum(prop, "control")
 
 
 @pytest.mark.parametrize("name,prop", [
-    ("type integer over nine string names",
-     {"type": "integer", "enum": ["message", "file"]}),
-    ("no type at all", {"enum": ["message", "file"]}),
-    ("type array", {"type": "array", "enum": ["message", "file"]}),
-    ("a schema with no enum", {"type": "string"}),
-    ("not an object at all", ["message", "file"]),
+    ("type string with an enum", {"type": "string", "enum": ["message", "file"]}),
+    # ASTRA round 3, false kill 1: an enum of strings with no `type` is valid
+    # JSON Schema and permits exactly those strings.
+    ("no type at all, the enum alone", {"enum": ["message", "file"]}),
+    # ASTRA round 3, false kill 2: the singleton type array is the same type.
+    ("the singleton type array", {"type": ["string"], "enum": ["message", "file"]}),
+    ("annotations that constrain nothing",
+     {"type": "string", "enum": ["message", "file"], "description": "which channel",
+      "title": "channel", "default": "message"}),
 ])
-def test_round3_a_schema_that_permits_none_of_its_enum_is_refused(name, prop):
+def test_a_valid_channel_schema_is_accepted(name, prop):
+    """The two rows in the middle are the false kills round 3's repair created."""
+    assert _channel_enum(prop, "control") == {"message", "file"}
+
+
+def test_the_schema_reader_accepts_what_this_server_actually_publishes():
+    """A control that uses the real shape, so the allowlist cannot drift off it.
+
+    Every row above is a shape someone wrote by hand. This one is the property
+    the running server emits today; if the allowlist ever stops accepting it,
+    that is a false kill against our own product and this test says so before a
+    reviewer does.
+    """
+    prop = {
+        "type": "string",
+        "description": "The input channel type. Affects which patterns are checked. "
+                       "Unknown channels are rejected (fail closed).",
+        "enum": list(SunglassesEngine.DOCUMENTED_CHANNELS),
+        "default": "message",
+    }
+    assert _channel_enum(prop, "control") == set(SunglassesEngine.DOCUMENTED_CHANNELS)
+
+
+# ── the tool result ──────────────────────────────────────────────────────────
+
+_TEXT_A = {"type": "text", "text": '{"channels": ["message"]}'}
+_TEXT_B = {"type": "text", "text": '{"channels": ["file"]}'}
+
+
+@pytest.mark.parametrize("name,payload", [
+    # round 2
+    ("a content block with no type", {"content": [{"text": '{"channels": []}'}]}),
+    ("content that is an object, not an array", {"content": {"type": "text", "text": "{}"}}),
+    ("a text block that is not JSON", {"content": [{"type": "text", "text": "not json"}]}),
+    ("isError true", {"content": [_TEXT_A], "isError": True}),
+    ("isError a non-bool", {"content": [_TEXT_A], "isError": "no"}),
+    # round 3: the comprehension DISCARDED what it could not read
+    ("an image block carrying text and no image",
+     {"content": [{"type": "image", "text": "{}"}, _TEXT_A]}),
+    ("two text blocks publishing different payloads", {"content": [_TEXT_A, _TEXT_B]}),
+    ("the same two in the other order", {"content": [_TEXT_B, _TEXT_A]}),
+    # the allowlist generalising
+    ("a content block of a type nobody has sent",
+     {"content": [{"type": "video", "data": "x"}, _TEXT_A]}),
+    ("a text block carrying an extra key",
+     {"content": [{"type": "text", "text": "{}", "trust_me": True}]}),
+    ("a result carrying an extra top-level key",
+     {"content": [_TEXT_A], "shortcut": "yes"}),
+    ("no content blocks at all", {"content": []}),
+    ("no text block among the content", {"content": [{"type": "image", "data": "a",
+                                                      "mimeType": "image/png"}]}),
+])
+def test_a_tool_result_outside_the_one_accepted_shape_is_refused(name, payload):
     with pytest.raises(WireError):
-        _schema_enum(prop, "control")
+        _tool_result_json(payload, "control")
 
 
-def test_a_well_formed_channel_schema_is_accepted():
-    assert _schema_enum({"type": "string", "enum": ["message", "file"]},
-                        "control") == {"message", "file"}
+@pytest.mark.parametrize("name,payload,expected", [
+    ("the canonical result", {"content": [_TEXT_A], "isError": False}, ["message"]),
+    # MCP defines isError as optional, absence meaning success. Requiring it was
+    # round 1's false kill; rejecting a correct server teaches everyone to
+    # ignore the gate, which is the same damage as passing a broken one.
+    ("isError omitted entirely", {"content": [_TEXT_A]}, ["message"]),
+    # MCP permits several blocks, so multiplicity itself is not a defect.
+    ("a well-formed image before the text",
+     {"content": [{"type": "image", "data": "aGVsbG8=", "mimeType": "image/png"}, _TEXT_A]},
+     ["message"]),
+    ("the same text published twice", {"content": [_TEXT_A, _TEXT_A]}, ["message"]),
+    ("result metadata alongside the content",
+     {"content": [_TEXT_A], "isError": False, "_meta": {"trace": "abc"}}, ["message"]),
+])
+def test_a_protocol_correct_tool_result_is_accepted(name, payload, expected):
+    assert _tool_result_json(payload, "control") == {"channels": expected}
+
+
+# ── the tools list ───────────────────────────────────────────────────────────
+
+def _tool(enum):
+    return {"name": "scan_text",
+            "inputSchema": {"properties": {"channel": {"type": "string", "enum": enum}}}}
+
+
+@pytest.mark.parametrize("name,tools", [
+    # round 3: the fixture built a dict keyed by name, so the LAST definition won
+    ("two definitions of one tool, the bad one first",
+     [_tool(["message"]), _tool(["message", "file"])]),
+    ("two definitions of one tool, the bad one last",
+     [_tool(["message", "file"]), _tool(["message"])]),
+    ("no such tool", [{"name": "scan_file"}]),
+    ("tools is not an array", {"scan_text": _tool(["message"])}),
+])
+def test_a_tools_list_that_defines_the_tool_twice_or_not_at_all_is_refused(name, tools):
+    with pytest.raises(WireError):
+        _one_tool(tools, "scan_text", "control")
+
+
+def test_one_definition_of_the_tool_is_accepted():
+    tools = [{"name": "scan_file"}, _tool(["message", "file"]), {"name": "scanner_info"}]
+    assert _one_tool(tools, "scan_text", "control") is tools[1]
+
+
+def test_the_two_readers_compose_on_a_well_formed_pair():
+    """The fixture's whole path, off the wire, with no server booted.
+
+    Each reader above is proven alone. This proves they are the ones the fixture
+    actually calls on a good wire -- the connection ASTRA showed could be cut in
+    round 3 without a single named control going red.
+    """
+    wire = "\n".join([
+        json.dumps({"jsonrpc": "2.0", "id": 2,
+                    "result": {"tools": [_tool(["message", "file"])]}}),
+        json.dumps({"jsonrpc": "2.0", "id": 3, "result": {
+            "content": [{"type": "text", "text": '{"channels": ["message", "file"]}'}]}}),
+    ])
+    replies = parse_replies(wire)
+    tool = _one_tool(replies[2]["result"]["tools"], "scan_text", "control")
+    enum = _channel_enum(tool["inputSchema"]["properties"]["channel"], "control")
+    info = _channel_list(_tool_result_json(replies[3]["result"], "control")["channels"],
+                         "control")
+    assert enum == info == {"message", "file"}
+
+
+# ── THE CONNECTION CONTROL ───────────────────────────────────────────────────
+# ASTRA, round 3: "direct helper controls prove less than a bounded full-fixture
+# control: they establish helper behavior, but do not prove the fixture invokes
+# it." Swapping ONE call in the fixture left all 33 tests green and made a
+# known-defective wire pass again.
+#
+# These rows drive `read_surfaces` -- the exact function the fixture drives --
+# with stdout built here instead of stdout from a subprocess. No server is
+# booted, which is what makes it affordable to have one row per defect, and the
+# reading path is shared, which is what makes cutting a call in it go red.
+
+def _wire(*, channel_prop=None, info_channels=None, tools=None, content=None,
+          list_id=2, info_id=3):
+    """One server's stdout, with any one layer replaced by a defective shape."""
+    nine = list(SunglassesEngine.DOCUMENTED_CHANNELS)
+    prop = {"type": "string", "enum": nine} if channel_prop is None else channel_prop
+    tool_list = [{"name": "scan_text", "inputSchema": {"properties": {"channel": prop}}}] \
+        if tools is None else tools
+    body = {"channels": nine if info_channels is None else info_channels}
+    blocks = [{"type": "text", "text": json.dumps(body)}] if content is None else content
+    return "\n".join([
+        json.dumps({"jsonrpc": "2.0", "id": list_id, "result": {"tools": tool_list}}),
+        json.dumps({"jsonrpc": "2.0", "id": info_id, "result": {"content": blocks}}),
+    ])
+
+
+_NINE = list(SunglassesEngine.DOCUMENTED_CHANNELS)
+
+
+@pytest.mark.parametrize("name,stdout", [
+    # every layer of the read, one defect each, through the fixture's own path
+    ("a channel schema that permits none of its enum",
+     _wire(channel_prop={"type": "integer", "enum": _NINE})),
+    ("a channel schema excluding its enum by const",
+     _wire(channel_prop={"type": "string", "enum": _NINE, "const": "nope"})),
+    ("a channel schema with a keyword this reader does not account for",
+     _wire(channel_prop={"type": "string", "enum": _NINE, "pattern": "^zzz$"})),
+    ("scan_text defined twice with different enums",
+     _wire(tools=[{"name": "scan_text",
+                   "inputSchema": {"properties": {"channel": {"type": "string",
+                                                              "enum": _NINE[:5]}}}},
+                  {"name": "scan_text",
+                   "inputSchema": {"properties": {"channel": {"type": "string",
+                                                              "enum": _NINE}}}}])),
+    ("two text blocks publishing different channel lists",
+     _wire(content=[{"type": "text", "text": json.dumps({"channels": _NINE})},
+                    {"type": "text", "text": json.dumps({"channels": _NINE[:5]})}])),
+    ("an image block carrying text and no image",
+     _wire(content=[{"type": "image", "text": "{}"},
+                    {"type": "text", "text": json.dumps({"channels": _NINE})}])),
+    ("the tools reply answered twice", _wire() + "\n" + _wire().splitlines()[0]),
+    ("an id that is boolean true", _wire(list_id=True)),
+])
+def test_a_defective_wire_is_refused_by_the_path_the_fixture_uses(name, stdout):
+    """Cut any call out of read_surfaces and one of these rows goes green."""
+    with pytest.raises(WireError):
+        read_surfaces(stdout)
+
+
+def test_read_surfaces_accepts_a_correct_wire_and_returns_both_vocabularies():
+    """Otherwise every row above passes by refusing everything."""
+    got = read_surfaces(_wire())
+    assert got["enum"] == got["info"] == set(SunglassesEngine.DOCUMENTED_CHANNELS)
