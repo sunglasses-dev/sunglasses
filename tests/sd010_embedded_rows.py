@@ -114,23 +114,45 @@ MUST_FIRE["bare_dollar_identifier_still_fires"] = '{"cfg":"API_KEY=$FOO"}'
 MUST_FIRE["single_quoted_python_dict"] = "{'cfg':'PASSWORD=" + PW + "'}"
 
 
-# ── the exclusion's disclosed cost ──────────────────────────────────────────
+# ── THE EVASIONS ASTRA FOUND, now must-fire rows ──────────────────────
 #
-# The placeholder exclusion reads the VALUE, and no test of value shape can
-# separate a placeholder from a weak real secret that resembles one. These are
-# NOT oversights and they are NOT benign twins: each one is a real assignment
-# this rule deliberately does not report, because the FP corpus is the side it
-# is asked to err on. They are pinned so the trade-off cannot change in silence
-# -- if a later edit makes one of them fire, that is a decision someone takes
-# on purpose, with this comment in front of them.
+# Round 1 of review refused the rule and raised both of these as analytical
+# concerns. They reproduced. Every one of them returned `allow` against the
+# shipped predicate at the time, and each is a real secret sitting in a real
+# assignment.
+#
+# The first three are the TERMINATOR gap: the end-of-value test accepted `,`
+# `}` `]`, which occur INSIDE a quoted value, so a `${VAR}` reference followed
+# by one of them ended the "value" while the secret sat in the same string.
+#
+# The last three are the PREFIX gap, and they are the worse class: the
+# placeholder tokens were matched as prefixes, so anyone able to influence the
+# value prepended one to a strong secret and the rule went quiet. A detection
+# rule whose suppression an attacker can trigger is worse than one with a
+# documented false positive. That is why the prose tokens are gone entirely
+# rather than tightened.
+_S = "hunter" + "2" + "x9q"
+MUST_FIRE["evasion_brace_ref_then_comma_then_secret"] = '{"cfg":"API_KEY=${VAR},' + _S + '"}'
+MUST_FIRE["evasion_brace_ref_then_brace_then_secret"] = '{"cfg":"API_KEY=${VAR}}' + _S + '"}'
+MUST_FIRE["evasion_brace_ref_then_bracket_then_secret"] = '{"cfg":"API_KEY=${VAR}]' + _S + '"}'
+MUST_FIRE["evasion_example_prefix_on_a_strong_value"] = '{"cfg":"PASSWORD=example' + _S + '"}'
+MUST_FIRE["evasion_your_prefix_on_a_strong_value"] = '{"cfg":"PASSWORD=your_' + _S + '"}'
+MUST_FIRE["evasion_xxx_prefix_on_a_strong_value"] = '{"cfg":"PASSWORD=xxx' + _S + '"}'
+
+# These two were DISCLOSED COSTS of the prose tokens. The prose tokens are gone,
+# so they are costs no longer and they belong on the other side of the ledger.
+# Keeping them here, as must-fire, is what stops the tokens coming back quietly.
+MUST_FIRE["a_placeholder_shaped_but_real_password"] = '{"cfg":"PASSWORD=example123"}'
+MUST_FIRE["a_redacted_looking_but_real_value"] = "config:\n    PASSWORD=xxxxxxxx\n"
+
+
+# ── what the rule still does not report ────────────────────────────
+#
+# ONE row, not three. A `${VAR}` interpolation is a REFERENCE to a secret: the
+# value is absent by construction, there is nothing in the text to leak. It must
+# be the ENTIRE value and the value must then end, so a secret cannot ride along
+# behind it -- the three evasion rows above are what enforces that.
 DISCLOSED_MISSES = {
-    "a_real_but_placeholder_shaped_password":
-        '{"cfg":"PASSWORD=example123"}',
-    "a_real_but_redacted_looking_value":
-        "config:\n    PASSWORD=xxxxxxxx\n",
-    # This one costs nothing real: a compose interpolation is a REFERENCE to a
-    # secret, and the value is absent by construction. It is the shape that
-    # kept the FP corpus document red under the ruled placeholder list.
     "a_compose_interpolation":
         'services:\n  app:\n    environment:\n      - "API_KEY=${API_KEY}"\n',
 }

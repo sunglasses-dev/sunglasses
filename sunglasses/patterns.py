@@ -2524,24 +2524,59 @@ PATTERNS = [
     #     indentation, case-SENSITIVE      1 doc           1
     #     + placeholder-value exclusion    0 docs          0   <- this rule
     #
-    # THE EXCLUSION LOOKS AT THE VALUE, NOT THE KEY, and sits OUTSIDE the
-    # `(?-i:)` scope on purpose, so YOUR_KEY, XXXX and REDACTED are placeholders
-    # in any casing while the key itself must still be upper case.
+    # THE EXCLUSION IS STRUCTURAL, WHOLE-VALUE, AND THAT IS A SECURITY
+    # PROPERTY RATHER THAN A TUNING CHOICE. Two tokens only: an angle-bracket
+    # placeholder `<...>` and a `${IDENT}` reference. Both must be the ENTIRE
+    # value, and the value must then END -- a closing quote, or the end of the
+    # line. Nothing else suppresses this rule.
     #
-    # `${...}` IS IN THE LIST BECAUSE THE CORPUS PUT IT THERE. The exclusion was
-    # ruled as `<`, `your_`, `xxx`, `...`, `example`, `changeme`, `REDACTED`.
-    # That list greens one of the three sites in the FP document and leaves two,
-    # both of the form `- "API_KEY=${API_KEY}"` in a compose file, so the
-    # document still blocked and the refinement bought nothing. A `${VAR}`
-    # interpolation is the strongest placeholder of the set: the value is
-    # absent by construction, it is a reference to a secret rather than one.
+    # IT USED TO BE SEVEN PROSE WORDS AND A PREFIX TEST, and ASTRA broke it in
+    # review. `example`, `your_`, `xxx`, `changeme` and friends were matched as
+    # PREFIXES, so anyone who could influence the value prepended one to a real
+    # secret and the rule went silent:
     #
-    # THE EXCLUSION'S OWN COST, disclosed rather than discovered in review: a
-    # real value that LOOKS like a placeholder is not blocked — `PASSWORD=
-    # example123`, `PASSWORD=xxxxxxxx`. No test of value shape can separate a
-    # placeholder from a weak real secret that resembles one, and the FP corpus
-    # is the side this rule is asked to err on. tests/test_sd010_embedded
-    # _boundary.py pins both halves so neither can change in silence.
+    #     {"cfg":"PASSWORD=examplehunter2x9q"}   allow   <- attacker-chosen
+    #     {"cfg":"PASSWORD=your_hunter2x9q"}     allow
+    #     {"cfg":"API_KEY=${VAR},hunter2x9q"}    allow   <- terminator gap
+    #
+    # The terminator also accepted `,` `}` `]`, which occur INSIDE a quoted
+    # value, so a brace reference followed by a comma ended the "value" while
+    # the real secret sat in the same string. Both classes are closed here and
+    # all six inputs are must-fire fixtures.
+    #
+    # THE DIFFERENCE IS NOT COSMETIC. A detection rule whose suppression an
+    # attacker can trigger is worse than one with a documented false positive.
+    # The prose words were never load-bearing: measured over the 77-document
+    # corpus, dropping all seven changes nothing (0 documents, 0 flips), because
+    # every site in the FP document is structural -- `<your key>` and two
+    # `${VAR}` interpolations.
+    #
+    # WHOLE-VALUE, NOT A PREFIX, is the same law #170 applies to siblings and
+    # the same one that made this a new rule rather than a sibling. It was
+    # applied to `${IDENT}` one revision earlier and NOT to the seven tokens on
+    # the line below it, which is how the gap survived a ruling that named it.
+    #
+    # Full 77-document sweep, engine level, channel `file`, each variant
+    # measured from scratch because each changes the predicate:
+    #
+    #     variant                               fires   flips   evasions closed
+    #     no indentation                        1 doc   1       -
+    #     indentation, case-FOLDED              3 docs  2       -
+    #     indentation, case-SENSITIVE           1 doc   1       -
+    #     + prefix exclusion (withdrawn)        0 docs  0       0 of 5
+    #     + all tokens whole-value              0 docs  0       4 of 5
+    #     + STRUCTURAL whole-value  <- this     0 docs  0       5 of 5
+    #     no exclusion at all                   1 doc   1       5 of 5
+    #
+    # The all-tokens row still lets `your_<secret>` through, because the token
+    # and the secret form one word and the whole-value test is satisfied. That
+    # is why the prose words are gone rather than repaired.
+    #
+    # WHAT IS STILL NOT REPORTED, and it is now one thing rather than three:
+    # a `${VAR}` interpolation, which is a REFERENCE to a secret and carries no
+    # value to leak. `PASSWORD=example123` and `PASSWORD=xxxxxxxx` DO fire now;
+    # they were disclosed costs of the prose tokens and the prose tokens are
+    # gone. tests/test_sd010_embedded_boundary.py pins all of it.
     #
     # NO KEYWORDS ON PURPOSE. The parent carries `API_KEY=` and friends as
     # keywords, which match independently of the regex; here that would fire on
@@ -2558,11 +2593,10 @@ PATTERNS = [
             r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="
-            r"(?![ \t]*[\"']?[ \t]*"
-            r"(?:<|\.\.\.|\u2026|your[_-]|x{3,}|example|changeme|redacted"
-            r"|\$\{\w+\}[\"']?[ \t]*(?:[\r\n,}\]]|\\[nr]|$)))",
+            r"(?![ \t]*[\"']?[ \t]*(?:<[^>\r\n]*>|\$\{\w+\})"
+            r"[ \t]*(?:[\"']|[\r\n]|\\[nr]|$))",
         ],
-        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match, and a value that is a placeholder or a ${VAR} reference is excluded."
+        "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. Only a value that is ENTIRELY an angle-bracket placeholder or a ${VAR} reference is excluded, so a real secret cannot be hidden behind a placeholder-looking prefix."
     },
 
     # ── GLS-SD -API siblings ─────────────────────────────────────────────────

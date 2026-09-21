@@ -362,3 +362,43 @@ def test_the_shadowing_itself_is_pinned_on_the_consumer_surface(engine, shape):
         assert ids == [RULE], (
             f"{shape} on {channel}: a consumer now sees {ids} rather than "
             f"[{RULE}] alone.")
+
+
+def test_control_readmitting_a_comma_terminator_reopens_the_evasion():
+    """The terminator set is load-bearing, proven by putting `,` back.
+
+    `,` `}` `]` occur INSIDE a quoted value, so accepting one as the end of the
+    value lets a `${VAR}` reference terminate early while the real secret sits
+    in the same string. That was a live evasion until review found it. This
+    re-admits the comma and watches the three brace-reference rows go quiet.
+    """
+    reopened = _rule_regex().replace(r"(?:[\"']|[\r\n]|\\[nr]|$))",
+                                     r"(?:[\"',}\]]|[\r\n]|\\[nr]|$))")
+    assert reopened != _rule_regex(), "the terminator set is not where it was"
+    e = _mutate(**{RULE: reopened})
+    quiet = [s for s in rows.MUST_FIRE
+             if s.startswith("evasion_brace_ref")
+             and RULE not in _ids(e, rows.MUST_FIRE[s])[1]]
+    assert len(quiet) == 3, (
+        f"re-admitting the comma silenced {len(quiet)} brace-reference rows, "
+        f"expected all 3 ({quiet}). Those rows are not guarding the "
+        f"terminator set.")
+
+
+def test_control_a_prefix_placeholder_test_reopens_the_attacker_class():
+    """The whole-value requirement is what closes the attacker-chosen class.
+
+    Replacing the structural tokens with the withdrawn prefix list silences
+    every prepend evasion at once. This is the shape the rule shipped with
+    before review, kept as a control so it cannot return unnoticed.
+    """
+    prefixed = _rule_regex().replace(
+        r"(?:<[^>\r\n]*>|\$\{\w+\})[ \t]*(?:[\"']|[\r\n]|\\[nr]|$))",
+        r"(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))")
+    assert prefixed != _rule_regex(), "the exclusion is not where it was"
+    e = _mutate(**{RULE: prefixed})
+    quiet = [s for s in rows.MUST_FIRE
+             if s.startswith("evasion_") and RULE not in _ids(e, rows.MUST_FIRE[s])[1]]
+    assert len(quiet) >= 3, (
+        f"a prefix test silenced only {quiet}; the evasion rows are not "
+        f"guarding the whole-value requirement.")
