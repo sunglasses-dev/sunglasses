@@ -217,11 +217,26 @@ def _channel_enum(prop, where):
     """
     _only_keys(prop, f"{where}: channel property",
                required=("enum",), optional=("type",) + tuple(_SCHEMA_ANNOTATIONS))
-    if "type" in prop and prop["type"] not in ("string", ["string"]):
-        raise WireError(
-            f"{where}: channel property does not describe strings: type={prop['type']!r}. "
-            f"Accepted: \"string\", [\"string\"], or no type at all (the enum alone "
-            f"restricts the value).")
+    # ROUND 6, ASTRA: `{"type": ["string", "null"], "enum": [...nine strings...]}`
+    # was refused and should not have been. `type` and `enum` are CONJUNCTIVE, so
+    # a union containing null admits no null while the enum holds only strings --
+    # the schema describes exactly the nine. Round 4 accepted two spellings by
+    # name, which is a list of the representations I had met, and round 3 had
+    # already produced two false kills the same way.
+    #
+    # The question is not which spelling it is, it is whether the type PERMITS
+    # STRINGS. `"integer"` and `["integer", "null"]` permit none of the nine and
+    # are still refused; `"string"`, `["string"]` and `["string", "null"]` all
+    # permit them and are accepted.
+    if "type" in prop:
+        t = prop["type"]
+        permits_strings = (t == "string"
+                           or (isinstance(t, list) and "string" in t))
+        if not permits_strings:
+            raise WireError(
+                f"{where}: channel property does not permit strings: type={t!r}. "
+                f"The enum advertises string names, and a type that excludes strings "
+                f"permits none of them.")
     names = _channel_list(prop["enum"], f"{where} enum")
     if not names:
         raise WireError(f"{where}: an empty enum advertises no channels")
@@ -229,6 +244,42 @@ def _channel_enum(prop, where):
         raise WireError(f"{where}: default={prop['default']!r} is not one of the "
                         f"{len(names)} names the enum advertises")
     return names
+
+
+def _input_schema_channel(schema, where):
+    """The channel property, from an inputSchema that constrains it NOWHERE ELSE.
+
+    ROUND 6, and it is the defect this whole file exists for arriving one layer
+    above where anyone was looking. ASTRA's wire kept the nine-value enum on the
+    property AND the nine in scanner_info, and added to the CONTAINING schema:
+
+        "allOf": [{"properties": {"channel": {"enum": ["message"]}}}]
+
+    Both published vocabularies still read nine, both equality assertions passed,
+    and a schema-obeying client could send exactly one channel. The reader was
+    inspecting the property and had never looked at its parent, so a constraint
+    placed one level up was invisible to it.
+
+    Reading `allOf` would have been the round-4 mistake again -- refusing the
+    shape I had just been shown. So the parent gets the same treatment as the
+    property: the keys an inputSchema may carry are enumerated, and every
+    applicator that could narrow a member (`allOf`, `anyOf`, `oneOf`, `not`,
+    `if`/`then`/`else`, `$ref`, `dependentSchemas`, `patternProperties`, and
+    whatever is invented next) is refused by construction rather than
+    interpreted.
+    """
+    _only_keys(schema, f"{where}: inputSchema",
+               required=("type", "properties"),
+               optional=("required", "additionalProperties", "$schema")
+                        + tuple(_SCHEMA_ANNOTATIONS))
+    if schema["type"] != "object":
+        raise WireError(f"{where}: inputSchema type={schema['type']!r}, not \"object\"")
+    props = schema["properties"]
+    if not isinstance(props, dict):
+        raise WireError(f"{where}: inputSchema properties is not an object")
+    if "channel" not in props:
+        raise WireError(f"{where}: inputSchema declares no `channel` property")
+    return props["channel"]
 
 
 def _one_tool(tools, name, where):
@@ -383,7 +434,10 @@ def read_surfaces(stdout):
             f"the server did not answer both introspection requests: ids {sorted(replies)}")
 
     scan_text = _one_tool(replies[2]["result"]["tools"], "scan_text", "tools/list")
-    enum = _channel_enum(scan_text["inputSchema"]["properties"]["channel"],
+    _only_keys(scan_text, "tools/list scan_text descriptor",
+               required=("name", "inputSchema"),
+               optional=("description", "title", "outputSchema", "annotations", "_meta"))
+    enum = _channel_enum(_input_schema_channel(scan_text["inputSchema"], "scan_text"),
                          "scan_text inputSchema")
 
     info = _tool_result_json(replies[3]["result"], "scanner_info")
@@ -587,7 +641,8 @@ def test_a_protocol_correct_wire_is_accepted(name, wire):
     # round 2: the enum was read without its surrounding type
     ("type integer over string names", {"type": "integer", "enum": ["message", "file"]}),
     ("type array", {"type": "array", "enum": ["message", "file"]}),
-    ("type a union including null", {"type": ["string", "null"], "enum": ["message"]}),
+    ("a type union that excludes strings",
+     {"type": ["integer", "null"], "enum": ["message", "file"]}),
     ("no enum at all", {"type": "string"}),
     ("not an object at all", ["message", "file"]),
     ("an empty enum", {"type": "string", "enum": []}),
@@ -619,6 +674,12 @@ def test_a_channel_schema_outside_the_one_accepted_shape_is_refused(name, prop):
     ("no type at all, the enum alone", {"enum": ["message", "file"]}),
     # ASTRA round 3, false kill 2: the singleton type array is the same type.
     ("the singleton type array", {"type": ["string"], "enum": ["message", "file"]}),
+    # ASTRA round 6: type and enum are CONJUNCTIVE, so a union carrying null
+    # admits no null while the enum holds only strings. Refusing it was the
+    # round-3 false-kill mistake in a third costume -- accepting the spellings I
+    # had met rather than asking whether the type permits strings.
+    ("a type union that still permits strings",
+     {"type": ["string", "null"], "enum": ["message", "file"]}),
     ("annotations that constrain nothing",
      {"type": "string", "enum": ["message", "file"], "description": "which channel",
       "title": "channel", "default": "message"}),
@@ -710,9 +771,15 @@ def test_a_protocol_correct_tool_result_is_accepted(name, payload, expected):
 
 # ── the tools list ───────────────────────────────────────────────────────────
 
+def _schema(prop):
+    """The shape the running server publishes: type/properties/required, nothing else."""
+    return {"type": "object",
+            "properties": {"text": {"type": "string"}, "channel": prop},
+            "required": ["text"]}
+
+
 def _tool(enum):
-    return {"name": "scan_text",
-            "inputSchema": {"properties": {"channel": {"type": "string", "enum": enum}}}}
+    return {"name": "scan_text", "inputSchema": _schema({"type": "string", "enum": enum})}
 
 
 @pytest.mark.parametrize("name,tools", [
@@ -771,7 +838,7 @@ def _wire(*, channel_prop=None, info_channels=None, tools=None, content=None,
     """One server's stdout, with any one layer replaced by a defective shape."""
     nine = list(SunglassesEngine.DOCUMENTED_CHANNELS)
     prop = {"type": "string", "enum": nine} if channel_prop is None else channel_prop
-    tool_list = [{"name": "scan_text", "inputSchema": {"properties": {"channel": prop}}}] \
+    tool_list = [{"name": "scan_text", "inputSchema": _schema(prop)}] \
         if tools is None else tools
     body = {"channels": nine if info_channels is None else info_channels}
     blocks = [{"type": "text", "text": json.dumps(body)}] if content is None else content
@@ -792,13 +859,17 @@ _NINE = list(SunglassesEngine.DOCUMENTED_CHANNELS)
      _wire(channel_prop={"type": "string", "enum": _NINE, "const": "nope"})),
     ("a channel schema with a keyword this reader does not account for",
      _wire(channel_prop={"type": "string", "enum": _NINE, "pattern": "^zzz$"})),
+    # Each descriptor carries a COMPLETE inputSchema on purpose. Written with a
+    # bare properties bag, this row still went red -- but at the parent-schema
+    # check, not at the duplicate-tool check it is named for, and the mutation
+    # battery caught it by showing `tool_disconnect` surviving. A row that
+    # passes for a reason other than the one it names is coverage that has
+    # quietly left.
     ("scan_text defined twice with different enums",
-     _wire(tools=[{"name": "scan_text",
-                   "inputSchema": {"properties": {"channel": {"type": "string",
-                                                              "enum": _NINE[:5]}}}},
-                  {"name": "scan_text",
-                   "inputSchema": {"properties": {"channel": {"type": "string",
-                                                              "enum": _NINE}}}}])),
+     _wire(tools=[{"name": "scan_text", "inputSchema": _schema(
+                       {"type": "string", "enum": _NINE[:5]})},
+                  {"name": "scan_text", "inputSchema": _schema(
+                       {"type": "string", "enum": _NINE})}])),
     ("two text blocks publishing different channel lists",
      _wire(content=[{"type": "text", "text": json.dumps({"channels": _NINE})},
                     {"type": "text", "text": json.dumps({"channels": _NINE[:5]})}])),
@@ -807,6 +878,34 @@ _NINE = list(SunglassesEngine.DOCUMENTED_CHANNELS)
                     {"type": "text", "text": json.dumps({"channels": _NINE})}])),
     ("the tools reply answered twice", _wire() + "\n" + _wire().splitlines()[0]),
     ("an id that is boolean true", _wire(list_id=True)),
+    # ROUND 6, ASTRA'S WIRE, kept verbatim in shape. The property still
+    # advertises nine and scanner_info still publishes nine, so both equality
+    # assertions pass; the containing schema narrows the channel to one value in
+    # `allOf`, and a schema-obeying client can send only `message`. The reader
+    # was inspecting the property and had never looked at its parent.
+    ("a parent allOf narrowing the channel to one value",
+     _wire(tools=[{"name": "scan_text", "inputSchema": {
+         "type": "object",
+         "properties": {"channel": {"type": "string",
+                                    "enum": list(SunglassesEngine.DOCUMENTED_CHANNELS)}},
+         "allOf": [{"properties": {"channel": {"enum": ["message"]}}}]}}])),
+    ("a parent anyOf", _wire(tools=[{"name": "scan_text", "inputSchema": {
+        "type": "object", "properties": {"channel": {"type": "string", "enum": _NINE}},
+        "anyOf": [{"properties": {"channel": {"enum": ["file"]}}}]}}])),
+    ("a parent $ref", _wire(tools=[{"name": "scan_text", "inputSchema": {
+        "type": "object", "properties": {"channel": {"type": "string", "enum": _NINE}},
+        "$ref": "#/definitions/narrower"}}])),
+    # the generalisation row, one level up: a keyword no round has sent
+    ("a parent keyword no round has ever sent",
+     _wire(tools=[{"name": "scan_text", "inputSchema": {
+         "type": "object", "properties": {"channel": {"type": "string", "enum": _NINE}},
+         "dependentSchemas": {"text": {"properties": {"channel": {"enum": ["code"]}}}}}}])),
+    ("an inputSchema that is not an object type",
+     _wire(tools=[{"name": "scan_text", "inputSchema": {
+         "type": "array", "properties": {"channel": {"type": "string", "enum": _NINE}}}}])),
+    ("a tool descriptor carrying an extra key",
+     _wire(tools=[{"name": "scan_text", "shortcut": True, "inputSchema": {
+         "type": "object", "properties": {"channel": {"type": "string", "enum": _NINE}}}}])),
 ])
 def test_a_defective_wire_is_refused_by_the_path_the_fixture_uses(name, stdout):
     """Cut any call out of read_surfaces and one of these rows goes green."""
@@ -818,3 +917,24 @@ def test_read_surfaces_accepts_a_correct_wire_and_returns_both_vocabularies():
     """Otherwise every row above passes by refusing everything."""
     got = read_surfaces(_wire())
     assert got["enum"] == got["info"] == set(SunglassesEngine.DOCUMENTED_CHANNELS)
+
+
+@pytest.mark.parametrize("name,schema", [
+    ("the shape this server publishes",
+     {"type": "object", "properties": {"text": {"type": "string"},
+                                       "channel": {"type": "string", "enum": _NINE}},
+      "required": ["text"]}),
+    ("with a description and additionalProperties",
+     {"type": "object", "description": "scan some text",
+      "properties": {"channel": {"type": "string", "enum": _NINE}},
+      "additionalProperties": False}),
+])
+def test_a_protocol_correct_input_schema_is_accepted(name, schema):
+    """The parent allowlist must not reject the server we actually ship.
+
+    Every row in the refusal block above is a parent constraint someone wrote by
+    hand. These two are the real shape and a benign variation of it; if the
+    parent rule ever stops accepting them, that is a false kill against our own
+    product and this says so before a reviewer does.
+    """
+    assert _channel_enum(_input_schema_channel(schema, "control"), "control") == set(_NINE)
