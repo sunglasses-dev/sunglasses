@@ -196,6 +196,46 @@ what moved.
 
 ### Documentation
 
+- **`GLS-SD-010`'s open gap was published narrower than it is.** 0.5.9's notes,
+  the README and the site all described it as a gap in the RESULT direction:
+  "GLS-SD-010 (line-anchored `API_KEY=`) stays open in the result direction
+  because its anchor cannot match inside a JSON string." The reason is right and
+  the scope is wrong, and the wrong part is the reassuring half. Re-measured on
+  `ec753bb`, `e.scan(text, channel)` per row:
+
+  | value | shape | channel | decision | ids |
+  |---|---|---|---|---|
+  | known credential format | bare | file | block | `GLS-SD-001`, `GLS-SD-010` |
+  | known credential format | JSON-embedded | file | block | `GLS-SD-001` |
+  | known credential format | JSON-embedded | api_response | block | `GLS-SD-001-API` |
+  | no recognisable format | bare | file | block | `GLS-SD-010` |
+  | no recognisable format | bare | message | block | `GLS-SD-010` |
+  | no recognisable format | JSON-embedded | file | **allow** | **none** |
+  | no recognisable format | JSON-embedded | message | **allow** | **none** |
+  | no recognisable format | JSON-embedded | api_response | **allow** | **none** |
+  | no recognisable format | quoted value | file | **allow** | **none** |
+
+  A line anchor is not a channel property. `GLS-SD-010` misses an embedded
+  `KEY=value` on **every** channel, including `file` and `message`, which it
+  declares — a `.env` dump inside a JSON blob in a FILE is not matched today,
+  and no surface said so. What kept this invisible is the last column: when the
+  value is in a known credential format the `GLS-SD-001` family catches it
+  everywhere anyway (`GLS-SD-001` on file, message and web content,
+  `GLS-SD-001-API` in a tool result), so the gap only shows for an assignment
+  whose value has no recognisable shape — a password, a DSN, an internal token.
+
+  Nothing about the scanner changed here; what changed is that three surfaces
+  now say the measured thing. Closing it needs a different anchor, which by the
+  rule the `-API` siblings were built under (a sibling copies its parent's
+  predicate character for character and adds channels only) is a **new rule**
+  with its own fixtures, FP sweep and review, not a channel added to this one.
+  The design is measured in
+  `warroom/SD010_ANCHOR_DIAGNOSIS_2026-09-21.md`: a content-boundary anchor,
+  variant B, 0 new false positives on the 76-document corpus, with its
+  disclosed cost — a quoted example inside prose would fire, and the corpus
+  contains no such case, so a prose-quote fixture is added to the corpus before
+  anyone builds it. Deferred to 0.6.1 rather than rushed before beta.
+
 - **The sixty-seconds demo is a recording, and the MCP registry manifest
   ships.** (#186) A 17-second recording of `demo/sixty-seconds.sh` against the
   released 0.5.9 with real output: a clean file passes, a vendor brief is

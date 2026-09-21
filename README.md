@@ -83,6 +83,17 @@ the rule, the bytes inspected and the rule ids that fired:
 
 - **A credential in a tool RESULT is withheld from your client.** The `-API`
   rules are the tool-result channel.
+- **`GLS-SD-010` is line-anchored, and that is a limit in every channel.** It
+  matches an assignment at the start of a line, so a `KEY=value` sitting inside
+  a JSON string or behind a quote is not matched **on any channel** — not in a
+  tool result, and not in a file or a message either, which are channels it
+  does declare. When the value is in a known credential format the
+  `GLS-SD-001` family still catches it everywhere (`GLS-SD-001` on file,
+  message and web content, `GLS-SD-001-API` in a tool result), so what is
+  actually uncovered is an assignment whose value has no recognisable shape —
+  a password, a DSN, an internal token — once it is embedded. Closing it needs
+  a different anchor, which is a new rule with its own fixtures rather than a
+  channel added to this one.
 - **A credential in a tool CALL does not reach the server.** Verified by reading
   the receiving server's own input, not by asking the proxy.
 - **Ordinary traffic passes.** `tools/list` returns the real list and a benign
