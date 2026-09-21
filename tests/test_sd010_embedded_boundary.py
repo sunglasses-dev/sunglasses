@@ -74,16 +74,29 @@ def without_rule():
 @pytest.mark.parametrize("shape", sorted(rows.MUST_FIRE))
 @pytest.mark.parametrize("channel", CHANNELS)
 def test_every_embedded_shape_is_caught(engine, shape, channel):
-    """Blocked on every declared channel, and by THIS rule where only it can.
+    """Blocked on every declared channel, and named by THIS rule where only it can.
 
-    The assertion is coverage, not attribution, and the difference is real.
-    Two rows sit at a true line start, so GLS-SD-010 reaches them as well, and
-    on the channels the parent declares severity-ranked dedup reports the
-    parent and suppresses this id. Demanding that this rule name itself there
-    would fail on correct behaviour and pass only on a tree where the two rules
-    had been made to disagree -- the trap `test_sd_api_siblings.py` wrote down
-    for the -API siblings. So those two rows are proved separately, below, by
-    removing the parent and watching this rule name itself.
+    The assertion is coverage, not attribution, and WHICH SURFACE IS READ
+    decides which of those two you are measuring.
+
+    `result.findings` is the raw list and reports both ids. `result.to_dict()`
+    dedupes, and that is the surface a consumer actually sees -- the CLI, the
+    API, the SARIF output. Measured on this head for the bare line start:
+
+        channel        .findings                      to_dict()
+        file           SD-010, SD-010-EMB             SD-010
+        api_response   SD-010-EMB                     SD-010-EMB
+
+    So on `message`, `file` and `code` -- exactly the parent's three declared
+    channels -- a consumer is told GLS-SD-010 and never hears this rule's name,
+    and on the other three it hears this one. `_ids` reads `to_dict()` on
+    purpose, because a test that read the raw list would assert something no
+    user can observe.
+
+    That is why the two line-start rows are exempt HERE and proved separately
+    below, by removing the parent and watching this rule still block them. A
+    draft of this file dropped the exemption after measuring `.findings`
+    instead, found it "never taken", and was wrong on the surface that ships.
     """
     decision, ids = _ids(engine, rows.MUST_FIRE[shape], channel)
     assert decision == "block", (
@@ -326,3 +339,26 @@ def test_control_removing_the_apostrophe_makes_pythons_own_repr_walk_past():
     assert RULE not in ids, (
         "removing the apostrophe did NOT make the single-quoted dict walk past "
         "the rule, so that row is not guarding the boundary class.")
+
+
+@pytest.mark.parametrize("shape", sorted(rows.PARENT_ALSO_COVERS))
+def test_the_shadowing_itself_is_pinned_on_the_consumer_surface(engine, shape):
+    """What a USER is told about the bare line start, asserted rather than assumed.
+
+    On the parent's three channels the deduped output names GLS-SD-010 alone;
+    on the three it does not declare, GLS-SD-010-EMB. If dedup, severity or the
+    parent's channel list ever changes, this is where it shows up -- and it is
+    a real behaviour change for anyone parsing our output, not an internal
+    detail.
+    """
+    text = rows.MUST_FIRE[shape]
+    for channel in ("message", "file", "code"):
+        _, ids = _ids(engine, text, channel)
+        assert ids == [PARENT], (
+            f"{shape} on {channel}: a consumer now sees {ids} rather than "
+            f"[{PARENT}] alone.")
+    for channel in ("api_response", "log_memory", "agent_input"):
+        _, ids = _ids(engine, text, channel)
+        assert ids == [RULE], (
+            f"{shape} on {channel}: a consumer now sees {ids} rather than "
+            f"[{RULE}] alone.")
