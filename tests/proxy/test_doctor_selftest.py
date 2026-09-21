@@ -146,3 +146,73 @@ def test_a_check_verdict_carrying_an_exception_string_is_dropped():
     whole, so both key and value are allowlisted."""
     leaked = {"deadline": "FAIL: Traceback (most recent call last): secret"}
     assert d._safe_checks(leaked) == {}
+
+
+# ─────────────────────── R-DOCTOR-R3c · absent is not failed (T9, 2026-09-21)
+#
+# The defect these pin, measured on 164bca7 before the fix: the seam returns
+# `(False, {})` on every build that has no live self-test, `judge_self_test({},
+# {})` then marks all five checks failed because none of them equals "PASS",
+# and `render` publishes failure_class SCHEMA. An operator reads "your proxy
+# failed five checks" when not one of them ran. Exit 1 is correct and STANDS
+# (R-DOCTOR-R3a: an instrument that cannot demonstrate mediation must never
+# imply it) — the exit code was never the lie. The words were.
+
+def test_a_self_test_that_never_ran_is_its_own_class_not_a_schema_miss():
+    """R-DOCTOR-R3c. No checks AND no controls = the instrument is absent."""
+    v = d.judge_self_test({}, {})
+    assert v.failure_class == d.SELF_TEST_UNAVAILABLE
+    assert v.ok is False
+
+
+def test_a_self_test_that_never_ran_marks_no_check_as_failed():
+    """The specific false sentence. Five names in `failed_checks` is what the
+    report prints, and printing a name there asserts that check was run and did
+    not pass."""
+    assert d.judge_self_test({}, {}).failed_checks == []
+
+
+def test_the_control_a_real_failure_still_reads_SCHEMA():
+    """THE CONTROL, and the reason this row is trustworthy at all.
+
+    A fix that classed everything UNAVAILABLE would make the row above green
+    and destroy the distinction it exists to draw. A run whose controls DID
+    trip is a run that happened; a check missing from it is a real miss.
+    """
+    v = d.judge_self_test({}, CONTROLS_OK)
+    assert v.failure_class == d.SCHEMA
+    assert v.failed_checks == list(d.SELF_TEST_CHECKS)
+
+
+def test_a_partial_run_is_a_failure_not_an_absence():
+    """Controls ran and one check is missing: the instrument worked, the check
+    did not. Absence is only ever the whole instrument."""
+    checks = dict(PASSING); checks.pop("disconnect")
+    v = d.judge_self_test(checks, CONTROLS_OK)
+    assert v.failure_class == d.SCHEMA
+    assert v.failed_checks == ["disconnect"]
+
+
+def test_render_prints_the_five_checks_as_NOT_RUN_when_unavailable():
+    """What the operator actually reads. An empty `checks` dict renders as no
+    information at all, which a reader fills in with whatever they already
+    believed; the five names carrying NOT_RUN say the true thing out loud."""
+    report = d.run(sources=[], self_test=lambda: (False, {}))
+    rendered = d.render(report)
+    assert rendered["self_test"]["checks"] == {
+        name: d.NOT_RUN for name in d.SELF_TEST_CHECKS}
+    assert rendered["self_test"]["failed"] == []
+    assert rendered["self_test"]["failure_class"] == d.SELF_TEST_UNAVAILABLE
+
+
+def test_NOT_RUN_can_never_arrive_from_an_upstream_process():
+    """NOT_RUN is OUR word about our own build, synthesised in `render`. An
+    upstream that claims it is dropped like any other unallowlisted verdict —
+    a spawned process must not be able to describe itself as not having run."""
+    assert d._safe_checks({"deadline": d.NOT_RUN}) == {}
+
+
+def test_an_unavailable_self_test_still_exits_one():
+    """R-DOCTOR-R3a is untouched by R3c. The class changed; the code did not."""
+    report = d.run(sources=[], self_test=lambda: (False, {}))
+    assert report.exit_code == d.EXIT_FAILED

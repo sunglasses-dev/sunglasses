@@ -2161,6 +2161,18 @@ def main():
         "--config", help="Config file to edit (default: ./.mcp.json)")
     uninstall_parser.set_defaults(func=cmd_uninstall)
 
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Report whether your MCP traffic actually runs through the proxy",
+        description=DOCTOR_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    doctor_parser.add_argument(
+        "--config",
+        help="Read ONLY this config file (default: ./.mcp.json and ~/.claude.json)")
+    doctor_parser.add_argument("--json", action="store_true",
+                               help="Output the report as JSON")
+    doctor_parser.set_defaults(func=cmd_doctor)
+
     config_parser = subparsers.add_parser("config", help="Configure SUNGLASSES")
     config_parser.add_argument("--email", "-e", help="Set email for daily reports")
     config_parser.set_defaults(func=cmd_config)
@@ -2301,6 +2313,122 @@ def cmd_uninstall(args):
         print(f"  {DIM}entry restored, file not byte-identical: it changed "
               f"after the install{RESET}\n")
     sys.exit(0)
+
+
+DOCTOR_HELP = """Report whether your MCP traffic actually runs through the proxy.
+
+WHAT IT CHECKS
+  Reads your MCP config, classifies every server entry as WRAPPED (its command
+  launches through us), DIRECT (it does not) or UNVERIFIED, and names every
+  source it could not open rather than omitting it.
+
+WHAT IT CANNOT DO IN THIS RELEASE
+  It cannot demonstrate that a wrapped route actually mediates traffic. The
+  live self-test that spawns the proxy against a bundled echo server is not
+  built yet, so `doctor` reports its self-test as NOT RUN and exits 1 on every
+  machine. That is deliberate: a doctor that cannot demonstrate mediation must
+  never imply it. Exit 1 here means "I could not prove it", not "your routes
+  failed" -- the report says which.
+
+EXIT CODES
+  0  every route it knows about is wrapped and passed a live check
+  1  something it ran FAILED in front of it, or its own self-test did not pass
+  2  it could not open a config or a record. It names the file.
+  3  not installed, or not verifiable. A fact, not a failure.
+
+  Precedence is 1 > 2 > 3 > 0. `0` and `3` never mean the same thing: "I looked
+  and nothing is wired" is not "everything is fine".
+"""
+
+
+def cmd_doctor(args, _run=None):
+    """0.6.1 row 2 — the command for `sunglasses/proxy/doctor.py`.
+
+    The module has been shippable since #180 and reachable by import only, so
+    the README showed an invocation that argparse rejected with exit 2 and #222
+    removed the line. This wires it.
+
+    `_run` is a TEST SEAM and not a flag: the exit ladder has codes this build
+    cannot reach (an unavailable self-test outranks everything at 1), and the
+    alternative ways to reach them from a test are an undeclared environment
+    read or a hidden argument, both of which are switches in a shipped wheel
+    that anything in the process tree can flip.
+    """
+    from .proxy import doctor as _doc
+
+    # `--config` SCOPES, it does not ADD. The default sources include
+    # `~/.claude.json`, and a flag that appended would report on servers the
+    # operator did not ask about while naming one file in the output.
+    sources = None
+    if args.config:
+        import pathlib as _pl
+        target = _pl.Path(args.config)
+        # A path the operator NAMED and that is not there is not absence.
+        #
+        # `read_sources` treats FileNotFoundError as absence and skips, which is
+        # right for the DEFAULT sources -- not having a project `.mcp.json` is a
+        # normal machine, not an error. It is wrong for a file the operator
+        # pointed at: reported through the inventory it would come back "no
+        # server entries found", which reads as "you have nothing wired" when
+        # the truth is "the file you named does not exist". That is the exact
+        # collapse of "I could not look" into "there was nothing to see" that
+        # this whole module is built to refuse, arriving through the one door
+        # the module does not guard.
+        #
+        # So we refuse, in `install`'s shape and with `install`'s code, because
+        # "point it at a path that does not exist and it refuses, naming the
+        # file" is already this product's documented answer. Exit 2 does not
+        # contend with R3's `1 > 2` precedence: nothing ran, so there is no
+        # self-test verdict for it to outrank.
+        if not target.exists():
+            print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "
+                  f"cannot read {target}: no such file")
+            print(f"  {DIM}target: {target}{RESET}\n")
+            sys.exit(2)
+        sources = [("config", target)]
+
+    report = (_run or _doc.run)(sources=sources)
+    rendered = _doc.render(report)
+
+    if getattr(args, "json", False):
+        print(json.dumps(rendered, indent=2))
+        sys.exit(rendered["exit_code"])
+
+    st = rendered["self_test"]
+    print()
+    if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
+        # The whole point of R-DOCTOR-R3c, in the one place an operator reads.
+        print(f"  {YELLOW}Self-test NOT RUN{RESET} "
+              f"{DIM}— this build has no live self-test, so nothing below is"
+              f" proof that a wrapped route mediates traffic.{RESET}")
+        for name in _doc.SELF_TEST_CHECKS:
+            print(f"    {DIM}{name}: NOT RUN{RESET}")
+    elif st["valid"]:
+        print(f"  {GREEN}Self-test PASSED{RESET} {DIM}{st['deadline']}{RESET}")
+    else:
+        klass = st["failure_class"] or "FAILED"
+        print(f"  {RED}Self-test {klass}{RESET} {DIM}{st['deadline']}{RESET}")
+        for name in st["failed"]:
+            print(f"    {RED}{name}: FAILED{RESET}")
+
+    print()
+    if rendered["inventory"]:
+        print(f"  {BOLD}Servers{RESET}")
+        for row in rendered["inventory"]:
+            name = row["name"] or "—"
+            detail = row.get("detail")
+            colour = GREEN if row["state"] == _doc.WRAPPED else DIM
+            line = f"    {colour}{row['state']:<10}{RESET} {name}  {DIM}({row['source']}){RESET}"
+            # An unreadable source is NAMED, never omitted: a file we could not
+            # open must not become, in a reader's head, a file with nothing in it.
+            print(line + (f"  {YELLOW}{detail}{RESET}" if detail else ""))
+    else:
+        print(f"  {DIM}No server entries found.{RESET}")
+
+    print()
+    print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
+    print()
+    sys.exit(rendered["exit_code"])
 
 
 def cmd_config(args):

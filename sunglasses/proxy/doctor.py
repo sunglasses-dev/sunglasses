@@ -20,12 +20,16 @@ front of us, which is not doubt, and R3 gives it precedence over both.
 
 WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: R1's live
 self-test spawns `sys.executable -m sunglasses.proxy` against a bundled echo
-server, and neither `sunglasses/proxy/__main__.py` nor that echo server exists
-on this branch. `default_self_test` and `default_launcher` therefore report
-failure with SELF_TEST_UNAVAILABLE and `run()` exits 1, which is the safe
-direction, a doctor that cannot demonstrate mediation must never imply it. They
-are the seam the real spawn lands in, and they are injectable so the decision
-logic above them is exercised today.
+server. Both artifacts EXIST on main since #168 -- this paragraph said they did
+not until 2026-09-21, which was true of the branch it was written on and stopped
+being true underneath it; an assertion of absence expires when the tree gains
+the thing. What is still absent is the spawn itself, which is 0.6.1's own row.
+`default_self_test` and `default_launcher` therefore still report failure, now
+with failure_class SELF_TEST_UNAVAILABLE and the five checks rendered NOT_RUN
+(R-DOCTOR-R3c), and `run()` exits 1, which is the safe direction: a doctor that
+cannot demonstrate mediation must never imply it. They are the seam the real
+spawn lands in, and they are injectable so the decision logic above them is
+exercised today.
 """
 from __future__ import annotations
 
@@ -76,6 +80,12 @@ SCHEMA = "SCHEMA"
 CONTROL_MUST_BE = "FAIL"
 CHECK_RESULTS = ("PASS", "FAIL", "SKIPPED")
 SELF_TEST_UNAVAILABLE = "SELF_TEST_UNAVAILABLE"
+# R-DOCTOR-R3c. OUR word about OUR build, and deliberately NOT in
+# CHECK_RESULTS: `_safe_checks` allowlists what an upstream process is allowed
+# to say about itself, and a spawned proxy that can report its own checks as
+# NOT_RUN can describe away a failure it just produced. This value is only ever
+# synthesised in `render`, from a class this module decided.
+NOT_RUN = "NOT_RUN"
 
 # The only details this report will ever print. An allowlist rather than a
 # string, because `detail` is the field a future caller reaches for when it has
@@ -173,9 +183,33 @@ def judge_self_test(checks, controls) -> SelfTestVerdict:
     rather than the control being noted and ignored.
     """
     controls = dict(controls or {})
+    checks = dict(checks or {})
     valid = self_test_valid(controls)
-    failed = [name for name in SELF_TEST_CHECKS
-              if dict(checks or {}).get(name) != "PASS"]
+    failed = [name for name in SELF_TEST_CHECKS if checks.get(name) != "PASS"]
+
+    # R-DOCTOR-R3c (T9, 2026-09-21). Nothing reported at all -- no checks AND
+    # no controls -- is an instrument that never ran, and it is a different
+    # fact from an instrument that ran and disagreed with us. Until this branch
+    # existed, `default_self_test`'s `(False, {})` fell through to SCHEMA with
+    # all five names in `failed_checks`, so every build without a live
+    # self-test told its operator that five checks had failed when not one of
+    # them had been performed. A name in `failed_checks` is an assertion that
+    # the check RAN and did not pass.
+    #
+    # The boundary is the controls, not the checks. A control is rigged to
+    # trip, so a run that produced controls is a run that happened, and a check
+    # missing from it is a real miss that stays SCHEMA. Absence is only ever
+    # the whole instrument.
+    #
+    # `ok` is untouched, so `process_exit_code` still returns 1 here:
+    # R-DOCTOR-R3a stands, a doctor that cannot demonstrate mediation must
+    # never imply it. The exit code was never the lie; the words were.
+    if not checks and not controls:
+        return SelfTestVerdict(ok=False,
+                               failed_checks=[],
+                               failure_class=SELF_TEST_UNAVAILABLE,
+                               controls_valid=False)
+
     cls = ""
     if failed:
         cls = DEADLINE if failed == ["deadline"] else SCHEMA
@@ -440,7 +474,14 @@ def render(report) -> dict:
     return {
         "self_test": {"valid": report.self_test_ok,
                       "controls": report.self_test_controls,
-                      "checks": report.self_test_checks,
+                      # R-DOCTOR-R3c. An empty dict renders as no information,
+                      # and a reader fills that in with whatever they already
+                      # believed. The five names carrying NOT_RUN say the true
+                      # thing out loud instead.
+                      "checks": ({name: NOT_RUN for name in SELF_TEST_CHECKS}
+                                 if report.self_test_failure_class
+                                 == SELF_TEST_UNAVAILABLE
+                                 else report.self_test_checks),
                       "failed": report.self_test_failed_checks,
                       "failure_class": report.self_test_failure_class,
                       "detail": (report.self_test_detail

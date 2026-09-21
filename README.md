@@ -758,18 +758,45 @@ sunglasses install github --config ~/some/other.json
 # Put it back. Byte-for-byte when the file has not changed since.
 sunglasses uninstall github
 
+# Ask what is actually wired. Reads ./.mcp.json and ~/.claude.json.
+sunglasses doctor
+
+# Or ask about one file only. --config SCOPES the read, it does not add to it.
+sunglasses doctor --config ~/some/other.json
+
+# The same report as JSON, for a script.
+sunglasses doctor --json
 ```
 
-**There is no `sunglasses doctor` command in this release.** The README showed
-one in a runnable block and argparse rejects it — the accepted commands are
-scan, check, info, firewall-hook, pin, init, receipts, demo, report, install,
-uninstall and config. What shipped is `sunglasses/proxy/doctor.py`: the R1
-judgment, R2 and R3 reconciled onto `install.py` (#180), with
-`tests/proxy/test_doctor_reconciled.py` and
-`tests/proxy/test_doctor_selftest.py` behind them. It is reachable by import
-only; no CLI path and no `python -m sunglasses.proxy doctor` subcommand exists.
-Wiring one is a product decision, not a documentation fix, so the line is
-removed rather than rewritten into a command that would still not run.
+**`doctor` tells you what is wired. It does not yet prove that a wrapped route
+mediates anything, and it says so on every run.** It reads your config,
+classifies each entry `WRAPPED` / `DIRECT` / `UNVERIFIED` against the recorded
+entry point and its digest, and names every source it could not open instead of
+omitting it. What it cannot do in this release is the live self-test — spawning
+the proxy against the bundled echo server — so it reports its five self-test
+checks as `NOT RUN` and **exits `1` on every machine**:
+
+```
+  Self-test NOT RUN — this build has no live self-test, so nothing below is
+  proof that a wrapped route mediates traffic.
+    initialized: NOT RUN
+    s1_forward_byte_equal: NOT RUN
+    ...
+
+  Servers
+    DIRECT     github  (config)
+
+  ROUTE_UNVERIFIED  exit 1
+```
+
+That exit `1` means *"I could not prove it"*, not *"your routes failed"*, and the
+report distinguishes the two in words. The alternative — reporting `0` because
+the config looked tidy — is the one sentence this tool must never say. A doctor
+that cannot demonstrate mediation must never imply it.
+
+Point `--config` at a file that does not exist and `doctor` refuses and names
+it, exactly as `install` does, rather than reporting "no server entries found"
+about a file that was never there.
 
 `install` keeps a copy of your original config and a record of what it changed,
 under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the
@@ -797,15 +824,22 @@ SUNGLASSES uses the same four codes everywhere: `0` clean, `1` a real failure,
 | code | meaning |
 |---|---|
 | `0` | every route it knows about is wrapped and every one passed a live check |
-| `1` | something it ran FAILED in front of it, or its own self-test failed |
+| `1` | something it ran FAILED in front of it, or its own self-test did not pass |
 | `2` | it could not open a config or a record. It names the file. |
 | `3` | **not installed, or not verifiable.** A fact, not a failure. |
 
-**`3` is the code you get on a machine where nothing is wired yet, and it is the
-right answer.** "I looked and nothing is protected" and "I could not look" are
+**`3` is the code for a machine where nothing is wired yet, and it is the right
+answer.** "I looked and nothing is protected" and "I could not look" are
 different facts from "everything is fine", and a tool that collapses them into
 `0` is telling you that you are safe because it did not check. `0` and `3` never
 mean the same thing here.
+
+**In this release you will not see `3` from `doctor`.** The live self-test is
+not built, `1` outranks everything, and so `1` is what every machine gets. The
+table is the ladder `doctor` applies, not a menu of codes this build can
+currently reach — and an unavailable self-test is reported as `NOT RUN` with no
+check marked failed, because "this wheel has no self-test" and "your self-test
+failed" are different facts too.
 
 A failed self-test is always `1`, whatever the rest of the report says, because
 an instrument that failed has no standing to report on anything else.
