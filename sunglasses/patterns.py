@@ -2500,6 +2500,15 @@ PATTERNS = [
     # this rule becomes a documentation shredder. Likewise a backtick: variant
     # C admitted one and picked up every README that documents an env var.
     #
+    # THE APOSTROPHE IS IN THE CLASS BECAUSE PYTHON'S OWN repr PUTS IT THERE.
+    # The class first read `["{[,` and `{'cfg':'PASSWORD=...'}` walked past it
+    # while the double-quoted twin blocked. `str(dict)` and `repr()` emit
+    # single quotes, so that is not an exotic evasion, it is the default
+    # formatting of the language this scanner is written in, and one of the
+    # commonest shapes a mapping reaches a log line or a tool result in. Added
+    # after measuring, not after review: the full 77-document sweep is
+    # unchanged at 0 documents and 0 decision flips either way.
+    #
     # THE KEY ALTERNATION IS CASE-SENSITIVE, via an inline `(?-i:...)` scope,
     # because the engine compiles every pattern with re.IGNORECASE and offers
     # no per-rule opt-out. This is load-bearing and was measured, not assumed.
@@ -2546,7 +2555,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
         "regex": [
-            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"{\[,])"
+            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="
             r"(?![ \t]*[\"']?[ \t]*"

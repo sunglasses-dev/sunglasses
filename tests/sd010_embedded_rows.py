@@ -107,6 +107,13 @@ MUST_FIRE["variable_prefix_then_a_real_value"] = (
 MUST_FIRE["bare_dollar_identifier_still_fires"] = '{"cfg":"API_KEY=$FOO"}'
 
 
+# Python's own repr. `str(dict)` and `repr()` emit single quotes, so a mapping
+# that reaches a log line or a tool result normally looks like this rather than
+# like JSON. The boundary class read `"` and not `'` until 2026-09-21 and this
+# shape walked straight past it while its double-quoted twin blocked.
+MUST_FIRE["single_quoted_python_dict"] = "{'cfg':'PASSWORD=" + PW + "'}"
+
+
 # ── the exclusion's disclosed cost ──────────────────────────────────────────
 #
 # The placeholder exclusion reads the VALUE, and no test of value shape can

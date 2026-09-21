@@ -210,7 +210,7 @@ def test_control_a_bare_space_boundary_makes_the_prose_twin_fire():
     Adding one to the boundary class is the smallest possible widening, and it
     is enough to block a sentence that merely names a variable.
     """
-    widened = _rule_regex().replace(r"[\"{\[,]", r"[\"{\[, ]")
+    widened = _rule_regex().replace(r"[\"'{\[,]", r"[\"'{\[, ]")
     assert widened != _rule_regex(), "the boundary class is not where it was"
     e = _mutate(**{RULE: widened})
     _, ids = _ids(e, rows.BENIGN["prose_a_space_is_not_a_boundary"])
@@ -310,3 +310,19 @@ def test_the_fp_corpus_document_stays_clean(engine):
         f"{RULE} fired on the document that licenses it. Every project README "
         f"that documents an environment variable looks like this.")
     assert decision == "allow", f"the document no longer scans clean: {ids}"
+
+
+def test_control_removing_the_apostrophe_makes_pythons_own_repr_walk_past():
+    """The apostrophe in the boundary class is load-bearing, proven by removal.
+
+    `str(dict)` and `repr()` emit single quotes. With only `"` in the class the
+    JSON twin blocks and the Python twin does not, which is the shape the rule
+    is likeliest to meet in a real log line.
+    """
+    narrowed = _rule_regex().replace(r"[\"'{\[,]", r"[\"{\[,]")
+    assert narrowed != _rule_regex(), "the boundary class no longer holds an apostrophe"
+    e = _mutate(**{RULE: narrowed})
+    _, ids = _ids(e, rows.MUST_FIRE["single_quoted_python_dict"])
+    assert RULE not in ids, (
+        "removing the apostrophe did NOT make the single-quoted dict walk past "
+        "the rule, so that row is not guarding the boundary class.")
