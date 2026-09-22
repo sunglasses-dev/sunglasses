@@ -237,6 +237,22 @@ def _check_value(name, value):
         for rule_id in value:
             if not isinstance(rule_id, str) or not _RULE_ID.match(rule_id):
                 raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
+    elif name == "detector_status":
+        # THE FIELD WAS PERMITTED AND NEVER ONCE USED -- before this change it
+        # appeared exactly once in the whole repository, in the allowlist above.
+        # So the first emitter also defines what may go in it, and defining that
+        # is this branch. The vocabulary is deliberately THREE values and not
+        # seven: no-output, two-outputs, unparseable and not-an-object all mean
+        # "look at the worker", and a vocabulary is easier to widen later than
+        # to narrow once receipts on disk use it.
+        #
+        # The three live in two modules by necessity, so they are named here
+        # rather than imported from one: `worker_process` cannot know about
+        # `schema_invalid` (validation happens after it builds a fault) and
+        # `route` cannot know about a crash (it never sees the pipe).
+        if value not in ("crashed", "malformed_output", "schema_invalid"):
+            raise ValueError(
+                f"detector_status {value!r} is not a worker fault cause")
     elif name == "id_token":
         # R-T903-1 (T9, 2026-09-14 10:24). The MINTED grammar, not merely a
         # string. `session._item_token` produces sixteen lowercase hex

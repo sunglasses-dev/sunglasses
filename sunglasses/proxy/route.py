@@ -36,6 +36,15 @@ UPSTREAM = "upstream"
 REQUEST = "request"
 RESULT = "result"
 
+# THE THIRD CAUSE, AND IT LIVES HERE BECAUSE IT CANNOT LIVE WITH THE OTHER TWO.
+# `worker_process` labels a fault `crashed` or `malformed_output` at the moment
+# it builds one. It cannot label this one: at that moment the result has not
+# been validated, and validation happens below, after `worker.validate`. Putting
+# all three in one enum in one module would leave a value that module could
+# never emit -- and nobody would notice, because an unset cause and an absent
+# one look identical in a receipt.
+CAUSE_SCHEMA_INVALID = "schema_invalid"
+
 REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
@@ -466,6 +475,12 @@ class Route:
                             held_content_bytes=held_bytes,
                             catalog=self.catalog)
         except worker.Invalid:
+            # The scan DID produce a result; it did not fit the contract. That
+            # is a different fact from a worker that died or printed nonsense,
+            # and all three reached the client as one word before this.
+            self._record("SCAN_RESULT", accepted=False, status="exception",
+                         inspection_complete=False,
+                         detector_status=CAUSE_SCHEMA_INVALID)
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False)
 
@@ -946,6 +961,9 @@ class Route:
             # T4.R2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
+            self._record("SCAN_RESULT", accepted=False, status="exception",
+                         inspection_complete=False,
+                         detector_status=CAUSE_SCHEMA_INVALID)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
                                   RULE_RESOURCE, attempt=attempt)
             return
