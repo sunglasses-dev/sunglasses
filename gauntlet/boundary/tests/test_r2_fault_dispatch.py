@@ -468,6 +468,14 @@ def test_g2_10_through_the_real_batch_path_is_not_refused(tmp_path):
         finally:
             Destination.start = start
 
+        if row.get("refused"):
+            # `malformed_hook_output` is refused by name: its target is a
+            # component this harness does not compose. That refusal has its own
+            # row below; here it simply is not a dispatcher question.
+            checked[variant["name"]] = "refused_by_name"
+            shutil.rmtree(root, ignore_errors=True)
+            continue
+
         try:
             run_dir = pathlib.Path(row["run_dir"])
             record = run_dir / "materialised.fault.json"
@@ -486,7 +494,11 @@ def test_g2_10_through_the_real_batch_path_is_not_refused(tmp_path):
 
     assert set(checked) == {"invalid_json", "invalid_result_shape",
                             "malformed_hook_output"}, checked
-    assert set(checked.values()) == {"not_refused"}, checked
+    # The two upstream_stdout variants drive and the dispatcher lets them
+    # through; the hook one never reaches the dispatcher at all.
+    assert checked["invalid_json"] == "not_refused", checked
+    assert checked["invalid_result_shape"] == "not_refused", checked
+    assert checked["malformed_hook_output"] == "refused_by_name", checked
 
 
 def test_an_unparseable_frame_holds_nothing_and_is_not_keyed(tmp_path):
@@ -511,3 +523,80 @@ def test_an_unparseable_frame_holds_nothing_and_is_not_keyed(tmp_path):
         b'"text":"hello"}]}}\n')
     held = batch._held_inspection_input(run_dir, "result")
     assert held is not None and "hello" in held, held
+
+
+def test_a_fault_against_a_component_this_harness_lacks_is_refused_by_name(tmp_path):
+    """G2-10.malformed_hook_output aims at `hook_stdout`, and there is no hook.
+
+    Measured: `mcp_config` composes exactly two things, a proxy and an
+    upstream; `HOOK_COMPARISON_SEEDS` is an alias for the control scope and
+    selects no hook route; the routes are `proxy_strict` and `control`. So the
+    component that fault names does not exist in this instrument.
+
+    Running it anyway produces a clean verdict about a session in which the
+    declared fault never happened — the same defect the dispatcher was written
+    to fix. Refused by name is the honest answer, and a refused row is
+    recoverable in a way a wrong row is not.
+    """
+    import shutil
+    import uuid
+    import runner
+    from destination.sink import Destination
+
+    entry = next(e for e in runner.load_manifest()["scenarios"]
+                 if e["id"] == "G2-10")
+    states = {}
+    for variant in runner.scenario_of(entry)["variants"]:
+        root = pathlib.Path("/private/tmp") / f"hook-{uuid.uuid4().hex[:10]}"
+        start = Destination.start
+        Destination.start = lambda self: "file:///dev/null"
+        try:
+            row = batch.run_one(
+                entry, variant, outdir=root, route="proxy_strict",
+                engine_root=pathlib.Path(__file__).resolve().parents[3],
+                upstream_argv=[sys.executable], ledger=None,
+                dry_run=True, call_no=0)
+            states[variant["name"]] = row.get("refused")
+        finally:
+            Destination.start = start
+            shutil.rmtree(root, ignore_errors=True)
+
+    assert states["malformed_hook_output"] == "uninjectable_fault_target", states
+    # THE OTHER TWO STILL RUN. Their target is `upstream_stdout`, which needs no
+    # injector because the seed carries the malformed bytes and the replay emits
+    # them verbatim. A refusal that swallowed these would be the false kill this
+    # check exists to avoid.
+    assert states["invalid_json"] is None, states
+    assert states["invalid_result_shape"] is None, states
+
+
+def test_the_scanner_targeted_scenarios_are_not_refused(tmp_path):
+    """The control for the row above, on the six that DO have an injector."""
+    import shutil
+    import uuid
+    import runner
+    from destination.sink import Destination
+
+    refused = {}
+    for scenario_id in ("G2-08", "G2-09", "G2-11"):
+        entry = next(e for e in runner.load_manifest()["scenarios"]
+                     if e["id"] == scenario_id)
+        for name in ("request", "result"):
+            variant = next(v for v in runner.scenario_of(entry)["variants"]
+                           if v["name"] == name)
+            root = pathlib.Path("/private/tmp") / f"sc-{uuid.uuid4().hex[:10]}"
+            start = Destination.start
+            Destination.start = lambda self: "file:///dev/null"
+            try:
+                row = batch.run_one(
+                    entry, variant, outdir=root, route="proxy_strict",
+                    engine_root=pathlib.Path(__file__).resolve().parents[3],
+                    upstream_argv=[sys.executable], ledger=None,
+                    dry_run=True, call_no=0)
+                refused[f"{scenario_id}.{name}"] = row.get("refused")
+            finally:
+                Destination.start = start
+                shutil.rmtree(root, ignore_errors=True)
+
+    assert set(refused.values()) == {None}, refused
+    assert len(refused) == 6, refused
