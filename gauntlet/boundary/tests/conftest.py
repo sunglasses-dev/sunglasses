@@ -24,6 +24,7 @@ Verified at build time: ASTRA's `source/gauntlet/boundary` is byte identical to
 """
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import sys
 
@@ -38,8 +39,21 @@ _EXAMS = sorted((pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026
 EXAM = _EXAMS[-1] if _EXAMS else (
     pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
     / "GATE2_FIT_0ba36c8_2026-09-13")
-LIVE = pathlib.Path("/private/tmp") / "GATE2_FIT_LIVE"
 REPO = pathlib.Path(__file__).resolve().parents[3]
+
+# ONE LIVE ROOT PER CHECKOUT, not one for the machine. This was a fixed path,
+# and the tree under it persists between runs while `source` below is only
+# created when it is ABSENT. So the first worktree to build it won: every other
+# checkout that ran afterwards inherited a `source` pointing at the first one's
+# code and ran the exam against a tree it was not testing, reporting the result
+# under its own branch's name. That is the failure this file's own COPIED
+# comment describes, arrived at from the other direction, and eighty-one
+# worktrees share this repository.
+#
+# Keyed by the checkout path so two of them cannot collide, and short so the
+# directory stays readable in a traceback.
+LIVE = (pathlib.Path("/private/tmp") /
+        ("GATE2_FIT_LIVE-" + hashlib.sha256(str(REPO).encode()).hexdigest()[:12]))
 
 # Written by the exam, never read from it. Anything else is ASTRA's and is
 # linked rather than copied so it cannot be edited by accident.
@@ -81,7 +95,15 @@ def _build_live_root() -> pathlib.Path | None:
             continue
         target.symlink_to(item)
 
+    # RE-POINTED IF IT IS WRONG, never merely created if it is missing. The
+    # per-checkout root above should make a stale one impossible; this is the
+    # assertion that it did, and it costs a readlink. A `source` pointing
+    # somewhere else means the whole exam runs against another tree while
+    # appearing to run against this branch, which is the single most expensive
+    # way this harness can be wrong and the hardest to see in a green run.
     source = LIVE / "source"
+    if source.is_symlink() and source.readlink() != REPO:
+        source.unlink()
     if not source.is_symlink():
         source.symlink_to(REPO)
 
