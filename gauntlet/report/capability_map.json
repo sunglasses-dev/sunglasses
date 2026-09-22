@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-22-f",
+ "revision": "2026-09-22-h",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -197,17 +197,22 @@
   },
   "assert_no_second_forward_and_no_pending_overwrite": {
    "bucket": "route_capability",
-   "basis": "reviewed_ruling",
+   "basis": "executed_witness",
    "ruled_by": "T8",
    "ruled_at": "2026-09-22",
-   "evidence": "ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both.",
+   "evidence": "WITNESS 2b. G2-20.duplicate_pending driven on proxy_strict AFTER the harness mediator was made to mirror the product: exactly one forward for id 2002, none forwarded twice, one ADMISSION_REFUSED naming duplicate_pending_id, and SETTLED MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING with forwarded=false. The subject comes from the REUSED ID and not from payload content, which is why it arrives even though these requests carry nothing inspectable. ADAPTER AGAINST HARNESS: this says the harness now behaves as T8 measured the product behaving, NOT that the product does. ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both.",
    "executed_attempt": {
     "run_id": "d728bee81e860d7f",
     "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.json",
     "outcome": "NO SUBJECT \u2014 not a pass and not a failure",
     "detail": "Driven end to end on G2-20.duplicate_pending. The scenario's precondition never arises in this harness: the requests carry `arguments: {}`, so the mediator records NO_INSPECTABLE_CONTENT, never holds (HOLD_ENTERED held=false) and writes no RPC_EGRESS. With nothing pending there is nothing for the property to be true of. The first version of this assertion returned held=true on that emptiness, which is the vacuous pass this harness keeps finding in itself; it now reports subject=false.",
-    "separate_harness_gap": "Not exercised by this run: passthrough.py assigns `self._pending[request_id] = handle` unconditionally with no duplicate check, where the product refuses with ADMISSION_REFUSED duplicate_pending_id and tears down. Even given a held request, this harness would not reproduce the product's behaviour."
-   }
+    "separate_harness_gap": "Not exercised by this run: passthrough.py assigns `self._pending[request_id] = handle` unconditionally with no duplicate check, where the product refuses with ADMISSION_REFUSED duplicate_pending_id and tears down. Even given a held request, this harness would not reproduce the product's behaviour.",
+    "superseded_by": "witness 2b, run 0a38cebd95ebe37b. Kept, not replaced: subject=false was the true state of the harness before the mirror, and a record that quietly becomes a pass hides that the instrument changed."
+   },
+   "run_id": "0a38cebd95ebe37b",
+   "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.2b.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness"
   },
   "assert_secondary_and_reverse_complete_independently": {
    "bucket": "route_capability",

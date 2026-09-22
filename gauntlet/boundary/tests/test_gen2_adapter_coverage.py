@@ -83,7 +83,10 @@ def test_the_operations_this_adapter_implements_are_written_down():
         # carries the caveat that independence holds for DISTINCT ids only.
         "arm_fault",
         "assert_no_second_forward_and_no_pending_overwrite",
-        "assert_secondary_and_reverse_complete_independently"})
+        "assert_secondary_and_reverse_complete_independently",
+        # The other half of arm_fault: a schedule that can arm and
+        # not release is one that can only hang.
+        "release_fault_barrier"})
 
 
 def test_the_events_this_adapter_can_answer_are_written_down():
@@ -158,13 +161,13 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
         k: len(v) for k, v in counted.items()}
     # 27, measured. It was 19 before the four assertion steps, which were chosen
     # because the sweep said those four unlock the most for the least.
-    assert len(drivable) == 28, sorted(drivable)
+    assert len(drivable) == 29, sorted(drivable)
     # The four G2-21 variants whose remaining blocker is an event, not an op.
     # 5 now, not 4: implementing `arm_fault` unmasked another variant whose
     # remaining blocker is an event, which is the same mask this ledger was
     # rewritten for. The operation check always fires first.
     assert len(event_refused) == 5, sorted(event_refused)
-    assert len(refused) == 41, len(refused)
+    assert len(refused) == 40, len(refused)
     assert "answer_relist" in missing_ops, sorted(missing_ops)
     assert not (missing_ops & adapter.IMPLEMENTED), (
         "an operation cannot be both implemented and missing")

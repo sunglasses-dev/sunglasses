@@ -1,0 +1,64 @@
+{
+ "witness": "G2-20.duplicate_pending",
+ "route": "proxy_strict",
+ "supersedes": null,
+ "beside": "G2-20.duplicate_pending.proxy_strict.json (witness #2, subject absent)",
+ "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+ "witness_class": "adapter-against-harness",
+ "executor": "gauntlet/boundary/gen2/execute.py run()",
+ "steps": [
+  "arm_fault",
+  "send_file",
+  "await_event",
+  "send_file",
+  "assert_no_second_forward_and_no_pending_overwrite"
+ ],
+ "assertions": [
+  {
+   "op": "arm_fault",
+   "kind": "request_worker",
+   "target": "scanner_worker",
+   "require_fresh_barrier": true,
+   "scanner_mode": "barrier",
+   "held": true
+  },
+  {
+   "op": "await_event",
+   "event": "HOLD_ENTERED",
+   "actor": "proxy",
+   "id": 2002,
+   "held": false,
+   "deadline_ms": 3000,
+   "seq": null
+  },
+  {
+   "op": "assert_no_second_forward_and_no_pending_overwrite",
+   "forwarded_per_id": {
+    "2002": 1
+   },
+   "forwarded_twice": {},
+   "admission_refusals": [
+    "duplicate_pending_id"
+   ],
+   "subject": true,
+   "held": true,
+   "why": null
+  }
+ ],
+ "receipt_kinds": {
+  "UPSTREAM_STARTED": 1,
+  "RUN_CONFIGURATION": 1,
+  "RPC_INGRESS": 5,
+  "NO_INSPECTABLE_CONTENT": 3,
+  "ADMISSION_REFUSED": 1,
+  "SETTLED": 1,
+  "RPC_EGRESS": 1,
+  "PUMP_CLOSED": 2,
+  "UPSTREAM_CLOSED": 1
+ },
+ "what_changed_since_witness_2": "The harness mediator now mirrors the product: a request whose id is still pending is refused with ADMISSION_REFUSED duplicate_pending_id and settled MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and the pending entry the first request owns is never overwritten. Witness #2 recorded subject=false because nothing was pending; the subject comes from the REUSED ID, not from payload content, so it arrives without the request needing anything inspectable.",
+ "what_this_witnesses": "The property HOLDS with a subject present: exactly one forward for id 2002, none forwarded twice, one admission refusal naming duplicate_pending_id.",
+ "what_this_does_NOT_witness": "Anything about the shipped route. This is the gauntlet's own passthrough, mirroring the product's behaviour because T8 measured it there; the witness says the harness now behaves as the product does, not that the product does. HOLD_ENTERED still reports held=false: the requests carry no inspectable content, so nothing is ever held, and that is unchanged.",
+ "recorded_at": "2026-09-22T22:17:04.971312+00:00",
+ "run_id": "0a38cebd95ebe37b"
+}
