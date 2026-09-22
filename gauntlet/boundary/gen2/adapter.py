@@ -58,6 +58,10 @@ IMPLEMENTED = frozenset({
     # because a client id reused while pending is a deliberate teardown.
     "assert_no_second_forward_and_no_pending_overwrite",
     "assert_secondary_and_reverse_complete_independently",
+    # The other half of `arm_fault`'s barrier: the worker waits on a release
+    # file and this creates it. Implemented with arm_fault, because a schedule
+    # that can arm and not release is one that can only hang.
+    "release_fault_barrier",
 })
 
 # THE EVENTS THIS MEDIATOR ACTUALLY EMITS, of the seven the contract names.

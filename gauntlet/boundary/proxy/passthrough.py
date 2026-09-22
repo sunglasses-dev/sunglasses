@@ -556,9 +556,44 @@ class Passthrough:
         if accepted is not None:
             accepted.set()
 
-    def expect_upstream(self, request_id) -> None:
+    def expect_upstream(self, request_id) -> bool:
+        """Admit a request, or REFUSE one whose id is still pending.
+
+        Mirrored from the product, which is the only reason it is here.
+        `sunglasses/proxy/session.py` refuses a request whose id is already in
+        `_owed` with ADMISSION_REFUSED reason `duplicate_pending_id`, tears down
+        MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the
+        assignment so the entry the first request owns is never replaced.
+
+        This wrote `self._awaiting_upstream[request_id] = time.time()`
+        unconditionally, so a duplicate silently overwrote that entry — the
+        exact overwrite G2-20.duplicate_pending exists to catch, in the
+        instrument meant to catch it.
+
+        PENDING IS THE CONDITION, not "seen before": once the upstream has
+        answered, `upstream_answered` drops the id and a later request may carry
+        it. And a DISTINCT id is a different request and is still admitted; a
+        refusal that fired on every second request would refuse every healthy
+        session while still looking green against the duplicate.
+        """
         with self._lock:
-            self._awaiting_upstream[request_id] = time.time()
+            duplicate = request_id in self._awaiting_upstream
+            if not duplicate:
+                self._awaiting_upstream[request_id] = time.time()
+        if duplicate:
+            self._emit("ADMISSION_REFUSED", request_id,
+                       reason="duplicate_pending_id")
+            # `cause`, not `kind`: `_emit(self, kind, request_id, **fields)`
+            # takes the event kind positionally, so a `kind=` keyword is a
+            # duplicate argument. The product calls this field the Cause's kind.
+            self._emit("SETTLED", request_id, reason="MALFORMED_CLIENT",
+                       cause="ID_REUSED_WHILE_PENDING", forwarded=False,
+                       terminated=False, inspection_complete=False,
+                       finding=False, detector=None, detector_status=None,
+                       elapsed_ms=0.0, inspected_utf8_bytes=0,
+                       observed_content_bytes=0)
+            return False
+        return True
 
     def upstream_answered(self, request_id) -> None:
         with self._lock:
@@ -1038,7 +1073,24 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                     _write(sink, raw)
                 continue
             if direction == "request" and message.get("method"):
-                proxy.expect_upstream(request_id)
+                if not proxy.expect_upstream(request_id):
+                    # REFUSED, so nothing is forwarded and the client is told.
+                    # The scenario's expectation for this shape is `not_run` /
+                    # MALFORMED_CLIENT / bytes replaced, which is what a refusal
+                    # before inspection produces: no worker starts, no frame
+                    # goes upstream, and the client gets a replacement.
+                    deliver(sink, raw, Outcome(
+                        request_id=request_id, direction=direction,
+                        forwarded=False,
+                        reason_code="MALFORMED_CLIENT",
+                        inspection_complete=False,
+                        inspected_utf8_bytes=0,
+                        replacement=proxy._withheld(
+                            request_id, "MALFORMED_CLIENT", 0.0, "",
+                            inspection_complete=False, inspected=0,
+                            observed=0)),
+                        direction)
+                    continue
             elif direction == "result":
                 proxy.upstream_answered(request_id)
             # MODEL_BOUND_TOOLS USED TO BE EMITTED HERE, before the message had

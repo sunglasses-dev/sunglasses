@@ -455,6 +455,32 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
             copies = _count_copies(reference, arrived)
             assertions.append({"op": op, "path": step["path"], "copies": copies,
                                "held": copies == 0, "basis": route})
+        elif op == "release_fault_barrier":
+            # THE FILE THE WORKER IS WAITING ON. `fault_worker.py barrier` spins
+            # until this path exists, and `arm_fault` above named it, so the
+            # release is a one-line fact rather than a signal to guess at.
+            #
+            # RECORDED AS WHETHER THE BARRIER WAS ACTUALLY THERE. Creating the
+            # file unconditionally and calling it released would be true of a
+            # session that never armed one, which is the vacuous pass this file
+            # has now been bitten by twice.
+            release = run_root / "fault.release"
+            armed_barrier = any(
+                st.get("op") == "arm_fault"
+                and st.get("target") == "scanner_worker"
+                and st.get("require_fresh_barrier")
+                for st in steps)
+            if armed_barrier:
+                release.touch()
+            assertions.append({
+                "op": op, "path": release.name,
+                "armed": armed_barrier,
+                "released": release.is_file(),
+                "held": armed_barrier and release.is_file(),
+                "why": None if armed_barrier else (
+                    "no barrier was armed in this schedule, so there was "
+                    "nothing to release")})
+
         elif op == "arm_fault":
             # RECORDED, not re-done. The mode was chosen before the session
             # started; this row says what was armed so a reader of the
@@ -523,7 +549,15 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                 "distinct_ids": distinct,
                 "reused_ids": reused,
                 "scope": "distinct ids only; a reused pending id is a deliberate NO",
-                "held": bool(distinct) and not reused})
+                # SAME THREE-WAY ANSWER as the row above. No settlement at all
+                # is not a failure of independence, it is an absent subject, and
+                # reporting it as `held: false` would send a reader looking for
+                # a correlation bug that did not happen.
+                "subject": bool(by_id),
+                "held": (not reused) if by_id else None,
+                "why": None if by_id else (
+                    "the mediator settled nothing in this run, so there are no "
+                    "completions for independence to be a property of")})
 
         elif op == "release_any_old_workers":
             # WHAT THE MEDIATOR RECORDS, not what this adapter hopes.
