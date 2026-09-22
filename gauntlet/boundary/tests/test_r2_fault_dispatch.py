@@ -305,3 +305,82 @@ def test_a_record_disagreeing_with_the_materialised_bytes_is_refused(tmp_path):
     assert fault_dispatch.declared_fault(run_dir, HELD) is None
 
 
+
+
+# ── DECLARED BUT NOT INJECTABLE ─────────────────────────────────────────────
+# Twelve of the delivery's thirteen declared kinds reach this branch. None is a
+# crash mode: they name the SHAPE of a scanner's output or a stage to fail at,
+# and the worker implements three faults. The dispatcher used to answer both
+# "no fault declared" and "a fault I cannot inject" with an ordinary scan, and
+# the row still produced a verdict.
+
+UNINJECTABLE = ["worker_missing_axes", "worker_false_string",
+                "worker_conflicting_allow", "queue_before_worker",
+                "writer_before_first_byte", "receipt_worker", "result_worker"]
+
+
+@pytest.mark.parametrize("kind", UNINJECTABLE)
+def test_a_declared_kind_this_worker_cannot_inject_is_still_reported(tmp_path, kind):
+    """`declared_fault` says None for it, and None is the same word it uses for
+    a payload that declares nothing at all. `declared_kind` tells them apart."""
+    run_dir = _run_dir(tmp_path, kind)
+    assert fault_dispatch.declared_fault(run_dir, HELD) is None
+    assert fault_dispatch.declared_kind(run_dir, HELD) == kind
+
+
+def test_nothing_declared_is_not_reported_as_a_declared_kind(tmp_path):
+    """The control. If this returned a kind, the refusal below would fire on
+    every ordinary scan and the dispatcher would be the outage."""
+    clean = tmp_path / "clean"
+    clean.mkdir()
+    assert fault_dispatch.declared_kind(clean, HELD) is None
+    # And a record that names a DIFFERENT document is not this payload's.
+    assert fault_dispatch.declared_kind(_run_dir(tmp_path, "hang"), OTHER) is None
+
+
+def test_an_uninjectable_declared_fault_refuses_instead_of_scanning(tmp_path):
+    """A missing row is recoverable. A wrong row is not.
+
+    Running the ordinary scan here answers the scenario's question with a
+    session that never had the fault in it, which is the finding this file was
+    written to fix, quoted in its own docstring.
+    """
+    run_dir = _run_dir(tmp_path, "worker_false_string")
+    completed = subprocess.run(
+        [sys.executable, str(pathlib.Path(fault_dispatch.__file__)),
+         "--run-dir", str(run_dir), "--channel", "api_response"],
+        input=HELD.encode(), capture_output=True)
+
+    assert completed.returncode == 3, (completed.returncode, completed.stderr[-400:])
+    assert b"worker_false_string" in completed.stderr, completed.stderr[-400:]
+    # It must not have quietly run the scan it could not justify.
+    assert not list(run_dir.glob("fault.*.started")), "a worker was started anyway"
+
+
+def test_narrowing_the_modes_refuses_rather_than_running_something_else(tmp_path):
+    """`--modes` is the operator saying what this session may inject. Asking for
+    less than the scenario needs is a configuration error, not a licence to run
+    the scenario unfaulted."""
+    run_dir = _run_dir(tmp_path, "barrier_hold")
+    completed = subprocess.run(
+        [sys.executable, str(pathlib.Path(fault_dispatch.__file__)),
+         "--run-dir", str(run_dir), "--channel", "api_response",
+         "--modes", "exception"],
+        input=HELD.encode(), capture_output=True)
+
+    assert completed.returncode == 3, (completed.returncode, completed.stderr[-400:])
+    assert b"barrier" in completed.stderr, completed.stderr[-400:]
+
+
+def test_an_ordinary_scan_still_runs_when_nothing_is_declared(tmp_path):
+    """The regression guard for the refusal above: the dispatcher runs on EVERY
+    scan of every mediated route, and most of them declare no fault at all."""
+    clean = tmp_path / "clean"
+    clean.mkdir()
+    completed = subprocess.run(
+        [sys.executable, str(pathlib.Path(fault_dispatch.__file__)),
+         "--run-dir", str(clean), "--channel", "api_response"],
+        input=HELD.encode(), capture_output=True)
+
+    assert completed.returncode != 3, completed.stderr[-400:]
+    assert b"cannot inject" not in completed.stderr
