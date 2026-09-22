@@ -1,6 +1,6 @@
 {
   "id": "GLS-TMS-234-API",
-  "name": "Tool metadata smuggling \u2014 metadata authority override (api_response)",
+  "name": "Metadata smuggling: authority override (api_response)",
   "version": "1.0",
   "category": "tool_metadata_smuggling",
   "severity": "high",

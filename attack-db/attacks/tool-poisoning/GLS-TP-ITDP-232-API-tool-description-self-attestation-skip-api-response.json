@@ -1,6 +1,6 @@
 {
   "id": "GLS-TP-ITDP-232-API",
-  "name": "Tool description self-attestation skip independent review (api_response)",
+  "name": "Tool description self-attestation skip (api_response)",
   "version": "1.0",
   "category": "tool_poisoning",
   "severity": "high",

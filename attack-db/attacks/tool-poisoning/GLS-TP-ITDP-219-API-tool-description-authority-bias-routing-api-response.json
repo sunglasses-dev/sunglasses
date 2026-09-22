@@ -1,6 +1,6 @@
 {
   "id": "GLS-TP-ITDP-219-API",
-  "name": "Tool description authority bias for sensitive action routing (api_response)",
+  "name": "Tool description authority bias routing (api_response)",
   "version": "1.0",
   "category": "tool_poisoning",
   "severity": "high",

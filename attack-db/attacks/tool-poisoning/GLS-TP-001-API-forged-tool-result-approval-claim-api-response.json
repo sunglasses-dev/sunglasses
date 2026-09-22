@@ -1,6 +1,6 @@
 {
   "id": "GLS-TP-001-API",
-  "name": "Forged tool-result claim of completed review/approval (api_response)",
+  "name": "Forged tool-result approval claim (api_response)",
   "version": "1.0",
   "category": "tool_poisoning",
   "severity": "high",

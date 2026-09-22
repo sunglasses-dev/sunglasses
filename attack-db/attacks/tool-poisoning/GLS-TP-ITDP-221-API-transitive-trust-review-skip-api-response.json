@@ -1,6 +1,6 @@
 {
   "id": "GLS-TP-ITDP-221-API",
-  "name": "Transitive trust review skip via upstream validation claim (api_response)",
+  "name": "Transitive trust review skip (api_response)",
   "version": "1.0",
   "category": "tool_poisoning",
   "severity": "high",

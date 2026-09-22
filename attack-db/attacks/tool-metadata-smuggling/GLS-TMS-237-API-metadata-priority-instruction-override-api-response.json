@@ -1,6 +1,6 @@
 {
   "id": "GLS-TMS-237-API",
-  "name": "Authoritative Metadata Priority Instruction Override (api_response)",
+  "name": "Metadata priority instruction override (api_response)",
   "version": "1.0",
   "category": "tool_metadata_smuggling",
   "severity": "high",

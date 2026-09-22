@@ -1,6 +1,6 @@
 {
   "id": "GLS-TP-ITDP-252-API",
-  "name": "Tool poisoning / ITDP \u2014 compliance pretext redaction bypass (api_response)",
+  "name": "Compliance pretext redaction bypass (api_response)",
   "version": "1.0",
   "category": "tool_poisoning",
   "severity": "high",
