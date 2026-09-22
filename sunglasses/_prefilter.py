@@ -358,7 +358,20 @@ class Clause:
         return item in self.literals
 
     def __repr__(self):
-        return f"Clause(literals={sorted(self.literals)[:3]}, classes={list(self.classes)})"
+        # THE COUNT IS PART OF THE TRUTH. This printed only the first three
+        # literals, so a clause holding seven read as three and looked like a
+        # prefilter that should have skipped a document it had correctly run.
+        # That nearly became a reported engine bug during the ENC-ALT-210
+        # measurement (2026-09-13): the requirement PRINTS as
+        # ['apply','base64','convert'] while also holding 'decode', which was
+        # in the document and is exactly why `can_skip` was correctly False.
+        # A repr that silently truncates is a repr that misleads whoever is
+        # debugging; if you are deciding from it, call `has_literal` /
+        # `can_skip` directly -- but it should not invite the mistake.
+        shown = sorted(self.literals)[:3]
+        more = len(self.literals) - len(shown)
+        lits = f"{shown}{f' +{more} more' if more > 0 else ''}"
+        return f"Clause(literals={lits}, classes={list(self.classes)})"
 
 
 def pages_of(text: str) -> frozenset:
