@@ -48,6 +48,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import wave
 import zipfile
 import zlib
@@ -663,6 +664,106 @@ def _console_cmd():
         else:
             _CONSOLE_CMD = [sys.executable, "-c", _CONSOLE_BODY]
     return list(_CONSOLE_CMD)
+
+
+# THE GUARD ABOVE ANSWERS "WHOSE CODE", AND NOTHING ANSWERED "WHICH INTERPRETER".
+#
+# `_console_script_is_under_test` exists so this leg cannot quietly grade a
+# stale install. It clears `cwd` so the worktree is off `sys.path` -- and it
+# does not clear PYTHONPATH, which is exactly how this suite is run from a
+# checkout. So a pipx `sunglasses` imports the worktree package through
+# PYTHONPATH and the guard answers, honestly, "same file". The CODE under test
+# really did run.
+#
+# What ran it was a different interpreter, and that interpreter had none of the
+# OPTIONAL media extras. Every matrix row whose fixture needs image or PDF
+# extraction then scans INCOMPLETE and exits 3 where the matrix expects 1, so
+# the developer sees eight exit-code mismatches spread over two files and not
+# one word about `pyzbar`. CI never sees it: it installs `.[dev,media]` into the
+# same interpreter it tests with.
+#
+# This is the Sep-09 "three sunglasses installs" trap in a new costume -- a
+# checkout, a `~/.local/bin` install and a fresh venv, with `which` and
+# `__file__` both answering by cwd and PATH rather than by provenance. That
+# round's own note records console cells silently skipping when PATH was not
+# pinned to the venv. The lesson there was to make provenance PROVABLE, so this
+# probe states the missing piece by name instead of letting the rows argue
+# about exit codes.
+#
+# It FAILS, it does not skip. A skip here would remove the console leg from the
+# run on the very machines where it is misconfigured, which is a check that
+# turns itself off exactly when it has something to say.
+_MEDIA_EXTRAS = ("PIL", "pyzbar", "pytesseract", "PyPDF2")
+
+
+def _console_interpreter(cmd):
+    """The python BEHIND a console command, which is not `cmd[0]`.
+
+    First version passed `-c` to `cmd[0]`, and on this machine `cmd[0]` is the
+    console SCRIPT -- so the scanner's own argument parser answered, with
+    `invalid choice: "import importlib..."`. The probe reported that as a
+    failure rather than as "nothing missing", which is the only reason it was
+    not a silent green.
+    """
+    if cmd[0] == sys.executable:
+        return sys.executable
+    try:
+        with open(cmd[0], "rb") as fh:
+            first = fh.readline().decode("utf-8", "replace").strip()
+    except OSError:
+        return None
+    return first[2:].strip() if first.startswith("#!") else None
+
+
+def _missing_media_extras(cmd, modules=_MEDIA_EXTRAS):
+    """Which of `modules` the interpreter behind `cmd` cannot import.
+
+    `cmd` is a console command as `_console_cmd` builds it, so the probe asks
+    THAT interpreter rather than this one -- asking `sys.executable` would
+    answer for the process running pytest, which is the interpreter that is
+    never the problem.
+    """
+    probe = ("import importlib.util,sys;"
+             "sys.stdout.write(','.join(m for m in %r "
+             "if importlib.util.find_spec(m) is None))" % (tuple(modules),))
+    interpreter = _console_interpreter(cmd)
+    if interpreter is None:
+        return ["<no interpreter resolved for %s>" % (cmd[0],)]
+    # Neutral cwd, for the reason the guard above gives: a probe standing in the
+    # worktree measures the worktree, not the interpreter.
+    out = subprocess.run([interpreter, "-c", probe], capture_output=True,
+                         text=True, timeout=120, cwd=tempfile.gettempdir())
+    if out.returncode != 0:
+        # An interpreter that cannot answer is not an interpreter with nothing
+        # missing. Saying "none missing" here would be the reassuring zero.
+        return ["<probe failed: %s>" % (out.stderr.strip().splitlines()[-1:] or [""])[0][:120]]
+    return [m for m in out.stdout.strip().split(",") if m]
+
+
+def test_the_console_interpreter_carries_the_media_extras():
+    """One named failure, instead of eight rows arguing about exit codes."""
+    missing = _missing_media_extras(_console_cmd())
+    assert missing == [], (
+        f"the console leg runs {_console_cmd()[0]}, and that interpreter cannot "
+        f"import {missing}. Every matrix row whose fixture needs image or PDF "
+        f"extraction will scan INCOMPLETE and exit 3 where the matrix expects a "
+        f"threat, which is a defect in THIS MACHINE and not in the scanner. "
+        f"Fix it where the console script lives: for a pipx install, "
+        f"`pipx inject sunglasses Pillow pyzbar pytesseract PyPDF2`; for a venv, "
+        f"`pip install -e '.[dev,media]'` into the interpreter that script uses.")
+
+
+def test_the_extras_probe_reports_a_module_that_is_really_absent():
+    """The control: build the absence, and watch the reader name it.
+
+    Without this, a probe that returned `[]` for every input would pass the row
+    above on a machine with nothing installed at all.
+    """
+    absent = "sunglasses_no_such_media_extra"
+    reported = _missing_media_extras(_console_cmd(), modules=(absent,))
+    assert reported == [absent], reported
+    # And the other direction, so "reports everything" cannot pass either.
+    assert _missing_media_extras(_console_cmd(), modules=("sys",)) == []
 
 
 def test_the_console_leg_enters_the_package_under_test():
