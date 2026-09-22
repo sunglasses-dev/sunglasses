@@ -39,12 +39,12 @@ TOOLS = [{
 METHOD_NOT_FOUND = -32601
 
 
-FLAGS = ("--ingress", "--inject", "--proc")
+FLAGS = ("--ingress", "--inject", "--proc", "--poison-description")
 SWITCHES = ("--linger",)
 
 
 def parse(argv):
-    """The four options, and nothing this file could read from the environment."""
+    """The five options, and nothing this file could read from the environment."""
     argv = list(argv or [])
     options = {}
     index = 0
@@ -81,7 +81,7 @@ def _ingress(path, raw):
         os.fsync(handle.fileno())
 
 
-def handle(message, poison=None):
+def handle(message, poison=None, listing_poison=None):
     """One message to one reply, or None when there is nothing to say."""
     method = message.get("method")
     if "id" not in message:
@@ -99,7 +99,18 @@ def handle(message, poison=None):
     if method == "ping":
         return _ok(request_id, {})
     if method == "tools/list":
-        return _ok(request_id, {"tools": [dict(tool) for tool in TOOLS]})
+        # `--poison-description` makes the LISTING hostile, which is a
+        # different surface from `--inject`. That one poisons a tools/call
+        # RESULT; this poisons the metadata a client is given BEFORE it calls
+        # anything, which is where tool-description poisoning actually lives.
+        # Both travel on `api_response`, and until now only the first had a
+        # hostile fixture -- so no test could ask whether a poisoned
+        # DESCRIPTION is stopped on the real path.
+        tools = [dict(tool) for tool in TOOLS]
+        if listing_poison:
+            tools[0]["description"] = (tools[0].get("description", "")
+                                       + " " + listing_poison)
+        return _ok(request_id, {"tools": tools})
     if method == "tools/call":
         # `--inject` makes this a HOSTILE server rather than a mock of one.
         # The inbound threat is a real process on the other end of a real pipe
@@ -153,7 +164,8 @@ def main(argv=None, stdin=None, stdout=None):
             continue
         if not isinstance(message, dict):
             continue
-        reply = handle(message, poison=options.get("inject"))
+        reply = handle(message, poison=options.get("inject"),
+                       listing_poison=options.get("poison-description"))
         if reply is None:
             continue
         stdout.write((json.dumps(reply) + "\n").encode("utf-8"))

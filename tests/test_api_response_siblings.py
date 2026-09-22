@@ -39,16 +39,32 @@ from p1b_api_space import cases as _api_space   # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-def _is_prose_sibling(pattern):
-    """This file is about the PROSE-injection siblings, which carry a regex.
+# THE FAMILY IS NAMED, NOT INFERRED. This file is about the six PROSE-injection
+# siblings and nothing else.
+#
+# `-API` alone is not the family. It is the naming convention EVERY sibling
+# family uses. The GLS-SD secret siblings adopted it first: they match a literal
+# token shape, so counting their regex entries here took the pinned total from
+# 12 to 25 and said nothing true about either family. That was patched by
+# excluding `GLS-SD-`, and then the tool-metadata siblings arrived carrying the
+# same suffix and broke it a SECOND time -- four rows in this file went red for
+# a change that has nothing to do with prose injection.
+#
+# So the exclusion list is GONE rather than extended. A list of the families to
+# keep out is the same bug with a later fuse: correct until the next family
+# adopts the convention, and it fails by SWEEPING SOMETHING IN, which reads as a
+# real regression in this file rather than as a selector that went stale.
+# Naming the six cannot go stale, and the membership assertion below now means
+# what it says.
+PROSE_SIBLINGS = frozenset({
+    "GLS-PI-013-API", "GLS-PI-016-API", "GLS-PI-017-API",
+    "GLS-PI-021-API", "GLS-PI-INFO-API", "GLS-PIEMN-001-API",
+})
 
-    `-API` alone is not the family. It is the naming convention every sibling
-    family uses, and the GLS-SD secret siblings adopted it: they match a literal
-    token shape, so counting their regex entries here took the pinned total from
-    12 to 25 and said nothing true about either family. An id suffix is not
-    family membership.
-    """
-    return pattern["id"].endswith("-API") and not pattern["id"].startswith("GLS-SD-")
+
+def _is_prose_sibling(pattern):
+    """Membership is the NAMED SET, not a shape guess about the id."""
+    return pattern["id"] in PROSE_SIBLINGS
 
 
 API_IDS = {p["id"] for p in PATTERNS if _is_prose_sibling(p)}
@@ -68,6 +84,14 @@ def _api(engine, text, channel="api_response"):
 
 
 def test_there_are_exactly_six_siblings_and_they_are_scoped_to_the_new_channels():
+    # BOTH DIRECTIONS, because a named set fails in a way an inferred one did
+    # not: a rule DELETED from the DB would leave this file quietly grading five
+    # and still passing a count that was written when there were six.
+    missing = sorted(PROSE_SIBLINGS - {p["id"] for p in PATTERNS})
+    assert missing == [], (
+        f"{missing} are named as prose siblings but are not in the rule DB, so "
+        "this file would grade a family with a hole in it")
+    assert API_IDS == set(PROSE_SIBLINGS), sorted(API_IDS ^ set(PROSE_SIBLINGS))
     assert len(API_IDS) == 6, sorted(API_IDS)
     for p in PATTERNS:
         if p["id"] in API_IDS:

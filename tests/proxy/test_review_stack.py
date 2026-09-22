@@ -42,9 +42,15 @@ def test_RS09_accepted_false_scan_keeps_session_state_closed_on_log_fault(tmp_pa
 def test_RS10_catalog_counts():
  # Recounted at the rebase onto 52b32b0. 1557 -> 1565 and 1569 -> 1577 are
  # #170's eight -API siblings arriving from main, not a change in this stack.
- assert len(inspection.engine_catalog())==1565
+ # Recounted again on this branch: 1565 -> 1579 and 1577 -> 1591 are the
+ # fourteen -API siblings THIS branch adds. Measured against a detached
+ # worktree of origin/main (ebb24fa), not counted by eye: the added sets on
+ # both catalogs are exactly those fourteen ids, nothing was removed, and
+ # helper_catalog did not move. A count that moves for any other reason must
+ # fail here rather than be re-pinned.
+ assert len(inspection.engine_catalog())==1579
  assert len(inspection.helper_catalog())==12
- assert len(inspection.trusted_catalog())==1577
+ assert len(inspection.trusted_catalog())==1591
 
 def test_RS11_list_finding_provenance_is_preserved():
  page={'tools':[{'name':'echo','inputSchema':{'type':'object'}}]}

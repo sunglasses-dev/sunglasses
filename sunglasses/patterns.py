@@ -2466,6 +2466,202 @@ PATTERNS = [
         "description": "Detects environment variable / config file secret leakage patterns."
     },
 
+    # ── TOOL-METADATA -API SIBLINGS ─────────────────────────────────────────
+    # Fourteen rules whose SUBJECT is a tool's advertised metadata did not
+    # declare `api_response`, and a `tools/list` RESULT travels on exactly that
+    # channel (selector.py T2.R7). The predicate matched, the rule existed, and
+    # it was never asked the question where a poisoned tool description arrives.
+    #
+    # MEASURED, not assumed. A bench built a description from each rule's own
+    # rendered predicate and asked whether the shipped engine stopped it on
+    # `api_response`. Fifteen stayed silent on a sample that matches their own
+    # regex standalone; fourteen of those do not declare the channel. The
+    # fifteenth (GLS-TMS-253) IS detected and merely dedup-shadowed behind
+    # GLS-TMS-250, so it is not here -- that is an attribution difference, not
+    # a miss, and counting it would have been reading the raw finding list
+    # instead of the consumer surface.
+    #
+    # THE FP SWEEP RAN FIRST, because widening a channel widens exposure and
+    # "it should be fine" is not a measurement: all 77 documents of the
+    # real-world corpus, scanned on `api_response` with these fourteen given
+    # the channel -- ZERO newly flagged.
+    #
+    # #170's LAW, AND BUILT FROM THE OBJECTS so the predicate is copied
+    # exactly: a sibling copies the parent predicate character for character
+    # and adds CHANNELS and nothing else. Same regex, same keywords, same
+    # severity; only id, name suffix and channel differ.
+    #
+    # TWO GENERATORS WERE THROWN AWAY GETTING HERE, and both failed quietly.
+    # The first extracted parents' SOURCE BLOCKS with a regex and silently
+    # produced nine of fourteen. The second emitted each regex as `r` plus its
+    # repr -- a RAW string of an already-escaped repr, doubling every backslash
+    # -- so all fourteen siblings carried CORRUPTED predicates and matched
+    # nothing. They loaded, they had the right ids, the count was right, and
+    # they detected 0 of 14. The round-trip is now asserted before insertion:
+    # every sibling's regex must compare equal to its parent's.
+    {
+        "id": 'GLS-TP-001-API',
+        "name": 'Forged tool-result approval claim (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)(security|compliance|manager|human|admin)\\s+(review|approval|sign-?off)\\s+(?:already\\s+)?(?:passed|completed|confirmed|recorded|approved)',
+        ],
+        "description": 'Detects forged tool-result claims that a review, approval, or compliance check already succeeded — a tool-poisoning primitive that steers agents without obvious override language.',
+    },
+    {
+        "id": 'GLS-TP-002-API',
+        "name": 'Command lure embedded in CI/build/log output (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'critical',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot)\\b.{0,120}\\b(?:run|execute|paste|apply|fix\\s+with)\\b.{0,60}\\b(curl|wget|bash|sh|powershell|python\\s+-c)\\b',
+        ],
+        "description": 'Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner — tool-output masquerading as trusted instruction.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-219-API',
+        "name": 'Tool description authority bias routing (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:official|trusted|certified|highest\\s+priority|always\\s+prefer|primary\\s+source)\\b.{0,120}\\b(?:tool|plugin|connector|integration|api)\\b.{0,120}\\b(?:for\\s+sensitive\\s+actions|over\\s+others|by\\s+policy)\\b',
+        ],
+        "keywords": ['official certified connector sensitive actions', 'always prefer this tool by policy', 'primary source over others', 'trusted tool over others policy', 'certified connector for sensitive actions', 'always prefer primary source', 'official tool sensitive actions by policy', 'trusted connector over others'],
+        "description": 'Detects implicit tool-description poisoning where authority or priority language biases agent tool routing for sensitive actions without explicit jailbreak phrasing.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-220-API',
+        "name": 'Tool description policy-bypass justification (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:for\\s+safety|for\\s+compliance|policy\\s+requires|security\\s+policy\\s+requires)\\b.{0,120}\\b(?:skip(?:ping)?|omit(?:ting)?|disable(?:d|ing)?|avoid(?:ing)?)\\b.{0,80}\\b(?:verification|validation|confirmation|checks?)\\b',
+        ],
+        "keywords": ['for compliance skip verification', 'policy requires skipping checks', 'for safety omit validation', 'security policy requires disabling confirmation', 'policy requires avoiding verification', 'compliance skip secondary checks', 'for safety disable checks', 'policy requires skip confirmation'],
+        "description": 'Detects implicit tool-description poisoning that reframes guardrail bypass as a policy or compliance requirement, steering the agent to suppress verification steps.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-221-API',
+        "name": 'Transitive trust review skip (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:already|pre[-\\s]?)?(?:verified|validated|approved)\\b.{0,90}\\b(?:by|from)\\b.{0,50}\\b(?:upstream|trusted\\s+(?:source|tool|connector)|official\\s+api)\\b.{0,120}\\b(?:skip|omit|bypass|no\\s+need\\s+for)\\b.{0,70}\\b(?:review|cross[-\\s]?check|confirmation|human\\s+approval)\\b',
+        ],
+        "keywords": ['already validated by trusted connector', 'pre-verified by upstream source', 'approved by official api skip review', 'upstream trusted tool bypass cross-check', 'verified upstream skip human approval', 'trusted source bypass confirmation', 'pre-verified skip independent review', 'upstream validation no need for cross-check'],
+        "description": 'Detects indirect tool-description poisoning that claims an upstream trusted tool already validated an action, then asks the agent to skip independent review or human approval.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-224-API',
+        "name": 'Tool description trusted route review bypass (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:tool\\s+description|connector\\s+note|integration\\s+guidance)\\b.{0,140}\\b(?:trusted\\s+path|approved\\s+route|recommended\\s+flow)\\b.{0,120}\\b(?:bypass|skip|without)\\b.{0,60}\\b(?:human\\s+approval|manual\\s+review|secondary\\s+review)\\b',
+        ],
+        "keywords": ['connector note trusted path without human approval', 'integration guidance approved route skip review', 'tool description recommended flow bypass', 'connector note trusted path bypass manual review', 'integration approved route without secondary review', 'tool description trusted path no human approval', 'connector note recommended flow skip review', 'integration guidance trusted path bypass'],
+        "description": 'Detects implicit tool-description poisoning that frames a trusted execution route as justification to suppress human or manual review, enabling unsafe autonomous execution.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-226-API',
+        "name": 'Tool description debug mode approval bypass (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:developer|debug|maintenance|test)\\s+mode\\b.{0,140}\\b(?:auto-approve|always\\s+approve|skip|disable|bypass)\\b.{0,80}\\b(?:confirmation|approval|permission|auth(?:entication)?|review)\\b',
+        ],
+        "keywords": ['developer mode auto-approve', 'debug mode skip confirmation', 'maintenance mode bypass approval', 'test mode disable authentication', 'developer mode always approve', 'debug mode skip review', 'maintenance mode disable confirmation', 'test mode bypass permission'],
+        "description": 'Detects tool-description poisoning that frames weakened controls as a temporary debug or maintenance mode, persuading agents to skip approval and review checks.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-232-API',
+        "name": 'Tool description self-attestation skip (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:tool|plugin|connector|integration)\\b.{0,120}\\b(?:self-verify|self-attest|already\\s+verified|pre-verified)\\b.{0,120}\\b(?:skip|without|no)\\b.{0,40}\\b(?:independent|secondary|external)\\b.{0,40}\\b(?:review|verification|approval)\\b',
+        ],
+        "keywords": ['connector self-attest skip independent review', 'plugin pre-verified without secondary review', 'tool already verified no external review', 'integration self-verify skip independent approval', 'connector pre-verified no secondary verification', 'plugin self-attest without external approval', 'tool self-verify skip secondary review', 'integration already verified no independent check'],
+        "description": 'Detects tool metadata that claims self-attestation or pre-verification and instructs skipping independent review, biasing agent tool-routing and suppressing safeguards.',
+    },
+    {
+        "id": 'GLS-TMS-234-API',
+        "name": 'Metadata smuggling: authority override (api_response)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?is)(?=.{0,500}\\b(?:meta(?:data)?|front\\s*matter|yaml\\s*header|attributes?|properties?|tags?|annotations?)\\b)(?=.{0,500}\\b(?:system|developer|root|highest|authoritative|trusted)\\b)(?=.{0,500}\\b(?:ignore|bypass|override|replace|discard|forget|waive)\\b)(?=.{0,500}\\b(?:instructions?|guardrails?|policy|safety|rules?)\\b).+',
+        ],
+        "keywords": ['metadata role system override', 'front matter root authority bypass', 'yaml header trusted ignore safety', 'annotations system authority replace instructions', 'properties trusted discard rules', 'trusted metadata override instructions', 'developer tag bypass guardrails'],
+        "description": 'Detects metadata, front matter, or annotations claiming system/root/authoritative status and instructing the agent to ignore, bypass, or override safety instructions or guardrails.',
+    },
+    {
+        "id": 'GLS-TP-ITDP-252-API',
+        "name": 'Compliance pretext redaction bypass (api_response)',
+        "category": 'tool_poisoning',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?i)\\b(?:for\\s+compliance|compliance\\s+(?:policy|review)|legal\\s+hold|audit\\s+request)\\b.{0,120}\\b(?:disable|turn\\s*off|skip|bypass)\\b.{0,80}\\b(?:redaction|masking|pii\\s*filter|data\\s*protection)\\b.{0,120}\\b(?:export|share|send|upload)\\b',
+        ],
+        "keywords": ['compliance policy disable redaction export', 'legal hold turn off masking share', 'audit request skip pii filter upload', 'compliance review bypass data protection send', 'compliance disable redaction export', 'legal hold turn off pii filter share', 'audit request skip masking upload', 'compliance policy bypass data protection send'],
+        "description": 'Detects ITDP (indirect tool data poisoning) variant using compliance/legal/audit pretext to justify disabling PII redaction/masking and then export/share/send/upload the unredacted data. Novel angle leveraging authority framing to bypass data-protection controls.',
+    },
+    {
+        "id": 'GLS-TMS-237-API',
+        "name": 'Metadata priority instruction override (api_response)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|constraint(?:s)?)\\b).*',
+        ],
+        "description": 'Detects a metadata header, annotation, or manifest claiming authoritative precedence used to override or bypass policy, guardrails, or safety instructions.',
+    },
+    {
+        "id": 'GLS-TMS-239-API',
+        "name": 'Forged Priority Header Execution Gate Rebind (api_response)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:priority\\s+header|tool\\s+metadata|execution\\s+manifest|run\\s+context\\s+header|scheduler\\s+header)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rebind|rebinds|rebound)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+scope|trust\\s+boundary|execution\\s+gate)\\b).+',
+        ],
+        "description": 'Detects a forged priority header, tool metadata, or execution manifest used to rebind or bypass trust boundary or execution gate policy.',
+    },
+    {
+        "id": 'GLS-TMS-240-API',
+        "name": 'Metadata System Authority Instruction Bypass (api_response)',
+        "category": 'tool_metadata_smuggling',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?is)^(?=.{0,500}$)(?!.*\\b(?:do\\s+not|never|without)\\s+(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:metadata|tool(?:_|\\s)?metadata|front[- ]?matter|header|annotation|properties)\\b)(?=.*\\b(?:system(?:\\s+message)?|root(?:\\s+authority)?|highest\\s+priority|authoritative)\\b)(?=.*\\b(?:ignore|bypass|override|replace|discard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).*',
+        ],
+        "description": 'Detects tool metadata, front matter, or headers claiming system-root or highest-priority authority used to replace or bypass safety instructions or previous policy.',
+    },
+    {
+        "id": 'GLS-MTI-001-API',
+        "name": 'MCP Database Tool SQL Wrapper Injection (api_response)',
+        "category": 'mcp_tool_injection',
+        "severity": 'high',
+        "channel": ['api_response'],
+        "regex": [
+            '(?six)^\n(?!.*\\b(?:security\\s+training|scanner\\s+docs?|scanners?\\s+should\\s+(?:flag|detect|report)|do\\s+not\\s+build)\\b)\n(?=.*\\b(?:mcp|model\\s+context\\s+protocol|fastmcp|server\\.tool|mcp\\.tool|tool\\s+decorator|database_query|execute_sql|run_sql|query_tool|sqlite|postgres|duckdb|mysql)\\b)\n(?=.*\\b(?:sql|query|user_sql|statement|command|prompt_query)\\b)\n(?=.*(?:\n    select\\s+(?:\\*|[a-z0-9_,\\s]+)\\s+from\\s*\\(\\s*(?:\\{?\\s*(?:sql|query|user_sql|statement|command|prompt_query)\\s*\\}?|["\'`]\\s*\\+\\s*(?:sql|query|user_sql|statement|command|prompt_query)\\s*\\+)\n  | select\\s+(?:\\*|[a-z0-9_,\\s]+)\\s+from\\s*\\(.{0,120}\\b(?:sql|query|user_sql|statement|command|prompt_query)\\b.{0,120}\\).{0,120}\\blimit\\b\n))\n(?=.*\\blimit\\b)\n.*',
+        ],
+        "keywords": ['FastMCP', 'LIMIT', 'SELECT ... FROM (', 'command', 'database_query', 'duckdb', 'execute_sql', 'fetchmany', 'mcp', 'mcp.tool', 'mysql', 'postgres', 'prompt_query', 'query', 'query_tool'],
+        "description": 'MCP database servers that enforce row limits by interpolating agent/user SQL into `SELECT * FROM ({sql}) LIMIT N` create a wrapper-breakout SQL injection sink at the agent-tool boundary.',
+    },
     # ── GLS-SD -API siblings ─────────────────────────────────────────────────
     # Secrets arriving in the RESULT direction. Nine of the ten GLS-SD rules
     # carried no `api_response` channel, so an AWS key id, a private key or a
