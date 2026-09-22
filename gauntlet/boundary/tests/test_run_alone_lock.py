@@ -58,3 +58,69 @@ def test_an_unreadable_or_empty_lock_is_not_a_holder(tmp_path):
     lock.write_text("   ")
     assert run_alone.current_holder(lock) is None
     assert run_alone.current_holder(tmp_path / "missing") is None
+
+
+# ── REPO LEVEL ──────────────────────────────────────────────────────────────
+
+def test_the_lock_is_keyed_on_the_shared_git_directory_not_the_worktree():
+    """Eighty worktrees of one repo must not get eighty locks.
+
+    `--git-common-dir` is the same path from every checkout; `--git-dir` is not.
+    Keying on the latter would let every worktree call itself alone.
+    """
+    shared = run_alone.common_git_dir()
+    assert shared is not None and shared.is_dir(), shared
+    assert run_alone.repo_lock_path() == shared / run_alone.REPO_LOCK_NAME
+    # The same answer from another checkout of the same repository.
+    others = [r for r in run_alone.worktree_roots()
+              if r.is_dir() and r != pathlib.Path.cwd()]
+    assert others, "no sibling worktree to compare against"
+    assert run_alone.common_git_dir(others[0]) == shared
+
+
+def test_a_pytest_invocation_is_told_apart_from_a_mention_of_pytest():
+    """The guard refuses a whole suite on this answer, so a loose match is a
+    false kill: it would name a shell that has already exited.
+
+    The capital P case is not hypothetical. macOS runs
+    `Python.app/Contents/MacOS/Python`, and a lowercase-only test matched
+    nothing on this machine — the guard passed forever and the control caught
+    it, not the reading.
+    """
+    macos = ("/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/"
+             "Python.framework/Versions/3.14/Resources/Python.app/Contents/"
+             "MacOS/Python -m pytest gauntlet/boundary/tests -q")
+    assert run_alone.is_pytest_invocation(macos)
+    assert run_alone.is_pytest_invocation("/usr/local/bin/pytest tests/")
+    assert run_alone.is_pytest_invocation("python3 -m pytest x.py")
+
+    assert not run_alone.is_pytest_invocation("echo pytest")
+    assert not run_alone.is_pytest_invocation("grep -rn pytest .")
+    assert not run_alone.is_pytest_invocation("python3 -c 'print(1)'")
+    assert not run_alone.is_pytest_invocation("")
+    # The wrapper shell that was ASKED to run pytest is not pytest. It exits
+    # while the run continues, so refusing on it names a dead pid.
+    assert not run_alone.is_pytest_invocation(
+        "/bin/zsh -c 'cd somewhere && python3 -m pytest tests/'")
+
+
+def test_the_scan_excludes_our_own_process_group_and_not_merely_our_pid():
+    """The conftest calling this runs INSIDE pytest, and xdist adds workers.
+
+    Counting either would make the guard refuse its own session every time,
+    which is the shape where a guard becomes the outage.
+    """
+    ours = os.getpgid(os.getpid())
+    mine = [pid for pid, command in run_alone._cmdlines().items()
+            if run_alone.is_pytest_invocation(command)
+            and _same_group(pid, ours)]
+    assert mine, "this test runs under pytest, so at least one must be ours"
+    found = run_alone.foreign_pytest()
+    assert found is None or found[0] not in mine
+
+
+def _same_group(pid, ours):
+    try:
+        return os.getpgid(pid) == ours
+    except OSError:
+        return False

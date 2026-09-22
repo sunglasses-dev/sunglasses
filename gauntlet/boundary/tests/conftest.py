@@ -151,19 +151,38 @@ import os as _os
 
 import pytest as _pytest
 
-from run_alone import LOCK as _LOCK, current_holder as _current_holder
+from run_alone import (current_holder as _current_holder,
+                       foreign_pytest as _foreign_pytest,
+                       repo_lock_path as _repo_lock_path)
+
+# KEYED ON THE REPOSITORY, not on this directory. The suite-local lock said
+# "I ran alone" while another session's suite ran against another worktree of
+# the same repo and burned the same cores. Three timing-sensitive rows moved
+# across four otherwise identical runs because of it.
+_LOCK = _repo_lock_path()
 
 
 @_pytest.fixture(autouse=True, scope="session")
 def one_run_at_a_time():
-    holder = _current_holder()
+    holder = _current_holder(_LOCK)
     if holder:
         _pytest.exit(
-            f"REFUSED: another pytest session (pid {holder}) is running this "
-            f"suite. Concurrent runs of the boundary tests interfere - they "
-            f"spawn real subprocesses and drive timed barriers - and the "
-            f"numbers they produce are void, not merely noisy. Wait, or remove "
+            f"REFUSED: another pytest session (pid {holder}) holds this "
+            f"repository's suite lock. Concurrent runs interfere - they spawn "
+            f"real subprocesses and drive timed barriers - and the numbers "
+            f"they produce are void, not merely noisy. Wait, or remove "
             f"{_LOCK} if that pid is gone.",
+            returncode=2)
+    # THE BACKSTOP, for a run that never took the lock. Checked second because
+    # the lock is the cheap and exact answer and this one shells out.
+    stranger = _foreign_pytest()
+    if stranger:
+        _pytest.exit(
+            f"REFUSED: pytest (pid {stranger[0]}) is running against a "
+            f"worktree of this repository without holding {_LOCK}. Its run and "
+            f"this one would contend for the same cores, and both sets of "
+            f"numbers would be void. Wait for it, or have that suite adopt "
+            f"`run_alone`.",
             returncode=2)
     _LOCK.write_text(str(_os.getpid()))
     try:
