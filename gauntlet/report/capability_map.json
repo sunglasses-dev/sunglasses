@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-22-c",
+ "revision": "2026-09-22-d",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -194,19 +194,24 @@
    "witness_class": "adapter-against-harness",
    "evidence": "G2-16.wire_name driven on proxy_strict through gauntlet/boundary/gen2/execute.py. The step recorded copies=0 held=true and the mediator's own receipts recorded SETTLED reason=PROHIBITED_SECRET forwarded=false, so the assertion and the mediator agree. ADAPTER AGAINST HARNESS: the mediator driven here is the gauntlet's own passthrough, not the shipped route, so this is evidence that the adapter drives the step and that the step measures egress. It is NOT proof about the product's real route and must not be read as the stronger claim.",
    "caveat": "This step could not hold on ANY run before 2026-09-22: it counted the reference file against the client wire, and the reference IS the file the schedule sends. Two runs of this variant, one with the scanner raising and one with it finding the secret, printed identical output. The witness is therefore evidence about the CORRECTED step."
+  },
+  "assert_no_second_forward_and_no_pending_overwrite": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "ruled_by": "T8",
+   "ruled_at": "2026-09-22",
+   "evidence": "ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both."
+  },
+  "assert_secondary_and_reverse_complete_independently": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "ruled_by": "T8",
+   "ruled_at": "2026-09-22",
+   "evidence": "ANSWERED YES FOR DISTINCT IDS. `_owed` is keyed per id and each entry carries its own `origin` alongside `at` and `method` (session.py), so two items with different ids complete independently. Verified at head.",
+   "caveat": "NOT UNCONDITIONAL, and an adapter that asserts it as such is WRONG on one shape. Where a client id is REUSED while still pending \u2014 G2-15 \u2014 the answer is a deliberate NO: that is the same teardown as the row above, by design. An implementation of this op must scope its claim to distinct ids or it will fail a scenario the product handles correctly."
   }
  },
  "unclassified": {
-  "assert_no_second_forward_and_no_pending_overwrite": {
-   "open_question": "whether the mediator can express this at all is a question about T8's real route, not about the adapter",
-   "owner": "T8",
-   "declared_at": "2026-09-14"
-  },
-  "assert_secondary_and_reverse_complete_independently": {
-   "open_question": "as above: a route question, not an adapter question",
-   "owner": "T8",
-   "declared_at": "2026-09-14"
-  },
   "execute_armed_worker_fault": {
    "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
    "owner": "T8",
