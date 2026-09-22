@@ -137,6 +137,44 @@ if _live is not None and str(_live) not in sys.path:
     # only `probe_support` comes from the exam.
     sys.path.append(str(_live))
 
+# BOUND TO THIS CHECKOUT BEFORE ANY TEST CAN IMPORT THE EXAM.
+#
+# The append above was supposed to be the whole protection, and it is not.
+# `probe_support` derives BOUNDARY from the exam root's `source` link and then
+# does `sys.path.insert(0, str(BOUNDARY))`, which puts a tree of its choosing
+# AHEAD of everything this file arranged. Every `test_astra_fit_*` module runs
+# `from probe_support import *` on the line BEFORE `import batch, grade`, so the
+# ordering that comment depends on is reversed by the module it is importing.
+#
+# It cost a real result. On 2026-09-22 two scratch copies of this tree ran the
+# suite, both resolved `batch`, `grade` and `proxy` through a shared exam root
+# whose `source` pointed at a THIRD checkout, and agreed with each other
+# exactly — which was then reported as evidence that the suite is
+# deterministic. They agreed because they were both grading the same code, and
+# neither was grading its own. → GAUNTLET_PROVENANCE_AUDIT_2026-09-22.md
+#
+# `probe_support` is ASTRA's file, copied byte for byte with its digest
+# asserted above, so it is not ours to change. Importing these HERE is: once a
+# module is in `sys.modules`, no later `sys.path` edit can re-point it. The
+# exam may still insert what it likes; it can no longer decide what `batch` is.
+_BOUNDARY = str(REPO / "gauntlet" / "boundary")
+if _BOUNDARY not in sys.path:
+    sys.path.insert(0, _BOUNDARY)
+
+import batch as _batch                                         # noqa: E402
+import grade as _grade                                         # noqa: E402
+from proxy import passthrough as _passthrough                  # noqa: E402
+from destination import sink as _sink                          # noqa: E402
+
+for _bound in (_batch, _grade, _passthrough, _sink):
+    # The postcondition, asserted at import so a contaminated session cannot
+    # reach a test. A suite that grades another checkout does not fail; it
+    # reports on the wrong artifact and looks exactly like a clean run.
+    assert pathlib.Path(_bound.__file__).resolve().is_relative_to(REPO), (
+        f"{_bound.__name__} resolved to {_bound.__file__}, outside the checkout "
+        f"under test at {REPO}. The exam has re-pointed the modules this suite "
+        f"is supposed to be measuring.")
+
 
 # ── the one trusted legacy context ──────────────────────────────────────────
 # ASTRA's round 2 acceptance file builds its rows the way destination receipts
