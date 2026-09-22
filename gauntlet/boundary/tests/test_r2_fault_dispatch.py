@@ -25,7 +25,7 @@ HELD = "the document this scenario declares a fault for\n"
 OTHER = "a different document in the same session\n"
 
 
-def _run_dir(tmp_path, kind, payload=HELD):
+def _run_dir(tmp_path, kind, payload=HELD, target="scanner_worker"):
     """The materialiser writes the payload as `payload.txt`, whatever the seed calls it.
 
     The first version of this helper wrote `result.payload.txt`, the name the
@@ -41,7 +41,7 @@ def _run_dir(tmp_path, kind, payload=HELD):
     (run_dir / "payload.txt").write_text(payload)
     (run_dir / "materialised.fault.json").write_text(json.dumps({
         "scenario_id": "G2-09", "variant": "result",
-        "fault": {"kind": kind, "direction": "result"},
+        "fault": {"kind": kind, "direction": "result", "target": target},
         "payload": "payload.txt",
         "payload_sha256": hashlib.sha256(payload.encode()).hexdigest(),
     }))
@@ -319,8 +319,47 @@ def test_a_record_disagreeing_with_the_materialised_bytes_is_refused(tmp_path):
 # never reach this file. Conflating the two is how this list first got written
 # out of names that cannot appear here.
 
-# G2-10's three, which are real and do reach this branch.
-UNINJECTABLE = ["invalid_json", "invalid_result_shape", "malformed_hook_output"]
+# MEASURED ACROSS THE DELIVERY, and the result changed this row twice.
+#
+# Every fault targeting `scanner_worker` is already selectable — G2-08's
+# exception, G2-09's hang, G2-11's barrier_hold. Every kind that is NOT
+# selectable targets something else: G2-10 aims `invalid_json` and
+# `invalid_result_shape` at `upstream_stdout` and `malformed_hook_output` at
+# `hook_stdout`. So there is no gap in the scanner lane at all, and refusing
+# G2-10 would kill three scenarios in which the scanner is supposed to run
+# normally while something else misbehaves.
+#
+# I had this wrong and the batch path proved it: before the target check,
+# `declared_kind` reported `invalid_result_shape` and `malformed_hook_output`
+# for real run directories built by `run_one`, so the refusal I added to stop a
+# wrong verdict would itself have produced two. The suite did not catch it —
+# the batch-path row above covers G2-08, G2-09 and G2-11 and not G2-10.
+UNINJECTABLE = ["some_future_scanner_fault", "worker_emits_nothing"]
+
+NOT_OURS = [("invalid_json", "upstream_stdout"),
+            ("invalid_result_shape", "upstream_stdout"),
+            ("malformed_hook_output", "hook_stdout")]
+
+
+@pytest.mark.parametrize("kind,target", NOT_OURS)
+def test_a_fault_aimed_elsewhere_is_not_this_dispatchers_refusal(tmp_path, kind, target):
+    """G2-10's three. The scanner runs NORMALLY; the upstream or the hook is
+    what misbehaves. A refusal here is a false kill of a working scenario."""
+    run_dir = _run_dir(tmp_path, kind, target=target)
+    assert fault_dispatch.declared_fault(run_dir, HELD) is None
+    assert fault_dispatch.declared_kind(run_dir, HELD) is None
+
+
+@pytest.mark.parametrize("kind,target", NOT_OURS)
+def test_a_fault_aimed_elsewhere_runs_an_ordinary_scan(tmp_path, kind, target):
+    """End to end, because the row above only proves the reader."""
+    run_dir = _run_dir(tmp_path, kind, target=target)
+    completed = subprocess.run(
+        [sys.executable, str(pathlib.Path(fault_dispatch.__file__)),
+         "--run-dir", str(run_dir), "--channel", "api_response"],
+        input=HELD.encode(), capture_output=True)
+    assert completed.returncode != 3, completed.stderr[-400:]
+    assert b"cannot inject" not in completed.stderr
 
 
 @pytest.mark.parametrize("kind", UNINJECTABLE)
@@ -388,3 +427,63 @@ def test_an_ordinary_scan_still_runs_when_nothing_is_declared(tmp_path):
 
     assert completed.returncode != 3, completed.stderr[-400:]
     assert b"cannot inject" not in completed.stderr
+
+
+def test_g2_10_through_the_real_batch_path_is_not_refused(tmp_path):
+    """The row that would have caught the false kill I added.
+
+    The batch-path row further up covers G2-08, G2-09 and G2-11 — the three
+    scanner-targeted scenarios — and not G2-10, so a refusal that fired only on
+    G2-10 passed the whole suite. `run_one` writes the fault record for ANY
+    declared kind with no filter on target, so G2-10's upstream and hook faults
+    do reach this dispatcher, and it has to let them through.
+
+    Built by `run_one`, never by hand: a directory I assemble agrees with
+    whatever I assumed when I assembled it, which is how the target field went
+    missing from the fixtures above in the first place.
+    """
+    import shutil
+    import uuid
+    import runner
+    from destination.sink import Destination
+
+    entry = next(e for e in runner.load_manifest()["scenarios"]
+                 if e["id"] == "G2-10")
+    checked = {}
+    for variant in runner.scenario_of(entry)["variants"]:
+        root = pathlib.Path("/private/tmp") / f"g210-{uuid.uuid4().hex[:10]}"
+        start = Destination.start
+        Destination.start = lambda self: "file:///dev/null"
+        try:
+            row = batch.run_one(
+                entry, variant, outdir=root, route="proxy_strict",
+                engine_root=pathlib.Path(__file__).resolve().parents[3],
+                upstream_argv=[sys.executable], ledger=None,
+                dry_run=True, call_no=0)
+        except json.JSONDecodeError:
+            # G2-10.invalid_json carries deliberately invalid JSON and `run_one`
+            # does not survive reading it. That is a separate defect in the
+            # batch path, recorded rather than fixed here; it is not a refusal.
+            checked[variant["name"]] = "run_one_cannot_read_it"
+            continue
+        finally:
+            Destination.start = start
+
+        try:
+            run_dir = pathlib.Path(row["run_dir"])
+            record = run_dir / "materialised.fault.json"
+            assert record.is_file(), (
+                f"{variant['name']}: no fault record, so this row proves nothing")
+            held_file = run_dir / "payload.txt"
+            held = held_file.read_text() if held_file.is_file() else ""
+            assert fault_dispatch.declared_kind(run_dir, held) is None, (
+                f"{variant['name']} targets "
+                f"{variant['fault']['target']} and the scanner dispatcher "
+                "claimed it, which refuses a scenario that must run an "
+                "ordinary scan")
+            checked[variant["name"]] = "not_refused"
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    assert checked, "no G2-10 variant was exercised"
+    assert "not_refused" in checked.values(), checked

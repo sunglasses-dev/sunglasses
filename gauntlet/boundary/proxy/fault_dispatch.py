@@ -44,6 +44,13 @@ FAULT_WORKER = PACKAGE / "fault_worker.py"
 # reader of the config can see the capability without running it.
 SELECTABLE = ("exception", "hang", "barrier")
 
+# THE FAULTS THAT ARE THIS DISPATCHER'S BUSINESS. It chooses a scanner mode, so
+# a fault aimed anywhere else is not one it can inject and not one it should
+# have an opinion about. G2-10 aims at `upstream_stdout` and `hook_stdout`: the
+# scanner is meant to run NORMALLY there while something else misbehaves, and
+# refusing those would kill three working scenarios.
+SCANNER_TARGETS = ("scanner_worker",)
+
 
 def declared_fault(run_dir: pathlib.Path, held: str):
     """The mode this scenario declares for the payload actually held, or None.
@@ -115,7 +122,15 @@ def declared_kind(run_dir: pathlib.Path, held: str) -> str | None:
     digest = hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest()
     if record.get("payload_sha256") != digest:
         return None
-    return (record.get("fault") or {}).get("kind") or None
+    fault = record.get("fault") or {}
+    if fault.get("target") not in SCANNER_TARGETS:
+        # NOT OURS, so not a refusal. Measured across the delivery: every fault
+        # targeting `scanner_worker` is already selectable, and every kind that
+        # is not selectable targets the upstream or the hook. So this branch is
+        # what the three non-selectable kinds actually hit, and the right answer
+        # for them is an ordinary scan.
+        return None
+    return fault.get("kind") or None
 
 
 def main(argv=None) -> int:
