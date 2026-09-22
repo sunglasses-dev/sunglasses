@@ -539,173 +539,192 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
                         byte_budget=policy.get("inspection_byte_budget"))
     sink = Destination(drop_dir=run_dir / "drop")
     sink_url = sink.start()
-    # BEFORE, so that a negative at the end is backed by a demonstration that
-    # this observer can see an arrival at all.
-    sink.calibrate("before")
-    request = json.loads((run_dir / "request.json").read_text())
-    params = request.get("params", {})
-    method = request.get("method", "tools/call")
-    if method in DRIVEN_DIRECTLY:
-        # NOT A MODEL'S DECISION. A descriptor request is part of session setup:
-        # the client asks for it and the mediator is supposed to inspect what
-        # comes back. Terminating the row was honest and left G2-06 unexercised;
-        # defaulting it to read_text_file, which came before that, silently ran a
-        # different experiment and reported result content as a descriptor
-        # result. One client turn, issued here, with the stimulus read from the
-        # mediator's attested ingress rather than from a transcript.
-        server = json.loads(config.read_text())["mcpServers"]["fs"]
-        try:
-            reply = descriptor.run_turn([server["command"], *server["args"]], request,
-                                        stderr_path=run_dir / "descriptor.stderr",
-                                        wire_path=run_dir / "client.wire.jsonl")
-            failure = None
-        except (descriptor.DescriptorTurnFailed, subprocess.TimeoutExpired) as exc:
-            reply, failure = None, str(exc)
-        (run_dir / "descriptor.reply.json").write_text(
-            json.dumps({"reply": reply, "failure": failure}, indent=1) + "\n")
+    # RELEASED WHATEVER HAPPENS. `call_claude` can raise — a native direct
+    # route whose child dies does exactly that — and the stop below was
+    # reached only on the success path, so the observer stayed bound to the
+    # declared port 18762 for the life of the process.
+    #
+    # It is invisible to the row that leaks it, because that row already
+    # failed for its own reason. It surfaces as an UNRELATED neighbour
+    # asserting the wrong port: the next sink finds 18762 held, falls back to
+    # an ephemeral one exactly as it is documented to, and every
+    # `endpoint_as_declared` check downstream goes false.
+    #
+    # Measured 2026-09-22: three failing rows were failing seven. Deselecting
+    # them took the suite from 11 failed to 4.
+    #
+    # `Destination.stop` is idempotent, so the explicit stops inside the block
+    # stay where they are and this only covers the paths that never reach one.
+    try:
+        # BEFORE, so that a negative at the end is backed by a demonstration that
+        # this observer can see an arrival at all.
+        sink.calibrate("before")
+        request = json.loads((run_dir / "request.json").read_text())
+        params = request.get("params", {})
+        method = request.get("method", "tools/call")
+        if method in DRIVEN_DIRECTLY:
+            # NOT A MODEL'S DECISION. A descriptor request is part of session setup:
+            # the client asks for it and the mediator is supposed to inspect what
+            # comes back. Terminating the row was honest and left G2-06 unexercised;
+            # defaulting it to read_text_file, which came before that, silently ran a
+            # different experiment and reported result content as a descriptor
+            # result. One client turn, issued here, with the stimulus read from the
+            # mediator's attested ingress rather than from a transcript.
+            server = json.loads(config.read_text())["mcpServers"]["fs"]
+            try:
+                reply = descriptor.run_turn([server["command"], *server["args"]], request,
+                                            stderr_path=run_dir / "descriptor.stderr",
+                                            wire_path=run_dir / "client.wire.jsonl")
+                failure = None
+            except (descriptor.DescriptorTurnFailed, subprocess.TimeoutExpired) as exc:
+                reply, failure = None, str(exc)
+            (run_dir / "descriptor.reply.json").write_text(
+                json.dumps({"reply": reply, "failure": failure}, indent=1) + "\n")
+            sink.collect_drops()
+            sink.calibrate("after")
+            sink.stop()
+            observed = descriptor.observed_at_ingress(
+                run_dir / "proxy.receipts.jsonl", method,
+                client_wire=run_dir / "client.wire.jsonl")
+            stimulus = fidelity.compare(request, observed)
+            row = {"call": call_no, "scenario_id": entry["id"],
+                   "variant": variant["name"], "route": route,
+                   "run_dir": str(run_dir), "at": time.time(),
+                   "method": method,
+                   "stimulus": stimulus.as_receipt(),
+                   "destination": sink.receipt(),
+                   "descriptor_failure": failure,
+                   "verdict": {"model_view": {
+                       "state": "DRIVEN" if stimulus and not failure
+                       else "INVALID_STIMULUS"}}}
+            (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+            return row
+        if method != "tools/call":
+            # REFUSED, not defaulted. G2-06 declares `tools/list`, and defaulting it
+            # to `read_text_file` did not fail: it silently ran a different
+            # experiment, measuring result content while the descriptor surface the
+            # scenario exists to test was never requested. A scenario this driver
+            # cannot drive terminates here, before it spends a call.
+            row = {"call": call_no, "scenario_id": entry["id"],
+                   "variant": variant["name"], "route": route,
+                   "run_dir": str(run_dir), "at": time.time(),
+                   "stimulus": {"stimulus_exact": False,
+                                "reason": fidelity.METHOD_MISMATCH,
+                                "detail": f"the driver can only issue tools/call; "
+                                          f"{entry['id']} declares {method} and "
+                                          f"needs the descriptor mutator"},
+                   "verdict": {"model_view": {"state": "INVALID_STIMULUS"}}}
+            sink.stop()
+            (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+            # NO SETTLEMENT HERE, because there is no charge yet. The ledger is
+            # charged further down, after this refusal, so a row that terminates on
+            # a method the driver cannot issue never spent anything. My first
+            # version called the settle helper from here and raised
+            # UnboundLocalError before it was even defined, which is the honest
+            # shape of the mistake: settling a charge that does not exist.
+            return row
+        # THE SERVER THE VARIANT DECLARES. `mcp__fs__` was built for every row, so
+        # G2-12, whose whole question is a call that reaches the upstream without
+        # passing the mediator, was driven at the mediated server. Adding the direct
+        # tools to the allow list did not select the route; this does.
+        tool = f"mcp__{_route_server(variant)}__{params.get('name', 'read_text_file')}"
+        arguments = params.get("arguments") or {"path": str(run_dir / "payload.txt")}
+        prompt = driver_prompt(run_dir, tool, arguments)
+        row = {"call": call_no, "scenario_id": entry["id"], "variant": variant["name"],
+               "route": route, "run_dir": str(run_dir), "at": time.time(),
+               "deviation_from_package": "driver_prompt",
+               "package_live_prompt": variant.get("live_prompt"),
+               "driver_prompt": prompt,
+               "allowed_tools": "mcp__fs__read_text_file,mcp__fs__write_file",
+               "disallowed_tools": DENIED_BUILTINS,
+               "expected_tool": tool,
+               "upstream_kind": upstream_kind,
+               "destination_url": sink_url}
+        # THE CHARGE ID WAS THROWN AWAY. `charge` returns one so the spend can be
+        # tied to what it produced, and this line discarded it, so every completed
+        # row left its charge unsettled: a call whose result nobody can find, which
+        # is the state the exam found rows in. Held here and settled against
+        # row.json on every exit from this function, including the early one.
+        charge_id = None
+        if not dry_run:
+            charge_id = ledger.charge(entry["id"], f"{variant['name']}/{route}")
+
+        def _settle(outcome):
+            """Tie the charge to its terminal artifact, once, whichever way we leave."""
+            if charge_id is not None:
+                ledger.settle(charge_id, str(run_dir / "row.json"), outcome)
+        # The allow list is the tool THIS scenario calls. Hardcoding the two
+        # filesystem tools meant the stub scenarios, which expose `gate2_fetch`, were
+        # permission-denied: the model emitted the tool_use and Claude Code refused
+        # it, so the route never ran and the delivered bytes were a denial message.
+        reachable = {tool, "mcp__fs__read_text_file", "mcp__fs__write_file"}
+        if variant.get("route") == "direct_second_server":
+            # THE SECOND ROUTE HAS TO BE CALLABLE. G2-12 asks what happens to a call
+            # that reaches the upstream without passing the mediator, and the second
+            # server was in the configuration while none of its tools were in the
+            # allow list, so the model could see the route and not take it and the
+            # row reported on the route it was supposed to avoid. Configured and
+            # inert, the same shape as the fault dispatcher.
+            #
+            # Keyed to the variant's own `route` field rather than to the presence
+            # of the server, because for every other scenario a call that went
+            # around the mediator is a different experiment and must read as one.
+            reachable |= {name.replace("mcp__fs__", "mcp__direct__")
+                          for name in list(reachable)}
+        allowed = ",".join(sorted(reachable))
+        row["allowed_tools"] = allowed
+        result, problem = call_claude(run_dir, prompt, config, dry_run=dry_run,
+                                      allowed=allowed)
+        if result:
+            row["session_id"] = result.get("session_id")
+            row["cost_usd"] = result.get("total_cost_usd")
+            row["num_turns"] = result.get("num_turns")
+            path = transcript_of(run_dir, result["session_id"])
+            row["transcript"] = str(path)
+            blocks = extract_tool_results(path.read_bytes()) if path.exists() else []
+            row["tool_result_blocks"] = [len(b) for b in blocks]
+            observed = _delivered(blocks)
+        else:
+            observed, row["problem"] = None, problem
+        # COLLECT, then calibrate again, then stop. `collect_drops` existed and was
+        # never called from here, so every row whose declared transport is
+        # `file_drop` reported `nothing_arrived` on the strength of an HTTP listener
+        # that was never the transport under test. The second calibration is what
+        # makes a terminal negative honest: it shows the observer still worked at
+        # the END of the run and not only at the start.
         sink.collect_drops()
         sink.calibrate("after")
         sink.stop()
-        observed = descriptor.observed_at_ingress(
-            run_dir / "proxy.receipts.jsonl", method,
-            client_wire=run_dir / "client.wire.jsonl")
-        stimulus = fidelity.compare(request, observed)
-        row = {"call": call_no, "scenario_id": entry["id"],
-               "variant": variant["name"], "route": route,
-               "run_dir": str(run_dir), "at": time.time(),
-               "method": method,
-               "stimulus": stimulus.as_receipt(),
-               "destination": sink.receipt(),
-               "descriptor_failure": failure,
-               "verdict": {"model_view": {
-                   "state": "DRIVEN" if stimulus and not failure
-                   else "INVALID_STIMULUS"}}}
+        row["destination"] = sink.receipt()
+        sink.write_receipt(run_dir / "destination.receipt.json")
+        row["fs_tool_invoked"] = _fs_tool_invoked(row.get("transcript"), tool)
+        # STIMULUS BEFORE SCORE. What arrived is compared to `request.json` leaf by
+        # leaf, and a row whose stimulus was not what the package specifies is not a
+        # result about the product at all. This is the check whose absence let an
+        # empty write be published as a detector gap.
+        observed_call, attested_by = route_call(run_dir, route, row.get("transcript"),
+                                                variant)
+        stimulus = fidelity.compare(request, observed_call)
+        row["stimulus"] = {**stimulus.as_receipt(), "attested_by": attested_by}
+        (run_dir / "stimulus.receipt.json").write_text(
+            json.dumps(row["stimulus"], indent=1) + "\n")
+        row["verdict"] = verdict(run_dir, route, observed,
+                                 run_dir / "proxy.receipts.jsonl", row["destination"])
+        if not row["fs_tool_invoked"]:
+            # Not a candidate result. A session where the model never reached the
+            # route measures the driving, not the boundary.
+            row["verdict"]["model_view"]["state"] = "INVALID_ROUTE_NOT_EXERCISED"
+        if not stimulus:
+            # Named, and it WINS over the route check: a call that reached the route
+            # carrying the wrong bytes is a worse failure than one that never
+            # reached it, because it produces a plausible number.
+            row["verdict"]["model_view"]["state"] = "INVALID_STIMULUS"
+            row["invalid_reason"] = stimulus.reason
         (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
+        _settle(row.get("verdict", {}).get("model_view", {}).get("state") or "completed")
         return row
-    if method != "tools/call":
-        # REFUSED, not defaulted. G2-06 declares `tools/list`, and defaulting it
-        # to `read_text_file` did not fail: it silently ran a different
-        # experiment, measuring result content while the descriptor surface the
-        # scenario exists to test was never requested. A scenario this driver
-        # cannot drive terminates here, before it spends a call.
-        row = {"call": call_no, "scenario_id": entry["id"],
-               "variant": variant["name"], "route": route,
-               "run_dir": str(run_dir), "at": time.time(),
-               "stimulus": {"stimulus_exact": False,
-                            "reason": fidelity.METHOD_MISMATCH,
-                            "detail": f"the driver can only issue tools/call; "
-                                      f"{entry['id']} declares {method} and "
-                                      f"needs the descriptor mutator"},
-               "verdict": {"model_view": {"state": "INVALID_STIMULUS"}}}
+    finally:
         sink.stop()
-        (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
-        # NO SETTLEMENT HERE, because there is no charge yet. The ledger is
-        # charged further down, after this refusal, so a row that terminates on
-        # a method the driver cannot issue never spent anything. My first
-        # version called the settle helper from here and raised
-        # UnboundLocalError before it was even defined, which is the honest
-        # shape of the mistake: settling a charge that does not exist.
-        return row
-    # THE SERVER THE VARIANT DECLARES. `mcp__fs__` was built for every row, so
-    # G2-12, whose whole question is a call that reaches the upstream without
-    # passing the mediator, was driven at the mediated server. Adding the direct
-    # tools to the allow list did not select the route; this does.
-    tool = f"mcp__{_route_server(variant)}__{params.get('name', 'read_text_file')}"
-    arguments = params.get("arguments") or {"path": str(run_dir / "payload.txt")}
-    prompt = driver_prompt(run_dir, tool, arguments)
-    row = {"call": call_no, "scenario_id": entry["id"], "variant": variant["name"],
-           "route": route, "run_dir": str(run_dir), "at": time.time(),
-           "deviation_from_package": "driver_prompt",
-           "package_live_prompt": variant.get("live_prompt"),
-           "driver_prompt": prompt,
-           "allowed_tools": "mcp__fs__read_text_file,mcp__fs__write_file",
-           "disallowed_tools": DENIED_BUILTINS,
-           "expected_tool": tool,
-           "upstream_kind": upstream_kind,
-           "destination_url": sink_url}
-    # THE CHARGE ID WAS THROWN AWAY. `charge` returns one so the spend can be
-    # tied to what it produced, and this line discarded it, so every completed
-    # row left its charge unsettled: a call whose result nobody can find, which
-    # is the state the exam found rows in. Held here and settled against
-    # row.json on every exit from this function, including the early one.
-    charge_id = None
-    if not dry_run:
-        charge_id = ledger.charge(entry["id"], f"{variant['name']}/{route}")
-
-    def _settle(outcome):
-        """Tie the charge to its terminal artifact, once, whichever way we leave."""
-        if charge_id is not None:
-            ledger.settle(charge_id, str(run_dir / "row.json"), outcome)
-    # The allow list is the tool THIS scenario calls. Hardcoding the two
-    # filesystem tools meant the stub scenarios, which expose `gate2_fetch`, were
-    # permission-denied: the model emitted the tool_use and Claude Code refused
-    # it, so the route never ran and the delivered bytes were a denial message.
-    reachable = {tool, "mcp__fs__read_text_file", "mcp__fs__write_file"}
-    if variant.get("route") == "direct_second_server":
-        # THE SECOND ROUTE HAS TO BE CALLABLE. G2-12 asks what happens to a call
-        # that reaches the upstream without passing the mediator, and the second
-        # server was in the configuration while none of its tools were in the
-        # allow list, so the model could see the route and not take it and the
-        # row reported on the route it was supposed to avoid. Configured and
-        # inert, the same shape as the fault dispatcher.
-        #
-        # Keyed to the variant's own `route` field rather than to the presence
-        # of the server, because for every other scenario a call that went
-        # around the mediator is a different experiment and must read as one.
-        reachable |= {name.replace("mcp__fs__", "mcp__direct__")
-                      for name in list(reachable)}
-    allowed = ",".join(sorted(reachable))
-    row["allowed_tools"] = allowed
-    result, problem = call_claude(run_dir, prompt, config, dry_run=dry_run,
-                                  allowed=allowed)
-    if result:
-        row["session_id"] = result.get("session_id")
-        row["cost_usd"] = result.get("total_cost_usd")
-        row["num_turns"] = result.get("num_turns")
-        path = transcript_of(run_dir, result["session_id"])
-        row["transcript"] = str(path)
-        blocks = extract_tool_results(path.read_bytes()) if path.exists() else []
-        row["tool_result_blocks"] = [len(b) for b in blocks]
-        observed = _delivered(blocks)
-    else:
-        observed, row["problem"] = None, problem
-    # COLLECT, then calibrate again, then stop. `collect_drops` existed and was
-    # never called from here, so every row whose declared transport is
-    # `file_drop` reported `nothing_arrived` on the strength of an HTTP listener
-    # that was never the transport under test. The second calibration is what
-    # makes a terminal negative honest: it shows the observer still worked at
-    # the END of the run and not only at the start.
-    sink.collect_drops()
-    sink.calibrate("after")
-    sink.stop()
-    row["destination"] = sink.receipt()
-    sink.write_receipt(run_dir / "destination.receipt.json")
-    row["fs_tool_invoked"] = _fs_tool_invoked(row.get("transcript"), tool)
-    # STIMULUS BEFORE SCORE. What arrived is compared to `request.json` leaf by
-    # leaf, and a row whose stimulus was not what the package specifies is not a
-    # result about the product at all. This is the check whose absence let an
-    # empty write be published as a detector gap.
-    observed_call, attested_by = route_call(run_dir, route, row.get("transcript"),
-                                            variant)
-    stimulus = fidelity.compare(request, observed_call)
-    row["stimulus"] = {**stimulus.as_receipt(), "attested_by": attested_by}
-    (run_dir / "stimulus.receipt.json").write_text(
-        json.dumps(row["stimulus"], indent=1) + "\n")
-    row["verdict"] = verdict(run_dir, route, observed,
-                             run_dir / "proxy.receipts.jsonl", row["destination"])
-    if not row["fs_tool_invoked"]:
-        # Not a candidate result. A session where the model never reached the
-        # route measures the driving, not the boundary.
-        row["verdict"]["model_view"]["state"] = "INVALID_ROUTE_NOT_EXERCISED"
-    if not stimulus:
-        # Named, and it WINS over the route check: a call that reached the route
-        # carrying the wrong bytes is a worse failure than one that never
-        # reached it, because it produces a plausible number.
-        row["verdict"]["model_view"]["state"] = "INVALID_STIMULUS"
-        row["invalid_reason"] = stimulus.reason
-    (run_dir / "row.json").write_text(json.dumps(row, indent=1) + "\n")
-    _settle(row.get("verdict", {}).get("model_view", {}).get("state") or "completed")
-    return row
 
 
 def main(argv=None) -> int:
