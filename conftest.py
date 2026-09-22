@@ -345,3 +345,75 @@ def pytest_configure(config):
             f"{command[:120]}. It did not take the lock, so it is older than "
             f"this guard or was started by hand. Same reasoning: wait, or run "
             f"a targeted selection.")
+
+
+# ── a BROAD filter is still a full run ──────────────────────────────────────
+#
+# The pre-collection guard exempts any `-k` or `-m`, on the reasoning that a
+# filtered run is someone iterating on a few rows. That reasoning fails exactly
+# when the expression is broad: `pytest tests -k "test_"` selects nearly
+# everything and sails straight past a check that only looks at whether a filter
+# is PRESENT. Presence is not breadth, and the guard was reading the wrong one.
+#
+# Breadth is not knowable before collection, which is why this lives here and
+# not beside the other check.
+#
+# HOOK ORDER IS THE WHOLE MECHANISM. pytest's own `-k`/`-m` deselection happens
+# inside `pytest_collection_modifyitems`, so a single hook sees either the
+# collected set or the selected one depending on when it runs, and which one it
+# got is invisible in the result. So there are two: `tryfirst` records what was
+# COLLECTED, `trylast` reads what SURVIVED. Comparing a number to itself is the
+# failure this shape invites, and the control below proves the two differ.
+_COLLECTED = {"n": None}
+
+
+def _filter_is_broad(selected, collected):
+    """A filtered run wide enough to be a full suite in disguise.
+
+    Split out so it can be tested WITHOUT spawning pytest inside pytest -- which
+    would be both slow and, given what this file does, self-defeating: the child
+    would be a foreign pytest to every other session on the machine.
+    """
+    if not collected or not selected:
+        return False
+    return selected >= BREADTH_ABSOLUTE or selected >= collected * BREADTH_FRACTION
+
+BREADTH_FRACTION = 0.25          # a filter selecting more than this of the tree
+BREADTH_ABSOLUTE = 500           # ...or more than this many rows outright
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(session, config, items):
+    """BEFORE pytest's own -k/-m deselection, so this is what was COLLECTED."""
+    _COLLECTED["n"] = len(items)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_finish(session):
+    config = session.config
+    if not (config.option.keyword or config.option.markexpr):
+        return                    # unfiltered: the pre-collection check owns it
+    collected = _COLLECTED["n"]
+    selected = len(session.items)
+    if not collected or not selected:
+        return                    # nothing collected is not this check's business
+    if not _filter_is_broad(selected, collected):
+        return                    # genuinely narrow: this is someone iterating
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "tools"))
+    try:
+        from run_alone import current_holder, foreign_pytest, repo_lock_path
+    except ImportError:                                      # pragma: no cover
+        return
+    holder = current_holder(repo_lock_path())
+    other = None if holder is not None else foreign_pytest()
+    if holder is None and other is None:
+        return
+    who = (f"the repository lock (pid {holder})" if holder is not None
+           else f"a live pytest (pid {other[0]})")
+    pct = 100.0 * selected / collected
+    raise pytest.UsageError(
+        f"this run filtered, but it SELECTED {selected} of {collected} rows "
+        f"({pct:.0f}%), which is a full suite wearing a `-k`. {who} is already "
+        f"running against this repository, and two sessions here invent "
+        f"failures in one direction and hide them in the other. Narrow the "
+        f"expression, or wait.")
