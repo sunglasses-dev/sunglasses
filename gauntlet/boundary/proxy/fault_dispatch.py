@@ -74,6 +74,42 @@ def declared_fault(run_dir: pathlib.Path, held: str):
     return mode if mode in SELECTABLE else None
 
 
+def declared_kind(run_dir: pathlib.Path, held: str) -> str | None:
+    """The kind this scenario declares for the held payload, selectable or not.
+
+    `declared_fault` collapses two different answers into None: "this payload
+    declares no fault" and "this payload declares a fault I cannot inject". The
+    first means run an ordinary scan, and the second means this session cannot
+    run this scenario at all. A dispatcher that cannot tell them apart runs the
+    unfaulted scan for both and the row still produces a verdict, which is the
+    exact finding this file was written to fix, quoted at the top of it.
+
+    THIRTEEN KINDS ARE DECLARED across the delivery and the worker implements
+    three faults, so twelve of them reach this branch. None of the twelve is a
+    crash mode: they name the SHAPE of a scanner's output
+    (`worker_missing_axes`, `worker_false_string`, `worker_conflicting_allow`)
+    or a stage to fail at (`queue_before_worker`, `writer_before_first_byte`).
+    Teaching them here would be teaching this file to fake a scanner result,
+    which is not a fault injection. They need behaviour in the worker, and the
+    worker is a delivered artifact.
+
+    `exception` and `hang` are the other direction: the worker implements them
+    and this dispatcher offers them, and NO declared kind maps to either. They
+    are reachable only by a scenario nobody has written.
+    """
+    manifest = run_dir / "materialised.fault.json"
+    if not manifest.is_file():
+        return None
+    try:
+        record = json.loads(manifest.read_text())
+    except ValueError:
+        return None
+    digest = hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest()
+    if record.get("payload_sha256") != digest:
+        return None
+    return (record.get("fault") or {}).get("kind") or None
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="select the declared scanner fault")
     parser.add_argument("--run-dir", type=pathlib.Path, required=True)
@@ -84,9 +120,32 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     held = sys.stdin.buffer.read().decode("utf-8", "surrogatepass")
-    mode = declared_fault(args.run_dir, held) or "scan"
-    if mode not in args.modes and mode != "scan":
+    mode = declared_fault(args.run_dir, held)
+
+    if mode is None:
+        # DECLARED BUT NOT INJECTABLE IS NOT THE SAME AS NOT DECLARED. Falling
+        # through to an ordinary scan here is how a scenario that asked for a
+        # fault produces a clean verdict about a session that never had one.
+        # Refuse loudly instead: a missing row is recoverable and a wrong row
+        # is not.
+        kind = declared_kind(args.run_dir, held)
+        if kind:
+            sys.stderr.write(
+                f"fault_dispatch: this scenario declares the fault {kind!r} for "
+                f"the payload it is holding, and this session cannot inject it. "
+                f"The worker implements {SELECTABLE}. Running an ordinary scan "
+                f"would answer the scenario's question with a session that "
+                f"never had the fault in it.\n")
+            return 3
         mode = "scan"
+
+    if mode not in args.modes and mode != "scan":
+        # The operator narrowed `--modes` below what this scenario needs. Same
+        # reasoning: say so rather than quietly run something else.
+        sys.stderr.write(
+            f"fault_dispatch: this scenario declares {mode!r} and this session "
+            f"was configured for {tuple(args.modes)}.\n")
+        return 3
 
     command = [sys.executable, str(FAULT_WORKER), mode]
     if args.engine_root:
