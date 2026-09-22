@@ -50,9 +50,10 @@ def _triggers():
     for p in PATTERNS:
         if not p["id"].endswith("-API"):
             continue
-        parent = p["id"][:-4]
-        if not any(parent.startswith(x) for x in ("GLS-TP-", "GLS-TMS-", "GLS-MTI-")):
-            continue
+        # NO FAMILY FILTER. An earlier version listed the three families this
+        # branch happened to add, which meant the whole file -- CONTROL
+        # INCLUDED -- skipped itself anywhere those families were absent. A
+        # check that names the branch it was written on is not a check.
         for rx in p.get("regex") or []:
             s = regex_sample.sample(rx)
             if s and len(s.strip()) >= 8 and _re.search(rx, s, _re.IGNORECASE):
