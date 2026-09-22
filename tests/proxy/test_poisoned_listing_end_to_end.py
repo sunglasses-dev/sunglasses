@@ -167,3 +167,46 @@ def test_a_tools_list_block_names_the_rule_that_refused_it(tmp_path):
     assert rule_id in data["rule_ids"], (
         f"the refusal names {data['rule_ids']} but the listing was poisoned "
         f"with {rule_id}'s own trigger")
+
+
+def test_a_zero_byte_count_is_qualified_by_inspection_complete(tmp_path):
+    """The zero is not bare: the envelope says in the same breath why it is 0.
+
+    THE REVIEW OBJECTION THIS ANSWERS, and it was a fair one to raise. A
+    refusal that names its rules while reporting `inspected_utf8_bytes: 0`
+    reads, on its own, like a measurement that came back empty -- and the
+    proposed fix was to OMIT the counter when nothing was measured.
+
+    Omitting it would have been the wrong repair and this test is the right
+    one. `envelope.withheld` emits `inspection_complete` on the line directly
+    above the counter, so the envelope already distinguishes "inspected
+    nothing" from "inspected and found nothing"; the counter is a required
+    parameter of a deliberately fixed key set, and the ONLY conditional pair in
+    that envelope carries a comment saying no other refusal should grow a field
+    it has no use for. So the meaning of the zero is pinned HERE, as a control,
+    rather than by deleting the number that needed explaining.
+
+    A future change that reports a non-zero count on a path that never
+    inspected anything, or that drops `inspection_complete`, fails this row.
+    """
+    if not TRIGGERS:
+        pytest.skip("no rendered triggers on this branch")
+    rule_id, trigger = TRIGGERS[0]
+    hostile = PoisonedListing(tmp_path, trigger)
+    data = next(f for f in hostile.talk([INIT, LIST])
+                if f.get("id") == 2)["error"]["data"]
+
+    assert data["reason_code"] == "PROHIBITED_CONTENT"
+    assert data["inspection_complete"] is False, (
+        "the refusal claims a COMPLETED inspection, so a zero byte count below "
+        "would be a measurement of nothing rather than an absence of one")
+    for counter in ("inspected_utf8_bytes", "observed_content_bytes",
+                    "elapsed_ms"):
+        assert counter in data, (
+            f"{counter} is absent; the envelope is a fixed key set and a "
+            f"consumer that reads it positionally cannot tell a dropped field "
+            f"from a dropped measurement")
+        assert data[counter] == 0, (
+            f"{counter} is {data[counter]!r} on a refusal that reports "
+            f"inspection_complete false -- a count from an inspection that "
+            f"never ran is worse than no count")
