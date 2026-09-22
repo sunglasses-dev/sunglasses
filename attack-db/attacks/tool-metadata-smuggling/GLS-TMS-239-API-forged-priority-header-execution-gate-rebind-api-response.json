@@ -1,0 +1,23 @@
+{
+  "id": "GLS-TMS-239-API",
+  "name": "Forged Priority Header Execution Gate Rebind (api_response)",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "api_response"
+  ],
+  "description": "Detects a forged priority header, tool metadata, or execution manifest used to rebind or bypass trust boundary or execution gate policy.",
+  "keywords": [],
+  "regex": [
+    "(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|bypass|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:override|bypass|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|spoofed|tampered|counterfeit)\\b)(?=.*\\b(?:priority\\s+header|tool\\s+metadata|execution\\s+manifest|run\\s+context\\s+header|scheduler\\s+header)\\b)(?=.*\\b(?:override|overrides|overridden|bypass|bypasses|bypassed|skip|skips|skipped|ignore|ignores|ignored|rebind|rebinds|rebound)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+scope|trust\\s+boundary|execution\\s+gate)\\b).+"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-22",
+  "source": "patterns.py:GLS-TMS-239-API"
+}

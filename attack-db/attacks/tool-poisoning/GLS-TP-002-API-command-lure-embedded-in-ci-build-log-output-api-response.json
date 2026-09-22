@@ -1,0 +1,23 @@
+{
+  "id": "GLS-TP-002-API",
+  "name": "Command lure embedded in CI/build/log output (api_response)",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "critical",
+  "channels": [
+    "api_response"
+  ],
+  "description": "Catches command lures embedded in CI/build/log output that tell a coding agent to run a remediation one-liner \u2014 tool-output masquerading as trusted instruction.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\b(error|stack\\s+trace|build\\s+output|ci\\s+log|test\\s+failure|issue\\s+bot)\\b.{0,120}\\b(?:run|execute|paste|apply|fix\\s+with)\\b.{0,60}\\b(curl|wget|bash|sh|powershell|python\\s+-c)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-22",
+  "source": "patterns.py:GLS-TP-002-API"
+}

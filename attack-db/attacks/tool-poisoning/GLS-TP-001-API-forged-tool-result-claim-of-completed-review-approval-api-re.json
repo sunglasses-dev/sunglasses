@@ -1,0 +1,23 @@
+{
+  "id": "GLS-TP-001-API",
+  "name": "Forged tool-result claim of completed review/approval (api_response)",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "api_response"
+  ],
+  "description": "Detects forged tool-result claims that a review, approval, or compliance check already succeeded \u2014 a tool-poisoning primitive that steers agents without obvious override language.",
+  "keywords": [],
+  "regex": [
+    "(?i)(security|compliance|manager|human|admin)\\s+(review|approval|sign-?off)\\s+(?:already\\s+)?(?:passed|completed|confirmed|recorded|approved)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-22",
+  "source": "patterns.py:GLS-TP-001-API"
+}
