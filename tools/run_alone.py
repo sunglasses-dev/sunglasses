@@ -167,9 +167,26 @@ def _cmdlines() -> dict[int, str]:
 
 
 def _cwds(pids: list[int]) -> dict[int, pathlib.Path]:
-    """Each pid's working directory. `lsof -d cwd` in ONE call, not one each."""
+    """Each pid's working directory.
+
+    `/proc/<pid>/cwd` where there is a /proc, which is Linux and every CI
+    runner; `lsof -d cwd` otherwise, which is macOS. lsof is not installed by
+    default on a Linux runner, and a guard that silently sees nothing there
+    would be a guard that only works on the machine it was written on.
+    """
     if not pids:
         return {}
+
+    proc = pathlib.Path("/proc")
+    if proc.is_dir():
+        found: dict[int, pathlib.Path] = {}
+        for pid in pids:
+            try:
+                found[pid] = pathlib.Path(os.readlink(proc / str(pid) / "cwd"))
+            except OSError:
+                continue                    # exited, or not ours to look at
+        return found
+
     try:
         done = subprocess.run(
             ("lsof", "-a", "-d", "cwd", "-Fpn", "-p", ",".join(map(str, pids))),

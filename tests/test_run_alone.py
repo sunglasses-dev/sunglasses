@@ -71,9 +71,14 @@ def test_the_lock_is_keyed_on_the_shared_git_directory_not_the_worktree():
     assert shared is not None and shared.is_dir(), shared
     assert run_alone.repo_lock_path(ROOT) == shared / run_alone.REPO_LOCK_NAME
 
-    others = [r for r in run_alone.worktree_roots(ROOT) if r.is_dir() and r != ROOT]
-    assert others, "expected at least one sibling worktree of this repository"
-    assert run_alone.common_git_dir(others[0]) == shared
+    # The same answer from anywhere inside the repository, which is the property
+    # that makes it a repository key rather than a directory key. Asked from a
+    # SIBLING WORKTREE at first, and that only holds on a machine that happens
+    # to have one: a CI runner has exactly one checkout and the row failed there
+    # for the environment rather than for the code.
+    assert run_alone.common_git_dir(ROOT / "tests") == shared
+    assert run_alone.common_git_dir(ROOT / "tools") == shared
+    assert ROOT in run_alone.worktree_roots(ROOT), run_alone.worktree_roots(ROOT)
 
 
 def test_a_pytest_invocation_is_told_apart_from_a_mention_of_pytest():
@@ -122,9 +127,10 @@ def test_a_real_foreign_pytest_is_seen(tmp_path):
     process group. The scan must name that process — not the shell that started
     it, which is what the first version returned.
     """
-    others = [r for r in run_alone.worktree_roots(ROOT) if r.is_dir() and r != ROOT]
-    assert others, "expected a sibling worktree to run the foreign pytest in"
-    elsewhere = others[0]
+    # THIS checkout, which every environment has. Requiring a sibling worktree
+    # tested the machine's layout rather than the scan: a CI runner has one
+    # checkout and there is nothing to find.
+    elsewhere = ROOT
 
     sleeper = tmp_path / "test_sleeper.py"
     sleeper.write_text("import time\n\n\ndef test_sleeps():\n    time.sleep(30)\n")
