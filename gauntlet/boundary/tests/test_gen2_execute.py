@@ -147,6 +147,24 @@ def test_a_terminal_that_never_arrives_is_a_timeout_not_a_success(run_root, monk
     assert "1 of 2 declared frames" in str(exc.value), str(exc.value)
 
 
+REPO = pathlib.Path(__file__).resolve().parents[3]
+
+
+def _settled_reason(run_root):
+    """What the mediator recorded for this run, or None if it never settled."""
+    receipts = run_root / "proxy.receipts.jsonl"
+    if not receipts.is_file():
+        return None
+    reason = None
+    for line in receipts.read_text().splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        if entry.get("kind") == "SETTLED":
+            reason = entry.get("reason")
+    return reason
+
+
 def test_every_drivable_variant_runs_on_the_control_route(run_root):
     """The whole drivable set, through real pipes, in one sweep.
 
@@ -382,13 +400,23 @@ def test_every_drivable_variant_runs_on_the_strict_route(run_root):
                     adapter.UnsupportedEvent):
                 continue
             root = run_root / f"strict-{entry['id']}.{variant['name']}"
+            # WITH THE ENGINE, or this sweep never reaches its subject. Without
+            # `engine_root` the scanner cannot import `sunglasses.engine` and
+            # every inspection ends in SCAN_EXCEPTION — which IS a disposition,
+            # so the assertions below passed while the mediator was failing
+            # closed on a broken worker rather than scanning. Measured over all
+            # 27: 14 inspect, and all 14 settled SCAN_EXCEPTION. With the engine
+            # those same 14 settle CLEAN x11, PROHIBITED_SECRET x2,
+            # PROHIBITED_CONTENT x1, so the sweep had never once reached a
+            # detection.
             run = execute.run(entry, variant, route="proxy_strict", run_root=root,
-                              timeout_ms=20000)
+                              timeout_ms=20000, engine_root=REPO)
             ran.append({"id": f"{entry['id']}.{variant['name']}",
                         "as_declared": run.upstream_as_declared,
                         "disposition": run.disposition,
                         "terminal": run.terminal is not None,
-                        "expected": run.terminal_expected})
+                        "expected": run.terminal_expected,
+                        "settled": _settled_reason(root)})
 
     assert ran, "nothing was drivable on the strict route"
     assert all(r["as_declared"] for r in ran), \
@@ -402,6 +430,26 @@ def test_every_drivable_variant_runs_on_the_strict_route(run_root):
     # mediator to have an opinion about a request the scenario never makes.
     assert all(r["disposition"] for r in ran if r["expected"]), \
         [r for r in ran if r["expected"] and not r["disposition"]]
+
+    # THE SCAN REACHED ITS SUBJECT. A SCAN_EXCEPTION is the mediator failing
+    # closed on a worker that could not start, which is a fact about this
+    # harness and not about the candidate. Letting it through meant every
+    # inspecting row in this sweep reported on a session whose scanner never
+    # ran.
+    broken = [r for r in ran if r["settled"] == "SCAN_EXCEPTION"]
+    assert not broken, (
+        "the scanner raised instead of scanning; the engine is not reaching it: "
+        f"{[r['id'] for r in broken]}")
+
+    # AND IT REACHED A FINDING. If every row comes back CLEAN the sweep has
+    # gone quiet in the other direction, which looks exactly like a pass.
+    inspected = [r for r in ran if r["settled"]]
+    assert len(inspected) >= 14, [r["id"] for r in inspected]
+    findings = [r for r in inspected
+                if r["settled"] not in ("CLEAN", "OVER_BYTE_BUDGET")]
+    assert findings, (
+        "no row in the whole strict sweep produced a finding, so nothing here "
+        f"exercised detection: {[(r['id'], r['settled']) for r in inspected]}")
     assert len(ran) == 27, [r["id"] for r in ran]
 
 
