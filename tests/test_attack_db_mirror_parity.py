@@ -23,6 +23,7 @@ the manifest comparison and nothing else is. The per-rule files carry no clock:
 the exporter preserves an existing file's `date_added` and stamps today's only
 on a genuinely new rule, so a re-export of an unchanged rule is byte-identical.
 """
+import collections
 import json
 import pathlib
 import shutil
@@ -123,3 +124,74 @@ def test_the_clock_field_is_the_only_thing_excluded():
         f"attack-db/manifest.json's shape changed: {sorted(keys)}. Decide "
         f"whether the new field is deterministic before widening the "
         f"exclusion in test_the_manifest_matches_apart_from_its_clock.")
+
+
+def _mirrored_by_rule_id(root):
+    """rule id -> the files describing it, read from the files themselves."""
+    by = collections.defaultdict(list)
+    for path in sorted(root.rglob("*.json")):
+        if path.name == "manifest.json":
+            continue
+        try:
+            doc = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            continue
+        rule_id = doc.get("rule_id") or doc.get("id")
+        if rule_id:
+            by[rule_id].append(path.relative_to(root).as_posix())
+    return by
+
+
+def test_no_rule_is_described_by_more_than_one_file():
+    """The direction the file-set comparison above CANNOT report.
+
+    `test_every_rule_file_is_present_in_both` prints two differences, and the
+    second one -- "committed but no longer a rule" -- can never be non-empty.
+    `fresh_export` COPIES the committed tree before running the exporter, which
+    it has to, because the exporter reads each existing file to preserve
+    `date_added`; and the exporter only ever writes. So anything stale in the
+    committed tree is also in the "fresh" one and the difference is empty by
+    construction. The message promises a direction the fixture forbids.
+
+    That is not theoretical. A mirror FILENAME is derived from the rule's NAME,
+    so shortening seven sibling names to fit the 60-character cap produced seven
+    new files and left the seven old ones in place -- the published mirror
+    described each of those rules TWICE, under two different names, and parity
+    stayed green.
+
+    This guard is deliberately NARROW: one rule, one file. It does not ask
+    whether every file corresponds to a rule, because that question has a
+    different and much larger answer -- an export into an EMPTY tree reproduces
+    1568 of the 1599 committed files, and the 24 GHSA-family leftovers are a
+    decision about published data rather than something a test should delete on
+    someone's behalf.
+    """
+    duplicated = {rule_id: files
+                  for rule_id, files in _mirrored_by_rule_id(COMMITTED).items()
+                  if len(files) > 1}
+    assert duplicated == {}, (
+        "the published mirror describes these rules more than once, which "
+        "usually means a rule was RENAMED and the old file was left behind "
+        "(the filename is derived from the name, and the exporter only adds):\n  "
+        + "\n  ".join(f"{rule_id}: {files}" for rule_id, files in
+                      sorted(duplicated.items()))
+        + "\nDelete the stale file and re-run "
+          "scripts/export_patterns_to_attack_db.py.")
+
+
+def test_the_duplicate_reader_can_actually_see_a_duplicate(tmp_path):
+    """The control. Build the artefact, watch the reader name it.
+
+    Without it, a reader that returned `{}` for every input -- a bad glob, a
+    key that is not `rule_id`, a parse error swallowed -- would pass the row
+    above on a mirror that was full of duplicates.
+    """
+    (tmp_path / "a.json").write_text(json.dumps({"rule_id": "GLS-CONTROL-1"}))
+    (tmp_path / "b.json").write_text(json.dumps({"rule_id": "GLS-CONTROL-1"}))
+    (tmp_path / "c.json").write_text(json.dumps({"rule_id": "GLS-CONTROL-2"}))
+    seen = _mirrored_by_rule_id(tmp_path)
+    assert sorted(seen["GLS-CONTROL-1"]) == ["a.json", "b.json"], seen
+    assert seen["GLS-CONTROL-2"] == ["c.json"], seen
+    # And it must read the REAL mirror, not an empty set, or the row above is
+    # green because it measured nothing.
+    assert len(_mirrored_by_rule_id(COMMITTED)) > 1000
