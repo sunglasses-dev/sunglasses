@@ -41,6 +41,7 @@ from gen2 import adapter                                   # noqa: E402
 MAP_PATH = pathlib.Path(__file__).with_name("capability_map.json")
 
 ROUTE = "route_capability"
+REVIEWED = "reviewed"          # the only review_state `load_map` accepts
 ADAPTER_ONLY = "adapter_implementable"
 BUCKETS = frozenset({ROUTE, ADAPTER_ONLY})
 
@@ -104,6 +105,27 @@ def load_map(path: pathlib.Path | None = None) -> dict:
             raise MapInvalid(
                 f"{op!r} is classified with no evidence. A bucket without a "
                 "citation is an assertion, and this map exists to stop those.")
+    # THE DOCSTRING'S PROMISE, NOW KEPT. This said "the reviewed map, refused
+    # rather than defaulted if it is not one" and never read `review_state`.
+    #
+    # Measured 2026-09-22 before this existed: moving all six unclassified ops
+    # into `classified`, with evidence text reading "PROBE ONLY -- deliberately
+    # fabricated", flipped the report from REFUSED / exit 3 to COMPLETE /
+    # exit 0 and computed a ceiling, while the page went on rendering
+    # `capability_map_review_state: unreviewed` in a field nobody had to act on.
+    # This report's whole subject is a true number under a false label, and its
+    # own gate was doing it.
+    #
+    # The map is `authored_by: T10`. Without this, the author's own unreviewed
+    # assertions publish a ceiling, which is self-review with a citation.
+    # ABSENT IS NOT REVIEWED: a missing field must not read as consent.
+    if data.get("review_state") != REVIEWED:
+        raise MapInvalid(
+            f"capability map review_state is {data.get('review_state')!r}, not "
+            f"{REVIEWED!r}. A well-formed map that nobody reviewed is not a "
+            "reviewed map, and every ceiling computed from one is an assertion "
+            "wearing a citation.")
+
     overlap = set(data["classified"]) & set(data["unclassified"])
     if overlap:
         raise MapInvalid(

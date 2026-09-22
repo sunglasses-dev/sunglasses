@@ -42,8 +42,22 @@ def honest():
 
 
 @pytest.fixture(scope="module")
-def capmap():
-    return classify.load_map()
+def capmap(tmp_path_factory):
+    """The shipped map, marked reviewed FOR THESE TESTS ONLY.
+
+    `load_map` refuses an unreviewed map (that gate is itself tested, below),
+    and the map in the tree is `unreviewed` today. These rows exercise
+    CLASSIFICATION, not the review gate, so they get a reviewed copy rather than
+    the gate being weakened to let them pass — a suite that softens a gate to
+    stay green is how the gate stops meaning anything.
+
+    Nothing here marks the real map reviewed. Only a human review does that.
+    """
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    data["review_state"] = classify.REVIEWED
+    path = tmp_path_factory.mktemp("capmap") / "reviewed.json"
+    path.write_text(json.dumps(data))
+    return classify.load_map(path)
 
 
 def test_the_honest_artifact_validates(honest):
@@ -513,6 +527,11 @@ def _with_rows(honest, row_results):
 
 
 def _reload_map(data, tmp=None):
+    # Defaults to reviewed so a row about SOME OTHER defect is not silently
+    # answered by the review gate. A row that means to test review state sets
+    # `review_state` itself and this leaves it alone.
+    data = dict(data)
+    data.setdefault("review_state", classify.REVIEWED)
     path = pathlib.Path(tmp or "/tmp") / "capability_map_under_test.json"
     path.write_text(json.dumps(data))
     return classify.load_map(path)
@@ -555,3 +574,48 @@ def test_the_description_moves_when_the_outcome_does(honest):
     assert moved != _description(render.render(honest)), \
         "the description did not change when the outcome did — it is not derived"
     assert "REFUSED" not in moved
+
+
+# ── the map must be REVIEWED, not merely well-formed (T10, 2026-09-22) ──────
+#
+# `load_map`'s own docstring says "The reviewed map, refused rather than
+# defaulted if it is not one." It did not check `review_state` at all. Measured
+# before the fix, on a copy: moving all six unclassified ops into `classified`
+# with evidence text reading "PROBE ONLY — deliberately fabricated" flipped the
+# whole report from REFUSED / exit 3 to COMPLETE / exit 0 and computed a ceiling
+# — while `capability_map_review_state` still rendered `unreviewed` on the page.
+#
+# That is this report's own failure mode turned on itself: a true number under a
+# false label, with the label sitting right there being ignored. The map is
+# `authored_by: T10`, so without this the author's own unreviewed assertions
+# publish a ceiling.
+
+def test_an_unreviewed_map_is_refused(tmp_path):
+    """THE GATE. A well-formed map that nobody reviewed is not a reviewed map."""
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    data["review_state"] = "unreviewed"
+    p = tmp_path / "unreviewed.json"
+    p.write_text(json.dumps(data))
+    with pytest.raises(classify.MapInvalid) as e:
+        classify.load_map(p)
+    assert "review" in str(e.value).lower()
+
+
+def test_a_reviewed_map_still_loads(tmp_path):
+    """THE CONTROL. A fix that refused every map passes the row above and makes
+    the tool useless; this row is the only reason that one means anything."""
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    data["review_state"] = "reviewed"
+    p = tmp_path / "reviewed.json"
+    p.write_text(json.dumps(data))
+    assert classify.load_map(p)["review_state"] == "reviewed"
+
+
+def test_a_map_with_no_review_state_at_all_is_refused(tmp_path):
+    """Absent is not reviewed. A missing field must not read as consent."""
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    data.pop("review_state", None)
+    p = tmp_path / "noreview.json"
+    p.write_text(json.dumps(data))
+    with pytest.raises(classify.MapInvalid):
+        classify.load_map(p)
