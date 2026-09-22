@@ -1120,6 +1120,29 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             thread.join()
     finally:
         _kill_group(upstream, TERMINATION_GRACE_MS / 1000)
+        # UPSTREAM_CLOSED, MIRRORED FROM THE PRODUCT AND NOT INVENTED.
+        #
+        # `sunglasses/proxy/session.py` emits this, and its own comment is the
+        # discipline this copies: it "IS A CLAIM ABOUT PROCESSES, so it is only
+        # made when something actually supervised them", because saying it
+        # otherwise "puts a false sentence in the evidence while a child is
+        # still running". `_kill_group` above is this harness's supervision, so
+        # the claim is available here and nowhere earlier.
+        #
+        # GUARDED ON THE PROCESS HAVING ACTUALLY ENDED. `_kill_group` returns
+        # early when it cannot signal the group, so a `poll()` of None means a
+        # child outlived us and the honest record is silence, not a closure we
+        # did not witness.
+        #
+        # Added because T8 measured the product on 1e4e526: UPSTREAM_CLOSED is
+        # in `receipts.EVENTS`, and REQUEST_RECEIVED, DESCRIPTOR_CHANGED and
+        # APPROVAL_INVALIDATED are not. Only what the product records is
+        # mirrored here.
+        status = upstream.poll()
+        if status is not None:
+            proxy._emit("UPSTREAM_CLOSED", None, status=status,
+                        settled=sum(1 for e in proxy.events
+                                    if e.get("kind") == "SETTLED"))
         if receipts and not proxy.events:
             # The stream already holds every event. This only covers a run that
             # emitted nothing at all, so the file exists either way.

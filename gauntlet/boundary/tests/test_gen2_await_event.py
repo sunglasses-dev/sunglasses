@@ -38,13 +38,30 @@ def test_an_emitted_event_plans(event):
         == ["await_event"]
 
 
-@pytest.mark.parametrize("event", ["REQUEST_RECEIVED", "UPSTREAM_CLOSED",
-                                   "APPROVAL_INVALIDATED", "DESCRIPTOR_CHANGED"])
-def test_an_event_the_mediator_does_not_emit_is_refused_by_name(event):
-    """The four the contract names and passthrough.py does not emit."""
+@pytest.mark.parametrize("event", ["REQUEST_RECEIVED", "APPROVAL_INVALIDATED",
+                                   "DESCRIPTOR_CHANGED"])
+def test_an_event_the_product_does_not_record_is_refused_by_name(event):
+    """THREE now, not four, and the bar moved from the harness to the PRODUCT.
+
+    UPSTREAM_CLOSED left this list on 2026-09-22 because
+    `sunglasses.proxy.receipts.EVENTS` carries it and the harness now emits it
+    with the same discipline `session.py` uses. These three stay because the
+    product does not record them either — mirroring one would let the harness
+    observe something the shipped route cannot.
+    """
     with pytest.raises(adapter.UnsupportedEvent) as refusal:
         adapter.plan({"profile_steps": [_await(event)]})
     assert event in str(refusal.value)
+    # THE REASON, in the product's terms. "unsupported" reads as a to-do.
+    assert adapter.EVENT_REFUSAL_REASONS[event][:40] in str(refusal.value)
+
+
+def test_upstream_closed_is_answerable_because_the_product_records_it():
+    """The other half, so the list above cannot quietly become everything."""
+    from sunglasses.proxy import receipts
+
+    assert "UPSTREAM_CLOSED" in receipts.EVENTS
+    assert adapter.plan({"profile_steps": [_await("UPSTREAM_CLOSED")]})
 
 
 def test_the_refusal_names_every_unsupported_event_not_just_the_first():
@@ -56,9 +73,9 @@ def test_the_refusal_names_every_unsupported_event_not_just_the_first():
     """
     with pytest.raises(adapter.UnsupportedEvent) as refusal:
         adapter.plan({"profile_steps": [_await("REQUEST_RECEIVED"),
-                                        _await("UPSTREAM_CLOSED")]})
+                                        _await("DESCRIPTOR_CHANGED")]})
     assert "REQUEST_RECEIVED" in str(refusal.value)
-    assert "UPSTREAM_CLOSED" in str(refusal.value)
+    assert "DESCRIPTOR_CHANGED" in str(refusal.value)
 
 
 def test_a_supported_event_for_the_upstream_actor_is_refused():
@@ -83,7 +100,7 @@ def test_the_whole_schedule_is_refused_not_the_drivable_prefix():
     with pytest.raises(adapter.UnsupportedEvent):
         adapter.plan({"profile_steps": [
             {"op": "send_file", "origin": "client", "path": "a.jsonl"},
-            _await("UPSTREAM_CLOSED"),
+            _await("REQUEST_RECEIVED"),
         ]})
 
 

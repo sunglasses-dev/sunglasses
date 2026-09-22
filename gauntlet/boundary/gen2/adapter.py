@@ -68,7 +68,38 @@ IMPLEMENTED = frozenset({
 # capability check would pass a REQUEST_RECEIVED variant as drivable and then
 # fail partway, which is the "half a schedule produces evidence" failure this
 # module exists to prevent.
-SUPPORTED_EVENTS = frozenset({"SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED"})
+SUPPORTED_EVENTS = frozenset({"SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED",
+                              # Mirrored 2026-09-22 after T8 measured the
+                              # product on 1e4e526: UPSTREAM_CLOSED is in
+                              # `sunglasses.proxy.receipts.EVENTS` and the
+                              # harness now emits it with the same discipline,
+                              # only after supervising the child.
+                              "UPSTREAM_CLOSED"})
+
+# WHY EACH REMAINING EVENT IS REFUSED, in the product's own terms.
+#
+# "this mediator does not emit X" was true and useless: it invited the reading
+# that the harness is behind and should catch up. Three of these are refused
+# because THE PRODUCT DOES NOT RECORD THEM EITHER, and mirroring one would mean
+# the harness could observe something the shipped route cannot. That is not a
+# gap to close; it is the answer.
+#
+# Measured by T8 on main 1e4e526 and re-checked here by importing
+# `sunglasses.proxy.receipts.EVENTS` rather than by reading the report.
+EVENT_REFUSAL_REASONS = {
+    "REQUEST_RECEIVED": (
+        "the product records no such event: ADMITTED and FRAME_IN in "
+        "sunglasses/proxy/ carry an id TYPE, never an origin, so 'the upstream "
+        "received it' is not a distinction the shipped route can make"),
+    "DESCRIPTOR_CHANGED": (
+        "the product has this name only as an envelope reason_code in "
+        "sunglasses/proxy/approvals.py, retired through `_retire()`. It is a "
+        "reason attached to a refusal, not a record of a moment, so awaiting it "
+        "would be awaiting the wrong surface"),
+    "APPROVAL_INVALIDATED": (
+        "the product changes this state in sunglasses/proxy/pump.py and emits "
+        "NOTHING for it. There is no record to mirror"),
+}
 
 # Every await_event step naming a supported event carries actor `proxy` or
 # omits it, and the contract says an omitted actor means proxy. Measured across
@@ -168,13 +199,19 @@ class UnsupportedEvent(Exception):
     def __init__(self, requests):
         self.requests = sorted(set(requests))
         detail = ", ".join(f"{event} (actor {actor})" for event, actor in self.requests)
+        # NAMED, one line each, in the product's terms. A refusal that only says
+        # "not supported" reads as a to-do; these are refused because the
+        # PRODUCT does not record them, and mirroring one would let the harness
+        # observe something the shipped route cannot.
+        why = "; ".join(
+            f"{event}: {EVENT_REFUSAL_REASONS[event]}"
+            for event, _ in self.requests if event in EVENT_REFUSAL_REASONS)
         super().__init__(
-            "this mediator does not emit " + detail + ". The step contract names "
-            "seven events and `proxy/passthrough.py` emits three of them; the "
-            "rest have neighbours that arrive at a similar moment and mean "
-            "something else. Answering one of those from a neighbour would make "
-            "this adapter the author of the scenario's meaning, so the variant "
-            "is refused whole until the event exists by name.")
+            "this mediator does not emit " + detail + ". "
+            + (why + ". " if why else "")
+            + "Answering one of these from a neighbouring event that arrives at "
+            "a similar moment would make this adapter the author of the "
+            "scenario's meaning, so the variant is refused whole.")
 
 
 class NoStepsToDrive(Exception):
