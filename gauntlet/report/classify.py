@@ -42,6 +42,27 @@ MAP_PATH = pathlib.Path(__file__).with_name("capability_map.json")
 
 ROUTE = "route_capability"
 REVIEWED = "reviewed"          # the only review_state `load_map` accepts
+
+# HOW AN ENTRY CAME TO BE BELIEVED. `basis` was free text, so a typo produced a
+# bucket nobody could audit and nothing refused it.
+#
+# `executed_witness` is added by ruling (T9, 2026-09-22) as SCHEMA ONLY — there
+# are zero entries under it and there cannot yet be one, because nothing in
+# `gauntlet/` executes a step: the adapter exports `check_step` (shape) and
+# `plan` ("the steps that WOULD run") and no executor exists. It is defined now
+# so whoever builds the executor has the shape to fill, and so a claim of a run
+# that carries no record of one is refused rather than believed.
+REVIEWED_RULING = "reviewed_ruling"
+INSPECTED_SOURCE = "inspected_source"
+EXECUTED_WITNESS = "executed_witness"
+BASES = frozenset({REVIEWED_RULING, INSPECTED_SOURCE, EXECUTED_WITNESS})
+
+# An executed witness must say WHICH run, WHERE the record is, and WHAT TREE it
+# was driven against. The last one is not bookkeeping: a witness driven against
+# `gauntlet/boundary/proxy` is adapter-against-harness evidence and is NOT proof
+# about the real route, and an entry that does not say so will be read as the
+# stronger claim by the next person.
+WITNESS_FIELDS = ("run_id", "step_record", "driven_against")
 ADAPTER_ONLY = "adapter_implementable"
 BUCKETS = frozenset({ROUTE, ADAPTER_ONLY})
 
@@ -101,6 +122,20 @@ def load_map(path: pathlib.Path | None = None) -> dict:
                 f"{op!r} carries bucket {entry.get('bucket')!r}; the only "
                 f"buckets are {sorted(BUCKETS)}. An unrecognised bucket is not "
                 "a third answer, it is a map defect.")
+        basis = entry.get("basis")
+        if basis not in BASES:
+            raise MapInvalid(
+                f"{op!r} carries basis {basis!r}; the only bases are "
+                f"{sorted(BASES)}. A basis outside the enumeration is not a new "
+                "kind of knowing, it is a typo nobody can audit.")
+        if basis == EXECUTED_WITNESS:
+            missing = [f for f in WITNESS_FIELDS if not entry.get(f)]
+            if missing:
+                raise MapInvalid(
+                    f"{op!r} claims basis {EXECUTED_WITNESS!r} without "
+                    f"{missing}. Claiming a run happened is not recording one: "
+                    "say which run, where its step record is, and which tree it "
+                    "was driven against.")
         if not entry.get("evidence"):
             raise MapInvalid(
                 f"{op!r} is classified with no evidence. A bucket without a "
