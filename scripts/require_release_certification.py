@@ -82,14 +82,14 @@ def main() -> int:
 
     mine = [r for r in runs if str(r.get("headSha", "")).lower() == sha]
     if not mine:
-        refuse(f"no {WORKFLOW} run exists for {sha[:12]} — "
+        refuse(f"no {WORKFLOW} run exists for {sha} ({sha[:12]}) — "
                "an unverified tree is not publishable")
 
     # Prefer a completed run; a later in-progress rerun must not mask an
     # earlier verdict, and an in-progress-only result is not certification.
     completed = [r for r in mine if r.get("status") == "completed"]
     if not completed:
-        refuse(f"the {WORKFLOW} run for {sha[:12]} has not finished "
+        refuse(f"the {WORKFLOW} run for {sha} ({sha[:12]}) has not finished "
                f"(status={mine[0].get('status')}) — running is not passing")
 
     run = completed[0]
@@ -132,7 +132,19 @@ def main() -> int:
     if problems:
         refuse("this tree is not release certified:\n  " + "\n  ".join(problems))
 
-    print(f"RELEASE CERTIFIED: {sha[:12]} — run {run['databaseId']}, "
+    # 0.6.1 row 3. The FULL forty hex, with the short form beside it.
+    #
+    # This line printed `sha[:12]` and Friday's ship step compares it against an
+    # expected commit, so the operator expanded it by hand with `git rev-parse`
+    # at exactly the moment the step exists to remove hand-work. Twelve hex is
+    # also the same CLASS of identifier that PR #159 was opened to remove: the
+    # gate matched run heads on SEVEN characters and a reviewer mined a
+    # colliding commit in seven seconds. The fix went into the comparison and
+    # left the REPORT abbreviated, which is where a human does the comparing.
+    #
+    # The short form stays because an operator reads it aloud and pastes it into
+    # a branch name; it just no longer stands alone.
+    print(f"RELEASE CERTIFIED: {sha} ({sha[:12]}) — run {run['databaseId']}, "
           f"{len(REQUIRED_EXACT)} jobs + {len(legs)} matrix legs all green")
     return 0
 
