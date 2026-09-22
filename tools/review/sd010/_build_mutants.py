@@ -12,42 +12,49 @@ OUT = os.path.join(D, "mutants")
 REL = os.path.join("sunglasses", "patterns.py")
 orig = io.open(os.path.join(SRC, REL), encoding="utf-8").read()
 
-# The predicate has NO exclusion any more -- value-driven exclusions were
-# closed as a class on 9-21 after three of them were defeated by
-# attacker-chosen bytes. So M3/M8/M9 (which mutated that exclusion) are gone
-# and M11 replaces them: it ADDS one back and must silence the evasion rows.
-# The builder refused to build until these were retargeted, which is the point
-# of a target-absent guard -- a mutation that was never injected reads as a
-# skip, and a skip reads as coverage.
-BOUNDARY = r"(?:\A[ \t]*|\n[ \t]*|\r[ \t]*"
-CLASS    = r"""[\"'{\[,])"""
-TAIL     = r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=","""
+# THE BOUNDARY CLASS MOVED AGAIN with the indentation fix, and the builder
+# REFUSED to build until these were retargeted -- five targets had gone stale.
+# That refusal is the feature: a mutation never injected reads as a kill you
+# did not earn. Two new rows cover what the fix added.
+IND  = r"(?:[ \t]|\\t)*"
+CLASS = r"""[\"'{\[,]"""
 
 MUTS = [
- ("M1-case-scope-dropped",      "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
- ("M2-indentation-dropped",     BOUNDARY, r"(?:\A|\n|\r"),
- ("M4-bare-space-a-boundary",   CLASS, r"""[\"'{\[, ])"""),
- ("M5-line-start-dropped",      r"(?:\A[ \t]*|\n[ \t]*", r"(?:\n[ \t]*"),
- ("M7-apostrophe-removed",      CLASS, r"""[\"{\[,])"""),
- ("M10-literal-CR-removed",     r"|\r[ \t]*", ""),
+ ("M1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
+ # every indentation allowance, everywhere
+ ("M2-indentation-dropped",      IND, "", 0),      # every occurrence
+ ("M4-bare-space-a-boundary",    CLASS, r"""[\"'{\[, ]"""),
+ ("M5-line-start-dropped",       r"(?:\A" + IND + "|", "(?:"),
+ ("M7-apostrophe-removed",       CLASS, r"""[\"{\[,]"""),
+ ("M10-literal-CR-removed",      r"|\r" + IND, ""),
+ # NEW, from round 4b's findings
+ ("M12-escaped-tab-not-indent",  IND, r"[ \t]*", 0),   # every occurrence
+ ("M13-unicode-separators-gone", r"|[\u2028\u2029]" + IND, ""),
  # The CLASS control: put a value exclusion back and the evasion rows must go
- # quiet. This is the one that guards the decision the rule now rests on.
- ("M11-value-exclusion-readded", TAIL,
+ # quiet. This guards the decision the rule now rests on.
+ ("M11-value-exclusion-readded",
+  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",""",
   r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="""
   r"""(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""),
 ]
 
-missing = [n for n, old, _ in MUTS if old not in orig]
+# A mutation may need EVERY occurrence replaced, not the first. The
+# indentation group appears seven times in the boundary class, so replacing
+# one left the other six and the rows still fired -- a SURVIVOR that meant
+# "my mutation was too weak", not "no guard here". A survivor that is really
+# an ineffective mutation is the same lie as a kill that never injected.
+MUTS = [(m + (1,)) if len(m) == 3 else m for m in MUTS]
+missing = [n for n, old, _new, _c in MUTS if old not in orig]
 if missing:
     sys.exit(f"MUTATION TARGETS ABSENT, refusing to build a battery that would "
              f"silently skip: {missing}")
 
 ignore = shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache")
 index = []
-for name, old, new in MUTS:
+for name, old, new, count in MUTS:
     dst = os.path.join(OUT, name)
     shutil.copytree(SRC, dst, ignore=ignore)
-    mutated = orig.replace(old, new, 1)
+    mutated = orig.replace(old, new) if count == 0 else orig.replace(old, new, count)
     assert mutated != orig, name
     io.open(os.path.join(dst, REL), "w", encoding="utf-8").write(mutated)
     # verified on disk, not assumed from the write returning
