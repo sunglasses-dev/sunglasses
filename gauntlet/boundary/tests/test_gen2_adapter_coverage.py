@@ -67,7 +67,12 @@ def test_the_operations_this_adapter_implements_are_written_down():
         # Added with its implementation and tests. The opcode is NOT the unit
         # of capability for it: `SUPPORTED_EVENTS` is pinned separately below,
         # because this mediator emits three of the contract's seven events.
-        "await_event"})
+        "await_event",
+        # Answered from the mediator's own WORKER_OUTPUT receipts, which carry
+        # `accepted` and `discarded_reason`. Implementing it did NOT make any
+        # variant drivable: all five that name it also await events this
+        # mediator does not emit, and the op refusal had been masking that.
+        "release_any_old_workers"})
 
 
 def test_the_events_this_adapter_can_answer_are_written_down():
@@ -94,7 +99,14 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
     19 is measured, not chosen. The first version of this test said 18 because I
     guessed, and the count corrected me.
     """
-    drivable, refused, missing_ops = [], [], set()
+    # THREE BUCKETS, not two. `plan` refuses for a missing operation OR for an
+    # event this mediator never emits, and only the first was counted here. The
+    # sum reached 74 anyway because the op check runs first and every variant
+    # with an event gap also had a missing op, so the second refusal was never
+    # reached. Implementing `release_any_old_workers` removed the mask and four
+    # variants fell out of the accounting entirely, which is how a coverage
+    # number comes to describe a population it no longer covers.
+    drivable, refused, event_refused, missing_ops = [], [], [], set()
     for entry in runner.load_manifest()["scenarios"]:
         for variant in runner.scenario_of(entry)["variants"]:
             if "routes" not in variant:
@@ -106,11 +118,17 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
             except adapter.UnimplementedOperation as exc:
                 refused.append(f"{entry['id']}.{variant['name']}")
                 missing_ops |= set(exc.operations)
+            except adapter.UnsupportedEvent:
+                event_refused.append(f"{entry['id']}.{variant['name']}")
 
-    assert len(drivable) + len(refused) == 74, (len(drivable), len(refused))
+    assert len(drivable) + len(refused) + len(event_refused) == 74, (
+        len(drivable), len(refused), len(event_refused))
     # 27, measured. It was 19 before the four assertion steps, which were chosen
     # because the sweep said those four unlock the most for the least.
     assert len(drivable) == 27, sorted(drivable)
+    # The four G2-21 variants whose remaining blocker is an event, not an op.
+    assert len(event_refused) == 4, sorted(event_refused)
+    assert len(refused) == 43, len(refused)
     assert "arm_fault" in missing_ops, sorted(missing_ops)
     assert not (missing_ops & adapter.IMPLEMENTED), (
         "an operation cannot be both implemented and missing")

@@ -377,24 +377,49 @@ def test_every_second_generation_seed_carries_its_rejecting_mutation():
 
 def test_a_payload_reference_points_at_a_file_that_is_there_with_those_bytes():
     """The new seeds reuse the old seeds' payloads by hash rather than copying
-    them, so a drifted or missing source is a silent change of stimulus."""
-    import hashlib
+    them, so a drifted or missing source is a silent change of stimulus.
 
+    THROUGH THE RESOLVER, not around it. This read `ref["path"]` directly and so
+    asserted something nobody requires: that the literal path in the seed is on
+    disk. One of the five references names a private temporary tree that was
+    reaped months ago, which made this test red over a file whose bytes are
+    present, intact, and hash to exactly what the seed declares. The rule that
+    matters is the resolver's, and it is the rule every consumer uses, so this
+    asserts that one and nothing else.
+    """
     broken = []
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            if not variant.get("payload_ref"):
+                continue
+            try:
+                runner.resolve_payload_ref(variant)
+            except (FileNotFoundError, ValueError) as exc:
+                broken.append(f"{entry['id']}.{variant['name']}: {exc}")
+    assert broken == [], broken
+
+
+def test_the_two_payload_resolvers_agree_on_every_reference():
+    """`runner` resolves references for the harness and `gen2.materialize`
+    resolves them for the materialiser. Two rules for one question is how the
+    harness comes to read one stimulus and the artifacts get built from another,
+    which is the exact failure `materialize.assert_same_seed` exists to catch
+    one layer up. So they are pinned to each other here.
+    """
+    from gen2 import materialize
+
+    disagreed = []
     for entry in runner.load_manifest()["scenarios"]:
         for variant in runner.scenario_of(entry)["variants"]:
             ref = variant.get("payload_ref")
             if not ref:
                 continue
-            path = pathlib.Path(ref["path"])
-            if not path.is_file():
-                broken.append(f"{entry['id']}.{variant['name']}: {path} missing")
-                continue
-            actual = hashlib.sha256(path.read_bytes()).hexdigest()
-            if actual != ref["sha256"]:
-                broken.append(f"{entry['id']}.{variant['name']}: {path} is "
-                              f"{actual[:12]}, the seed expects {ref['sha256'][:12]}")
-    assert broken == [], broken
+            where = f"{entry['id']}.{variant['name']}"
+            mine = runner._durable(pathlib.Path(ref["path"]))
+            theirs = materialize.resolved_payload_path(ref, where=where)
+            if mine != theirs:
+                disagreed.append(f"{where}: runner {mine}, materialise {theirs}")
+    assert disagreed == [], disagreed
 
 
 def test_the_payload_resolver_checks_the_hash_and_not_just_the_path(tmp_path):

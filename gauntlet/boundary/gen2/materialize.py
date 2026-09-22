@@ -17,12 +17,15 @@ Nothing here writes into the package. The check reads both copies and refuses.
 from __future__ import annotations
 
 import contextlib
+import copy
 import dataclasses
 import hashlib
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 REVIEW_ROOT = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
@@ -35,6 +38,12 @@ MATERIALISER = REVIEW_ROOT / "materialize_specs.py"
 # resolve into a real tree is a fixture that can reach one.
 PRIVATE_TMP = pathlib.Path("/private/tmp")
 
+# Where the seeds were built, and where their payload references still point.
+# The tree was reaped, as a private temporary tree is supposed to be, and the
+# references in scenario.json are frozen absolute paths into it. Every file it
+# held also exists under the review root, which is on disk and durable.
+REAPED_FIXTURE_ROOT = pathlib.Path("/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13")
+
 
 class UnsafeRunRoot(Exception):
     """A run root outside the private temporary tree."""
@@ -46,6 +55,10 @@ class SeedCopiesDiverged(Exception):
 
 class MaterialisationFailed(Exception):
     """The materialiser did not produce what the variant names."""
+
+
+class PayloadReferenceUnresolved(Exception):
+    """A payload reference names a file that is gone, with no twin that binds."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -123,6 +136,137 @@ def assert_same_seed(directory: str, *, package: pathlib.Path | None = None,
     ).hexdigest()
 
 
+def resolved_payload_path(ref: dict, *, where: str) -> pathlib.Path:
+    """The file a payload reference means, which is not always the path it names.
+
+    The reference is a frozen absolute path into a private temporary tree that
+    no longer exists. Redirecting it is only safe because the reference also
+    carries the digest: the twin under the review root is accepted when its
+    BYTES hash to what the reference declares, and refused otherwise. So this
+    cannot quietly substitute a different payload, which is the only thing that
+    would make the run report on a scenario nobody wrote.
+
+    A path that is still there is returned untouched. Resolution is for the
+    reaped tree alone; anything else missing is a refusal, because a reference
+    outside that tree pointing at nothing is a broken delivery and not a
+    reaped one.
+    """
+    declared = pathlib.Path(ref["path"])
+    if declared.is_file():
+        return declared
+
+    try:
+        relative = declared.relative_to(REAPED_FIXTURE_ROOT)
+    except ValueError:
+        raise PayloadReferenceUnresolved(
+            f"{where}: the payload reference names {declared}, which is not "
+            f"there and is not under {REAPED_FIXTURE_ROOT}. Only the reaped "
+            "fixture tree is resolved; this is a delivery that lost a file."
+        ) from None
+
+    twin = REVIEW_ROOT / relative
+    if not twin.is_file():
+        raise PayloadReferenceUnresolved(
+            f"{where}: the payload reference names {declared}, the tree it "
+            f"points into was reaped, and there is no copy at {twin}.")
+
+    got = hashlib.sha256(twin.read_bytes()).hexdigest()
+    if got != ref["sha256"]:
+        raise PayloadReferenceUnresolved(
+            f"{where}: {twin} is where {declared} was, and its bytes are not "
+            f"that payload. The reference declares {ref['sha256'][:12]} and the "
+            f"file hashes to {got[:12]}. The digest decides, so this refuses "
+            "rather than build a variant out of a different payload."
+        )
+    return twin
+
+
+def _without_payload_paths(scenario: dict) -> dict:
+    """The scenario with every payload path removed, for comparing the rest."""
+    bare = copy.deepcopy(scenario)
+    for variant in bare.get("variants", []):
+        if isinstance(variant.get("payload_ref"), dict):
+            variant["payload_ref"].pop("path", None)
+    return bare
+
+
+def _resolved_scenario(delivered_path: pathlib.Path, *, directory: str) -> str:
+    """The delivered scenario with its payload paths resolved, and nothing else.
+
+    The comparison at the end is the point. This function edits a document the
+    materialiser treats as the contract, so it has to be provable that it
+    changed the one field it claims to change. Digests, expectations, sequences
+    and the variant list all come through untouched or this refuses.
+    """
+    delivered = json.loads(delivered_path.read_text())
+    resolved = copy.deepcopy(delivered)
+    for variant in resolved.get("variants", []):
+        ref = variant.get("payload_ref")
+        if not isinstance(ref, dict) or "path" not in ref:
+            continue
+        ref["path"] = str(resolved_payload_path(
+            ref, where=f"{directory}.{variant.get('name')}"))
+
+    if _without_payload_paths(delivered) != _without_payload_paths(resolved):
+        raise PayloadReferenceUnresolved(
+            f"{directory}: resolving the payload references changed something "
+            "other than a payload path. Refusing rather than handing the "
+            "materialiser a contract it was not given."
+        )
+    return json.dumps(resolved, ensure_ascii=False, indent=1) + "\n"
+
+
+@contextlib.contextmanager
+def _materialiser_root(directory: str):
+    """A root the materialiser can run from whose payload references resolve.
+
+    The script finds its own root by resolving its own path, so it is the one
+    thing here that has to be a real copy. Everything else it reads is linked
+    to the delivery, which means `expected.json` still resolves to the review
+    copy the schedule has always named, and the seed the materialiser builds
+    from is still the delivered seed.
+
+    Two files are not links. `scenario.json`, because resolving its payload
+    paths is the whole purpose. And `evidence/`, because the materialiser
+    writes its receipt there on every call and the delivered receipt is
+    ASTRA's record of THEIR run.
+
+    Nothing under the review root is written. The copy is torn down after.
+    """
+    seed = REVIEW / directory
+    if not seed.is_dir():
+        raise SeedCopiesDiverged(
+            f"{directory}: no such seed under the materialiser's copy {REVIEW}")
+
+    workspace = pathlib.Path(tempfile.mkdtemp(prefix="gen2-materialiser-",
+                                              dir=PRIVATE_TMP))
+    try:
+        shutil.copy2(MATERIALISER, workspace / MATERIALISER.name)
+        shutil.copytree(REVIEW_ROOT / "evidence", workspace / "evidence")
+        for sibling in REVIEW_ROOT.iterdir():
+            if sibling.name in {"evidence", "fixtures", MATERIALISER.name}:
+                continue
+            (workspace / sibling.name).symlink_to(sibling)
+
+        fixtures = workspace / "fixtures"
+        fixtures.mkdir()
+        for sibling in REVIEW.iterdir():
+            if sibling.name != directory:
+                (fixtures / sibling.name).symlink_to(sibling)
+
+        mirror = fixtures / directory
+        mirror.mkdir()
+        for member in seed.iterdir():
+            if member.name != "scenario.json":
+                (mirror / member.name).symlink_to(member)
+        (mirror / "scenario.json").write_text(
+            _resolved_scenario(seed / "scenario.json", directory=directory))
+
+        yield workspace
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def materialize(entry: dict, variant: dict, *, run_root: pathlib.Path) -> Built:
     """Build one second generation variant's artifacts, and hand back bytes.
 
@@ -147,13 +291,14 @@ def materialize(entry: dict, variant: dict, *, run_root: pathlib.Path) -> Built:
     seed_digest = assert_same_seed(entry["directory"])
 
     run_root.parent.mkdir(parents=True, exist_ok=True)
-    with _astras_evidence_untouched():
-        result = subprocess.run(
-            [sys.executable, str(MATERIALISER),
-             "--seed", entry["directory"],
-             "--variant", variant["name"],
-             "--run-root", str(run_root)],
-            capture_output=True, text=True)
+    with _materialiser_root(entry["directory"]) as materialiser_root:
+        with _astras_evidence_untouched():
+            result = subprocess.run(
+                [sys.executable, str(materialiser_root / MATERIALISER.name),
+                 "--seed", entry["directory"],
+                 "--variant", variant["name"],
+                 "--run-root", str(run_root)],
+                capture_output=True, text=True)
     if result.returncode != 0:
         raise MaterialisationFailed(
             f"{entry['id']}.{variant['name']}: the materialiser exited "

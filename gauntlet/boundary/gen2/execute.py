@@ -172,6 +172,48 @@ def _error_for(messages: list, wanted) -> dict | None:
     return None
 
 
+def _receipts_of_kind(receipts: pathlib.Path, kind: str) -> list[dict]:
+    """Every receipt of `kind`, in order, uncorrelated.
+
+    `_event_for` answers "did THIS id see this event" and is right for the
+    correlated steps. `release_any_old_workers` asks about ANY worker, so it
+    needs the whole stream — using the correlated reader would silently answer
+    a narrower question under the wider op's name.
+
+    A missing receipts file yields an empty list, never an error: on the control
+    route there is no mediator and so no receipts, and that is the definition of
+    the control rather than a failure to observe.
+    """
+    if not receipts.is_file():
+        return []
+    out = []
+    for line in receipts.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("kind") == kind:
+            out.append(event)
+    return out
+
+
+def _forwarded_upstream(receipts: pathlib.Path) -> list:
+    """The frames the mediator actually sent upstream, from its own receipts.
+
+    `client_wire` is what this adapter wrote into the mediator's stdin and
+    `upstream_wire` is what came back out of its stdout toward the client.
+    Neither is egress: the upstream is a CHILD of the mediator, so nothing this
+    adapter holds ever saw the forwarded bytes. `passthrough.py` records them,
+    with `replaced` set when what went out is not what came in, and that record
+    is the only place the question has an answer.
+    """
+    return [message for entry in _receipts_of_kind(receipts, "RPC_EGRESS")
+            if entry.get("direction") == "request"
+            for message in _messages((entry.get("raw") or "").encode())]
+
+
 def _event_for(receipts: pathlib.Path, kind: str, wanted) -> dict | None:
     """The first receipt of `kind` correlated to `wanted`, or None.
 
@@ -376,10 +418,52 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         if op == "assert_no_rpc_response_to_notification_or_borrowed_id":
             assertions.append({"op": op, **_check_correlation(sent, received)})
         elif op == "assert_zero_upstream_copies":
+            # AGAINST WHAT THE UPSTREAM GOT, which differs by route.
+            #
+            # This counted the reference against `sent` on both routes. On the
+            # control that is exactly right: with nothing in the middle the
+            # client's stdin IS the upstream's stdin, so every frame sent
+            # arrived. On the mediated route it answers a different question
+            # under the same name, and it cannot answer this one: the reference
+            # file is the file the schedule just sent, so it is always a subset
+            # of the client wire and the step can never hold. Two runs of
+            # G2-16.wire_name, one where the scanner threw and the mediator
+            # failed closed and one where it found the secret, printed the same
+            # `copies: 1` while the mediator's receipts recorded
+            # `forwarded: false` both times.
             reference = _messages(declared(step["path"]).read_bytes())
-            copies = _count_copies(reference, sent)
+            arrived = (_forwarded_upstream(run_root / "proxy.receipts.jsonl")
+                       if route == "proxy_strict" else sent)
+            copies = _count_copies(reference, arrived)
             assertions.append({"op": op, "path": step["path"], "copies": copies,
-                               "held": copies == 0})
+                               "held": copies == 0, "basis": route})
+        elif op == "release_any_old_workers":
+            # WHAT THE MEDIATOR RECORDS, not what this adapter hopes.
+            # `passthrough.py` emits WORKER_OUTPUT with `accepted` and
+            # `discarded_reason`; a worker whose output was thrown away carries
+            # a reason and accepted=False. So "were the old workers released"
+            # is answerable from the receipts, with no new machinery.
+            #
+            # NOT CORRELATED TO ONE ID, and that is the point of the op's name:
+            # it asks about ANY worker still around, so the question is over the
+            # whole receipt stream rather than one request. Correlating it would
+            # answer a narrower question under this op's name.
+            outputs = _receipts_of_kind(run_root / "proxy.receipts.jsonl",
+                                        "WORKER_OUTPUT")
+            discarded = [e for e in outputs if e.get("discarded_reason")]
+            row = {"op": op,
+                   "worker_outputs": len(outputs),
+                   "discarded": len(discarded),
+                   "reasons": sorted({e["discarded_reason"] for e in discarded}),
+                   # ABSENCE IS REPORTED, NEVER PASSED OVER. Zero worker outputs
+                   # means nothing ran to be released, which is a different fact
+                   # from "everything was released" and must not read as one.
+                   "observed": bool(outputs)}
+            if step.get("require_discard"):
+                row["require_discard"] = True
+                row["satisfied"] = bool(discarded)
+            assertions.append(row)
+
         elif op == "await_event":
             # CORRELATED BY THE FILE THE STEP NAMES, like every other id here.
             # `correlate_id_from` rather than `id_from`, and reading it from the

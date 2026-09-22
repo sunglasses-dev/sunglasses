@@ -41,6 +41,13 @@ IMPLEMENTED = frozenset({
     # than assumed — all 24 variants naming it need at least one other
     # unimplemented operation beside it.
     "await_event",
+    # Reads the mediator's own WORKER_OUTPUT receipts (`accepted`,
+    # `discarded_reason`) — evidence the executor already collects, no new
+    # machinery. Added 2026-09-22 with its implementation and its test, as the
+    # rule above requires. It is the ONLY one of the four unclassified ops that
+    # can be driven today: the other three appear only in variants whose
+    # `arm_fault` declares a kind `fault_dispatch.SELECTABLE` cannot select.
+    "release_any_old_workers",
 })
 
 # THE EVENTS THIS MEDIATOR ACTUALLY EMITS, of the seven the contract names.
