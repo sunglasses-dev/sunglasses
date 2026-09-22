@@ -163,7 +163,11 @@ def test_every_drivable_variant_runs_on_the_control_route(run_root):
                 continue
             try:
                 adapter.plan(artifacts.of_record(entry, variant).schedule)
-            except (adapter.UnimplementedOperation, adapter.NoStepsToDrive):
+            except (adapter.UnimplementedOperation, adapter.NoStepsToDrive,
+                    # An event this mediator never emits refuses the variant
+                    # just as completely as a missing operation. It was absent
+                    # here only because the op check always fired first.
+                    adapter.UnsupportedEvent):
                 continue
             drivable.append(f"{entry['id']}.{variant['name']}")
             root = run_root / f"{entry['id']}.{variant['name']}"
@@ -371,7 +375,11 @@ def test_every_drivable_variant_runs_on_the_strict_route(run_root):
                 continue
             try:
                 adapter.plan(artifacts.of_record(entry, variant).schedule)
-            except (adapter.UnimplementedOperation, adapter.NoStepsToDrive):
+            except (adapter.UnimplementedOperation, adapter.NoStepsToDrive,
+                    # An event this mediator never emits refuses the variant
+                    # just as completely as a missing operation. It was absent
+                    # here only because the op check always fired first.
+                    adapter.UnsupportedEvent):
                 continue
             root = run_root / f"strict-{entry['id']}.{variant['name']}"
             run = execute.run(entry, variant, route="proxy_strict", run_root=root,
