@@ -28,11 +28,18 @@ import json
 import pathlib
 import uuid
 
-from . import (activation, bounds, envelope, framing, inspection, policy,
+from . import (activation, bounds, envelope, framing, inspection, policy, pump,
                receipts, selector, snapshot, worker)
 
-CLIENT = "client"
-UPSTREAM = "upstream"
+# ONE DEFINITION, ALIASED RATHER THAN RE-SPELLED. These were two more copies
+# of a vocabulary `pump` already owns: `ORIGIN_CLIENT`, `ORIGIN_UPSTREAM`,
+# `ORIGIN_PROXY`. Equal by value, with nothing keeping them equal -- and the
+# moment origin goes onto a receipt, a drifted spelling is a false fact in a
+# durable record. Binding them to pump's constants keeps this module's own
+# idiom at the eight call sites that use it while making a divergence
+# impossible rather than merely unlikely.
+CLIENT = pump.ORIGIN_CLIENT
+UPSTREAM = pump.ORIGIN_UPSTREAM
 REQUEST = "request"
 RESULT = "result"
 
@@ -609,7 +616,7 @@ class Route:
         refusal = []
         admitted = []
         if not self.session.admit_request(request_id, method=method,
-                                          origin="client",
+                                          origin=CLIENT,
                                           on_refusal=refusal.append,
                                           on_attempt=admitted.append):
             closed = self.session.closed_with()
@@ -627,7 +634,16 @@ class Route:
         # kept it. It travels as a parameter from here to every settlement and
         # every release token.
         attempt = admitted[0] if admitted else None
-        self._record("ADMITTED", id_type=type(request_id).__name__)
+        # ORIGIN, beside the id type. The type answers "was it 4 or \"4\"";
+        # origin answers WHO AUTHORED the request, which the proxy already knows
+        # here -- it is part of the identity key (`pump.key()` is origin plus
+        # JSON type plus value) and it was passed into `admit_request` a few
+        # lines above. It was known at this exact moment and dropped, so an
+        # auditor reading ADMITTED could not tell a client call from an
+        # upstream-authored one. `FRAME_IN` carries `direction`, which is the
+        # hop, not the author.
+        self._record("ADMITTED", id_type=type(request_id).__name__,
+                     origin=CLIENT)
 
         # T2.R14. Zero inspectable leaves is COMPLETE for these shapes only, so
         # they are forwarded without a scan rather than sent to a worker to
