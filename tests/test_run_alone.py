@@ -106,6 +106,21 @@ def test_a_pytest_invocation_is_told_apart_from_a_mention_of_pytest():
         "/bin/zsh -c 'cd somewhere && python3 -m pytest tests/'")
 
 
+def test_the_classifier_recognises_the_pytest_that_is_running_this_test():
+    """Against the REAL invocation, whatever form this environment used.
+
+    The table above is a set of strings I thought of. This is the one running
+    now, and it is the row that catches the forms I did not think of: the
+    classifier handled `python -m pytest`, which is how everything on my
+    machine starts, and missed the console script, which is how CI starts. The
+    table was green while the guard was blind.
+    """
+    mine = run_alone._cmdlines().get(os.getpid())
+    assert mine, f"our own pid {os.getpid()} is not in the process listing"
+    assert run_alone.is_pytest_invocation(mine), (
+        f"this process IS pytest and the classifier says otherwise: {mine!r}")
+
+
 def test_the_scan_excludes_our_own_process_group_and_not_merely_our_pid():
     """This test runs INSIDE pytest, and xdist would add workers besides.
 

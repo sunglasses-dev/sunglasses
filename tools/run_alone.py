@@ -230,9 +230,32 @@ def is_pytest_invocation(command: str) -> bool:
         return True
     if not name.startswith("python") and name != "py":
         return False
-    for first, second in zip(argv, argv[1:]):
-        if first == "-m" and second == "pytest":
-            return True
+
+    # `-m pytest` AND THE CONSOLE SCRIPT, which is the common form and was
+    # missed. Running `pytest` resolves a shebang, so the kernel execs the
+    # interpreter with the script as argv[1] and `ps` renders
+    # `.../Python /usr/local/bin/pytest -q ...` — no `-m` anywhere. The guard
+    # recognised only `-m pytest` and was therefore blind to how CI and most
+    # people start a run. It took a CI failure to surface it, because on this
+    # machine everything is launched as `python3 -m pytest`.
+    VALUED = {"-W", "-X", "-Q", "--check-hash-based-pycs"}
+    rest = argv[1:]
+    index = 0
+    while index < len(rest):
+        token = rest[index]
+        if token == "-m":
+            return index + 1 < len(rest) and rest[index + 1] == "pytest"
+        if token in VALUED:
+            index += 2                       # the flag and the value it takes
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        # The first token that is not a flag is the script the interpreter
+        # runs. Anything after it belongs to that script, so a test file named
+        # `test_pytest_helpers.py` in the arguments cannot be mistaken for the
+        # runner itself.
+        return os.path.basename(token).lower().startswith("pytest")
     return False
 
 
