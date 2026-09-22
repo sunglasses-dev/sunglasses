@@ -10,7 +10,7 @@ import batch
 from destination.sink import Destination
 from proxy import passthrough as proxy
 
-def test_native_g2_04_pair():
+def test_native_g2_04_pair(runnable_direct_route):
     results={}
     config_source=ARCHIVE/'evidence/GATE2_RUN_2026-09-13/live4/G2-04.main.control/mcp.control.json'
     original=json.loads(config_source.read_text())['mcpServers']['fs']
