@@ -416,9 +416,23 @@ def _held_inspection_input(run_dir: pathlib.Path, direction: str) -> str:
     """
     if direction == "result":
         lines = (run_dir / "upstream.jsonl").read_bytes().splitlines()
-        message = json.loads(next(line for line in lines if line.strip()))
+        raw = next(line for line in lines if line.strip())
     else:
-        message = json.loads((run_dir / "request.json").read_text())
+        raw = (run_dir / "request.json").read_bytes()
+
+    try:
+        message = json.loads(raw)
+    except ValueError:
+        # A FRAME THE PROXY WOULD REFUSE HOLDS NOTHING, and this mirrors it
+        # rather than deciding for itself. `passthrough` emits FRAME_REFUSED
+        # with reason `unparseable` and never inspects such a frame, so there
+        # is no inspection input to record — not an empty one, none.
+        #
+        # G2-10.invalid_json carries invalid JSON ON PURPOSE; that IS the
+        # scenario. This function raised on it, so `run_one` died before
+        # writing anything and the variant could not be driven through the
+        # batch path at all.
+        return None
     return "\n".join(value for _, value in passthrough.inspection_input(message, direction))
 
 
@@ -464,7 +478,16 @@ def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
             # only the result direction, where the payload happens to BE the
             # whole inspection input, and the three request rows ran an ordinary
             # scan and reported PROHIBITED_SECRET with no fault worker started.
-            "payload_sha256": hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest(),
+            # NO DIGEST WHEN THERE IS NOTHING HELD, and deliberately not the
+            # digest of an empty string: that would key this record to every
+            # run that happens to hold nothing, and the dispatcher matches on
+            # exactly this field. Absent, it can never equal a real digest, so
+            # the fault is simply never selected — which is the right answer
+            # for a frame the proxy refuses before inspecting.
+            "payload_sha256": (
+                hashlib.sha256(held.encode("utf-8", "surrogatepass")).hexdigest()
+                if held is not None else None),
+            "inspection_input": "unparseable" if held is None else "held",
             "payload_file_sha256": hashlib.sha256(
                 materialised_payload.read_bytes()).hexdigest(),
         }, indent=1) + "\n")
