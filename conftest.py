@@ -33,6 +33,8 @@ import signal
 import threading
 import time
 
+import pathlib
+import sys
 import pytest
 
 from sunglasses.engine import SunglassesEngine
@@ -278,3 +280,68 @@ def engine_budget():
             f"if it genuinely needs its own, and raise the declared budget in "
             f"the same commit if the extra engine is deliberate.")
 
+
+
+# ── one full suite at a time, per REPOSITORY ─────────────────────────────────
+#
+# WHY THIS IS HERE AND NOT A RULE IN A DOCUMENT. 2026-09-22: the gauntlet
+# boundary suite was reported FLAKY on runs that returned 15, 17, 16 and 20
+# failures. It is not flaky -- five sequential runs of an untouched tree
+# returned 15 every time with zero movers. The spread came from two and three
+# pytest sessions running at once on one machine: both suites spawn real
+# subprocesses, bind real files and drive timed barriers, so a number produced
+# beside another run is VOID rather than merely noisy. A FALSE FINDING ABOUT
+# THE HARNESS WAS WRITTEN UP AND REPORTED before anyone measured it alone.
+#
+# The scanner suite is the other half of that collision and, measured the same
+# day, the louder half: a full run is 4,115 tests and 28 minutes, and three of
+# them went through this machine in one morning. A rule in a manual is read by
+# whoever already knows it. This refuses.
+#
+# ONLY A FULL SUITE IS GATED. A targeted run -- one file, one node id, `-k` --
+# is how anyone iterates, it is short, and refusing it would make the guard
+# something people switch off. The lock exists for the 28-minute runs.
+#
+# IT REFUSES, IT DOES NOT WARN. A warning at the top of a 28-minute run is read
+# after the damage, if at all.
+def _run_is_the_whole_tree(config):
+    """True when this invocation means "everything", not "these rows".
+
+    `config.args` is what the user actually typed, already absolutised. No
+    arguments means the rootdir; `tests` or `tests/` means the tree. Anything
+    naming a file, a node id or a `-k` selection is a targeted run and is left
+    alone.
+    """
+    if config.option.keyword or config.option.markexpr:
+        return False
+    root = pathlib.Path(str(config.rootdir)).resolve()
+    args = [pathlib.Path(a.split("::", 1)[0]).resolve() for a in config.args]
+    if not args:
+        return True
+    return all(a == root or a == root / "tests" for a in args)
+
+
+def pytest_configure(config):
+    if not _run_is_the_whole_tree(config):
+        return
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "tools"))
+    try:
+        from run_alone import current_holder, foreign_pytest, repo_lock_path
+    except ImportError:                                      # pragma: no cover
+        return          # the helper is the coordination point, not this file
+    holder = current_holder(repo_lock_path())
+    if holder is not None:
+        raise pytest.UsageError(
+            f"another full suite holds this repository's lock (pid {holder}). "
+            f"Two pytest sessions on one machine invent failures in one "
+            f"direction and hide them in the other, so a number produced now "
+            f"would be VOID rather than noisy. Wait for it, or run the rows "
+            f"you actually need -- a targeted run is not gated.")
+    other = foreign_pytest()
+    if other is not None:
+        pid, command = other
+        raise pytest.UsageError(
+            f"a pytest is already running against this repository: pid {pid}, "
+            f"{command[:120]}. It did not take the lock, so it is older than "
+            f"this guard or was started by hand. Same reasoning: wait, or run "
+            f"a targeted selection.")
