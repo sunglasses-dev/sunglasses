@@ -46,6 +46,27 @@ HOOK_COMPARISON_SEEDS = {"G2-01", "G2-02", "G2-04", "G2-12"}
 # The scanner faults a session can select. Kept beside the configuration because
 # the configuration is where a reader looks to see what a run was able to do.
 FAULT_MODES = ("exception", "hang", "barrier")
+# THE FAULT TARGETS THIS HARNESS CAN ACTUALLY REACH, measured rather than
+# assumed:
+#
+#   scanner_worker   the dispatcher selects a mode per scan. Six variants.
+#   upstream_stdout  needs no injector at all — the upstream is a replay that
+#                    emits the declared frames verbatim, and the two seeds that
+#                    name this target already CARRY the malformed bytes.
+#                    `invalid_json.upstream.jsonl` line 0 is a truncated frame
+#                    and `invalid_result_shape`'s `result.content` is a string
+#                    where a list belongs. The fault IS the fixture.
+#
+# `hook_stdout` is not here because this harness runs no hook. `mcp_config`
+# composes exactly two things, a proxy and an upstream; `HOOK_COMPARISON_SEEDS`
+# below is an alias for the control scope and selects no hook route; and the
+# routes are `proxy_strict` and `control`. So the component that fault names
+# does not exist in this instrument.
+#
+# It is REFUSED BY NAME rather than run. Running it produces a clean verdict
+# about a session in which the declared fault never happened, which is the same
+# defect the fault dispatcher was written to fix.
+INJECTABLE_TARGETS = ("scanner_worker", "upstream_stdout")
 
 # Methods this driver issues itself rather than asking a model for. A descriptor
 # request is session setup, not a choice a model makes, and G2-06 has no other
@@ -438,6 +459,25 @@ def _held_inspection_input(run_dir: pathlib.Path, direction: str) -> str:
 
 def run_one(entry, variant, *, outdir, route, engine_root, upstream_argv,
             ledger, dry_run, call_no):
+    # REFUSED BEFORE ANYTHING RUNS, because a run directory is the first thing a
+    # reader treats as evidence that something was measured.
+    declared_fault = variant.get("fault") or {}
+    if (declared_fault.get("kind")
+            and declared_fault.get("target") not in INJECTABLE_TARGETS):
+        return {"call": call_no, "scenario_id": entry["id"],
+                "variant": variant["name"], "route": route,
+                "at": time.time(),
+                "refused": "uninjectable_fault_target",
+                "fault": declared_fault,
+                "verdict": {"model_view": {"state": "REFUSED"}},
+                "why": (
+                    f"{entry['id']}.{variant['name']} declares the fault "
+                    f"{declared_fault.get('kind')!r} against "
+                    f"{declared_fault.get('target')!r}, and this harness "
+                    f"composes only {INJECTABLE_TARGETS}. Running it would "
+                    "grade a session in which the declared fault never "
+                    "happened.")}
+
     run_dir = outdir / f"{entry['id']}.{variant['name']}.{route}"
     if run_dir.exists():
         shutil.rmtree(run_dir)
