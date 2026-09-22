@@ -24,11 +24,14 @@ see the design note.
 import argparse
 import json
 import re
+
+import regex_sample
 import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]  # tools/bench/ -> repo root
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from sunglasses.engine import SunglassesEngine  # noqa: E402
 
 ATTACK_DB = ROOT / "attack-db" / "attacks"
@@ -90,7 +93,24 @@ def triggers():
             continue
         for f in sorted(p.glob("*.json")):
             rec = json.loads(f.read_text())
+            # A RENDERED SAMPLE FIRST, because 38% of these rules need
+            # CO-OCCURRENCE -- a marker AND a verb inside a window -- and a
+            # single extracted literal can never satisfy them. Measuring those
+            # rules with one word made "45%" a floor rather than a rate. The
+            # renderer walks the regex and emits the first alternative of every
+            # choice, so all required parts arrive together by construction.
             t = None
+            for rx in rec.get("regex") or []:
+                try:
+                    gen = regex_sample.sample(rx)
+                except Exception:
+                    gen = ""
+                if gen and len(gen.strip()) >= 8:
+                    t = gen.strip()
+                    break
+            if t:
+                out.append((rec["id"], d, t))
+                continue
             for kw in rec.get("keywords") or []:
                 if len(kw) >= 6:
                     t = kw
@@ -133,38 +153,63 @@ def main():
         return eng.scan(text, channel=args.channel).to_dict()["decision"] != "allow"
 
     trigs = triggers()
-    rows = [(i, d, w.replace("{T}", t))
-            for i, d, t in trigs for w in WRAPPERS]
-    caught = [r for r in rows if blocked(r[2])]
-    per_rule = {}
-    for i, d, text in rows:
-        per_rule.setdefault(i, False)
+    rows = [(i, d, t, w.replace("{T}", t)) for i, d, t in trigs for w in WRAPPERS]
+    by_rule = {}
+    for i, d, t, text in rows:
+        by_rule.setdefault(i, {"trigger": t, "fired": False, "regex": None})
         if blocked(text):
-            per_rule[i] = True
-    hit_rules = sum(1 for v in per_rule.values() if v)
+            by_rule[i]["fired"] = True
+    # Attach each rule's own regexes so the stimulus can be validated.
+    for d in POISON_DIRS:
+        p = ATTACK_DB / d
+        if not p.is_dir():
+            continue
+        for f in sorted(p.glob("*.json")):
+            rec = json.loads(f.read_text())
+            if rec["id"] in by_rule:
+                by_rule[rec["id"]]["regex"] = rec.get("regex") or []
+
+    # A MISS IS ONLY EVIDENCE IF THE STIMULUS WAS VALID. If the rendered sample
+    # does not match the rule's OWN regex standalone, the renderer failed and
+    # the rule was never actually asked the question. Those are reported
+    # separately and NOT scored -- a fail row is a harness defect until the
+    # stimulus is proven.
+    fired, valid_miss, invalid = [], [], []
+    for rid, info in by_rule.items():
+        if info["fired"]:
+            fired.append(rid)
+            continue
+        ok = any(re.search(rx, info["trigger"], re.IGNORECASE)
+                 for rx in (info["regex"] or []))
+        (valid_miss if ok else invalid).append(rid)
+
     false_alarms = [t for t in CLEAN if blocked(t)]
     docs = own_docs()
     docs_blocked = [(i, t) for i, t in docs if blocked(t)]
+    scored = len(fired) + len(valid_miss)
 
     print(f"channel                      : {args.channel}")
-    print(f"rules with a usable trigger  : {len(trigs)}  "
+    print(f"rules with a usable trigger  : {len(by_rule)}  "
           f"({', '.join(POISON_DIRS)})")
     print(f"constructed descriptions     : {len(rows)}  "
           f"({len(WRAPPERS)} wrappers x each trigger)")
-    print(f"  blocked                    : {len(caught)}")
-    if rows:
-        print(f"  rate over descriptions     : {len(caught)}/{len(rows)} "
-              f"= {len(caught)/len(rows):.0%}")
-    if per_rule:
-        print(f"  rules caught in >=1 wrapper: {hit_rules}/{len(per_rule)} "
-              f"= {hit_rules/len(per_rule):.0%}")
+    print(f"  fired in >= 1 wrapper      : {len(fired)}")
+    print(f"  VALID MISS                 : {len(valid_miss)}  "
+          f"(sample matches its own regex; the rule stayed silent anyway)")
+    print(f"  stimulus INVALID, not scored: {len(invalid)}  "
+          f"(the renderer failed, so the rule was never asked)")
+    if scored:
+        print(f"  per-rule rate              : {len(fired)}/{scored} "
+              f"= {len(fired)/scored:.0%}")
     print(f"clean descriptions           : {len(CLEAN)}  "
           f"false alarms {len(false_alarms)}")
     print(f"OUR OWN attack-db docs       : {len(docs)}  "
           f"BLOCKED BY US {len(docs_blocked)}  <- describes-vs-performs")
     if args.show_misses:
-        for i, t in docs_blocked[:10]:
-            print(f"      OWN-DOC BLOCKED {i:28} {t[:64]}")
+        for i in sorted(valid_miss)[:15]:
+            print(f"      VALID MISS {i}")
+        for i in sorted(invalid):
+            print(f"      STIMULUS INVALID {i}")
     for t in false_alarms:
         print(f"      FALSE ALARM {t[:70]}")
 
