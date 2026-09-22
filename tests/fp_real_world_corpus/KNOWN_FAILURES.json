@@ -90,7 +90,7 @@
     "patterns": [
       "GLS-SD-010-EMB"
     ],
-    "reason": "#219's env-var documentation doc is an accepted FP of GLS-SD-010-EMB. Reason: attacker-controlled exclusion class closed 9-21 - every value-driven exclusion (tokens, brackets, ${}, positive-evidence tests) was defeated by attacker-chosen bytes across r1/r2 plus the interior-quote costume; a rule with one documented FP beats a rule an attacker can silence. Retirement path: the opt-in Jev 'describes vs performs' arbiter (lab exp 2, clears 6/6 known FPs), never a regex carve-out.",
-    "ruled_by": "T9, 2026-09-21, warroom/t9-fable.md"
+    "reason": "#219's env-var documentation doc is an accepted FP of GLS-SD-010-EMB. Reason: attacker-controlled exclusion class closed 9-21 - every value-driven exclusion (tokens, brackets, ${}, positive-evidence tests) was defeated by attacker-chosen bytes across r1/r2 plus the interior-quote costume; a rule with one documented FP beats a rule an attacker can silence. Retirement path: AUTHORING-TIME - the arbiter tells us which regex to fix; NEVER a runtime unblock. (Corrected 9-22: the jev-study found the FP-arbiter would turn block->allow at runtime, which our runtime rule forbids; the earlier wording read as a licence for exactly the runtime carve-out this entry exists to record the closing of.)",
+    "ruled_by": "T9, 2026-09-21 (wording corrected 2026-09-22), warroom/t9-fable.md"
   }
 }
