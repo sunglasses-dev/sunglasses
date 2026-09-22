@@ -84,18 +84,26 @@ def declared_kind(run_dir: pathlib.Path, held: str) -> str | None:
     unfaulted scan for both and the row still produces a verdict, which is the
     exact finding this file was written to fix, quoted at the top of it.
 
-    THIRTEEN KINDS ARE DECLARED across the delivery and the worker implements
-    three faults, so twelve of them reach this branch. None of the twelve is a
-    crash mode: they name the SHAPE of a scanner's output
-    (`worker_missing_axes`, `worker_false_string`, `worker_conflicting_allow`)
-    or a stage to fail at (`queue_before_worker`, `writer_before_first_byte`).
-    Teaching them here would be teaching this file to fake a scanner result,
-    which is not a fault injection. They need behaviour in the worker, and the
-    worker is a delivered artifact.
+    TWO VOCABULARIES, and they are easy to confuse because both spell the field
+    `kind`. This one is `variant["fault"]["kind"]`, which the materialiser
+    writes into `materialised.fault.json` and this file reads. SIX are declared
+    across the delivery: `exception`, `hang` and `barrier_hold` are selectable
+    and carried by G2-08, G2-09 and G2-11; `invalid_json`,
+    `invalid_result_shape` and `malformed_hook_output` are G2-10's and reach
+    this branch.
 
-    `exception` and `hang` are the other direction: the worker implements them
-    and this dispatcher offers them, and NO declared kind maps to either. They
-    are reachable only by a scenario nobody has written.
+    The OTHER vocabulary is the `arm_fault` step in a second generation
+    schedule, thirteen kinds naming the shape of a scanner's output
+    (`worker_missing_axes`, `worker_false_string`) or a stage to fail at
+    (`queue_before_worker`, `writer_before_first_byte`). Those are the
+    adapter's business, not this file's, and it refuses every one of them. They
+    do not pass through here at all.
+
+    So what actually reaches this branch is G2-10's three, and none of them is a
+    crash mode either: they name a malformed scanner RESULT. Producing one
+    would be this file fabricating a scanner's output rather than injecting a
+    fault, so they need behaviour in the worker, and the worker is a delivered
+    artifact.
     """
     manifest = run_dir / "materialised.fault.json"
     if not manifest.is_file():
