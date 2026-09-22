@@ -48,3 +48,48 @@ def test_the_exam_source_points_at_the_tree_under_test():
     # And the tree it points at is really this one: a file only this checkout
     # has at this path, reached THROUGH the link.
     assert (source / "gauntlet" / "boundary" / "tests" / __file__.rsplit("/", 1)[-1]).is_file()
+
+
+def test_the_modules_under_test_resolve_to_this_checkout():
+    """`batch`, `grade`, `proxy` and `destination` must be THIS tree's.
+
+    `probe_support` inserts a boundary directory of its own choosing at
+    `sys.path[0]`, ahead of anything the conftest arranged, and every
+    `test_astra_fit_*` module imports it BEFORE it imports these. So the
+    conftest binds them first: once a module is in `sys.modules` no later path
+    edit can re-point it.
+
+    This is the row that would have caught the 2026-09-22 contamination, where
+    two scratch copies both graded a third checkout and agreed with each other.
+    """
+    import batch
+    import grade
+    from proxy import passthrough
+    from destination import sink
+
+    repo = conftest.REPO
+    for module in (batch, grade, passthrough, sink):
+        resolved = pathlib.Path(module.__file__).resolve()
+        assert resolved.is_relative_to(repo), (
+            f"{module.__name__} came from {resolved}, not from the checkout "
+            f"under test at {repo}")
+
+
+def test_the_exam_cannot_re_point_a_module_once_it_is_bound():
+    """The mechanism, not just the outcome.
+
+    Putting the exam's boundary directory back at `sys.path[0]` — exactly what
+    `probe_support` does — must not change what `batch` is, because it is
+    already imported.
+    """
+    import batch
+
+    before = batch.__file__
+    intruder = "/private/tmp/some-other-checkout/gauntlet/boundary"
+    sys.path.insert(0, intruder)
+    try:
+        import batch as again
+        assert again.__file__ == before, (
+            "an import after a path change re-pointed a bound module")
+    finally:
+        sys.path.remove(intruder)
