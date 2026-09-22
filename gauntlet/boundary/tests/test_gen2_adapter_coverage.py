@@ -42,14 +42,18 @@ def test_an_operation_the_adapter_cannot_drive_is_refused_by_name():
     # wrong reason and this test would pass while proving something else.
     schedule = {"profile_steps": [
         {"op": "send_file", "origin": "client", "path": "a.jsonl"},
-        {"op": "arm_fault", "kind": "barrier_hold", "target": "scanner_worker",
-         "require_fresh_barrier": True},
+        # `answer_relist`, because the example has to be an op this adapter
+        # still cannot drive. `arm_fault` was implemented on 2026-09-22 and a
+        # test whose example became implementable would pass for the wrong
+        # reason.
+        {"op": "answer_relist", "path": "changed.tools-list.json",
+         "bind_id_from": "actual_relist_request"},
     ]}
 
     with pytest.raises(adapter.UnimplementedOperation) as exc:
         adapter.plan(schedule)
 
-    assert "arm_fault" in str(exc.value), str(exc.value)
+    assert "answer_relist" in str(exc.value), str(exc.value)
     assert "send_file" not in str(exc.value), (
         "the refusal should name what is missing, not what is fine")
 
@@ -72,7 +76,14 @@ def test_the_operations_this_adapter_implements_are_written_down():
         # `accepted` and `discarded_reason`. Implementing it did NOT make any
         # variant drivable: all five that name it also await events this
         # mediator does not emit, and the op refusal had been masking that.
-        "release_any_old_workers"})
+        "release_any_old_workers",
+        # Added 2026-09-22 with implementations, red-first, and an executed run.
+        # `arm_fault` selects the worker mode for the session; the two
+        # assertions are T8's answers against the real route, and the second
+        # carries the caveat that independence holds for DISTINCT ids only.
+        "arm_fault",
+        "assert_no_second_forward_and_no_pending_overwrite",
+        "assert_secondary_and_reverse_complete_independently"})
 
 
 def test_the_events_this_adapter_can_answer_are_written_down():
@@ -147,10 +158,13 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
         k: len(v) for k, v in counted.items()}
     # 27, measured. It was 19 before the four assertion steps, which were chosen
     # because the sweep said those four unlock the most for the least.
-    assert len(drivable) == 27, sorted(drivable)
+    assert len(drivable) == 28, sorted(drivable)
     # The four G2-21 variants whose remaining blocker is an event, not an op.
-    assert len(event_refused) == 4, sorted(event_refused)
-    assert len(refused) == 43, len(refused)
-    assert "arm_fault" in missing_ops, sorted(missing_ops)
+    # 5 now, not 4: implementing `arm_fault` unmasked another variant whose
+    # remaining blocker is an event, which is the same mask this ledger was
+    # rewritten for. The operation check always fires first.
+    assert len(event_refused) == 5, sorted(event_refused)
+    assert len(refused) == 41, len(refused)
+    assert "answer_relist" in missing_ops, sorted(missing_ops)
     assert not (missing_ops & adapter.IMPLEMENTED), (
         "an operation cannot be both implemented and missing")

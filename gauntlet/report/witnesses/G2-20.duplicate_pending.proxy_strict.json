@@ -1,0 +1,55 @@
+{
+ "witness": "G2-20.duplicate_pending",
+ "route": "proxy_strict",
+ "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+ "witness_class": "adapter-against-harness",
+ "executor": "gauntlet/boundary/gen2/execute.py run()",
+ "steps": [
+  "arm_fault",
+  "send_file",
+  "await_event",
+  "send_file",
+  "assert_no_second_forward_and_no_pending_overwrite"
+ ],
+ "assertions": [
+  {
+   "op": "arm_fault",
+   "kind": "request_worker",
+   "target": "scanner_worker",
+   "require_fresh_barrier": true,
+   "scanner_mode": "barrier",
+   "held": true
+  },
+  {
+   "op": "await_event",
+   "event": "HOLD_ENTERED",
+   "actor": "proxy",
+   "id": 2002,
+   "held": false,
+   "deadline_ms": 3000,
+   "seq": null
+  },
+  {
+   "op": "assert_no_second_forward_and_no_pending_overwrite",
+   "forwarded_per_id": {},
+   "forwarded_twice": {},
+   "admission_refusals": [],
+   "subject": false,
+   "held": null,
+   "why": "the mediator recorded no forwarded request for any id, so nothing was pending and this property has no subject in this run"
+  }
+ ],
+ "receipt_kinds": {
+  "UPSTREAM_STARTED": 1,
+  "RUN_CONFIGURATION": 1,
+  "RPC_INGRESS": 5,
+  "NO_INSPECTABLE_CONTENT": 4,
+  "PUMP_CLOSED": 2,
+  "UPSTREAM_CLOSED": 1
+ },
+ "what_this_witnesses": "The adapter DRIVES this schedule end to end: arm_fault selects the worker mode, both client sends land, the await and the assertion both execute. That is the capability being recorded.",
+ "what_this_does_NOT_witness": "It does not witness that no second forward or pending overwrite occurs. The scenario's precondition never arises here: the requests carry `arguments: {}`, so the mediator records NO_INSPECTABLE_CONTENT, never holds (HOLD_ENTERED held=false), and writes no RPC_EGRESS. With nothing pending there is nothing for the property to be true of, and the assertion reports subject=false / held=null rather than a pass.",
+ "note_on_the_harness": "Separately and not exercised by this run: the harness mediator assigns `self._pending[request_id] = handle` unconditionally, with no duplicate check, where the product refuses with ADMISSION_REFUSED duplicate_pending_id and tears down. So even given a held request this harness would not reproduce the product's behaviour.",
+ "recorded_at": "2026-09-22T21:44:01.278136+00:00",
+ "run_id": "d728bee81e860d7f"
+}

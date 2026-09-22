@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-22-d",
+ "revision": "2026-09-22-f",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -200,7 +200,14 @@
    "basis": "reviewed_ruling",
    "ruled_by": "T8",
    "ruled_at": "2026-09-22",
-   "evidence": "ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both."
+   "evidence": "ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both.",
+   "executed_attempt": {
+    "run_id": "d728bee81e860d7f",
+    "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.json",
+    "outcome": "NO SUBJECT \u2014 not a pass and not a failure",
+    "detail": "Driven end to end on G2-20.duplicate_pending. The scenario's precondition never arises in this harness: the requests carry `arguments: {}`, so the mediator records NO_INSPECTABLE_CONTENT, never holds (HOLD_ENTERED held=false) and writes no RPC_EGRESS. With nothing pending there is nothing for the property to be true of. The first version of this assertion returned held=true on that emptiness, which is the vacuous pass this harness keeps finding in itself; it now reports subject=false.",
+    "separate_harness_gap": "Not exercised by this run: passthrough.py assigns `self._pending[request_id] = handle` unconditionally with no duplicate check, where the product refuses with ADMISSION_REFUSED duplicate_pending_id and tears down. Even given a held request, this harness would not reproduce the product's behaviour."
+   }
   },
   "assert_secondary_and_reverse_complete_independently": {
    "bucket": "route_capability",
@@ -209,6 +216,15 @@
    "ruled_at": "2026-09-22",
    "evidence": "ANSWERED YES FOR DISTINCT IDS. `_owed` is keyed per id and each entry carries its own `origin` alongside `at` and `method` (session.py), so two items with different ids complete independently. Verified at head.",
    "caveat": "NOT UNCONDITIONAL, and an adapter that asserts it as such is WRONG on one shape. Where a client id is REUSED while still pending \u2014 G2-15 \u2014 the answer is a deliberate NO: that is the same teardown as the row above, by design. An implementation of this op must scope its claim to distinct ids or it will fail a scenario the product handles correctly."
+  },
+  "arm_fault[kind=request_worker]": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "d728bee81e860d7f",
+   "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "G2-20.duplicate_pending driven on proxy_strict. The step selected the worker's `barrier` mode for the session and the run recorded it. Scoped: the mode is chosen before the session starts, which is faithful only because every delivered schedule arms BEFORE its first send. KEYED PER KIND, because `units.arm_fault` is 'opcode+kind' and this map's whole point is that capability is not the opcode. A bare `arm_fault` entry collapsed the per-kind buckets and broke two acceptance controls, which is the controls doing their job."
   }
  },
  "unclassified": {
