@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-22-b",
+ "revision": "2026-09-22-c",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -236,12 +236,25 @@
    "tests_refused": [
     "test_astra_fit_round3.py::test_r1_actual_g2_12_direct_route_is_gradeable",
     "test_astra_fit_round4.py::test_r1_configured_direct_route_produces_own_capture",
-    "test_astra_fit_round5.py::test_native_direct_independent_captures"
+    "test_astra_fit_round5.py::test_native_direct_independent_captures",
+    "test_astra_fit_native.py::test_native_g2_04_pair"
    ],
    "reason": "The frozen config at ARCHIVE/evidence/GATE2_RUN_2026-09-13/live4/G2-04.main.control/mcp.control.json names an absolute node entrypoint inside ANOTHER SESSION'S scratchpad (78494234-...), which was reaped. No durable install of @modelcontextprotocol/server-filesystem exists on this machine. The child dies MODULE_NOT_FOUND.",
    "effect": "There is NO executed native direct-route evidence for G2-12 while this holds. Refused by name rather than run, the same answer this harness gives hook_stdout and release_scheduler: a scenario whose component does not exist is not a failing scenario.",
    "cost_before_refusing": "Each of the three waited ten seconds and, until run_one released its observer in a finally, took four neighbours down with it. Three failing rows were failing seven.",
    "re_enable": "A pinned, gitignored, per-checkout install of the server-filesystem package. Test-only dependency. The delivery is NOT edited and no network fixture was installed off a peer ruling.",
+   "declared_at": "2026-09-22",
+   "downstream": {
+    "test_astra_fit_round2.py::test_r4_native_pair_counters": "reads evidence/native_pair/results.json, which test_native_g2_04_pair writes. Refused naming its producer rather than reporting a missing file, because 'the file is not there' sends the next reader looking for a path problem when the answer is that nothing produced it."
+   }
+  },
+  "v1_2_correction_checks": {
+   "tests_refused": [
+    "test_v1_2_corrections_vendored.py::test_all_43_correction_checks_pass_including_the_restorations"
+   ],
+   "reason": "grader_v1_2.FIT is the absolute path /private/tmp/GATE2_FIT_40d5c26_2026-09-14, a private temporary tree that was reaped. The durable copy on the review Desktop carries the calibration PLAN and none of the row.json outputs, which are the run's results and existed only there.",
+   "effect": "ASTRA's 43 v1.2 correction checks, including the three restoration controls, have nothing to grade. His script is NOT edited.",
+   "re_enable": "Re-run the calibration pair and keep its row.json somewhere durable. This is a missing RUN, not a path fix.",
    "declared_at": "2026-09-22"
   }
  }

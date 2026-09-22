@@ -69,7 +69,20 @@ FRESH = {"evidence", "source", "__pycache__", ".pytest_cache"}
 #
 # Copied byte for byte, and the digest is asserted below, so this relocates the
 # file without reinterpreting it.
-COPIED = {"probe_support.py"}
+#
+# `ledger_contender.py` JOINS IT for the same reason, found 2026-09-22 and
+# missed the first time. It is a SCRIPT, launched as
+# `python3 <root>/ledger_contender.py`, and Python sets `sys.path[0]` to the
+# RESOLVED directory of the script. Through a link that is ASTRA's directory,
+# where `source` does not exist — so `probe_support` there computes a BOUNDARY
+# that is not on disk, `from runner import Ledger` raises
+# ModuleNotFoundError, all eight contenders die before writing `.ready`, and
+# `test_r7_concurrent_overspend_refuses` fails waiting for them.
+#
+# The symptom named the wrong layer: the failure looked like a concurrency or
+# ledger problem, and the eight children were writing the real answer into
+# their own logs the whole time.
+COPIED = {"probe_support.py", "ledger_contender.py"}
 
 
 def _build_live_root() -> pathlib.Path | None:
@@ -84,8 +97,17 @@ def _build_live_root() -> pathlib.Path | None:
             continue
         target = LIVE / item.name
         if item.name in COPIED:
-            if not target.exists() or target.read_bytes() != item.read_bytes():
-                if target.is_symlink():
+            # A SYMLINK IS ALWAYS WRONG HERE, whatever its bytes say. Both
+            # `exists()` and `read_bytes()` follow the link, so a link pointing
+            # at the very file being copied passed this check and was left in
+            # place — a guard whose whole purpose is to stop a symlink, defeated
+            # by one that happened to have the right contents.
+            #
+            # It mattered the moment a SCRIPT joined the set: `sys.path[0]` is
+            # the RESOLVED directory of the script Python was asked to run.
+            if (target.is_symlink() or not target.exists()
+                    or target.read_bytes() != item.read_bytes()):
+                if target.is_symlink() or target.exists():
                     target.unlink()
                 shutil.copy2(item, target)
             assert hashlib.sha256(target.read_bytes()).hexdigest() == \

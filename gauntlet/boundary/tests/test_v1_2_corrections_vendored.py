@@ -25,6 +25,8 @@ import hashlib
 import json
 import pathlib
 import subprocess
+
+import pytest
 import sys
 
 BOUNDARY = pathlib.Path(__file__).resolve().parents[1]
@@ -54,6 +56,30 @@ def test_all_43_correction_checks_pass_including_the_restorations():
     that did nothing could not hide inside a green run. `baseline_restored` then
     requires both live rows to grade clean again afterwards.
     """
+    # HIS SCRIPT GRADES A RUN, and that run's outputs are gone. `grader_v1_2.FIT`
+    # is the absolute path `/private/tmp/GATE2_FIT_40d5c26_2026-09-14`, a
+    # private temporary tree that was reaped. The durable copy on the review
+    # Desktop carries the calibration PLAN — request.json, driver prompts,
+    # generated mcp configs — and none of the `row.json` files, because those
+    # are the run's OUTPUT and were only ever written in /private/tmp.
+    #
+    # Refused BY NAME rather than run. Without those rows his 43 checks have
+    # nothing to grade, and the FileNotFoundError they raised named a missing
+    # file instead of a missing RUN. Nothing here edits his script.
+    import grader_v1_2
+
+    missing = [grader_v1_2.FIT / "calibration_plan" / route / "row.json"
+               for route in ("control", "proxy_strict")
+               if not (grader_v1_2.FIT / "calibration_plan" / route
+                       / "row.json").is_file()]
+    if missing:
+        pytest.skip(
+            "REFUSED BY NAME: the evidence these checks grade no longer "
+            f"exists. {missing[0]} is in a reaped /private/tmp tree, and the "
+            "durable copy on the review Desktop holds the calibration plan but "
+            "none of the row.json outputs. Restoring this needs that run's "
+            "results, not a path fix.")
+
     completed = subprocess.run([sys.executable, "-B", str(SCRIPT)],
                                cwd=str(BOUNDARY), capture_output=True, text=True,
                                env={"PYTHONPATH": str(BOUNDARY), "PATH": "/usr/bin:/bin"})
