@@ -84,7 +84,21 @@ def test_the_events_this_adapter_can_answer_are_written_down():
     `proxy/passthrough.py` and belongs in that commit, not this one.
     """
     assert adapter.SUPPORTED_EVENTS == frozenset({
-        "SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED"})
+        "SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED",
+        # Added 2026-09-22 with the harness emission that backs it. The bar is
+        # not "the scenario asks for it" — it is that the PRODUCT records it:
+        # `sunglasses.proxy.receipts.EVENTS` carries UPSTREAM_CLOSED, and the
+        # harness now emits it after supervising the child, as session.py does.
+        "UPSTREAM_CLOSED"})
+
+    # AND THE THREE THAT STAY OUT, each with the product's reason. A refusal
+    # that only says "unsupported" reads as a to-do; these are refused because
+    # the product does not record them either, so mirroring one would let the
+    # harness observe what the shipped route cannot.
+    assert set(adapter.EVENT_REFUSAL_REASONS) == {
+        "REQUEST_RECEIVED", "DESCRIPTOR_CHANGED", "APPROVAL_INVALIDATED"}
+    assert not (set(adapter.EVENT_REFUSAL_REASONS) & adapter.SUPPORTED_EVENTS), (
+        "an event cannot be both answerable and refused")
     assert adapter.SUPPORTED_EVENT_ACTORS == frozenset({"proxy"})
 
 
