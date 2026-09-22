@@ -18,11 +18,60 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
-import conftest  # noqa: E402
+
+
+def _boundary_conftest():
+    """THIS directory's conftest, found by FILE and never by bare name.
+
+    `import conftest` binds whichever conftest reached `sys.modules` first. Run
+    alone that is this one; run beside `gauntlet/report/tests` it is the report
+    suite's, and every attribute below then raises AttributeError. These rows
+    passed for eight consecutive runs and failed the first time the two suites
+    were invoked together — a test that depended on how it was called, inside
+    the file written to catch exactly that.
+
+    Located rather than imported, because importing it again would re-execute
+    `_build_live_root` and wipe the evidence tree mid-session.
+    """
+    target = str(HERE / "conftest.py")
+    for module in list(sys.modules.values()):
+        if getattr(module, "__file__", None) == target:
+            return module
+    return None
+
+
+def _conftest_or_skip():
+    """These rows assert on what the boundary conftest BUILT, so without it
+    they have no subject — and the reason it can be missing is worth saying in
+    full rather than reporting as three AttributeErrors.
+
+    `gauntlet/boundary/tests/conftest.py` and `gauntlet/report/tests/conftest.py`
+    are both module `conftest`, and neither directory has an `__init__.py`.
+    Under pytest's default prepend import mode the first one imported claims the
+    name and THE OTHER IS NEVER LOADED. So naming both suites in one invocation
+    silently runs one of them with no conftest at all: no exam root, no module
+    binding, no run-alone lock.
+
+    Not a live CI defect — `pytest.ini` sets `testpaths = tests,
+    test_customer_zero.py`, so a bare run collects neither gauntlet suite and CI
+    never names them. It is a trap for a human who runs both paths at once,
+    which is exactly how it was found.
+    """
+    import pytest
+
+    found = _boundary_conftest()
+    if found is None:
+        pytest.skip(
+            "the boundary conftest was not loaded: it collides with "
+            "gauntlet/report/tests/conftest.py under prepend import mode. Run "
+            "this suite without the report suite on the same command line.")
+    return found
+
 
 
 def test_the_live_root_is_keyed_to_this_checkout():
     """Eighty-one worktrees share this repository; they may not share this."""
+    conftest = _conftest_or_skip()
     assert conftest.LIVE.name.startswith("GATE2_FIT_LIVE-"), conftest.LIVE
     expected = hashlib.sha256(str(conftest.REPO).encode()).hexdigest()[:12]
     assert conftest.LIVE.name == f"GATE2_FIT_LIVE-{expected}", conftest.LIVE
@@ -35,6 +84,7 @@ def test_the_live_root_is_keyed_to_this_checkout():
 
 def test_the_exam_source_points_at_the_tree_under_test():
     """The one that would have been wrong, silently, for every worktree but one."""
+    conftest = _conftest_or_skip()
     if conftest._live is None:
         import pytest
         pytest.skip("no exam delivery on this machine")
@@ -62,6 +112,7 @@ def test_the_modules_under_test_resolve_to_this_checkout():
     This is the row that would have caught the 2026-09-22 contamination, where
     two scratch copies both graded a third checkout and agreed with each other.
     """
+    conftest = _conftest_or_skip()
     import batch
     import grade
     from proxy import passthrough
