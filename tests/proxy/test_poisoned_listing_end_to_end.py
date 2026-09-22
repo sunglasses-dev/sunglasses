@@ -133,34 +133,36 @@ def test_a_poisoned_description_is_stopped_on_the_wire(tmp_path, rule_id, trigge
         f"gets exactly that, so this must be the other one.")
 
 
-def test_a_tools_list_block_names_no_rule_and_a_tools_call_block_does(tmp_path):
-    """THE AUDIT GAP, pinned so it cannot drift while nobody is looking.
+def test_a_tools_list_block_names_the_rule_that_refused_it(tmp_path):
+    """The audit gap, CLOSED, and this is the test that used to assert it open.
 
-    A poisoned listing IS stopped on the wire -- every row above proves that.
-    But its refusal comes back with `rule_ids: []` and
-    `inspected_utf8_bytes: 0`, while the tools/call refusal for a credential
-    names its rules (test_wrapped_route_end_to_end asserts exactly that, and
-    passes). Same channel, same proxy, two different answers about what was
-    inspected.
+    Until 2026-09-22 a poisoned listing came back `PROHIBITED_CONTENT` with
+    `rule_ids: []` and `inspected_utf8_bytes: 0`, while the tools/call refusal
+    for a credential NAMED its rules. An operator asking why a server's listing
+    was refused got a reason code and nothing else.
 
-    So an operator asked "why was this server's listing refused?" gets
-    PROHIBITED_CONTENT and nothing else. A block that names no rule cannot be
-    audited -- the credential test says so in its own words, and this surface
-    does not meet it.
+    WHICH PATH REFUSED IT was the whole question. Not the result-scan path: the
+    SNAPSHOT COLLECTOR stops a poisoned listing before the approval store is
+    ever asked for a verdict, and that return dropped the ids it was holding.
+    They were never missing -- `found.page_scans` had them all along. That is
+    also why `inspected_utf8_bytes` reads 0: those bytes belong to the
+    result-scan envelope, and this refusal does not come from there.
 
-    This asserts the CURRENT behaviour deliberately. It is a defect to fix,
-    not a property to keep, and when it is fixed this test fails and is
-    rewritten -- which is the point of pinning it rather than leaving it as a
-    sentence in a report.
+    The ids named are the ones on the FIRST page that carried findings, not a
+    union over every page: an operator needs to know which tool's description
+    was prohibited, and merging them would name rules from pages that were
+    clean.
     """
     if not TRIGGERS:
         pytest.skip("no rendered triggers on this branch")
-    hostile = PoisonedListing(tmp_path, TRIGGERS[0][1])
+    rule_id, trigger = TRIGGERS[0]
+    hostile = PoisonedListing(tmp_path, trigger)
     data = next(f for f in hostile.talk([INIT, LIST])
                 if f.get("id") == 2)["error"]["data"]
     assert data["reason_code"] == "PROHIBITED_CONTENT"
-    assert data["rule_ids"] == [], (
-        "the listing refusal now NAMES a rule -- the audit gap is closed, so "
-        "delete this test and tighten the rows above to assert rule_ids")
-    assert data["inspected_utf8_bytes"] == 0, (
-        "the listing refusal now reports inspected bytes -- same as above")
+    assert data["rule_ids"], (
+        "the listing refusal names no rule again -- a block that names no rule "
+        "cannot be audited, which is the sentence this whole row exists for")
+    assert rule_id in data["rule_ids"], (
+        f"the refusal names {data['rule_ids']} but the listing was poisoned "
+        f"with {rule_id}'s own trigger")

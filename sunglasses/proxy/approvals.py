@@ -39,12 +39,17 @@ class NotApprovable(RuntimeError):
 
 
 class Activation:
-    __slots__ = ("activated", "provenance", "detail")
+    __slots__ = ("activated", "provenance", "detail", "rule_ids")
 
-    def __init__(self, activated, provenance=None, detail=None):
+    def __init__(self, activated, provenance=None, detail=None, rule_ids=()):
         self.activated = activated
         self.provenance = provenance
         self.detail = detail
+        # THE IDS THE REFUSAL IS MADE OF. `_page_provenance` already holds the
+        # findings when it decides PROHIBITED_CONTENT and used to drop them, so
+        # an operator asking why a listing was refused got the reason code and
+        # nothing else. A block that names no rule cannot be audited.
+        self.rule_ids = list(rule_ids)
 
     def __repr__(self):
         return f"<Activation {'ok' if self.activated else self.provenance}>"
@@ -304,11 +309,12 @@ class Store:
                 return Activation(False, DESCRIPTOR_CHANGED,
                                   "the current snapshot is not the approved one")
             # (c) every page
-            provenance = _page_provenance(page_scans)
+            provenance, rule_ids = _page_provenance(page_scans)
             if provenance:
                 self._active = None
                 return Activation(False, provenance,
-                                  "an activation scan was not clean")
+                                  "an activation scan was not clean",
+                                  rule_ids=rule_ids)
             # (d) nothing moved while we were scanning
             if revision != self.revision or epoch != self.epoch:
                 self._retire(DESCRIPTOR_CHANGED)
@@ -416,26 +422,33 @@ def _page_provenance(page_scans):
 
     Checked in severity order rather than in the order the fields appear, so a
     page that is both incomplete and carrying a finding reports the finding.
+
+    Returns `(provenance, rule_ids)`. The ids are the ones on the page that
+    DECIDED the refusal, not a union over every page: an operator needs to know
+    which tool's description was prohibited, and merging them would name rules
+    from pages that were clean.
     """
     if not page_scans:
         # T501. No pages is no evidence, and an activation with no evidence is
         # a snapshot nobody scanned. An empty list read as "nothing wrong" is
         # the vacuous pass this row exists to refuse.
-        return SCAN_EXCEPTION
+        return SCAN_EXCEPTION, []
     for page in page_scans or []:
         if page.get("findings"):
-            return PROHIBITED_CONTENT
+            ids = sorted({f.get("rule_id") for f in page["findings"]
+                          if f.get("rule_id")})
+            return PROHIBITED_CONTENT, ids
         if page.get("decision") == "review":
-            return REVIEW_REQUIRED
+            return REVIEW_REQUIRED, []
         if page.get("check_pin") != "clean":
             # T5.R3(c) wants the helper's pin outcome CLEAN for every tool.
             # None is "the helper never ran" and "not applicable" is "it
             # declined to answer"; neither is a clean pin, and treating them as
             # one activates on a check that did not happen.
-            return SCAN_EXCEPTION
+            return SCAN_EXCEPTION, []
         if (page.get("accepted") is not True
                 or page.get("status") != "complete"
                 or page.get("inspection_complete") is not True
                 or page.get("decision") != "allow"):
-            return SCAN_EXCEPTION
-    return None
+            return SCAN_EXCEPTION, []
+    return None, []
