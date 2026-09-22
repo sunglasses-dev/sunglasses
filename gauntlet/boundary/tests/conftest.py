@@ -211,6 +211,14 @@ import os as _os
 
 import pytest as _pytest
 
+# ONE COPY, and it lives on main at `tools/run_alone.py` so the scanner suites
+# can take the SAME lock. A second copy here would be a second answer to one
+# question, which is the whole defect this guard exists to stop: the two would
+# drift, and the lane that lost the race would be certifying itself alone
+# against a rule the other lane no longer follows.
+if str(REPO / "tools") not in sys.path:
+    sys.path.insert(0, str(REPO / "tools"))
+
 from run_alone import (current_holder as _current_holder,
                        foreign_pytest as _foreign_pytest,
                        repo_lock_path as _repo_lock_path)
