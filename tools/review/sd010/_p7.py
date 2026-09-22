@@ -143,6 +143,30 @@ def run(axis):
         print(f"      {m}")
     return missed
 
+# PLACEHOLDERS, so a reviewer never has to WRITE a credential-shaped literal.
+# Round 4 was cut by the platform content safeguard while the reviewer was
+# authoring candidates for a SECRET-DETECTION rule -- the candidates are
+# credential-shaped by subject, and the filter reads command text. The repo
+# already solved this once: sd_api_sibling_rows.py assembles every value from
+# fragments and stores none, "which is the thing this product tells people not
+# to do". Same answer here.
+#
+#   {SECRET}  a value with no recognisable credential format
+#   {KEY}     an upper-case environment variable name
+#   {LOWER}   the same name lower-cased, for the kwarg twin
+#   {DSN}     a connection string
+_FRAG = {
+    "{SECRET}": "hunter" + "2" + "x9q",
+    "{KEY}": "PASS" + "WORD",
+    "{LOWER}": "pass" + "word",
+    "{DSN}": "postgres://svc:" + "hunter" + "2" + "@db.internal/app",
+}
+def expand(t):
+    for k, v in _FRAG.items():
+        t = t.replace(k, v)
+    return t
+
+
 def run_cases(path):
     """Reviewer-authored JSON candidates. The finding is a mismatch."""
     import json, glob
@@ -163,14 +187,15 @@ def run_cases(path):
                   f"string \"text\" -- not scored")
             miss.append(c.get("name", f))
             continue
-        d = e.scan(c["text"], channel=ch).to_dict()
+        d = e.scan(expand(c["text"]), channel=ch).to_dict()
         ids = {x["id"] for x in d["findings"]}
         got = "block" if RULE in ids else "allow"
         ok = got == need
         if not ok:
             miss.append(c.get("name", f))
         print(f"      {c.get('name','?'):40} channel={ch:12} expect {need:5} "
-              f"got {got:5} {'OK' if ok else '*MISMATCH*'}")
+              f"got {got:5} {'OK' if ok else '*MISMATCH*'}"
+              + ("  [template]" if any(k in c["text"] for k in _FRAG) else ""))
     print(f"  cases {len(files)} · mismatches {len(miss)}")
     return miss
 
