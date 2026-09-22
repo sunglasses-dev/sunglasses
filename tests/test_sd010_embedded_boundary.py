@@ -377,7 +377,7 @@ def test_control_removing_the_carriage_return_loses_the_cr_delimited_line():
     `\\n`, keeps working -- otherwise this control is not aimed at the right
     character.
     """
-    narrowed = _rule_regex().replace(r"|\r[ \t]*", "", 1)
+    narrowed = _rule_regex().replace(r"|\r(?:[ \t]|\\t)*", "", 1)
     assert narrowed != _rule_regex(), "the literal CR is no longer in the class"
     e = _mutate(**{RULE: narrowed})
     assert RULE not in _ids(e, rows.MUST_FIRE["cr_only_line_separator"])[1], (
@@ -386,3 +386,23 @@ def test_control_removing_the_carriage_return_loses_the_cr_delimited_line():
     assert RULE in _ids(e, rows.MUST_FIRE["crlf_line_separator"])[1], (
         "the CRLF row also broke, so this control is measuring the newline "
         "rather than the carriage return.")
+
+
+def test_control_indentation_only_after_a_newline_loses_the_escaped_tabs():
+    """Indentation after EVERY boundary is load-bearing, proven by narrowing it.
+
+    Round 4's reviewer found 24 of 39 authored candidates unreported, and the
+    largest family was this: only the newline alternatives allowed indentation,
+    and an ESCAPED tab (backslash-t, which is how a serialiser indents inside a
+    JSON string) was not treated as indentation anywhere. Putting the class
+    back the way it was must lose those rows again.
+    """
+    narrowed = _rule_regex().replace(r"|[\"'{\[,](?:[ \t]|\\t)*", r"|[\"'{\[,]", 1)
+    assert narrowed != _rule_regex(), "the delimiter class no longer carries indentation"
+    e = _mutate(**{RULE: narrowed})
+    quiet = [k for k in rows.MUST_FIRE
+             if ("tab" in k or "indent" in k)
+             and RULE not in _ids(e, rows.MUST_FIRE[k])[1]]
+    assert len(quiet) >= 4, (
+        f"removing indentation from the delimiter class silenced only {quiet}; "
+        f"those rows are not guarding it.")

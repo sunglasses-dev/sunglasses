@@ -154,6 +154,24 @@ MUST_FIRE["cr_only_line_separator"] = "x\r  PASSWORD=" + PW + "\r"
 MUST_FIRE["crlf_line_separator"] = "x\r\n  PASSWORD=" + PW + "\r\n"
 
 
+# ── ROUND 4's REVIEWER FOUND THESE, and they are the same shape as the CR ────
+# Indentation was only allowed after a NEWLINE, and an escaped tab was not
+# indentation at all. Inside a JSON string `\t` is two characters, backslash
+# and t, which is exactly how a serialiser indents -- so every escaped-tab
+# indent in a payload was invisible. A quote followed by a real tab walked past
+# too, because the delimiter class had no trailing allowance.
+MUST_FIRE["escaped_tab_after_a_quote"] = '{"cfg":"\\t' + "PASS" + 'WORD=' + PW + '"}'
+MUST_FIRE["two_escaped_tabs"] = '{"cfg":"\\t\\t' + "PASS" + 'WORD=' + PW + '"}'
+MUST_FIRE["literal_tab_after_a_quote"] = '{"cfg":"\t' + "PASS" + 'WORD=' + PW + '"}'
+MUST_FIRE["escaped_newline_then_escaped_tab"] = (
+    '{"cfg":"prev\\n\\t' + "PASS" + 'WORD=' + PW + '"}')
+MUST_FIRE["mixed_literal_and_escaped_indent"] = (
+    '{"cfg":"  \\t  ' + "PASS" + 'WORD=' + PW + '"}')
+MUST_FIRE["escaped_tab_in_a_json_array"] = '["\\t' + "PASS" + 'WORD=' + PW + '"]'
+MUST_FIRE["unicode_line_separator"] = "prev\u2028" + "PASS" + "WORD=" + PW
+MUST_FIRE["unicode_paragraph_separator"] = "prev\u2029" + "PASS" + "WORD=" + PW
+
+
 # The compose interpolation. It was the last DISCLOSED miss, and it is a
 # must-fire row now because the exclusion that spared it is gone. It leaks
 # nothing by itself -- `${API_KEY}` is a reference -- so reporting it is a

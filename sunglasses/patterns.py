@@ -2524,6 +2524,31 @@ PATTERNS = [
     #     indentation, case-SENSITIVE      1 doc           1
     #     + placeholder-value exclusion    0 docs          0   <- this rule
     #
+    # INDENTATION FOLLOWS EVERY BOUNDARY, AND AN ESCAPED TAB IS INDENTATION.
+    # Round 4's reviewer authored 39 candidates and 24 came back unreported.
+    # Two causes, both mine and both the same shape as the carriage return:
+    #
+    #   1. Only the NEWLINE alternatives allowed indentation. A quote followed
+    #      by a tab -- `{"cfg":"\tPASSWORD=..."}` -- walked straight past,
+    #      because the delimiter class had no trailing allowance at all.
+    #   2. Inside a JSON string, indentation is `\t`: the two characters
+    #      BACKSLASH and t, not a tab. The class knew `\n` and never `\t`,
+    #      so every escaped-tab indent in a JSON payload was invisible.
+    #
+    # U+2028 and U+2029 join for the reason the literal CR did: they are line
+    # separators a reader and a serialiser both treat as ending a line.
+    #
+    # Measured: the reviewer's 39 candidates go from 24 unreported to 6, with
+    # the 77-document corpus UNCHANGED (one fire, one flip, both the accepted
+    # ratchet row), no must-fire row lost and no benign twin gained.
+    #
+    # STILL UNREPORTED, and named rather than chased: `\u003d`, `\u000a`,
+    # `\u0020`, `\u0009` -- JSON \uXXXX escapes of the `=`, the newline, the
+    # space and the tab -- plus one nested-escape and one YAML sequence shape.
+    # Those are a DECODING problem, not a boundary problem: closing them means
+    # interpreting JSON string escapes before matching, which is a parser, and
+    # adding four more alternatives would be the widening game again.
+    #
     # A BARE CARRIAGE RETURN IS A BOUNDARY, and it was missing until a
     # case-constructing probe went looking. The class carried `\\r` -- the
     # ESCAPED two-character form that appears inside a JSON string -- and never
@@ -2599,7 +2624,9 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
         "regex": [
-            r"(?:\A[ \t]*|\n[ \t]*|\r[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
+            r"(?:\A(?:[ \t]|\\t)*|\n(?:[ \t]|\\t)*|\r(?:[ \t]|\\t)*"
+            r"|\\n(?:[ \t]|\\t)*|\\r(?:[ \t]|\\t)*"
+            r"|[\u2028\u2029](?:[ \t]|\\t)*|[\"'{\[,](?:[ \t]|\\t)*)"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",
         ],
