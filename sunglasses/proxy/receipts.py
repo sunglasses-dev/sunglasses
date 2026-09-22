@@ -40,6 +40,14 @@ EVENTS = frozenset({
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
     "SETTLEMENT_REFUSED",
+    # APPROVAL_INVALIDATED. The third time this list has cost a change, and the
+    # two comments above are the first two. The transition emit lives inside
+    # `Session._authority_lock`, so a kind missing here is not a lost receipt --
+    # it is a ValueError raised while authority is being revoked, on the path
+    # that exists to handle a server whose descriptors moved. Found by the
+    # read-back-from-disk row, which is the only kind of test that reaches this
+    # allowlist at all; every in-memory assertion passed without it.
+    "APPROVAL_INVALIDATED",
 })
 
 # T9.R5. The events that END a session. A log that stops without one of these
@@ -77,6 +85,12 @@ PERMITTED_FIELDS = frozenset({
     "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
+    # AUTHORITY_EPOCH, added with the emitter that needed it and not before.
+    # The comment above this list is the reason: a name missing here is dropped
+    # on the way to disk SILENTLY, and every in-memory assertion still passes.
+    # So this line and the `accept_invalidation` emit are one commit, and the
+    # control reads the receipt back FROM DISK rather than off `session.events`.
+    "authority_epoch",
 })
 
 
@@ -115,6 +129,19 @@ def _check_value(name, value):
         for rule_id in value:
             if not isinstance(rule_id, str) or not _RULE_ID.match(rule_id):
                 raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
+    elif name == "authority_epoch":
+        # WE generate this, so the risk is not a hostile value -- it is a
+        # careless one. `_check_value` exists because five fields were carrying
+        # whatever the caller passed; a counter that can arrive as a float, a
+        # string or a negative would be the sixth. It is a monotonic count of
+        # authority changes, so it is a whole number and never negative, and
+        # `bool` is refused explicitly because `isinstance(True, int)` is True
+        # and `authority_epoch: true` would otherwise be written as 1.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"authority_epoch {value!r} is not a whole number")
+        if value < 0:
+            raise ValueError(f"authority_epoch {value!r} is negative")
     elif name == "id_token":
         # R-T903-1 (T9, 2026-09-14 10:24). The MINTED grammar, not merely a
         # string. `session._item_token` produces sixteen lowercase hex
