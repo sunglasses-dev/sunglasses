@@ -32,6 +32,40 @@ from proxy.passthrough import Passthrough                                # noqa:
 
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 
+# THE DELIVERED PACKAGE POINTS AT A TEMP COPY THAT GETS REAPED.
+#
+# 16 of ASTRA's scenarios carry absolute `payload_ref` paths under
+# `/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13/`, which macOS cleans up. The
+# same package also lives durably on the Desktop, and MEASURED 2026-09-22 all
+# 76 referenced files are present there, none missing. So the delivery is
+# intact and only its address died.
+#
+# The DELIVERY is not rewritten. A reviewer's package is evidence, and editing
+# it to make a test pass would destroy the thing the test checks against. The
+# READER learns the second address instead, and the digest check below is
+# unchanged — a path found here still has to hash to what the seed declares, so
+# this cannot substitute a different file.
+_REAPED_ROOT = pathlib.Path("/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13")
+_DURABLE_ROOT = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
+                 / "GATE3_DESIGN_REVIEW_2026-09-13")
+
+
+def _durable(path: pathlib.Path) -> pathlib.Path:
+    """The delivered path, or the same file under the durable root.
+
+    Returns the ORIGINAL when it exists, so nothing changes on a machine where
+    the temp copy is still there, and returns the original when neither exists,
+    so the caller's error names the address the seed actually declares.
+    """
+    if path.is_file():
+        return path
+    try:
+        rel = path.relative_to(_REAPED_ROOT)
+    except ValueError:
+        return path
+    alt = _DURABLE_ROOT / rel
+    return alt if alt.is_file() else path
+
 
 class LedgerRequired(RuntimeError):
     """A live batch was started without a durable call ledger."""
@@ -225,7 +259,7 @@ def resolve_payload_ref(variant: dict) -> bytes:
     ref = variant.get("payload_ref")
     if not ref:
         raise KeyError(f"variant {variant.get('name')!r} has no payload_ref")
-    path = pathlib.Path(ref["path"])
+    path = _durable(pathlib.Path(ref["path"]))
     if not path.is_file():
         raise FileNotFoundError(
             f"{variant.get('name')!r} points at {path}, which is not there")
