@@ -308,15 +308,19 @@ def test_a_record_disagreeing_with_the_materialised_bytes_is_refused(tmp_path):
 
 
 # ── DECLARED BUT NOT INJECTABLE ─────────────────────────────────────────────
-# Twelve of the delivery's thirteen declared kinds reach this branch. None is a
-# crash mode: they name the SHAPE of a scanner's output or a stage to fail at,
-# and the worker implements three faults. The dispatcher used to answer both
-# "no fault declared" and "a fault I cannot inject" with an ordinary scan, and
-# the row still produced a verdict.
+# The delivery declares SIX kinds in the vocabulary this dispatcher reads
+# (`variant["fault"]["kind"]`). Three are selectable and three are G2-10's
+# malformed-result kinds, which reach this branch. The dispatcher used to
+# answer both "no fault declared" and "a fault I cannot inject" with an
+# ordinary scan, and the row still produced a verdict.
+#
+# The thirteen `arm_fault` STEP kinds in the second generation schedules are a
+# different vocabulary with the same field name. The adapter refuses those; they
+# never reach this file. Conflating the two is how this list first got written
+# out of names that cannot appear here.
 
-UNINJECTABLE = ["worker_missing_axes", "worker_false_string",
-                "worker_conflicting_allow", "queue_before_worker",
-                "writer_before_first_byte", "receipt_worker", "result_worker"]
+# G2-10's three, which are real and do reach this branch.
+UNINJECTABLE = ["invalid_json", "invalid_result_shape", "malformed_hook_output"]
 
 
 @pytest.mark.parametrize("kind", UNINJECTABLE)
