@@ -172,6 +172,30 @@ All notable changes to Sunglasses are documented here.
 - **The install record and the capture were in different trees.** (#213)
 - **A container that answers introspection, because a registry asks the server not the README.** (#214)
 
+- **A refused tool listing now names the rule that refused it.** (#231) A
+  poisoned `tools/list` was blocked, but the envelope carried `rule_ids: []` and
+  `inspected_utf8_bytes: 0`, while the same poison in a `tools/call` named its
+  rule. An operator asking why a listing was refused got `PROHIBITED_CONTENT`
+  and nothing else. The cause was not the scan: the snapshot collector refuses a
+  poisoned listing **before the approval store is ever asked for a verdict**,
+  and that return dropped the rule ids it was already holding. The ids now come
+  from the FIRST page that carried findings — deliberately not a union across
+  pages, so the envelope names the rules that decided rather than accumulating
+  ids from pages that were clean.
+
+  `inspected_utf8_bytes` is still `0` on that path and that is deliberate: those
+  bytes are counted by a result-scan envelope this refusal never reaches, and
+  `inspection_complete` is `false` on the same line, so the zero is qualified
+  rather than bare. A review asked for the counter to be omitted instead; it is
+  kept, and a test now pins the pairing — `inspection_complete` false means all
+  three counters are present and `0`.
+
+- **A truncated `repr` nearly became a false bug report.** (#229)
+  `Clause.__repr__` printed three literals and stopped, with no indication that
+  more existed, so a clause with many literals read as a clause with three. It
+  prints the remainder count now. Nothing about matching changed; the defect was
+  entirely in what a reader was told.
+
 ### Continuous integration
 
 Three of these change no shipped code and are listed so the release accounts for
@@ -308,6 +332,28 @@ what moved.
 - **The comment said the product cannot name the bound, and it can.** (#208)
 - **Every packaging version home tracks `__version__`.** (#210)
 - **The wheel rows need a package index, and nothing said so.** (#216)
+- **The console leg names the interpreter's missing extras instead of arguing
+  about exit codes.** (#232) Eight rows across two files failed on a developer
+  checkout, on exit codes, and not one of them said `pyzbar`. The existing guard
+  refuses a stale install by asking whether the console script imports the
+  package under test — it clears `cwd` but not `PYTHONPATH`, so a pipx script
+  imports the worktree package through it and answers, correctly, "same file".
+  The right CODE ran; what nothing checked was whether that INTERPRETER could
+  satisfy the optional media extras. It fails once, naming the interpreter, the
+  missing modules and the fix command. It does not skip: a skip would drop the
+  console leg on precisely the machines where it is misconfigured.
+
+- **One rule, one mirror file — the direction the parity check cannot report.**
+  (#233) `test_every_rule_file_is_present_in_both` prints two differences and
+  the second, "committed but no longer a rule", can never be non-empty: the
+  fixture copies the committed `attack-db` before running the exporter, because
+  the exporter reads each existing file to preserve `date_added`, and the
+  exporter only ever writes. Anything stale in the committed tree is therefore
+  also in the "fresh" one. Since a mirror filename is derived from a rule's
+  NAME, renaming a rule leaves a duplicate entry and parity stays green. The new
+  guard is narrow on purpose — one rule id, one file — and does not ask whether
+  every file corresponds to a rule, because that question has a larger answer
+  that belongs to whoever owns the published data.
 
 ### PENDING — open, not shipped, and not to be described as shipped
 
