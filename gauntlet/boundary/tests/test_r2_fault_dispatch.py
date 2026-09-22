@@ -455,17 +455,16 @@ def test_g2_10_through_the_real_batch_path_is_not_refused(tmp_path):
         start = Destination.start
         Destination.start = lambda self: "file:///dev/null"
         try:
+            # NOT WRAPPED IN A `try/except JSONDecodeError` any more. It was,
+            # because `_held_inspection_input` raised on G2-10.invalid_json,
+            # whose frame is invalid ON PURPOSE. Swallowing that here recorded
+            # "cannot read it" and moved on, which is a test agreeing with a
+            # defect. All three variants must drive.
             row = batch.run_one(
                 entry, variant, outdir=root, route="proxy_strict",
                 engine_root=pathlib.Path(__file__).resolve().parents[3],
                 upstream_argv=[sys.executable], ledger=None,
                 dry_run=True, call_no=0)
-        except json.JSONDecodeError:
-            # G2-10.invalid_json carries deliberately invalid JSON and `run_one`
-            # does not survive reading it. That is a separate defect in the
-            # batch path, recorded rather than fixed here; it is not a refusal.
-            checked[variant["name"]] = "run_one_cannot_read_it"
-            continue
         finally:
             Destination.start = start
 
@@ -485,5 +484,30 @@ def test_g2_10_through_the_real_batch_path_is_not_refused(tmp_path):
         finally:
             shutil.rmtree(root, ignore_errors=True)
 
-    assert checked, "no G2-10 variant was exercised"
-    assert "not_refused" in checked.values(), checked
+    assert set(checked) == {"invalid_json", "invalid_result_shape",
+                            "malformed_hook_output"}, checked
+    assert set(checked.values()) == {"not_refused"}, checked
+
+
+def test_an_unparseable_frame_holds_nothing_and_is_not_keyed(tmp_path):
+    """The proxy REFUSES an unparseable frame and never inspects it.
+
+    `passthrough` emits FRAME_REFUSED with reason `unparseable` and hands the
+    scanner nothing, so the record for such a run has no inspection input — not
+    an empty one, none. The distinction is load bearing: the digest of the
+    empty string is a real digest, and the dispatcher selects on exactly that
+    field, so keying a record to it would arm a fault for every run that
+    happens to hold nothing.
+    """
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "upstream.jsonl").write_bytes(b'{"jsonrpc":"2.0","id":1,"result":\n')
+    assert batch._held_inspection_input(run_dir, "result") is None
+
+    # And a frame that DOES parse still yields its inspection input, or the
+    # line above would be passing for everything.
+    (run_dir / "upstream.jsonl").write_bytes(
+        b'{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text",'
+        b'"text":"hello"}]}}\n')
+    held = batch._held_inspection_input(run_dir, "result")
+    assert held is not None and "hello" in held, held
