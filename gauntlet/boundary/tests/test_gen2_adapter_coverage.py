@@ -106,23 +106,31 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
     # reached. Implementing `release_any_old_workers` removed the mask and four
     # variants fell out of the accounting entirely, which is how a coverage
     # number comes to describe a population it no longer covers.
-    drivable, refused, event_refused, missing_ops = [], [], [], set()
+    counted = {name: [] for name in adapter.CLASSES}
+    missing_ops = set()
     for entry in runner.load_manifest()["scenarios"]:
         for variant in runner.scenario_of(entry)["variants"]:
             if "routes" not in variant:
                 continue
             record = artifacts.of_record(entry, variant)
+            counted[adapter.classify(record.schedule)].append(
+                f"{entry['id']}.{variant['name']}")
             try:
                 adapter.plan(record.schedule)
-                drivable.append(f"{entry['id']}.{variant['name']}")
             except adapter.UnimplementedOperation as exc:
-                refused.append(f"{entry['id']}.{variant['name']}")
                 missing_ops |= set(exc.operations)
-            except adapter.UnsupportedEvent:
-                event_refused.append(f"{entry['id']}.{variant['name']}")
+            except Exception:
+                pass
 
-    assert len(drivable) + len(refused) + len(event_refused) == 74, (
-        len(drivable), len(refused), len(event_refused))
+    drivable = counted[adapter.DRIVABLE]
+    refused = counted[adapter.MISSING_OPERATION]
+    event_refused = counted[adapter.EVENT_GAP]
+
+    # EVERY class, summed from the classifier itself. Naming the buckets in the
+    # test is what let the previous version sum two of three to 74 and call it
+    # whole; this cannot miss a class without failing here first.
+    assert sum(len(v) for v in counted.values()) == 74, {
+        k: len(v) for k, v in counted.items()}
     # 27, measured. It was 19 before the four assertion steps, which were chosen
     # because the sweep said those four unlock the most for the least.
     assert len(drivable) == 27, sorted(drivable)

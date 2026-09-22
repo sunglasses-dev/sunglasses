@@ -405,6 +405,12 @@ def test_the_two_payload_resolvers_agree_on_every_reference():
     harness comes to read one stimulus and the artifacts get built from another,
     which is the exact failure `materialize.assert_same_seed` exists to catch
     one layer up. So they are pinned to each other here.
+
+    PINNED RATHER THAN MERGED, deliberately. `runner` is imported by
+    `gen2.materialize`'s callers and sits above it, so having `runner` import
+    `gen2.materialize` to share one resolver would close an import cycle. The
+    test is the cheaper way to buy the same guarantee: the two may live apart,
+    but they may not disagree.
     """
     from gen2 import materialize
 
