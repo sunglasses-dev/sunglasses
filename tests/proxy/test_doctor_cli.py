@@ -33,15 +33,35 @@ sys.path.insert(0, REPO)
 from sunglasses.proxy import doctor  # noqa: E402
 
 
-def _run_cli(*args, cwd=None):
+def _run_cli(*args, cwd=None, home=None):
     """The command as a user gets it. cwd defaults to an EMPTY directory, never
     the repo: `default_sources()` reads `cwd/.mcp.json` and `~/.claude.json`, so
     a test run from the repo would read whatever the developer happens to have
-    wired and pass or fail by machine."""
+    wired and pass or fail by machine.
+
+    HOME IS OVERRIDDEN FOR ANY ROW THAT CAN WRITE, and this is not tidiness.
+    `install` records its work under `state_root()` = `Path.home()/.sunglasses/
+    proxy`, which deliberately has no environment override. The first version of
+    the install row below passed `cwd` and not `home`, so it isolated the CONFIG
+    it edited and NOT the RECORD: a `state=complete` record for the server name
+    `github` landed in the developer's real state tree, pointing at a pytest tmp
+    directory that no longer existed.
+
+    That is worse than litter. It made a REAL `sunglasses install github` refuse
+    with "already has a completed install record", and it silently disarmed a
+    review probe the next day -- `install` refused for that unrelated reason on
+    the fixed tree AND the buggy one, so the probe returned identical results
+    either way and could not fail. Residue from a test suite hid the defect the
+    probe existed to find.
+
+    A test that writes outside its tmp_path is not isolated, however green it is.
+    """
+    env = {**os.environ, "PYTHONPATH": REPO}
+    if home is not None:
+        env["HOME"] = str(home)
     return subprocess.run(
         [sys.executable, "-m", "sunglasses.cli", *args],
-        capture_output=True, text=True, cwd=cwd or REPO,
-        env={**os.environ, "PYTHONPATH": REPO},
+        capture_output=True, text=True, cwd=cwd or REPO, env=env,
     )
 
 
@@ -266,8 +286,10 @@ def test_install_and_uninstall_refuse_an_empty_config_too(tmp_path):
                                                              "args": ["server"]}}}))
     before = hashlib.sha256(default.read_bytes()).hexdigest()
 
+    home = tmp_path / "home"
+    home.mkdir()
     for cmd in ("install", "uninstall"):
-        proc = _run_cli(cmd, "github", "--config", "", cwd=str(tmp_path))
+        proc = _run_cli(cmd, "github", "--config", "", cwd=str(tmp_path), home=home)
         after = hashlib.sha256(default.read_bytes()).hexdigest()
         assert proc.returncode == 2, f"{cmd}: {proc.stdout}"
         assert after == before, f"{cmd} edited the default file it was not given"
