@@ -89,7 +89,7 @@ def test_r7_two_reference_measurements():
     assert results['G2-02'] == dict(declared=147, extracted=147, reference=147)
     assert results['G2-04'] == dict(declared=21, extracted=83, reference=None)
 
-def test_native_direct_independent_captures(monkeypatch):
+def test_native_direct_independent_captures(monkeypatch, runnable_direct_route):
     import ast
     import test_round3
     from pathlib import Path
