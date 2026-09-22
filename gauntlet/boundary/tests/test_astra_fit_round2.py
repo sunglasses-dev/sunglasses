@@ -221,8 +221,29 @@ def test_r6_rpc_wire_capture_matches_observed():
 
 
 def test_r6_rpc_frame_content_matches_observed():
+    """Frame by frame, which is what this test is named for.
+
+    It compared a byte blob with `.rstrip()` applied to ONE side. The
+    receipts' `raw` carries each frame's delimiter and the capture file
+    carries the same bytes, so stripping the trailing newline off only the
+    file manufactured a one byte difference out of data that agrees
+    exactly. The file IS the concatenation of `raw`, measured, which is
+    what `test_r6_rpc_wire_capture_matches_observed` above asserts and
+    passes on. This row could never hold: it was a broken copy of that one
+    rather than a second check.
+
+    Comparing the FRAMES earns the name and asks something the byte blob
+    cannot. Two captures can concatenate to identical bytes while the frame
+    boundaries fall in different places, and a mediator that re-split a
+    stream would be reported as faithful by a blob comparison.
+    """
     d=ROOT/'evidence/independent/r6_midrun';ev=events(d/'receipts.jsonl')
     for kind,direction,name in [('RPC_INGRESS','request','client.ingress.jsonl'),('RPC_EGRESS','result','client.egress.jsonl')]:
-        actual=(d/name).read_bytes().rstrip(b'\n')
-        recorded=b''.join(e.get('raw','').encode() for e in ev if e['kind']==kind and e['direction']==direction)
-        assert actual==recorded, 'R6_FRAME_CONTENT_MISMATCH'
+        on_disk=[frame for frame in (d/name).read_bytes().split(b'\n') if frame]
+        recorded=[e.get('raw','').encode().rstrip(b'\n') for e in ev
+                  if e['kind']==kind and e['direction']==direction]
+        # NEITHER SIDE MAY BE EMPTY. Two empty lists compare equal, so this
+        # would pass for a run that captured nothing at all.
+        assert on_disk, 'R6_NO_FRAMES_ON_DISK ' + name
+        assert recorded, 'R6_NO_FRAMES_RECORDED ' + kind + '/' + direction
+        assert on_disk==recorded, 'R6_FRAME_CONTENT_MISMATCH'
