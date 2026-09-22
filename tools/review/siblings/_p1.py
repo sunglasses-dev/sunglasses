@@ -34,13 +34,21 @@ if not sibs:
 # goes stale the moment a field is added; a check that compares everything and
 # declares its exceptions does not.
 # `name` is the third field that differs on purpose, and widening the check is
-# what surfaced it: every sibling is "<parent name> (api_response)". It reaches
-# a consumer (engine.py copies it into each finding) but never the match, so it
-# is not silently skipped either -- the CONVENTION is asserted below, which
-# catches a sibling that renames itself into something an operator would read
-# as a different rule.
+# what surfaced it. It reaches a consumer (engine.py copies it into each
+# finding) but never the match, so it is not silently skipped -- the rule about
+# it is asserted below.
+#
+# THE RULE IS "CARRIES THE MARKER AND FITS", NOT "IS THE PARENT'S NAME PLUS THE
+# MARKER". The first version of this probe asserted parent+marker, and the name
+# HYGIENE guard then failed on seven of these siblings: it caps a name at 60
+# characters, the parents run 52 to 60, and the marker adds 15. Parent+marker
+# was therefore a convention the rest of the repo could not accept, and it took
+# a cap that only ever ratchets DOWN to prove it. The seven were reworded to
+# fit rather than the cap being raised, so the marker is what ties a sibling to
+# its channel and the length cap is checked here too, where a reviewer sees it.
 DIFFER_BY_DESIGN = {"id", "channel", "name"}
 NAME_SUFFIX = " (api_response)"
+MAX_NAME = 60
 bad_fields, bad_ch, orphan, shape, bad_name = [], [], [], [], []
 for s in sibs:
     parent = by.get(s["id"][:-4])
@@ -54,14 +62,15 @@ for s in sibs:
         if s.get(field) != parent.get(field):
             bad_fields.append((s["id"], field))
     if s.get("channel") != ["api_response"]: bad_ch.append((s["id"], s.get("channel")))
-    if s.get("name") != (parent.get("name") or "") + NAME_SUFFIX:
-        bad_name.append((s["id"], s.get("name")))
+    nm = s.get("name") or ""
+    if not nm.endswith(NAME_SUFFIX) or len(nm) > MAX_NAME:
+        bad_name.append((s["id"], nm, len(nm)))
 print(f"  tool-metadata -API siblings : {len(sibs)}")
 print(f"  fields compared per sibling : every key except {sorted(DIFFER_BY_DESIGN)}")
 print(f"  field NOT identical         : {len(bad_fields)} {bad_fields}")
 print(f"  key set differs from parent : {len(shape)} {shape}")
 print(f"  channel not [api_response]  : {len(bad_ch)} {bad_ch}")
-print(f"  name not parent+{NAME_SUFFIX!r} : {len(bad_name)} {bad_name}")
+print(f"  name lacks {NAME_SUFFIX!r} or >{MAX_NAME}: {len(bad_name)} {bad_name}")
 print(f"  sibling with no parent      : {len(orphan)} {orphan}")
 broken = bad_fields or bad_ch or orphan or shape or bad_name
 print(f"SPINE {'CLEAN' if not broken else 'BROKEN'}")

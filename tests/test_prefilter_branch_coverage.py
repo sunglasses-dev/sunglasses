@@ -66,6 +66,22 @@ BASELINE_PAIRS = frozenset({
     ("GLS-PE-004", 0),
     ("GLS-SC-014", 0),
     ("GLS-TP-002", 0),
+    # DELIBERATE, and it is the parent's cost rather than a new one.
+    # GLS-TP-002-API is a CHANNEL sibling: under #170's law it copies the parent
+    # predicate character for character and adds CHANNELS and nothing else, so
+    # regex entry 0 is byte-identical to ("GLS-TP-002", 0) already above. That
+    # is not asserted by eye -- tools/review/siblings/_p1.py compares every key
+    # of a sibling against its parent minus a declared allowlist of three fields
+    # and this one is CLEAN, so the two entries cannot drift apart without that
+    # probe going red first.
+    #
+    # WHAT IS ACTUALLY NEW, stated rather than buried: the same unskippable
+    # regex now also runs on api_response documents. The per-document shape is
+    # the parent's, because the bytes are the parent's; the reach is new, and
+    # the reach is the entire point of the sibling. No allowlist entry is
+    # claimed, because nothing here needs an exemption from the ratio bound --
+    # this pair is baselined, not excused.
+    ("GLS-TP-002-API", 0),
 })
 BASELINE = len(BASELINE_PAIRS)          # printed, never asserted against alone
 

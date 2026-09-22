@@ -2501,7 +2501,7 @@ PATTERNS = [
     # every sibling's regex must compare equal to its parent's.
     {
         "id": 'GLS-TP-001-API',
-        "name": 'Forged tool-result claim of completed review/approval (api_response)',
+        "name": 'Forged tool-result approval claim (api_response)',
         "category": 'tool_poisoning',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2523,7 +2523,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TP-ITDP-219-API',
-        "name": 'Tool description authority bias for sensitive action routing (api_response)',
+        "name": 'Tool description authority bias routing (api_response)',
         "category": 'tool_poisoning',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2547,7 +2547,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TP-ITDP-221-API',
-        "name": 'Transitive trust review skip via upstream validation claim (api_response)',
+        "name": 'Transitive trust review skip (api_response)',
         "category": 'tool_poisoning',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2583,7 +2583,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TP-ITDP-232-API',
-        "name": 'Tool description self-attestation skip independent review (api_response)',
+        "name": 'Tool description self-attestation skip (api_response)',
         "category": 'tool_poisoning',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2595,7 +2595,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TMS-234-API',
-        "name": 'Tool metadata smuggling — metadata authority override (api_response)',
+        "name": 'Metadata smuggling: authority override (api_response)',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2607,7 +2607,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TP-ITDP-252-API',
-        "name": 'Tool poisoning / ITDP — compliance pretext redaction bypass (api_response)',
+        "name": 'Compliance pretext redaction bypass (api_response)',
         "category": 'tool_poisoning',
         "severity": 'high',
         "channel": ['api_response'],
@@ -2619,7 +2619,7 @@ PATTERNS = [
     },
     {
         "id": 'GLS-TMS-237-API',
-        "name": 'Authoritative Metadata Priority Instruction Override (api_response)',
+        "name": 'Metadata priority instruction override (api_response)',
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['api_response'],
