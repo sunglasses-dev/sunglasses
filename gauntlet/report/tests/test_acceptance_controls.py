@@ -619,3 +619,50 @@ def test_a_map_with_no_review_state_at_all_is_refused(tmp_path):
     p.write_text(json.dumps(data))
     with pytest.raises(classify.MapInvalid):
         classify.load_map(p)
+
+
+# ── `basis` is an enumeration, and executed_witness carries its own fields ──
+#
+# T9 ruling 2026-09-22: add the basis, schema only, zero entries. `basis` was
+# free text — a typo produced a bucket nobody could audit and nothing refused
+# it. The four witness ops cannot be evidenced at all today (nothing in
+# gauntlet/ executes a step), so this defines the SHAPE an executor must fill
+# and refuses anything that claims the basis without the evidence.
+
+def test_an_unknown_basis_is_refused(tmp_path):
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    op = next(iter(data["classified"]))
+    data["classified"][op] = dict(data["classified"][op], basis="vibes")
+    with pytest.raises(classify.MapInvalid) as e:
+        _reload_map(data, tmp_path)
+    assert "basis" in str(e.value).lower()
+
+
+def test_executed_witness_without_its_evidence_fields_is_refused(tmp_path):
+    """The whole point. Claiming a run happened is not recording one."""
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    op = next(iter(data["classified"]))
+    data["classified"][op] = {"bucket": "route_capability",
+                              "basis": "executed_witness",
+                              "evidence": "I ran it, honest"}
+    with pytest.raises(classify.MapInvalid) as e:
+        _reload_map(data, tmp_path)
+    assert "run_id" in str(e.value) or "witness" in str(e.value).lower()
+
+
+def test_a_complete_executed_witness_is_accepted(tmp_path):
+    """THE CONTROL. A guard that refused every executed_witness would pass both
+    rows above and make the basis unusable."""
+    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    op = next(iter(data["classified"]))
+    data["classified"][op] = {
+        "bucket": "route_capability", "basis": "executed_witness",
+        "evidence": "driven end to end, step record retained",
+        "run_id": "abc123", "step_record": "logs/r1/steps.jsonl",
+        "driven_against": "gauntlet/boundary/proxy (adapter-against-harness)"}
+    assert _reload_map(data, tmp_path)["classified"][op]["basis"] == "executed_witness"
+
+
+def test_the_existing_bases_still_load(capmap):
+    """No entry in the shipped map is invalidated by adding the enumeration."""
+    assert {e["basis"] for e in capmap["classified"].values()} <= classify.BASES
