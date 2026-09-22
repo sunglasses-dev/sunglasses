@@ -231,3 +231,37 @@ def plan(schedule: dict) -> list[dict]:
     if unsupported:
         raise UnsupportedEvent(unsupported)
     return steps
+
+
+# THE OUTCOMES `plan` HAS FOR A VARIANT, named because two of them were being
+# counted as one population. A variant is refused for an operation this adapter
+# does not implement OR for an event this mediator does not emit, and every
+# consumer that knew only the first still summed to 74: the operation check runs
+# first, and until `release_any_old_workers` was implemented every variant with
+# an event gap also had a missing operation, so the second refusal was never
+# reached. Four variants then fell out of the accounting entirely. A refusal
+# class nobody names is a refusal class nobody counts.
+DRIVABLE = "drivable"
+MISSING_OPERATION = "missing_operation"
+EVENT_GAP = "event_gap"
+NO_STEPS = "no_steps"
+
+CLASSES = (DRIVABLE, MISSING_OPERATION, EVENT_GAP, NO_STEPS)
+
+
+def classify(schedule: dict) -> str:
+    """Which of `CLASSES` this schedule falls into, by the same call that drives.
+
+    Defined HERE and not in each consumer, so that a new refusal class shows up
+    everywhere the moment `plan` can raise it, rather than in whichever counter
+    someone remembered to update.
+    """
+    try:
+        plan(schedule)
+    except UnimplementedOperation:
+        return MISSING_OPERATION
+    except UnsupportedEvent:
+        return EVENT_GAP
+    except NoStepsToDrive:
+        return NO_STEPS
+    return DRIVABLE
