@@ -165,6 +165,29 @@ def render(report: dict, *, findings: list | None = None) -> str:
             f"{len(findings)} validation finding(s); the first is {findings[0]}")
 
     run, fresh = report["run"], report["freshness"]
+
+    # A META DESCRIPTION THE PAGE CAN STAND BEHIND.
+    #
+    # `site_lint.py` requires one on every document it judges (a page with a
+    # <title> is not a fragment, so this one is judged), and without it the html
+    # gate fails. But a FIXED description would be the exact failure this report
+    # exists to refuse: a page whose whole point may be "it refused" cannot
+    # carry a summary that assumes it did not. So the sentence is DERIVED from
+    # the same fields the body renders -- outcome, and when the ceiling is
+    # unclassified, how many operations are unclassified and why.
+    outcome = str(run.get("outcome") or "unknown")
+    ceiling = (report.get("coverage") or {}).get("ceiling") or {}
+    unclassified = ceiling.get("unclassified_count")
+    if outcome == "refused" and unclassified:
+        summary = (f"Nightly gauntlet report: REFUSED. {unclassified} operation(s) have no "
+                   f"reviewed capability classification, so the ceiling is not computed.")
+    elif outcome == "refused":
+        summary = (f"Nightly gauntlet report: REFUSED ("
+                   f"{run.get('reason_code') or 'no reason code'}).")
+    else:
+        summary = f"Nightly gauntlet report: {outcome}."
+    description = html_mod.escape(summary, quote=True)
+
     embedded = json.dumps({
         "measured_at": fresh.get("measured_at"),
         "policy_hours": fresh.get("policy_hours"),
@@ -174,6 +197,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
     return f"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="{description}">
 <title>Nightly gauntlet</title>
 <style>
  :root {{ color-scheme: dark; }}

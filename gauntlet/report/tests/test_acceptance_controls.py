@@ -516,3 +516,42 @@ def _reload_map(data, tmp=None):
     path = pathlib.Path(tmp or "/tmp") / "capability_map_under_test.json"
     path.write_text(json.dumps(data))
     return classify.load_map(path)
+
+
+# ── the meta description is DERIVED, not decorative (T10, 2026-09-22) ────────
+#
+# `site_lint.py` requires a meta description on every document it judges, and a
+# page with a <title> is not a fragment, so this page is judged and was failing
+# the html gate without one. The risk in satisfying that gate is a FIXED
+# sentence: this report's whole point can be "it refused", and a page that
+# always describes itself the same way would be the exact lie it exists to
+# prevent -- a true label over an unknown result.
+#
+# So these two rows are the control pair. The first pins what today's artifact
+# actually says; the second changes the outcome underneath it and requires the
+# sentence to move. A hardcoded description passes the first and fails the
+# second, which is the only reason the first is worth anything.
+
+def _description(page):
+    import re
+    m = re.search(r'<meta name="description" content="([^"]*)"', page)
+    return m.group(1) if m else None
+
+
+def test_the_description_states_todays_real_outcome(honest):
+    page = render.render(honest)
+    d = _description(page)
+    assert d, "no meta description — the html site gate fails on this page"
+    assert "REFUSED" in d
+    n = honest["coverage"]["ceiling"]["unclassified_count"]
+    assert str(n) in d, f"description does not carry the {n} unclassified operations"
+
+
+def test_the_description_moves_when_the_outcome_does(honest):
+    """THE CONTROL. A fixed string passes the row above and fails this one."""
+    other = copy.deepcopy(honest)
+    other["run"]["outcome"] = "completed"
+    moved = _description(render.render(other, findings=[]))
+    assert moved != _description(render.render(honest)), \
+        "the description did not change when the outcome did — it is not derived"
+    assert "REFUSED" not in moved
