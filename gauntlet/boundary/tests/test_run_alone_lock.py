@@ -10,6 +10,9 @@ HERE = pathlib.Path(__file__).resolve().parent
 # nothing but leaves that import unresolvable when this file is collected alone.
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
+# The module lives on main at `tools/run_alone.py`; this suite no longer keeps
+# its own copy. → tests/test_run_alone.py covers it there as well.
+sys.path.insert(0, str(HERE.parents[2] / "tools"))
 
 import run_alone  # noqa: E402
 
