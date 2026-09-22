@@ -48,6 +48,16 @@ IMPLEMENTED = frozenset({
     # can be driven today: the other three appear only in variants whose
     # `arm_fault` declares a kind `fault_dispatch.SELECTABLE` cannot select.
     "release_any_old_workers",
+    # Added 2026-09-22 with their implementations. `arm_fault` chooses the
+    # scanner's mode for the session, which is honest only because every
+    # delivered schedule that arms a fault arms BEFORE its first send.
+    "arm_fault",
+    # Both answered by T8 against the real route and recorded in the capability
+    # map with cites re-verified at this head. The second carries a caveat its
+    # implementation must honour: independence holds for DISTINCT ids only,
+    # because a client id reused while pending is a deliberate teardown.
+    "assert_no_second_forward_and_no_pending_overwrite",
+    "assert_secondary_and_reverse_complete_independently",
 })
 
 # THE EVENTS THIS MEDIATOR ACTUALLY EMITS, of the seven the contract names.

@@ -17,6 +17,7 @@ correct first.
 """
 from __future__ import annotations
 
+import collections
 import dataclasses
 import json
 import pathlib
@@ -338,9 +339,26 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         # that this one has something in the middle, which is the entire
         # experiment. Same scanner the package ships, same byte budget it
         # declares.
-        scanner = (f"{sys.executable} {FAULT_WORKER} scan "
-                   f"--engine-root {engine_root}" if engine_root else
-                   f"{sys.executable} {FAULT_WORKER} scan")
+        # THE MODE THE SCHEDULE ARMS. Chosen here because the scanner command is
+        # fixed for the whole session, and that is faithful only because every
+        # delivered schedule that arms a fault arms BEFORE its first send. A
+        # mid-session arm would need a different mechanism; none asks for one.
+        #
+        # `require_fresh_barrier` against `scanner_worker` means the worker must
+        # HOLD rather than answer, so the request it is scanning stays pending
+        # while the rest of the schedule runs. The release file is named and
+        # deliberately never created: G2-20.duplicate_pending has no
+        # `release_fault_barrier` step, so the hold is meant to outlive the run
+        # and the worker is reaped at teardown.
+        armed = next((st for st in steps if st.get("op") == "arm_fault"), None)
+        mode = "barrier" if (armed
+                             and armed.get("target") == "scanner_worker"
+                             and armed.get("require_fresh_barrier")) else "scan"
+        scanner = f"{sys.executable} {FAULT_WORKER} {mode}"
+        if mode == "barrier":
+            scanner += f" --release {run_root / 'fault.release'}"
+        if engine_root:
+            scanner += f" --engine-root {engine_root}"
         argv = [sys.executable, str(BOUNDARY / "proxy" / "passthrough.py"),
                 "--deadline-ms", str(timeout_ms),
                 "--byte-budget", str(PACKAGE_INSPECTION_BYTE_BUDGET),
@@ -437,6 +455,76 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
             copies = _count_copies(reference, arrived)
             assertions.append({"op": op, "path": step["path"], "copies": copies,
                                "held": copies == 0, "basis": route})
+        elif op == "arm_fault":
+            # RECORDED, not re-done. The mode was chosen before the session
+            # started; this row says what was armed so a reader of the
+            # assertions sees it instead of inferring it from the argv.
+            assertions.append({
+                "op": op, "kind": step.get("kind"), "target": step.get("target"),
+                "require_fresh_barrier": step.get("require_fresh_barrier"),
+                "scanner_mode": "barrier" if (
+                    step.get("target") == "scanner_worker"
+                    and step.get("require_fresh_barrier")) else "scan",
+                "held": True})
+
+        elif op == "assert_no_second_forward_and_no_pending_overwrite":
+            # A second request carrying an id that is STILL PENDING must not be
+            # forwarded, and must not replace the pending entry the first one
+            # owns. Counted from the mediator's own egress: the product refuses
+            # the duplicate outright, so at most ONE egress may carry any id.
+            receipts = run_root / "proxy.receipts.jsonl"
+            per_id = collections.Counter(
+                message.get("id") for message in _forwarded_upstream(receipts)
+                if message.get("id") is not None)
+            repeated = {i: n for i, n in per_id.items() if n > 1}
+            refusals = [r.get("reason")
+                        for r in _receipts_of_kind(receipts, "ADMISSION_REFUSED")]
+            # A ZERO HAS TWO READINGS, and this op is where they look alike.
+            # "no id was forwarded twice" is TRUE of a session that forwarded
+            # nothing at all, and the first run of this row returned exactly
+            # that: `forwarded_per_id: {}`, held true, subject absent.
+            #
+            # G2-20.duplicate_pending sends `arguments: {}`, so the mediator
+            # records NO_INSPECTABLE_CONTENT, never holds, and never writes an
+            # RPC_EGRESS. The scenario's precondition — a request still PENDING
+            # when its twin arrives — does not occur here at all, so there is
+            # nothing for the property to be true OF.
+            #
+            # Reported as no subject rather than as a pass. A green with no
+            # subject is the defect this whole harness keeps finding in itself.
+            subject = bool(per_id)
+            assertions.append({
+                "op": op,
+                "forwarded_per_id": dict(per_id),
+                "forwarded_twice": repeated,
+                "admission_refusals": refusals,
+                "subject": subject,
+                "held": (not repeated) if subject else None,
+                "why": None if subject else (
+                    "the mediator recorded no forwarded request for any id, so "
+                    "nothing was pending and this property has no subject in "
+                    "this run")})
+
+        elif op == "assert_secondary_and_reverse_complete_independently":
+            # SCOPED TO DISTINCT IDS, and the scope IS the ruling. T8: `_owed`
+            # is per id with a per-item origin, so items with DIFFERENT ids
+            # complete independently — but a client id reused while pending is a
+            # deliberate NO, torn down on purpose. An unconditional claim would
+            # fail G2-15, a shape the product handles correctly.
+            settled = _receipts_of_kind(run_root / "proxy.receipts.jsonl", "SETTLED")
+            by_id = collections.Counter(
+                row.get("request_id") for row in settled
+                if row.get("request_id") is not None)
+            reused = sorted(i for i, n in by_id.items() if n > 1)
+            distinct = sorted(i for i, n in by_id.items() if n == 1)
+            assertions.append({
+                "op": op,
+                "settled_per_id": dict(by_id),
+                "distinct_ids": distinct,
+                "reused_ids": reused,
+                "scope": "distinct ids only; a reused pending id is a deliberate NO",
+                "held": bool(distinct) and not reused})
+
         elif op == "release_any_old_workers":
             # WHAT THE MEDIATOR RECORDS, not what this adapter hopes.
             # `passthrough.py` emits WORKER_OUTPUT with `accepted` and

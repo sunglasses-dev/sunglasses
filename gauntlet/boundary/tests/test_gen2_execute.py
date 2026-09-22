@@ -207,7 +207,7 @@ def test_every_drivable_variant_runs_on_the_control_route(run_root):
     # 27 is measured, by the same sweep that corrected 297 to 340 in the step
     # contract. It was 19 before the four assertion ops. If ASTRA's delivery
     # changes this changes with it, loudly.
-    assert len(ran) == 27, [r["id"] for r in ran]
+    assert len(ran) == 28, [r["id"] for r in ran]
 
 
 def test_a_scenario_whose_own_request_is_an_initialize_is_not_eaten_by_the_handshake(run_root):
@@ -450,7 +450,7 @@ def test_every_drivable_variant_runs_on_the_strict_route(run_root):
     assert findings, (
         "no row in the whole strict sweep produced a finding, so nothing here "
         f"exercised detection: {[(r['id'], r['settled']) for r in inspected]}")
-    assert len(ran) == 27, [r["id"] for r in ran]
+    assert len(ran) == 28, [r["id"] for r in ran]
 
 
 def test_the_disposition_is_the_primary_request_s_and_not_the_handshake_s(run_root):

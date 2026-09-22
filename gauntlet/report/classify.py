@@ -204,12 +204,24 @@ def needs_of(variant_id: str, steps: list[dict], capmap: dict,
                                   event, variant_id))
             continue
 
-        if op in implemented:
-            continue
-
         if unit == "opcode+kind":
+            # ABOVE the implemented check, for the same reason the event branch
+            # is: the unit is FINER THAN THE OPCODE, so "the adapter implements
+            # arm_fault" does not answer "can it arm THIS kind".
+            #
+            # It was below, and nothing noticed until `arm_fault` was actually
+            # implemented on 2026-09-22 — at which point every kind stopped
+            # being asked about and `classify` returned an empty bucket set. The
+            # C4 and C6 acceptance controls caught it in the same run, which is
+            # what they are for: C4 wants a kind outside the cited enumeration
+            # bucketed as real-route work, C6 wants a kind INSIDE it bucketed as
+            # adapter work so the ceiling can go false. Neither can happen if
+            # the opcode short-circuits first.
             kind = step.get("kind")
             needs.append(Need(op, f"{op}[kind={kind}]", kind, variant_id))
+            continue
+
+        if op in implemented:
             continue
 
         needs.append(Need(op, op, None, variant_id))
