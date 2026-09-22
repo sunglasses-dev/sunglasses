@@ -17,6 +17,28 @@ beside the rule they grade instead of in a tmp directory.
 | p7 | cases CONSTRUCTED from axes, plus `--cases` for reviewer-authored ones |
 | p8 | the `(?-i:)` scope in every evaluation mode, read back from the engine |
 
+## ADDRESS THE PACKAGE AS `/tmp`, NEVER `/private/tmp`
+
+The reviewer runs under `sandbox: workspace-write [workdir, /tmp, $TMPDIR]`,
+and that writable root is matched as the LITERAL STRING `/tmp`. The resolved
+spelling `/private/tmp` is the SAME DIRECTORY and gets a different answer: the
+reviewer's SHELL works there, so every probe runs and every log lands, but its
+EDITOR refuses the path as "outside of the project" — so it can measure
+everything and still be unable to write a verdict.
+
+**Round 5 was REFUSED for exactly this and nothing else.** Every probe was
+green (red control 29/29, matrix 37/37, sweep 77 with 1 accepted and 0
+unbooked, mutations 9/9 with control, ratio 1.01x, evasions 6/6, modes 4/4).
+The round eleven minutes later, same design and same tree, wrote its verdict
+without trouble because it happened to use `/tmp`. Nothing about the design was
+wrong; the spelling was a coin flip and it landed badly once.
+
+So the builder defaults to `/tmp`, and **every prompt must say the directory as
+`/tmp/...` and tell the reviewer in one line that the editor rejects
+`/private/tmp`** — because a reviewer that is refused a write will spend the
+whole round before discovering it, and a blocked round costs the same window as
+a real one.
+
 ## What the harness learned the hard way
 
 - **No wrapper states a count.** Numbers in comments went stale twice and were

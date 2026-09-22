@@ -18,7 +18,17 @@ set -eu
 HEAD_REF=${1:?head ref}; BASE_REF=${2:?base ref}
 ROOT=$(git rev-parse --show-toplevel)
 SHORT=$(git -C "$ROOT" rev-parse --short "$HEAD_REF")
-OUT=${3:-/private/tmp/SD010_EMB_REVIEW_${SHORT}_$(date +%Y-%m-%d)}
+# THE SPELLING IS LOAD-BEARING: `/tmp`, never `/private/tmp`. codex runs the
+# reviewer with `sandbox: workspace-write [workdir, /tmp, $TMPDIR]`, and that
+# writable root is matched as the LITERAL STRING `/tmp`. Hand it the resolved
+# spelling and its SHELL still works -- it will happily run a probe in there --
+# but its EDITOR refuses the path as "outside of the project", so a reviewer can
+# run every probe and still be unable to write a verdict. Round 5 was REFUSED
+# for exactly that and nothing else; the round eleven minutes later wrote fine
+# because it happened to use `/tmp`. Same directory (`/tmp -> private/tmp`),
+# different answer, and leaving the spelling to chance is what turned a bug
+# into a coin flip.
+OUT=${3:-/tmp/SD010_EMB_REVIEW_${SHORT}_$(date +%Y-%m-%d)}
 rm -rf "$OUT"; mkdir -p "$OUT/head" "$OUT/base" "$OUT/probes"
 git -C "$ROOT" archive "$HEAD_REF" | tar -x -C "$OUT/head"
 git -C "$ROOT" archive "$BASE_REF" | tar -x -C "$OUT/base"
