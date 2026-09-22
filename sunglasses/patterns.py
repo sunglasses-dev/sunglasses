@@ -2524,6 +2524,23 @@ PATTERNS = [
     #     indentation, case-SENSITIVE      1 doc           1
     #     + placeholder-value exclusion    0 docs          0   <- this rule
     #
+    # A BARE CARRIAGE RETURN IS A BOUNDARY, and it was missing until a
+    # case-constructing probe went looking. The class carried `\\r` -- the
+    # ESCAPED two-character form that appears inside a JSON string -- and never
+    # a literal CR, so `\r\n` matched only because of the `\n` beside it and a
+    # CR-delimited log or a classic-Mac file walked straight past:
+    #
+    #     'x\r  API_KEY=<secret>\r'      allow    before
+    #     'x\r\n  API_KEY=<secret>\r\n'  block    always worked
+    #
+    # Nothing in two review rounds or two hundred fixtures had touched it,
+    # because every fixture was one somebody had already thought of. The probe
+    # that found it builds its cases from axes instead: eleven quoting contexts
+    # crossed with nine values, and the CR rows were the only ones that came
+    # back unreported. Measured cost of admitting it: none. 0 new decision
+    # flips over the 77-document corpus, 0 must-fire rows lost, 0 benign twins
+    # gained, and the tenth attack input closed.
+    #
     # THERE IS NO EXCLUSION, AND THAT IS THE FINDING RATHER THAN A SHORTCUT.
     #
     # Three review rounds, three exclusions, three attacker-controlled off
@@ -2582,7 +2599,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
         "regex": [
-            r"(?:\A[ \t]*|\n[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
+            r"(?:\A[ \t]*|\n[ \t]*|\r[ \t]*|\\n[ \t]*|\\r|[\"'{\[,])"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",
         ],

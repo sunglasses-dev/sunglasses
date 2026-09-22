@@ -146,6 +146,14 @@ MUST_FIRE["a_placeholder_shaped_but_real_password"] = '{"cfg":"PASSWORD=example1
 MUST_FIRE["a_redacted_looking_but_real_value"] = "config:\n    PASSWORD=xxxxxxxx\n"
 
 
+# A CR-delimited line. `\r\n` always worked because of the `\n`; a BARE
+# carriage return did not, and no hand-written fixture had ever tried one. This
+# row exists because a case-constructing probe crossed eleven quoting contexts
+# with nine values and these were the only cells that came back unreported.
+MUST_FIRE["cr_only_line_separator"] = "x\r  PASSWORD=" + PW + "\r"
+MUST_FIRE["crlf_line_separator"] = "x\r\n  PASSWORD=" + PW + "\r\n"
+
+
 # The compose interpolation. It was the last DISCLOSED miss, and it is a
 # must-fire row now because the exclusion that spared it is gone. It leaks
 # nothing by itself -- `${API_KEY}` is a reference -- so reporting it is a

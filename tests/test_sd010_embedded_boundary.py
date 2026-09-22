@@ -366,3 +366,23 @@ def test_nothing_is_disclosed_as_unreported():
     assert rows.DISCLOSED_MISSES == {}, (
         f"something is being declined again: {sorted(rows.DISCLOSED_MISSES)}. "
         f"Name the shape, and show an attacker cannot produce it.")
+
+
+def test_control_removing_the_carriage_return_loses_the_cr_delimited_line():
+    """The literal CR in the boundary class is load-bearing, proven by removal.
+
+    The class also carries `\\r` as an ESCAPED two-character sequence, which is
+    a different thing and is NOT what this guards. Removing only the literal
+    one must lose the CR-delimited row while the CRLF row, which rides on the
+    `\\n`, keeps working -- otherwise this control is not aimed at the right
+    character.
+    """
+    narrowed = _rule_regex().replace(r"|\r[ \t]*", "", 1)
+    assert narrowed != _rule_regex(), "the literal CR is no longer in the class"
+    e = _mutate(**{RULE: narrowed})
+    assert RULE not in _ids(e, rows.MUST_FIRE["cr_only_line_separator"])[1], (
+        "removing the literal CR did not lose the CR-delimited line, so that "
+        "row is not guarding this character.")
+    assert RULE in _ids(e, rows.MUST_FIRE["crlf_line_separator"])[1], (
+        "the CRLF row also broke, so this control is measuring the newline "
+        "rather than the carriage return.")
