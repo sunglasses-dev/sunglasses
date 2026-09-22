@@ -29,18 +29,38 @@ from . import snapshot as _snapshot
 class Outcome:
     """Activated or not, with the snapshot that decided it."""
 
-    __slots__ = ("activated", "provenance", "detail", "snapshot")
+    __slots__ = ("activated", "provenance", "detail", "snapshot", "rule_ids")
 
-    def __init__(self, activated, *, provenance=None, detail="", snapshot=None):
+    def __init__(self, activated, *, provenance=None, detail="", snapshot=None,
+                 rule_ids=()):
         self.activated = activated
         self.provenance = provenance
         self.detail = detail
         self.snapshot = snapshot
+        # Carried so a refusal can NAME what refused it. The verdict knows;
+        # until now the Outcome dropped it on the floor between here and the
+        # wire, and the client was told PROHIBITED_CONTENT with no rule.
+        self.rule_ids = list(rule_ids)
 
     def __repr__(self):
         if self.activated:
             return "<Outcome activated>"
         return f"<Outcome refused {self.provenance}: {self.detail}>"
+
+
+def _deciding_rule_ids(page_scans):
+    """The ids on the FIRST page that carried findings, not a union.
+
+    An operator needs to know which tool's description was prohibited. Merging
+    every page would name rules from pages that were clean, which reads as a
+    broader refusal than the one that happened.
+    """
+    for page in page_scans or []:
+        findings = page.get("findings") if isinstance(page, dict) else None
+        if findings:
+            return sorted({f.get("rule_id") for f in findings
+                           if isinstance(f, dict) and f.get("rule_id")})
+    return []
 
 
 def activate(store, *, list_pages, scan, server_identity, collect=None):
@@ -55,8 +75,15 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
         # T8.R13. There is no sha to compare, by construction, so the store is
         # never asked. Capturing a truncation would put a document in front of
         # a human that the server never finished sending.
+        # THE COLLECTOR REFUSES FIRST, AND IT KNOWS WHY. A poisoned tool
+        # description is stopped here, before the store is ever asked for a
+        # verdict -- which is why that refusal reached the client carrying
+        # `rule_ids: []` and `inspected_utf8_bytes: 0`, and why it looked like
+        # a refusal that had inspected nothing. It had inspected plenty; the
+        # ids were sitting in `found.page_scans` and this return dropped them.
         return Outcome(False, provenance=found.reason or APPROVAL_REQUIRED,
-                       detail=found.detail, snapshot=found)
+                       detail=found.detail, snapshot=found,
+                       rule_ids=_deciding_rule_ids(found.page_scans))
 
     # T5.R2. Captured whatever the verdict, so the operator has the thing they
     # would be approving.
@@ -69,4 +96,5 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
     if verdict.activated:
         return Outcome(True, snapshot=found)
     return Outcome(False, provenance=verdict.provenance,
-                   detail=verdict.detail or "", snapshot=found)
+                   detail=verdict.detail or "", snapshot=found,
+                   rule_ids=getattr(verdict, "rule_ids", ()))
