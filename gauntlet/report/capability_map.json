@@ -1,102 +1,231 @@
 {
-  "map_version": 1,
-  "revision": "2026-09-14-a",
-  "authored_by": "T10",
-  "review_state": "unreviewed",
-  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it.",
-  "bound_to": {
-    "adapter_path": "gauntlet/boundary/gen2/adapter.py",
-    "mediator_paths": ["gauntlet/boundary/proxy", "gauntlet/boundary/client", "gauntlet/boundary/destination"],
-    "note": "Relevant identity changes invalidate every entry until revalidated. The producer records the digests it actually read; a digest mismatch invalidates this map rather than carrying it across."
+ "map_version": 1,
+ "revision": "2026-09-22-a",
+ "authored_by": "T10",
+ "review_state": "unreviewed",
+ "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
+ "bound_to": {
+  "adapter_path": "gauntlet/boundary/gen2/adapter.py",
+  "mediator_paths": [
+   "gauntlet/boundary/proxy",
+   "gauntlet/boundary/client",
+   "gauntlet/boundary/destination"
+  ],
+  "note": "Relevant identity changes invalidate every entry until revalidated. The producer records the digests it actually read; a digest mismatch invalidates this map rather than carrying it across."
+ },
+ "units": {
+  "note": "Capability is not the opcode. An entry declares which tuple decides it, because opcode membership omits actor, selector, target, direction, schema, barriers and transport.",
+  "arm_fault": "opcode+kind",
+  "await_event": "opcode+event+actor",
+  "default": "opcode"
+ },
+ "enumerated_values": {
+  "arm_fault.kind": {
+   "available": [
+    "exception",
+    "hang",
+    "barrier"
+   ],
+   "source": "gauntlet/boundary/proxy/fault_dispatch.py:45 SELECTABLE",
+   "basis": "enumerated_source_constant",
+   "note": "An explicit closed list, so membership is an enumeration rather than a resemblance. A kind outside it is a real-route capability, not an unclassified op."
   },
-  "units": {
-    "note": "Capability is not the opcode. An entry declares which tuple decides it, because opcode membership omits actor, selector, target, direction, schema, barriers and transport.",
-    "arm_fault": "opcode+kind",
-    "await_event": "opcode+event+actor",
-    "default": "opcode"
+  "await_event.event": {
+   "available": [
+    "SCAN_STARTED",
+    "HOLD_ENTERED",
+    "CANCEL_ACCEPTED"
+   ],
+   "source": "gauntlet/boundary/gen2/adapter.py SUPPORTED_EVENTS",
+   "basis": "enumerated_source_constant",
+   "note": "Four of the contract's seven are refused by name. Binding one to a neighbouring event would make the adapter the author of the scenario's meaning."
   },
-  "enumerated_values": {
-    "arm_fault.kind": {
-      "available": ["exception", "hang", "barrier"],
-      "source": "gauntlet/boundary/proxy/fault_dispatch.py:45 SELECTABLE",
-      "basis": "enumerated_source_constant",
-      "note": "An explicit closed list, so membership is an enumeration rather than a resemblance. A kind outside it is a real-route capability, not an unclassified op."
-    },
-    "await_event.event": {
-      "available": ["SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED"],
-      "source": "gauntlet/boundary/gen2/adapter.py SUPPORTED_EVENTS",
-      "basis": "enumerated_source_constant",
-      "note": "Four of the contract's seven are refused by name. Binding one to a neighbouring event would make the adapter the author of the scenario's meaning."
-    }
-  },
-  "classified": {
-    "answer_relist": {
-      "bucket": "route_capability",
-      "basis": "inspected_source",
-      "evidence": "no occurrence of relist, next_page or cursor machinery anywhere in proxy/, client/ or destination/",
-      "caveat": "absence by inspection is not proof of exhaustive absence; it is a located judgement, revalidated when the route identity changes"
-    },
-    "answer_next_page": {
-      "bucket": "route_capability",
-      "basis": "inspected_source",
-      "evidence": "as answer_relist: no pagination machinery in the mediator",
-      "caveat": "absence by inspection is not proof of exhaustive absence"
-    },
-    "set_pin_state": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03: pin is a real-route capability only T8's proxy will have"},
-    "assert_pin_matches_reviewed_hash_only": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, pin family"},
-    "begin_explicit_approval": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "assert_no_implicit_approval_or_pin_write": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval and pin families"},
-    "launch_and_approve": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "assert_no_inherited_approval": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "commit_reviewed_snapshot_only": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "switch_upstream_snapshot": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "assert_generation_not_activated": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, approval family"},
-    "restart_with_same_pin_store": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, pin family"},
-    "configure_private_doctor_profile": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, doctor family"},
-    "invoke_real_doctor": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, doctor family; the operation names the real product surface"},
-    "assert_configured_route_status": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, doctor family"},
-    "arm_receipt_profile": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, receipts family"},
-    "execute_receipt_profile": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, receipts family"},
-    "assert_production_receipt_schema_redaction_and_completion": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, receipts family"},
-    "arm_process_transport_profile": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"},
-    "execute_process_transport_profile": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"},
-    "assert_deadline_and_process_group_cleanup": {"bucket": "route_capability", "basis": "reviewed_ruling", "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"},
-    "invoke_real_install": {"bucket": "route_capability", "basis": "inspected_source", "evidence": "the operation invokes the real installation entry point; the stand-in mediator has no installer"},
-    "invoke_real_uninstall_if_profile_allows": {"bucket": "route_capability", "basis": "inspected_source", "evidence": "as invoke_real_install"},
-    "execute_config_transaction_profile": {"bucket": "route_capability", "basis": "inspected_source", "evidence": "config transaction machinery is a product surface; absent from the mediator"},
-    "snapshot_private_config_bytes_and_mode": {"bucket": "route_capability", "basis": "inspected_source", "evidence": "reads real private configuration bytes and mode; absent from the mediator"},
-    "compare_config_bytes_entries_mode_and_claim": {"bucket": "route_capability", "basis": "inspected_source", "evidence": "compares real configuration state; absent from the mediator"}
-  },
-  "unclassified": {
-    "assert_no_second_forward_and_no_pending_overwrite": {
-      "open_question": "whether the mediator can express this at all is a question about T8's real route, not about the adapter",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    },
-    "assert_secondary_and_reverse_complete_independently": {
-      "open_question": "as above: a route question, not an adapter question",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    },
-    "execute_armed_worker_fault": {
-      "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    },
-    "release_fault_barrier": {
-      "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    },
-    "release_any_old_workers": {
-      "open_question": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    },
-    "assert_pending_retired": {
-      "open_question": "retirement is emitted at passthrough.py:528 but whether the adapter can assert it is unevidenced",
-      "owner": "T8",
-      "declared_at": "2026-09-14"
-    }
+  "plan.refusal_class": {
+   "available": [
+    "drivable",
+    "missing_operation",
+    "event_gap",
+    "no_steps"
+   ],
+   "source": "gauntlet/boundary/gen2/adapter.py CLASSES / classify()",
+   "basis": "enumerated_source_constant",
+   "note": "A REFUSAL CLASS NOBODY NAMES IS A REFUSAL CLASS NOBODY COUNTS. `event_gap` existed in behaviour and in no vocabulary: the coverage ledger and both route sweeps caught only `missing_operation`, and their accounting still summed to 74 because the operation check always fired first. Implementing release_any_old_workers removed the mask and four G2-21 variants fell out of the accounting entirely. Measured 2026-09-22: 27 drivable, 43 missing_operation, 4 event_gap."
   }
+ },
+ "classified": {
+  "answer_relist": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "no occurrence of relist, next_page or cursor machinery anywhere in proxy/, client/ or destination/",
+   "caveat": "absence by inspection is not proof of exhaustive absence; it is a located judgement, revalidated when the route identity changes"
+  },
+  "answer_next_page": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "as answer_relist: no pagination machinery in the mediator",
+   "caveat": "absence by inspection is not proof of exhaustive absence"
+  },
+  "set_pin_state": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03: pin is a real-route capability only T8's proxy will have"
+  },
+  "assert_pin_matches_reviewed_hash_only": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, pin family"
+  },
+  "begin_explicit_approval": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_no_implicit_approval_or_pin_write": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval and pin families"
+  },
+  "launch_and_approve": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_no_inherited_approval": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "commit_reviewed_snapshot_only": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "switch_upstream_snapshot": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_generation_not_activated": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "restart_with_same_pin_store": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, pin family"
+  },
+  "configure_private_doctor_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family"
+  },
+  "invoke_real_doctor": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family; the operation names the real product surface"
+  },
+  "assert_configured_route_status": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family"
+  },
+  "arm_receipt_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "execute_receipt_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "assert_production_receipt_schema_redaction_and_completion": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "arm_process_transport_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "execute_process_transport_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "assert_deadline_and_process_group_cleanup": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "invoke_real_install": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "the operation invokes the real installation entry point; the stand-in mediator has no installer"
+  },
+  "invoke_real_uninstall_if_profile_allows": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "as invoke_real_install"
+  },
+  "execute_config_transaction_profile": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "config transaction machinery is a product surface; absent from the mediator"
+  },
+  "snapshot_private_config_bytes_and_mode": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "reads real private configuration bytes and mode; absent from the mediator"
+  },
+  "compare_config_bytes_entries_mode_and_claim": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "compares real configuration state; absent from the mediator"
+  },
+  "assert_zero_upstream_copies": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "2647b42dc118d1cf",
+   "step_record": "gauntlet/report/witnesses/G2-16.wire_name.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "G2-16.wire_name driven on proxy_strict through gauntlet/boundary/gen2/execute.py. The step recorded copies=0 held=true and the mediator's own receipts recorded SETTLED reason=PROHIBITED_SECRET forwarded=false, so the assertion and the mediator agree. ADAPTER AGAINST HARNESS: the mediator driven here is the gauntlet's own passthrough, not the shipped route, so this is evidence that the adapter drives the step and that the step measures egress. It is NOT proof about the product's real route and must not be read as the stronger claim.",
+   "caveat": "This step could not hold on ANY run before 2026-09-22: it counted the reference file against the client wire, and the reference IS the file the schedule sends. Two runs of this variant, one with the scanner raising and one with it finding the secret, printed identical output. The witness is therefore evidence about the CORRECTED step."
+  }
+ },
+ "unclassified": {
+  "assert_no_second_forward_and_no_pending_overwrite": {
+   "open_question": "whether the mediator can express this at all is a question about T8's real route, not about the adapter",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "assert_secondary_and_reverse_complete_independently": {
+   "open_question": "as above: a route question, not an adapter question",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "execute_armed_worker_fault": {
+   "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "release_fault_barrier": {
+   "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "release_any_old_workers": {
+   "open_question": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "assert_pending_retired": {
+   "open_question": "retirement is emitted at passthrough.py:528 but whether the adapter can assert it is unevidenced",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  }
+ }
 }

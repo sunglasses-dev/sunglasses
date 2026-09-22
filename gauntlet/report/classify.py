@@ -46,12 +46,17 @@ REVIEWED = "reviewed"          # the only review_state `load_map` accepts
 # HOW AN ENTRY CAME TO BE BELIEVED. `basis` was free text, so a typo produced a
 # bucket nobody could audit and nothing refused it.
 #
-# `executed_witness` is added by ruling (T9, 2026-09-22) as SCHEMA ONLY — there
-# are zero entries under it and there cannot yet be one, because nothing in
-# `gauntlet/` executes a step: the adapter exports `check_step` (shape) and
-# `plan` ("the steps that WOULD run") and no executor exists. It is defined now
-# so whoever builds the executor has the shape to fill, and so a claim of a run
-# that carries no record of one is refused rather than believed.
+# `executed_witness` was added by ruling (T9, 2026-09-22) as SCHEMA ONLY, on the
+# grounds that nothing in `gauntlet/` executed a step. THAT IS NO LONGER TRUE
+# and the comment outlived it by hours: `gen2/execute.py` has a `run()` that
+# drives a variant through real pipes, and the first witness was taken the same
+# day. There is one entry under this basis now.
+#
+# The comment is corrected rather than deleted because the reason it gave is the
+# reason the fields below exist: a claim of a run that carries no record of one
+# is refused rather than believed. Note what the first witness needed before it
+# could be taken — the step it exercised could not hold on ANY run until the day
+# it was recorded, because it compared a file against itself.
 REVIEWED_RULING = "reviewed_ruling"
 INSPECTED_SOURCE = "inspected_source"
 EXECUTED_WITNESS = "executed_witness"
