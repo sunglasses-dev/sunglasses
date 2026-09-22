@@ -4,6 +4,17 @@ from _common import head_engine, without
 RULE="GLS-SD-010-EMB"
 ship=head_engine(D); base=without(D, RULE)
 docs=sorted(glob.glob(os.path.join(D,"head","tests","fp_real_world_corpus","*.md")))
+# A SWEEP OVER NOTHING IS NOT A CLEAN SWEEP. This subject comes from a GLOB, so
+# a moved corpus, a renamed directory or an extension change empties it in
+# silence -- and every count below is then 0, `unbooked` is empty, and the probe
+# exits 0 reporting no false positives over no documents. This exact reassuring
+# zero has already been banked once: an FP sweep came back clean over a rule set
+# that matched nothing at all, which was true and worthless.
+if not docs:
+    print(f"  *** NO CORPUS DOCUMENTS under {os.path.join(D,'head','tests','fp_real_world_corpus')}. "
+          f"A zero here would measure nothing. Harness defect, not a product finding. ***")
+    sys.exit(2)
+print(f"  corpus documents swept        : {len(docs)}")
 hits=[];flips=[]
 for p in docs:
     t=open(p,errors="ignore").read(); n=os.path.basename(p)

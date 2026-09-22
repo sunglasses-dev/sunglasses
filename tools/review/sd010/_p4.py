@@ -49,6 +49,16 @@ if rc0 != 0:
 
 killed = 0
 mutants = names[1:]
+# AN EMPTY BATTERY IS NOT A PASSING ONE. `killed == len(mutants)` is 0 == 0 when
+# nothing was built, so a builder that wrote no trees -- a renamed directory, a
+# glob that stopped matching, a failed pre-build -- printed "0/0 killed, control
+# green" and exited 0. That is the most expensive version of a reassuring zero
+# available here, because the mutation battery is the strongest evidence in the
+# package and a reviewer reads its exit code first.
+if not mutants:
+    print("  *** NO MUTANT TREES. The battery injected NOTHING, so 0/0 is not "
+          "a score. Harness defect, not a product finding. ***")
+    sys.exit(2)
 for n in mutants:
     rc, tail = run(os.path.join(OUT, n))
     # rc 1 = tests ran and failed. Anything else is the harness breaking, and
