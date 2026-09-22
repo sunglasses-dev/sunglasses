@@ -144,3 +144,33 @@ def _legacy_destination_shape(request):
         yield
     finally:
         grade.LEGACY_DESTINATION_SHAPE = previous
+# ── ONE RUN AT A TIME ───────────────────────────────────────────────────────
+# The decision lives in `run_alone.py` so it can be imported and tested; see its
+# docstring for why this guard exists and why it is not a pgrep.
+import os as _os
+
+import pytest as _pytest
+
+from run_alone import LOCK as _LOCK, current_holder as _current_holder
+
+
+@_pytest.fixture(autouse=True, scope="session")
+def one_run_at_a_time():
+    holder = _current_holder()
+    if holder:
+        _pytest.exit(
+            f"REFUSED: another pytest session (pid {holder}) is running this "
+            f"suite. Concurrent runs of the boundary tests interfere - they "
+            f"spawn real subprocesses and drive timed barriers - and the "
+            f"numbers they produce are void, not merely noisy. Wait, or remove "
+            f"{_LOCK} if that pid is gone.",
+            returncode=2)
+    _LOCK.write_text(str(_os.getpid()))
+    try:
+        yield
+    finally:
+        try:
+            if _LOCK.exists() and _LOCK.read_text().strip() == str(_os.getpid()):
+                _LOCK.unlink()
+        except OSError:
+            pass
