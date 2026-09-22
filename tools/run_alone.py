@@ -151,13 +151,31 @@ def worktree_roots(start: pathlib.Path | None = None) -> list[pathlib.Path]:
 
 
 def _cmdlines() -> dict[int, str]:
-    try:
-        done = subprocess.run(("ps", "-axo", "pid=,command="),
-                              capture_output=True, text=True, timeout=15)
-    except (OSError, subprocess.SubprocessError):
+    # `ww` IS LOAD BEARING. Without it `ps` clips each line to the terminal
+    # width, and on a CI runner the interpreter path alone is longer than that:
+    # the command came back as
+    # `/opt/hostedtoolcache/Python/3.12.14/x64/bin/python /opt/hostedtoolcache/`
+    # — cut off before the word `pytest` ever appeared. The classifier was
+    # right and the reader had handed it half a sentence. Doubled because one
+    # `w` only widens to 132 columns.
+    # BSD FORM, no leading dash, because it is the spelling both platforms
+    # accept. The fallback is the UNIX form for a `ps` that rejects it: a reader
+    # that returns nothing makes the guard blind, and blind is the state this
+    # whole module exists to avoid.
+    text = ""
+    for argv in (("ps", "axww", "-o", "pid=,command="),
+                 ("ps", "-eo", "pid=,command=")):
+        try:
+            done = subprocess.run(argv, capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if done.returncode == 0 and done.stdout.strip():
+            text = done.stdout
+            break
+    if not text:
         return {}
     out: dict[int, str] = {}
-    for line in done.stdout.splitlines():
+    for line in text.splitlines():
         pid, _, command = line.strip().partition(" ")
         try:
             out[int(pid)] = command

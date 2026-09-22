@@ -182,3 +182,31 @@ def _group_of(pid):
         return os.getpgid(pid)
     except OSError:
         return None
+
+
+def test_the_process_listing_is_not_clipped_to_the_terminal_width():
+    """`ps` truncates each line to the terminal width unless told not to.
+
+    On a CI runner the interpreter path alone is longer than that, so our own
+    command came back as
+    `/opt/hostedtoolcache/Python/3.12.14/x64/bin/python /opt/hostedtoolcache/`
+    — cut off before the word `pytest` ever appeared. The classifier was right
+    and the reader had handed it half a sentence, which is the same defect as
+    reading a file with `tail -5` and reporting four names as the whole list.
+
+    Asserted against THIS process's real arguments, so it holds wherever it
+    runs and however long the paths are.
+    """
+    recorded = run_alone._cmdlines().get(os.getpid())
+    assert recorded, f"our own pid {os.getpid()} is not in the process listing"
+
+    # A token from the far end of our own argv. If the line were clipped this
+    # is the part that would be missing.
+    tail = [arg for arg in sys.argv[1:] if not arg.startswith("-")]
+    if tail:
+        assert tail[-1] in recorded, (
+            f"the process listing is clipped: {recorded!r} does not contain "
+            f"{tail[-1]!r}, which is in our own argv")
+    assert len(recorded) >= len(sys.executable), (
+        f"the recorded command {recorded!r} is shorter than the interpreter "
+        "path that started it, so it has been truncated")
