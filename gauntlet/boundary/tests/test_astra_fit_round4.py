@@ -117,7 +117,7 @@ def test_r1_missing_direct_capture_does_not_attest(tmp_path):
     assert observed is None
     assert attester is None, 'R1_ATTESTER_WITHOUT_CAPTURE'
 
-def test_r1_configured_direct_route_produces_own_capture(monkeypatch):
+def test_r1_configured_direct_route_produces_own_capture(monkeypatch, runnable_direct_route):
     import test_round3
     text = (ROOT / 'test_round3.py').read_text()
     tree = ast.parse(text)

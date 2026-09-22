@@ -71,7 +71,7 @@ def test_r5_fallback_does_not_prove_declared_endpoint(tmp_path,monkeypatch):
  assert receipt['endpoint_as_declared'] is False
  assert receipt['observation_complete'] is False,'R5_UNBOUND_TARGET_MARKED_COMPLETE'
 
-def test_r1_actual_g2_12_direct_route_is_gradeable(monkeypatch):
+def test_r1_actual_g2_12_direct_route_is_gradeable(monkeypatch, runnable_direct_route):
  import queue,threading,subprocess
  entry,folder,scenario,v=case(12)
  source=ARCHIVE/'evidence/GATE2_RUN_2026-09-13/live4/G2-04.main.control/mcp.control.json'

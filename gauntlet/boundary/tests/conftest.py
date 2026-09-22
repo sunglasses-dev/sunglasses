@@ -261,3 +261,28 @@ def one_run_at_a_time():
                 _LOCK.unlink()
         except OSError:
             pass
+
+
+# ── the frozen direct-route config ──────────────────────────────────────────
+# A fixture rather than an import, because the tests directory is not on
+# `sys.path` for a bare `import` and three call sites should not each grow a
+# path manipulation to work around that.
+import importlib.util as _ilu                                  # noqa: E402
+
+_spec = _ilu.spec_from_file_location(
+    "gauntlet_direct_route_precondition",
+    pathlib.Path(__file__).resolve().parent / "direct_route_precondition.py")
+_direct_route = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_direct_route)
+
+
+@pytest.fixture()
+def runnable_direct_route():
+    """The native entrypoint, or a refusal BY NAME before the ten second wait.
+
+    See `direct_route_precondition.py` for what is missing and why this is a
+    refusal rather than a failure.
+    """
+    from probe_support import ARCHIVE
+
+    return _direct_route.refuse_unless_runnable(ARCHIVE)
