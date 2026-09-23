@@ -355,11 +355,43 @@ what moved.
   every file corresponds to a rule, because that question has a larger answer
   that belongs to whoever owns the published data.
 
+- **One pytest run at a time, per repository.** (#234) Two suites here spawn
+  real subprocesses and drive timed barriers, and run together their numbers
+  are void rather than noisy. Four sequential runs of one commit returned 13,
+  15, 12 and 12 failures: a stable core of 12 and three movers, all of them
+  subprocess-against-a-deadline. The existing guard keyed on its own directory,
+  so it certified "I ran alone" while another worktree of the same repository
+  ran beside it. `tools/run_alone.py` keys on `git rev-parse --git-common-dir`,
+  identical from every worktree, so every conftest takes the same lock. This
+  lands the module and its tests; nothing is wired up by it.
+
+- **The scanner refuses to start a full suite beside another pytest.** (#235)
+  Adopts #234 in the scanner's root conftest. A full run is about 4,100 tests
+  and 28 minutes, and a boundary suite reported as flaky was not: five
+  sequential runs of an untouched tree returned the same 15 failures with no
+  movers. Only a FULL run is gated -- one file, one node id, `-k` or `-m` still
+  run -- and it refuses rather than warns, because a warning at the top of a
+  28-minute run is read after the damage.
+
+- **A broad `-k` is a full suite wearing a filter.** (#237) #235 exempted any
+  run carrying `-k` or `-m`, which asks whether a filter is present, not how
+  much it selects; `pytest tests -k "test_"` selected every row and passed
+  straight through. A filtered run is now refused when it selects at least 25%
+  of what was collected, or at least 500 rows, while the repository lock is
+  held or another pytest is live. Breadth is only knowable after collection, so
+  a `tryfirst` hook records what was collected and the finish hook reads what
+  survived -- one hook would see either, and which one is invisible in the
+  result.
+
 ### PENDING — open, not shipped, and not to be described as shipped
 
-**Empty.** Every change described above is in `main`. The block stays in the
-file because the next release will need it, and because a reader should be able
-to see that it was checked rather than quietly deleted.
+- **A control cannot assert its own child against a first-of answer.** (#236,
+  OPEN) `foreign_pytest()` returns the lowest pid, because the guard only needs
+  to know that something else is running. A positive control needs a different
+  question -- can the scan see the process it just started -- and with any other
+  suite live, the singular form handed it a stranger's process. Adds
+  `foreign_pytests()` returning every candidate; the guard's own behaviour is
+  unchanged. **Not in `main` until #236 merges.**
 
 ### What this release claims about the proxy, and what it does not
 
