@@ -171,3 +171,52 @@ def test_coverage_over_the_real_delivery_is_reported_and_not_rounded():
     assert "answer_relist" in missing_ops, sorted(missing_ops)
     assert not (missing_ops & adapter.IMPLEMENTED), (
         "an operation cannot be both implemented and missing")
+
+
+# ── A FAULT THE EXECUTOR CANNOT INJECT IS REFUSED BY NAME ───────────────────
+#
+# Measured 2026-09-23: four variants (G2-20.reused_id_late, G2-24.before_worker,
+# G2-24.before_write, G2-24.result_hold) arm a fault at target
+# `release_scheduler`, which exists nowhere in this instrument, and each is
+# blocked ONLY by `assert_pending_retired`. The executor runs `scan` mode for
+# any target but scanner_worker, and the arm_fault row said held:true. So the
+# day that one op landed, four variants would have driven with NO FAULT and
+# reported on it. The op check was masking the fault check, again.
+
+def _schedule_arming(kind, target):
+    return {"profile_steps": [
+        {"op": "arm_fault", "kind": kind, "target": target, "require_fresh_barrier": True},
+        {"op": "send_file", "origin": "client", "path": "a.jsonl"},
+        {"op": "release_fault_barrier"},
+    ]}
+
+
+def test_a_fault_at_a_target_that_does_not_exist_is_refused_by_name():
+    with pytest.raises(adapter.UnsupportedFault) as exc:
+        adapter.plan(_schedule_arming("queue_before_worker", "release_scheduler"))
+    assert ("queue_before_worker", "release_scheduler") in exc.value.faults
+    assert adapter.classify(_schedule_arming("queue_before_worker", "release_scheduler")) \
+        == adapter.FAULT_GAP
+
+
+def test_the_kind_is_not_the_unit_the_pair_is():
+    """result_worker is injectable at scanner_worker and NOT at release_scheduler."""
+    assert adapter.classify(_schedule_arming("result_worker", "scanner_worker")) == adapter.DRIVABLE
+    assert adapter.classify(_schedule_arming("result_worker", "release_scheduler")) == adapter.FAULT_GAP
+
+
+def test_an_unscoped_barrier_kind_is_refused_rather_than_held_session_wide():
+    """barrier_hold names no item, so the barrier would hold every scan."""
+    assert adapter.classify(_schedule_arming("barrier_hold", "scanner_worker")) == adapter.FAULT_GAP
+
+
+def test_the_mask_is_gone_when_the_blocking_op_lands(monkeypatch):
+    monkeypatch.setattr(adapter, "IMPLEMENTED", adapter.IMPLEMENTED | {"assert_pending_retired"})
+    got = {}
+    for entry in runner.load_manifest()["scenarios"]:
+        for variant in runner.scenario_of(entry)["variants"]:
+            name = f"{entry['id']}.{variant['name']}"
+            if name in ("G2-20.reused_id_late", "G2-24.before_worker",
+                        "G2-24.before_write", "G2-24.result_hold"):
+                got[name] = adapter.classify(artifacts.of_record(entry, variant).schedule)
+    assert got and set(got.values()) == {adapter.FAULT_GAP}, got

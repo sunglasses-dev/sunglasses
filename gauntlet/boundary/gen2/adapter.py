@@ -207,6 +207,38 @@ def check_step(step: dict) -> None:
             "an extra field means this schedule is not the one described.")
 
 
+# THE FAULTS THE EXECUTOR CAN ACTUALLY INJECT, as (kind, target) pairs. The unit
+# is the PAIR (ARM_FAULT_ADAPTER_DESIGN_2026-09-22): result_worker is injectable
+# at scanner_worker and names a component that does not exist at
+# release_scheduler. Only the two stage kinds whose barrier is scoped to ONE item
+# (execute.STAGE_KINDS, gen2/scoped_barrier.py) are here. barrier_hold is not: it
+# names no item, so it would hold every scan in the session.
+SUPPORTED_FAULTS = frozenset({("request_worker", "scanner_worker"),
+                              ("result_worker", "scanner_worker")})
+
+FAULT_REFUSAL_REASONS = {
+    "release_scheduler": ("appears in zero .py files in gauntlet/; the executor "
+                          "would run `scan` mode and inject nothing"),
+    "barrier_hold": ("names no item, so the fixed scanner command would hold "
+                     "every scan in the session, not one"),
+}
+
+
+class UnsupportedFault(Exception):
+    """An arm_fault step names a (kind, target) the executor cannot inject."""
+
+    def __init__(self, faults):
+        self.faults = sorted(set(faults))
+        why = "; ".join(
+            f"{kind}@{target}: "
+            f"{FAULT_REFUSAL_REASONS.get(target) or FAULT_REFUSAL_REASONS.get(kind) or 'no injection exists for this pair'}"
+            for kind, target in self.faults)
+        super().__init__(
+            f"arm_fault pair(s) this executor cannot inject: {why}. A variant "
+            "driven without the fault it declares is a clean verdict about a "
+            "session that never had one.")
+
+
 class UnsupportedEvent(Exception):
     """An await_event step names an event this mediator does not emit."""
 
@@ -281,6 +313,14 @@ def plan(schedule: dict) -> list[dict]:
     }
     if unsupported:
         raise UnsupportedEvent(unsupported)
+    # THE FAULT, BY PAIR, LAST so today's accounting does not move: every
+    # variant it refuses is also refused above today. It is here for the day
+    # the op in front of it lands (measured 2026-09-23: assert_pending_retired
+    # alone would have made four release_scheduler variants drivable, unfaulted).
+    faults = {(step.get("kind"), step.get("target")) for step in steps
+              if step["op"] == "arm_fault"} - SUPPORTED_FAULTS
+    if faults:
+        raise UnsupportedFault(faults)
     return steps
 
 
@@ -296,8 +336,9 @@ DRIVABLE = "drivable"
 MISSING_OPERATION = "missing_operation"
 EVENT_GAP = "event_gap"
 NO_STEPS = "no_steps"
+FAULT_GAP = "fault_gap"
 
-CLASSES = (DRIVABLE, MISSING_OPERATION, EVENT_GAP, NO_STEPS)
+CLASSES = (DRIVABLE, MISSING_OPERATION, EVENT_GAP, NO_STEPS, FAULT_GAP)
 
 
 def classify(schedule: dict) -> str:
@@ -313,6 +354,8 @@ def classify(schedule: dict) -> str:
         return MISSING_OPERATION
     except UnsupportedEvent:
         return EVENT_GAP
+    except UnsupportedFault:
+        return FAULT_GAP
     except NoStepsToDrive:
         return NO_STEPS
     return DRIVABLE
