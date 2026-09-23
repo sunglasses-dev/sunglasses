@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import subprocess
 import threading
 import time
@@ -43,19 +44,36 @@ STATUS_DEADLINE = "deadline"
 
 DECISION_REVIEW = "review"
 
+# THE STARTUP BUDGET IS NOT THE SCAN'S. Loading the engine costs ~1.5 s
+# (measured 9-23 on an M3 Max: `SunglassesEngine()` 1,512 ms, a warm scan
+# 0.6 ms), so a child spawned per scan spent ~80% of T8.R4's 2,000 ms before it
+# read a byte -- and on a slower machine every message would be a deadline.
+# A spare loads BEFORE it is given work and says so on a separate pipe; the
+# scan's clock starts at the payload write. Waiting for a spare that is still
+# loading is bounded HERE, separately, and a spare that never gets ready is
+# killed and the item faults -- it is never handed a scan.
+STARTUP_MS = 10_000
+READY_ENV = "SUNGLASSES_WORKER_READY_FD"
+
 
 def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
-        stdout_limit=None, raw=False):
-    """Spawn the worker, feed it the payload, and bound what comes back."""
+        stdout_limit=None, child=None):
+    """Spawn the worker, feed it the payload, and bound what comes back.
+
+    `child` is an already-running worker (a warm spare from `ProcessScan`).
+    Everything after the spawn is identical: the deadline, the stdout bound and
+    the kill all apply to it the same way, and the clock starts at the write.
+    """
     timeout_ms = bounds.INSPECTION_MS if timeout_ms is None else timeout_ms
     grace_ms = bounds.KILL_GRACE_MS if grace_ms is None else grace_ms
     stdout_limit = (bounds.WORKER_STDOUT_BYTES if stdout_limit is None
                     else stdout_limit)
     argv = argv or default_argv()
 
-    child = subprocess.Popen(
-        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL, start_new_session=True)
+    if child is None:
+        child = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True)
 
     collected: dict = {}
 
@@ -102,7 +120,7 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
 
     if collected.get("broken"):
         return _fault(binding, STATUS_EXCEPTION)
-    return _parse(collected.get("out", b""), binding, raw=raw)
+    return _parse(collected.get("out", b""), binding)
 
 
 def default_argv():
@@ -127,7 +145,7 @@ def _read_bounded(stream, limit):
         chunks.append(chunk)
 
 
-def _parse(out, binding, *, raw=False):
+def _parse(out, binding):
     lines = [line for line in out.splitlines() if line.strip()]
     if len(lines) != 1:
         # Zero is silence and two is a choice. Neither is a verdict.
@@ -138,7 +156,14 @@ def _parse(out, binding, *, raw=False):
         return _fault(binding, STATUS_EXCEPTION)
     if not isinstance(value, dict):
         return _fault(binding, STATUS_EXCEPTION)
-    return value if raw else dict(value, binding=dict(binding))
+    # THE CHILD'S BINDING, AS THE CHILD SAID IT. This used to be
+    # `dict(value, binding=dict(binding))`: the parent stamped its own binding
+    # over the answer, so `worker.validate` compared the parent with itself and
+    # a child answering about ANOTHER item was accepted as this one's result
+    # (found by T10, 9-23; measured through the route: another item's `allow`
+    # forwarded this call). Faults above still carry the parent's binding --
+    # those are ours, built here, about the item we asked about.
+    return value
 
 
 def _fault(binding, status):
@@ -149,3 +174,84 @@ def _fault(binding, status):
             "inspection_complete": False, "decision": DECISION_REVIEW,
             "inspected_utf8_bytes": 0, "observed_content_bytes": 0,
             "elapsed_ms": 0, "findings": []}
+
+
+def _spawn(argv):
+    """A child that will say `R` on its own pipe once the engine is loaded."""
+    ready_r, ready_w = os.pipe()
+    env = dict(os.environ)
+    env[READY_ENV] = str(ready_w)
+    try:
+        child = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True,
+            pass_fds=(ready_w,), env=env)
+    finally:
+        os.close(ready_w)
+    return child, ready_r
+
+
+def _await_ready(ready_r, timeout_ms):
+    """True only on the child's `R`. EOF (it died loading) and silence past the
+    budget are both False; the caller kills it either way."""
+    try:
+        readable, _, _ = select.select([ready_r], [], [], timeout_ms / 1000.0)
+        return bool(readable) and os.read(ready_r, 1) == b"R"
+    finally:
+        os.close(ready_r)
+
+
+class ProcessScan:
+    """The route's `scan=` through a real child, with T8.R4 and T8.R7 applied.
+
+    ONE WARM SPARE. Each scan takes the spare and a replacement starts loading
+    at once, so the next scan normally finds it ready. When it does not -- two
+    directions at once, or back-to-back scans -- the scan waits for readiness
+    under STARTUP_MS, never under its own deadline, and a spare that is not
+    ready by then is killed and the item faults.
+    """
+
+    def __init__(self, *, argv=None, timeout_ms=None, grace_ms=None,
+                 stdout_limit=None, startup_ms=None):
+        self.argv = argv or default_argv()
+        self.timeout_ms = bounds.INSPECTION_MS if timeout_ms is None else timeout_ms
+        self.grace_ms = bounds.KILL_GRACE_MS if grace_ms is None else grace_ms
+        self.stdout_limit = stdout_limit
+        self.startup_ms = STARTUP_MS if startup_ms is None else startup_ms
+        self._lock = threading.Lock()
+        self._closed = False
+        self._spare = _spawn(self.argv)
+
+    def _take(self):
+        with self._lock:
+            spare = self._spare
+            self._spare = None if self._closed else _spawn(self.argv)
+        return spare
+
+    def __call__(self, params, *, channel, binding, content_bytes):
+        spare = self._take()
+        if spare is None:
+            return _fault(binding, STATUS_EXCEPTION)
+        child, ready_r = spare
+        if not _await_ready(ready_r, self.startup_ms):
+            supervisor.stop_group(child.pid, grace_ms=self.grace_ms,
+                                  handle=child)
+            return _fault(binding, STATUS_EXCEPTION)
+        return run({"params": params, "channel": channel, "binding": binding,
+                    "content_bytes": content_bytes},
+                   binding=binding, child=child, timeout_ms=self.timeout_ms,
+                   grace_ms=self.grace_ms, stdout_limit=self.stdout_limit)
+
+    def close(self):
+        """Kill the waiting spare. Idempotent; the proxy calls it on teardown,
+        because `exit_process` leaves through `os._exit` and atexit never runs."""
+        with self._lock:
+            spare, self._spare, self._closed = self._spare, None, True
+        if spare is not None:
+            child, ready_r = spare
+            try:
+                os.close(ready_r)
+            except OSError:
+                pass
+            supervisor.stop_group(child.pid, grace_ms=self.grace_ms,
+                                  handle=child)

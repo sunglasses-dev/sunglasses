@@ -17,14 +17,34 @@ cannot believe.
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 from .proxy import inspection
+
+# Must equal worker_process.READY_ENV; a test holds them together.
+READY_ENV = "SUNGLASSES_WORKER_READY_FD"
 
 
 def main(stdin=None, stdout=None):
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
+    # LOAD FIRST, THEN READ. The engine takes ~1.5 s to build, and loading it
+    # after the request arrived charged that to the scan's deadline. A spare
+    # started by `worker_process.ProcessScan` is told a pipe to announce
+    # readiness on; it writes one byte there, never on stdout, whose contract
+    # stays exactly one line.
+    try:
+        inspection.default_engine()
+    except Exception:
+        return 1
+    ready = os.environ.pop(READY_ENV, None)
+    if ready is not None:
+        try:
+            os.write(int(ready), b"R")
+            os.close(int(ready))
+        except (OSError, ValueError):
+            return 1
     try:
         request = json.loads(stdin.read().decode("utf-8"))
         result = inspection.scan(

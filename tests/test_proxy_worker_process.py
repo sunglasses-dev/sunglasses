@@ -73,7 +73,7 @@ def test_the_payload_reaches_the_child_on_stdin():
     echo = _script("import sys,json;d=sys.stdin.read();"
                    "print(json.dumps({'seen':len(d)}))")
     out = worker_process.run({"params": {"text": "hello"}}, argv=echo,
-                             binding=BINDING, raw=True)
+                             binding=BINDING)
     assert out["seen"] > 0
 
 
