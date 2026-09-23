@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-f",
+ "revision": "2026-09-23-g",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -268,6 +268,20 @@
     "owner": "T8",
     "declared_at": "2026-09-14"
    }
+  },
+  "cancel_behind_scan": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "no per-run id exists; 24 runs (8 configs x 3) at gauntlet 5d8cc9f, each in the step record",
+   "step_record": "gauntlet/report/witnesses/cancel_behind_scan.product.runs.json",
+   "driven_against": "PRODUCT: sunglasses/proxy serve._drain_client + serve._drain + route.Route at 474c849 (both --worker modes) and 35f04ce (in-process)",
+   "witness_class": "product-route (serve's own reader loops)",
+   "ruled_by": "T9",
+   "ruled_at": "2026-09-23",
+   "finding": "#7: a cancel arriving on the client thread while its OWN request is scanned is read only after the scan; a clean scan forwards the cancelled call +1.1-3.4 s; 1/15 the client got the RESULT. Cross-thread cancel works 12/12.",
+   "red_row": "tests/proxy/test_cancel_behind_scan.py (2199b7e): deterministic, xfail(strict) on main; fails without the marker on 'the server received a call the client cancelled while it was held'",
+   "evidence": "warroom/CANCEL_BEHIND_SCAN_2026-09-23.md",
+   "caveat": "The first key compared B's cancel with the REQUEST scan (the wrong item) and read True; corrected to the marked item's scan. The stub server answers instantly, so 1/15 is 'possible', not a rate."
   }
  },
  "unclassified": {
