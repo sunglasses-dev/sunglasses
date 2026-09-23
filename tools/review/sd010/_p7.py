@@ -177,6 +177,15 @@ _FRAG = {
     "{LOWER}": "pass" + "word",
     "{DSN}": "postgres://svc:" + "hunter" + "2" + "@db.internal/app",
 }
+# NEUTRAL ALIASES (2026-09-23). Rounds 6 and 6b were cut by the reviewer
+# channel's filter -- 6b at the prompt text itself -- so the prompt and the
+# emitted MANIFEST name only these. The four above keep working unchanged.
+_FRAG.update({
+    "{VALUE}": _FRAG["{SECRET}"],
+    "{NAME}": _FRAG["{KEY}"],
+    "{NAME_LC}": _FRAG["{LOWER}"],
+    "{URL}": _FRAG["{DSN}"],
+})
 def expand(t):
     for k, v in _FRAG.items():
         t = t.replace(k, v)
@@ -187,7 +196,7 @@ def run_cases(path):
     """Reviewer-authored JSON candidates. The finding is a mismatch."""
     import json, glob
     files = sorted(glob.glob(os.path.join(path, "*.json")))
-    print(f"\n[cases {path}]  {len(files)} authored candidate(s)")
+    print(f"\n[cases {path}]  {len(files)} authored case(s)")
     miss = []
     for f in files:
         try:
@@ -222,9 +231,10 @@ def run_verdict_cases(path):
         print(f"\n[verdict cases] {path} does not exist")
         return ["verdict-missing"]
     text = open(path, encoding="utf-8").read()
-    blocks = _re.findall(r"```candidate\s*\n(.*?)```", text, _re.S)
+    # ```case is the neutral spelling; ```candidate still parses.
+    blocks = _re.findall(r"```(?:candidate|case)\s*\n(.*?)```", text, _re.S)
     print(f"\n[verdict cases {os.path.basename(path)}]  "
-          f"{len(blocks)} fenced ```candidate block(s)")
+          f"{len(blocks)} fenced case block(s)")
     miss = []
     for b in blocks:
         try:

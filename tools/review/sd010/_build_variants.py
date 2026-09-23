@@ -8,7 +8,7 @@ import io, os, shutil, sys, json
 
 D = sys.argv[1]
 SRC = os.path.join(D, "head")
-OUT = os.path.join(D, "mutants")
+OUT = os.path.join(D, "v")
 REL = os.path.join("sunglasses", "patterns.py")
 orig = io.open(os.path.join(SRC, REL), encoding="utf-8").read()
 
@@ -20,19 +20,19 @@ IND  = r"(?:[ \t]|\\t)*"
 CLASS = r"""[\"'{\[,]"""
 
 MUTS = [
- ("M1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
+ ("V1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
  # every indentation allowance, everywhere
- ("M2-indentation-dropped",      IND, "", 0),      # every occurrence
- ("M4-bare-space-a-boundary",    CLASS, r"""[\"'{\[, ]"""),
- ("M5-line-start-dropped",       r"(?:\A" + IND + "|", "(?:"),
- ("M7-apostrophe-removed",       CLASS, r"""[\"{\[,]"""),
- ("M10-literal-CR-removed",      r"|\r" + IND, ""),
+ ("V2-indentation-dropped",      IND, "", 0),      # every occurrence
+ ("V4-bare-space-a-boundary",    CLASS, r"""[\"'{\[, ]"""),
+ ("V5-line-start-dropped",       r"(?:\A" + IND + "|", "(?:"),
+ ("V7-apostrophe-removed",       CLASS, r"""[\"{\[,]"""),
+ ("V10-literal-CR-removed",      r"|\r" + IND, ""),
  # NEW, from round 4b's findings
- ("M12-escaped-tab-not-indent",  IND, r"[ \t]*", 0),   # every occurrence
- ("M13-unicode-separators-gone", r"|[\u2028\u2029]" + IND, ""),
+ ("V12-escaped-tab-not-indent",  IND, r"[ \t]*", 0),   # every occurrence
+ ("V13-unicode-separators-gone", r"|[\u2028\u2029]" + IND, ""),
  # The CLASS control: put a value exclusion back and the evasion rows must go
  # quiet. This guards the decision the rule now rests on.
- ("M11-value-exclusion-readded",
+ ("V11-value-exclusion-readded",
   r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",""",
   r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="""
   r"""(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""),
@@ -64,12 +64,12 @@ for name, old, new, count in MUTS:
 
 # A CONTROL TREE: a verbatim copy with no defect. If the battery reports this
 # one red, the harness is broken and no other row means anything.
-dst = os.path.join(OUT, "M0-control-unmutated")
+dst = os.path.join(OUT, "V0-control-unchanged")
 shutil.copytree(SRC, dst, ignore=ignore)
 assert io.open(os.path.join(dst, REL), encoding="utf-8").read() == orig
-index.insert(0, "M0-control-unmutated")
+index.insert(0, "V0-control-unchanged")
 
 io.open(os.path.join(OUT, "INDEX.json"), "w").write(json.dumps(index, indent=2))
-print(f"built {len(index)} trees (1 control + {len(MUTS)} mutants) under mutants/")
+print(f"built {len(index)} trees (1 control + {len(MUTS)} variants) under v/")
 for n in index:
     print(f"  {n}")

@@ -1,6 +1,6 @@
 #!/bin/zsh
 # P4 the mutation battery. THE REVIEWER WRITES NOTHING — every tree under
-# mutants/ was built and verified on disk before the round started, each
+# v/ was built and verified on disk before the round started, each
 # carrying exactly one defect. This driver only reads and executes.
 # EXPECT: and no row below it means anything.
 # EXPECT: this wrapper states NO counts. Round 1 found its numbers stale,

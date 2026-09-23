@@ -7,7 +7,7 @@ bracketed the whole battery with one baseline rather than proving the harness
 around each row.
 
 All three are fixed by moving the writes OUT of the round. Every tree under
-mutants/ was built and verified before the round started; this driver only
+v/ was built and verified before the round started; this driver only
 reads and executes.
 
 M0 IS A CONTROL, not a mutant: a verbatim copy of head with no defect. It must
@@ -17,7 +17,7 @@ means anything -- which is the thing a kill count cannot tell you by itself.
 import json, os, subprocess, sys
 
 D = sys.argv[1]
-OUT = os.path.join(D, "mutants")
+OUT = os.path.join(D, "v")
 LOGS = os.path.join(D, "logs", "r2")
 names = json.load(open(os.path.join(OUT, "INDEX.json")))
 
@@ -65,10 +65,10 @@ for n in mutants:
     # it is reported as such rather than banked as a kill.
     ok = (rc == 1) and (" failed" in tail)
     if rc not in (0, 1):
-        print(f"  {n:28} *** HARNESS rc={rc} ({tail}) -- NOT a kill ***")
+        print(f"  {n:28} *** HARNESS rc={rc} ({tail}) -- NOT a detection ***")
     killed += ok
     label = "KILLED  " if ok else ("*SURVIVED*" if rc == 0 else "*HARNESS* ")
     print(f"  {n:28} rc={rc} {label} {tail}")
 
-print(f"MUTATIONS {killed}/{len(mutants)} killed, control green")
+print(f"VARIANTS {killed}/{len(mutants)} detected, control green")
 sys.exit(0 if killed == len(mutants) else 1)

@@ -32,7 +32,19 @@ OUT=${3:-/tmp/SD010_EMB_REVIEW_${SHORT}_$(date +%Y-%m-%d)}
 rm -rf "$OUT"; mkdir -p "$OUT/head" "$OUT/base" "$OUT/probes"
 git -C "$ROOT" archive "$HEAD_REF" | tar -x -C "$OUT/head"
 git -C "$ROOT" archive "$BASE_REF" | tar -x -C "$OUT/base"
-cp "$ROOT"/tools/review/sd010/_*.py "$ROOT"/tools/review/sd010/p*.sh "$OUT/probes/"
+# THE HARNESS COMES FROM THE EXTRACTED HEAD TREE, never from the checkout this
+# script runs in (the siblings builder had the same defect; ASTRA found it in
+# round 2 there). A rebuild from another checkout must grade the same refs with
+# the same probes, or the package is not what it says it is.
+H="$OUT/head/tools/review/sd010"
+for need in "$H/_common.py" "$H/_build_variants.py" "$H/MANIFEST.template.md" "$H/VERDICT.template.md"; do
+  [ -f "$need" ] || { echo "REFUSED: $HEAD_REF has no ${need#$OUT/head/} -- the harness must come from the ref under review" >&2; exit 3; }
+done
+cp "$H"/_*.py "$H"/p*.sh "$OUT/probes/"
+# The variant builder is NOT a probe. It holds the rule fragments each variant
+# tree removes, the reviewer never needs to run it, and the channel it reads
+# through filters on exactly that kind of text. It runs from head/ below.
+rm -f "$OUT/probes/_build_variants.py"
 rm -rf "$OUT/probes/__pycache__"
 find "$OUT/head" "$OUT/base" \( -name __pycache__ -o -name .pytest_cache \) -type d -prune -exec rm -rf {} + 2>/dev/null || true
 
@@ -60,5 +72,19 @@ verify_tree "$BASE_REF" base
 echo "  head sha256 $(shasum -a256 "$OUT/head/sunglasses/patterns.py" | cut -c1-16)"
 echo "  base sha256 $(shasum -a256 "$OUT/base/sunglasses/patterns.py" | cut -c1-16)"
 mkdir -p "$OUT/logs"
-python3 "$OUT/probes/_build_mutants.py" "$OUT"
+python3 "$H/_build_variants.py" "$OUT"
+# MANIFEST.md and VERDICT.md are EMITTED, not hand-written. On 2026-09-23 the
+# Mac rebooted, /tmp went with it, and the only copies of both were in /tmp:
+# the round had to be reconstructed from the reviewer's own logs. Now every
+# byte of a package comes from the ref plus this script.
+HS=$(git -C "$ROOT" rev-parse --short "$HEAD_REF"); BS=$(git -C "$ROOT" rev-parse --short "$BASE_REF")
+NH=$(git -C "$ROOT" ls-tree -r --name-only "$HEAD_REF" | wc -l | tr -d ' ')
+NB=$(git -C "$ROOT" ls-tree -r --name-only "$BASE_REF" | wc -l | tr -d ' ')
+PS=$(shasum -a256 "$OUT/head/sunglasses/patterns.py" | cut -c1-16)
+for t in MANIFEST VERDICT; do
+  sed -e "s|@HEAD@|$HS|g" -e "s|@BASE@|$BS|g" -e "s|@HEAD_FILES@|$NH|g" \
+      -e "s|@BASE_FILES@|$NB|g" -e "s|@PATTERNS_SHA@|$PS|g" -e "s|@OUT@|$OUT|g" \
+      "$H/$t.template.md" > "$OUT/$t.md"
+  if grep -q "@[A-Z_]*@" "$OUT/$t.md"; then echo "REFUSED: $t.md has an unfilled placeholder" >&2; exit 4; fi
+done
 echo "package: $OUT"
