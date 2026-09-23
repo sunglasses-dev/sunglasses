@@ -36,6 +36,39 @@ UPSTREAM = "upstream"
 REQUEST = "request"
 RESULT = "result"
 
+# THE THIRD CAUSE, AND IT LIVES HERE BECAUSE IT CANNOT LIVE WITH THE OTHER TWO.
+# `worker_process` labels a fault `crashed` or `malformed_output` at the moment
+# it builds one. It cannot label this one: at that moment the result has not
+# been validated, and validation happens below, after `worker.validate`. Putting
+# all three in one enum in one module would leave a value that module could
+# never emit -- and nobody would notice, because an unset cause and an absent
+# one look identical in a receipt.
+CAUSE_SCHEMA_INVALID = "schema_invalid"
+
+
+def _unusable(result):
+    """The SCAN_RESULT fields for a result `worker.validate` refused.
+
+    ASTRA r1 on ccee55d: both catches wrote `schema_invalid` for EVERYTHING
+    that raised `Invalid`, and every fault this process builds has
+    `accepted=False`, which `validate` always refuses. So a crash, unusable
+    output, an engine exception and a deadline were all recorded as a contract
+    failure -- three causes collapsed back into one, by the change written to
+    split them.
+
+    A `worker.LocalFault` keeps its own status and its own cause, and a fault
+    with no cause (a deadline, an engine that raised in-process) records NONE
+    rather than borrowing one. Only a result the proxy did not build is a
+    contract failure. The field is OMITTED when there is no cause, never
+    written as null: a supplied null claims a cause and names nobody.
+    """
+    if isinstance(result, worker.LocalFault):
+        fields = {"status": result.get("status")}
+        if result.get("detector_status") is not None:
+            fields["detector_status"] = result["detector_status"]
+        return fields
+    return {"status": "exception", "detector_status": CAUSE_SCHEMA_INVALID}
+
 REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
@@ -466,6 +499,11 @@ class Route:
                             held_content_bytes=held_bytes,
                             catalog=self.catalog)
         except worker.Invalid:
+            # Either the scan produced a result that did not fit the contract,
+            # or this process built a fault because it produced none -- and
+            # `validate` refuses both. `_unusable` keeps them apart.
+            self._record("SCAN_RESULT", accepted=False,
+                         inspection_complete=False, **_unusable(result))
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False)
 
@@ -946,6 +984,8 @@ class Route:
             # T4.R2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
+            self._record("SCAN_RESULT", accepted=False,
+                         inspection_complete=False, **_unusable(result))
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
                                   RULE_RESOURCE, attempt=attempt)
             return

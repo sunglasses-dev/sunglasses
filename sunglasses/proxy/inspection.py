@@ -131,18 +131,18 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
         # of time recorded "the scanner broke" for "the scanner did not finish
         # in the budget" -- different facts, and only one is a reason to
         # distrust the scanner.
-        return _result(binding, accepted=False, status=STATUS_DEADLINE,
-                       inspection_complete=False, decision=DECISION_REVIEW,
-                       inspected=0, observed=content_bytes, elapsed=0,
-                       findings=())
+        return worker.LocalFault(_result(
+            binding, accepted=False, status=STATUS_DEADLINE,
+            inspection_complete=False, decision=DECISION_REVIEW,
+            inspected=0, observed=content_bytes, elapsed=0, findings=()))
     except Exception:
         # T4.R3. A scan that raised did not look. `allow` is the engine's word
         # for having looked and found nothing, and the exception text is
         # peer-adjacent prose that never reaches a result.
-        return _result(binding, accepted=False, status=STATUS_EXCEPTION,
-                       inspection_complete=False, decision=DECISION_REVIEW,
-                       inspected=0, observed=content_bytes, elapsed=0,
-                       findings=())
+        return worker.LocalFault(_result(
+            binding, accepted=False, status=STATUS_EXCEPTION,
+            inspection_complete=False, decision=DECISION_REVIEW,
+            inspected=0, observed=content_bytes, elapsed=0, findings=()))
 
     truncated = bool(getattr(result, "truncated", False)) or not bool(
         getattr(result, "extraction_complete", True))
