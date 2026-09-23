@@ -181,3 +181,28 @@ def test_mixed_type_ids_do_not_break_the_correlation_check():
 def test_per_id_counts_survive_json_with_both_types():
     counts = json.loads(json.dumps(execute._per_id([2001, "2001", "2001"])))
     assert counts == {"int:2001": 1, 'str:"2001"': 2}, counts
+
+
+# ── A FAULT THAT HELD MORE THAN IT NAMES ────────────────────────────────────
+#
+# Measured on G2-20.typed_ids after the typed-id fix let it finish: the scanner
+# command is fixed per session, so `barrier` holds EVERY scan, not the one item
+# the arm_fault kind names. The secondary was held by the primary's fault,
+# killed at SCAN_DEADLINE, settled once, and the independence row read
+# held:true. "Completed independently" was "refused because the fault leaked
+# onto it". Not a pass and not a fail: the experiment did not happen.
+
+def test_a_barrier_that_held_two_items_voids_independence():
+    settled = [{"request_id": 2001, "reason": "SCAN_DEADLINE"}]
+    check = execute._independence(settled, barrier_held_ids=[2001, "2001"])
+    assert check["subject"] is False and check["held"] is None, check
+    assert "barrier" in check["why"]
+    assert sorted(map(json.dumps, check["fault_scope"]["held_by_barrier"])) == \
+        ['"2001"', "2001"]
+
+
+def test_a_barrier_that_held_one_item_leaves_independence_measurable():
+    """The control: the guard must not void the case it exists to allow."""
+    settled = [{"request_id": 2001, "reason": "CLEAN"}]
+    check = execute._independence(settled, barrier_held_ids=["2001"])
+    assert check["subject"] is True and check["held"] is True, check

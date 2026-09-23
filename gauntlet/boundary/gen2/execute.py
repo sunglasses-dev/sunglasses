@@ -165,7 +165,7 @@ def _per_id(ids) -> dict:
     return {f"{kind}:{text}": n for (kind, text), n in sorted(counts.items())}
 
 
-def _independence(settled) -> dict:
+def _independence(settled, barrier_held_ids=None) -> dict:
     """assert_secondary_and_reverse_complete_independently, over SETTLED rows.
 
     SCOPED TO DISTINCT IDS, and the scope IS the ruling. T8: `_owed` is per id
@@ -173,6 +173,13 @@ def _independence(settled) -> dict:
     but a client id reused while pending is a deliberate NO, torn down on
     purpose. An unconditional claim would fail G2-15, a shape the product
     handles correctly. "2001" and 2001 are different ids.
+
+    `barrier_held_ids` is every distinct id whose scan STARTED while the session
+    ran in barrier mode. The scanner command is fixed per session, so the
+    barrier holds every scan, not the one item the arm_fault kind names. If it
+    held more than one, the secondary was held by the primary's fault and any
+    completion it reached was a deadline refusal: the experiment did not
+    happen, so there is no subject. Measured on G2-20.typed_ids, 2026-09-23.
     """
     ids = [row.get("request_id") for row in settled
            if row.get("request_id") is not None]
@@ -183,6 +190,21 @@ def _independence(settled) -> dict:
         first.setdefault(_id_order(i), i)
     reused = [first[k] for k, n in sorted(by_id.items()) if n > 1]
     distinct = [first[k] for k, n in sorted(by_id.items()) if n == 1]
+    held_by_barrier = sorted(
+        {_id_order(i): i for i in (barrier_held_ids or [])}.items())
+    if len(held_by_barrier) > 1:
+        return {
+            "settled_per_id": _per_id(ids),
+            "distinct_ids": distinct,
+            "reused_ids": reused,
+            "scope": "distinct ids only; a reused pending id is a deliberate NO",
+            "fault_scope": {"held_by_barrier": [i for _, i in held_by_barrier]},
+            "subject": False,
+            "held": None,
+            "why": (f"the session-wide barrier held {len(held_by_barrier)} items "
+                    "and the fault names one, so the secondary was held by the "
+                    "primary's fault; a completion it reached is not an "
+                    "independent one")}
     return {
         "settled_per_id": _per_id(ids),
         "distinct_ids": distinct,
@@ -594,8 +616,18 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                     "this run")})
 
         elif op == "assert_secondary_and_reverse_complete_independently":
-            settled = _receipts_of_kind(run_root / "proxy.receipts.jsonl", "SETTLED")
-            assertions.append({"op": op, **_independence(settled)})
+            receipts = run_root / "proxy.receipts.jsonl"
+            settled = _receipts_of_kind(receipts, "SETTLED")
+            barrier_session = any(
+                st.get("op") == "arm_fault"
+                and st.get("target") == "scanner_worker"
+                and st.get("require_fresh_barrier")
+                for st in steps) and route == "proxy_strict"
+            started = [row.get("request_id")
+                       for row in _receipts_of_kind(receipts, "SCAN_STARTED")
+                       if row.get("request_id") is not None]
+            assertions.append({"op": op, **_independence(
+                settled, barrier_held_ids=started if barrier_session else None)})
 
         elif op == "release_any_old_workers":
             # WHAT THE MEDIATOR RECORDS, not what this adapter hopes.
