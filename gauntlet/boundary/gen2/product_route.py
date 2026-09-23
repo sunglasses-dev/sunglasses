@@ -53,6 +53,9 @@ CHILD = textwrap.dedent('''
         raise SystemExit(1)
     elif mode == "leak_extra":
         out = dict(real(), debug_input=json.dumps(request.get("params")))
+    elif mode == "slow":
+        time.sleep(STIM["delay_s"])   # honest, just slow: only the marked item
+        out = real()
     elif mode == "template":
         # G2-25 stimuli authored from the PRODUCT's receipt vocabulary: a JSON
         # object where "__P__" becomes the payload the child just read and
