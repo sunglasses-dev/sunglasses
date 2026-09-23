@@ -262,12 +262,17 @@ class ProcessScan:
     def __call__(self, params, *, channel, binding, content_bytes):
         spare = self._take()
         if spare is None:
-            return _fault(binding, STATUS_EXCEPTION)
+            # close() already ran: the worker this call needed does not exist.
+            # Reachable only after teardown. crashed, from the three causes
+            # (T9 ruling 9-23): a missing process is the host's side.
+            return _fault(binding, STATUS_EXCEPTION, CAUSE_CRASHED)
         child, ready_r = spare
         if not _await_ready(ready_r, self.startup_ms):
             supervisor.stop_group(child.pid, grace_ms=self.grace_ms,
                                   handle=child)
-            return _fault(binding, STATUS_EXCEPTION)
+            # It died loading or never said ready: a process failure the
+            # parent observed, never a scan result. crashed.
+            return _fault(binding, STATUS_EXCEPTION, CAUSE_CRASHED)
         return run({"params": params, "channel": channel, "binding": binding,
                     "content_bytes": content_bytes},
                    binding=binding, child=child, timeout_ms=self.timeout_ms,
