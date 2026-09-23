@@ -206,3 +206,75 @@ def test_a_barrier_that_held_one_item_leaves_independence_measurable():
     settled = [{"request_id": 2001, "reason": "CLEAN"}]
     check = execute._independence(settled, barrier_held_ids=["2001"])
     assert check["subject"] is True and check["held"] is True, check
+
+
+# ── THE BARRIER, SCOPED TO THE ITEM THE FAULT NAMES ─────────────────────────
+from gen2 import scoped_barrier                                  # noqa: E402
+
+
+def test_the_named_item_is_held():
+    target = {"id": "2001", "direction": "result"}
+    assert scoped_barrier.is_target({"id": "2001", "direction": "result"}, target)
+
+
+def test_a_same_digits_id_of_another_type_is_not_held():
+    target = {"id": "2001", "direction": "result"}
+    assert not scoped_barrier.is_target({"id": 2001, "direction": "result"}, target)
+
+
+def test_the_same_id_in_the_other_direction_is_not_held():
+    target = {"id": "2001", "direction": "result"}
+    assert not scoped_barrier.is_target({"id": "2001", "direction": "request"}, target)
+
+
+def test_an_item_the_mediator_did_not_name_is_not_held():
+    """Fail toward scanning: holding unnamed items IS the session-wide bug."""
+    target = {"id": "2001", "direction": "result"}
+    assert not scoped_barrier.is_target(None, target)
+    assert not scoped_barrier.is_target({"direction": "result"}, target)
+
+
+# ── THE RELEASE HAPPENS IN THE SESSION, AFTER THE HOLD BEGAN ────────────────
+#
+# It used to run after the server exited: every held item died at
+# SCAN_DEADLINE and the row said released:true.
+
+def test_a_release_waits_for_the_hold_and_then_releases(tmp_path):
+    (tmp_path / "barrier.held.jsonl").write_text('{"id": "2001", "direction": "result"}\n')
+    rec = execute._release_in_session(tmp_path, {"id": "2001", "direction": "result"}, 500)
+    assert rec["in_session"] is True and rec["hold_entered"] is True
+    assert (tmp_path / "fault.release").is_file()
+
+
+def test_a_hold_that_never_began_is_not_released(tmp_path):
+    """The control: no fresh barrier, so no release file, and it says why."""
+    rec = execute._release_in_session(tmp_path, {"id": "2001", "direction": "result"}, 50)
+    assert rec["in_session"] is False and rec["hold_entered"] is False
+    assert not (tmp_path / "fault.release").exists()
+    assert "never entered the hold" in rec["why"]
+
+
+def test_an_unscoped_barrier_is_not_released_in_session(tmp_path):
+    rec = execute._release_in_session(tmp_path, None, 50)
+    assert rec["in_session"] is False
+    assert not (tmp_path / "fault.release").exists()
+
+
+@pytest.mark.parametrize("mode", ["head_of_line", "contract"])
+def test_typed_ids_has_a_subject_in_both_mediator_modes(run_root, mode):
+    """End to end: the secondary completes, the primary is held, released in
+    session, and delivered. Before: the secondary died under the primary's
+    barrier and the primary died at the deadline, in both modes."""
+    entry, variant = _case("G2-20", "typed_ids")
+    run = execute.run(entry, variant, route="proxy_strict", run_root=run_root,
+                      mode=mode, engine_root=pathlib.Path(__file__).resolve().parents[3])
+    arm = _held(run, "arm_fault")
+    assert arm["fault_scope"] == {"id": "2001", "direction": "result"}
+    assert arm["mediator_mode"] == mode
+    independence = _held(run, "assert_secondary_and_reverse_complete_independently")
+    assert independence["subject"] is True and independence["held"] is True, independence
+    release = _held(run, "release_fault_barrier")
+    assert release["held"] is True and release["release"]["hold_entered"] is True, release
+    settled = execute._receipts_of_kind(run_root / "proxy.receipts.jsonl", "SETTLED")
+    assert sorted((json.dumps(r["request_id"]), r["reason"], r["forwarded"]) for r in settled) \
+        == [('"2001"', "CLEAN", True), ("2001", "CLEAN", True)], settled

@@ -311,9 +311,15 @@ class Passthrough:
              method=None, content_bytes=None) -> None:
         started = time.perf_counter()
         argv = scanner(payload, channel) if callable(scanner) else list(scanner)
+        # THE ITEM, NAMED TO THE WORKER. Instrumentation only: the delivered
+        # worker ignores it; gen2/scoped_barrier.py reads it so a fault aimed at
+        # ONE item holds that item and not every scan in the session. JSON so
+        # "2001" and 2001 stay two ids.
+        env = dict(os.environ, GAUNTLET_ITEM=json.dumps(
+            {"id": request_id, "direction": direction}))
         worker = subprocess.Popen(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, start_new_session=True)
+            stderr=subprocess.PIPE, start_new_session=True, env=env)
         self._emit("SCAN_STARTED", request_id, pid=worker.pid, argv=argv[:2])
         feeder = threading.Thread(target=_feed, daemon=True, args=(worker, payload))
         feeder.start()
@@ -941,7 +947,7 @@ def _string_leaves(node, path, out):
 
 def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
           wire_frame_limit=DEFAULT_WIRE_FRAME_LIMIT, byte_budget=None,
-          receipts=None, stdin=None, stdout=None) -> int:
+          receipts=None, stdin=None, stdout=None, head_of_line=False) -> int:
     """Sit between a client on stdio and an upstream MCP server."""
     import sys as _sys
     stdin = stdin if stdin is not None else _sys.stdin.buffer
@@ -965,7 +971,14 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                 scanner_argv=list(scanner_argv),
                 scanner_argv_sha256=_argv_digest(scanner_argv),
                 deadline_ms=deadline_ms, watchdog_ms=watchdog_ms,
-                wire_frame_limit=wire_frame_limit, byte_budget=byte_budget)
+                wire_frame_limit=wire_frame_limit, byte_budget=byte_budget,
+                # WHICH MEDIATOR THIS RUN MIRRORS, said in the receipt. The
+                # default is the CONTRACT mode: a killable worker per item, the
+                # T4 worker lane the product still owes. `head_of_line` is the
+                # SHIPPED product on 1cae43a: one reader per direction scanning
+                # inline (serve.py:199, route.py:462), so a held frame stalls
+                # every later frame in its direction (inspection.py:24-29).
+                mode="head_of_line" if head_of_line else "contract")
 
     def scanner(payload, channel):
         return list(scanner_argv) + ["--channel", channel]
@@ -1141,6 +1154,22 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             worker = threading.Thread(target=settle, daemon=True)
             inflight.append(worker)
             worker.start()
+            if head_of_line:
+                # THE SHIPPED PRODUCT WAITS HERE, and this mode exists to
+                # measure that. The note above says why the contract mode does
+                # not: waiting is what puts a cancel behind the scan it cancels.
+                # Those consequences are the product's on 1cae43a, so in this
+                # mode they are findings about it, not harness defects.
+                worker.join()
+                outcome = handle._outcome if handle._done.is_set() else None
+                if outcome is not None and outcome.reason_code == SCAN_DEADLINE:
+                    # The product has no scan deadline (inspection.py:24-29), so
+                    # a deadline firing here is the HARNESS giving up on a stall
+                    # the product would still be in. Never a pass.
+                    proxy._emit("HARNESS_STALL", request_id, direction=direction,
+                                label="harness-not-product",
+                                detail="SCAN_DEADLINE fired in head_of_line mode; "
+                                       "the shipped product would still be stalled")
         # Every scan still in flight is given until its own watchdog to settle
         # before this direction is declared closed, so a message is never lost
         # merely because the stream ended while it was being inspected.
@@ -1332,6 +1361,9 @@ def _main(argv=None) -> int:
     parser.add_argument("--scanner", required=True,
                         help='the scanner worker argv as one quoted string, e.g. '
                              '"python3 fault_worker.py scan --engine-root /path"')
+    parser.add_argument("--head-of-line", action="store_true",
+                        help="mirror the shipped product: one reader per direction "
+                             "waits for each scan (default: contract mode)")
     parser.add_argument("upstream", nargs=argparse.REMAINDER,
                         help="-- then the upstream server argv")
     args = parser.parse_args(argv)
@@ -1341,7 +1373,7 @@ def _main(argv=None) -> int:
     import shlex
     return serve(upstream, shlex.split(args.scanner), deadline_ms=args.deadline_ms,
                  watchdog_ms=args.watchdog_ms, receipts=args.receipts,
-                 byte_budget=args.byte_budget)
+                 byte_budget=args.byte_budget, head_of_line=args.head_of_line)
 
 
 if __name__ == "__main__":
