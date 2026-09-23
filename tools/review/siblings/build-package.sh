@@ -32,7 +32,8 @@ git -C "$ROOT" archive "$BASE_REF" | tar -x -C "$OUT/base"
 # different probes, and the tree verification below only covers head/ and
 # base/, so nothing would have said so.
 H="$OUT/head/tools/review/siblings"
-for need in "$H/_p1.py" "$H/p1-predicate-parity.sh" "$OUT/head/tests/regex_sample.py"; do
+for need in "$H/_p1.py" "$H/p1-predicate-parity.sh" "$OUT/head/tests/regex_sample.py" \
+            "$H/MANIFEST.template.md" "$H/VERDICT.template.md" "$H/ROUND_NOTES.md"; do
   [ -f "$need" ] || { echo "REFUSED: $HEAD_REF has no ${need#$OUT/head/} -- the harness must come from the ref under review" >&2; exit 3; }
 done
 cp "$H"/_*.py "$H"/p*.sh "$OUT/probes/"
@@ -59,4 +60,27 @@ verify_tree "$HEAD_REF" head
 verify_tree "$BASE_REF" base
 [ "$fail" -eq 0 ] || exit 1
 echo "  head sha256 $(shasum -a256 "$OUT/head/sunglasses/patterns.py" | cut -c1-16)"
+# MANIFEST.md and VERDICT.md are EMITTED from the head tree's templates, never
+# hand-written into /tmp. On 2026-09-23 a reboot took /tmp and the only copies
+# of both with it; round 2 had to be reconstructed from the reviewer's own log.
+# §0 is ROUND_NOTES.md (rewritten per round, committed); the rest is template.
+python3 - "$OUT" "$H" "$(git -C "$ROOT" rev-parse --short "$HEAD_REF")" \
+  "$(git -C "$ROOT" rev-parse --short "$BASE_REF")" \
+  "$(git -C "$ROOT" ls-tree -r --name-only "$HEAD_REF" | wc -l | tr -d ' ')" \
+  "$(git -C "$ROOT" ls-tree -r --name-only "$BASE_REF" | wc -l | tr -d ' ')" \
+  "$(shasum -a256 "$OUT/head/sunglasses/patterns.py" | cut -c1-16)" <<'PY'
+import re, sys
+out, h, head, base, nh, nb, ps = sys.argv[1:8]
+fill = {"@HEAD@": head, "@BASE@": base, "@HEAD_FILES@": nh, "@BASE_FILES@": nb,
+        "@PATTERNS_SHA@": ps, "@OUT@": out,
+        "@ROUND_NOTES@": re.sub(r"<!--.*?-->\n?", "", open(f"{h}/ROUND_NOTES.md").read(), flags=re.S)}
+for name in ("MANIFEST", "VERDICT"):
+    text = open(f"{h}/{name}.template.md").read()
+    for k, v in fill.items():
+        text = text.replace(k, v)
+    left = re.findall(r"@[A-Z_]+@", text)
+    if left:
+        sys.exit(f"REFUSED: {name}.md has unfilled placeholder(s) {sorted(set(left))}")
+    open(f"{out}/{name}.md", "w").write(text)
+PY
 echo "package: $OUT"
