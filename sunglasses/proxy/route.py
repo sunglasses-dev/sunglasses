@@ -502,10 +502,17 @@ class Route:
             # Either the scan produced a result that did not fit the contract,
             # or this process built a fault because it produced none -- and
             # `validate` refuses both. `_unusable` keeps them apart.
+            # ONE set of fields for the receipt AND the client. The envelope
+            # used to fall to its "not_run" default here, telling the client a
+            # scan never ran while the receipt recorded that it ran and failed
+            # (T10, 9-23). The cause stays in the receipt: the envelope is a
+            # fixed key set and carries status, not cause.
+            unusable = _unusable(result)
             self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **_unusable(result))
+                         inspection_complete=False, **unusable)
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
-                                         RULE_RESOURCE, record=False)
+                                         RULE_RESOURCE, record=False,
+                                         status=unusable["status"])
 
         # An inbound result is not an outbound call, so T4.R4(7)'s direction
         # test is false here and a finding settles PROHIBITED_CONTENT. Saying
@@ -553,7 +560,7 @@ class Route:
         return None, None
 
     def _withhold_result(self, request_id, reason, rule, *, settlement=None,
-                         result=None, record=True):
+                         result=None, record=True, status=None):
         """One answer in the client's own typed id, or nothing at all when the
         thing withheld was a notification.
 
@@ -572,7 +579,8 @@ class Route:
         body = envelope.withheld(
             request_id=request_id, reason_code=reason, rule=rule,
             accepted=bool(settlement.accepted) if settlement else False,
-            status=settlement.status if settlement else "not_run",
+            status=(settlement.status if settlement
+                    else status or "not_run"),
             inspection_complete=(bool(settlement.inspection_complete)
                                  if settlement else False),
             inspected_utf8_bytes=result.get("inspected_utf8_bytes", 0),
@@ -984,10 +992,13 @@ class Route:
             # T4.R2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
+            # Same fields to both, as in the result direction above.
+            unusable = _unusable(result)
             self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **_unusable(result))
+                         inspection_complete=False, **unusable)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
-                                  RULE_RESOURCE, attempt=attempt)
+                                  RULE_RESOURCE, attempt=attempt,
+                                  status=unusable["status"])
             return
 
         # T4.R4(7) takes a DESCRIPTOR of the held message, not the message.
@@ -1032,7 +1043,7 @@ class Route:
 
     def _settle_withheld(self, request_id, reason, rule, *, attempt=None,
                          settlement=None,
-                         result=None):
+                         result=None, status=None):
         if request_id is NO_ID:
             # T2.R13. Dropped with a receipt, and no acknowledgement, because a
             # notification has no response to put one in.
@@ -1041,10 +1052,11 @@ class Route:
             return
         self._withhold(request_id, reason, rule, attempt=attempt,
                        settlement=settlement,
-                       result=result)
+                       result=result, status=status)
 
     def _withhold(self, request_id, reason, rule, *, attempt=None,
-                  settlement=None, result=None, budget=None, rule_ids=None):
+                  settlement=None, result=None, budget=None, rule_ids=None,
+                  status=None):
         # R-168-R12/(b). THE BODY IS BUILT FIRST so the two cases can be one
         # if/else and the take can sit at the top level, where it plainly
         # dominates the write. Before this the take lived inside the claim
@@ -1064,7 +1076,8 @@ class Route:
             rule=rule,
             budget=budget,
             accepted=bool(settlement.accepted) if settlement else False,
-            status=settlement.status if settlement else "not_run",
+            status=(settlement.status if settlement
+                    else status or "not_run"),
             inspection_complete=(bool(settlement.inspection_complete)
                                  if settlement else False),
             inspected_utf8_bytes=result.get("inspected_utf8_bytes", 0),
