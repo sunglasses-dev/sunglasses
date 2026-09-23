@@ -277,20 +277,26 @@ def is_pytest_invocation(command: str) -> bool:
     return False
 
 
-def foreign_pytest(start: pathlib.Path | None = None) -> tuple[int, str] | None:
-    """A live pytest running against this repository from another process group.
+def foreign_pytests(start: pathlib.Path | None = None) -> list[tuple[int, str]]:
+    """EVERY live pytest running against this repository, not just the first.
 
-    OUR OWN PROCESS GROUP IS EXCLUDED, not just our own pid. The conftest that
-    calls this runs INSIDE pytest, and a distributed run has workers besides;
-    counting either would make the guard refuse its own session every time.
+    `foreign_pytest` answers "is anything else running", which is all the guard
+    needs to refuse. A CONTROL needs a different answer: it starts a pytest of
+    its own and has to confirm the scan can see THAT one. Asking the singular
+    form gives it the lowest pid among all candidates, so with any long suite
+    already live the control gets a process it did not start — and passes,
+    having proved nothing about its own child. T8 hit exactly this: his first
+    positive control was naming my boundary suite.
 
-    Best effort on purpose. `ps` or `lsof` being unavailable returns None rather
-    than raising, because the lock below is the authoritative coordination point
-    and this is the backstop for a run that never took it.
+    It is worse than a weak pass. A control that loops until the singular
+    answer EQUALS its child never terminates while a lower pid is live, so the
+    row hangs and then fails for a reason that has nothing to do with the code.
+
+    Ordered by pid so the singular form below stays deterministic.
     """
     roots = worktree_roots(start)
     if not roots:
-        return None
+        return []
     try:
         ours = os.getpgid(os.getpid())
     except OSError:                                          # pragma: no cover
@@ -309,11 +315,28 @@ def foreign_pytest(start: pathlib.Path | None = None) -> tuple[int, str] | None:
             pass
         candidates[pid] = command
 
+    found = []
     for pid, cwd in _cwds(sorted(candidates)).items():
         for root in roots:
             try:
                 cwd.relative_to(root)
             except ValueError:
                 continue
-            return pid, candidates[pid]
-    return None
+            found.append((pid, candidates[pid]))
+            break
+    return sorted(found)
+
+
+def foreign_pytest(start: pathlib.Path | None = None) -> tuple[int, str] | None:
+    """A live pytest running against this repository from another process group.
+
+    OUR OWN PROCESS GROUP IS EXCLUDED, not just our own pid. The conftest that
+    calls this runs INSIDE pytest, and a distributed run has workers besides;
+    counting either would make the guard refuse its own session every time.
+
+    Best effort on purpose. `ps` or `lsof` being unavailable returns None rather
+    than raising, because the lock below is the authoritative coordination point
+    and this is the backstop for a run that never took it.
+    """
+    every = foreign_pytests(start)
+    return every[0] if every else None

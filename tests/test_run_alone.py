@@ -155,15 +155,18 @@ def test_a_real_foreign_pytest_is_seen(tmp_path):
         cwd=str(elsewhere), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True)
     try:
-        # THE CHILD, by pid. "Some foreign pytest was found" would pass on a
-        # process this test did not start, which proves nothing about whether
-        # the scan can see the one in front of it.
+        # THE CHILD, by pid, and looked for among ALL candidates rather than
+        # compared against the first. `foreign_pytest` returns the lowest pid,
+        # so on a machine with any other suite live this loop would never see
+        # its own child: it would spin for the full deadline and then fail for
+        # a reason that has nothing to do with the code.
         seen = None
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            found = run_alone.foreign_pytest(ROOT)
-            if found and found[0] == child.pid:
-                seen = found
+            found = [row for row in run_alone.foreign_pytests(ROOT)
+                     if row[0] == child.pid]
+            if found:
+                seen = found[0]
                 break
             time.sleep(0.25)
 
@@ -210,3 +213,60 @@ def test_the_process_listing_is_not_clipped_to_the_terminal_width():
     assert len(recorded) >= len(sys.executable), (
         f"the recorded command {recorded!r} is shorter than the interpreter "
         "path that started it, so it has been truncated")
+
+
+def test_the_plural_finds_a_child_the_singular_hides(tmp_path):
+    """T8's finding, reproduced: two live pytests, and the singular shows one.
+
+    `foreign_pytest` returns the lowest pid because the guard only needs to
+    know that SOMETHING else is running. A control needs to confirm the scan
+    sees the process IT started, and with any other suite live the singular
+    form hands it a stranger. T8's first positive control passed by naming a
+    boundary suite running in another session.
+
+    So: start one child, let it take the lower pid, start a second, and require
+    the plural to carry BOTH while the singular carries only the earlier one.
+    """
+    sleeper = tmp_path / "test_sleeper.py"
+    sleeper.write_text("import time\n\n\ndef test_sleeps():\n    time.sleep(30)\n")
+
+    def spawn():
+        return subprocess.Popen(
+            [sys.executable, "-m", "pytest", str(sleeper), "-q",
+             "-p", "no:cacheprovider"],
+            cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True)
+
+    first = spawn()
+    second = spawn()
+    try:
+        wanted = {first.pid, second.pid}
+        deadline = time.monotonic() + 20
+        every = []
+        while time.monotonic() < deadline:
+            every = run_alone.foreign_pytests(ROOT)
+            if wanted <= {pid for pid, _ in every}:
+                break
+            time.sleep(0.25)
+
+        pids = [pid for pid, _ in every]
+        assert wanted <= set(pids), (
+            f"the plural must carry both children; wanted {sorted(wanted)}, "
+            f"got {pids}")
+
+        # Ordered, so the singular is deterministic rather than whatever the
+        # process table happened to yield.
+        assert pids == sorted(pids), pids
+
+        # AND THE SINGULAR HIDES ONE. This is the defect, asserted rather than
+        # described: it can only ever name the lowest, so a control comparing
+        # against it is comparing against a process it may not own.
+        single = run_alone.foreign_pytest(ROOT)
+        assert single is not None and single[0] == pids[0], (single, pids)
+        assert single[0] != max(wanted), (
+            "the singular happened to name the later child, so this row proved "
+            "nothing; it needs two live candidates to be meaningful")
+    finally:
+        for child in (first, second):
+            child.kill()
+            child.wait()
