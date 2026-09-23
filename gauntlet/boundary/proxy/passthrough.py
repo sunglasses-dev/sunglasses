@@ -404,6 +404,11 @@ class Passthrough:
             # a liveness mediator with no policy in it. Unreadable means
             # uninspected, and uninspected fails closed.
             reason, status, complete = INSPECTION_UNREADABLE, STATUS_UNREADABLE, False
+        elif finding.get("invalid"):
+            # Parsed, and breaks the worker contract (see _finding_of). The
+            # product's route settles this SCAN_EXCEPTION once validate raises.
+            self._emit("WORKER_RESULT_INVALID", request_id, detail=finding["invalid"])
+            reason, status, complete = SCAN_EXCEPTION, STATUS_EXCEPTION, False
         elif not finding["inspection_complete"]:
             # The scanner itself says it did not finish. Checked BEFORE the
             # finding, because an incomplete scan that happened to find
@@ -754,11 +759,30 @@ def _finding_of(raw):
         if not isinstance(decision, str) or not decision:
             continue
         findings = result.get("findings") or []
+        rule_ids = sorted({f.get("id") for f in findings if isinstance(f, dict)})
+        # MIRRORED FROM THE PRODUCT'S worker.validate (T10 2026-09-23). This read
+        # `bool(result.get("inspection_complete", True))` and judged on
+        # `decision == allow` alone: an ABSENT completeness defaulted to complete,
+        # the string "false" read as True, and allow-with-a-high-finding was
+        # forwarded. Those are, verbatim, the mutations G2-17 exists to reject, so
+        # the mirror was a wrong subject for exactly those scenarios. A result
+        # that parses and breaks the contract is INVALID and settles as
+        # SCAN_EXCEPTION, as the product's route does after validate raises.
+        # NOT mirrored: binding. The delivered worker echoes none.
+        complete = result.get("inspection_complete")
+        invalid = None
+        if type(complete) is not bool:
+            invalid = f"inspection_complete is {complete!r}, not a boolean"
+        elif decision == "allow" and any(
+                isinstance(f, dict) and f.get("severity") in ("high", "critical")
+                for f in findings):
+            invalid = "decision is allow with a high or critical finding"
         return {
             "decision": decision,
-            "rule_ids": sorted({f.get("id") for f in findings if isinstance(f, dict)}),
+            "rule_ids": rule_ids,
             "blocked": decision is not None and decision != "allow",
-            "inspection_complete": bool(result.get("inspection_complete", True)),
+            "inspection_complete": complete is True,
+            "invalid": invalid,
         }
     return None
 
