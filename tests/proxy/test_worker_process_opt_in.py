@@ -301,3 +301,67 @@ def test_the_childs_own_binding_still_passes(tmp_path):
     is still accepted -- or the fix is refusing everything."""
     out = worker_process.run(PAYLOAD, binding=BINDING, argv=REAL)
     assert out["status"] == "complete" and out["binding"] == BINDING, out
+
+
+# ── EVERY ProcessScan FAULT NAMES ITS CAUSE, READ BACK FROM DISK ──────────
+# T9 ruling 9-23 14:49, pinned BEFORE review rather than left for the PR: a
+# ProcessScan fault carries one of the three causes, or is a deadline with none.
+#   spare never ready / died loading -> crashed (a process failure the parent saw)
+#   child closed stdout with no answer -> malformed_output (as `_parse`'s zero lines)
+#   ready child past the scan deadline -> deadline, NO cause
+#   scan already close()d, no spare   -> crashed: the worker this call needed does
+#       not exist. Only reachable after teardown; "closed" here means OUR close(),
+#       not a child closing its pipe.
+# Each row goes through a real Route and reads the SCAN_RESULT off the file.
+
+def _one_scan_result(tmp_path, scan):
+    upstream, client = _H["_Sink"](), _H["_Sink"]()
+    engine = route.Route(session=pump.Session(strict=False),
+                         log=_H["_log"](tmp_path), upstream_write=upstream,
+                         client_write=client, approvals=_H["_Approved"](),
+                         scan=scan)
+    engine.client_frame(_H["_call"]("hello"))
+    assert upstream.bytes == b"", "a faulted scan let the call through"
+    assert client.messages()[0]["error"]["data"]["reason_code"] == "SCAN_EXCEPTION"
+    rows = _scan_rows(tmp_path)
+    assert len(rows) == 1, rows
+    return rows[0]
+
+
+def test_a_spare_that_never_gets_ready_is_recorded_crashed(tmp_path):
+    scan = worker_process.ProcessScan(argv=_script("import time;time.sleep(300)"),
+                                      startup_ms=300)
+    try:
+        row = _one_scan_result(tmp_path, scan)
+    finally:
+        scan.close()
+    assert row["status"] == "exception" and row.get("detector_status") == "crashed", row
+
+
+def test_a_child_that_answers_nothing_is_recorded_malformed_output(tmp_path):
+    silent = _script(_READY + "sys.stdin.read()")
+    scan = worker_process.ProcessScan(argv=silent)
+    try:
+        row = _one_scan_result(tmp_path, scan)
+    finally:
+        scan.close()
+    assert row["status"] == "exception", row
+    assert row.get("detector_status") == "malformed_output", row
+
+
+def test_a_parent_side_timeout_is_a_deadline_with_no_cause(tmp_path):
+    hangs = _script(_READY + "sys.stdin.read();time.sleep(300)")
+    scan = worker_process.ProcessScan(argv=hangs, timeout_ms=300)
+    try:
+        row = _one_scan_result(tmp_path, scan)
+    finally:
+        scan.close()
+    assert row["status"] == "deadline", row
+    assert "detector_status" not in row, row
+
+
+def test_a_scan_after_close_is_recorded_crashed(tmp_path):
+    scan = worker_process.ProcessScan(argv=REAL)
+    scan.close()
+    row = _one_scan_result(tmp_path, scan)
+    assert row["status"] == "exception" and row.get("detector_status") == "crashed", row
