@@ -38,7 +38,7 @@ def test_framings_default_origin_has_not_drifted():
         f"and this row is the only thing keeping them equal")
 
 
-@pytest.mark.parametrize("good", ["client", "proxy", "upstream", None])
+@pytest.mark.parametrize("good", ["client", "proxy", "upstream"])
 def test_every_real_origin_is_accepted(good):
     assert receipts._check_value("origin", good) is None
 
@@ -66,3 +66,59 @@ def test_the_admitted_record_carries_origin_to_disk(tmp_path):
         f"origin did not survive to the file: {admitted[0]}")
     assert admitted[0].get("id_type") == "int", (
         "the field this record already carried must still be there")
+
+
+# ── ASTRA r1 on 8d21e5d: an explicit null origin walked past the check ──────
+# `_check_value` returned on `None` BEFORE it reached the origin branch, and the
+# row above this comment used to list None as a GOOD origin -- the test agreed
+# with the hole. An omitted field and a field supplied as None are different
+# requests: the first means "this record has no origin", the second claims an
+# author and names nobody.
+
+
+def test_an_explicit_null_origin_RAISES():
+    with pytest.raises(ValueError):
+        receipts._check_value("origin", None)
+
+
+def _rows(tmp_path):
+    rows = []
+    for path in sorted((tmp_path / "receipts").glob("*.jsonl")):
+        rows += [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    return rows
+
+
+def test_a_refused_null_origin_leaves_nothing_on_disk(tmp_path):
+    """The read-back, from the refusing side. The check raises inside
+    `_write_row` before the write, so the file must hold no ADMITTED row at all
+    -- not one with a null origin, not one with the origin stripped -- and the
+    sequence must not have advanced past a row that was never written."""
+    log = receipts.Log(tmp_path, run_id="t-origin-null", header={})
+    before = _rows(tmp_path)
+    with pytest.raises(ValueError):
+        log.event("ADMITTED", id_type="int", origin=None)
+    after = _rows(tmp_path)
+    assert after == before, f"a refused record reached the file: {after[len(before):]}"
+    assert not [r for r in after if r.get("kind") == "ADMITTED"]
+    written = log.event("ADMITTED", id_type="int", origin=pump.ORIGIN_CLIENT)
+    admitted = [r for r in _rows(tmp_path) if r.get("kind") == "ADMITTED"]
+    assert len(admitted) == 1 and admitted[0]["origin"] == "client"
+    assert admitted[0]["seq"] == written["seq"] == (before[-1]["seq"] + 1 if before else 0), (
+        "the refused write consumed a sequence number")
+
+
+def test_an_OMITTED_origin_is_still_optional(tmp_path):
+    """The other direction. Origin is not mandatory: events that never carry
+    it must still write, and must not grow a null origin on the way."""
+    log = receipts.Log(tmp_path, run_id="t-origin-omitted", header={})
+    log.event("CANCEL_ACCEPTED", id_type="str")
+    rows = [r for r in _rows(tmp_path) if r.get("kind") == "CANCEL_ACCEPTED"]
+    assert len(rows) == 1 and "origin" not in rows[0]
+
+
+@pytest.mark.parametrize("name", ["reason_code", "status", "method", "rule_ids"])
+def test_other_checked_fields_still_accept_None(name):
+    """The fix moved ONE branch ahead of the null shortcut. Every other checked
+    field keeps its optional-None behaviour, or this change widened into a
+    refusal nobody asked for."""
+    assert receipts._check_value(name, None) is None

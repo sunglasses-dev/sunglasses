@@ -95,6 +95,28 @@ def _check_value(name, value):
     refusal is a ValueError because the caller has a bug or the peer has an
     attack, and neither should produce a quietly shortened receipt.
     """
+    if name == "origin":
+        # ORIGIN IS OURS, and that is exactly why it is checked here. The five
+        # fields below are checked because they arrived from the WIRE; this one
+        # is checked because it did not. `pump` defines the vocabulary as three
+        # constants, and `route`/`framing` were passing the bare literals
+        # "client" and "upstream" instead -- equal by value today, with nothing
+        # keeping them equal. A fourth spelling, or a typo, becomes a false fact
+        # in a durable record the moment anything reads origin off a receipt to
+        # decide what happened, which is what putting it on ADMITTED is for.
+        from .pump import ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM
+        if value not in (ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM):
+            raise ValueError(
+                f"origin {value!r} is not one of this proxy's three origins")
+        return
+    # ORIGIN IS CHECKED BEFORE THIS LINE ON PURPOSE. `None` here means "the
+    # caller did not have one", which is right for the wire-supplied fields
+    # below. For origin it was a hole: the check lived AFTER this return, so an
+    # explicit `origin=None` skipped it and was written as a null author -- a
+    # record claiming nobody sent the request. An OMITTED origin never reaches
+    # this function (`_clean` iterates only the fields passed), so optional
+    # stays optional; a SUPPLIED None is a value, and it is not one of three.
+    # (ASTRA r1 on 8d21e5d, 2026-09-22.)
     if value is None:
         return
     if name == "reason_code":
@@ -115,19 +137,7 @@ def _check_value(name, value):
         for rule_id in value:
             if not isinstance(rule_id, str) or not _RULE_ID.match(rule_id):
                 raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
-    elif name == "origin":
-        # ORIGIN IS OURS, and that is exactly why it is checked here. The five
-        # fields above are checked because they arrived from the WIRE; this one
-        # is checked because it did not. `pump` defines the vocabulary as three
-        # constants, and `route`/`framing` were passing the bare literals
-        # "client" and "upstream" instead -- equal by value today, with nothing
-        # keeping them equal. A fourth spelling, or a typo, becomes a false fact
-        # in a durable record the moment anything reads origin off a receipt to
-        # decide what happened, which is what putting it on ADMITTED is for.
-        from .pump import ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM
-        if value not in (ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM):
-            raise ValueError(
-                f"origin {value!r} is not one of this proxy's three origins")
+
     elif name == "id_token":
         # R-T903-1 (T9, 2026-09-14 10:24). The MINTED grammar, not merely a
         # string. `session._item_token` produces sixteen lowercase hex
