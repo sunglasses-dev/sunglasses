@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-d",
+ "revision": "2026-09-23-e",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -315,6 +315,76 @@
    "effect": "ASTRA's 43 v1.2 correction checks, including the three restoration controls, have nothing to grade. His script is NOT edited.",
    "re_enable": "Re-run the calibration pair and keep its row.json somewhere durable. This is a missing RUN, not a path fix.",
    "declared_at": "2026-09-22"
+  }
+ },
+ "branch_subjects": {
+  "what": "Kinds with a SUBJECT on a product BRANCH and none on main. NOT counted by classify(): main counts stay drivable/missing_op/event_gap/no_steps/fault_gap = 29/40/5/0/0.",
+  "finding_6": "client envelope says status not_run for a validate-refused worker answer while disk records SCAN_RESULT exception/schema_invalid (route.py:575 default under record=False); pre-existing on main in-process; own 0.6.1 row, T8 lane",
+  "kinds": {
+   "worker_missing_axes": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control (honest child) PROHIBITED_CONTENT"
+   },
+   "worker_false_string": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control PROHIBITED_CONTENT"
+   },
+   "worker_conflicting_allow": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control PROHIBITED_CONTENT"
+   },
+   "worker_wrong_binding": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld (after T8 489cb71 removed the parent-binding stamp); control PROHIBITED_CONTENT"
+   },
+   "worker_review_only": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "REVIEW_REQUIRED, complete, withheld; control delivered clean"
+   },
+   "worker_finding_incomplete": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, status incomplete, rule GLS-PI-016-API kept; control PROHIBITED_CONTENT"
+   },
+   "worker_complete_finding": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "PROHIBITED_CONTENT, complete/accepted, GLS-MECH-003 + GLS-PI-016-API; failing control = finding_incomplete on the same payload"
+   },
+   "receipt_worker": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "PARTIAL: stimulus AUTHORED from FIXTURE_SPECS.md:76 prose (no delivered shape); payload absent from receipts and client; stderr closed by construction (DEVNULL)"
+   }
   }
  }
 }
