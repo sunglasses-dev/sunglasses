@@ -26,9 +26,20 @@ OUT=${3:-/tmp/SIBLINGS_REVIEW_${SHORT}_$(date +%Y-%m-%d)}
 rm -rf "$OUT"; mkdir -p "$OUT/head" "$OUT/base" "$OUT/probes" "$OUT/logs"
 git -C "$ROOT" archive "$HEAD_REF" | tar -x -C "$OUT/head"
 git -C "$ROOT" archive "$BASE_REF" | tar -x -C "$OUT/base"
-cp "$ROOT"/tools/review/siblings/_*.py "$ROOT"/tools/review/siblings/p*.sh "$OUT/probes/"
-# regex_sample lives with the tests and the probes import it by name
-cp "$ROOT"/tests/regex_sample.py "$OUT/probes/" 2>/dev/null || true
+# THE HARNESS COMES FROM THE EXTRACTED HEAD TREE, never from the checkout this
+# script happens to run in (ASTRA r2 on cba2251). Copying from "$ROOT" meant a
+# rebuild from a different or dirty checkout graded the same refs with
+# different probes, and the tree verification below only covers head/ and
+# base/, so nothing would have said so.
+H="$OUT/head/tools/review/siblings"
+for need in "$H/_p1.py" "$H/p1-predicate-parity.sh" "$OUT/head/tests/regex_sample.py"; do
+  [ -f "$need" ] || { echo "REFUSED: $HEAD_REF has no ${need#$OUT/head/} -- the harness must come from the ref under review" >&2; exit 3; }
+done
+cp "$H"/_*.py "$H"/p*.sh "$OUT/probes/"
+# regex_sample lives with the tests and the probes import it by name. It used
+# to be copied with `|| true`, so a missing sampler built a package whose p3
+# could not generate a single stimulus.
+cp "$OUT/head/tests/regex_sample.py" "$OUT/probes/"
 rm -rf "$OUT/probes/__pycache__"
 find "$OUT/head" "$OUT/base" \( -name __pycache__ -o -name .pytest_cache \) -type d -prune -exec rm -rf {} + 2>/dev/null || true
 
