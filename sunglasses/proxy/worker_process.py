@@ -36,11 +36,26 @@ import subprocess
 import threading
 import time
 
-from . import bounds, supervisor
+from . import bounds, supervisor, worker
 
 STATUS_COMPLETE = "complete"
 STATUS_EXCEPTION = "exception"
 STATUS_DEADLINE = "deadline"
+
+# WHY A CAUSE EXISTS BESIDE THE STATUS. Three operationally different failures
+# reached the client as one word. A worker that DIED says look at the host; a
+# worker that printed something unusable says look at the worker; a worker whose
+# output did not fit the contract says the worker and this proxy disagree. The
+# status stays `exception` for all three -- it is the client's contract and
+# nothing here changes it -- and the cause is evidence for an operator.
+#
+# `schema_invalid` is NOT defined here on purpose. It cannot be: at `_fault`
+# time the result has not been validated yet, and validation happens in `route`
+# after `worker.validate`. A single enum in one module would have one value
+# that this file could never emit, and nobody would notice, because an unset
+# cause and an absent one look identical in a receipt.
+CAUSE_CRASHED = "crashed"
+CAUSE_MALFORMED_OUTPUT = "malformed_output"
 
 DECISION_REVIEW = "review"
 
@@ -116,10 +131,16 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
         reader.join(timeout=1.0)
         return _fault(binding,
                       STATUS_EXCEPTION if collected.get("over")
-                      else STATUS_DEADLINE)
+                      else STATUS_DEADLINE,
+                      # Over the cap is the worker saying too much, which is its
+                      # output being wrong. A deadline gets NO cause: "still
+                      # running when time ran out" is already the whole fact.
+                      CAUSE_MALFORMED_OUTPUT if collected.get("over") else None)
 
     if collected.get("broken"):
-        return _fault(binding, STATUS_EXCEPTION)
+        # The read failed, which means the child stopped being there while we
+        # were reading it. That is the host's problem, not the worker's logic.
+        return _fault(binding, STATUS_EXCEPTION, CAUSE_CRASHED)
     return _parse(collected.get("out", b""), binding)
 
 
@@ -149,13 +170,13 @@ def _parse(out, binding):
     lines = [line for line in out.splitlines() if line.strip()]
     if len(lines) != 1:
         # Zero is silence and two is a choice. Neither is a verdict.
-        return _fault(binding, STATUS_EXCEPTION)
+        return _fault(binding, STATUS_EXCEPTION, CAUSE_MALFORMED_OUTPUT)
     try:
         value = json.loads(lines[0].decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        return _fault(binding, STATUS_EXCEPTION)
+        return _fault(binding, STATUS_EXCEPTION, CAUSE_MALFORMED_OUTPUT)
     if not isinstance(value, dict):
-        return _fault(binding, STATUS_EXCEPTION)
+        return _fault(binding, STATUS_EXCEPTION, CAUSE_MALFORMED_OUTPUT)
     # THE CHILD'S BINDING, AS THE CHILD SAID IT. This used to be
     # `dict(value, binding=dict(binding))`: the parent stamped its own binding
     # over the answer, so `worker.validate` compared the parent with itself and
@@ -166,14 +187,24 @@ def _parse(out, binding):
     return value
 
 
-def _fault(binding, status):
+def _fault(binding, status, cause=None):
     """A fault is a worker RESULT, so it carries the binding it was asked
     about. One bound to nothing is another item's answer under T4.R2, and it
-    carries nothing the child said."""
-    return {"binding": dict(binding), "accepted": False, "status": status,
-            "inspection_complete": False, "decision": DECISION_REVIEW,
-            "inspected_utf8_bytes": 0, "observed_content_bytes": 0,
-            "elapsed_ms": 0, "findings": []}
+    carries nothing the child said.
+
+    `cause` is optional because a DEADLINE has no cause to add: the status
+    already says the child was still running and got its group stopped, which
+    is a different fact from anything below.
+    """
+    fault = {"binding": dict(binding), "accepted": False, "status": status,
+             "inspection_complete": False, "decision": DECISION_REVIEW,
+             "inspected_utf8_bytes": 0, "observed_content_bytes": 0,
+             "elapsed_ms": 0, "findings": []}
+    if cause is not None:
+        fault["detector_status"] = cause
+    # A LocalFault, so the route can tell a cause WE assigned from one a child
+    # printed; see worker.LocalFault. `_parse` returns plain dicts on purpose.
+    return worker.LocalFault(fault)
 
 
 def _spawn(argv):
