@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-a",
+ "revision": "2026-09-23-b",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -222,7 +222,12 @@
    "ruled_by": "T8",
    "ruled_at": "2026-09-22",
    "evidence": "ANSWERED YES FOR DISTINCT IDS. `_owed` is keyed per id and each entry carries its own `origin` alongside `at` and `method` (session.py), so two items with different ids complete independently. Verified at head.",
-   "caveat": "NOT UNCONDITIONAL, and an adapter that asserts it as such is WRONG on one shape. Where a client id is REUSED while still pending \u2014 G2-15 \u2014 the answer is a deliberate NO: that is the same teardown as the row above, by design. An implementation of this op must scope its claim to distinct ids or it will fail a scenario the product handles correctly."
+   "caveat": "NOT UNCONDITIONAL, and an adapter that asserts it as such is WRONG on one shape. Where a client id is REUSED while still pending \u2014 G2-15 \u2014 the answer is a deliberate NO: that is the same teardown as the row above, by design. An implementation of this op must scope its claim to distinct ids or it will fail a scenario the product handles correctly.",
+   "witnessed_by": {
+    "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+    "run_id": "34acaf393f5c",
+    "scope": "distinct ids only, as ruled; typed ids \"2001\" and 2001 held apart"
+   }
   },
   "arm_fault[kind=request_worker]": {
    "bucket": "route_capability",
@@ -232,6 +237,16 @@
    "driven_against": "gauntlet/boundary/proxy/passthrough.py",
    "witness_class": "adapter-against-harness",
    "evidence": "G2-20.duplicate_pending driven on proxy_strict. The step selected the worker's `barrier` mode for the session and the run recorded it. Scoped: the mode is chosen before the session starts, which is faithful only because every delivered schedule arms BEFORE its first send. KEYED PER KIND, because `units.arm_fault` is 'opcode+kind' and this map's whole point is that capability is not the opcode. A bare `arm_fault` entry collapsed the per-kind buckets and broke two acceptance controls, which is the controls doing their job."
+  },
+  "arm_fault[kind=result_worker]": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "34acaf393f5c",
+   "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "WITNESS 3. G2-20.typed_ids driven on proxy_strict in head_of_line mode. The barrier was SCOPED to the item the kind names (str \"2001\", result): the wrapper's hold log shows exactly that item, the secondary (int 2001) and the reverse request completed, the hold was released IN the session (1731-1764 ms after the run began, behind the secondary's scan), and the primary then settled CLEAN, forwarded, byte-identical, id type str. 3/3 identical per mode (head_of_line and contract), run ids in the step record.",
+   "caveat": "Adapter-against-harness, not the shipped product. Before a7afd09 this kind could not have a subject: the barrier held every scan and was released only after the session ended, so every held item died at SCAN_DEADLINE while the row said released:true."
   }
  },
  "unclassified": {
@@ -243,7 +258,12 @@
   "release_fault_barrier": {
    "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
    "owner": "T8",
-   "declared_at": "2026-09-14"
+   "declared_at": "2026-09-14",
+   "witness_candidate": {
+    "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+    "run_id": "34acaf393f5c",
+    "note": "Integration evidenced at a7afd09: released in session only once the scoped hold was entered (require_fresh_barrier). Left unclassified: the question is T8's and reclassifying it is a ruling, not an edit."
+   }
   },
   "release_any_old_workers": {
    "open_question": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
