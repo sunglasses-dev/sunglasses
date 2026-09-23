@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-22-h",
+ "revision": "2026-09-23-a",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -57,13 +57,15 @@
    "bucket": "route_capability",
    "basis": "inspected_source",
    "evidence": "no occurrence of relist, next_page or cursor machinery anywhere in proxy/, client/ or destination/",
-   "caveat": "absence by inspection is not proof of exhaustive absence; it is a located judgement, revalidated when the route identity changes"
+   "caveat": "absence by inspection is not proof of exhaustive absence; it is a located judgement, revalidated when the route identity changes",
+   "status": "PARKED 2026-09-23 (T9 ruling). The 'absent' above is about the HARNESS tree and is true there; the PRODUCT has lazy relist + a cursor pager since #168 (route.py list_changed -> _activated=False; next tools/call -> _activate_once -> activation.activate(list_pages=self._pager()) -> snapshot.collect). Measured at plan level over all 74 variants: implementing this op alone unlocks 0 witnesses; +1 (G2-19.removed_tool) only once APPROVAL_INVALIDATED is emitted (T8 5b9e2b8, 0.6.1) and mirrored. The contract answers the relist BEFORE the triggering call while the product relists ON it, so a build must be an armed responder, not a blocking wait. Do not rebuild from the 'absent' label. Note: ~/.claude/state/warroom/ANSWER_RELIST_MEASURED_2026-09-23.md"
   },
   "answer_next_page": {
    "bucket": "route_capability",
    "basis": "inspected_source",
    "evidence": "as answer_relist: no pagination machinery in the mediator",
-   "caveat": "absence by inspection is not proof of exhaustive absence"
+   "caveat": "absence by inspection is not proof of exhaustive absence",
+   "status": "PARKED 2026-09-23 with answer_relist (same note). Its one user, G2-19.paged_list, also needs assert_generation_not_activated, so this op alone unlocks 0."
   },
   "set_pin_state": {
    "bucket": "route_capability",
