@@ -1,0 +1,143 @@
+{
+ "witness": "G2-20.typed_ids",
+ "route": "proxy_strict",
+ "supersedes": null,
+ "beside": "G2-20.duplicate_pending.proxy_strict.2b.json (witness #2b)",
+ "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+ "witness_class": "adapter-against-harness",
+ "mediator_mode": "head_of_line",
+ "executor": "gauntlet/boundary/gen2/execute.py run()",
+ "steps": [
+  "arm_fault",
+  "send_file",
+  "send_file",
+  "send_file",
+  "send_file",
+  "assert_secondary_and_reverse_complete_independently",
+  "send_file",
+  "release_fault_barrier"
+ ],
+ "assertions": [
+  {
+   "op": "arm_fault",
+   "kind": "result_worker",
+   "target": "scanner_worker",
+   "require_fresh_barrier": true,
+   "scanner_mode": "barrier",
+   "fault_scope": {
+    "id": "2001",
+    "direction": "result"
+   },
+   "mediator_mode": "head_of_line",
+   "held": true
+  },
+  {
+   "op": "assert_secondary_and_reverse_complete_independently",
+   "settled_per_id": {
+    "int:2001": 1,
+    "str:\"2001\"": 1
+   },
+   "distinct_ids": [
+    2001,
+    "2001"
+   ],
+   "reused_ids": [],
+   "scope": "distinct ids only; a reused pending id is a deliberate NO",
+   "subject": true,
+   "held": true,
+   "why": null
+  },
+  {
+   "op": "release_fault_barrier",
+   "path": "fault.release",
+   "armed": true,
+   "released": true,
+   "release": {
+    "in_session": true,
+    "hold_entered": true,
+    "waited_ms": 1748.9,
+    "why": null
+   },
+   "held": true,
+   "why": null
+  }
+ ],
+ "settled": [
+  {
+   "request_id": 2001,
+   "reason": "CLEAN",
+   "forwarded": true,
+   "detector_status": "complete",
+   "inspection_complete": true,
+   "finding": false
+  },
+  {
+   "request_id": "2001",
+   "reason": "CLEAN",
+   "forwarded": true,
+   "detector_status": "complete",
+   "inspection_complete": true,
+   "finding": false
+  }
+ ],
+ "barrier_held_log": [
+  {
+   "id": "2001",
+   "direction": "result"
+  }
+ ],
+ "receipt_kinds": {
+  "UPSTREAM_STARTED": 1,
+  "RUN_CONFIGURATION": 1,
+  "RPC_INGRESS": 8,
+  "NO_INSPECTABLE_CONTENT": 5,
+  "INSPECTING": 2,
+  "HOLD_ENTERED": 2,
+  "SCAN_STARTED": 2,
+  "WORKER_OUTPUT": 2,
+  "SETTLED": 2,
+  "RPC_EGRESS": 2,
+  "PUMP_CLOSED": 2,
+  "UPSTREAM_CLOSED": 1
+ },
+ "expectation_source": "~/.claude/state/warroom/GATE2_SCENARIOS/20_g3_correlation/expected.json variants.typed_ids.proxy_strict (primary only)",
+ "expectation_vs_observed": {
+  "detector: complete, finding no, accepted": "SETTLED detector_status complete, inspection_complete true, finding false; WORKER_OUTPUT accepted true",
+  "policy: allow / CLEAN, exactly one terminal": "SETTLED CLEAN forwarded true; exactly 1 client frame for str id \"2001\"",
+  "bytes: original, correlated id AND JSON type preserved": "client frame byte-identical to the declared primary response; id type str"
+ },
+ "repeats": {
+  "rule": "T9 2026-09-23: a witness measured once is a run, not a witness",
+  "head_of_line": [
+   "34acaf393f5c",
+   "84ba55f5e15d",
+   "23dc08f59447"
+  ],
+  "contract": [
+   "03490cd7281f",
+   "f30f9809213d",
+   "509b221c3fc8"
+  ],
+  "result": "3/3 identical per mode on settled, primary frame count, byte identity, independence, release, held log, stall",
+  "hold_wait_ms": {
+   "head_of_line": [
+    1748.9,
+    1731.2,
+    1763.6
+   ],
+   "contract": [
+    119.6,
+    119.3,
+    116.4
+   ]
+  }
+ },
+ "controls": [
+  "the same variant at 2d63abd: primary SCAN_DEADLINE not forwarded, independence void (warroom/MEASURE29_BASE_2d63abd_2026-09-23.json)",
+  "a release before the hold begins does not release and says why (tests/test_gen2_assertions.py::test_a_hold_that_never_began_is_not_released)"
+ ],
+ "what_this_witnesses": "On the harness mediator in head_of_line mode (the shipped topology on 1cae43a), a result held at a barrier scoped to ONE item (str \"2001\") does not hold the secondary (int 2001) or the reverse request; the barrier is entered and released IN the session; the held item then completes CLEAN with its original bytes and its id's JSON type intact.",
+ "what_this_does_NOT_witness": "The shipped product itself (driven_against is the harness mirror). A faulted frame that arrives FIRST in its direction (the head-of-line stall: no drivable variant has that order). Any fault other than a hold. The contract-mode result is the same and is not separate evidence about the product.",
+ "recorded_at": "2026-09-23",
+ "run_id": "34acaf393f5c"
+}
