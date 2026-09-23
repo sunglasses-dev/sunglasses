@@ -341,3 +341,72 @@ def test_the_worker_runs_in_its_own_process_group(tmp_path):
                        timeout_ms=300)
     assert int(marker.read_text()) != os.getpgid(0), \
         "the worker shares our group, so its deadline kill would hit us"
+
+
+# ── EOF IS NOT EXIT (T8 2026-09-23, measured before it was fixed) ────────
+# `run()` decided "timed out" as `reader.is_alive() or child.poll() is None`.
+# The reader finishes at stdout EOF, and a child that has closed stdout is not
+# yet a child that has exited -- interpreter teardown sits between the two. So
+# a worker that ANSWERED, in full and on time, was recorded as a DEADLINE and
+# its answer discarded whenever its exit trailed its EOF. Measured on 1cae43a
+# with the child below: 20 runs out of 20 read `deadline` at a 1,000 ms budget.
+
+_ANSWER = json.dumps({"binding": BINDING, "accepted": True, "status": "complete",
+                      "inspection_complete": True, "decision": "allow",
+                      "inspected_utf8_bytes": 0, "observed_content_bytes": 0,
+                      "elapsed_ms": 1, "findings": []})
+
+
+def test_an_answer_whose_exit_trails_its_eof_is_the_answer():
+    """Prints one valid line, closes stdout, then takes 50 ms to exit -- well
+    inside a 1,000 ms budget. That is an answer, not a deadline."""
+    lingers = _script(
+        "import os,sys,time;sys.stdin.read();"
+        f"sys.stdout.write({_ANSWER!r}+'\\n');sys.stdout.flush();"
+        "os.close(1);time.sleep(0.05)")
+    for _ in range(5):
+        out = worker_process.run({"params": {}}, argv=lingers, binding=BINDING,
+                                 timeout_ms=1000)
+        assert out["status"] == "complete", out
+        assert out["accepted"] is True
+
+
+def test_a_child_that_closes_stdout_and_then_hangs_is_still_a_deadline(
+        tmp_path):
+    """The other direction. Waiting for the exit must stay inside the SAME
+    budget: a child that answers and then never leaves is still running at
+    the deadline, and T8.R4 says that child is killed and reported."""
+    marker = tmp_path / "pid"
+    stays = _script(
+        f"import os,sys,time;open({str(marker)!r},'w').write(str(os.getpid()));"
+        f"sys.stdin.read();sys.stdout.write({_ANSWER!r}+'\\n');"
+        "sys.stdout.flush();os.close(1);time.sleep(300)")
+    started = time.monotonic()
+    out = worker_process.run({"params": {}}, argv=stays, binding=BINDING,
+                             timeout_ms=300)
+    waited = time.monotonic() - started
+    assert out["status"] == "deadline", out
+    assert waited >= 0.300, f"reported after {waited:.3f}s against 300 ms"
+    pid = int(marker.read_text())
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            break
+        time.sleep(0.02)
+    else:
+        pytest.fail("a child that answered and then hung was abandoned")
+
+
+def test_a_flood_is_still_stopped_at_once_not_after_the_budget():
+    """Over the stdout bound, the child is still writing and will never exit on
+    its own. Waiting for its exit would spend the whole budget first."""
+    flood = _script("import sys;sys.stdin.read();"
+                    "w=sys.stdout.buffer.write\nwhile True: w(b'x'*65536)")
+    started = time.monotonic()
+    out = worker_process.run({"params": {}}, argv=flood, binding=BINDING,
+                             timeout_ms=5000, stdout_limit=1024)
+    waited = time.monotonic() - started
+    assert out["status"] == "exception", out
+    assert waited < 3.0, f"a flood took {waited:.2f}s -- it waited on the budget"

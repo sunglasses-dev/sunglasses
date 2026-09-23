@@ -33,6 +33,7 @@ import json
 import os
 import subprocess
 import threading
+import time
 
 from . import bounds, supervisor
 
@@ -74,8 +75,21 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
     except OSError:
         pass
 
+    deadline = time.monotonic() + timeout_ms / 1000.0
     reader.join(timeout=timeout_ms / 1000.0)
-    timed_out = reader.is_alive() or child.poll() is None
+    timed_out = reader.is_alive()
+    if not timed_out and not collected.get("over"):
+        # EOF IS NOT EXIT. The reader finishes when the child closes stdout,
+        # and interpreter teardown sits between that and the process ending.
+        # Deciding on `poll()` at that instant recorded a complete, on-time
+        # answer as a DEADLINE and threw it away (20/20 with a child whose exit
+        # trailed its EOF by 50 ms). So wait for the exit -- inside the SAME
+        # budget, so a child that answers and then stays is still killed at the
+        # deadline. A flood is not waited on: it will never exit by itself.
+        try:
+            child.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            timed_out = True
     if timed_out or collected.get("over"):
         # Both faults end the same way and for the same reason: the child is
         # still there. Stopping the GROUP rather than the pid catches anything
