@@ -34,7 +34,7 @@ import os
 import subprocess
 import threading
 
-from . import bounds, supervisor
+from . import bounds, supervisor, worker
 
 STATUS_COMPLETE = "complete"
 STATUS_EXCEPTION = "exception"
@@ -163,4 +163,6 @@ def _fault(binding, status, cause=None):
              "elapsed_ms": 0, "findings": []}
     if cause is not None:
         fault["detector_status"] = cause
-    return fault
+    # A LocalFault, so the route can tell a cause WE assigned from one a child
+    # printed; see worker.LocalFault. `_parse` returns plain dicts on purpose.
+    return worker.LocalFault(fault)
