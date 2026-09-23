@@ -138,6 +138,67 @@ def _messages(raw: bytes) -> list:
     return out
 
 
+def _id_order(value):
+    """A sort key for JSON-RPC ids that never compares a str with an int.
+
+    G2-20.typed_ids puts "2001" and 2001 on the wire together, which is the
+    scenario, and a plain `sorted()` over them raises TypeError: the variant
+    was counted drivable and had never completed a run.
+    """
+    return (type(value).__name__, json.dumps(value, sort_keys=True))
+
+
+def _id_label(value) -> str:
+    """A JSON object key that keeps "2001" and 2001 apart.
+
+    `json.dumps({2001: 1, "2001": 1})` writes the key "2001" twice, and every
+    reader keeps the last one, so a record keyed on the raw id loses one of the
+    two ids this scenario exists to separate, silently.
+    """
+    return f"{type(value).__name__}:{json.dumps(value, sort_keys=True)}"
+
+
+def _per_id(ids) -> dict:
+    """How many times each id occurs, with the id's type in the key."""
+    counts = collections.Counter((type(i).__name__, json.dumps(i, sort_keys=True))
+                                 for i in ids)
+    return {f"{kind}:{text}": n for (kind, text), n in sorted(counts.items())}
+
+
+def _independence(settled) -> dict:
+    """assert_secondary_and_reverse_complete_independently, over SETTLED rows.
+
+    SCOPED TO DISTINCT IDS, and the scope IS the ruling. T8: `_owed` is per id
+    with a per-item origin, so items with DIFFERENT ids complete independently,
+    but a client id reused while pending is a deliberate NO, torn down on
+    purpose. An unconditional claim would fail G2-15, a shape the product
+    handles correctly. "2001" and 2001 are different ids.
+    """
+    ids = [row.get("request_id") for row in settled
+           if row.get("request_id") is not None]
+    by_id = collections.Counter((type(i).__name__, json.dumps(i, sort_keys=True))
+                                for i in ids)
+    first = {}
+    for i in ids:
+        first.setdefault(_id_order(i), i)
+    reused = [first[k] for k, n in sorted(by_id.items()) if n > 1]
+    distinct = [first[k] for k, n in sorted(by_id.items()) if n == 1]
+    return {
+        "settled_per_id": _per_id(ids),
+        "distinct_ids": distinct,
+        "reused_ids": reused,
+        "scope": "distinct ids only; a reused pending id is a deliberate NO",
+        # SAME THREE-WAY ANSWER as the duplicate-forward row. No settlement at
+        # all is not a failure of independence, it is an absent subject, and
+        # reporting it as `held: false` would send a reader looking for a
+        # correlation bug that did not happen.
+        "subject": bool(ids),
+        "held": (not reused) if ids else None,
+        "why": None if ids else (
+            "the mediator settled nothing in this run, so there are no "
+            "completions for independence to be a property of")}
+
+
 def _check_correlation(client_sent, upstream_answered) -> dict:
     """Nothing answers a notification, and nothing borrows a pending id.
 
@@ -151,12 +212,13 @@ def _check_correlation(client_sent, upstream_answered) -> dict:
     pending = {m["id"] for m in client_sent
                if m.get("id") is not None and m.get("method")}
     borrowed = sorted({m["id"] for m in upstream_answered
-                       if m.get("id") in pending and m.get("method")})
+                       if m.get("id") in pending and m.get("method")},
+                      key=_id_order)
     # A reply to a notification would have to carry an id nobody requested.
     requested = {m.get("id") for m in client_sent if m.get("id") is not None}
     unrequested = sorted({m["id"] for m in upstream_answered
                           if m.get("id") is not None and not m.get("method")
-                          and m["id"] not in requested})
+                          and m["id"] not in requested}, key=_id_order)
     return {"held": not borrowed and not unrequested,
             "borrowed_ids": borrowed, "unrequested_reply_ids": unrequested}
 
@@ -502,7 +564,7 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
             per_id = collections.Counter(
                 message.get("id") for message in _forwarded_upstream(receipts)
                 if message.get("id") is not None)
-            repeated = {i: n for i, n in per_id.items() if n > 1}
+            repeated = {_id_label(i): n for i, n in per_id.items() if n > 1}
             refusals = [r.get("reason")
                         for r in _receipts_of_kind(receipts, "ADMISSION_REFUSED")]
             # A ZERO HAS TWO READINGS, and this op is where they look alike.
@@ -521,7 +583,7 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
             subject = bool(per_id)
             assertions.append({
                 "op": op,
-                "forwarded_per_id": dict(per_id),
+                "forwarded_per_id": {_id_label(i): n for i, n in per_id.items()},
                 "forwarded_twice": repeated,
                 "admission_refusals": refusals,
                 "subject": subject,
@@ -532,32 +594,8 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                     "this run")})
 
         elif op == "assert_secondary_and_reverse_complete_independently":
-            # SCOPED TO DISTINCT IDS, and the scope IS the ruling. T8: `_owed`
-            # is per id with a per-item origin, so items with DIFFERENT ids
-            # complete independently — but a client id reused while pending is a
-            # deliberate NO, torn down on purpose. An unconditional claim would
-            # fail G2-15, a shape the product handles correctly.
             settled = _receipts_of_kind(run_root / "proxy.receipts.jsonl", "SETTLED")
-            by_id = collections.Counter(
-                row.get("request_id") for row in settled
-                if row.get("request_id") is not None)
-            reused = sorted(i for i, n in by_id.items() if n > 1)
-            distinct = sorted(i for i, n in by_id.items() if n == 1)
-            assertions.append({
-                "op": op,
-                "settled_per_id": dict(by_id),
-                "distinct_ids": distinct,
-                "reused_ids": reused,
-                "scope": "distinct ids only; a reused pending id is a deliberate NO",
-                # SAME THREE-WAY ANSWER as the row above. No settlement at all
-                # is not a failure of independence, it is an absent subject, and
-                # reporting it as `held: false` would send a reader looking for
-                # a correlation bug that did not happen.
-                "subject": bool(by_id),
-                "held": (not reused) if by_id else None,
-                "why": None if by_id else (
-                    "the mediator settled nothing in this run, so there are no "
-                    "completions for independence to be a property of")})
+            assertions.append({"op": op, **_independence(settled)})
 
         elif op == "release_any_old_workers":
             # WHAT THE MEDIATOR RECORDS, not what this adapter hopes.

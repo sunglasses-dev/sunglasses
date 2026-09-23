@@ -132,3 +132,52 @@ def test_the_assertions_are_in_the_execution_record(run_root):
                       timeout_ms=8000)
     record = json.loads((run.run_dir / "execution.json").read_text())
     assert [a["op"] for a in record["assertions"]] == [a["op"] for a in run.assertions]
+
+
+# ── TYPED IDS: "2001" and 2001 are two ids, and every record must keep them two ──
+#
+# G2-20.typed_ids exists to put a string id and a number id with the same digits
+# on the wire at once. On c09f7ff it was counted DRIVABLE at plan level and had
+# never completed a run: the independence step called `sorted()` over a mix of
+# str and int and raised TypeError, and a Counter rendered with `dict(...)`
+# would have merged the two ids into one JSON key had it got that far.
+# The scenario's own subject is what broke the instrument that measures it.
+
+def test_mixed_type_ids_are_two_ids_in_the_independence_record():
+    settled = [{"request_id": 2001}, {"request_id": "2001"}]
+    check = json.loads(json.dumps(execute._independence(settled)))
+    assert sorted(map(json.dumps, check["distinct_ids"])) == ['"2001"', "2001"]
+    assert check["reused_ids"] == []
+    assert len(check["settled_per_id"]) == 2, check["settled_per_id"]
+    assert check["held"] is True
+
+
+def test_a_reused_id_is_still_caught_when_its_twin_has_another_type():
+    """The control: typing the key must not make a real reuse disappear."""
+    settled = [{"request_id": 2001}, {"request_id": 2001}, {"request_id": "2001"}]
+    check = json.loads(json.dumps(execute._independence(settled)))
+    assert check["reused_ids"] == [2001]
+    assert check["distinct_ids"] == ["2001"]
+    assert check["held"] is False
+
+
+def test_no_settlement_is_no_subject_not_a_pass():
+    check = execute._independence([])
+    assert check["subject"] is False and check["held"] is None
+
+
+def test_mixed_type_ids_do_not_break_the_correlation_check():
+    client = [{"jsonrpc": "2.0", "id": "2001", "method": "tools/call", "params": {}},
+              {"jsonrpc": "2.0", "id": 2001, "method": "tools/call", "params": {}}]
+    upstream = [{"jsonrpc": "2.0", "id": 2001, "method": "ping", "params": {}},
+                {"jsonrpc": "2.0", "id": 9, "result": {}},
+                {"jsonrpc": "2.0", "id": "9", "result": {}}]
+    check = execute._check_correlation(client, upstream)
+    assert check["borrowed_ids"] == [2001]
+    assert sorted(map(json.dumps, check["unrequested_reply_ids"])) == ['"9"', "9"]
+    assert check["held"] is False
+
+
+def test_per_id_counts_survive_json_with_both_types():
+    counts = json.loads(json.dumps(execute._per_id([2001, "2001", "2001"])))
+    assert counts == {"int:2001": 1, 'str:"2001"': 2}, counts
