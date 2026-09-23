@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-b",
+ "revision": "2026-09-23-c",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -247,6 +247,26 @@
    "witness_class": "adapter-against-harness",
    "evidence": "WITNESS 3. G2-20.typed_ids driven on proxy_strict in head_of_line mode. The barrier was SCOPED to the item the kind names (str \"2001\", result): the wrapper's hold log shows exactly that item, the secondary (int 2001) and the reverse request completed, the hold was released IN the session (1731-1764 ms after the run began, behind the secondary's scan), and the primary then settled CLEAN, forwarded, byte-identical, id type str. 3/3 identical per mode (head_of_line and contract), run ids in the step record.",
    "caveat": "Adapter-against-harness, not the shipped product. Before a7afd09 this kind could not have a subject: the barrier held every scan and was released only after the session ended, so every held item died at SCAN_DEADLINE while the row said released:true."
+  },
+  "release_fault_barrier": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "34acaf393f5c",
+   "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "ruled_by": "T9",
+   "ruled_at": "2026-09-23",
+   "basis_commits": {
+    "a7afd09": "released IN the session, only once the scoped hold was entered (require_fresh_barrier)",
+    "9be748d": "witness 3, 3/3 identical per mediator mode"
+   },
+   "evidence": "WITNESS 3 (G2-20.typed_ids). The release was touched at the step's place in the schedule after the wrapper's log showed the named item ENTERED the hold; the held item then settled CLEAN and forwarded. Before a7afd09 the release ran after the server had exited, so nothing waiting on it was ever released and the row still said released:true.",
+   "answers": {
+    "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
+    "owner": "T8",
+    "declared_at": "2026-09-14"
+   }
   }
  },
  "unclassified": {
@@ -254,16 +274,6 @@
    "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
    "owner": "T8",
    "declared_at": "2026-09-14"
-  },
-  "release_fault_barrier": {
-   "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
-   "owner": "T8",
-   "declared_at": "2026-09-14",
-   "witness_candidate": {
-    "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
-    "run_id": "34acaf393f5c",
-    "note": "Integration evidenced at a7afd09: released in session only once the scoped hold was entered (require_fresh_barrier). Left unclassified: the question is T8's and reclassifying it is a ruling, not an edit."
-   }
   },
   "release_any_old_workers": {
    "open_question": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
