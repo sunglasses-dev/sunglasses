@@ -383,15 +383,19 @@ what moved.
   survived -- one hook would see either, and which one is invisible in the
   result.
 
-### PENDING — open, not shipped, and not to be described as shipped
-
-- **A control cannot assert its own child against a first-of answer.** (#236,
-  OPEN) `foreign_pytest()` returns the lowest pid, because the guard only needs
-  to know that something else is running. A positive control needs a different
+- **A control cannot assert its own child against a first-of answer.**
+  (#236) `foreign_pytest()` returns the lowest pid, because the guard only
+  needs to know that something else is running. A positive control needs a different
   question -- can the scan see the process it just started -- and with any other
   suite live, the singular form handed it a stranger's process. Adds
   `foreign_pytests()` returning every candidate; the guard's own behaviour is
-  unchanged. **Not in `main` until #236 merges.**
+  unchanged.
+
+### PENDING — open, not shipped, and not to be described as shipped
+
+**Empty.** Every change described above is in `main`. The block stays in the
+file because the next release will need it, and because a reader should be able
+to see that it was checked rather than quietly deleted.
 
 ### What this release claims about the proxy, and what it does not
 
