@@ -1,0 +1,1382 @@
+[
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   2702
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2702,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    2702,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    2702,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    2702,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    2702,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2719,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 2702,
+  "scan_result_ms": 2702,
+  "marked_scan_ms": 2702,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   2713
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -101,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2712,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    2713,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    2713,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    2713,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    2713,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2734,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 2713,
+  "scan_result_ms": 2712,
+  "marked_scan_ms": 2712,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   2683
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2683,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    2683,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    2683,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    2683,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    2683,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2700,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 2683,
+  "scan_result_ms": 2683,
+  "marked_scan_ms": 2683,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": false,
+  "call_forwarded_after_cancel_ms": [],
+  "client_replies_for_1": [
+   "SCAN_EXCEPTION"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3524,
+    null,
+    "deadline"
+   ],
+   [
+    "SETTLED",
+    3525,
+    "SCAN_EXCEPTION",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3525,
+    null,
+    null
+   ]
+  ],
+  "cancel_accepted_ms": 3525,
+  "scan_result_ms": 3524,
+  "marked_scan_ms": 3524,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": false,
+  "call_forwarded_after_cancel_ms": [],
+  "client_replies_for_1": [
+   "SCAN_EXCEPTION"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -101,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3530,
+    null,
+    "deadline"
+   ],
+   [
+    "SETTLED",
+    3530,
+    "SCAN_EXCEPTION",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3530,
+    null,
+    null
+   ]
+  ],
+  "cancel_accepted_ms": 3530,
+  "scan_result_ms": 3530,
+  "marked_scan_ms": 3530,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": false,
+  "call_forwarded_after_cancel_ms": [],
+  "client_replies_for_1": [
+   "SCAN_EXCEPTION"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3517,
+    null,
+    "deadline"
+   ],
+   [
+    "SETTLED",
+    3517,
+    "SCAN_EXCEPTION",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3517,
+    null,
+    null
+   ]
+  ],
+  "cancel_accepted_ms": 3517,
+  "scan_result_ms": 3517,
+  "marked_scan_ms": 3517,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   2635
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -108,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2635,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    2635,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    2635,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    2636,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    2636,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    2636,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 2635,
+  "scan_result_ms": 2635,
+  "marked_scan_ms": 2635,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   1103
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -100,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1103,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    1103,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    1103,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    1103,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    1104,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1104,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 1103,
+  "scan_result_ms": 1103,
+  "marked_scan_ms": 1103,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   1102
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1101,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    1102,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    1102,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    1102,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    1102,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1102,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 1102,
+  "scan_result_ms": 1101,
+  "marked_scan_ms": 1101,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   3404
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -101,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3403,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    3404,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3404,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    3404,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    3404,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3405,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 3404,
+  "scan_result_ms": 3403,
+  "marked_scan_ms": 3403,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   3393
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3393,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    3394,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3394,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    3394,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    3394,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3394,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 3394,
+  "scan_result_ms": 3393,
+  "marked_scan_ms": 3393,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "A",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   3404
+  ],
+  "client_replies_for_1": [
+   "result"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -108,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3404,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    3404,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    3404,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3405,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    3405,
+    "CLEAN",
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    3405,
+    null,
+    null
+   ]
+  ],
+  "cancel_accepted_ms": 3405,
+  "scan_result_ms": 3404,
+  "marked_scan_ms": 3404,
+  "cancel_before_marked_scan_ended": false
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -116
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1736,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -116,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -116,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -115,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1108,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -116,
+  "marked_scan_ms": 1108,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -118
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1723,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -118,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -118,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -118,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1103,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -118,
+  "marked_scan_ms": 1103,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -119
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1729,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -120,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -119,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -119,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1108,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -120,
+  "marked_scan_ms": 1108,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -113
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1726,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -113,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -113,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -113,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1935,
+    null,
+    "deadline"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -113,
+  "marked_scan_ms": 1935,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -105
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1713,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -106,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -105,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -105,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1926,
+    null,
+    "deadline"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -106,
+  "marked_scan_ms": 1926,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "process",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -109
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -1709,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -109,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -109,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -109,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1937,
+    null,
+    "deadline"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -109,
+  "marked_scan_ms": 1937,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -119
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -124,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -120,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -119,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -119,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    1,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1095,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -120,
+  "marked_scan_ms": 1095,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -110
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -113,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -111,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -110,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -110,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    1,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    1,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1103,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 1,
+  "scan_result_ms": -111,
+  "marked_scan_ms": 1103,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 1.2,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -121
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -123,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -122,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -121,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -121,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    1081,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -122,
+  "marked_scan_ms": 1081,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -114
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -115,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -114,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -114,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -114,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3391,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -114,
+  "marked_scan_ms": 3391,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -123
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -125,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -123,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -123,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -123,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3388,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -123,
+  "marked_scan_ms": 3388,
+  "cancel_before_marked_scan_ended": true
+ },
+ {
+  "scenario": "B",
+  "mode": "inprocess",
+  "delay_s": 3.5,
+  "call_forwarded_upstream": true,
+  "call_forwarded_after_cancel_ms": [
+   -123
+  ],
+  "client_replies_for_1": [
+   "REQUEST_CANCELLED"
+  ],
+  "timeline_ms_from_cancel": [
+   [
+    "SCAN_STARTED",
+    -125,
+    null,
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    -124,
+    null,
+    "complete"
+   ],
+   [
+    "SETTLED",
+    -123,
+    "CLEAN",
+    null
+   ],
+   [
+    "SCAN_STARTED",
+    -123,
+    null,
+    null
+   ],
+   [
+    "CANCEL_ACCEPTED",
+    0,
+    null,
+    null
+   ],
+   [
+    "SETTLED",
+    0,
+    "REQUEST_CANCELLED",
+    null
+   ],
+   [
+    "SCAN_RESULT",
+    3388,
+    null,
+    "complete"
+   ]
+  ],
+  "cancel_accepted_ms": 0,
+  "scan_result_ms": -124,
+  "marked_scan_ms": 3388,
+  "cancel_before_marked_scan_ended": true
+ }
+]
