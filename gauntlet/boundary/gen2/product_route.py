@@ -53,11 +53,26 @@ CHILD = textwrap.dedent('''
         raise SystemExit(1)
     elif mode == "leak_extra":
         out = dict(real(), debug_input=json.dumps(request.get("params")))
+    elif mode == "template":
+        # G2-25 stimuli authored from the PRODUCT's receipt vocabulary: a JSON
+        # object where "__P__" becomes the payload the child just read and
+        # "__BINDING__" the binding it was sent.
+        def fill(o):
+            if o == "__P__": return STIM["payload"]
+            if o == "__BINDING__": return request.get("binding")
+            if isinstance(o, dict): return {fill(k): fill(v) for k, v in o.items()}
+            if isinstance(o, list): return [fill(v) for v in o]
+            return o
+        out = fill(STIM["shape"])
+    elif mode == "text":
+        sys.stdout.write(STIM["shape"].replace("__P__", STIM["payload"])); sys.stdout.flush()
+        raise SystemExit(STIM.get("exit", 1))
     sys.stdout.write(json.dumps(out) + "\\n"); sys.stdout.flush()
 ''')
 
 
-def drive(*, product_root, run_dir, request_frame, result_frame, marker, mode, shape=None):
+def drive(*, product_root, run_dir, request_frame, result_frame, marker, mode, shape=None,
+          payload=None, exit_code=1):
     """One drive. Returns what the client got, the SCAN_RESULT rows, and every
     receipt file's text, all read after the fact."""
     product_root = pathlib.Path(product_root).resolve()
@@ -69,7 +84,8 @@ def drive(*, product_root, run_dir, request_frame, result_frame, marker, mode, s
     child = run_dir / "stimulus_child.py"; child.write_text(CHILD)
     stim = run_dir / "stimulus.json"
     stim.write_text(json.dumps({"product_root": str(product_root), "gen2_parent": str(HERE.parent),
-                                "marker": marker, "mode": mode, "shape": shape}))
+                                "marker": marker, "mode": mode, "shape": shape,
+                                "payload": payload, "exit": exit_code}))
     receipts = run_dir / "receipts"; receipts.mkdir(exist_ok=True)
     scan = worker_process.ProcessScan(argv=[sys.executable, str(child), str(stim)])
     try:
