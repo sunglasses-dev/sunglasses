@@ -33,6 +33,18 @@ SUPPORTED_ROUTES = frozenset({"no_mediation", "proxy_strict"})
 BOUNDARY = HERE.parent
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
 FAULT_WORKER = PACKAGE / "fault_worker.py"
+SCOPED_BARRIER = HERE / "scoped_barrier.py"
+
+# THE ITEM A STAGE KIND NAMES. `request_worker` is the worker scanning the
+# primary request, `result_worker` the one scanning its result. Scoped to these
+# two because they are the kinds in DRIVABLE variants (G2-20.duplicate_pending,
+# G2-20.typed_ids); every other kind stays as it was, and none of them drives.
+STAGE_KINDS = {"request_worker": "request", "result_worker": "result"}
+
+# WHICH MEDIATOR A proxy_strict RUN MIRRORS. `head_of_line` is the shipped
+# product on 1cae43a (one reader per direction, inline scan); `contract` is the
+# killable-worker-per-item lane the product still owes. See passthrough.py.
+MODES = ("head_of_line", "contract")
 PACKAGE_INSPECTION_BYTE_BUDGET = 262144
 
 # What the mediator says it DID about a held message. Both are dispositions: one
@@ -163,6 +175,39 @@ def _per_id(ids) -> dict:
     counts = collections.Counter((type(i).__name__, json.dumps(i, sort_keys=True))
                                  for i in ids)
     return {f"{kind}:{text}": n for (kind, text), n in sorted(counts.items())}
+
+
+def _release_in_session(run_root: pathlib.Path, fault_scope, timeout_ms: int) -> dict:
+    """release_fault_barrier, DURING the session, and only once the hold began.
+
+    It used to run after the session had ended: the executor walks assertion
+    steps only once the server has exited, so the barrier was never released
+    while anything waited on it, every held item died at SCAN_DEADLINE, and the
+    row still said released:true. `require_fresh_barrier` is honoured here: the
+    release waits until the wrapper's own log shows the named item entered the
+    hold, because a release file that exists before the hold starts is a
+    barrier that never held.
+    """
+    started = time.monotonic()
+    release = run_root / "fault.release"
+    if fault_scope is None:
+        return {"in_session": False, "hold_entered": None, "waited_ms": 0.0,
+                "why": "an unscoped barrier has no single item to wait for, so it "
+                       "is not released in session"}
+    held_log = run_root / "barrier.held.jsonl"
+    entered = False
+    while time.monotonic() - started < timeout_ms / 1000:
+        if held_log.is_file() and held_log.read_text().strip():
+            entered = True
+            break
+        time.sleep(0.01)
+    if entered:
+        release.touch()
+    return {"in_session": entered, "hold_entered": entered,
+            "waited_ms": round((time.monotonic() - started) * 1000, 1),
+            "why": None if entered else (
+                f"the named item never entered the hold within {timeout_ms} ms, "
+                "so there was no fresh barrier to release")}
 
 
 def _independence(settled, barrier_held_ids=None) -> dict:
@@ -352,8 +397,13 @@ def _mediator_ingress(receipts: pathlib.Path) -> list[bytes]:
 def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         materialise: bool = True, timeout_ms: int = 3000,
         materialised: pathlib.Path | None = None,
-        engine_root: pathlib.Path | None = None) -> Run:
+        engine_root: pathlib.Path | None = None,
+        mode: str = "head_of_line") -> Run:
     """Execute one variant on one route and hand back what was observed."""
+    if mode not in MODES:
+        raise ValueError(f"mode {mode!r} is not one of {MODES}; a mediator mode "
+                         "nobody named is a run nobody can attribute")
+    fault_scope = None
     if route not in SUPPORTED_ROUTES:
         raise UnsupportedRoute(
             f"{route}: this adapter drives {sorted(SUPPORTED_ROUTES)} only. "
@@ -435,19 +485,41 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         # `release_fault_barrier` step, so the hold is meant to outlive the run
         # and the worker is reaped at teardown.
         armed = next((st for st in steps if st.get("op") == "arm_fault"), None)
-        mode = "barrier" if (armed
+        worker_mode = "barrier" if (armed
                              and armed.get("target") == "scanner_worker"
                              and armed.get("require_fresh_barrier")) else "scan"
-        scanner = f"{sys.executable} {FAULT_WORKER} {mode}"
-        if mode == "barrier":
-            scanner += f" --release {run_root / 'fault.release'}"
+        # THE BARRIER, SCOPED TO THE ITEM ITS KIND NAMES. The scanner command
+        # is fixed per session, so an unscoped barrier held EVERY scan: on
+        # G2-20.typed_ids it held the secondary too, which the product (one
+        # reader per direction, the secondary's frame arriving first) would
+        # have scanned normally. The mediator names each item in GAUNTLET_ITEM;
+        # the wrapper holds only the one named here.
+        fault_scope = None
+        if (worker_mode == "barrier" and armed.get("kind") in STAGE_KINDS
+                and variant.get("requests")):
+            fault_scope = {"id": _primary_id(run_root, variant["requests"])
+                           if (run_root / variant["requests"]).is_file()
+                           else _primary_id(record.path, variant["requests"]),
+                           "direction": STAGE_KINDS[armed["kind"]]}
+            (run_root / "fault.item.json").write_text(json.dumps(fault_scope))
+            scanner = (f"{sys.executable} {SCOPED_BARRIER}"
+                       f" --fault-worker {FAULT_WORKER}"
+                       f" --item-file {run_root / 'fault.item.json'}"
+                       f" --release {run_root / 'fault.release'}")
+        else:
+            scanner = f"{sys.executable} {FAULT_WORKER} {worker_mode}"
+            if worker_mode == "barrier":
+                scanner += f" --release {run_root / 'fault.release'}"
         if engine_root:
             scanner += f" --engine-root {engine_root}"
         argv = [sys.executable, str(BOUNDARY / "proxy" / "passthrough.py"),
                 "--deadline-ms", str(timeout_ms),
                 "--byte-budget", str(PACKAGE_INSPECTION_BYTE_BUDGET),
                 "--receipts", str(run_root / "proxy.receipts.jsonl"),
-                "--scanner", scanner, "--"] + upstream_argv
+                "--scanner", scanner]
+        if mode == "head_of_line":
+            argv.append("--head-of-line")
+        argv += ["--"] + upstream_argv
     else:
         argv = upstream_argv
     server = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -469,6 +541,7 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         send(frame + b"\n")
 
     primary_id = None
+    release_record = None
     for step in steps:
         if step["op"] == "send_file":
             if step["origin"] == "client":
@@ -481,6 +554,8 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
         elif step["op"] == "await_primary_terminal":
             primary_id = _primary_id(run_root, step["id_from"])
             timeout_ms = step.get("timeout_ms", timeout_ms)
+        elif step["op"] == "release_fault_barrier" and route == "proxy_strict":
+            release_record = _release_in_session(run_root, fault_scope, timeout_ms)
 
     server.stdin.close()
     deadline = time.monotonic() + timeout_ms / 1000
@@ -554,16 +629,22 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                 and st.get("target") == "scanner_worker"
                 and st.get("require_fresh_barrier")
                 for st in steps)
-            if armed_barrier:
-                release.touch()
+            # RELEASED IN SESSION OR NOT AT ALL. Touching the file here, after
+            # the server has exited, released nothing anyone was waiting on and
+            # recorded it as released. The file is now touched by
+            # `_release_in_session` at the step's own place in the schedule.
+            in_session = bool(release_record and release_record["in_session"])
             assertions.append({
                 "op": op, "path": release.name,
                 "armed": armed_barrier,
-                "released": release.is_file(),
-                "held": armed_barrier and release.is_file(),
-                "why": None if armed_barrier else (
-                    "no barrier was armed in this schedule, so there was "
-                    "nothing to release")})
+                "released": in_session,
+                "release": release_record,
+                "held": armed_barrier and in_session,
+                "why": (None if (armed_barrier and in_session) else
+                        "no barrier was armed in this schedule, so there was "
+                        "nothing to release" if not armed_barrier else
+                        (release_record or {}).get("why")
+                        or "the barrier was not released during the session")})
 
         elif op == "arm_fault":
             # RECORDED, not re-done. The mode was chosen before the session
@@ -575,6 +656,10 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                 "scanner_mode": "barrier" if (
                     step.get("target") == "scanner_worker"
                     and step.get("require_fresh_barrier")) else "scan",
+                # WHICH ITEM THE BARRIER HOLDS. None with a barrier means every
+                # scan in the session, which is what this row used to hide.
+                "fault_scope": fault_scope,
+                "mediator_mode": mode if route == "proxy_strict" else None,
                 "held": True})
 
         elif op == "assert_no_second_forward_and_no_pending_overwrite":
@@ -623,9 +708,19 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                 and st.get("target") == "scanner_worker"
                 and st.get("require_fresh_barrier")
                 for st in steps) and route == "proxy_strict"
-            started = [row.get("request_id")
-                       for row in _receipts_of_kind(receipts, "SCAN_STARTED")
-                       if row.get("request_id") is not None]
+            # WHAT THE BARRIER HELD. Scoped: the wrapper's own log of every
+            # item it sent into the hold. Unscoped: every scan that started,
+            # because the fixed scanner command holds them all.
+            held_log = run_root / "barrier.held.jsonl"
+            if fault_scope is not None:
+                started = [json.loads(line).get("id")
+                           for line in (held_log.read_text().splitlines()
+                                        if held_log.is_file() else [])
+                           if line.strip()]
+            else:
+                started = [row.get("request_id")
+                           for row in _receipts_of_kind(receipts, "SCAN_STARTED")
+                           if row.get("request_id") is not None]
             assertions.append({"op": op, **_independence(
                 settled, barrier_held_ids=started if barrier_session else None)})
 
@@ -726,6 +821,20 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
     expected = primary_id is not None and any(
         json.loads(frame).get("id") == primary_id for frame in declared_frames)
 
+    # A HARNESS STALL IS NEVER A PASS. In head_of_line mode the product has no
+    # scan deadline (inspection.py:24-29), so a deadline firing is the harness
+    # giving up on a stall the product would still be in.
+    stalls = _receipts_of_kind(run_root / "proxy.receipts.jsonl", "HARNESS_STALL") \
+        if route == "proxy_strict" else []
+    if stalls:
+        assertions.append({
+            "op": "harness_stall", "label": "harness-not-product",
+            "ids": [row.get("request_id") for row in stalls],
+            "subject": False, "held": None,
+            "why": "a scan deadline fired in head_of_line mode; the shipped "
+                   "product would still be stalled, so no row in this run is a "
+                   "pass"})
+
     result = Run(run_dir=run_root, steps=steps, client_wire=bytes(client_wire),
                  upstream_wire=bytes(upstream_wire), terminal=terminal,
                  primary_id=primary_id, upstream_as_declared=as_declared,
@@ -735,6 +844,7 @@ def run(entry: dict, variant: dict, *, route: str, run_root: pathlib.Path,
                  assertions=assertions)
     (run_root / "execution.json").write_text(json.dumps({
         "scenario_id": entry["id"], "variant": variant["name"], "route": route,
+        "mediator_mode": mode if route == "proxy_strict" else None,
         "steps": [step["op"] for step in steps],
         "primary_id": primary_id,
         "client_wire_bytes": len(client_wire),
