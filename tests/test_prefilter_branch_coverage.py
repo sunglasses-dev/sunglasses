@@ -116,8 +116,23 @@ AllowlistEntry = _collections.namedtuple(
     "AllowlistEntry",
     "reason plain marker_only marker_no_object worst_seed measured_on receipt")
 
-# rule id -> AllowlistEntry. Empty: nothing has earned one.
-KNOWN_UNSKIPPABLE = {}
+# rule id -> AllowlistEntry. One has earned it, measured, with an exit row.
+KNOWN_UNSKIPPABLE = {
+    # T9 ruling 5, 2026-09-23. The boundary alternatives ARE the rule -- a
+    # start, a newline, a quote -- and no literal can stand for them; the key
+    # names derive, the boundaries cannot. worst_seed is the worse of T9's two
+    # families, both in the receipt: the densest matching prefix repeated
+    # (every byte up to the `=`, no `=`) peaked at 1.03x; one unbroken 1 MiB
+    # token peaked at 1.07x on a run of quotes, each one a boundary. EXIT in
+    # 0.6.2: give the rule derivable literals, then delete this entry.
+    "GLS-SD-010-EMB": AllowlistEntry(
+        reason="7 of 16 branches are boundary alternatives with no literal; "
+               "the 9 key names derive. Exit 0.6.2: derivable literals, "
+               "then remove this entry.",
+        plain=1.01, marker_only=1.01, marker_no_object=1.03, worst_seed=1.07,
+        measured_on="2026-09-23",
+        receipt="tests/perf_receipts/GLS-SD-010-EMB.json"),
+}
 
 # Measured and REFUSED, a separate structure that lends nothing. Kept because a
 # refusal is evidence too, and the next person reaching for the allowlist should
