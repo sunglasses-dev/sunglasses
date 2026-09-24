@@ -180,8 +180,11 @@ def test_AT27_the_detector_gap_disposition_is_message_only():
 
 def _invoke(request_id):
     settlements = []
+    # `obligation_for`: ruling 33 keys a request's scan on its obligation
+    # token, which this stub session names by the id alone.
     session = types.SimpleNamespace(closed_with=lambda: None,
-                                    admit_request=lambda *a, **k: True)
+                                    admit_request=lambda *a, **k: True,
+                                    obligation_for=lambda rid, **k: ("client", rid))
 
     def scan(params, **kw):
         return result(binding=kw["binding"],
