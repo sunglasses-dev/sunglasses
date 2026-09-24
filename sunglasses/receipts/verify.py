@@ -86,6 +86,18 @@ def verify(data: bytes, public_key: bytes, *, expected_fingerprint=None,
     out of band; the key beside a log gives portability, not trust.
     `expected_endpoint` is `{"seq": int, "hash": hex}` of a checkpoint an
     auditor retained independently."""
+    return _verify(data, public_key, expected_fingerprint, expected_endpoint).report
+
+
+@dataclasses.dataclass
+class _Walk:
+    report: Report
+    prefix: list             # (line_no, record, hash) of the verified prefix
+    records: list            # every linked record
+    genesis: dict | None     # the first record, if it decoded
+
+
+def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
     fingerprint = wire.key_fingerprint(public_key)
     results = {
         "key_trust": ("KEY_UNTRUSTED" if expected_fingerprint is None
@@ -169,7 +181,7 @@ def verify(data: bytes, public_key: bytes, *, expected_fingerprint=None,
 
     results["expected_endpoint"] = _endpoint(prefix, records, expected_endpoint)
     results["lifecycle"] = _lifecycle(prefix)
-    return report
+    return _Walk(report, prefix, records, records[0][1] if records else None)
 
 
 def _endpoint(prefix, records, expected):
@@ -210,6 +222,116 @@ def _lifecycle(prefix):
     if any(ident not in closed for ident in open_):
         return "LIFECYCLE_ORPHAN"
     return "UNKNOWN_EVENT" if unknown else "LIFECYCLE_COMPLETE"
+
+
+# -- one log: a directory of segments (T9 ruling 15) -----------------------------
+
+# The writer's name for a segment file. Repeated here, not imported, because
+# this module must stand alone in the offline bundle.
+SEGMENT_GLOB = "segment-*.chain"
+
+
+@dataclasses.dataclass
+class LogReport:
+    """Five results for the LOG, and each segment's own five. The log's
+    integrity is its segments' and the links between them; nothing here reads
+    another log, so pairing across logs can never reach integrity."""
+    results: dict
+    segments: list                       # (file name, Report), in order
+    first_failure_segment: str | None = None
+    failure_detail: str | None = None
+    fingerprint: str | None = None
+
+
+def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
+               expected_endpoint=None) -> LogReport:
+    """Every segment in `directory`, in name order, each verified alone; then
+    each successor's genesis must name its predecessor's last verified
+    checkpoint. `expected_endpoint` may carry `chain_id` to say which segment
+    it was retained from."""
+    import pathlib
+    paths = sorted(pathlib.Path(directory).glob(SEGMENT_GLOB))
+    walks = [(p.name, _verify(p.read_bytes(), public_key, expected_fingerprint, None))
+             for p in paths]
+    fingerprint = wire.key_fingerprint(public_key)
+    results = {"key_trust": ("KEY_UNTRUSTED" if expected_fingerprint is None
+                             else "KEY_TRUSTED" if expected_fingerprint == fingerprint
+                             else "EXPECTED_KEY_MISMATCH")}
+    report = LogReport(results=results, segments=[(n, w.report) for n, w in walks],
+                       fingerprint=fingerprint)
+
+    def fail(code, name, detail):
+        if "chain_integrity" not in results:
+            results["chain_integrity"] = code
+            report.first_failure_segment = name
+            report.failure_detail = detail
+
+    if not walks:
+        fail("MISSING_GENESIS", None, "no segment in this log")
+    present = {w.genesis.get("chain_id") for _, w in walks if w.genesis}
+    for index, (name, walk) in enumerate(walks):
+        body = (walk.genesis or {}).get("body") or {}
+        named = body.get("previous") if isinstance(body, dict) else None
+        if index == 0:
+            if named is not None:
+                fail("SEGMENT_MISSING", name,
+                     "the first segment here names a predecessor that is absent")
+        else:
+            before = walks[index - 1][1]
+            through = before.report.verified_through
+            if named is None:
+                fail("CONTEXT_MISMATCH", name,
+                     "a later segment names no predecessor: a fresh start inside a log")
+            elif not isinstance(named, dict) or named.get("chain_id") not in present:
+                fail("SEGMENT_MISSING", name,
+                     "the segment its genesis names is absent")
+            elif (named.get("chain_id") != (before.genesis or {}).get("chain_id")
+                  or through is None or named.get("seq") != through["seq"]
+                  or named.get("hash") != through["hash"]):
+                fail("HASH_LINK_MISMATCH", name,
+                     "its genesis does not name the previous segment's last "
+                     "verified checkpoint")
+        own = walk.report.results["chain_integrity"]
+        if own != "CHAIN_OK":
+            fail(own, name, walk.report.failure_detail)
+    results.setdefault("chain_integrity", "CHAIN_OK")
+
+    results["unsigned_tail"] = ("UNVERIFIED_TAIL" if any(
+        w.report.results["unsigned_tail"] == "UNVERIFIED_TAIL" for _, w in walks)
+        else "NO_VISIBLE_TAIL")
+    results["expected_endpoint"] = _log_endpoint(walks, expected_endpoint)
+    # Judged over the verified prefixes in order: an item may open before a
+    # size rotation and settle after it.
+    results["lifecycle"] = _lifecycle([r for _, w in walks for r in w.prefix])
+    return report
+
+
+def _log_endpoint(walks, expected):
+    if expected is None:
+        return "HISTORY_EXTENT_UNKNOWN"
+    found = [_endpoint(w.prefix, w.records, expected) for _, w in walks
+             if expected.get("chain_id") in (None, (w.genesis or {}).get("chain_id"))]
+    if "ENDPOINT_CONFIRMED" in found:
+        return "ENDPOINT_CONFIRMED"
+    if expected.get("chain_id") is not None and found:
+        return found[0]
+    return "EXPECTED_CHECKPOINT_MISSING"
+
+
+def render_log(report: LogReport, name: str = "log") -> str:
+    """The log's five results, then each segment's. No summary line."""
+    out = [f"{name}: {len(report.segments)} segment(s), key {report.fingerprint}"]
+    for kind in codes.RESULT_KINDS:
+        code = report.results[kind]
+        out.append(f"{kind}: {code} -- {codes.CODES.get(code, '')}")
+    if report.first_failure_segment is not None:
+        out.append(f"first failure: {report.first_failure_segment} "
+                   f"({report.failure_detail})")
+    for segment_name, segment in report.segments:
+        out.append("")
+        out.append(f"-- {segment_name}")
+        out.append(render(segment))
+    return "\n".join(out)
 
 
 def render(report: Report) -> str:
