@@ -37,6 +37,12 @@ def get_real_stats():
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
 
+    # sync_readme prints this count. It comes from the generator, the same source
+    # stats/current.json records, never from a literal.
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    from gen_language_stats import measure
+    languages = measure(patterns)["dedicated_pattern_languages"]
+
     # Get version
     init_file = REPO_ROOT / "sunglasses" / "__init__.py"
     version = "0.0.0"
@@ -50,6 +56,7 @@ def get_real_stats():
         "categories": len(categories),
         "keywords": keyword_count,
         "regex": regex_count,
+        "dedicated_pattern_languages": languages,
         "version": version,
         "date": date.today().isoformat(),
     }
