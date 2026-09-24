@@ -308,3 +308,17 @@ def test_cli_control_a_foreign_edit_keeps_the_generic_warning_on_step_1(
 
     assert CHANGED in out[0]
     assert STACKED not in out[0]
+
+
+def test_cli_three_stacked_wraps_name_both_later_installs(project, tmp_path):
+    cfg = project / ".mcp.json"
+    cfg.write_bytes((json.dumps({"mcpServers": {
+        **json.loads(CANON)["mcpServers"],
+        "third": {"command": "third-server", "args": []}}}, indent=2)
+        + "\n").encode("utf-8"))
+    home = tmp_path / "h"
+    out = _run(project, home, ("install", "echo"), ("install", "fetch"),
+               ("install", "third"), ("uninstall", "echo"))
+
+    assert "later sunglasses installs of 'fetch', 'third' are still wrapped" in out[3]
+    assert "sunglasses uninstall fetch and sunglasses uninstall third" in out[3]
