@@ -36,7 +36,8 @@ def _cancel(request_id):
                         "params": {"requestId": request_id}}) + "\n").encode()
 
 
-def _drive(tmp_path, request_id, *, during_scan, close_after_done=False):
+def _drive(tmp_path, request_id, *, during_scan, close_after_done=False,
+           prime=None, lookahead=True, monkeypatch=None):
     """Send one held call; while its scan runs, `during_scan(write)` sends more.
     Returns (forwarded tools/call frames, client replies, receipt rows, source)."""
     inspection.default_engine()
@@ -66,7 +67,14 @@ def _drive(tmp_path, request_id, *, during_scan, close_after_done=False):
         sink(raw)
         if any(m.get("id") == request_id for m in sink.messages()):
             decided.set()
+    if not lookahead:
+        # THE ORDINARY ORDER, as the control: the same reader and the same
+        # frames with the lookahead seeing nothing.
+        monkeypatch.setattr(framing.LineSource, "pending_cancel",
+                            lambda self, request_id: False)
     session = pump.Session(strict=False)
+    if prime is not None:
+        prime(session)
     engine = route.Route(session=session, log=_H["_log"](tmp_path),
                          upstream_write=upstream_write, client_write=client,
                          approvals=_H["_Approved"](), scan=scan)
@@ -77,7 +85,13 @@ def _drive(tmp_path, request_id, *, during_scan, close_after_done=False):
     reader.start()
     os.write(c_w, _call(request_id))
     during_scan(lambda data: os.write(c_w, data), sent)
-    assert decided.wait(30), "the held call was neither forwarded nor answered"
+    # Or the reader ended on its own verdict: a close answers the held item at
+    # teardown (retained), not here, in either order.
+    deadline = time.monotonic() + 30
+    while not (decided.is_set() or done.is_set()):
+        assert time.monotonic() < deadline, \
+            "the held call was neither forwarded nor answered"
+        decided.wait(0.05)
     if close_after_done:
         # The reader must end on ITS OWN verdict (a refusal), not on an EOF we
         # caused mid-frame -- which would read MALFORMED_CLIENT/unterminated.
@@ -102,13 +116,128 @@ def _then_set(frames):
     return during
 
 
-def test_the_early_cancel_is_RECORDED_as_lookahead(tmp_path):
+def test_the_suppressed_forward_is_RECORDED_as_lookahead(tmp_path):
+    """T9 RULING 4: `lookahead` means "forward suppressed ahead of order". The
+    cancel itself is accepted IN order, so its receipt carries no flag, and it
+    comes AFTER the suppression -- one SETTLED, the cancel's."""
     calls, replies, rows, _, _ = _drive(tmp_path, 1, during_scan=_then_set([_cancel(1)]))
     assert not calls
+    kinds = [r.get("kind") for r in rows]
+    suppressed = [r for r in rows if r.get("kind") == "FORWARD_SUPPRESSED"]
+    assert len(suppressed) == 1 and suppressed[0].get("lookahead") is True, suppressed
     accepted = [r for r in rows if r.get("kind") == "CANCEL_ACCEPTED"]
-    assert len(accepted) == 1 and accepted[0].get("lookahead") is True, accepted
+    assert len(accepted) == 1 and "lookahead" not in accepted[0], accepted
+    assert kinds.index("FORWARD_SUPPRESSED") < kinds.index("CANCEL_ACCEPTED"), kinds
     settled = [r.get("reason_code") for r in rows if r.get("kind") == "SETTLED"]
     assert settled == ["REQUEST_CANCELLED"], settled
+
+
+def test_the_peek_leaves_the_cancel_IN_the_stream():
+    """The lookahead decides nothing, so it takes nothing: the cancel is read
+    at its own position, after the frame that sat before it."""
+    r, w = os.pipe()
+    try:
+        os.write(w, _benign(9) + _cancel(1))
+        source = framing.LineSource(os.fdopen(r, "rb"))
+        assert source.pending_cancel(1) is True
+        assert source.pending_cancel(1) is True, "a second look still sees it"
+        assert source.read1() == _benign(9)
+        assert source.read1() == _cancel(1)
+    finally:
+        os.close(w)
+
+
+# ── ASTRA r1 NO GO (170e17d): the lookahead may not reorder ANY other decision ──
+# T9 RULING 4 (9-23): the lookahead suppresses the FORWARD of the held id and
+# nothing else. The item stays outstanding until the cancel is processed at ITS
+# OWN stream position, so every frame between the request and its cancel is
+# decided exactly as it would be without a lookahead.
+
+
+def _outstanding(*ids):
+    def prime(session):
+        for i in ids:
+            assert session.admit_request(i, method="tools/call", origin="client")
+    return prime
+
+
+def _benign(request_id):
+    return (json.dumps({"jsonrpc": "2.0", "id": request_id, "method": "tools/call",
+                        "params": {"name": "echo", "arguments": {"text": "ok"}}})
+            + "\n").encode()
+
+
+def _reason(message):
+    return ((message.get("error") or {}).get("data") or {}).get("reason_code")
+
+
+def _both_orders(tmp_path, monkeypatch, **kw):
+    """The same frames twice: with the lookahead, and in the ordinary order
+    (lookahead blind). Everything but the forward of the held id must match."""
+    held = _drive(tmp_path / "lookahead", 8, **kw)
+    with monkeypatch.context() as m:
+        plain = _drive(tmp_path / "plain", 8, lookahead=False, monkeypatch=m, **kw)
+    return held, plain
+
+
+def _decisions(rows):
+    """The receipt stream minus the forward itself and the one row that says it
+    was suppressed. What remains is every decision the proxy made, in order."""
+    skip = {"FRAME_OUT", "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE",
+            "FORWARD_SUPPRESSED"}
+    out = []
+    for r in rows:
+        if r.get("kind") in skip or r.get("kind") == "HEADER":
+            continue
+        if r.get("kind") == "SETTLED" and r.get("reason_code") == "CLEAN":
+            continue
+        out.append((r.get("kind"), r.get("reason_code"), r.get("id_type")))
+    return out
+
+
+def test_a_request_BETWEEN_the_held_one_and_its_cancel_still_sees_it_outstanding(
+        tmp_path, monkeypatch):
+    """ASTRA's counterexample, verbatim: ids 1-7 outstanding, 8 held in a clean
+    scan, request 9 queued, THEN cancel 8. In order, 9 meets 8 outstanding and
+    is refused OVERLOADED. Retiring 8 early admitted 9 and forwarded it."""
+    held, plain = _both_orders(tmp_path, monkeypatch,
+                               prime=_outstanding(*range(1, 8)),
+                               during_scan=_then_set([_benign(9), _cancel(8)]))
+    calls, replies, rows, session, _ = held
+    assert not calls, [json.loads(c).get("id") for c in calls]
+    nine = [_reason(m) for m in replies if m.get("id") == 9]
+    assert nine == ["OVERLOADED"], nine
+    eight = [_reason(m) for m in replies if m.get("id") == 8]
+    assert eight == ["REQUEST_CANCELLED"], eight
+    order = [m.get("id") for m in replies]
+    assert order.index(9) < order.index(8), "the cancel answered ahead of 9"
+    assert session.closed_with() is None
+    # CONTROL: the ordinary order forwards 8 and decides everything else the same.
+    p_calls, p_replies, p_rows, p_session, _ = plain
+    assert [json.loads(c).get("id") for c in p_calls] == [8]
+    assert replies == p_replies
+    assert session.closed_with() == p_session.closed_with()
+    assert _decisions(rows) == _decisions(p_rows)
+
+
+def test_a_duplicate_id_BETWEEN_the_held_one_and_its_cancel_closes_as_in_order(
+        tmp_path, monkeypatch):
+    """ASTRA's second witness: a duplicate request id 8 between the held 8 and
+    its cancel. In order that is ID_REUSED_WHILE_PENDING and the session closes;
+    an early retire turned it into a tombstone refusal and kept it open."""
+    held, plain = _both_orders(tmp_path, monkeypatch,
+                               during_scan=_then_set([_benign(8), _cancel(8)]))
+    calls, replies, rows, session, _ = held
+    assert not calls, "the held 8 reached the server"
+    closed = session.closed_with()
+    assert closed is not None, "the duplicate id left the session serviceable"
+    assert "ID_REUSED_WHILE_PENDING" in repr(session.events), closed
+    p_calls, p_replies, p_rows, p_session, _ = plain
+    assert [json.loads(c).get("id") for c in p_calls] == [8]
+    assert replies == p_replies
+    assert closed == p_session.closed_with()
+    assert "ID_REUSED_WHILE_PENDING" in repr(p_session.events)
+    assert _decisions(rows) == _decisions(p_rows)
 
 
 def test_a_cancel_for_ANOTHER_id_does_not_stop_this_forward(tmp_path):
@@ -181,7 +310,7 @@ def test_a_flood_during_the_scan_is_refused_the_same_way_as_without_one(tmp_path
 def test_a_source_without_an_fd_has_no_lookahead():
     source = framing.LineSource(io.BytesIO(_call(1) + _cancel(1)))
     assert source.read1() == _call(1), "one line per read"
-    assert source.pending_cancel(1) is None, "a non-fd source must keep today's behaviour"
+    assert source.pending_cancel(1) is False, "a non-fd source must keep today's behaviour"
     assert source.read1() == _cancel(1)
 
 
@@ -228,7 +357,7 @@ def test_the_lookahead_fill_stops_at_the_frame_bound():
         os.write(w, b"x" * 60_000)          # one unterminated line, past the bound
         os.write(w, _cancel(1))              # a cancel beyond it
         source = framing.LineSource(os.fdopen(r, "rb"), limit=1000)
-        assert source.pending_cancel(1) is None
+        assert source.pending_cancel(1) is False
         assert source.high_water == 1001, source.high_water
     finally:
         os.close(w)

@@ -131,7 +131,6 @@ class Route:
         # PRODUCT FINDING #7. Set by the client reader (serve._drain_client) to
         # its LineSource.pending_cancel; None means no lookahead, as before.
         self.client_lookahead = client_lookahead
-        self._lookahead_frame = False
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
@@ -920,8 +919,7 @@ class Route:
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
         self.session.accept_cancellation(target, origin=CLIENT)
-        self._record("CANCEL_ACCEPTED", id_type=type(target).__name__,
-                     **({"lookahead": True} if self._lookahead_frame else {}))
+        self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
         if self.session.is_settling(target, origin=CLIENT):
             # R-168-R3. The item has left `_pending` and its answer is in the
             # reader's hands, NOT the client's. Settling it here would be the
@@ -1024,30 +1022,31 @@ class Route:
 
     def _cancel_waiting(self, request_id):
         """PRODUCT FINDING #7: a cancel for THIS id that is already waiting on
-        the client's stream wins, before a single byte is forwarded.
+        the client's stream stops the FORWARD, and nothing else.
 
         The scan ran on the client reader thread, so the cancel could not be
-        read until now. It is taken out of the stream and handled here through
-        the ordinary cancel path -- ahead of any frames that sit between it and
-        its request, which is sound because a cancel concerns only its own id.
-        Its CANCEL_ACCEPTED receipt carries `lookahead`, so the log never
-        claims pipe order was processing order.
+        read until now. T9 RULING 4 (after ASTRA r1 on 170e17d): the lookahead
+        may only suppress the forward. It does NOT retire the id, free its
+        capacity, answer the client or change any other id's admission. The
+        item stays outstanding exactly as a forwarded one would -- `_release`
+        writes a receipt and the upstream bytes and changes no session state --
+        until the cancel is processed at ITS OWN stream position, where the
+        ordinary cancel path runs unchanged: CANCEL_ACCEPTED, tombstone, one
+        REQUEST_CANCELLED. Every frame in between is decided as it would be
+        without a lookahead, against the same outstanding set.
 
-        True only if the cancel actually retired the item. If it did not (the
-        session no longer held it as expected), the forward proceeds exactly
-        as it would have without the lookahead.
+        FORWARD_SUPPRESSED carries `lookahead`, so the log never claims the
+        request was forwarded and never claims the cancel was processed early.
+        It is not a settlement: the item's one SETTLED is the cancel's, or the
+        close's if a frame in between closes the session first.
         """
         if request_id is NO_ID or self.client_lookahead is None:
             return False
-        raw = self.client_lookahead(request_id)
-        if raw is None:
+        if not self.client_lookahead(request_id):
             return False
-        self._lookahead_frame = True
-        try:
-            self.client_frame(raw)
-        finally:
-            self._lookahead_frame = False
-        return not self.session.expects(request_id, origin=CLIENT)
+        self._record("FORWARD_SUPPRESSED", id_type=type(request_id).__name__,
+                     lookahead=True)
+        return True
 
     # ── the two exits ──────────────────────────────────────────────────────
 

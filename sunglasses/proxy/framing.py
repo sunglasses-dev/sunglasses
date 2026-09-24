@@ -278,7 +278,7 @@ class LineSource:
 
     Only an fd-backed source gets a lookahead, read with `os.read` alone (never
     mixed with a BufferedReader, whose buffer the fd cannot see). Any other
-    source behaves exactly as before and `pending_cancel` answers None.
+    source behaves exactly as before and `pending_cancel` answers False.
 
     THE LOOKAHEAD FILL IS BOUNDED LIKE THE READ PATH: it never holds more than
     one frame's worth (`limit + 1` bytes, what `bounded_lines` may hold for an
@@ -333,25 +333,32 @@ class LineSource:
         return out
 
     def pending_cancel(self, request_id):
-        """The raw cancel for exactly this id if one is already waiting,
-        REMOVED from the stream so it is handled once; otherwise None.
+        """True if a cancel for exactly this id is already waiting in the
+        stream, and the stream is NOT changed: the cancel stays where it is
+        and is processed at its own position, after every frame before it.
+
+        ASTRA r1 NO GO on 170e17d: this used to REMOVE the cancel and hand it
+        over, and processing it early retired the id ahead of the frames in
+        between -- a request queued behind the held one was admitted into the
+        capacity the held one still occupied in order, and a duplicate id was
+        refused as a tombstone instead of closing ID_REUSED_WHILE_PENDING. A
+        peek cannot reorder anything, because it decides nothing.
 
         The id match is TYPED: `"1"` and `1` are different held items (T6.R6),
         so a cancel for one never stops the other.
         """
         if self._fd is None:
-            return None
+            return False
         while self._take_bytes(block=False):
             pass
         offset = 0
         while True:
             cut = self._stash.find(b"\n", offset)
             if cut < 0:
-                return None
+                return False
             line = self._stash[offset:cut + 1]
             if len(line) <= self._limit and _cancels(line, request_id):
-                self._stash = self._stash[:offset] + self._stash[cut + 1:]
-                return line
+                return True
             offset = cut + 1
 
 

@@ -40,6 +40,10 @@ EVENTS = frozenset({
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
     "SETTLEMENT_REFUSED",
+    # PRODUCT FINDING #7 (T9 RULING 4). A clean request whose cancel was
+    # already waiting was not forwarded. Not a settlement: the cancel settles
+    # the item at its own stream position.
+    "FORWARD_SUPPRESSED",
 })
 
 # T9.R5. The events that END a session. A log that stops without one of these
@@ -77,7 +81,7 @@ PERMITTED_FIELDS = frozenset({
     "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
-    # PRODUCT FINDING #7: a cancel handled ahead of pipe order says so.
+    # PRODUCT FINDING #7: a forward suppressed ahead of pipe order says so.
     "lookahead",
 })
 
@@ -119,8 +123,9 @@ def _check_value(name, value):
     # OMITS the field when there is no cause. Same hole, same day, as origin on
     # feat/admitted-carries-origin (ASTRA r1, 2026-09-22).
     if name == "lookahead":
-        # OURS, and only ever present when true: the cancel was taken out of
-        # the stream ahead of pipe order. Absent means it was not.
+        # OURS, and only ever present when true: the forward was suppressed
+        # because a cancel was seen ahead of pipe order. The cancel itself is
+        # still processed in order. Absent means no lookahead decided anything.
         if value is not True:
             raise ValueError(f"lookahead {value!r} is not true")
         return
