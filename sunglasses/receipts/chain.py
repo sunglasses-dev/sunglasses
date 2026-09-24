@@ -121,22 +121,22 @@ class Chain:
         with open(path, "rb") as handle:
             size = handle.seek(0, os.SEEK_END)
             first = _first_line(handle)
+            try:
+                chain_id = wire.decode_strict(first).get("chain_id") if first else None
+            except ValueError:
+                chain_id = None
             buffer, start = b"", size
             while True:
                 lines, torn = _split_back(buffer, start == 0)
-                found = max((i for i, (_, r) in enumerate(lines)
-                             if r is not None and r.get("event") == CHECKPOINT),
-                            default=None)      # the LAST checkpoint
+                found = next((i for i in range(len(lines) - 1, -1, -1)
+                              if self._vouched(lines[i][1], chain_id)),
+                             None)             # the LAST checkpoint that verifies
                 if found is not None or start == 0:
                     break
                 step = min(_CHUNK, start)
                 start -= step
                 handle.seek(start)
                 buffer = handle.read(step) + buffer
-        try:
-            chain_id = wire.decode_strict(first).get("chain_id") if first else None
-        except ValueError:
-            chain_id = None
         after = lines[found + 1:] if found is not None else lines
         last_line, last = lines[-1] if lines else (None, None)
         checkpoint = None
@@ -149,6 +149,18 @@ class Chain:
                      size=size, unsigned=len(after), torn=torn,
                      damaged=not lines or any(r is None for _, r in after),
                      last_checkpoint=checkpoint)
+
+    def _vouched(self, record, chain_id) -> bool:
+        """R15b: a checkpoint seals a tail only if it is this chain's and its
+        signature verifies under THIS writer's key. A forged, garbled or
+        foreign seal is just bytes: it counts as unsigned, so the tail is not
+        continued and the next genesis names the last checkpoint that does."""
+        return (record is not None and record.get("event") == CHECKPOINT
+                and record.get("chain_id") == chain_id
+                and record.get("key_id") == self._signer.fingerprint
+                and isinstance(record.get(wire.SIGNATURE_MEMBER), str)
+                and self._signer.verifies(wire.checkpoint_signing_bytes(record),
+                                          record[wire.SIGNATURE_MEMBER]))
 
     def _open_segment(self, previous: _Tail | None) -> _Tail:
         segments = self._segments()

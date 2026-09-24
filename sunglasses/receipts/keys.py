@@ -23,6 +23,7 @@ import os
 import pathlib
 import stat
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -50,6 +51,13 @@ class Signer:
 
     def sign(self, message: bytes) -> bytes:
         return self._private.sign(message)
+
+    def verifies(self, message: bytes, signature_hex) -> bool:
+        try:
+            self._private.public_key().verify(bytes.fromhex(signature_hex), message)
+        except (InvalidSignature, ValueError, TypeError):
+            return False
+        return True
 
 
 def _key_dir(home) -> pathlib.Path:

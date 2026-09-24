@@ -192,6 +192,12 @@ Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
   `close` checkpoint over them, signed before the process exits. A call that
   finds the tail sealed continues the segment; one that finds an unsigned tail
   (a call that died) opens a new segment whose genesis names it.
+- **Sealed means verified (ruling 15b).** A tail counts as sealed only when its
+  last checkpoint is this segment's, names this writer's key, and its signature
+  verifies under that key. A forged, garbled or foreign seal is just bytes: it
+  is counted as unsigned, the segment is closed untouched, and the new genesis
+  names the last checkpoint that does verify. Cost: one signature verification
+  per write.
 - **Durability** is `os.fsync` of the file and the directory for both producers,
   one statement for both. `F_FULLFSYNC` is not used.
 - **The verifier reports per chain**: five results for each chain. Matching a
