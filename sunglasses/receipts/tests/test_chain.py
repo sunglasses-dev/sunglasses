@@ -404,3 +404,59 @@ def test_a_line_over_16_kib_is_refused_and_nothing_is_written(home):
         writer.write([{"event": "decision",
                        "body": {f"f{i}": "x" * n for i, n in enumerate(sizes)}}])
     assert segment.read_bytes() == before
+
+
+# --- WIRE_SPEC "Record fields" is the writer's, measured ---------------------
+
+def _spec_tables():
+    """{table: {field: [cited chain.py line numbers]}} from WIRE_SPEC's three
+    record tables."""
+    import re
+    text = (HERE.parent / "WIRE_SPEC.md").read_text(encoding="utf-8")
+    section = text.split("## Record fields", 1)[1].split("\n## ", 1)[0]
+    tables = {}
+    for name in ("genesis", "event", "checkpoint"):
+        body = section.split(f"### {name}\n", 1)[1].split("\n### ", 1)[0]
+        rows = {}
+        for line in body.splitlines():
+            match = re.match(r"\| `(\w+)` \|.*\| (chain\.py:[\d:, -]+) \|$", line)
+            if not match:
+                continue
+            cited = []
+            for ref in re.findall(r"(\d+)(?:-(\d+))?", match.group(2).split(":", 1)[1]):
+                start = int(ref[0])
+                cited.extend(range(start, int(ref[1] or start) + 1))
+            rows[match.group(1)] = cited
+        tables[name] = rows
+    return tables
+
+
+def test_the_spec_names_every_field_the_writer_writes(home):
+    writer = _writer(home, max_records=8)
+    writer.write(_call("a"), seal="close")
+    writer.write([{"event": "in_flight", "body": {"eval_id": "b"}, "t_mono_ns": 7},
+                  {"event": "decision", "body": {"eval_id": "b"}}], seal="close")
+    writer.write(_call("c"), seal="close")
+    assert len(_segments(home)) > 1                   # a successor genesis too
+    seen = {"genesis": set(), "event": set(), "checkpoint": set()}
+    for path in _segments(home):
+        for record in _records(path):
+            kind = record["event"] if record["event"] in seen else "event"
+            seen[kind] |= set(record)
+    tables = _spec_tables()
+    assert {name: set(rows) for name, rows in tables.items()} == seen
+    source = (HERE.parent / "chain.py").read_text(encoding="utf-8").splitlines()
+    for name, rows in tables.items():
+        for field, cited in rows.items():
+            text = "\n".join(source[n - 1] for n in cited)
+            assert f'"{field}"' in text or f"{field}=" in text, (
+                f"WIRE_SPEC {name}.{field} cites chain.py:{cited}, which does "
+                "not write it")
+
+
+def test_the_control_a_field_the_spec_does_not_name_is_caught(home, monkeypatch):
+    tables = _spec_tables()
+    del tables["event"]["t_mono_ns"]
+    monkeypatch.setattr(sys.modules[__name__], "_spec_tables", lambda: tables)
+    with pytest.raises(AssertionError):
+        test_the_spec_names_every_field_the_writer_writes(home)

@@ -60,7 +60,9 @@ before checking it is checking your own rewrite.
 - no lone surrogates (U+D800 to U+DFFF) in strings or keys; UTF-8 cannot
   carry one, so a record holding one has no bytes to sign and is refused
 - bounded: strings 4096, integers signed 64 bit, arrays 256, object keys 64,
-  nesting 8
+  nesting 8, and one whole line at most 16 KiB (16384 bytes) with its LF
+  (`wire.MAX_LINE`). Values inside every other bound can still add up past
+  it, and the writer refuses such a line before anything is written
 - unknown types are **refused, never converted**. A value needing a conversion
   was never the value the producer meant to commit
 
@@ -180,6 +182,96 @@ an independent implementation.
 A committed vector file that regenerates differently fails `test_the_vectors_
 are_pinned` in the same commit, rather than six weeks later when an auditor's
 verifier disagrees with ours.
+
+## Record fields
+
+Read from the writer at this head, not designed here. Every row cites the
+lines that write it, relative to `sunglasses/receipts/`, and
+`test_the_spec_names_every_field_the_writer_writes` parses the three tables
+below, compares them with every record a real writer produced, and checks that
+each cited line names its field. A table that drifts from the writer fails in
+the commit that moved it.
+
+A segment is one file, `segment-NNNNNN.chain` (six digits, from 000001),
+created 0600 with `O_EXCL` in a 0700 directory beside a `LOCK` file that every
+write holds with `flock(LOCK_EX)` (chain.py:183, :206, :277-280). Its first
+line is a genesis and its second a checkpoint with purpose `genesis`
+(chain.py:205).
+
+### genesis
+
+| field | value | where |
+|---|---|---|
+| `wire` | `sg-receipt-chain/1` | chain.py:197 |
+| `chain_id` | 32 lowercase hex, fresh per segment (`secrets.token_hex(16)`) | chain.py:184, :197 |
+| `key_id` | the signing key's fingerprint | chain.py:198 |
+| `seq` | `0` | chain.py:198 |
+| `prev_hash` | `null`, the only null predecessor in a segment | chain.py:199 |
+| `event` | `genesis` | chain.py:199 |
+| `producer` | the writer's producer name; the callers pass `hook` or `proxy`, and a writer refuses a directory whose genesis names another (R15) | chain.py:200, :87-92 |
+| `t_wall_ns` | integer, the writer's wall clock, not trusted time | chain.py:200 |
+| `body` | `{}` for a log's first segment, else the predecessor object below | chain.py:185-201 |
+
+A successor's genesis `body` carries `previous`, the `{chain_id, seq, hash}`
+of the last checkpoint that verifies in the segment before it (`seq` and
+`hash` are `null` when none does), and `observed_unsigned`, the count of
+complete records seen after that checkpoint. When they apply it also carries
+`observed_torn_bytes` (bytes after the last LF) and `observed_undecodable:
+true` (chain.py:186-194). These are observations and never a vouch: the
+successor signs nothing that came after that checkpoint.
+
+### event
+
+| field | value | where |
+|---|---|---|
+| `wire` | `sg-receipt-chain/1` | chain.py:249 |
+| `chain_id` | the segment's | chain.py:249 |
+| `key_id` | the signing key's fingerprint | chain.py:250 |
+| `seq` | previous `seq` + 1 | chain.py:250 |
+| `prev_hash` | the chain hash of the previous line | chain.py:251 |
+| `event` | the producer's event name, never `genesis` or `checkpoint` | chain.py:251, :217 |
+| `producer` | as in the genesis | chain.py:252 |
+| `t_wall_ns` | integer, the writer's wall clock | chain.py:252 |
+| `body` | an object: the producer's allowed fields (see Redaction) | chain.py:253 |
+| `t_mono_ns` | integer, optional: the producer's monotonic clock (the proxy sets it) | chain.py:254-255 |
+
+A producer supplies only `event`, `body` and `t_mono_ns`. Any other field is
+refused before anything is written, so the envelope is always the writer's
+(chain.py:42, :213-216).
+
+### checkpoint
+
+| field | value | where |
+|---|---|---|
+| `chain_id` | the segment's | chain.py:240 |
+| `covered_head` | equal to `prev_hash`: the head this signature commits to | chain.py:240 |
+| `covered_seq` | `seq` - 1 | chain.py:241 |
+| `event` | `checkpoint` | chain.py:241 |
+| `interval` | the writer's interval, an integer of at least 1, so the cadence is inside the signed bytes | chain.py:242, :66 |
+| `key_id` | the signing key's fingerprint | chain.py:242 |
+| `prev_hash` | the chain hash of the previous line | chain.py:243 |
+| `purpose` | `genesis`, `interval`, `close`, or a producer's seal name | chain.py:243, :257-260 |
+| `seq` | previous `seq` + 1 | chain.py:243 |
+| `wire` | `sg-receipt-chain/1` | chain.py:244 |
+| `signature` | 128 lowercase hex: Ed25519 as in Hashing and signing | chain.py:245-246 |
+
+A checkpoint has no `producer`, `t_wall_ns` or `body`. An `interval`
+checkpoint is written once `interval` records are unsigned (chain.py:257-258).
+A `genesis` or `close` seal is written even over nothing, and any other
+purpose only over at least one unsigned record (chain.py:259-260).
+
+### The vocabulary a verifier judges
+
+Lifecycle is judged over the verified prefix by the producer's vocabulary,
+frozen in verify.py:44-64 because the verifier imports nothing from the
+product.
+
+- hook: `in_flight` opens and `decision` closes, paired by `body.eval_id`;
+  `receipts_off` is known and pairs with nothing (verify.py:44-49).
+- proxy: the session, `HEADER` then `SESSION_TORN_DOWN` or `TEARDOWN`; items
+  are not paired (see A proxy chain's lifecycle, R24) (verify.py:56-64).
+- anything else is `UNKNOWN_EVENT` under lifecycle and never an integrity
+  failure.
 
 ## Chains and writers: one chain per log (T9 ruling 15)
 
