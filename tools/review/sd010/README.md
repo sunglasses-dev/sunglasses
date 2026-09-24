@@ -4,7 +4,7 @@ The probes that produced the round 1–4 verdicts for `GLS-SD-010-EMB`, living
 beside the rule they grade instead of in a tmp directory.
 
     tools/review/sd010/build-package.sh <head-ref> <base-ref> [out-dir]
-    zsh <package>/probes/p1-baseline.sh            # …p8
+    zsh <package>/probes/p1-baseline.sh            # …p9
 
 | probe | asks |
 |---|---|
@@ -16,6 +16,7 @@ beside the rule they grade instead of in a tmp directory.
 | p6 | the historical evasions, each reopening under its DESIGNATED mutant |
 | p7 | cases CONSTRUCTED from axes, plus `--cases` for reviewer-authored ones |
 | p8 | the `(?-i:)` scope in every evaluation mode, read back from the engine |
+| p9 | what each decoder reads for a spelling, written apart from the grammar module (RULING 32) |
 
 ## ADDRESS THE PACKAGE AS `/tmp`, NEVER `/private/tmp`
 

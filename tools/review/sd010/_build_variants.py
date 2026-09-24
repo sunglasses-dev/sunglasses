@@ -12,6 +12,10 @@ OUT = os.path.join(D, "v")
 REL = os.path.join("sunglasses", "patterns.py")
 orig = io.open(os.path.join(SRC, REL), encoding="utf-8").read()
 
+# ROUND 11 moved the name scopes from `(?i:` to `(?ai:` (RULING 32), and the
+# two targets that spell a scope moved with them; the builder refused until
+# they did.
+#
 # ROUND 10 REWROTE THE RULE FROM A TABLE (T9 RULING 13), and every target
 # below moved with it; the builder refused until they were retargeted, which is
 # the feature. The indentation and separator groups now span several source
@@ -26,7 +30,7 @@ CLASS = r"""\x85\u2028\u2029\"'{\[,]"""
 INDENT = _between(r'r"(?:[ \t]|(?-i:', r'r"(?-i:(?:API_KEY')
 SEP = _between(r'r"(?:\s|(?-i:', r'r"(?:=|(?-i:')
 LEAD = "\n" + " " * 12            # the indentation of a regex source line
-EQUALS_END = r'r"|\\N\{(?i:EQUALS SIGN)\}))",'
+EQUALS_END = r'r"|\\N\{(?ai:EQUALS SIGN)\}))",'
 EXCLUSION = r"""r"(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""
 
 MUTS = [
@@ -46,7 +50,7 @@ MUTS = [
  ("V16-boundary-octal-escapes-gone",
   r'r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)"', 'r""'),
  ("V17-line-feed-names-gone",
-  r"(?i:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE", r"(?i:CARRIAGE"),
+  r"(?ai:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE", r"(?ai:CARRIAGE"),
  ("V18-indentation-numeric-gone",
   r"|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)", ""),
  ("V19-escaped-equals-gone",
@@ -56,6 +60,11 @@ MUTS = [
  ("V20-escapes-case-folded",     r"(?-i:\\", r"(?:\\", 0),   # every occurrence
  ("V21-backslash-any-space",
   r"\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]", r"\\[\stnrfvNLP_]"),
+ # ROUND 11 (T9 RULING 32): the four character-name scopes fold ASCII case
+ # only. Put Unicode folding back and a name spelled with a dotted or dotless
+ # I, a long s or the Kelvin sign reads as its ASCII twin again, which is the
+ # over-fire round 10 found. Every occurrence, because each scope is a door.
+ ("V22-names-fold-beyond-ASCII", "(?ai:", "(?i:", 0),
  # The CLASS control: put a value exclusion back and the evasion rows must go
  # quiet. This guards the decision the rule now rests on.
  ("V11-value-exclusion-readded", EQUALS_END, EQUALS_END[:-2] + '"' + LEAD + EXCLUSION),
