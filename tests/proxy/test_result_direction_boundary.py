@@ -710,17 +710,33 @@ def _receipt_rows(tmp_path):
             for line in path.read_text().splitlines() if line.strip()]
 
 
-# Where the log dies decides whether a completed scan is ON DISK when the
-# refusal is paid. Stated per event, so the oracle below can never go vacuous:
-# a failure at SCAN_RESULT means that row was never written.
+# Where the log dies decides two things, stated per event so the oracle below
+# can never go vacuous: whether the scan RAN (a result exists in memory), and
+# whether its SCAN_RESULT is ON DISK. They differ at SCAN_RESULT itself: the
+# scan completed and the write of its record is the one that failed.
+_SCAN_RAN = {"SCAN_STARTED": False, "SCAN_RESULT": True,
+             "RELEASE_AUTHORIZED": True}
 _SCAN_ON_DISK = {"SCAN_STARTED": False, "SCAN_RESULT": False,
                  "RELEASE_AUTHORIZED": True}
 
 
+def _what_the_scan_said(tmp_path_factory, finding):
+    """The scan's three fields, read from the SCAN_RESULT row of the same
+    route with a log that works. Independent of the refusal under test, so a
+    refusal that invents its fields cannot also invent the oracle."""
+    home = tmp_path_factory.mktemp("reference")
+    route, _ = _route(home, finding=finding)
+    route.pump_upstream(_answer())
+    rows = [r for r in _receipt_rows(home) if r.get("kind") == "SCAN_RESULT"]
+    assert len(rows) == 1 and rows[0]["status"] == "complete", rows
+    return {f: rows[0][f] for f in ("status", "accepted", "inspection_complete")}
+
+
 @pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
-@pytest.mark.parametrize("event", sorted(_SCAN_ON_DISK))
+@pytest.mark.parametrize("event", sorted(_SCAN_RAN))
 def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event,
-                                                            finding):
+                                                            finding,
+                                                            tmp_path_factory):
     """XE03. The bounded refusal reached ONE path out of many.
 
     Round 5 paid it from `_release_frame`, so it arrived only when the frame
@@ -733,12 +749,12 @@ def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event,
     The refusal is keyed on OWNERSHIP now -- admitted and not yet answered on
     the wire -- so it is paid wherever the log dies, exactly once.
 
-    ASTRA refused-e430147 r2. AND IT SAYS WHAT THE RECEIPT SAYS. The payer
-    hardcoded `not_run` with both booleans false, so a failure at the release
-    authorisation -- after a SCAN_RESULT of `complete` was on disk -- told the
-    client no scan ran. This row used to assert exactly that. The oracle is
-    the log: a SCAN_RESULT on disk is what the refusal reports, and no
-    SCAN_RESULT means `not_run`.
+    ASTRA refused-e430147 r2 + T9 RULING 14. AND IT SAYS WHAT THE SCAN DID.
+    Two cases. (a) No scan result exists: `not_run` is the truth. (b) A result
+    exists and a receipt write fails -- at the release authorisation, OR at the
+    SCAN_RESULT write itself: the scan's three real fields stand, and the
+    reason, RECEIPT_IO_ERROR, is what says the record failed. A status
+    describes the scan; the receipt's failure is its own field.
     """
     route, out = _route(tmp_path, finding=finding)
     fired = _fail_receipts_at(route, event)
@@ -749,15 +765,38 @@ def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event,
     data = json.loads([raw for raw in out if raw][0])["error"]["data"]
     results = [r for r in _receipt_rows(tmp_path) if r.get("kind") == "SCAN_RESULT"]
     assert len(results) == int(_SCAN_ON_DISK[event]), (event, results)
-    if results:
-        assert results[0]["status"] == "complete", results
-        for field in ("status", "accepted", "inspection_complete"):
-            assert data[field] == results[0][field], (
-                f"{event}: the receipt says {field}={results[0][field]!r} and "
-                f"the client was told {data[field]!r}")
+    told = {f: data[f] for f in ("status", "accepted", "inspection_complete")}
+    if _SCAN_RAN[event]:
+        assert told == _what_the_scan_said(tmp_path_factory, finding), (
+            f"{event}: the scan ran and the client was told {told}")
+        if results:
+            assert told == {f: results[0][f] for f in told}, (event, results)
     else:
-        assert (data["status"], data["accepted"], data["inspection_complete"]) \
-            == ("not_run", False, False), data
+        assert told == {"status": "not_run", "accepted": False,
+                        "inspection_complete": False}, told
+
+
+def test_a_failed_scan_whose_record_fails_still_reports_that_it_ran(
+        tmp_path, tmp_path_factory):
+    """RULING 14 (b) on the other branch: the scan completed UNUSABLY and the
+    write of that SCAN_RESULT failed. It ran and it failed, and that is what
+    the client is told; `not_run` would say it never ran."""
+    home = tmp_path_factory.mktemp("reference")
+    reference, _ = _route(home, finding=False)
+    reference.scan = lambda surface, **kw: {}      # an invalid completion
+    reference.pump_upstream(_answer())
+    rows = [r for r in _receipt_rows(home) if r.get("kind") == "SCAN_RESULT"]
+    assert len(rows) == 1 and rows[0]["status"] != "not_run", rows
+
+    route, out = _route(tmp_path, finding=False)
+    route.scan = lambda surface, **kw: {}
+    fired = _fail_receipts_at(route, "SCAN_RESULT")
+    route.pump_upstream(_answer())
+    assert fired, "the SCAN_RESULT receipt was never reached"
+    assert _reason_codes(out) == ["RECEIPT_IO_ERROR"], _reason_codes(out)
+    data = json.loads([raw for raw in out if raw][0])["error"]["data"]
+    assert (data["status"], data["accepted"], data["inspection_complete"]) == (
+        rows[0]["status"], False, False), data
 
 
 @pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
