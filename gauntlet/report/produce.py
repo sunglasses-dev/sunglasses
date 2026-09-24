@@ -37,6 +37,7 @@ import uuid
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "boundary"))
 
+import review_root                                         # noqa: E402
 import schema                                              # noqa: E402
 import classify                                            # noqa: E402
 from gen2 import adapter, loader                           # noqa: E402
@@ -49,8 +50,8 @@ REPORT_PATH = REPORT_DIR / "nightly.json"
 EXAMINER_RECORD = pathlib.Path(__file__).with_name("examiner_record.json")
 LEDGER_RECORD = pathlib.Path(__file__).with_name("ledger_record.json")
 
-MATERIALISED = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-                / "GATE3_DESIGN_REVIEW_2026-09-13" / "materialized")
+# GAUNTLET_REVIEW_ROOT, read in ONE place (review_root.py); unset = absent = refusal.
+MATERIALISED = review_root.GATE3 / "materialized"
 
 
 def _now() -> str:
