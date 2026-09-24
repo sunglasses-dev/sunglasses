@@ -228,7 +228,7 @@ def test_control_a_bare_space_boundary_makes_the_prose_twin_fire():
     Adding one to the boundary class is the smallest possible widening, and it
     is enough to block a sentence that merely names a variable.
     """
-    widened = _rule_regex().replace(r"[\"'{\[,]", r"[\"'{\[, ]")
+    widened = _rule_regex().replace(r"\"'{\[,]", r"\"'{\[, ]", 1)
     assert widened != _rule_regex(), "the boundary class is not where it was"
     e = _mutate(**{RULE: widened})
     _, ids = _ids(e, rows.BENIGN["prose_a_space_is_not_a_boundary"])
@@ -381,7 +381,7 @@ def test_control_removing_the_carriage_return_loses_the_cr_delimited_line():
     `\\n`, keeps working -- otherwise this control is not aimed at the right
     character.
     """
-    narrowed = _rule_regex().replace(r"|\r(?:[ \t]|\\t)*", "", 1)
+    narrowed = _rule_regex().replace(r"[\n\r\v", r"[\n\v", 1)
     assert narrowed != _rule_regex(), "the literal CR is no longer in the class"
     e = _mutate(**{RULE: narrowed})
     assert RULE not in _ids(e, rows.MUST_FIRE["cr_only_line_separator"])[1], (
@@ -392,17 +392,24 @@ def test_control_removing_the_carriage_return_loses_the_cr_delimited_line():
         "rather than the carriage return.")
 
 
-def test_control_indentation_only_after_a_newline_loses_the_escaped_tabs():
-    """Indentation after EVERY boundary is load-bearing, proven by narrowing it.
+def _around(rx, start, end):
+    """(before, after) the one group that opens with `start` and ends where
+    `end` begins; refuses if either is absent, so a moved group fails loudly."""
+    i = rx.index(start)
+    return rx[:i], rx[rx.index(end, i):]
+
+
+def test_control_literal_only_indentation_loses_the_escaped_tabs():
+    """Escaped indentation is load-bearing, proven by removing it.
 
     Round 4's reviewer found 24 of 39 authored candidates unreported, and the
-    largest family was this: only the newline alternatives allowed indentation,
-    and an ESCAPED tab (backslash-t, which is how a serialiser indents inside a
-    JSON string) was not treated as indentation anywhere. Putting the class
-    back the way it was must lose those rows again.
+    largest family was this: an ESCAPED tab (backslash-t, which is how a
+    serialiser indents inside a JSON string) was not treated as indentation.
+    Since r10 indentation follows every boundary in one group; narrowing that
+    group to literal space and tab must lose those rows again.
     """
-    narrowed = _rule_regex().replace(r"|[\"'{\[,](?:[ \t]|\\t)*", r"|[\"'{\[,]", 1)
-    assert narrowed != _rule_regex(), "the delimiter class no longer carries indentation"
+    before, after = _around(_rule_regex(), r"(?:[ \t]|(?-i:", "(?-i:(?:API_KEY")
+    narrowed = before + r"[ \t]*" + after
     e = _mutate(**{RULE: narrowed})
     quiet = [k for k in rows.MUST_FIRE
              if ("tab" in k or "indent" in k)
@@ -422,8 +429,8 @@ def test_control_a_literal_only_separator_loses_exactly_the_escaped_rows():
     side all blocked before the fix, so if one of them goes quiet here this
     control is measuring something other than the separator.
     """
-    narrowed = _rule_regex().replace(r"(?:\s|\\[\stnrfv_LP])*=", r"\s*=", 1)
-    assert narrowed != _rule_regex(), "the separator no longer carries the escaped class"
+    before, after = _around(_rule_regex(), r"(?:\s|(?-i:", "(?:=|(?-i:")
+    narrowed = before + r"\s*" + after
     e = _mutate(**{RULE: narrowed})
     escaped = sorted(k for k in rows.MUST_FIRE
                      if k.startswith("sep_") and not k.startswith("sep_ctl_"))

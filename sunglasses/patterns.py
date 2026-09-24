@@ -2556,17 +2556,47 @@ PATTERNS = [
     # twin blocked. Measured on 7430bc5, the whole one-character class was
     # open: `\v`, YAML's `\_` `\L` `\P`, and a backslash before a literal
     # space, tab or newline (YAML's escaped space and tab, a line
-    # continuation). `[\stnrfv_LP]` is that class; the engine compiles
-    # case-insensitively, which is also why YAML's `\N` was already caught.
-    # Numeric escapes (\x0b, \013) name a character by its code, like \uXXXX,
-    # and stay with it in the residual.
+    # continuation). `[\stnrfv_LP]` was that class; numeric escapes (\x0b,
+    # \013) waited for round 10, below, which also narrowed it.
     #
-    # STILL UNREPORTED, and named rather than chased: `\u003d`, `\u000a`,
-    # `\u0020`, `\u0009` -- JSON \uXXXX escapes of the `=`, the newline, the
-    # space and the tab -- plus one nested-escape and one YAML sequence shape.
-    # Those are a DECODING problem, not a boundary problem: closing them means
-    # interpreting JSON string escapes before matching, which is a parser, and
-    # adding four more alternatives would be the widening game again.
+    # ROUND 10 STOPPED THE CASE-BY-CASE LOOP (T9 RULING 13). Nine rounds each
+    # found the next escape the last one had not thought of, so the escapes now
+    # come from a TABLE, not from review: tests/sd010_escape_grammar.py lists
+    # every escape of JSON, Python and YAML 1.2 double-quoted strings -- one
+    # character, \xNN, \uNNNN, \UNNNNNNNN, octal, \N{name} with its aliases,
+    # and escaped line breaks -- checks each against json.loads,
+    # ast.literal_eval and yaml.safe_load, and generates 4400 cases in five
+    # positions (boundary, indentation, after an escaped newline, separator,
+    # the `=` itself), each with its lowercase control.
+    #
+    # THE CONTRACT the table holds this regex to: the rule reports iff EITHER
+    # reading of the bytes would report under the literal-only rule -- the raw
+    # text, or the text with the escape replaced by what it decodes to. The
+    # rule cannot know which syntax it is reading, so a spelling that is an
+    # escape in ANY of the three counts everywhere. Consequence, disclosed: the
+    # r9 reviewer's `r9_python_escaped_space_indent` (a Python string where
+    # backslash-space is two literal characters) now BLOCKS, because the same
+    # bytes are YAML's escaped space.
+    #
+    # WHAT CHANGED, all measured by the matrix: numeric and named escapes of
+    # every boundary, indentation and separator character, and of the `=`
+    # (the r9 residual, closed); the literal boundary gains the rest of the
+    # `str.splitlines` set (VT, FF, FS, GS, RS, NEL); every escape sits in a
+    # `(?-i:...)` scope, because under the engine's IGNORECASE the escaped-r
+    # alternative also read `\R` and escaped-t read `\T` (11 over-fires on
+    # f31a3d0); and a backslash is an escape before a space, a tab or a line
+    # break only, not before any whitespace (r9 read backslash-NBSP as one).
+    #
+    # WHY THE FRAGMENTS ARE HAND-WRITTEN SETS AND NOT "ANY ESCAPE": the
+    # boundary escapes and the indentation escapes must be DISJOINT. If one
+    # spelling were both, a run of it would make every position a start that
+    # consumes the rest of the run -- quadratic, and the 2.0x receipt gate
+    # would fail at 1 MiB. Each fragment family has a mutation control in the
+    # grammar test that removes it and watches the matrix go red.
+    #
+    # STILL UNREPORTED: an escape INSIDE the key's letters (`API\x5fKEY=`).
+    # The key is a literal alternation; decoding it is the parser this rule
+    # is not.
     #
     # A BARE CARRIAGE RETURN IS A BOUNDARY, and it was missing until a
     # case-constructing probe went looking. The class carried `\\r` -- the
@@ -2650,11 +2680,37 @@ PATTERNS = [
         "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input",
                     "tool_output", "web_content"],
         "regex": [
-            r"(?:\A(?:[ \t]|\\t)*|\n(?:[ \t]|\\t)*|\r(?:[ \t]|\\t)*"
-            r"|\\n(?:[ \t]|\\t)*|\\r(?:[ \t]|\\t)*"
-            r"|[\u2028\u2029](?:[ \t]|\\t)*|[\"'{\[,](?:[ \t]|\\t)*)"
+            r"(?:\A|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029\"'{\[,]|(?-i:\\[nrvfNLP]"
+            r"|\\x(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])"
+            r"|\\u(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])"
+            r"|\\U0000(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])"
+            r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)"
+            r"|\\N\{(?i:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE RETURN|CR"
+            r"|LINE TABULATION|VERTICAL TABULATION|VT|FORM FEED|FF"
+            r"|INFORMATION SEPARATOR (?:FOUR|THREE|TWO)|FILE SEPARATOR|GROUP SEPARATOR"
+            r"|RECORD SEPARATOR|FS|GS|RS|NEXT LINE|NEL|LINE SEPARATOR|PARAGRAPH SEPARATOR"
+            r"|QUOTATION MARK|APOSTROPHE|LEFT CURLY BRACKET|LEFT SQUARE BRACKET|COMMA)\}))"
+            r"(?:[ \t]|(?-i:\\[ \tt]|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)"
+            r"|\\0?(?:11|40)"
+            r"|\\N\{(?i:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)\}))*"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
-            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))(?:\s|\\[\stnrfv_LP])*=",
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))"
+            r"(?:\s|(?-i:\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]"
+            r"|\\x(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)"
+            r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]|202[89fF]|205[fF]|3000)"
+            r"|\\U0000(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]|202[89fF]|205[fF]|3000)"
+            r"|\\(?:0?(?:1[1-5]|3[4-7]|40)|205|240)"
+            r"|\\N\{(?i:SPACE|SP|NBSP|NO-BREAK SPACE|OGHAM SPACE MARK|EN QUAD|EM QUAD"
+            r"|EN SPACE|EM SPACE|THREE-PER-EM SPACE|FOUR-PER-EM SPACE|SIX-PER-EM SPACE"
+            r"|FIGURE SPACE|PUNCTUATION SPACE|THIN SPACE|HAIR SPACE|NARROW NO-BREAK SPACE"
+            r"|NNBSP|MEDIUM MATHEMATICAL SPACE|MMSP|IDEOGRAPHIC SPACE|LINE SEPARATOR"
+            r"|PARAGRAPH SEPARATOR|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT"
+            r"|LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|LINE TABULATION|VERTICAL TABULATION"
+            r"|VT|FORM FEED|FF|CARRIAGE RETURN|CR|INFORMATION SEPARATOR (?:ONE|TWO|THREE|FOUR)"
+            r"|FILE SEPARATOR|GROUP SEPARATOR|RECORD SEPARATOR|UNIT SEPARATOR|FS|GS|RS|US"
+            r"|NEXT LINE|NEL)\}))*"
+            r"(?:=|(?-i:\\x3[dD]|\\u003[dD]|\\U0000003[dD]|\\0?75"
+            r"|\\N\{(?i:EQUALS SIGN)\}))",
         ],
         "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. The value is not inspected at all: every exclusion tried on it was a switch an attacker could flip by writing the excluded shape around the secret, so this rule reports the assignment and accepts that documentation of an environment variable is reported too."
     },

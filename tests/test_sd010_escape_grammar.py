@@ -94,3 +94,54 @@ def test_the_rule_matches_the_parity_contract(engine, position):
 def test_every_declared_channel_reads_the_same_verdicts(engine, channel):
     sample = CASES[::37]
     assert _mismatches(engine, sample, channel) == []
+
+
+# ── every fragment is load-bearing, proven by removing it ───────────────────
+# (name, the bytes removed or narrowed, what replaces them, the direction the
+# matrix must fail in). Each mutant is the rule with ONE family taken out; the
+# matrix has to see it. `count == 1` is asserted so a moved fragment fails
+# here instead of silently mutating nothing.
+MUTATIONS = [
+    ("boundary one-char", r"(?-i:\\[nrvfNLP]", r"(?-i:\\[rvfNLP]", "miss"),
+    ("boundary hex", r"|\\x(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])", "", "miss"),
+    ("boundary \\u", r"|\\u(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])",
+     "", "miss"),
+    ("boundary \\U", r"|\\U0000(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])",
+     "", "miss"),
+    ("boundary octal", r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)", "", "miss"),
+    ("boundary names", r"\{(?i:LINE FEED|", r"\{(?i:", "miss"),
+    ("boundary literal line ends", r"\v\f\x1c-\x1e\x85", "", "miss"),
+    ("indentation one-char", r"\\[ \tt]", r"\\[t]", "miss"),
+    ("indentation numeric", r"|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)", "", "miss"),
+    ("indentation octal", r"|\\0?(?:11|40)", "", "miss"),
+    ("indentation names", r"(?i:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)",
+     r"(?i:SPACE)", "miss"),
+    ("separator hex", r"|\\x(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)", "", "miss"),
+    ("separator \\u", r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]",
+     r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|200[0-9aA]", "miss"),
+    ("separator octal", r"|\\(?:0?(?:1[1-5]|3[4-7]|40)|205|240)", "", "miss"),
+    ("separator names", r"|NBSP|NO-BREAK SPACE|", "|NBSP|", "miss"),
+    ("equals", r"|\\u003[dD]", "", "miss"),
+    # The over-fire direction: the r9 separator read a backslash before ANY
+    # whitespace as an escape, and IGNORECASE read \R \T \V as escapes.
+    ("separator any backslash-space", r"\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]",
+     r"\\[\stnrfvNLP_]", "over"),
+    ("escapes case-folded", "(?-i:\\\\", "(?:\\\\", "over"),
+    ("a lazy space name", "|NBSP|NO-BREAK SPACE|", "|NBSP|[A-Z -]*SPACE|", "over"),
+]
+
+
+@pytest.mark.parametrize("name,old,new,direction", MUTATIONS, ids=[m[0] for m in MUTATIONS])
+def test_control_each_fragment_is_seen_by_the_matrix(name, old, new, direction):
+    rule = _rule()
+    regex = rule["regex"][0]
+    if direction == "over" and name == "escapes case-folded":
+        assert regex.count(old) >= 4, name
+        mutated = regex.replace(old, new)
+    else:
+        assert regex.count(old) == 1, (name, regex.count(old))
+        mutated = regex.replace(old, new, 1)
+    rule["regex"] = [mutated]
+    wrong = _mismatches(SunglassesEngine(patterns=[rule]), CASES)
+    want = "expect block" if direction == "miss" else "expect allow"
+    assert [w for w in wrong if w[1] == want], f"{name}: the matrix did not see it"
