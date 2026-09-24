@@ -65,6 +65,16 @@ before checking it is checking your own rewrite.
   it, and the writer refuses such a line before anything is written
 - unknown types are **refused, never converted**. A value needing a conversion
   was never the value the producer meant to commit
+- **text a peer chose is replaced before the wire, never refused (T9 ruling
+  43).** The refusals above stay the wire's own rule. A producer writing a
+  string it did not choose (the proxy writes a server's name, the methods it
+  advertises, a reason it gave) replaces first, so a refusal is never a
+  switch a peer can flip. Each control character (U+0000 to U+001F and
+  U+007F) becomes its JSON escape as six characters of text, `\u` and four
+  lowercase hex digits, so a newline can never split a record in two. Each
+  lone surrogate becomes U+FFFD. The same input always gives the same
+  output, and the record says how many were replaced in `sanitized`, keyed
+  by field (proxy/receipts.py:103-132)
 
 ## The three domain prefixes
 
@@ -285,7 +295,11 @@ product.
   and never a lifecycle failure, since the integrity result already says why
   nothing verified. A genesis and its checkpoint alone are verified, so a
   chain that started and recorded nothing stays `LIFECYCLE_COMPLETE`
-  (vectors 2c, 5c and 8b against 6 and 6b).
+  (vectors 2c, 5c and 8b against 6, 6b and the hook's 6c).
+- a proxy genesis with no `HEADER` is `NO_SESSION` (T9 ruling 43): the proxy
+  opens a session with `HEADER`, so none was opened. Not `LIFECYCLE_ORPHAN`,
+  since nothing opened, and not `LIFECYCLE_COMPLETE`; neither a pass nor a
+  failure (vector 6d).
 
 ## Redaction: what is never signed
 
@@ -339,26 +353,31 @@ is not a chain and this spec does not cover it.
   `PERMITTED_FIELDS` (proxy/receipts.py:64-82) is dropped without a note.
 - The values of `reason_code`, `status`, `method`, `rule_ids`, `id_token` and
   `rule` are checked against the proxy's own catalog or grammar, and a value
-  outside is refused, never trimmed (proxy/receipts.py:144-195). The whole
+  outside is refused, never trimmed (proxy/receipts.py:177-227). The whole
   value is checked before any cut, so a bad entry cannot hide past a bound.
 - `leaf_provenance` keeps index, depth, byte count and the value's digest; the
   JSON pointer is hashed to `pointer_sha256`, never carried (proxy/receipts.py:
-  370-384). No caller writes it at this head.
+  410-424). No caller writes it at this head.
 - **A row fits its line by construction (T9 ruling 41).** A long value is cut
   and the cut is counted, never refused, because the values come from matches
   on what a peer sent and a refusal would stop the audit for the rest of the
-  session (proxy/receipts.py:83-141, 340-368):
-  - `rule_ids` keeps the first 256 in the order the engine gave, and never
-    more than 6 KiB of them; the rest are counted in `rule_ids_omitted`.
+  session (proxy/receipts.py:84-174, 373-407):
+  - `rule_ids` keeps the first 256 in the order the engine gave, and the
+    kept ids, each encoded with its quotes, total at most 6 KiB; whichever
+    cuts first (T9 ruling 43). `rule_ids_omitted` counts every id left out,
+    for either reason, in one number. Real catalog ids are at most 21
+    characters, so 256 of them are kept whole.
   - `leaf_provenance` keeps the first 8 entries; the rest are counted in
     `leaf_provenance_omitted`.
-  - every other field keeps at most 72 bytes once encoded. Text keeps its
-    longest prefix that fits; a longer list or object is written as `null`.
-    Either way `truncated` maps the field to its original length.
-  - the three markers are derived by the writer and are not permitted input,
-    so a caller cannot claim a cut that did not happen.
+  - every other field is first replaced as the canonicalisation section
+    says, counted in `sanitized`, and then keeps at most 72 bytes once
+    encoded. Text keeps its longest prefix that fits; a longer list or
+    object is written as `null`. Either way `truncated` maps the field to
+    the length it had when it was cut.
+  - the four markers are derived by the writer and are not permitted input,
+    so a caller cannot claim a cut or a repair that did not happen.
 - The chained body is the same cleaned fields, plus the proxy's `t_mono_ns`
-  (proxy/receipts.py:316-338). The 16 KiB line check stays as the invariant,
+  (proxy/receipts.py:349-371). The 16 KiB line check stays as the invariant,
   and a test feeds every permitted field at its worst to show nothing reaches
   it. If it ever fires, the bounds above are wrong: like any other failure to
   append, it stops the session as a receipt failure (R4), the refusal is kept
