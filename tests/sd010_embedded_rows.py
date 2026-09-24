@@ -83,6 +83,11 @@ BENIGN = {
         "The PASSWORD variable is read once at boot and never logged.\n",
     "a_comparison_not_an_assignment":
         'if (TOKEN == expected) { grant(); }\n',
+
+    # Round 7's separator class, kept honest from the other side: escaped
+    # whitespace after a key is only a separator when an `=` follows it.
+    "escaped_whitespace_after_a_key_with_no_assignment":
+        '{"note":"PASSWORD\\tis rotated\\nTOKEN\\fexpires"}',
 }
 
 
@@ -170,6 +175,34 @@ MUST_FIRE["mixed_literal_and_escaped_indent"] = (
 MUST_FIRE["escaped_tab_in_a_json_array"] = '["\\t' + "PASS" + 'WORD=' + PW + '"]'
 MUST_FIRE["unicode_line_separator"] = "prev\u2028" + "PASS" + "WORD=" + PW
 MUST_FIRE["unicode_paragraph_separator"] = "prev\u2029" + "PASS" + "WORD=" + PW
+
+
+# \u2500\u2500 ROUND 7's REVIEWER FOUND THE SEPARATOR, and it is the indentation lesson \u2500\u2500
+# again, on the other side of the key. The separator was `\s*=`, which admits a
+# literal tab, newline, CR or form feed between the key and the `=` but never
+# the ESCAPED two-character form a JSON string carries for each. So
+# `"PASSWORD\t=..."` in a payload walked past while its literal twin blocked.
+# The reviewer named the tab; the class is every JSON escape whose literal
+# character `\s` already accepts -- \t \n \r \f -- and measuring it on ecf1d01
+# found all four open, so all four are rows. The `sep_ctl_` rows are the
+# reviewer's paired controls: the literal and space twins and an escaped tab on
+# the VALUE side, which blocked before this change and must keep blocking.
+MUST_FIRE["sep_escaped_tab_before_equals"] = '{"cfg":"' + "PASS" + 'WORD\\t=' + PW + '"}'
+MUST_FIRE["sep_two_escaped_tabs_before_equals"] = (
+    '{"cfg":"' + "PASS" + 'WORD\\t\\t=' + PW + '"}')
+MUST_FIRE["sep_mixed_escaped_tab_before_equals"] = (
+    '{"cfg":"' + "PASS" + 'WORD \\t =' + PW + '"}')
+MUST_FIRE["sep_escaped_indent_and_separator_tab"] = (
+    '{"cfg":"\\t' + "PASS" + 'WORD\\t=' + PW + '"}')
+MUST_FIRE["sep_escaped_newline_before_equals"] = (
+    '{"cfg":"' + "PASS" + 'WORD\\n=' + PW + '"}')
+MUST_FIRE["sep_escaped_cr_before_equals"] = '{"cfg":"' + "PASS" + 'WORD\\r=' + PW + '"}'
+MUST_FIRE["sep_escaped_formfeed_before_equals"] = (
+    '{"cfg":"' + "PASS" + 'WORD\\f=' + PW + '"}')
+MUST_FIRE["sep_ctl_literal_tab_before_equals"] = '{"cfg":"' + "PASS" + 'WORD\t=' + PW + '"}'
+MUST_FIRE["sep_ctl_space_before_equals"] = '{"cfg":"' + "PASS" + 'WORD =' + PW + '"}'
+MUST_FIRE["sep_ctl_escaped_tab_after_equals"] = (
+    '{"cfg":"' + "PASS" + 'WORD=\\t' + PW + '"}')
 
 
 # The compose interpolation. It was the last DISCLOSED miss, and it is a

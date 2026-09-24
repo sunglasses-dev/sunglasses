@@ -406,3 +406,30 @@ def test_control_indentation_only_after_a_newline_loses_the_escaped_tabs():
     assert len(quiet) >= 4, (
         f"removing indentation from the delimiter class silenced only {quiet}; "
         f"those rows are not guarding it.")
+
+
+def test_control_a_literal_only_separator_loses_exactly_the_escaped_rows():
+    """The escaped separator class is load-bearing, proven by putting `\\s*=` back.
+
+    Round 7's reviewer found `"PASSWORD\\t=..."` inside a JSON string walking
+    past while its literal-tab twin blocked. Narrowing the separator to what it
+    was must silence EVERY escaped-separator row and NONE of the paired
+    controls -- the literal tab, the space and the escaped tab on the value
+    side all blocked before the fix, so if one of them goes quiet here this
+    control is measuring something other than the separator.
+    """
+    narrowed = _rule_regex().replace(r"(?:\s|\\[tnrf])*=", r"\s*=", 1)
+    assert narrowed != _rule_regex(), "the separator no longer carries the escaped class"
+    e = _mutate(**{RULE: narrowed})
+    escaped = sorted(k for k in rows.MUST_FIRE
+                     if k.startswith("sep_") and not k.startswith("sep_ctl_"))
+    controls = sorted(k for k in rows.MUST_FIRE if k.startswith("sep_ctl_"))
+    assert len(escaped) == 7 and len(controls) == 3, (escaped, controls)
+    still = [k for k in escaped if RULE in _ids(e, rows.MUST_FIRE[k])[1]]
+    assert still == [], (
+        f"with the literal-only separator these still fire: {still}; "
+        f"they are not guarding the escaped class.")
+    lost = [k for k in controls if RULE not in _ids(e, rows.MUST_FIRE[k])[1]]
+    assert lost == [], (
+        f"the literal-only separator lost the paired controls {lost}; "
+        f"this control is not aimed at the escaped separator alone.")

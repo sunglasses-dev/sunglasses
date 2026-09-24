@@ -2542,6 +2542,15 @@ PATTERNS = [
     # the 77-document corpus UNCHANGED (one fire, one flip, both the accepted
     # ratchet row), no must-fire row lost and no benign twin gained.
     #
+    # THE SEPARATOR TAKES THE SAME ESCAPES, found by round 7's reviewer on the
+    # other side of the key. It read `\s*=`: a literal tab, newline, CR or form
+    # feed before the `=` blocked, and the escaped two-character form of each
+    # -- `PASSWORD\t=` inside a JSON string -- walked past. The reviewer named
+    # the tab; measuring the rest on ecf1d01 found \n \r \f open too, so the
+    # class is every JSON escape whose literal character `\s` already accepts,
+    # not the one that was reported. `\uXXXX`-encoded separators stay in the
+    # decoding residual below, for the reason given there.
+    #
     # STILL UNREPORTED, and named rather than chased: `\u003d`, `\u000a`,
     # `\u0020`, `\u0009` -- JSON \uXXXX escapes of the `=`, the newline, the
     # space and the tab -- plus one nested-escape and one YAML sequence shape.
@@ -2628,7 +2637,7 @@ PATTERNS = [
             r"|\\n(?:[ \t]|\\t)*|\\r(?:[ \t]|\\t)*"
             r"|[\u2028\u2029](?:[ \t]|\\t)*|[\"'{\[,](?:[ \t]|\\t)*)"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
-            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))(?:\s|\\[tnrf])*=",
         ],
         "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. The value is not inspected at all: every exclusion tried on it was a switch an attacker could flip by writing the excluded shape around the secret, so this rule reports the assignment and accepts that documentation of an environment variable is reported too."
     },
