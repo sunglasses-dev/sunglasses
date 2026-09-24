@@ -250,6 +250,42 @@ def test_a_hanging_child_is_withheld_through_the_route(tmp_path):
         scan.close()
 
 
+
+def test_a_ready_child_that_never_reads_a_large_call_is_withheld_on_time(tmp_path):
+    """ASTRA worker-design r1, R1, through the route: a ready spare that never
+    reads stdin, handed an admitted call bigger than the pipe. Before the
+    repair the parent sat in the stdin write with the deadline behind it, so
+    this row runs the route on a thread and fails on "never returned"."""
+    import threading
+    stalls = _script(_READY + "time.sleep(300)")
+    scan = worker_process.ProcessScan(argv=stalls, timeout_ms=300)
+    try:
+        time.sleep(0.3)
+        handed = scan._spare[0].pid
+        upstream, client = _H["_Sink"](), _H["_Sink"]()
+        engine = route.Route(session=pump.Session(strict=False),
+                             log=_H["_log"](tmp_path), upstream_write=upstream,
+                             client_write=client,
+                             approvals=_H["_Approved"](), scan=scan)
+        t = threading.Thread(target=engine.client_frame,
+                             args=(_H["_call"]("a" * 200_000),), daemon=True)
+        started = time.monotonic()
+        t.start()
+        t.join(3.0)
+        if t.is_alive():
+            os.killpg(handed, 9)
+            t.join(5)
+            pytest.fail("the route never returned: delivery blocked the deadline")
+        assert time.monotonic() - started < 1.5
+        assert upstream.bytes == b"", "a scan that never read the call let it through"
+        assert client.messages()[0]["error"]["data"]["reason_code"] == "SCAN_EXCEPTION"
+        rows = _scan_rows(tmp_path)
+        assert len(rows) == 1 and rows[0]["status"] == "deadline", rows
+        assert "detector_status" not in rows[0], rows[0]
+        assert _gone(handed), "the stalled spare outlived its deadline"
+    finally:
+        scan.close()
+
 # ── A CHILD'S ANSWER ABOUT ANOTHER ITEM IS NOT THIS ITEM'S ANSWER ─────────
 # `_parse` used to return `dict(value, binding=dict(binding))`: the PARENT's
 # binding stamped over whatever the child said, so `worker.validate`'s binding
