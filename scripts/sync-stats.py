@@ -37,6 +37,13 @@ def get_real_stats():
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
 
+    # The typed language count stats/current.json records, from the same generator,
+    # never from a literal. (The README's Text scanning line no longer prints it:
+    # it points at the measured coverage table instead.)
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    from gen_language_stats import measure
+    languages = measure(patterns)["dedicated_pattern_languages"]
+
     # Get version
     init_file = REPO_ROOT / "sunglasses" / "__init__.py"
     version = "0.0.0"
@@ -49,7 +56,12 @@ def get_real_stats():
         "patterns": total,
         "categories": len(categories),
         "keywords": keyword_count,
+        # README's "unique keywords" is the DECLARED count; `keywords` is the smaller
+        # pre-screen index. Writing the index there would state a different number.
+        "keywords_declared": info["keywords_declared"],
+        "keyword_entries": info["keyword_entries"],
         "regex": regex_count,
+        "dedicated_pattern_languages": languages,
         "version": version,
         "date": date.today().isoformat(),
     }
@@ -84,19 +96,27 @@ def sync_readme(stats):
     """Update README.md stats table and What Works Today section."""
     readme = REPO_ROOT / "README.md"
     replacements = [
-        # Stats table
-        (r'\| Patterns \| \d+ \|', f'| Patterns | {stats["patterns"]} |'),
-        (r'\| Keywords \| \d+ \|', f'| Keywords | {stats["keywords"]} |'),
-        (r'\| Attack categories \| \d+ \|', f'| Attack categories | {stats["categories"]} |'),
+        # Stats table. The README writes thousands separators, so a bare \d+ matched
+        # nothing and these were silent no-ops. The Keywords row carries four numbers:
+        # the DECLARED count leads, the pre-screen index (stats["keywords"]) appears
+        # only where the row says "index holds", and the excluded count is their
+        # difference, so the row cannot contradict itself after a sync.
+        (r'\| Patterns \| [\d,]+ \|', f'| Patterns | {stats["patterns"]:,} |'),
+        (r'\| Keywords \| [\d,]+ unique declared \([\d,]+ entries across all patterns\); '
+         r'the pre-screen index holds [\d,]+ \u2014 [\d,]+ generic keywords',
+         f'| Keywords | {stats["keywords_declared"]:,} unique declared '
+         f'({stats["keyword_entries"]:,} entries across all patterns); '
+         f'the pre-screen index holds {stats["keywords"]:,} \u2014 '
+         f'{stats["keywords_declared"] - stats["keywords"]:,} generic keywords'),
+        (r'\| Attack categories \| [\d,]+ \|', f'| Attack categories | {stats["categories"]:,} |'),
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
-        # What Works Today line
-        # The language count was a LITERAL here on both sides, so this line would have
-        # re-emitted 13 no matter what the patterns said. It reads the typed field now,
-        # which tools/gen_language_stats.py measures from patterns.py.
-        (r'Text scanning: \d+ patterns, \d+ keywords, \d+ languages, \d+ attack categories',
-         f'Text scanning: {stats["patterns"]} patterns, {stats["keywords"]} keywords, '
-         f'{stats["dedicated_pattern_languages"]} languages, {stats["categories"]} attack categories'),
+        # What Works Today line. It must match the README as written (thousands
+        # separators, "unique keywords", no language count), or the replacement is a
+        # silent no-op, which it was from #147 until this pattern was fixed.
+        (r'Text scanning: [\d,]+ patterns, [\d,]+ unique keywords, [\d,]+ attack categories',
+         f'Text scanning: {stats["patterns"]:,} patterns, {stats["keywords_declared"]:,} unique keywords, '
+         f'{stats["categories"]:,} attack categories'),
     ]
     return update_file(readme, replacements, "README.md")
 
