@@ -410,3 +410,109 @@ def test_a_flood_is_still_stopped_at_once_not_after_the_budget():
     waited = time.monotonic() - started
     assert out["status"] == "exception", out
     assert waited < 3.0, f"a flood took {waited:.2f}s -- it waited on the budget"
+
+
+# ── DELIVERY IS INSIDE THE DEADLINE (ASTRA worker-design r1, R1) ─────────
+# `run()` wrote the whole payload to the child's stdin and only THEN started
+# the clock. A child that stops draining stdin, handed an admitted payload
+# larger than the pipe, held the parent inside that write for as long as it
+# liked: the kill sits after the write, so it was unreachable, and a slow
+# drain got a fresh full budget once it finally finished. Readiness proves the
+# engine loaded, not that the child will ever read.
+#
+# THESE ROWS HANG ON THE DEFECT BY DESIGN, so each call runs in a thread with
+# a bounded wait and fails on "never returned" -- CI never hangs. The only
+# process a row kills is the one it spawned, by the pid the child wrote.
+
+PIPE_OVER = 200_000          # ASCII chars; > 64 KiB pipe, < the 262,144 cap
+STALL_BUDGET_MS = 300
+STALL_GRACE_MS = 250
+
+
+def _gone(pid, within=3.0):
+    """The GROUP is gone, not just the leader: start_new_session makes pgid=pid."""
+    deadline = time.monotonic() + within
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(pid, 0)
+        except OSError:
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def _run_bounded(marker, **kw):
+    """`run()` on a thread; (result, seconds) or a failure naming the hang."""
+    import threading
+    box = {}
+
+    def call():
+        started = time.monotonic()
+        box["out"] = worker_process.run(**kw)
+        box["s"] = time.monotonic() - started
+
+    t = threading.Thread(target=call, daemon=True)
+    t.start()
+    t.join(STALL_BUDGET_MS / 1000 + STALL_GRACE_MS / 1000 + 2.0)
+    if t.is_alive():
+        try:
+            os.killpg(int(marker.read_text()), signal.SIGKILL)
+        except (OSError, ValueError):
+            pass
+        t.join(5)
+        pytest.fail("run() never returned: the payload write blocked and the "
+                    "deadline behind it could not fire")
+    return box["out"], box["s"]
+
+
+def _stalled_child(marker, after_pid):
+    return _script(
+        "import os,signal,sys,time;"
+        f"open({str(marker)!r},'w').write(str(os.getpid()));" + after_pid)
+
+
+STALLS = {
+    "never_reads": "time.sleep(300)",
+    "reads_a_prefix_then_stops": "os.read(0,4096);time.sleep(300)",
+    # 512 B every 100 ms is 5 KB/s: 200 KB would take ~40 s, then it answers.
+    # On the defect it eventually says `complete`, long after its budget.
+    "drains_slowly": (
+        "\nwhile os.read(0,512): time.sleep(0.1)\n"
+        "print('{\"accepted\": true, \"status\": \"complete\"}')"),
+    "never_reads_and_ignores_term": (
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(300)"),
+}
+
+
+@pytest.mark.parametrize("shape", sorted(STALLS))
+def test_a_child_that_will_not_take_the_payload_still_meets_its_deadline(
+        tmp_path, shape):
+    marker = tmp_path / "pid"
+    out, took = _run_bounded(
+        marker, payload={"params": {"text": "a" * PIPE_OVER}},
+        argv=_stalled_child(marker, STALLS[shape]), binding=BINDING,
+        timeout_ms=STALL_BUDGET_MS, grace_ms=STALL_GRACE_MS)
+    assert out["status"] == "deadline", out
+    assert "detector_status" not in out, (
+        "a deadline has no cause: still running when time ran out is the fact")
+    assert out["accepted"] is False and out["findings"] == []
+    assert took >= STALL_BUDGET_MS / 1000, f"returned in {took:.3f}s, before its budget"
+    assert took < STALL_BUDGET_MS / 1000 + STALL_GRACE_MS / 1000 + 1.0, (
+        f"{took:.3f}s: the deadline was not one budget from the start")
+    assert _gone(int(marker.read_text())), "the stalled child's group outlived its deadline"
+
+
+def test_control_a_large_payload_to_a_child_that_reads_it_all_completes(tmp_path):
+    """The repair must not turn a big request into a deadline: same payload
+    size, a child that drains it at once and answers inside the budget."""
+    marker = tmp_path / "pid"
+    answer = ("import json,os,sys,time;"
+              f"open({str(marker)!r},'w').write(str(os.getpid()));"
+              "n=len(sys.stdin.buffer.read());"
+              f"print(json.dumps(dict(json.loads({_ANSWER!r}),"
+              "observed_content_bytes=n)))")
+    out, _ = _run_bounded(marker, payload={"params": {"text": "a" * PIPE_OVER}},
+                          argv=_script(answer), binding=BINDING, timeout_ms=2000)
+    assert out["status"] == "complete", out
+    assert out["observed_content_bytes"] > PIPE_OVER, (
+        "the child did not receive the whole payload")
