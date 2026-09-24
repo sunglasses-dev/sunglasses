@@ -1,78 +1,79 @@
 {
  "rule_id": "GLS-SD-010-EMB",
- "engine_sha": "9c665d7690214adc348574768fb4bfbddb5317a447ee8a6de3887b998c4e875a",
+ "engine_sha": "4743e7194863d40e8e08a7235d717f1d6fc56fd1f130e4c3da98e347f04abde0",
  "measured_on": "2026-09-23",
  "method": "1 MiB per shape, channel file, median of 5 scans, the full engine against the same engine without this rule, one process (M3 Max, Python 3.14). Ratio = with / without.",
  "why_unskippable": "7 of 16 branches are the boundary alternatives (start, newline, CR, escaped \\n \\r, U+2028/9, quote/brace/bracket/comma) and carry no literal; the 9 key names do.",
  "shapes": {
   "plain": {
-   "without_seconds": 1.979163,
-   "with_seconds": 1.998438
+   "without_seconds": 1.986972,
+   "with_seconds": 2.007303
   },
   "marker_only": {
-   "without_seconds": 2.962463,
-   "with_seconds": 2.986041
+   "without_seconds": 2.969097,
+   "with_seconds": 2.986691
   },
   "marker_no_object": {
-   "without_seconds": 1.023583,
-   "with_seconds": 1.057438
+   "without_seconds": 1.0267,
+   "with_seconds": 1.065023
   },
   "worst_seed": {
-   "without_seconds": 0.812305,
-   "with_seconds": 0.873043
+   "without_seconds": 0.801793,
+   "with_seconds": 0.870778
   }
  },
  "worst_seed_is": "unbroken_token/quote_run",
  "worst_seed_candidates": {
   "dense_prefix": {
    "quote_TOKEN_esc_tab": {
-    "without_seconds": 1.883013,
-    "with_seconds": 1.927582,
+    "without_seconds": 1.892709,
+    "with_seconds": 1.935544,
     "ratio": 1.02
    },
    "quote_TOKEN": {
-    "without_seconds": 1.748429,
-    "with_seconds": 1.783781,
+    "without_seconds": 1.761604,
+    "with_seconds": 1.793014,
     "ratio": 1.02
    },
    "newline_TOKEN_space": {
-    "without_seconds": 1.612557,
-    "with_seconds": 1.651691,
+    "without_seconds": 1.614178,
+    "with_seconds": 1.652178,
     "ratio": 1.02
    },
    "quote_indent_TOKEN_sep": {
-    "without_seconds": 2.051067,
-    "with_seconds": 2.104903,
-    "ratio": 1.03
+    "without_seconds": 2.063848,
+    "with_seconds": 2.112907,
+    "ratio": 1.02
    }
   },
   "unbroken_token": {
    "x_run": {
-    "without_seconds": 0.791287,
-    "with_seconds": 0.815601,
+    "without_seconds": 0.794763,
+    "with_seconds": 0.815933,
     "ratio": 1.03
    },
    "quote_run": {
-    "without_seconds": 0.812305,
-    "with_seconds": 0.873043,
-    "ratio": 1.07
+    "without_seconds": 0.801793,
+    "with_seconds": 0.870778,
+    "ratio": 1.09
    },
    "esc_tab_run": {
-    "without_seconds": 1.394589,
-    "with_seconds": 1.443477,
-    "ratio": 1.04
+    "without_seconds": 1.379245,
+    "with_seconds": 1.426617,
+    "ratio": 1.03
    },
    "quote_then_esc_tab_run": {
-    "without_seconds": 1.391993,
-    "with_seconds": 1.442976,
+    "without_seconds": 1.377527,
+    "with_seconds": 1.425882,
     "ratio": 1.04
    },
    "TOKEN_then_sep_run": {
-    "without_seconds": 2.165362,
-    "with_seconds": 2.210997,
+    "without_seconds": 2.133842,
+    "with_seconds": 2.171735,
     "ratio": 1.02
    }
   }
  },
- "exit": "0.6.2: give the rule derivable literals (split the boundary alternatives into regex entries that each carry the key alternation), then delete this receipt and its KNOWN_UNSKIPPABLE entry."
+ "exit": "0.6.2: give the rule derivable literals (split the boundary alternatives into regex entries that each carry the key alternation), then delete this receipt and its KNOWN_UNSKIPPABLE entry.",
+ "measured_at": "merge of origin/main 35f04ce into the branch (753f964)"
 }
