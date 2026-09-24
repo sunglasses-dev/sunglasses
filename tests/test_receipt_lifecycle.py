@@ -642,6 +642,28 @@ _SITE_RESTORES = {
     "pretty_lane": ("_display(row.get('lane', ''), limit=13)",
                     "str(row.get('lane', ''))"),
     "summary_decision": ("_display(k, 10)", "str(k)"),
+    # R21. These two print an exception's text, not a receipt field.
+    "off_failure": ("_display(f'{type(exc).__name__}: {exc}', limit=200)",
+                    "f'{type(exc).__name__}: {exc}'"),
+    "verify_key_unusable": ("_display(str(cause), limit=400)", "str(cause)"),
+}
+
+# The R21 sites say what a failure said, and a failure's text is whatever the
+# key file, the chain or the OS put in it. So their fixture is the CAUSE: the
+# subprocess replaces the one call that fails with one that raises the payload.
+# site -> (code run before the CLI, with {payload} filled in; receipts action)
+_CAUSE_SITES = {
+    "off_failure": (
+        "from sunglasses.receipts import optin\n"
+        "def _fail(home):\n"
+        "    raise OSError({payload!r})\n"
+        "optin.turn_off = _fail\n", "off"),
+    "verify_key_unusable": (
+        "from sunglasses.receipts import optin\n"
+        "optin.opted_in = lambda home: True\n"
+        "def _fail(home):\n"
+        "    raise optin.KeyUnusable({payload!r})\n"
+        "optin.signer = _fail\n", None),
 }
 
 # Every payload carries an erase, a cursor home and a bidi override, which is
@@ -663,6 +685,8 @@ def _clean_decision(**over):
 
 def _fixture(site, payload):
     """(rows, verify) for one site, with `payload` inside the DISPLAYED slice."""
+    if site in _CAUSE_SITES:
+        return [json.dumps(_clean_decision())], site == "verify_key_unusable"
     if site.startswith("orphan_"):
         started, decided = _pair()
         field = {"orphan_ts": "ts", "orphan_tool": "tool_name",
@@ -686,9 +710,14 @@ def _fixture(site, payload):
     return [json.dumps(_clean_decision(**{field: payload + "x"}))], False
 
 
-def _run_cli(home, verify, restore=None):
-    """The real CLI in a subprocess, with at most ONE display site put to raw."""
+def _run_cli(home, verify, restore=None, cause=None):
+    """The real CLI in a subprocess, with at most ONE display site put to raw.
+    `cause` is (site, payload) for a site whose text comes from a failure."""
     prelude = "import pathlib, sys, types\nfrom sunglasses import cli\n"
+    action = None
+    if cause is not None:
+        inject, action = _CAUSE_SITES[cause[0]]
+        prelude += inject.format(payload=cause[1])
     if restore is not None:
         old, new = _SITE_RESTORES[restore]
         prelude += (
@@ -699,7 +728,7 @@ def _run_cli(home, verify, restore=None):
         )
     code = prelude + (
         f"sys.exit(cli.cmd_receipts(types.SimpleNamespace("
-        f"verify={verify!r}, today=False, limit=40)))\n"
+        f"verify={verify!r}, today=False, limit=40, action={action!r})))\n"
     )
     env = dict(os.environ, SUNGLASSES_HOME=str(home))
     proc = subprocess.run([sys.executable, "-c", code], cwd=TREE,
@@ -757,13 +786,17 @@ def test_the_matrix_covers_every_display_site():
         f"no restore control.\n  " + "\n  ".join(calls))
 
 
+def _cause(site, payload):
+    return (site, _PAYLOADS[payload]) if site in _CAUSE_SITES else None
+
+
 @pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
 @pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
 def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, payload):
-    """Twenty runtime assertions: ten sites, control bytes and a lone surrogate."""
+    """Two runtime assertions per site: control bytes and a lone surrogate."""
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
-    _code, raw = _run_cli(home, verify)
+    _code, raw = _run_cli(home, verify, cause=_cause(site, payload))
     assert b"Traceback" not in raw, raw.decode("utf-8", "replace")
     _assert_inert(raw)
 
@@ -771,14 +804,15 @@ def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, paylo
 @pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
 @pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
 def test_control_restoring_one_site_replays_it(home, site, payload):
-    """And each of the twenty goes red on its own when that ONE call is raw.
+    """And each of them goes red on its own when that ONE call is raw.
 
     Not the helper globally. The reviewer's finding was a site the global
     mutation could not distinguish from a covered one.
     """
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
-    _code, raw = _run_cli(home, verify, restore=site)
+    _code, raw = _run_cli(home, verify, restore=site,
+                          cause=_cause(site, payload))
     if payload == "control":
         assert ESC_ERASE in raw and CURSOR_HOME in raw, (
             f"{site}: restoring this one call did not replay its controls, so "
