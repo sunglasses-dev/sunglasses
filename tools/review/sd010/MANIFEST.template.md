@@ -1,5 +1,5 @@
 # GLS-SD-010-EMB @ `@HEAD@` — REVIEW PACKAGE
-Base `@BASE@`. Release: 0.6.0 if this round is GO and the PR is green by Thu 9-24 18:00, otherwise 0.6.1.
+Base `@BASE@`. Release: 0.6.1 (T11 count rule, 9-23: Friday ships without this rule).
 Emitted by `tools/review/sd010/build-package.sh @HEAD@ @BASE@` — every file here comes from the two refs plus that script.
 
 ## §1 WHAT THE RULE IS
@@ -7,8 +7,11 @@ A detection rule for a `NAME=value` assignment that sits INSIDE structured text 
 YAML line). It fires when the assignment starts at a boundary:
 start of text · newline · literal CR · escaped `\n` / `\r` · U+2028 / U+2029 · one of `" ' { [ ,`
 — each optionally followed by indentation, where indentation is a space, a tab, or an escaped `\t`.
-Between the name and the `=`, the separator admits any whitespace `\s` matches OR its escaped two-character
-form `\t` `\n` `\r` `\f` (added after round 7, which found the escaped tab there; the other three measured open too).
+Between the name and the `=`, the separator admits any whitespace `\s` matches OR a backslash followed by one
+character from the one-character escape class this rule reads: `t n r f v`, YAML's `N _ L P`, and a backslash before
+any literal whitespace (escaped space, escaped tab character, line continuation). Round 7 found `\t`; round 8 found
+`\v` in Python and YAML strings, and the whole one-character class was closed together. NUMERIC escapes
+(`\x0b`, `\013`, `\u000b`) are deliberately NOT read: decoding them is a residual, like the `\uXXXX` boundary exclusion.
 The name alternation is case-sensitive (inline `(?-i:)`, because the engine compiles with IGNORECASE).
 **The value is not inspected at all.** A bare space and a backtick are NOT boundaries.
 Declared channels (eight): message, file, code, api_response, log_memory, agent_input, tool_output, web_content —
@@ -55,7 +58,9 @@ only for the exact form that was tested. Round 7's family is now closed; its row
   KNOWN_FAILURES with a reason and a ruling. `p3` reports it as accepted.
 - **Six decoding shapes are out of scope, by decision:** JSON `\uXXXX` escapes of `=`, newline, space and tab, one
   nested escape, and one YAML sequence shape. Closing them means decoding string escapes before matching — a parser,
-  not a boundary.
+  not a boundary. The NUMERIC escapes of a separator character (`\x0b`, `\013`, `\u000b`) are the same residual:
+  they name a character by its code. Every one-character escape (`\v`, YAML `\N \_ \L \P`, backslash + whitespace)
+  IS read, with a row per escape and a literal-twin control.
 - The consumer surface shadows this rule on the parent's three channels; `to_dict()` dedupes and is what CLI, API and
   SARIF show. Every probe that inspects a finding reads it; `p5` measures timing and inspects none.
 - Cost ratio stated by `p5` against its gate; pattern count 1554 → 1555.
