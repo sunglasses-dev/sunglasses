@@ -168,10 +168,15 @@ class Route:
         # typed id, for the replacement `_release_frame` builds when authority
         # moves at the handoff. See `_scanned_fields`.
         self._scanned = None
+        # The same for the CLIENT direction, in its own slot because the two
+        # directions run on different threads: the request being inspected,
+        # from the moment its scan has a result until it crosses upstream.
+        self._scanned_request = None
 
     # ── one frame from the client ──────────────────────────────────────────
 
     def client_frame(self, raw):
+        self._scanned_request = None
         if self.session.closed_with():
             return
         frame = framing.parse_frame(raw, origin=CLIENT)
@@ -424,11 +429,15 @@ class Route:
         says one did. The reader inspects and then hands off the same frame,
         so the last inspection IS this item's when the typed id matches; when
         it does not, nothing is claimed and the default stands.
+
+        T9 ruling 14: the same holds when the refusal is the receipt's own
+        failure. A scan with a result reports that result even if writing its
+        SCAN_RESULT is what failed; only an item with no result is `not_run`.
         """
-        scanned = self._scanned
-        if scanned is None or scanned[0] != _typed(request_id):
-            return {}
-        return scanned[1]
+        for scanned in (self._scanned, self._scanned_request):
+            if scanned is not None and scanned[0] == _typed(request_id):
+                return scanned[1]
+        return {}
 
     def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
@@ -530,9 +539,12 @@ class Route:
             # (T10, 9-23). The cause stays in the receipt: the envelope is a
             # fixed key set and carries status, not cause.
             unusable = _unusable(result)
+            # BEFORE the record, not after: a failed record pays the client
+            # from inside `_record`, and it must pay what this scan said
+            # (T9 ruling 14).
+            self._scanned = (_typed(request_id), {"status": unusable["status"]})
             self._record("SCAN_RESULT", accepted=False,
                          inspection_complete=False, **unusable)
-            self._scanned = (_typed(request_id), {"status": unusable["status"]})
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False,
                                          status=unusable["status"])
@@ -544,13 +556,17 @@ class Route:
         held = {"direction": RESULT, "is_request": False, "method": method}
         settlement = policy.settle(result, held=held,
                                    held_content_bytes=held_bytes)
+        # T9 RULING 14. The scan has a result from here on, and that is what
+        # the client is told whatever the receipt does: set before the record,
+        # because a record that fails pays the client from inside `_record`.
+        # The receipt's failure is its own field, RECEIPT_IO_ERROR.
+        self._scanned = (_typed(request_id),
+                         {"settlement": settlement, "result": result})
         self._record("SCAN_RESULT", accepted=settlement.accepted,
                      status=settlement.status,
                      inspection_complete=settlement.inspection_complete,
                      rule_ids=[r for r in settlement.rule_ids
                                if r in self.catalog])
-        self._scanned = (_typed(request_id),
-                         {"settlement": settlement, "result": result})
         # THE BARRIER IS ASKED AGAIN, and the second asking is the point.
         #
         # It was asked once, before the scan, and never after -- so a
@@ -605,8 +621,19 @@ class Route:
                          forwarded=False)
         if request_id is NO_ID:
             return (None, reason, rule)
+        body = self._withheld_body(request_id, reason, rule,
+                                   settlement=settlement, result=result,
+                                   status=status)
+        return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
+                reason, rule)
+
+    def _withheld_body(self, request_id, reason, rule, *, settlement=None,
+                       result=None, status=None):
+        """The envelope for one withheld id: a settlement's fields when there
+        is one, else `status` (a scan that completed unusably), else
+        `not_run`."""
         result = result or {}
-        body = envelope.withheld(
+        return envelope.withheld(
             request_id=request_id, reason_code=reason, rule=rule,
             accepted=bool(settlement.accepted) if settlement else False,
             status=(settlement.status if settlement
@@ -619,8 +646,6 @@ class Route:
             rule_ids=settlement.rule_ids if settlement else (),
             catalog=self.catalog,
             **self._approval_hint(reason))
-        return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
-                reason, rule)
     def _approval_hint(self, reason):
         """The two ids `proxy approve` needs, for the one reason it answers.
 
@@ -1022,8 +1047,11 @@ class Route:
             # T4.R2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
-            # Same fields to both, as in the result direction above.
+            # Same fields to both, as in the result direction above, and
+            # known BEFORE the record for the same reason (T9 ruling 14).
             unusable = _unusable(result)
+            self._scanned_request = (_typed(request_id),
+                                     {"status": unusable["status"]})
             self._record("SCAN_RESULT", accepted=False,
                          inspection_complete=False, **unusable)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
@@ -1040,6 +1068,10 @@ class Route:
                 "method": method}
         settlement = policy.settle(result, held=held,
                                    held_content_bytes=held_bytes)
+        # T9 RULING 14, the client direction: a receipt that fails from here
+        # until the request crosses is refused with THIS scan's fields.
+        self._scanned_request = (_typed(request_id),
+                                 {"settlement": settlement, "result": result})
         self._record("SCAN_RESULT", accepted=settlement.accepted,
                      status=settlement.status,
                      inspection_complete=settlement.inspection_complete,
@@ -1067,6 +1099,10 @@ class Route:
         except receipts.ReceiptIOError:
             self._receipt_failure(request_id)
             return
+        # The request has crossed. What the client is still owed is the
+        # RESPONSE, which nothing has scanned: a refusal from here on is
+        # `not_run`, and this request's scan no longer describes it.
+        self._scanned_request = None
         self._record("WRITE_COMPLETE", bytes=len(raw))
         self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_ADMISSION,
                      forwarded=True)
@@ -1208,11 +1244,13 @@ class Route:
         owed = self.session.obligation_for(request_id)
         if not self.session.take_obligation(owed):
             return
-        self._to_client(envelope.withheld(
-            request_id=request_id, reason_code=REASON_RECEIPT_IO_ERROR,
-            rule=RULE_RESOURCE, accepted=False, status="not_run",
-            inspection_complete=False, inspected_utf8_bytes=0,
-            observed_content_bytes=0, elapsed_ms=0, catalog=self.catalog))
+        # T9 RULING 14. This used to hardcode `not_run`, and its one caller is
+        # the release authorisation, which runs only after a scan settled
+        # clean: the client was told no scan ran while SCAN_RESULT said
+        # `complete`. The same builder and fields as the payer.
+        self._to_client(self._withheld_body(
+            request_id, REASON_RECEIPT_IO_ERROR, RULE_RESOURCE,
+            **self._scanned_fields(request_id)))
         self.session.answered_on_the_wire(owed, final=True)
 
     # ── plumbing ───────────────────────────────────────────────────────────
@@ -1390,8 +1428,10 @@ class Route:
                     # hardcode `not_run` with both booleans false, so a failure
                     # at the release authorisation -- after a SCAN_RESULT of
                     # `complete` was on disk -- told the client no scan ran.
-                    # `_scanned` is set only once that SCAN_RESULT is written,
-                    # so an obligation nothing inspected keeps the default.
+                    # `_scanned` is set once the scan has a result, before its
+                    # SCAN_RESULT is written (T9 ruling 14: a failed receipt
+                    # does not unsay the scan), so an obligation nothing
+                    # inspected keeps the default.
                     # `record=False`: nothing can be written down now.
                     frame, _, _ = self._withhold_result(
                         request_id, REASON_RECEIPT_IO_ERROR, RULE_RESOURCE,
