@@ -63,6 +63,9 @@ CODES = {
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
     "LIFECYCLE_ORPHAN": "an opening with no terminal, or a terminal with no opening",
     "LIFECYCLE_DUPLICATE": "more than one settlement for one invocation",
+    "UNKNOWN_EVENT":
+        "an event outside this verifier's vocabulary; its meaning is not "
+        "judged, and chain integrity is unaffected",
 }
 
 # Exactly what a verifier prints about what a valid signature means. ASTRA's
@@ -102,6 +105,7 @@ def strict_exit_code(results: dict) -> int:
         "HISTORY_EXTENT_UNKNOWN", "EXPECTED_CHECKPOINT_MISSING",
         "CHECKPOINT_MISMATCH", "MISSING_GENESIS", "SEGMENT_MISSING",
         "LIFECYCLE_ORPHAN", "LIFECYCLE_DUPLICATE", "LEGACY_UNSIGNED",
+        "UNKNOWN_EVENT",
     }
     for kind in RESULT_KINDS:
         if results.get(kind) in failing:
