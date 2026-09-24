@@ -156,8 +156,9 @@ def test_a_call_that_died_leaves_its_opening_unsigned_and_the_next_call_moves_on
 
 def test_an_unusable_key_asks_instead_of_writing_unsigned(keyed):
     os.chmod(keys.private_path(keyed), 0o644)           # load() refuses it
-    out = run_hook(PAYLOAD, home=keyed)
-    assert "GLS-FW-RECEIPTS-UNWRITABLE" in json.dumps(out)
+    out = run_hook(PAYLOAD, home=keyed)["hookSpecificOutput"]
+    assert out["permissionDecision"] == "ask"
+    assert "audit trail" in out["permissionDecisionReason"]
     assert list((keyed / "receipts").glob("*.jsonl")) == []
 
 
@@ -187,5 +188,7 @@ def test_a_key_with_the_extra_gone_asks_and_writes_no_unsigned_line(keyed, tmp_p
     proc = subprocess.run([sys.executable, "-c", script], cwd=TREE,
                           capture_output=True, text=True, env=env)
     assert proc.returncode == 0, proc.stderr
-    assert "GLS-FW-RECEIPTS-UNWRITABLE" in proc.stdout
+    out = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert out["permissionDecision"] == "ask"
+    assert "audit trail" in out["permissionDecisionReason"]
     assert list((keyed / "receipts").glob("*.jsonl")) == []

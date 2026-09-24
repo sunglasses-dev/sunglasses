@@ -1665,6 +1665,67 @@ def write_receipt(record: dict, home=None) -> None:
     _restrict(path, 0o600)
 
 
+class _Confession(str):
+    """One evaluation's config errors: the text the legacy receipt has always
+    carried, plus `types`, their class names, for the signed log, which never
+    carries a message (T9 ruling 11 Q3)."""
+    types: tuple = ()
+
+    @classmethod
+    def of(cls, errors) -> "_Confession":
+        text = cls("; ".join(str(e) for e in errors))
+        text.types = tuple(type(e).__name__ for e in errors)
+        return text
+
+
+class _HookReceipts:
+    """Where one call's two records go.
+
+    The legacy day file, unchanged, until the user runs `sunglasses receipts
+    init`. From then on the signed chain IS the log (T9 ruling 11 Q1): the
+    opening is appended unsigned before the work, and the terminal goes with a
+    `close` checkpoint that seals the call (ruling 15). Whether a key exists is
+    one directory listing; nothing is imported to answer it, so an install
+    without a key never loads the signing code.
+
+    A key that exists but cannot be used (unsafe mode, the extra removed) is a
+    receipt failure like a full disk: it raises, and the caller's F6 rule
+    applies. It never falls back to writing unsigned lines, because a signed
+    log that silently turns into an unsigned one is the downgrade the signing
+    exists to show.
+    """
+
+    def __init__(self, home):
+        self.home = home
+        self.signed = any((home / "keys").glob("receipt-*.ed25519"))
+        self._chain = None
+
+    def _writer(self):
+        if self._chain is None:
+            from .receipts import chain, keys
+            # One writer for both records: its in-memory note of the opening
+            # it wrote is what lets the close seal it (R15d).
+            self._chain = chain.Chain(self.home / "receipts" / "hook",
+                                      keys.load(self.home), producer="hook")
+        return self._chain
+
+    def opening(self, row: dict) -> None:
+        if not self.signed:
+            write_receipt(row, home=self.home)
+            return
+        from .receipts import hook_rows
+        self._writer().write([{"event": "in_flight",
+                               "body": hook_rows.in_flight(_sanitize_record(row))}])
+
+    def terminal(self, row: dict, error_types=()) -> None:
+        if not self.signed:
+            write_receipt(row, home=self.home)
+            return
+        from .receipts import hook_rows
+        body = hook_rows.decision(_sanitize_record(row), error_types=error_types)
+        self._writer().write([{"event": "decision", "body": body}], seal="close")
+
+
 def _input_digest(tool_input) -> str:
     """SHA-256 of the canonical tool input. The receipt stores this and never
     the input itself: an audit trail that quotes the payload becomes the leak."""
@@ -1730,7 +1791,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
                             # fallback verdict instead of a silent fall-through
 
     def confession():
-        return "; ".join(errors) if errors else None
+        return _Confession.of(errors) if errors else None
 
     try:
         policy = load_policy(home / "policy.yaml")
@@ -1740,7 +1801,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         # still holds, so this does not short-circuit the remaining lanes. What
         # changes is the FALLBACK: where nothing else decided, the answer is no
         # longer `{}` but an ask that names which control is down.
-        errors.append(str(down))
+        errors.append(down)
         extras["policy_state"] = down.state
         policy_down = Decision(
             "ask", "error", f"GLS-FW-POLICY-{down.state.upper().replace('_', '-')}",
@@ -1749,7 +1810,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
             f"under ~/.sunglasses or run `sunglasses init --policy`. Approve only if "
             f"you would have approved this call unchecked.")
     except PolicyError as exc:
-        errors.append(str(exc))
+        errors.append(exc)
     else:
         decision = check_policy(tool_name, tool_input, policy)
         if decision is not None:
@@ -1768,7 +1829,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         try:
             state = load_pin_state(home / "pin_state.json")
         except PolicyError as exc:
-            errors.append(str(exc))
+            errors.append(exc)
         else:
             if state:
                 age = pin_state_age_s(state)
@@ -1787,7 +1848,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         try:
             pins = load_pins(home / "pins.json")
         except PolicyError as exc:
-            errors.append(str(exc))
+            errors.append(exc)
         else:
             extras["pin_reach"] = pin_reach(tool_name, pins)
             decision = check_pin_by_name(tool_name, pins)
@@ -1850,15 +1911,17 @@ def run_hook(stdin_text: str, home=None) -> dict:
     except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
         payload = {}
     eval_id = _new_eval_id()
+    receipts = _HookReceipts(home)
+    error_types = ()
     try:
-        write_receipt({
+        receipts.opening({
             "ts": _now_iso(),
             "kind": "in_flight",
             "eval_id": eval_id,
             "tool_name": payload.get("tool_name"),
             "session_id": payload.get("session_id"),
             "input_sha256": _input_digest(payload.get("tool_input")),
-        }, home=home)
+        })
     except Exception:  # noqa: BLE001
         # Losing the opening line must not change what the firewall does, for
         # the same reason losing the closing one does not.
@@ -1869,8 +1932,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
         if not isinstance(payload, dict):
             raise ValueError("hook payload was not a JSON object")
         decision, error, extras = evaluate(payload, home=home)
+        error_types = getattr(error, "types", ())
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
         error = f"{type(exc).__name__}: {exc}"
+        error_types = (type(exc).__name__,)
         decision = Decision(
             "defer", "error", "GLS-FW-ERROR",
             "SUNGLASSES firewall: internal error, deferring to normal permission "
@@ -1889,7 +1954,7 @@ def run_hook(stdin_text: str, home=None) -> dict:
         extras = {**extras, "degraded": True}
 
     try:
-        write_receipt({
+        receipts.terminal({
             "ts": _now_iso(),
             "kind": "decision",
             "eval_id": eval_id,
@@ -1902,7 +1967,7 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "elapsed_ms": round((_time.perf_counter() - started) * 1000, 2),
             **extras,
             **({"error": error} if error else {}),
-        }, home=home)
+        }, error_types=error_types)
     except Exception as exc:  # noqa: BLE001
         # F6 — THE AUDIT TRAIL IS DOWN.
         #
