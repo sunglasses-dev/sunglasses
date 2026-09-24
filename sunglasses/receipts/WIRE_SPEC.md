@@ -206,6 +206,29 @@ Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
   hook call to a proxy item across chains is a **lifecycle** result only. A
   partner missing from another chain never changes either chain's integrity.
 
+## A proxy chain's lifecycle is the session (T9 ruling 24)
+
+Stated 2026-09-24 for this round, in its own commit, so the limit is on the
+record before a verifier prints it.
+
+- **The lifecycle checked is the session.** A proxy chain opens with `HEADER`
+  and ends with `SESSION_TORN_DOWN` or `TEARDOWN`. A chain with no terminal is
+  `LIFECYCLE_ORPHAN`. That is all this round judges.
+- **Items are recorded, not paired.** `ADMITTED`, `SETTLED` and
+  `FORWARD_SUPPRESSED` rows are written and signed like any other, but most
+  `SETTLED` rows carry no key to pair an `ADMITTED` by, and pairing them
+  anyway would let one keyless `SETTLED` settle every keyless `ADMITTED`. So
+  the verifier pairs nothing and says so: a session that ended prints
+  **`PAIRING_UNKEYED`**, which is neither a pass nor a failure (strict exit
+  0), and never `LIFECYCLE_COMPLETE`, because that code says every opening
+  has its terminal and nobody checked.
+- **The target is unchanged, and not yet judged.** Freeze vector 15, "proxy
+  `ADMITTED` without `SETTLED` → lifecycle failure; `FORWARD_SUPPRESSED` +
+  `SETTLED REQUEST_CANCELLED` → lifecycle ok", stays the requirement. It is
+  **not judged until R24-A lands**: its own change after this round, where
+  each obligation carries one key (`record_key` + direction, T9 ruling 25,
+  never the raw JSON-RPC id) and the verifier pairs by it.
+
 ## What is built here, and what is not
 
 Built: the encoding, the hashes, the signature construction, the fingerprint,
