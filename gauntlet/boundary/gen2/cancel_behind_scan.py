@@ -47,6 +47,11 @@ def run(product_root, run_dir, *, scenario, mode, delay_s):
         scan = worker_process.ProcessScan(argv=[sys.executable, str(child), str(stim)])
         close = scan.close
     else:
+        # WARM THE ENGINE FIRST (T8's catch on the red row, 9-23): cold, the first
+        # scan builds it (~1.5 s) on the reader thread, which showed up here as a
+        # 1.5 s slower first run and could outlast a short wait in a test.
+        inspection.default_engine()
+
         def scan(params, *, channel, binding, content_bytes):
             if MARK in json.dumps(params):
                 time.sleep(delay_s)
