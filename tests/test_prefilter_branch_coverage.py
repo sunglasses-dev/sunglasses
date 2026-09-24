@@ -123,14 +123,16 @@ KNOWN_UNSKIPPABLE = {
     # names derive, the boundaries cannot. worst_seed is the worse of T9's two
     # families, both in the receipt: the densest matching prefix repeated
     # (every byte up to the `=`, no `=`) peaked at 1.03x; one unbroken 1 MiB
-    # token peaked at 1.07x on a run of quotes, each one a boundary. EXIT in
+    # token peaked at 1.07x on a run of quotes, each one a boundary. Round 10
+    # (escapes by table) re-measured with a run per numeric and named escape
+    # family: every one <= 1.07x, the quote run still the worst. EXIT in
     # 0.6.2: give the rule derivable literals, then delete this entry.
     "GLS-SD-010-EMB": AllowlistEntry(
-        reason="7 of 16 branches are boundary alternatives with no literal; "
-               "the 9 key names derive. Exit 0.6.2: derivable literals, "
-               "then remove this entry.",
-        plain=1.01, marker_only=1.00, marker_no_object=1.04, worst_seed=1.07,
-        measured_on="2026-09-23",
+        reason="The boundary alternatives, literal and escaped, carry no "
+               "literal; the 9 key names derive. Exit 0.6.2: derivable "
+               "literals, then remove this entry.",
+        plain=1.01, marker_only=1.00, marker_no_object=1.03, worst_seed=1.07,
+        measured_on="2026-09-24",
         receipt="tests/perf_receipts/GLS-SD-010-EMB.json"),
 }
 
