@@ -10,12 +10,11 @@ chain integrity, unsigned tail, expected endpoint, lifecycle), never one
 pass/fail. Every mutation has its positive control beside it: a verifier that
 refuses everything must fail this file.
 """
+import json
 import pathlib
 import sys
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
@@ -23,73 +22,13 @@ sys.path.insert(0, str(HERE.parent))
 import codes                                               # noqa: E402
 import verify                                              # noqa: E402
 import wire                                                # noqa: E402
-
-SEED = bytes(range(32))            # the published test seed, never a real key
-OTHER_SEED = bytes(range(1, 33))
-
-
-def _public(seed):
-    return ed25519.Ed25519PrivateKey.from_private_bytes(seed).public_key() \
-        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-
+from make_vectors import OTHER_SEED, TEST_SEED as SEED     # noqa: E402
+from make_vectors import WireChain as _Chain               # noqa: E402
+from make_vectors import public_bytes as _public           # noqa: E402
+from make_vectors import sealed_chain as _sealed_chain     # noqa: E402
 
 PUBLIC = _public(SEED)
 FP = wire.key_fingerprint(PUBLIC)
-
-
-class _Chain:
-    """Lines built from the wire alone. `seal()` appends a signed checkpoint
-    covering everything before it."""
-
-    def __init__(self, seed=SEED, chain_id="chain-verify-0001", interval=100):
-        self.key = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
-        self.fp = wire.key_fingerprint(_public(seed))
-        self.chain_id = chain_id
-        self.interval = interval
-        self.lines = []
-        self._add({"event": "genesis", "prev_hash": None})
-
-    def _head(self):
-        return wire.record_hash(self.lines[-1]) if self.lines else None
-
-    def _add(self, fields):
-        record = {"chain_id": self.chain_id, "key_id": self.fp,
-                  "seq": len(self.lines), "wire": wire.WIRE_VERSION,
-                  "prev_hash": self._head(), **fields}
-        self.lines.append(wire.encode(record))
-        return record
-
-    def event(self, event, **body):
-        return self._add({"event": event, "body": body})
-
-    def seal(self, purpose="interval"):
-        record = {"chain_id": self.chain_id, "covered_head": self._head(),
-                  "covered_seq": len(self.lines) - 1, "event": "checkpoint",
-                  "interval": self.interval, "key_id": self.fp,
-                  "prev_hash": self._head(), "purpose": purpose,
-                  "seq": len(self.lines), "wire": wire.WIRE_VERSION}
-        signature = self.key.sign(wire.checkpoint_signing_bytes(record))
-        self.lines.append(wire.encode(dict(record, signature=signature.hex())))
-        return len(self.lines) - 1
-
-    def call(self, eval_id):
-        self.event("in_flight", eval_id=eval_id)
-        self.event("decision", eval_id=eval_id)
-
-    def data(self):
-        return b"".join(self.lines)
-
-    def endpoint(self, index):
-        return {"seq": index, "hash": wire.record_hash(self.lines[index])}
-
-
-def _sealed_chain():
-    """Vector 1: genesis, a creation seal, one hook call, a seal."""
-    c = _Chain()
-    c.seal("genesis")
-    c.call("e1")
-    c.seal()
-    return c
 
 
 def _results(report):
@@ -359,3 +298,39 @@ def test_the_verifier_imports_nothing_from_sunglasses():
     source = (HERE.parent / "verify.py").read_text(encoding="utf-8")
     assert "import sunglasses" not in source
     assert "from sunglasses" not in source
+
+
+# --- the exported vectors (VECTORS.json "verifier"), replayed ---------------
+
+def _exported(kind):
+    return json.loads((HERE.parent / "VECTORS.json").read_text())[kind]
+
+
+def test_the_exported_vector_1_is_this_files_sealed_chain():
+    """The fixtures and the export are one builder: the bytes an outside
+    implementation copies are the bytes these tests run on."""
+    one = next(v for v in _exported("verifier") if v["id"] == "1")
+    assert bytes.fromhex(one["input"]["data_hex"]) == _sealed_chain().data()
+
+
+@pytest.mark.parametrize("vector", _exported("verifier"), ids=lambda v: v["id"])
+def test_every_exported_vector_replays(vector):
+    given, want = vector["input"], vector["expect"]
+    report = verify.verify(bytes.fromhex(given["data_hex"]),
+                           bytes.fromhex(given["public_hex"]),
+                           expected_fingerprint=given["expected_fingerprint"],
+                           expected_endpoint=given["expected_endpoint"])
+    assert _results(report) == want["results"]
+    assert report.first_failure_line == want["first_failure_line"]
+    assert report.tail == want["tail"]
+    assert report.verified_through == want["verified_through"]
+    assert (report.meaning is None) == (want["verified_through"] is None)
+    if "meaning" in want:
+        assert report.meaning == want["meaning"]
+
+
+def test_every_numbered_vector_is_exported_or_says_why_not():
+    numbers = {v["id"].rstrip("abcde") for v in _exported("verifier")}
+    numbers |= {v["id"] for v in _exported("verifier_logs")}
+    numbers |= set(_exported("verifier_not_exported"))
+    assert numbers == {str(n) for n in range(1, 19)}

@@ -310,3 +310,27 @@ def test_12_rotation_with_the_old_key_absent_is_successor_asserted(tmp_path):
     log = _write(tmp_path / "hook", *_rotated())
     report = verify.verify_log(log, PUBLIC, expected_fingerprint=FP)
     assert report.results["chain_integrity"] == "SUCCESSOR_ASSERTED"
+
+
+# --- the exported log vectors (VECTORS.json "verifier_logs"), replayed -------
+
+def _log_vectors():
+    import json
+    return json.loads((HERE.parent / "VECTORS.json").read_text())["verifier_logs"]
+
+
+@pytest.mark.parametrize("vector", _log_vectors(), ids=lambda v: v["id"])
+def test_every_exported_log_vector_replays(tmp_path, vector):
+    public = bytes.fromhex(vector["public_hex"])
+    for name, segments in vector["logs"].items():
+        log = tmp_path / name
+        log.mkdir()
+        for seg in segments:
+            (log / seg["name"]).write_bytes(bytes.fromhex(seg["data_hex"]))
+    for name, want in vector["expect"].items():
+        report = verify.verify_log(tmp_path / name, public,
+                                   expected_fingerprint=vector["expected_fingerprint"])
+        assert _results(report) == want["results"]
+        assert report.first_failure_segment == want["first_failure_segment"]
+        if "segments" in want:
+            assert {n: _results(s) for n, s in report.segments} == want["segments"]
