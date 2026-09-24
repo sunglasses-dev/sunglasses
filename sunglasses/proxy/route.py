@@ -164,6 +164,10 @@ class Route:
         # forgets to make.
         self._cancelled = set()
         self._invalidated_reason = None
+        # The scan fields of the item this reader inspected last, keyed by its
+        # typed id, for the replacement `_release_frame` builds when authority
+        # moves at the handoff. See `_scanned_fields`.
+        self._scanned = None
 
     # ── one frame from the client ──────────────────────────────────────────
 
@@ -406,8 +410,25 @@ class Route:
         # settles once, `_release_record` writes that once, and a reader
         # counting SETTLED rows per item counts what the wire carried.
         frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL,
-                                            record=False)
+                                            record=False,
+                                            **self._scanned_fields(request_id))
         return frame if frame is not None else b""
+
+    def _scanned_fields(self, request_id):
+        """The scan this item already had, for a refusal built after it.
+
+        ASTRA refused-db2a0c3 r1. A cancel or an invalidation that moves
+        authority at the handoff arrives AFTER the scan completed and its
+        SCAN_RESULT was written, and the replacement fell to the envelope's
+        `not_run` default -- telling the client no scan ran while the receipt
+        says one did. The reader inspects and then hands off the same frame,
+        so the last inspection IS this item's when the typed id matches; when
+        it does not, nothing is claimed and the default stands.
+        """
+        scanned = self._scanned
+        if scanned is None or scanned[0] != _typed(request_id):
+            return {}
+        return scanned[1]
 
     def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
@@ -435,6 +456,7 @@ class Route:
         # correlated to a null-id request is a response, and reading it as a
         # notification loses the client's one answer.
         request_id = message["id"] if "id" in message else NO_ID
+        self._scanned = None
         is_response = request_id is not NO_ID
         method = (self.session.expected_method(request_id, origin=CLIENT)
                   if is_response else message.get("method"))
@@ -510,6 +532,7 @@ class Route:
             unusable = _unusable(result)
             self._record("SCAN_RESULT", accepted=False,
                          inspection_complete=False, **unusable)
+            self._scanned = (_typed(request_id), {"status": unusable["status"]})
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False,
                                          status=unusable["status"])
@@ -526,6 +549,8 @@ class Route:
                      inspection_complete=settlement.inspection_complete,
                      rule_ids=[r for r in settlement.rule_ids
                                if r in self.catalog])
+        self._scanned = (_typed(request_id),
+                         {"settlement": settlement, "result": result})
         # THE BARRIER IS ASKED AGAIN, and the second asking is the point.
         #
         # It was asked once, before the scan, and never after -- so a
@@ -538,7 +563,12 @@ class Route:
         # handed back to the pump.
         retired = self._release_barrier(request_id)
         if retired is not None and is_response:
-            return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
+            # The scan COMPLETED and its SCAN_RESULT is on disk; the refusal
+            # carries those fields, or the client is told no scan ran (ASTRA
+            # refused-db2a0c3 r1). The reason stays the authority's.
+            return self._withhold_result(request_id, retired, RULE_APPROVAL,
+                                         record=False,
+                                         **self._scanned_fields(request_id))
 
         if settlement.reason == REASON_CLEAN:
             # T2.R5, CB06. The ENTIRE original, its own id and its own code.
