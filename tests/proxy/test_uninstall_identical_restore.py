@@ -227,3 +227,84 @@ def test_cli_lifo_and_single_wrap_wording_is_unchanged(project, tmp_path):
     for printed in (out[2], out[3], out[5]):
         assert "(byte-identical)" in printed
         assert WARNING not in printed
+
+
+# ------------------------------------- FIFO step 1 names its cause (R38 b)
+#
+# The first FIFO uninstall is not back at the original because the second
+# wrap is still in the file, and that is the only thing between the two. The
+# generic "changed after the install" reads as somebody else's edit; the true
+# sentence names the later install and what to run.
+
+STACKED = "still wrapped here"
+
+
+def test_fifo_first_uninstall_names_the_later_install_as_the_cause(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+
+    first = inst.uninstall(cfg, "echo", home=home)
+
+    assert first.byte_exact is False
+    assert first.later == ("fetch",)
+
+
+def test_three_stacked_wraps_name_every_later_install(cfg, home, artifact):
+    cfg.write_bytes((json.dumps({"mcpServers": {
+        **json.loads(CANON)["mcpServers"],
+        "third": {"command": "third-server", "args": []}}}, indent=2)
+        + "\n").encode("utf-8"))
+    for name in ("echo", "fetch", "third"):
+        inst.install(cfg, name, artifact=artifact, home=home)
+
+    assert inst.uninstall(cfg, "echo", home=home).later == ("fetch", "third")
+
+
+def test_control_a_foreign_edit_on_top_is_not_blamed_on_the_later_install(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    foreign_edit(cfg)
+
+    assert inst.uninstall(cfg, "echo", home=home).later == ()
+
+
+def test_control_a_foreign_edit_between_the_installs_breaks_the_link(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    foreign_edit(cfg)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+
+    assert inst.uninstall(cfg, "echo", home=home).later == ()
+
+
+def test_control_every_ordinary_uninstall_names_no_later_install(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    assert inst.uninstall(cfg, "fetch", home=home).later == ()
+    assert inst.uninstall(cfg, "echo", home=home).later == ()
+
+
+def test_cli_fifo_first_uninstall_says_the_later_install_is_still_wrapped(
+        project, tmp_path):
+    home = tmp_path / "h"
+    out = _run(project, home, ("install", "echo"), ("install", "fetch"),
+               ("uninstall", "echo"))
+
+    assert STACKED in out[2]
+    assert "'fetch'" in out[2]
+    assert "sunglasses uninstall fetch" in out[2]
+    assert CHANGED not in out[2]
+
+
+def test_cli_control_a_foreign_edit_keeps_the_generic_warning_on_step_1(
+        project, tmp_path):
+    home = tmp_path / "h"
+    _run(project, home, ("install", "echo"), ("install", "fetch"))
+    foreign_edit(project / ".mcp.json")
+    out = _run(project, home, ("uninstall", "echo"))
+
+    assert CHANGED in out[0]
+    assert STACKED not in out[0]
