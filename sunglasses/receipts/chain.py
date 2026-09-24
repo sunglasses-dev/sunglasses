@@ -14,8 +14,8 @@ names the old segment's last checkpoint and what was seen after it, as an
 observation, never a vouch. The verifier still reports the old tail unverified.
 
 NOTHING IS WRITTEN UNTIL EVERYTHING ENCODES. A batch is encoded and signed in
-memory first, so a float or an over-long field refuses the whole batch and the
-file is byte-identical afterwards.
+memory first, so a float, an over-long field or a line over `wire.MAX_LINE`
+refuses the whole batch and the file is byte-identical afterwards.
 
 DURABILITY. A data row is one unbuffered write. A checkpoint is fsynced with
 its directory before the next record is written (WIRE_SPEC: the checkpoint at
@@ -63,6 +63,10 @@ class Chain:
                  clock=time.time_ns):
         if signer is None:
             raise ValueError("no key: no chain is written (spec §2)")
+        if isinstance(interval, bool) or not isinstance(interval, int) or interval < 1:
+            # Bound into every signed checkpoint: a cadence of zero, or one the
+            # wire refuses only at the first seal, is refused here instead.
+            raise ValueError(f"interval must be a positive integer, not {interval!r}")
         self._dir = pathlib.Path(directory)
         self._signer = signer
         self._producer = producer
@@ -224,6 +228,10 @@ class Chain:
         def add(record, is_checkpoint):
             nonlocal seq, head, unsigned, size
             line = wire.encode(record)
+            if len(line) > wire.MAX_LINE:
+                raise wire.NotEncodable(
+                    f"seq {record['seq']}: a line of {len(line)} bytes, over "
+                    f"{wire.MAX_LINE}")
             pieces.append((line, is_checkpoint))
             seq, head, size = record["seq"], wire.record_hash(line), size + len(line)
             unsigned = 0 if is_checkpoint else unsigned + 1

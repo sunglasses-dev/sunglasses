@@ -68,6 +68,10 @@ MIN_INT = -(2 ** 63)
 MAX_DEPTH = 8
 MAX_KEYS = 64
 MAX_ARRAY = 256
+# One whole line, its LF included. The writer refuses a longer one before
+# anything is written; values inside every bound above can still add up past
+# it, and a verifier reading a line at a time needs a number it can stop at.
+MAX_LINE = 16 * 1024
 
 
 class NotCanonical(ValueError):
