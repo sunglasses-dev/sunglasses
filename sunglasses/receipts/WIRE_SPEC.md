@@ -273,6 +273,66 @@ product.
 - anything else is `UNKNOWN_EVENT` under lifecycle and never an integrity
   failure.
 
+## Redaction: what is never signed
+
+What the code does at this head, not a design. A signed byte is permanent: there
+is no redaction after signing, because an edited record breaks the hash link
+after it and a re-signed one is a different history. The one way to erase is
+to delete a whole segment, and the verifier then reports the gap (a successor
+names a checkpoint that is not there). So everything below happens BEFORE the
+writer sees a body. Paths are relative to `sunglasses/`.
+
+Each producer builds its own body from an allowlist. The writer adds only the
+envelope (see Record fields) and refuses any other top level field.
+
+**The hook** (`receipts/hook_rows.py`, called from firewall.py:1727 and :1734)
+
+- An allowlist with a grammar per field (hook_rows.py:64-83). `in_flight`
+  carries `eval_id` (16 hex), `tool_name`, `session_id` (printable, at most 256
+  characters) and `input_sha256` (64 hex or null). `decision` adds `decision`,
+  `lane`, `rule_id` (`GLS-` grammar), the flags `degraded`, `fuzzy_lane` and
+  `pin_state_stale` (carried only when true), and `policy_state`, `pin_source`,
+  `pin_reach` and `pin_checked_at` as fixed tokens.
+- Converted once, here: `elapsed_ms` becomes the integer `elapsed_us` and
+  `pin_state_age_s` is floored to an integer (hook_rows.py:96, :104);
+  `cleared_canaries` keeps only each entry's `rule_id` and `fingerprint`
+  (hook_rows.py:153).
+- The error's CLASS NAME only. `error` never reaches a body, because an
+  exception message may quote the value that raised it; the caller passes
+  `error_types`, class names of at most 64 characters, at most 64 of them
+  (hook_rows.py:40, :118). Measured by
+  `test_a_chained_error_carries_its_class_name_never_its_message` in
+  tests/test_receipts_hook_chain.py.
+- A field that is not named, or whose value fails its grammar, is withheld and
+  its name listed sorted in `withheld`; a name that is not a plain field name
+  is only counted in `withheld_unnamed` (hook_rows.py:123, :147-149). Less
+  evidence, said out loud.
+- An input that has no digest carries `input_sha256` null and `input_digest`
+  set to `"UNENCODABLE"` (hook_rows.py:145).
+- Before any of this, `tool_name`, `session_id`, `error` and `rule_id` pass
+  through `sanitize_receipt_field`: control, DEL, C1 and bidi characters are
+  stripped and the value is cut to 128 characters (firewall.py:1597-1636).
+
+With a key the chain is the hook's log and no unsigned JSONL line is written.
+Without a key the unsigned JSONL receipt keeps its sanitized error message; it
+is not a chain and this spec does not cover it.
+
+**The proxy** (`proxy/receipts.py`)
+
+- The never list, as field names: `payload`, `matched_text`, `stderr`,
+  `stdout`, `exception`, `detail`, `pointer`, `raw_id`, `key`, `text`,
+  `content`, `body` (proxy/receipts.py:59-62). Any field outside
+  `PERMITTED_FIELDS` (proxy/receipts.py:64-82) is dropped without a note.
+- The values of `reason_code`, `status`, `method`, `rule_ids`, `id_token` and
+  `rule` are checked against the proxy's own catalog or grammar, and a value
+  outside is refused, never trimmed (proxy/receipts.py:84-135).
+- `leaf_provenance` keeps index, depth, byte count and the value's digest; the
+  JSON pointer is hashed to `pointer_sha256`, never carried (proxy/receipts.py:
+  291-305). No caller writes it at this head.
+- The chained body is the same cleaned fields, plus the proxy's `t_mono_ns`
+  (proxy/receipts.py:256-268). Any failure to append, including a line the
+  wire refuses, stops the session as a receipt failure (R4).
+
 ## Chains and writers: one chain per log (T9 ruling 15)
 
 Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
