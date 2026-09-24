@@ -280,6 +280,12 @@ product.
   are not paired (see A proxy chain's lifecycle, R24) (verify.py:56-64).
 - anything else is `UNKNOWN_EVENT` under lifecycle and never an integrity
   failure.
+- nothing verified at all (no genesis, the wrong key, no checkpoint) is
+  `EMPTY_CHAIN` (T9 ruling 41): printed by name, never `LIFECYCLE_COMPLETE`
+  and never a lifecycle failure, since the integrity result already says why
+  nothing verified. A genesis and its checkpoint alone are verified, so a
+  chain that started and recorded nothing stays `LIFECYCLE_COMPLETE`
+  (vectors 2c, 5c and 8b against 6 and 6b).
 
 ## Redaction: what is never signed
 
@@ -333,13 +339,30 @@ is not a chain and this spec does not cover it.
   `PERMITTED_FIELDS` (proxy/receipts.py:64-82) is dropped without a note.
 - The values of `reason_code`, `status`, `method`, `rule_ids`, `id_token` and
   `rule` are checked against the proxy's own catalog or grammar, and a value
-  outside is refused, never trimmed (proxy/receipts.py:84-135).
+  outside is refused, never trimmed (proxy/receipts.py:144-195). The whole
+  value is checked before any cut, so a bad entry cannot hide past a bound.
 - `leaf_provenance` keeps index, depth, byte count and the value's digest; the
   JSON pointer is hashed to `pointer_sha256`, never carried (proxy/receipts.py:
-  291-305). No caller writes it at this head.
+  370-384). No caller writes it at this head.
+- **A row fits its line by construction (T9 ruling 41).** A long value is cut
+  and the cut is counted, never refused, because the values come from matches
+  on what a peer sent and a refusal would stop the audit for the rest of the
+  session (proxy/receipts.py:83-141, 340-368):
+  - `rule_ids` keeps the first 256 in the order the engine gave, and never
+    more than 6 KiB of them; the rest are counted in `rule_ids_omitted`.
+  - `leaf_provenance` keeps the first 8 entries; the rest are counted in
+    `leaf_provenance_omitted`.
+  - every other field keeps at most 72 bytes once encoded. Text keeps its
+    longest prefix that fits; a longer list or object is written as `null`.
+    Either way `truncated` maps the field to its original length.
+  - the three markers are derived by the writer and are not permitted input,
+    so a caller cannot claim a cut that did not happen.
 - The chained body is the same cleaned fields, plus the proxy's `t_mono_ns`
-  (proxy/receipts.py:256-268). Any failure to append, including a line the
-  wire refuses, stops the session as a receipt failure (R4).
+  (proxy/receipts.py:316-338). The 16 KiB line check stays as the invariant,
+  and a test feeds every permitted field at its worst to show nothing reaches
+  it. If it ever fires, the bounds above are wrong: like any other failure to
+  append, it stops the session as a receipt failure (R4), the refusal is kept
+  so every later row is refused too, and the message names the cause.
 
 ## Chains and writers: one chain per log (T9 ruling 15)
 
@@ -411,10 +434,6 @@ key, and `sunglasses receipts --verify` checks both.
 - The standalone offline bundle. The verifier is the one in this package.
 - A streaming verifier. The verifier reads one whole segment into memory, and
   a segment is at most 256 MiB (`chain.py:62`).
-- A counted cut for long values. A proxy row whose `rule_ids` would pass 256
-  entries, or any row past the 16 KiB line, is refused by the writer, not
-  shortened with a count. The proxy keeps that failure, so every later row
-  in the session is refused too (`proxy/receipts.py:264-271`).
 - An upper bound on the checkpoint interval. The writer refuses an interval
   that is not a positive integer (`chain.py:66`) and accepts any larger one.
 - Concurrency between hook and proxy beyond their separate chains, and the
