@@ -1920,9 +1920,17 @@ def run_hook(stdin_text: str, home=None) -> dict:
     except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
         payload = {}
     eval_id = _new_eval_id()
-    receipts = _HookReceipts(home)
     error_types = ()
+    # T9 RULING 34. THE RECEIPTS PATH IS INSIDE THE GUARD, construction too.
+    # Building `_HookReceipts` decides whether the user opted in, which reads
+    # the chain's tail, and it used to run above every `try`: an exception
+    # there left `run_hook` altogether and the hook exited 1, which the host
+    # does not block on. A failure here is F6 like the terminal's, below: the
+    # call asks, naming the cause, and a deny stays a deny.
+    receipts = None
+    receipts_down = None
     try:
+        receipts = _HookReceipts(home)
         receipts.opening({
             "ts": _now_iso(),
             "kind": "in_flight",
@@ -1931,10 +1939,8 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "session_id": payload.get("session_id"),
             "input_sha256": _input_digest(payload.get("tool_input")),
         })
-    except Exception:  # noqa: BLE001
-        # Losing the opening line must not change what the firewall does, for
-        # the same reason losing the closing one does not.
-        pass
+    except Exception as exc:  # noqa: BLE001
+        receipts_down = exc
 
     try:
         payload = _json.loads(stdin_text) if stdin_text.strip() else {}
@@ -1962,7 +1968,14 @@ def run_hook(stdin_text: str, home=None) -> dict:
         # was the one receipt not flagged as degraded.
         extras = {**extras, "degraded": True}
 
+    if receipts_down is not None:
+        # Decided BEFORE the terminal, so the terminal (if it can be written)
+        # records the answer the host is actually given.
+        decision, error = _receipts_unwritable(decision, error, receipts,
+                                               receipts_down)
     try:
+        if receipts is None:
+            raise receipts_down
         receipts.terminal({
             "ts": _now_iso(),
             "kind": "decision",
@@ -1978,34 +1991,43 @@ def run_hook(stdin_text: str, home=None) -> dict:
             **({"error": error} if error else {}),
         }, error_types=error_types)
     except Exception as exc:  # noqa: BLE001
-        # F6 — THE AUDIT TRAIL IS DOWN.
-        #
-        # Losing an audit line must not WEAKEN a decision, so a deny stays a deny
-        # and is returned unchanged. But a `defer` or an `allow` that nobody can
-        # record is a call with no evidence it happened, which is the same silence
-        # the lifecycle records exist to remove. Those ASK, naming the dead control
-        # rather than echoing an exception at the user.
-        if decision.action != "deny":
-            check = ("Check the receipts directory under ~/.sunglasses for "
-                     "permissions and disk space.")
-            if receipts.signed:
-                # The user turned signing on, so the key is a likely cause, and
-                # the one a directory check would never find.
-                check = ("Check the signing key in ~/.sunglasses/keys (private to "
-                         "you, and sunglasses[receipts] installed), then the "
-                         "receipts directory for permissions and disk space.")
-                from .receipts import optin
-                if isinstance(exc, optin.KeyUnusable):
-                    # R21 (a): the cause and the one command that clears it.
-                    check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
-            decision = Decision(
-                "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
-                "SUNGLASSES firewall: the audit trail could not be written, so this "
-                f"call would leave no record. {check} Approve only if you "
-                "would have approved it unrecorded.")
-            error = f"receipts unwritable: {type(exc).__name__}: {exc}"
+        decision, error = _receipts_unwritable(decision, error, receipts, exc)
 
     return decision.to_hook_output()
+
+
+def _receipts_unwritable(decision, error, receipts, exc):
+    """F6 — THE AUDIT TRAIL IS DOWN.
+
+    Losing an audit line must not WEAKEN a decision, so a deny stays a deny
+    and is returned unchanged. But a `defer` or an `allow` that nobody can
+    record is a call with no evidence it happened, which is the same silence
+    the lifecycle records exist to remove. Those ASK, naming the dead control
+    rather than echoing an exception at the user.
+
+    `receipts` is None when building it is what failed (T9 ruling 34). That
+    build is the opt-in decision, so it counts as signed: the key is a likely
+    cause and the one a directory check would never find.
+    """
+    if decision.action == "deny":
+        return decision, error
+    from .receipts import optin
+    cause = "KEY_UNUSABLE" if isinstance(exc, optin.KeyUnusable) else "RECEIPT_IO_ERROR"
+    check = ("Check the receipts directory under ~/.sunglasses for "
+             "permissions and disk space.")
+    if receipts is None or receipts.signed:
+        check = ("Check the signing key in ~/.sunglasses/keys (private to "
+                 "you, and sunglasses[receipts] installed), then the "
+                 "receipts directory for permissions and disk space.")
+        if isinstance(exc, optin.KeyUnusable):
+            # R21 (a): the cause and the one command that clears it.
+            check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
+    decision = Decision(
+        "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
+        f"SUNGLASSES firewall: the audit trail could not be written ({cause}), "
+        f"so this call would leave no record. {check} Approve only if you "
+        "would have approved it unrecorded.")
+    return decision, f"receipts unwritable: {type(exc).__name__}: {exc}"
 
 
 def _new_eval_id() -> str:
@@ -2331,7 +2353,19 @@ def main(argv=None) -> int:
         stdin_text = _sys.stdin.read()
     except Exception:  # noqa: BLE001
         stdin_text = ""
-    _sys.stdout.write(_json.dumps(run_hook(stdin_text)))
+    try:
+        out = run_hook(stdin_text)
+    except Exception as exc:  # noqa: BLE001
+        # T9 RULING 35, THE BELT. Anything that escapes `run_hook` would exit
+        # 1, and the host proceeds on exit 1: the fail-open. It asks instead,
+        # naming the exception's TYPE only -- its text is not trusted to be
+        # printable, or even to exist.
+        out = Decision(
+            "ask", "error", "GLS-FW-HOOK-FAULT",
+            f"SUNGLASSES firewall: the hook failed ({type(exc).__name__}), so "
+            "this call was not checked and not recorded. Approve only if you "
+            "would have approved it unchecked.").to_hook_output()
+    _sys.stdout.write(_json.dumps(out))
     return 0
 
 

@@ -89,7 +89,12 @@ def _chain_open(directory) -> bool:
         return False
     # A tail that cannot be read is not an off record: it stays opted in, and
     # the key failure that follows says so, rather than going quietly unsigned.
-    return _last_event(segments[-1]) != OFF_EVENT
+    # T9 ruling 34: the comment said so and the read let the OSError out, which
+    # took the hook down with exit 1 -- the one exit the host lets through.
+    try:
+        return _last_event(segments[-1]) != OFF_EVENT
+    except OSError:
+        return True
 
 
 def _last_event(segment):
