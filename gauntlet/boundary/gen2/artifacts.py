@@ -26,8 +26,12 @@ import json
 import pathlib
 import sys
 
-MATERIALISED = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-                / "GATE3_DESIGN_REVIEW_2026-09-13" / "materialized")
+_BOUNDARY = str(pathlib.Path(__file__).resolve().parents[1])
+if _BOUNDARY not in sys.path:      # appended, never inserted: import order is the suite's
+    sys.path.append(_BOUNDARY)
+import review_root                                         # noqa: E402
+
+MATERIALISED = review_root.GATE3 / "materialized"
 
 # `materialization.json` is written last and so cannot list itself. Everything
 # else in the directory has to appear in it.

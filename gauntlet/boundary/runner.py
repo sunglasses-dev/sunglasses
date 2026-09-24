@@ -46,8 +46,12 @@ PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARI
 # unchanged — a path found here still has to hash to what the seed declares, so
 # this cannot substitute a different file.
 _REAPED_ROOT = pathlib.Path("/private/tmp/GATE3_DESIGN_REVIEW_2026-09-13")
-_DURABLE_ROOT = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-                 / "GATE3_DESIGN_REVIEW_2026-09-13")
+_BOUNDARY = str(pathlib.Path(__file__).resolve().parents[0])
+if _BOUNDARY not in sys.path:      # appended, never inserted: import order is the suite's
+    sys.path.append(_BOUNDARY)
+import review_root                                         # noqa: E402
+
+_DURABLE_ROOT = review_root.GATE3
 
 
 def _durable(path: pathlib.Path) -> pathlib.Path:
