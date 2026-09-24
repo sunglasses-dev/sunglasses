@@ -143,6 +143,10 @@ class Report:
     # The self-test's own wall duration, measured in `run`. A field rather than
     # a formatted string so the number can be compared as well as read.
     self_test_measured_ms: int = 0
+    # R21 (b): OFF, ON, or KEY_UNUSABLE with the cause `receipts --verify`
+    # prints. Our own sentence, never anything an upstream process said.
+    receipts_key: str = "OFF"
+    receipts_key_cause: str = ""
 
 
 # ── T10.R1 · an instrument that cannot fail proves nothing ─────────────────
@@ -338,7 +342,30 @@ def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
         inventory=inventory)
 
 
-def process_exit_code(outcome, self_test_ok, unreadable=()) -> int:
+def receipts_key_status(home=None):
+    """(OFF | ON | KEY_UNUSABLE, cause). Signing on with a key that cannot
+    sign stops every wrapped route's proxy before it starts (R24b a), so the
+    doctor names it rather than leaving the user a route that will not start
+    and no reason (R21 b). No key and no hook chain imports nothing."""
+    import pathlib
+    if home is None:
+        from ..firewall import sunglasses_home
+        home = sunglasses_home()
+    home = pathlib.Path(home)
+    if (not any((home / "keys").glob("receipt-*.ed25519"))
+            and not (home / "receipts" / "hook").is_dir()):
+        return "OFF", ""
+    from ..receipts import optin
+    if not optin.opted_in(home):
+        return "OFF", ""
+    try:
+        optin.signer(home)
+    except optin.KeyUnusable as cause:
+        return "KEY_UNUSABLE", str(cause)
+    return "ON", ""
+
+
+def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False) -> int:
     """R3's precedence, `1 > 2 > 3 > 0` (R-DOCTOR-R3a, and AGENTS.md's own
     order).
 
@@ -353,13 +380,17 @@ def process_exit_code(outcome, self_test_ok, unreadable=()) -> int:
         return EXIT_FAILED
     if any(w["result"] == "FAIL" for w in outcome.per_wrapper):
         return EXIT_FAILED
+    if key_unusable:
+        # R21 (b): every wrapped route refuses to start and every hook call
+        # asks. That is a failure we know, not doubt, whatever a launch said.
+        return EXIT_FAILED
     if unreadable:
         return EXIT_OPERATIONAL
     return outcome.exit_code
 
 
 def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
-        self_test=None, launcher=None) -> Report:
+        self_test=None, launcher=None, home=None) -> Report:
     """Read, classify, self-test, launch every wrapped route, then aggregate.
 
     Every part above is called from here. On 2026-09-13 a review of this lane
@@ -408,9 +439,13 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
 
     outcome = aggregate(sources_readable=not unreadable, entries=entries,
                         unreadable=unreadable)
+    key_status, key_cause = receipts_key_status(home)
     return Report(outcome=outcome,
-                  exit_code=process_exit_code(outcome, self_test_ok,
-                                             unreadable=unreadable),
+                  exit_code=process_exit_code(
+                      outcome, self_test_ok, unreadable=unreadable,
+                      key_unusable=key_status == "KEY_UNUSABLE"),
+                  receipts_key=key_status,
+                  receipts_key_cause=key_cause,
                   self_test_ok=self_test_ok,
                   self_test_controls={k: v for k, v in controls.items()
                                       if v in CHECK_RESULTS},
@@ -456,6 +491,8 @@ def render(report) -> dict:
         "inventory": report.outcome.inventory,
         "aggregate": report.outcome.aggregate,
         "route_checks": report.route_checks,
+        "receipts_key": {"status": report.receipts_key,
+                         "cause": report.receipts_key_cause},
         "exit_code": report.exit_code,
     }
 
