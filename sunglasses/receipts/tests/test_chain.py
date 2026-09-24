@@ -285,3 +285,53 @@ def test_concurrent_writers_that_seal_every_hold_share_one_segment(home):
     assert report.results["chain_integrity"] == "CHAIN_OK"
     assert report.results["lifecycle"] == "LIFECYCLE_COMPLETE"
     assert sum(r["event"] == "in_flight" for r in _records(segment)) == 120
+
+
+_UNSEALED = """
+import sys; sys.path.insert(0, sys.argv[1])
+import chain, keys, pathlib
+home = pathlib.Path(sys.argv[2])
+writer = chain.Chain(home / "receipts" / "chain", keys.load(home), producer="proxy")
+writer.write([{"event": "in_flight", "body": {"eval_id": sys.argv[3]}}],
+             seal=None if sys.argv[4] == "open" else "release")
+"""
+
+
+def _process(home, eval_id, mode):
+    import subprocess
+    subprocess.run([sys.executable, "-c", _UNSEALED, str(HERE.parent), str(home),
+                    eval_id, mode], check=True, timeout=60)
+
+
+def test_a_writers_own_suffix_lives_in_its_memory_only(home):
+    """T9 R15d. The in-process exception (a long-lived writer keeps its own
+    unsigned rows across holds) must die with the process: nothing on disk
+    remembers it, and the next PROCESS opens a new genesis, leaving the rows
+    it did not write as an unverified tail it never repairs."""
+    _process(home, "a", "open")                  # exits with one unsigned row
+    directory = home / "receipts" / "chain"
+    assert sorted(p.name for p in directory.iterdir()) == [
+        "LOCK", "segment-000001.chain"]
+    assert (directory / "LOCK").stat().st_size == 0
+    [old] = _segments(home)
+    before = old.read_bytes()
+
+    _process(home, "b", "sealed")
+
+    assert old.read_bytes() == before
+    old_report = _report(home, old)
+    assert old_report.results["unsigned_tail"] == "UNVERIFIED_TAIL"
+    assert old_report.tail["count"] == 1
+    new = _segments(home)[1]
+    assert _records(new)[0]["body"]["observed_unsigned"] == 1
+    assert _report(home, new).results["chain_integrity"] == "CHAIN_OK"
+
+
+def test_the_control_one_process_continues_its_own_suffix(home):
+    """The paired control: the same two writes in ONE process stay one
+    segment, so the test above is measuring the process boundary."""
+    writer = _writer(home, producer="proxy")
+    writer.write([{"event": "in_flight", "body": {"eval_id": "a"}}])
+    writer.write([{"event": "in_flight", "body": {"eval_id": "b"}}], seal="release")
+    [segment] = _segments(home)
+    assert _report(home, segment).results["unsigned_tail"] == "NO_VISIBLE_TAIL"
