@@ -125,8 +125,13 @@ class Route:
 
     def __init__(self, *, session, log, upstream_write, client_write,
                  scan=None, catalog=None, approvals=None,
-                 descriptor_sha_for=None, control=None, server_identity=None):
+                 descriptor_sha_for=None, control=None, server_identity=None,
+                 client_lookahead=None):
         self.session = session
+        # PRODUCT FINDING #7. Set by the client reader (serve._drain_client) to
+        # its LineSource.pending_cancel; None means no lookahead, as before.
+        self.client_lookahead = client_lookahead
+        self._lookahead_frame = False
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
@@ -915,7 +920,8 @@ class Route:
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
         self.session.accept_cancellation(target, origin=CLIENT)
-        self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
+        self._record("CANCEL_ACCEPTED", id_type=type(target).__name__,
+                     **({"lookahead": True} if self._lookahead_frame else {}))
         if self.session.is_settling(target, origin=CLIENT):
             # R-168-R3. The item has left `_pending` and its answer is in the
             # reader's hands, NOT the client's. Settling it here would be the
@@ -1008,11 +1014,40 @@ class Route:
                      observed_bytes=result.get("observed_content_bytes", 0))
 
         if settlement.reason == REASON_CLEAN:
+            if self._cancel_waiting(request_id):
+                return
             self._release(raw, request_id, attempt=attempt)
             return
         self._settle_withheld(request_id, settlement.reason, settlement.rule,
                               attempt=attempt, settlement=settlement,
                               result=result)
+
+    def _cancel_waiting(self, request_id):
+        """PRODUCT FINDING #7: a cancel for THIS id that is already waiting on
+        the client's stream wins, before a single byte is forwarded.
+
+        The scan ran on the client reader thread, so the cancel could not be
+        read until now. It is taken out of the stream and handled here through
+        the ordinary cancel path -- ahead of any frames that sit between it and
+        its request, which is sound because a cancel concerns only its own id.
+        Its CANCEL_ACCEPTED receipt carries `lookahead`, so the log never
+        claims pipe order was processing order.
+
+        True only if the cancel actually retired the item. If it did not (the
+        session no longer held it as expected), the forward proceeds exactly
+        as it would have without the lookahead.
+        """
+        if request_id is NO_ID or self.client_lookahead is None:
+            return False
+        raw = self.client_lookahead(request_id)
+        if raw is None:
+            return False
+        self._lookahead_frame = True
+        try:
+            self.client_frame(raw)
+        finally:
+            self._lookahead_frame = False
+        return not self.session.expects(request_id, origin=CLIENT)
 
     # ── the two exits ──────────────────────────────────────────────────────
 

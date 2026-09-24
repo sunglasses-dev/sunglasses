@@ -18,6 +18,8 @@ agree on what the message SAYS, and nothing after it can be trusted.
 """
 from __future__ import annotations
 
+import os
+import select
 import time
 
 import json
@@ -259,6 +261,112 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
                     buffer = chunk.split(b"\n", 1)[1]
                     break
 
+
+class LineSource:
+    """The client's byte source, handed to `bounded_lines` ONE LINE AT A TIME.
+
+    PRODUCT FINDING #7 (T10 witnessed, 9-23). The client direction reads and
+    scans on one thread, so a `notifications/cancelled` that arrives while its
+    own request is being scanned was not read until that scan ended -- and a
+    clean scan then FORWARDED the call the client had already cancelled.
+
+    Peeking the pipe alone would not see it: `bounded_lines` reads 64 KiB at a
+    time into a private buffer, so a cancel that came in the same read as its
+    request is inside the generator, not in the pipe. So this source hands out
+    at most one line per `read1`, which keeps every complete frame that has not
+    been processed yet HERE, where `pending_cancel` can look for it.
+
+    Only an fd-backed source gets a lookahead, read with `os.read` alone (never
+    mixed with a BufferedReader, whose buffer the fd cannot see). Any other
+    source behaves exactly as before and `pending_cancel` answers None.
+
+    THE LOOKAHEAD FILL IS BOUNDED LIKE THE READ PATH: it never holds more than
+    one frame's worth (`limit + 1` bytes, what `bounded_lines` may hold for an
+    incomplete line). A client that floods during a scan is not buffered past
+    that; the ordinary path refuses the frame at the same bound as before.
+    """
+
+    def __init__(self, source, limit=MAX_FRAME_BYTES):
+        self._source = source
+        self._limit = limit
+        try:
+            self._fd = source.fileno()
+        except (AttributeError, OSError, ValueError):
+            self._fd = None
+        self._stash = b""
+        self._eof = False
+        self.high_water = 0
+
+    def _take_bytes(self, block):
+        if self._eof:
+            return False
+        if self._fd is None:
+            if not block:
+                return False
+            chunk = (self._source.read1(65536) if hasattr(self._source, "read1")
+                     else self._source.read(65536))
+        else:
+            if not block:
+                if len(self._stash) > self._limit:
+                    return False
+                ready, _, _ = select.select([self._fd], [], [], 0)
+                if not ready:
+                    return False
+                chunk = os.read(self._fd, min(65536, self._limit + 1 - len(self._stash)))
+            else:
+                chunk = os.read(self._fd, 65536)
+        if not chunk:
+            self._eof = True
+            return False
+        self._stash += chunk
+        self.high_water = max(self.high_water, len(self._stash))
+        return True
+
+    def read1(self, size=65536):
+        if not self._stash:
+            self._take_bytes(block=True)
+        if not self._stash:
+            return b""
+        cut = self._stash.find(b"\n")
+        end = cut + 1 if 0 <= cut < size else min(size, len(self._stash))
+        out, self._stash = self._stash[:end], self._stash[end:]
+        return out
+
+    def pending_cancel(self, request_id):
+        """The raw cancel for exactly this id if one is already waiting,
+        REMOVED from the stream so it is handled once; otherwise None.
+
+        The id match is TYPED: `"1"` and `1` are different held items (T6.R6),
+        so a cancel for one never stops the other.
+        """
+        if self._fd is None:
+            return None
+        while self._take_bytes(block=False):
+            pass
+        offset = 0
+        while True:
+            cut = self._stash.find(b"\n", offset)
+            if cut < 0:
+                return None
+            line = self._stash[offset:cut + 1]
+            if len(line) <= self._limit and _cancels(line, request_id):
+                self._stash = self._stash[:offset] + self._stash[cut + 1:]
+                return line
+            offset = cut + 1
+
+
+def _cancels(line, request_id):
+    try:
+        message = json.loads(line)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    if not isinstance(message, dict) or message.get("method") != "notifications/cancelled":
+        return False
+    params = message.get("params")
+    if not isinstance(params, dict) or "requestId" not in params:
+        return False
+    target = params["requestId"]
+    return type(target) is type(request_id) and target == request_id
 
 def _envelope_fault(message):
     """Every frame is a request, a notification or a response, and nothing else.

@@ -77,6 +77,8 @@ PERMITTED_FIELDS = frozenset({
     "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
+    # PRODUCT FINDING #7: a cancel handled ahead of pipe order says so.
+    "lookahead",
 })
 
 
@@ -116,6 +118,12 @@ def _check_value(name, value):
     # OURS: a supplied None would claim a cause and name nobody, and the route
     # OMITS the field when there is no cause. Same hole, same day, as origin on
     # feat/admitted-carries-origin (ASTRA r1, 2026-09-22).
+    if name == "lookahead":
+        # OURS, and only ever present when true: the cancel was taken out of
+        # the stream ahead of pipe order. Absent means it was not.
+        if value is not True:
+            raise ValueError(f"lookahead {value!r} is not true")
+        return
     if value is None:
         return
     if name == "reason_code":

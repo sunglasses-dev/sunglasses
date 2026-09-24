@@ -384,8 +384,13 @@ def _drain(engine, child, done):
 
 def _drain_client(engine, session, stdin, done):
     tail = []
+    # PRODUCT FINDING #7. One line at a time, so a cancel that arrives while
+    # its own request is being scanned is still visible to the route before it
+    # forwards that request.
+    source = framing.LineSource(stdin)
+    engine.client_lookahead = source.pending_cancel
     try:
-        for raw in framing.bounded_lines(stdin, framing.MAX_FRAME_BYTES, tail):
+        for raw in framing.bounded_lines(source, framing.MAX_FRAME_BYTES, tail):
             engine.client_frame(raw)
             if session.closed_with():
                 break
