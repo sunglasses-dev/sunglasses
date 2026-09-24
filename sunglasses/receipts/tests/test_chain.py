@@ -335,3 +335,72 @@ def test_the_control_one_process_continues_its_own_suffix(home):
     writer.write([{"event": "in_flight", "body": {"eval_id": "b"}}], seal="release")
     [segment] = _segments(home)
     assert _report(home, segment).results["unsigned_tail"] == "NO_VISIBLE_TAIL"
+
+
+# --- hard limits: the interval and the line (spec freeze prep) --------------
+
+LINE_LIMIT = 16 * 1024            # bytes of one line, its LF included
+
+
+@pytest.mark.parametrize("interval", [0, -1, True, 1.5, "100", None])
+def test_an_interval_that_is_not_a_positive_integer_is_refused(home, interval):
+    """The interval is bound in every signed checkpoint. Zero or less would
+    checkpoint after every record while the header claims a cadence of none;
+    a float is refused by the wire only when the first checkpoint is signed,
+    long after the writer was built. Refused at construction instead."""
+    with pytest.raises(ValueError):
+        _writer(home, interval=interval)
+    assert not (home / "receipts" / "chain").exists()
+
+
+def test_the_control_an_interval_of_one_seals_every_record(home):
+    _writer(home, interval=1).write(_call("a"))
+    [segment] = _segments(home)
+    events = [(r["event"], r.get("purpose")) for r in _records(segment)]
+    assert events == [("genesis", None), ("checkpoint", "genesis"),
+                      ("in_flight", None), ("checkpoint", "interval"),
+                      ("decision", None), ("checkpoint", "interval")]
+    assert _report(home, segment).results["chain_integrity"] == "CHAIN_OK"
+
+
+def _one_line(home, name, sizes):
+    """The data line a fresh writer writes for a body of `sizes` x-strings,
+    on a fixed clock, so two writers differ only in the filler."""
+    directory = home / "receipts" / name
+    writer = chain.Chain(directory, keys.load(home), producer="hook",
+                         clock=lambda: 1)
+    body = {f"f{i}": "x" * n for i, n in enumerate(sizes)}
+    writer.write([{"event": "decision", "body": body}], seal="close")
+    [segment] = sorted(directory.glob("segment-*.chain"))
+    return segment.read_bytes().splitlines(True)[2]
+
+
+def _filler(total, parts=5):
+    """`total` bytes of filler over `parts` strings, none over the wire's 4096."""
+    sizes = [min(4096, max(0, total - 4096 * i)) for i in range(parts)]
+    assert sum(sizes) == total
+    return sizes
+
+
+def test_a_line_of_exactly_16_kib_is_written(home):
+    """The control for the refusal below: the limit is inclusive."""
+    probe = _one_line(home, "probe", [0] * 5)
+    line = _one_line(home, "at", _filler(LINE_LIMIT - len(probe)))
+    assert len(line) == LINE_LIMIT
+    assert wire.decode_strict(line)["event"] == "decision"
+
+
+def test_a_line_over_16_kib_is_refused_and_nothing_is_written(home):
+    """Every value inside the wire's own bounds, and the line one byte over:
+    the writer refuses the whole batch before a byte reaches the file, as it
+    does a float."""
+    probe = _one_line(home, "probe", [0] * 5)
+    sizes = _filler(LINE_LIMIT - len(probe) + 1)
+    writer = _writer(home, clock=lambda: 1)       # the probe's clock
+    writer.write(_call("a"), seal="release")
+    [segment] = _segments(home)
+    before = segment.read_bytes()
+    with pytest.raises(wire.NotEncodable):
+        writer.write([{"event": "decision",
+                       "body": {f"f{i}": "x" * n for i, n in enumerate(sizes)}}])
+    assert segment.read_bytes() == before
