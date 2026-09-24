@@ -164,13 +164,15 @@ class Route:
         # forgets to make.
         self._cancelled = set()
         self._invalidated_reason = None
-        # The scan fields of the item this reader inspected last, keyed by its
-        # typed id, for the replacement `_release_frame` builds when authority
-        # moves at the handoff. See `_scanned_fields`.
+        # The scan fields of the item this reader inspected last, as
+        # (obligation token, RESULT, fields), for the replacement
+        # `_release_frame` builds when authority moves at the handoff. See
+        # `_scanned_fields`.
         self._scanned = None
-        # The same for the CLIENT direction, in its own slot because the two
-        # directions run on different threads: the request being inspected,
-        # from the moment its scan has a result until it crosses upstream.
+        # The same for the CLIENT direction, (token, REQUEST, fields), in its
+        # own slot because the two directions run on different threads: the
+        # request being inspected, from the moment its scan has a result until
+        # it crosses upstream.
         self._scanned_request = None
 
     # ── one frame from the client ──────────────────────────────────────────
@@ -414,12 +416,13 @@ class Route:
         # trace in the receipt stream, because it is not a settlement: the item
         # settles once, `_release_record` writes that once, and a reader
         # counting SETTLED rows per item counts what the wire carried.
-        frame, _, _ = self._withhold_result(request_id, reason, RULE_APPROVAL,
-                                            record=False,
-                                            **self._scanned_fields(request_id))
+        frame, _, _ = self._withhold_result(
+            request_id, reason, RULE_APPROVAL, record=False,
+            **self._scanned_fields(request_id, direction=RESULT))
         return frame if frame is not None else b""
 
-    def _scanned_fields(self, request_id):
+    def _scanned_fields(self, request_id, attempt=None, *, token=None,
+                        direction=None):
         """The scan this item already had, for a refusal built after it.
 
         ASTRA refused-db2a0c3 r1. A cancel or an invalidation that moves
@@ -433,11 +436,41 @@ class Route:
         T9 ruling 14: the same holds when the refusal is the receipt's own
         failure. A scan with a result reports that result even if writing its
         SCAN_RESULT is what failed; only an item with no result is `not_run`.
+
+        T9 ruling 33 (ASTRA refused-4ff6983 r3). KEYED ON THE OBLIGATION, NOT
+        THE ID. Matching the typed id let a completed response's scan, still in
+        `_scanned`, answer a later request that reused the id -- `complete`
+        for a request nothing had inspected, or in place of the scan that
+        request did get. A slot names the token of the generation it scanned,
+        the same token the receipts name, and the direction it read.
+
+        `direction=None` is the payer, which holds a token and not a path: a
+        RESULT slot for a generation means its request already crossed, so the
+        response is what is owed and it is looked at first.
         """
+        owed = token if token is not None else self._obligation(request_id,
+                                                               attempt)
         for scanned in (self._scanned, self._scanned_request):
-            if scanned is not None and scanned[0] == _typed(request_id):
-                return scanned[1]
+            if (scanned is not None and scanned[0] == owed
+                    and direction in (None, scanned[1])):
+                return scanned[2]
         return {}
+
+    def _obligation(self, request_id, attempt=None):
+        """The token a scan of this item answers: the attempt's own when there
+        is one, else the live generation, which is unambiguous while the item
+        is pending because admission refuses an id already pending."""
+        if attempt is not None and attempt.request_id == request_id:
+            return attempt.token
+        return self.session.obligation_for(request_id)
+
+    def _spend_scan(self, owed):
+        """A slot pays ONE answer. Once that answer is on the wire the slot
+        is gone, so nothing later can be told this scan again."""
+        for slot in ("_scanned", "_scanned_request"):
+            scanned = getattr(self, slot)
+            if scanned is not None and scanned[0] == owed:
+                setattr(self, slot, None)
 
     def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
@@ -542,7 +575,8 @@ class Route:
             # BEFORE the record, not after: a failed record pays the client
             # from inside `_record`, and it must pay what this scan said
             # (T9 ruling 14).
-            self._scanned = (_typed(request_id), {"status": unusable["status"]})
+            self._scanned = (self._obligation(request_id), RESULT,
+                             {"status": unusable["status"]})
             self._record("SCAN_RESULT", accepted=False,
                          inspection_complete=False, **unusable)
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
@@ -560,7 +594,7 @@ class Route:
         # the client is told whatever the receipt does: set before the record,
         # because a record that fails pays the client from inside `_record`.
         # The receipt's failure is its own field, RECEIPT_IO_ERROR.
-        self._scanned = (_typed(request_id),
+        self._scanned = (self._obligation(request_id), RESULT,
                          {"settlement": settlement, "result": result})
         self._record("SCAN_RESULT", accepted=settlement.accepted,
                      status=settlement.status,
@@ -582,9 +616,9 @@ class Route:
             # The scan COMPLETED and its SCAN_RESULT is on disk; the refusal
             # carries those fields, or the client is told no scan ran (ASTRA
             # refused-db2a0c3 r1). The reason stays the authority's.
-            return self._withhold_result(request_id, retired, RULE_APPROVAL,
-                                         record=False,
-                                         **self._scanned_fields(request_id))
+            return self._withhold_result(
+                request_id, retired, RULE_APPROVAL, record=False,
+                **self._scanned_fields(request_id, direction=RESULT))
 
         if settlement.reason == REASON_CLEAN:
             # T2.R5, CB06. The ENTIRE original, its own id and its own code.
@@ -1050,8 +1084,8 @@ class Route:
             # Same fields to both, as in the result direction above, and
             # known BEFORE the record for the same reason (T9 ruling 14).
             unusable = _unusable(result)
-            self._scanned_request = (_typed(request_id),
-                                     {"status": unusable["status"]})
+            self._scanned_request = (self._obligation(request_id, attempt),
+                                     REQUEST, {"status": unusable["status"]})
             self._record("SCAN_RESULT", accepted=False,
                          inspection_complete=False, **unusable)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
@@ -1070,7 +1104,8 @@ class Route:
                                    held_content_bytes=held_bytes)
         # T9 RULING 14, the client direction: a receipt that fails from here
         # until the request crosses is refused with THIS scan's fields.
-        self._scanned_request = (_typed(request_id),
+        self._scanned_request = (self._obligation(request_id, attempt),
+                                 REQUEST,
                                  {"settlement": settlement, "result": result})
         self._record("SCAN_RESULT", accepted=settlement.accepted,
                      status=settlement.status,
@@ -1095,7 +1130,7 @@ class Route:
         of letting it go is not there."""
         try:
             self.log.authorise_release(self._token(request_id, attempt),
-                                       write=lambda: self.upstream_write(raw))
+                                       write=lambda: self._cross_upstream(raw))
         except receipts.ReceiptIOError:
             self._receipt_failure(request_id)
             return
@@ -1106,6 +1141,16 @@ class Route:
         self._record("WRITE_COMPLETE", bytes=len(raw))
         self._record("SETTLED", reason_code=REASON_CLEAN, rule=RULE_ADMISSION,
                      forwarded=True)
+
+    def _cross_upstream(self, raw):
+        """T9 ruling 33. The request's slot ends AS its bytes move, not after
+        the write returns. From the first byte the server can answer, and a
+        refusal of that answer on the reader's thread is owed the RESPONSE,
+        which this request's scan does not describe. Cleared here, on the
+        thread that owns the slot, rather than from the reader, which would
+        erase a scan still being written down."""
+        self._scanned_request = None
+        self.upstream_write(raw)
 
     def _settle_withheld(self, request_id, reason, rule, *, attempt=None,
                          settlement=None,
@@ -1250,8 +1295,9 @@ class Route:
         # `complete`. The same builder and fields as the payer.
         self._to_client(self._withheld_body(
             request_id, REASON_RECEIPT_IO_ERROR, RULE_RESOURCE,
-            **self._scanned_fields(request_id)))
+            **self._scanned_fields(request_id, token=owed, direction=REQUEST)))
         self.session.answered_on_the_wire(owed, final=True)
+        self._spend_scan(owed)
 
     # ── plumbing ───────────────────────────────────────────────────────────
 
@@ -1433,14 +1479,18 @@ class Route:
                     # does not unsay the scan), so an obligation nothing
                     # inspected keeps the default.
                     # `record=False`: nothing can be written down now.
+                    # T9 ruling 33: by TOKEN, so a finished generation's scan
+                    # can never answer this one.
                     frame, _, _ = self._withhold_result(
                         request_id, REASON_RECEIPT_IO_ERROR, RULE_RESOURCE,
-                        record=False, **self._scanned_fields(request_id))
+                        record=False,
+                        **self._scanned_fields(request_id, token=owed))
                     self.client_write(frame)
                     # The bytes have moved: confirm, and no give-back may
                     # resurrect this one.
                     self.session.answered_on_the_wire(owed, final=True)
                     confirmed = True
+                    self._spend_scan(owed)
                 finally:
                     if not confirmed:
                         # The sink failed. The obligation was taken and not
