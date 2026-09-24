@@ -81,6 +81,66 @@ PERMITTED_FIELDS = frozenset({
 
 
 
+# T9 ruling 41. Every variable-length field has its own bound, so a row fits
+# the wire's 16 KiB line BY CONSTRUCTION. rule_ids come from matches on
+# attacker input, and when an oversized row was refused the failure was kept
+# and every later row refused with it: enough matches switched the audit off
+# for the rest of the session. So a long value is cut and the cut is counted,
+# never refused. The writer's line check stays as the invariant; if it fires,
+# the bounds below are wrong, and that is a receipt failure like any other.
+RULE_IDS_KEPT = 256            # the first 256, in the order the engine gave
+RULE_IDS_BYTES = 6 * 1024      # and never more than this much of the line
+LEAVES_KEPT = 8
+FIELD_BYTES = 72               # one encoded value; a sha256 hex digest is 66
+
+
+def _encoded_size(value):
+    return len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+               .encode("utf-8", "surrogatepass"))
+
+
+def _cut_text(text, budget):
+    """The longest prefix of `text` whose encoding fits `budget` bytes."""
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if _encoded_size(text[:middle]) <= budget:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low]
+
+
+def _bounded(value):
+    """(what is written, the original length if it was cut, else None).
+
+    Text keeps its longest prefix that fits. A list or object too large for
+    its field is not written at all, and the marker says how long it was.
+    A value JSON cannot express is passed through for the wire to refuse, as
+    before: that is a caller's bug, not something a peer can send."""
+    if value is None or isinstance(value, (bool, int, float)):
+        return value, None
+    try:
+        if _encoded_size(value) <= FIELD_BYTES:
+            return value, None
+    except (TypeError, ValueError):
+        return value, None
+    if isinstance(value, str):
+        return _cut_text(value, FIELD_BYTES), len(value)
+    return None, len(value)
+
+
+def _kept_rule_ids(rule_ids):
+    kept, used = [], 2
+    for rule_id in rule_ids:
+        cost = _encoded_size(rule_id) + 1
+        if len(kept) == RULE_IDS_KEPT or used + cost > RULE_IDS_BYTES:
+            break
+        kept.append(rule_id)
+        used += cost
+    return kept
+
+
 def _check_value(name, value):
     """T903. What may be INSIDE a permitted field.
 
@@ -268,23 +328,42 @@ class Log:
                                     "t_mono_ns": time.monotonic_ns()}], seal=seal)
             except Exception as failure:
                 self._failure = failure
+                # R41: the cause is named. The wire's messages carry field
+                # paths, sizes and bounds, never a value, so naming it here
+                # copies nothing a peer wrote.
                 raise ReceiptIOError(
                     f"the signed receipt could not be written: "
-                    f"{type(failure).__name__}") from failure
+                    f"{type(failure).__name__}: {str(failure)[:200]}") from failure
             self._seq += 1
             return dict(body, seq=self._seq - 1, kind=kind)
 
     def _clean(self, fields):
         """T9.R3. An allowlist, and provenance reduced to indices and hashes."""
-        clean = {}
+        clean, truncated = {}, {}
         for name, value in (fields or {}).items():
             if name in FORBIDDEN_FIELDS or name not in PERMITTED_FIELDS:
                 continue
             if name == "leaf_provenance":
-                clean[name] = [self._leaf(entry) for entry in value or ()]
+                leaves = list(value or ())
+                clean[name] = [self._leaf(entry) for entry in leaves[:LEAVES_KEPT]]
+                if len(leaves) > LEAVES_KEPT:
+                    clean["leaf_provenance_omitted"] = len(leaves) - LEAVES_KEPT
                 continue
+            # Checked whole, THEN cut: the cut decides what is kept, never
+            # what is checked, so a bad id cannot hide past the bound.
             _check_value(name, value)
-            clean[name] = value
+            if name == "rule_ids":
+                clean[name] = _kept_rule_ids(value)
+                if len(clean[name]) < len(value):
+                    clean["rule_ids_omitted"] = len(value) - len(clean[name])
+                continue
+            clean[name], cut = _bounded(value)
+            if cut is not None:
+                truncated[name] = cut
+        # Derived here and nowhere else. None of the three names is permitted
+        # as input, so a caller cannot claim a cut that did not happen.
+        if truncated:
+            clean["truncated"] = truncated
         return clean
 
     @staticmethod
@@ -297,7 +376,7 @@ class Log:
         """
         out = {"index": entry.get("index"), "depth": entry.get("depth"),
                "bytes": entry.get("bytes"),
-               "value_sha256": entry.get("value_sha256")}
+               "value_sha256": _bounded(entry.get("value_sha256"))[0]}
         pointer = entry.get("pointer")
         if pointer is not None:
             out["pointer_sha256"] = hashlib.sha256(
