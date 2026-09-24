@@ -57,6 +57,8 @@ before checking it is checking your own rewrite.
   the whole attack
 - no control characters in strings; diagnostics are displayed separately and
   never inside signed bytes
+- no lone surrogates (U+D800 to U+DFFF) in strings or keys; UTF-8 cannot
+  carry one, so a record holding one has no bytes to sign and is refused
 - bounded: strings 4096, integers signed 64 bit, arrays 256, object keys 64,
   nesting 8
 - unknown types are **refused, never converted**. A value needing a conversion
