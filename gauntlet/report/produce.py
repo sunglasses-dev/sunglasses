@@ -267,7 +267,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
         ledger_panel = _unavailable(
             "EVIDENCE_UNBOUND",
             "no ledger record declaring its own scope, cap, updated_at and "
-            "digest. Budget policy is T9's; this process does not author it.")
+            "digest. Budget policy is set outside this process, which does not author it.")
     else:
         ledger_panel = {"state": "measured", "unit": schema.LEDGER_UNIT,
                         "record": ledger, "record_digest": ledger_digest}

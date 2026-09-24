@@ -73,6 +73,15 @@ def _figure(path: str, value) -> str:
     return f'<span class="fig" data-bound="{_esc(path)}">{_esc(value)}</span>'
 
 
+def _bound_or_not(path: str, value) -> str:
+    """A figure when the field holds one; the words "not bound" when it is null.
+
+    str(None) is "None", and a bound span reading "None" transcribes its field
+    exactly, so no transcription check can catch it (measured 2026-09-23).
+    """
+    return _figure(path, value) if value is not None else "<em>not bound</em>"
+
+
 def _state_note(panel: dict) -> str:
     state = panel.get("state")
     code = panel.get("reason_code")
@@ -277,11 +286,11 @@ and not provider requests. A deterministic run adds none.</p>
 <section id="inputs">
 <h2>What this was measured against</h2>
 <p class="detail">Corpus digest
-{_figure("identities.corpus_digest", report["identities"]["corpus_digest"])}.
+{_bound_or_not("identities.corpus_digest", report["identities"]["corpus_digest"])}.
 Capability map revision
-{_figure("identities.capability_map_revision",
+{_bound_or_not("identities.capability_map_revision",
          report["identities"]["capability_map_revision"])}, review state
-{_figure("identities.capability_map_review_state",
+{_bound_or_not("identities.capability_map_review_state",
          report["identities"]["capability_map_review_state"])}.</p>
 </section>
 </main>
