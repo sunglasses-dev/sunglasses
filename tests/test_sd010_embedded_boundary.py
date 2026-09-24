@@ -444,3 +444,106 @@ def test_control_a_literal_only_separator_loses_exactly_the_escaped_rows():
     assert lost == [], (
         f"the literal-only separator lost the paired controls {lost}; "
         f"this control is not aimed at the escaped separator alone.")
+
+
+# ── 7. the prefilter can skip the rule, so it pays for itself ───────────────
+# 0.6.2 EXIT ROW (T9 ruling 5). The rule held the first KNOWN_UNSKIPPABLE entry:
+# the prefilter derived nothing from it, so it ran on every document. The key
+# names are the literals, but they sit in a `(?-i:...)` scope and the deriver
+# refuses any scope that removes a flag. Splitting the boundary alternatives
+# was measured first and derives nothing either, for the same reason. What
+# derives is a case-FOLDED lookahead naming the same keys in front of the
+# scope. A case-sensitive match of a key implies the folded lookahead matches
+# at the same position, so the rule matches exactly what it matched before.
+
+import re as _re                                         # noqa: E402
+
+from sunglasses import _prefilter as _pf                 # noqa: E402
+
+_SCOPED_KEYS = _re.compile(r"\(\?-i:\(\?:((?:[A-Z_]+\|)+[A-Z_]+)\)\)")
+_LOOKAHEAD_KEYS = _re.compile(r"\(\?=((?:[A-Z_]+\|)+[A-Z_]+)\)")
+
+
+def _one(pattern, regex, what):
+    found = pattern.findall(regex)
+    assert len(found) == 1, f"expected one {what}, found {len(found)}"
+    return found[0]
+
+
+def _derivation_problems(regex):
+    """Everything that makes the folded lookahead disagree with the key scope.
+
+    Two copies can drift two ways. A key in the scope and not the lookahead
+    never matches at all; a key in the lookahead and not the scope makes the
+    requirement weaker than the rule. Either way the derived clause stops being
+    exactly the scoped keys, folded.
+    """
+    scoped = _one(_SCOPED_KEYS, regex, "case-sensitive key scope").split("|")
+    ahead = _one(_LOOKAHEAD_KEYS, regex, "folded key lookahead").split("|")
+    problems = []
+    if ahead != scoped:
+        problems.append(f"lookahead {ahead} is not the scope {scoped}")
+    want = {k.lower() for k in scoped}
+    got = [set(c) for c in _pf.requirement(regex)]
+    if got != [want]:
+        problems.append(f"the prefilter derives {got}, not {sorted(want)}")
+    return problems
+
+
+def _drop_key(regex, key, where):
+    """The rule with `key` removed from ONE copy of the key list."""
+    pattern = _LOOKAHEAD_KEYS if where == "lookahead" else _SCOPED_KEYS
+    keys = _one(pattern, regex, where)
+    fewer = "|".join(k for k in keys.split("|") if k != key)
+    head = "(?=" if where == "lookahead" else "(?-i:(?:"
+    mutated = regex.replace(head + keys, head + fewer, 1)
+    assert mutated != regex, f"{key} is not in the {where}"
+    return mutated
+
+
+def test_the_prefilter_derives_exactly_the_scoped_key_names():
+    """One clause, and it is the key alternation, no key more and none less."""
+    rx = _rule_regex()
+    assert len(_one(_SCOPED_KEYS, rx, "scope").split("|")) == 9
+    problems = _derivation_problems(rx)
+    assert problems == [], (
+        "GLS-SD-010-EMB no longer hands the prefilter its key names, so it "
+        "runs on every document again:\n  " + "\n  ".join(problems))
+
+
+@pytest.mark.parametrize("where", ["lookahead", "scope"])
+def test_control_a_key_dropped_from_one_copy_is_caught(where):
+    """Each copy is checked against the other, proven by removing a key from each."""
+    assert _derivation_problems(_drop_key(_rule_regex(), "PASSWORD", where))
+
+
+def test_control_a_key_dropped_from_the_lookahead_loses_its_rows():
+    """Why the drift matters: the lookahead gates the match, not only the skip."""
+    e = _mutate(**{RULE: _drop_key(_rule_regex(), "PASSWORD", "lookahead")})
+    _, ids = _ids(e, rows.MUST_FIRE["indented_two_spaces"])
+    assert RULE not in ids
+
+
+def test_control_without_the_lookahead_the_rule_derives_nothing():
+    """The lookahead is what derives, proven by removing it."""
+    rx = _rule_regex()
+    keys = _one(_LOOKAHEAD_KEYS, rx, "lookahead")
+    bare = rx.replace("(?=" + keys + ")", "", 1)
+    assert bare != rx
+    assert _pf.requirement(bare) == ()
+
+
+def test_the_engine_skips_the_rule_on_a_document_without_a_key(engine):
+    """The engine's own requirement and literal index, not a model of them.
+
+    A boundary, indentation and an `=` are all present; only the key is not.
+    The twin carries one key and must not be skipped.
+    """
+    (_m, rx, _g), = engine._compiled_by_id[RULE]
+    req = engine._regex_requirement[id(rx)]
+    keyless = '{"cfg":"\\tUSERNAME=hunter2","x":"\\n  HOST=db"}'
+    keyed = keyless.replace("USERNAME", "PASSWORD")
+    skip = [_pf.can_skip(req, engine._literal_index.present(_pf.fold(t)))
+            for t in (keyless, keyed)]
+    assert skip == [True, False]
+    assert RULE in _ids(engine, keyed)[1]

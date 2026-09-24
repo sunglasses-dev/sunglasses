@@ -2608,6 +2608,18 @@ PATTERNS = [
     # and swaps the case of every letter introducer (`\X0a`, `\U000a`,
     # `\n{LINE FEED}`), and the real decoders rule on every one (T9 RULING 32).
     #
+    # THE KEYS ARE WRITTEN TWICE SO THE PREFILTER CAN SKIP THE RULE (0.6.2 exit
+    # row, T9 ruling 5). The prefilter derives a rule's required literals from
+    # its parse tree and refuses any scope that REMOVES a flag, so the
+    # case-sensitive key scope gave it nothing and this rule ran on every
+    # document; it held the first KNOWN_UNSKIPPABLE entry. Splitting the
+    # boundary alternatives into separate entries was measured first and
+    # derives nothing either, for the same reason. The case-folded lookahead
+    # in front of the scope names the same nine keys and does derive them. It
+    # cannot change a verdict: wherever the case-sensitive scope matches a key,
+    # the folded lookahead matches at the same position. The two copies are
+    # held equal by test_the_prefilter_derives_exactly_the_scoped_key_names.
+    #
     # STILL UNREPORTED: an escape INSIDE the key's letters (`API\x5fKEY=`).
     # The key is a literal alternation; decoding it is the parser this rule
     # is not.
@@ -2707,6 +2719,8 @@ PATTERNS = [
             r"(?:[ \t]|(?-i:\\[ \tt]|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)"
             r"|\\0?(?:11|40)"
             r"|\\N\{(?ai:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)\}))*"
+            r"(?=API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))"
             r"(?:\s|(?-i:\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]"
