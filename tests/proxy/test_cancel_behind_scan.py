@@ -14,7 +14,8 @@ until the test has already written the cancel into the client's pipe. The
 proxy is still HOLDING the request at that moment, so a correct proxy honours
 the cancel: never forwards, answers REQUEST_CANCELLED once, delivers no result.
 
-RED on main 35f04ce. The fix PR removes the xfail line below and nothing else.
+RED on main 35f04ce. The fix PR removes the xfail line below (T8 did, in 170e17d on
+feat/cancel-wins-before-forward, where it is green 3/3 alone).
 """
 import json
 import os
@@ -42,6 +43,13 @@ def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_pa
             assert cancel_written.wait(10), "the test never wrote the cancel"
         return inspection.scan(params, channel=channel, binding=binding,
                                content_bytes=content_bytes)
+
+    # WARM THE ENGINE FIRST (T8, adopting this row in 170e17d). The first scan in a
+    # process builds the engine (~1.5 s) on the reader thread AFTER the cancel is
+    # written, which outlasted the 1 s below: upstream EOF then closed the session
+    # MALFORMED_UPSTREAM before the scan ended, and the row went red for a reason
+    # unrelated to cancel ordering whenever it ran first or alone.
+    inspection.default_engine()
 
     c_r, c_w = os.pipe()
     u_r, u_w = os.pipe()
