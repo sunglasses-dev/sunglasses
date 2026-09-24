@@ -82,6 +82,11 @@ ONE_CHAR = [
     _e("\\a", "\a", "python", "yaml"),
     _e("\\v", "\v", "python", "yaml"),
     _e("\\\n", "", "python", "yaml"),        # line continuation / escaped break
+    _e("\\\r", "", "python", "yaml"),
+    _e("\\\r\n", "", "python", "yaml"),
+    _e("\\\x85", "", "yaml"),                 # PyYAML breaks on these too
+    _e("\\\u2028", "", "yaml"),
+    _e("\\\u2029", "", "yaml"),
     # YAML 1.2 double-quoted (§5.7)
     _e("\\0", "\0", "python", "yaml"),       # Python reads it as octal
     _e("\\\t", "\t", "yaml"),
@@ -95,8 +100,9 @@ ONE_CHAR = [
 
 # Bytes that look like an escape and are not one in any of the three: the
 # decoded reading is the raw reading, so these are always allow controls.
-NOT_ESCAPES = ["\\R", "\\V", "\\F", "\\T", "\\l", "\\p", "\\E", "\\q",
-               "\\N{NOT A NAME}"]
+NOT_ESCAPES = (["\\R", "\\V", "\\F", "\\T", "\\l", "\\p", "\\E", "\\q",
+                "\\N{NOT A NAME}"]
+               + ["\\" + c for c in WHITESPACE if c not in " \t\n\r\x85\u2028\u2029"])
 
 # Python \N{...} names beyond unicodedata.name(): the formal aliases, and the
 # names of the controls, which have no unicodedata.name(). Each is checked
@@ -121,7 +127,8 @@ NAME_ALIASES = {
 # Every codepoint whose escaped spellings the matrix covers: everything the
 # literal rule gives a meaning to, plus near neighbours that must stay allow.
 CODEPOINTS = sorted({ord(c) for c in LINE_ENDS + DELIMS + INDENT + WHITESPACE + "="}
-                    | {0x00, 0x07, 0x08, 0x1B, 0x2D, 0x2F, 0x3A, 0x41, 0x5C, 0x5D, 0x7D})
+                    | {0x00, 0x07, 0x08, 0x1B, 0x2D, 0x2F, 0x3A, 0x41, 0x5C, 0x5D, 0x7D,
+                       0x200B, 0xFEFF})
 
 
 def _numeric(cp):
