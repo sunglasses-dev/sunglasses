@@ -516,3 +516,44 @@ def test_control_a_large_payload_to_a_child_that_reads_it_all_completes(tmp_path
     assert out["status"] == "complete", out
     assert out["observed_content_bytes"] > PIPE_OVER, (
         "the child did not receive the whole payload")
+
+
+# ── A FLOOD DURING A BLOCKED WRITE (ASTRA worker r2 GO, evidence limit) ──
+# r2 ruled from source that an overflow ends the reader while the writer is
+# still stuck in a payload the child never drains, so the fault comes at once
+# and not at the deadline. The flood row above reads stdin FIRST, so nothing
+# measured both at the same time. This row does: a payload over the pipe to a
+# child that never reads it, and a stdout flood over the bound. On a runner
+# that waits on the writer, or on the budget, it takes the whole 5 s.
+
+def test_a_flood_while_the_payload_write_is_blocked_is_stopped_at_once(tmp_path):
+    import threading
+    marker = tmp_path / "pid"
+    floods = _stalled_child(
+        marker, "w=sys.stdout.buffer.write\nwhile True: w(b'x'*65536)")
+    box = {}
+
+    def call():
+        started = time.monotonic()
+        box["out"] = worker_process.run(
+            {"params": {"text": "a" * PIPE_OVER}}, argv=floods,
+            binding=BINDING, timeout_ms=5000, stdout_limit=1024,
+            grace_ms=STALL_GRACE_MS)
+        box["s"] = time.monotonic() - started
+
+    t = threading.Thread(target=call, daemon=True)
+    t.start()
+    t.join(10.0)                    # past the 5 s budget: a slow mutant still returns
+    if t.is_alive():
+        try:
+            os.killpg(int(marker.read_text()), signal.SIGKILL)
+        except (OSError, ValueError):
+            pass
+        t.join(5)
+        pytest.fail("run() never returned with a blocked write and a flood")
+    out, took = box["out"], box["s"]
+    assert out["status"] == "exception", out
+    assert out["detector_status"] == worker_process.CAUSE_MALFORMED_OUTPUT, out
+    assert out["accepted"] is False and out["findings"] == []
+    assert took < 3.0, f"{took:.2f}s: the flood waited on the blocked write or the budget"
+    assert _gone(int(marker.read_text())), "the flooding child's group outlived its fault"
