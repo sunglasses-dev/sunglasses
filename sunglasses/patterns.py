@@ -2594,6 +2594,20 @@ PATTERNS = [
     # would fail at 1 MiB. Each fragment family has a mutation control in the
     # grammar test that removes it and watches the matrix go red.
     #
+    # A CHARACTER NAME FOLDS ASCII CASE ONLY, found by round 10's reviewer.
+    # The names sat in `(?i:...)`, and under Unicode matching that scope also
+    # equates four non-ASCII letters with ASCII ones: dotted and dotless I
+    # (U+0130, U+0131), long s (U+017F) and the Kelvin sign (U+212A). So
+    # `\N{L<U+0130>NE FEED}` read as a line feed and blocked, while Python,
+    # whose name lookup upper-cases with an ASCII toupper, refuses it as a
+    # SyntaxError and no reading of those bytes has a boundary. The scopes are
+    # `(?ai:...)` now: case-insensitive, ASCII only, so `\N{line feed}` and
+    # `\N{Line Feed}` still block. The grammar module no longer lists these
+    # spellings by hand. It asks the regex engine which codepoints fold to an
+    # ASCII letter, over all of Unicode, respells every table name with each,
+    # and swaps the case of every letter introducer (`\X0a`, `\U000a`,
+    # `\n{LINE FEED}`), and the real decoders rule on every one (T9 RULING 32).
+    #
     # STILL UNREPORTED: an escape INSIDE the key's letters (`API\x5fKEY=`).
     # The key is a literal alternation; decoding it is the parser this rule
     # is not.
@@ -2685,14 +2699,14 @@ PATTERNS = [
             r"|\\u(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])"
             r"|\\U0000(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])"
             r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)"
-            r"|\\N\{(?i:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE RETURN|CR"
+            r"|\\N\{(?ai:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE RETURN|CR"
             r"|LINE TABULATION|VERTICAL TABULATION|VT|FORM FEED|FF"
             r"|INFORMATION SEPARATOR (?:FOUR|THREE|TWO)|FILE SEPARATOR|GROUP SEPARATOR"
             r"|RECORD SEPARATOR|FS|GS|RS|NEXT LINE|NEL|LINE SEPARATOR|PARAGRAPH SEPARATOR"
             r"|QUOTATION MARK|APOSTROPHE|LEFT CURLY BRACKET|LEFT SQUARE BRACKET|COMMA)\}))"
             r"(?:[ \t]|(?-i:\\[ \tt]|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)"
             r"|\\0?(?:11|40)"
-            r"|\\N\{(?i:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)\}))*"
+            r"|\\N\{(?ai:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)\}))*"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
             r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))"
             r"(?:\s|(?-i:\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]"
@@ -2700,7 +2714,7 @@ PATTERNS = [
             r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]|202[89fF]|205[fF]|3000)"
             r"|\\U0000(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]|202[89fF]|205[fF]|3000)"
             r"|\\(?:0?(?:1[1-5]|3[4-7]|40)|205|240)"
-            r"|\\N\{(?i:SPACE|SP|NBSP|NO-BREAK SPACE|OGHAM SPACE MARK|EN QUAD|EM QUAD"
+            r"|\\N\{(?ai:SPACE|SP|NBSP|NO-BREAK SPACE|OGHAM SPACE MARK|EN QUAD|EM QUAD"
             r"|EN SPACE|EM SPACE|THREE-PER-EM SPACE|FOUR-PER-EM SPACE|SIX-PER-EM SPACE"
             r"|FIGURE SPACE|PUNCTUATION SPACE|THIN SPACE|HAIR SPACE|NARROW NO-BREAK SPACE"
             r"|NNBSP|MEDIUM MATHEMATICAL SPACE|MMSP|IDEOGRAPHIC SPACE|LINE SEPARATOR"
@@ -2710,7 +2724,7 @@ PATTERNS = [
             r"|FILE SEPARATOR|GROUP SEPARATOR|RECORD SEPARATOR|UNIT SEPARATOR|FS|GS|RS|US"
             r"|NEXT LINE|NEL)\}))*"
             r"(?:=|(?-i:\\x3[dD]|\\u003[dD]|\\U0000003[dD]|\\0?75"
-            r"|\\N\{(?i:EQUALS SIGN)\}))",
+            r"|\\N\{(?ai:EQUALS SIGN)\}))",
         ],
         "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. The value is not inspected at all: every exclusion tried on it was a switch an attacker could flip by writing the excluded shape around the secret, so this rule reports the assignment and accepts that documentation of an environment variable is reported too."
     },

@@ -1,194 +1,194 @@
 {
  "rule_id": "GLS-SD-010-EMB",
- "engine_sha": "d4efe0e4da294d0a52a510e0c2fe5374c72b58755136ac49f362b35d7d2bda10",
+ "engine_sha": "b24a5e0adee65c7594df2155c26f5daf84473b808c6e83d0fdc5048c04a352d1",
  "measured_on": "2026-09-24",
  "method": "1 MiB per shape, channel file, median of 5 scans, the full engine against the same engine without this rule, one process (M3 Max, Python 3.14). Ratio = with / without.",
  "why_unskippable": "The boundary alternatives (start, the splitlines set, quote/brace/bracket/comma, and their table-derived escapes) carry no literal; the 9 key names do.",
  "shapes": {
   "plain": {
-   "without_seconds": 1.957465,
-   "with_seconds": 1.979973
+   "without_seconds": 1.93891,
+   "with_seconds": 1.956186
   },
   "marker_only": {
-   "without_seconds": 2.930644,
-   "with_seconds": 2.935281
+   "without_seconds": 2.905826,
+   "with_seconds": 2.923425
   },
   "marker_no_object": {
-   "without_seconds": 1.00624,
-   "with_seconds": 1.040428
+   "without_seconds": 0.995986,
+   "with_seconds": 1.030186
   },
   "worst_seed": {
-   "without_seconds": 0.811131,
-   "with_seconds": 0.869193
+   "without_seconds": 0.791831,
+   "with_seconds": 0.846882
   }
  },
  "worst_seed_is": "unbroken_token/quote_run",
  "worst_seed_candidates": {
   "dense_prefix": {
    "quote_TOKEN_esc_tab": {
-    "without_seconds": 1.871997,
-    "with_seconds": 1.916086,
+    "without_seconds": 1.8535,
+    "with_seconds": 1.895087,
     "ratio": 1.02
    },
    "quote_TOKEN": {
-    "without_seconds": 1.734772,
-    "with_seconds": 1.817831,
-    "ratio": 1.05
+    "without_seconds": 1.718312,
+    "with_seconds": 1.753908,
+    "ratio": 1.02
    },
    "newline_TOKEN_space": {
-    "without_seconds": 1.616112,
-    "with_seconds": 1.654669,
+    "without_seconds": 1.571512,
+    "with_seconds": 1.608898,
     "ratio": 1.02
    },
    "quote_indent_TOKEN_sep": {
-    "without_seconds": 2.069553,
-    "with_seconds": 2.139367,
+    "without_seconds": 2.00937,
+    "with_seconds": 2.079353,
     "ratio": 1.03
    },
    "quote_TOKEN_esc_vtab": {
-    "without_seconds": 1.896551,
-    "with_seconds": 1.944711,
+    "without_seconds": 1.836941,
+    "with_seconds": 1.88593,
     "ratio": 1.03
    },
    "quote_TOKEN_esc_space": {
-    "without_seconds": 1.74113,
-    "with_seconds": 1.789672,
-    "ratio": 1.03
+    "without_seconds": 1.69275,
+    "with_seconds": 1.729185,
+    "ratio": 1.02
    },
    "quote_TOKEN_yaml_escs": {
-    "without_seconds": 2.064523,
-    "with_seconds": 2.156961,
+    "without_seconds": 2.015517,
+    "with_seconds": 2.10449,
     "ratio": 1.04
    },
    "hexlf_hexsp_TOKEN_hexsep": {
-    "without_seconds": 1.603939,
-    "with_seconds": 1.662822,
-    "ratio": 1.04
+    "without_seconds": 1.56288,
+    "with_seconds": 1.616688,
+    "ratio": 1.03
    },
    "namelf_namesp_TOKEN_namesep": {
-    "without_seconds": 1.736568,
-    "with_seconds": 1.824702,
-    "ratio": 1.05
+    "without_seconds": 1.698569,
+    "with_seconds": 1.77295,
+    "ratio": 1.04
    },
    "octlf_octsp_TOKEN_octsep": {
-    "without_seconds": 1.610011,
-    "with_seconds": 1.665168,
-    "ratio": 1.03
+    "without_seconds": 1.57296,
+    "with_seconds": 1.629629,
+    "ratio": 1.04
    }
   },
   "unbroken_token": {
    "x_run": {
-    "without_seconds": 0.794886,
-    "with_seconds": 0.808874,
+    "without_seconds": 0.778464,
+    "with_seconds": 0.792902,
     "ratio": 1.02
    },
    "quote_run": {
-    "without_seconds": 0.811131,
-    "with_seconds": 0.869193,
+    "without_seconds": 0.791831,
+    "with_seconds": 0.846882,
     "ratio": 1.07
    },
    "esc_tab_run": {
-    "without_seconds": 1.406649,
-    "with_seconds": 1.48406,
-    "ratio": 1.06
+    "without_seconds": 1.369178,
+    "with_seconds": 1.44015,
+    "ratio": 1.05
    },
    "quote_then_esc_tab_run": {
-    "without_seconds": 1.398207,
-    "with_seconds": 1.472367,
+    "without_seconds": 1.370191,
+    "with_seconds": 1.438302,
     "ratio": 1.05
    },
    "TOKEN_then_sep_run": {
-    "without_seconds": 2.167597,
-    "with_seconds": 2.252035,
+    "without_seconds": 2.123645,
+    "with_seconds": 2.198917,
     "ratio": 1.04
    },
    "backslash_run": {
-    "without_seconds": 0.814041,
-    "with_seconds": 0.862855,
+    "without_seconds": 0.801902,
+    "with_seconds": 0.848962,
     "ratio": 1.06
    },
    "esc_vtab_run": {
-    "without_seconds": 1.380374,
-    "with_seconds": 1.450812,
+    "without_seconds": 1.354059,
+    "with_seconds": 1.4253,
     "ratio": 1.05
    },
    "TOKEN_then_esc_vtab_run": {
-    "without_seconds": 2.138972,
-    "with_seconds": 2.25824,
+    "without_seconds": 2.095017,
+    "with_seconds": 2.21025,
     "ratio": 1.06
    },
    "TOKEN_then_esc_space_run": {
-    "without_seconds": 1.511563,
-    "with_seconds": 1.593132,
+    "without_seconds": 1.484338,
+    "with_seconds": 1.564668,
     "ratio": 1.05
    },
    "hex_lf_run": {
-    "without_seconds": 1.028341,
-    "with_seconds": 1.078518,
+    "without_seconds": 1.008016,
+    "with_seconds": 1.057892,
     "ratio": 1.05
    },
    "hex_space_run": {
-    "without_seconds": 1.014189,
-    "with_seconds": 1.065905,
+    "without_seconds": 1.009797,
+    "with_seconds": 1.061435,
     "ratio": 1.05
    },
    "u_lf_run": {
-    "without_seconds": 0.987692,
-    "with_seconds": 1.031751,
+    "without_seconds": 0.97625,
+    "with_seconds": 1.019665,
     "ratio": 1.04
    },
    "u_space_run": {
-    "without_seconds": 0.98436,
-    "with_seconds": 1.02764,
+    "without_seconds": 0.981341,
+    "with_seconds": 1.025018,
     "ratio": 1.04
    },
    "U_space_run": {
-    "without_seconds": 0.915076,
-    "with_seconds": 0.949118,
+    "without_seconds": 0.907019,
+    "with_seconds": 0.940647,
     "ratio": 1.04
    },
    "octal_lf_run": {
-    "without_seconds": 1.087529,
-    "with_seconds": 1.135864,
+    "without_seconds": 1.082536,
+    "with_seconds": 1.129791,
     "ratio": 1.04
    },
    "octal_space_run": {
-    "without_seconds": 1.081202,
-    "with_seconds": 1.136829,
+    "without_seconds": 1.07588,
+    "with_seconds": 1.128626,
     "ratio": 1.05
    },
    "name_lf_run": {
-    "without_seconds": 1.109094,
-    "with_seconds": 1.157248,
+    "without_seconds": 1.100522,
+    "with_seconds": 1.14459,
     "ratio": 1.04
    },
    "name_space_run": {
-    "without_seconds": 1.098814,
-    "with_seconds": 1.151677,
+    "without_seconds": 1.085436,
+    "with_seconds": 1.141839,
     "ratio": 1.05
    },
    "boundary_indent_pair_run": {
-    "without_seconds": 1.051154,
-    "with_seconds": 1.073586,
-    "ratio": 1.02
+    "without_seconds": 1.008292,
+    "with_seconds": 1.060863,
+    "ratio": 1.05
    },
    "TOKEN_then_hex_sep_run": {
-    "without_seconds": 1.592922,
-    "with_seconds": 1.654619,
+    "without_seconds": 1.517119,
+    "with_seconds": 1.576123,
     "ratio": 1.04
    },
    "TOKEN_then_name_sep_run": {
-    "without_seconds": 1.661786,
-    "with_seconds": 1.772398,
-    "ratio": 1.07
+    "without_seconds": 1.640231,
+    "with_seconds": 1.696481,
+    "ratio": 1.03
    },
    "TOKEN_then_u_nbsp_run": {
-    "without_seconds": 1.493664,
-    "with_seconds": 1.549914,
-    "ratio": 1.04
+    "without_seconds": 1.426764,
+    "with_seconds": 1.474156,
+    "ratio": 1.03
    }
   }
  },
  "exit": "0.6.2: give the rule derivable literals (split the boundary alternatives into regex entries that each carry the key alternation), then delete this receipt and its KNOWN_UNSKIPPABLE entry.",
- "measured_at": "r10 fix 3444647 (escape grammar by table), after the r8 re-measure; adds numeric and named escape seeds: \\x \\u \\U octal \\N{} runs of line feed and space, a boundary+indentation escape pair run, and escaped-separator runs after TOKEN"
+ "measured_at": "SD-010-EMB unpark prep per T9 RULING 32, on r10 3444647: the four \\N{} name scopes are (?ai:...) (ASCII-only case folding), same seeds as the r10 receipt"
 }

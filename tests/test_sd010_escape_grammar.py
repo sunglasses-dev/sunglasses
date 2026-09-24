@@ -8,6 +8,7 @@ table to the decoders and the rule to the table.
 import copy
 import pathlib
 import sys
+import unicodedata
 from collections import Counter
 
 import pytest
@@ -82,6 +83,77 @@ def test_the_matrix_has_both_verdicts_in_every_position():
     assert not any(c.expect_block for c in CASES if c.key != c.key.upper())
 
 
+# ── the matrix reaches every family a reviewer has probed ───────────────────
+# R32. Round 10's reviewer probed four families the r10 matrix never generated,
+# and one of them (non-ASCII letters inside a character name) was a false
+# positive 37 green tests and 17 dead mutations could not see. This is the red:
+# every escape round 10 put beside a key, classified by the same function as
+# every matrix spelling, must name a family the matrix has. The classifier is
+# written HERE, independent of sd010_escape_grammar, so it can be pointed at an
+# older matrix and show what that matrix lacked.
+
+def _family(spelling):
+    intro, rest = spelling[1:2], spelling[2:]
+    if intro in "Nn" and rest.startswith("{"):
+        if not rest.isascii():
+            return "named, non-ASCII letter in the name"
+        return "named" if intro == "N" else "named, lower-case introducer"
+    if intro == "x":
+        return "hex"
+    if intro == "X":
+        return "hex, upper-case introducer"
+    if intro == "u":
+        return "\\u, four digits" if len(rest) == 4 else "\\u, other length"
+    if intro == "U":
+        return "\\U, eight digits" if len(rest) == 8 else "\\U, other length"
+    if intro.isdigit():
+        return "octal"
+    return "one character"
+
+
+R10_PROBES = {   # verbatim from SD010EMB_e2942a5_r10_VERDICT.md
+    "r10_ascii_named_indent_control": "\\N{SPACE}",
+    "r10_ascii_named_boundary_control": "\\N{LINE FEED}",
+    "r10_long_s_lowername_control": "\\N{\u017fPACE}",
+    "r10_dotted_i_lowername_control": "\\N{L\u0130NE FEED}",
+    "r10_dotless_i_named_boundary": "\\N{L\u0131NE FEED}",
+    "r10_long_s_named_line_separator": "\\N{LINE \u017fEPARATOR}",
+    "r10_invalid_dotted_i_named_boundary": "\\N{L\u0130NE FEED}",
+    "r10_invalid_long_s_named_indent": "\\N{\u017fPACE}",
+    "r10_invalid_upper_X_boundary": "\\X0a",
+    "r10_invalid_upper_X_indent": "\\X20",
+    "r10_invalid_short_upper_U_boundary": "\\U000a",
+    "r10_lower_n_named_indent": "\\n{SPACE}",
+    "r10_lower_n_named_boundary": "\\n{LINE FEED}",
+    "r10_upper_X_separator": "\\X20",
+    "r10_lower_x_boundary_control": "\\x0a",
+    "r10_upper_U_full_boundary_control": "\\U0000000a",
+}
+
+
+def test_the_matrix_has_every_family_round_10_probed():
+    have = {_family(c.spelling) for c in CASES}
+    missing = {name: _family(s) for name, s in R10_PROBES.items() if _family(s) not in have}
+    assert missing == {}
+
+
+def test_every_round_10_probe_spelling_is_in_the_matrix():
+    spelled = {c.spelling for c in CASES}
+    assert sorted(n for n, s in R10_PROBES.items() if s not in spelled) == []
+
+
+def test_a_name_folds_ascii_only_in_the_decoder():
+    """The premise of the name family, asked of the decoder and not assumed:
+    ASCII case is free, a non-ASCII equivalent is refused."""
+    assert grammar.FOLD_EQUIVALENTS, "the regex engine folds no non-ASCII letter to ASCII"
+    assert grammar.decode("python", "\\N{Line Feed}") == "\n"
+    for fold, letters in grammar.FOLD_EQUIVALENTS.items():
+        name = unicodedata.name(letters[-1])            # LATIN CAPITAL LETTER <it>
+        assert grammar.decode("python", "\\N{%s}" % name) == letters[-1]
+        with pytest.raises(SyntaxError):
+            grammar.decode("python", "\\N{%s}" % (name[:-1] + fold))
+
+
 # ── the rule is the table ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("position", sorted(grammar.POSITIONS))
@@ -109,13 +181,13 @@ MUTATIONS = [
     ("boundary \\U", r"|\\U0000(?:00(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])|202[89])",
      "", "miss"),
     ("boundary octal", r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)", "", "miss"),
-    ("boundary names", r"\{(?i:LINE FEED|", r"\{(?i:", "miss"),
+    ("boundary names", r"\{(?ai:LINE FEED|", r"\{(?ai:", "miss"),
     ("boundary literal line ends", r"\v\f\x1c-\x1e\x85", "", "miss"),
     ("indentation one-char", r"\\[ \tt]", r"\\[t]", "miss"),
     ("indentation numeric", r"|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)", "", "miss"),
     ("indentation octal", r"|\\0?(?:11|40)", "", "miss"),
-    ("indentation names", r"(?i:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)",
-     r"(?i:SPACE)", "miss"),
+    ("indentation names", r"(?ai:SPACE|SP|CHARACTER TABULATION|HORIZONTAL TABULATION|TAB|HT)",
+     r"(?ai:SPACE)", "miss"),
     ("separator hex", r"|\\x(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)", "", "miss"),
     ("separator \\u", r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|1680|200[0-9aA]",
      r"|\\u(?:00(?:0[9a-dA-D]|1[c-fC-F]|20|85|[aA]0)|200[0-9aA]", "miss"),
@@ -128,15 +200,19 @@ MUTATIONS = [
      r"\\[\stnrfvNLP_]", "over"),
     ("escapes case-folded", "(?-i:\\\\", "(?:\\\\", "over"),
     ("a lazy space name", "|NBSP|NO-BREAK SPACE|", "|NBSP|[A-Z -]*SPACE|", "over"),
+    # r10: a name matched under Unicode folding read L\u0130NE FEED as LINE FEED.
+    ("names fold beyond ASCII", "(?ai:", "(?i:", "over"),
 ]
+# Mutations that replace EVERY occurrence, and the least count they need.
+_EVERYWHERE = {"escapes case-folded": 4, "names fold beyond ASCII": 4}
 
 
 @pytest.mark.parametrize("name,old,new,direction", MUTATIONS, ids=[m[0] for m in MUTATIONS])
 def test_control_each_fragment_is_seen_by_the_matrix(name, old, new, direction):
     rule = _rule()
     regex = rule["regex"][0]
-    if direction == "over" and name == "escapes case-folded":
-        assert regex.count(old) >= 4, name
+    if name in _EVERYWHERE:
+        assert regex.count(old) >= _EVERYWHERE[name], (name, regex.count(old))
         mutated = regex.replace(old, new)
     else:
         assert regex.count(old) == 1, (name, regex.count(old))

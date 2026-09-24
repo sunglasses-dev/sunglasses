@@ -24,6 +24,12 @@ key, then separator whitespace, then `=`.
   indentation  space or tab, any number
   key          one of KEYS, case-sensitive (the lowercase control)
   separator    any Python unicode whitespace (`\\s`), any number
+
+R32 (the r10 NO GO). The table is what each grammar's reference LISTS. Two
+families sit between listed escapes and only the decoders' own rules decide
+them, so they are ENUMERATED from those rules and every spelling is handed to
+the real decoders, which say what it decodes to (`DERIVED`, below). Nothing
+in either family is a claim written here.
 """
 from __future__ import annotations
 
@@ -31,7 +37,9 @@ import ast
 import dataclasses
 import json
 import re
+import string
 import unicodedata
+import warnings
 
 import yaml
 
@@ -131,6 +139,15 @@ CODEPOINTS = sorted({ord(c) for c in LINE_ENDS + DELIMS + INDENT + WHITESPACE + 
                        0x200B, 0xFEFF})
 
 
+def _names(cp):
+    names = list(NAME_ALIASES.get(cp, []))
+    try:
+        names.append(unicodedata.name(chr(cp)))
+    except ValueError:
+        pass
+    return names
+
+
 def _numeric(cp):
     out = []
     if cp < 0x100:
@@ -144,12 +161,7 @@ def _numeric(cp):
             out.append(_e(form % cp, chr(cp), "json", "python", "yaml"))
     for form in ("\\U%08x", "\\U%08X"):
         out.append(_e(form % cp, chr(cp), "python", "yaml"))
-    names = list(NAME_ALIASES.get(cp, []))
-    try:
-        names.append(unicodedata.name(chr(cp)))
-    except ValueError:
-        pass
-    for name in names:
+    for name in _names(cp):
         for spelled in (name, name.lower()):
             out.append(_e("\\N{%s}" % spelled, chr(cp), "python"))
     return out
@@ -177,10 +189,90 @@ def decode(grammar: str, spelling: str) -> str:
     if grammar == "json":
         return json.loads(quoted)
     if grammar == "python":
-        return ast.literal_eval(quoted)
+        with warnings.catch_warnings():     # `\\X` is an invalid-escape warning, kept
+            warnings.simplefilter("ignore")
+            return ast.literal_eval(quoted)
     if grammar == "yaml":
         return yaml.safe_load(quoted)
     raise ValueError(grammar)
+
+
+def decodings(spelling: str) -> tuple:
+    """What each grammar that accepts the spelling decodes it to. Empty when
+    none does, and then the raw reading is the only reading."""
+    out = []
+    for grammar in ("json", "python", "yaml"):
+        try:
+            got = decode(grammar, spelling)
+        except Exception:                  # noqa: BLE001 -- a refusal is an answer
+            continue
+        if isinstance(got, str) and got not in out:
+            out.append(got)
+    return tuple(out)
+
+
+# ── derived families: enumerated from the decoders' rules, decided by them ──
+#
+# 1. CASE FOLDING INSIDE \\N{name}. Python finds a character name ignoring
+#    ASCII case only: the lookup upper-cases the name with an ASCII toupper,
+#    so `\\N{line feed}` is a line feed and `\\N{L\u0130NE FEED}` is a
+#    SyntaxError. The rule's regex engine folds wider. Under IGNORECASE it
+#    equates some non-ASCII letters with ASCII ones, and FOLD_EQUIVALENTS asks
+#    the engine which, over every codepoint there is, rather than listing them.
+#    Every name the table spells is respelled with each equivalent in place of
+#    each letter it equates to, upper-case name and lower-case name.
+#
+# 2. THE INTRODUCER IN THE OTHER CASE. Every table escape whose introducer is
+#    a letter, with that letter's case swapped: `\\x0a` -> `\\X0a`, `\\u000a` ->
+#    `\\U000a` (four digits after the eight-digit introducer), `\\U0000000a` ->
+#    `\\u0000000a`, `\\N{...}` -> `\\n{...}`, `\\t` -> `\\T`.
+
+_ASCII_LETTER = re.compile(r"[A-Za-z]", re.IGNORECASE)
+
+FOLD_EQUIVALENTS = {
+    chr(c): "".join(a for a in string.ascii_letters if re.fullmatch(a, chr(c), re.IGNORECASE))
+    for c in range(0x80, 0x110000) if _ASCII_LETTER.fullmatch(chr(c))
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class Derived:
+    spelling: str
+    family: str
+    readings: tuple         # decodings(spelling), whatever the decoders said
+
+
+def _folded_names():
+    out = []
+    for cp in CODEPOINTS:
+        for name in _names(cp):
+            for base in (name, name.lower()):
+                for i, letter in enumerate(base):
+                    for fold, letters in FOLD_EQUIVALENTS.items():
+                        if letter in letters:
+                            out.append("\\N{%s}" % (base[:i] + fold + base[i + 1:]))
+    return out
+
+
+def _swapped_introducers():
+    return ["\\" + e.spelling[1].swapcase() + e.spelling[2:]
+            for e in TABLE if e.spelling[1:2].isascii() and e.spelling[1:2].isalpha()]
+
+
+def _derive():
+    known = {e.spelling for e in TABLE} | set(NOT_ESCAPES)
+    out, seen = [], set()
+    for family, spellings in (("name case fold", _folded_names()),
+                              ("introducer case", _swapped_introducers())):
+        for spelling in spellings:
+            if spelling in known or spelling in seen:
+                continue
+            seen.add(spelling)
+            out.append(Derived(spelling, family, decodings(spelling)))
+    return out
+
+
+DERIVED = _derive()
 
 
 def self_check():
@@ -233,15 +325,22 @@ def _readings(position, spelling, decoded):
     return raw, dec
 
 
+def _reports(position, spelling, readings, k):
+    """The parity contract: the raw reading, or any decoder's reading."""
+    raw = _readings(position, spelling, spelling)[0].replace("{K}", k)
+    return raw, literal_rule(raw) or any(
+        literal_rule(_readings(position, spelling, d)[1].replace("{K}", k))
+        for d in readings)
+
+
 def cases():
     out = []
-    items = [(e.spelling, e.decoded) for e in TABLE] + [(s, s) for s in NOT_ESCAPES]
-    for n, (spelling, decoded) in enumerate(items):
+    items = ([(e.spelling, (e.decoded,)) for e in TABLE] + [(s, (s,)) for s in NOT_ESCAPES]
+             + [(d.spelling, d.readings) for d in DERIVED])
+    for n, (spelling, readings) in enumerate(items):
         key = KEYS[n % len(KEYS)]
         for position in POSITIONS:
             for k in (key, key.lower()):
-                raw, dec = _readings(position, spelling, decoded)
-                raw, dec = raw.replace("{K}", k), dec.replace("{K}", k)
-                out.append(Case(position, spelling, k, raw,
-                                literal_rule(raw) or literal_rule(dec)))
+                raw, block = _reports(position, spelling, readings, k)
+                out.append(Case(position, spelling, k, raw, block))
     return out
