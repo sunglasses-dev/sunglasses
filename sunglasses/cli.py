@@ -1366,7 +1366,13 @@ def cmd_receipts(args):
 
     directory = sunglasses_home() / "receipts"
     files = sorted(directory.glob("*.jsonl"))
-    chain_logs = _chain_logs(directory) if getattr(args, "verify", False) else []
+    chain_logs = []
+    if getattr(args, "verify", False):
+        from .proxy.serve import state_root
+        # The proxy writes one chain per run under its own state root, and the
+        # hook's chain is under the home; both are signed with the home's key
+        # (T9 ruling 24b). A run moved with `--state-root` is not found here.
+        chain_logs = _chain_logs(directory) + _chain_logs(state_root() / "receipts")
     if args.today:
         import datetime
         today = datetime.datetime.now().strftime("%Y-%m-%d")
