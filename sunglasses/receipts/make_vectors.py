@@ -73,13 +73,17 @@ class WireChain:
     and the exported verifier vectors are both built with this, so the bytes
     an outside implementation copies are the bytes our tests ran on."""
 
-    def __init__(self, seed=TEST_SEED, chain_id="chain-verify-0001", interval=100):
+    def __init__(self, seed=TEST_SEED, chain_id="chain-verify-0001", interval=100,
+                 producer=None):
         self.key = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
         self.fp = wire.key_fingerprint(public_bytes(seed))
         self.chain_id = chain_id
         self.interval = interval
         self.lines = []
-        self._add({"event": "genesis", "prev_hash": None})
+        # A genesis names its producer the way the writer does; left out, the
+        # bytes are the ones every earlier vector was built from.
+        named = {} if producer is None else {"producer": producer}
+        self._add({"event": "genesis", "prev_hash": None, **named})
 
     def _head(self):
         return wire.record_hash(self.lines[-1]) if self.lines else None
@@ -273,6 +277,18 @@ def verifier_vectors() -> list:
     g.seal("genesis")
     out.append(_vector("6b", "genesis only: a started chain is not an empty one",
                        g.data(), g, results=_results(), through=1))
+    # T9 ruling 43 part 3: the proxy side of the same boundary. A proxy
+    # session is opened by its HEADER, so a proxy genesis with no HEADER is
+    # no session at all: not an orphan (nothing opened) and not complete.
+    h = WireChain(producer="hook")
+    h.seal("genesis")
+    out.append(_vector("6c", "a hook genesis only is complete, as 6b",
+                       h.data(), h, results=_results(), through=1))
+    p = WireChain(producer="proxy")
+    p.seal("genesis")
+    out.append(_vector("6d", "a proxy genesis with no HEADER is NO_SESSION",
+                       p.data(), p, results=_results(lifecycle="NO_SESSION"),
+                       through=1))
     out.append(_vector("7", "a retained endpoint beyond the log",
                        b"".join(c.lines[:2]), c, endpoint=c.endpoint(4),
                        results=_results(endpoint="EXPECTED_CHECKPOINT_MISSING"),

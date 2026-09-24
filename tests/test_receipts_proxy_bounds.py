@@ -93,6 +93,35 @@ def test_the_control_256_matches_are_kept_whole_with_no_count(home):
     assert "rule_ids_omitted" not in row
 
 
+def test_256_real_ids_are_all_kept(home):
+    """T9 ruling 43 part 1. Real catalog ids are at most 21 characters, and
+    256 of them fit the 6 KiB budget whole: the budget never cuts a real scan
+    short of the count bound."""
+    ids = [f"GLS-PROMPTINJ-XY-{n:04d}" for n in range(256)]
+    assert {len(i) for i in ids} == {21}
+    log = _log()
+    log.event("SCAN_RESULT", rule_ids=ids)
+    _end(log)
+    (row,) = _rows(home, "SCAN_RESULT")
+    assert row["rule_ids"] == ids
+    assert "rule_ids_omitted" not in row
+
+
+def test_256_grammar_max_ids_are_cut_by_bytes_and_counted_in_one_number(home):
+    """Whichever cuts first. 256 ids of the longest the grammar allows are
+    past 6 KiB, so the budget cuts before the count does, and the omitted
+    number covers both reasons. Each id costs its encoding, quotes included:
+    66 bytes, so 93 fit in 6144 and 163 are counted."""
+    ids = [f"GLS-{n:04d}-" + "Z" * 55 for n in range(256)]
+    assert {len(i) for i in ids} == {64}
+    log = _log()
+    log.event("SCAN_RESULT", rule_ids=ids)
+    _end(log)
+    (row,) = _rows(home, "SCAN_RESULT")
+    assert row["rule_ids"] == ids[:93]
+    assert row["rule_ids_omitted"] == 163
+
+
 def test_a_malformed_id_past_the_cut_is_still_refused(home):
     """The cut decides what is KEPT, never what is checked: an id that is not
     an engine rule id is refused wherever it sits in the list."""
