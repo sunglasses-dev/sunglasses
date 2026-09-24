@@ -1,6 +1,6 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-g",
+ "revision": "2026-09-23-h",
  "authored_by": "T10",
  "review_state": "unreviewed",
  "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
@@ -282,16 +282,18 @@
    "red_row": "tests/proxy/test_cancel_behind_scan.py (2199b7e): deterministic, xfail(strict) on main; fails without the marker on 'the server received a call the client cancelled while it was held'",
    "evidence": "warroom/CANCEL_BEHIND_SCAN_2026-09-23.md",
    "caveat": "The first key compared B's cancel with the REQUEST scan (the wrong item) and read True; corrected to the marked item's scan. The stub server answers instantly, so 1/15 is 'possible', not a rate."
+  },
+  "release_any_old_workers": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "the mediator emits WORKER_OUTPUT with accepted and discarded_reason (gauntlet/boundary/proxy/passthrough.py:379-381); gen2/adapter.py:50 lists the op in IMPLEMENTED (added 2026-09-22 with its test); gen2/execute.py:727 answers it from those WORKER_OUTPUT receipts, including discard and absence",
+   "caveat": "an inspection of the HARNESS mediator, not a run and not the product route: no executed witness exists and release semantics are not certified. All 5 delivered variants naming it stay blocked by event gaps, so reclassifying it moves no count (main stays 29/40/5/0/0)",
+   "reconciled": "2026-09-23 (T10), ASTRA capmap-88403e5-r1 NO GO: the entry was stale. It was unclassified with open_question \"discard machinery present (passthrough.py:375) but no evidence a schedule drives it\" (declared 2026-09-14, owner T8) after the op was implemented"
   }
  },
  "unclassified": {
   "execute_armed_worker_fault": {
    "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
-   "owner": "T8",
-   "declared_at": "2026-09-14"
-  },
-  "release_any_old_workers": {
-   "open_question": "discard machinery present (passthrough.py:375) but no evidence a schedule drives it",
    "owner": "T8",
    "declared_at": "2026-09-14"
   },
