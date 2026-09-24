@@ -119,6 +119,21 @@ def test_control_a_real_foreign_edit_still_warns_on_a_single_wrap(cfg, home, art
     assert res.byte_exact is False
 
 
+def test_a_reformat_only_edit_comes_back_identical_to_this_installs_original(
+        cfg, home, artifact):
+    """The other half of "compare the final file to the pre-install original":
+    an editor that re-indents the wrapped file moves it off the after-image, so
+    the restore is entry-only, and it still lands on the exact original."""
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    cfg.write_bytes(json.dumps(json.loads(read(cfg)), indent=4).encode("utf-8"))
+
+    res = inst.uninstall(cfg, "echo", home=home)
+
+    assert read(cfg) == CANON
+    assert res.byte_exact is True
+    assert res.earlier is False
+
+
 def test_lifo_is_unchanged(cfg, home, artifact):
     inst.install(cfg, "echo", artifact=artifact, home=home)
     inst.install(cfg, "fetch", artifact=artifact, home=home)
