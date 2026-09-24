@@ -54,6 +54,7 @@ class _Tail:
     torn: int             # bytes after the last LF
     damaged: bool         # a line that does not decode strictly
     last_checkpoint: tuple | None   # (seq, hash)
+    producer: str | None = None     # its genesis's, when that line decodes
 
 
 class Chain:
@@ -78,7 +79,14 @@ class Chain:
     def write(self, events, *, seal: str | None = None) -> None:
         events = [self._checked(event) for event in events]
         with self._locked():
-            tail = self._continuable(self._read_tail())
+            tail = self._read_tail()
+            if tail is not None and tail.producer not in (None, self._producer):
+                # One chain per LOG (R15): both producers sign with the user's
+                # one key, so another producer's seal verifies here too and
+                # would be continued. The directory is theirs; nothing is written.
+                raise ValueError(
+                    f"{self._dir.name}: a {tail.producer} chain, not {self._producer}'s")
+            tail = self._continuable(tail)
             pieces, after = self._plan(tail, events, seal)
             if (tail.seq + 1 + after.records + 1 > self._max_records     # +1: the close
                     or tail.size + after.size > self._max_bytes):
@@ -122,9 +130,11 @@ class Chain:
             size = handle.seek(0, os.SEEK_END)
             first = _first_line(handle)
             try:
-                chain_id = wire.decode_strict(first).get("chain_id") if first else None
+                genesis = wire.decode_strict(first) if first else {}
             except ValueError:
-                chain_id = None
+                genesis = {}
+            chain_id = genesis.get("chain_id")
+            producer = genesis.get("producer")
             buffer, start = b"", size
             while True:
                 lines, torn = _split_back(buffer, start == 0)
@@ -148,7 +158,8 @@ class Chain:
                      head=wire.record_hash(last_line) if last_line else None,
                      size=size, unsigned=len(after), torn=torn,
                      damaged=not lines or any(r is None for _, r in after),
-                     last_checkpoint=checkpoint)
+                     last_checkpoint=checkpoint,
+                     producer=producer if isinstance(producer, str) else None)
 
     def _vouched(self, record, chain_id) -> bool:
         """R15b: a checkpoint seals a tail only if it is this chain's and its
