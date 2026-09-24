@@ -108,13 +108,19 @@ class UninstallResult:
     `kept_at` names a retained copy that could NOT be used -- gone, or failing
     the digest recorded at install -- and was set aside rather than deleted, so
     a person can look at what failed. It is None on every ordinary uninstall.
+
+    `earlier` True means the file is byte-identical to the bytes an EARLIER
+    install on the same file captured, not the bytes this one captured (R38).
+    Two wraps undone first-installed-first end exactly where the user started,
+    and the second uninstall used to call that a change.
     """
 
-    __slots__ = ("byte_exact", "kept_at")
+    __slots__ = ("byte_exact", "kept_at", "earlier")
 
-    def __init__(self, byte_exact, kept_at=None):
+    def __init__(self, byte_exact, kept_at=None, earlier=False):
         self.byte_exact = byte_exact
         self.kept_at = kept_at
+        self.earlier = earlier
 
 
 def _digest_bytes(b):
@@ -2149,6 +2155,50 @@ def _is_digest(value) -> bool:
             and all(c in "0123456789abcdef" for c in value))
 
 
+def _earlier_originals(home, name, target_id, sha_before):
+    """The pre-install digests of every wrap this install stacks directly on.
+
+    R38. An install on top of another install's wrapper captures THAT wrapper
+    as its original, so the bytes the user started from live only in the
+    earlier record, and that record is gone once the earlier wrap is undone.
+    Carried forward here as digests only: they decide the WORDING of an
+    uninstall and nothing it writes.
+
+    The link is exact: an earlier record counts only when the file this
+    install read is byte-for-byte the wrapper that record left. An edit in
+    between breaks the chain, and a broken chain gets the warning. Runs under
+    the target's transaction lock, so no other install on this file can move a
+    record while it is read.
+    """
+    found = []
+    d = _record_paths(home, name)[0]
+    for rec_path in sorted(d.glob("*.json")):
+        other = rec_path.stem
+        if other == name:
+            continue
+        try:
+            rec = _read_record(rec_path, other, expect_state="complete")
+        except ConfigConflict:
+            continue
+        if rec.get("target_path") != target_id:
+            continue
+        if rec.get("file_sha_after") != sha_before:
+            continue
+        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
+            if _is_digest(digest) and digest not in found:
+                found.append(digest)
+    return found
+
+
+def _earlier_of(record):
+    """A record's carried digests, or none at all when they are not a list of
+    digests. Unreadable means the conservative sentence, never the claim."""
+    earlier = record.get("earlier_sha_before")
+    if not isinstance(earlier, list) or not all(_is_digest(d) for d in earlier):
+        return ()
+    return tuple(earlier)
+
+
 def _read_record(path, name, *, expect_state):
     """Read and validate a record, or refuse.
 
@@ -2413,6 +2463,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         "original_bytes_path": str(bytes_path),
         "target_path": target_id,
         "entry_existed": entry_existed,
+        "earlier_sha_before": _earlier_originals(
+            home, name, target_id, _digest_bytes(raw)),
     }
 
     try:
@@ -2473,6 +2525,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             "installed_entry": fresh_wrapper,
             "file_sha_before": _digest_bytes(current),
             "entry_existed": fresh_existed,
+            "earlier_sha_before": _earlier_originals(
+                home, name, target_id, _digest_bytes(current)),
         })
         try:
             pending_path.write_text(
@@ -2906,8 +2960,9 @@ def _uninstall_locked(config_path, name, *, home):
             raise retained_failure
         _AUTHORISED[str(target)] = authority
 
+    restored = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
     try:
-        _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+        _atomic_write(target, restored)
     finally:
         spent = _AUTHORISED.pop(str(target), None)
         if spent is not None:
@@ -2930,4 +2985,13 @@ def _uninstall_locked(config_path, name, *, home):
             except OSError:
                 pass
     _discard(*(q for q in (rec_path, pending_path, retained_path) if q))
+
+    # R38. The file moved, and the restore may still have put back exactly
+    # what was there before, so the answer is taken from the bytes written and
+    # not from the path taken. Digests only: the claim needs no retained copy.
+    written = _digest_bytes(restored)
+    if written == record.get("file_sha_before"):
+        return UninstallResult(byte_exact=True, kept_at=kept_at)
+    if written in _earlier_of(record):
+        return UninstallResult(byte_exact=True, kept_at=kept_at, earlier=True)
     return UninstallResult(byte_exact=False, kept_at=kept_at)

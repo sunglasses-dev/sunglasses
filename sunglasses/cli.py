@@ -2293,7 +2293,14 @@ def cmd_uninstall(args):
         print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {e}")
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
-    if res.byte_exact:
+    if res.byte_exact and res.earlier:
+        # R38. The end state is the file before an earlier install on it, so
+        # saying it changed would be false; saying which original it matches
+        # keeps the claim exact.
+        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
+              f"{DIM}(byte-identical to the file before an earlier "
+              f"install){RESET}\n")
+    elif res.byte_exact:
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
               f"{DIM}(byte-identical){RESET}\n")
     else:
