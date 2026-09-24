@@ -23,6 +23,7 @@ from __future__ import annotations
 
 APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 
+from . import inspection
 from . import snapshot as _snapshot
 
 
@@ -69,6 +70,10 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
     revision, epoch = store.revision, store.epoch
 
     collector = collect or _snapshot.collect
+    # R28, the belt. serve.main warms the engine at startup; a caller that
+    # reaches here without it still pays the cold build OUTSIDE the list
+    # deadline. Idempotent: one engine per process.
+    inspection.default_engine()
     found = collector(list_pages, scan=scan)
 
     if not found.complete:
