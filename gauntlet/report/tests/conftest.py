@@ -28,10 +28,13 @@ import classify  # noqa: E402
 @pytest.fixture(autouse=True, scope="session")
 def reviewed_map_for_the_suite(tmp_path_factory):
     original = classify.MAP_PATH
-    data = json.loads(pathlib.Path(original).read_text())
-    data["review_state"] = classify.REVIEWED
-    path = tmp_path_factory.mktemp("capmap-session") / "reviewed.json"
-    path.write_text(json.dumps(data))
+    # Reviewed THROUGH THE MECHANISM (review.record), never by typing the state:
+    # a typed `reviewed` is exactly what load_map now refuses.
+    import review
+    path = tmp_path_factory.mktemp("capmap-session") / "capability_map.json"
+    path.write_text(pathlib.Path(original).read_text())
+    review.record(path, "**GO**: test-suite fixture, not a real review.\n", verdict="GO",
+                  reviewer="TEST-FIXTURE", round_id="suite")
     classify.MAP_PATH = path
     yield path
     classify.MAP_PATH = original

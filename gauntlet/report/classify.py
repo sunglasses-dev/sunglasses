@@ -38,6 +38,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "boundary")
 
 from gen2 import adapter                                   # noqa: E402
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import review                                              # noqa: E402
+
 MAP_PATH = pathlib.Path(__file__).with_name("capability_map.json")
 
 ROUTE = "route_capability"
@@ -165,6 +168,14 @@ def load_map(path: pathlib.Path | None = None) -> dict:
             f"{REVIEWED!r}. A well-formed map that nobody reviewed is not a "
             "reviewed map, and every ceiling computed from one is an assertion "
             "wearing a citation.")
+    # A REVIEW IS RECORDED, NEVER TYPED (T9 row 2026-09-23). `reviewed` counts only
+    # with a receipt bound to this map's content and a committed GO verdict; see
+    # review.py. Before this, two fixtures typed the string and a test asserted
+    # that typing it worked.
+    try:
+        review.verify(path, data)
+    except review.ReviewInvalid as exc:
+        raise MapInvalid(f"capability map review is not established: {exc}") from None
 
     overlap = set(data["classified"]) & set(data["unclassified"])
     if overlap:
