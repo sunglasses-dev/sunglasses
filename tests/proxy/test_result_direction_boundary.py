@@ -705,9 +705,22 @@ def _fail_receipts_at(route, event):
     return fired
 
 
-@pytest.mark.parametrize("event", ["SCAN_STARTED", "SCAN_RESULT",
-                                   "RELEASE_AUTHORIZED"])
-def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event):
+def _receipt_rows(tmp_path):
+    return [json.loads(line) for path in sorted(tmp_path.rglob("*.jsonl"))
+            for line in path.read_text().splitlines() if line.strip()]
+
+
+# Where the log dies decides whether a completed scan is ON DISK when the
+# refusal is paid. Stated per event, so the oracle below can never go vacuous:
+# a failure at SCAN_RESULT means that row was never written.
+_SCAN_ON_DISK = {"SCAN_STARTED": False, "SCAN_RESULT": False,
+                 "RELEASE_AUTHORIZED": True}
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+@pytest.mark.parametrize("event", sorted(_SCAN_ON_DISK))
+def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event,
+                                                            finding):
     """XE03. The bounded refusal reached ONE path out of many.
 
     Round 5 paid it from `_release_frame`, so it arrived only when the frame
@@ -719,16 +732,56 @@ def test_a_receipt_failure_anywhere_answers_the_client_once(tmp_path, event):
 
     The refusal is keyed on OWNERSHIP now -- admitted and not yet answered on
     the wire -- so it is paid wherever the log dies, exactly once.
+
+    ASTRA refused-e430147 r2. AND IT SAYS WHAT THE RECEIPT SAYS. The payer
+    hardcoded `not_run` with both booleans false, so a failure at the release
+    authorisation -- after a SCAN_RESULT of `complete` was on disk -- told the
+    client no scan ran. This row used to assert exactly that. The oracle is
+    the log: a SCAN_RESULT on disk is what the refusal reports, and no
+    SCAN_RESULT means `not_run`.
     """
-    route, out = _route(tmp_path, finding=False)
+    route, out = _route(tmp_path, finding=finding)
     fired = _fail_receipts_at(route, event)
     route.pump_upstream(_answer())
 
     assert fired, f"the {event} receipt was never reached"
     assert _reason_codes(out) == ["RECEIPT_IO_ERROR"], _reason_codes(out)
-    body = json.loads([raw for raw in out if raw][0])
-    assert body["error"]["data"]["inspection_complete"] is False, body
-    assert body["error"]["data"]["status"] == "not_run", body
+    data = json.loads([raw for raw in out if raw][0])["error"]["data"]
+    results = [r for r in _receipt_rows(tmp_path) if r.get("kind") == "SCAN_RESULT"]
+    assert len(results) == int(_SCAN_ON_DISK[event]), (event, results)
+    if results:
+        assert results[0]["status"] == "complete", results
+        for field in ("status", "accepted", "inspection_complete"):
+            assert data[field] == results[0][field], (
+                f"{event}: the receipt says {field}={results[0][field]!r} and "
+                f"the client was told {data[field]!r}")
+    else:
+        assert (data["status"], data["accepted"], data["inspection_complete"]) \
+            == ("not_run", False, False), data
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_a_receipt_failure_pays_an_unscanned_obligation_as_not_run(tmp_path,
+                                                                   finding):
+    """The other half of the r2 correction. The payer answers EVERY client
+    still owed, and only the one whose scan is on disk carries a scan's
+    fields: request 2 was admitted and never answered, nothing inspected it,
+    and it is told `not_run` whatever request 1's scan found."""
+    route, out = _route(tmp_path, finding=finding)
+    assert route.session.admit_request(2, method="tools/call", origin="client")
+    _fail_receipts_at(route, "RELEASE_AUTHORIZED")
+    route.pump_upstream(_answer())
+
+    frames = {json.loads(raw)["id"]: json.loads(raw)["error"]["data"]
+              for raw in out if raw}
+    assert sorted(frames) == [1, 2], frames
+    assert {d["reason_code"] for d in frames.values()} == {"RECEIPT_IO_ERROR"}
+    results = [r for r in _receipt_rows(tmp_path) if r.get("kind") == "SCAN_RESULT"]
+    assert len(results) == 1 and results[0]["status"] == "complete", results
+    for field in ("status", "accepted", "inspection_complete"):
+        assert frames[1][field] == results[0][field], (field, frames[1])
+    assert (frames[2]["status"], frames[2]["accepted"],
+            frames[2]["inspection_complete"]) == ("not_run", False, False), frames[2]
 
 
 def test_a_failure_recording_completion_does_not_answer_twice(tmp_path):
