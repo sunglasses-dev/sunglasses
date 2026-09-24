@@ -62,3 +62,37 @@ def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkey
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
     assert sync.sync_readme(stats) is False
     assert (tmp_path / "README.md").read_text() == real
+
+
+KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the pre-screen "
+                "index holds {} — {} generic keywords are deliberately excluded from it. "
+                "`engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |")
+
+
+def _expected_table(stats):
+    d, e, i = stats["keywords_declared"], stats["keyword_entries"], stats["keywords"]
+    return [f'| Patterns | {stats["patterns"]:,} |',
+            KEYWORDS_ROW.format(f"{d:,}", f"{e:,}", f"{i:,}", f"{d - i:,}"),
+            f'| Attack categories | {stats["categories"]:,} |']
+
+
+def test_sync_readme_rewrites_every_stats_table_row(tmp_path, monkeypatch):
+    """Each row is REWRITTEN, counted once. The declared count goes in the declared
+    slot and the index count only in the index slot, never the other way round."""
+    sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_table")
+    stats = sync.get_real_stats()
+    stale = ["| Patterns | 1 |", KEYWORDS_ROW.format("2", "3", "4", "5"), "| Attack categories | 6 |"]
+    (tmp_path / "README.md").write_text("\n".join(["x", *stale, "y"]) + "\n")
+    monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
+    assert sync.sync_readme(stats) is True
+    lines = (tmp_path / "README.md").read_text().splitlines()
+    for want in _expected_table(stats):
+        assert lines.count(want) == 1, want
+    assert not set(stale) & set(lines)
+
+
+def test_real_readme_stats_table_is_current_and_each_row_is_hit_once():
+    sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_table_real")
+    lines = (ROOT / "README.md").read_text().splitlines()
+    for want in _expected_table(sync.get_real_stats()):
+        assert lines.count(want) == 1, f"README table row not current: {want[:60]}"

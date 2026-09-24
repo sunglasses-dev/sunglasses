@@ -59,6 +59,7 @@ def get_real_stats():
         # README's "unique keywords" is the DECLARED count; `keywords` is the smaller
         # pre-screen index. Writing the index there would state a different number.
         "keywords_declared": info["keywords_declared"],
+        "keyword_entries": info["keyword_entries"],
         "regex": regex_count,
         "dedicated_pattern_languages": languages,
         "version": version,
@@ -95,10 +96,19 @@ def sync_readme(stats):
     """Update README.md stats table and What Works Today section."""
     readme = REPO_ROOT / "README.md"
     replacements = [
-        # Stats table
-        (r'\| Patterns \| \d+ \|', f'| Patterns | {stats["patterns"]} |'),
-        (r'\| Keywords \| \d+ \|', f'| Keywords | {stats["keywords"]} |'),
-        (r'\| Attack categories \| \d+ \|', f'| Attack categories | {stats["categories"]} |'),
+        # Stats table. The README writes thousands separators, so a bare \d+ matched
+        # nothing and these were silent no-ops. The Keywords row carries four numbers:
+        # the DECLARED count leads, the pre-screen index (stats["keywords"]) appears
+        # only where the row says "index holds", and the excluded count is their
+        # difference, so the row cannot contradict itself after a sync.
+        (r'\| Patterns \| [\d,]+ \|', f'| Patterns | {stats["patterns"]:,} |'),
+        (r'\| Keywords \| [\d,]+ unique declared \([\d,]+ entries across all patterns\); '
+         r'the pre-screen index holds [\d,]+ \u2014 [\d,]+ generic keywords',
+         f'| Keywords | {stats["keywords_declared"]:,} unique declared '
+         f'({stats["keyword_entries"]:,} entries across all patterns); '
+         f'the pre-screen index holds {stats["keywords"]:,} \u2014 '
+         f'{stats["keywords_declared"] - stats["keywords"]:,} generic keywords'),
+        (r'\| Attack categories \| [\d,]+ \|', f'| Attack categories | {stats["categories"]:,} |'),
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
         # What Works Today line. It must match the README as written (thousands
