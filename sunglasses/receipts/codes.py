@@ -72,6 +72,10 @@ CODES = {
         "no record was verified, so there is no lifecycle to judge (T9 ruling "
         "R41). Not a pass and not a failure; the integrity result says why "
         "nothing verified.",
+    "NO_SESSION":
+        "a proxy segment with its genesis and no HEADER: no session was "
+        "opened, so there is none to judge (T9 ruling R43). Not an orphan, "
+        "since nothing opened, and not complete. Not a pass and not a failure.",
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
     "LIFECYCLE_ORPHAN": "an opening with no terminal, or a terminal with no opening",
     "LIFECYCLE_DUPLICATE": "more than one settlement for one invocation",

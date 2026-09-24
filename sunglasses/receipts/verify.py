@@ -261,7 +261,12 @@ def _proxy_lifecycle(prefix):
     has its terminal, and the items inside were not paired (ruling 24)."""
     events = [record.get("event") for _, record, _ in prefix
               if record.get("event") not in CHAIN_EVENTS]
-    if not events or events[0] != "HEADER":
+    if not events:
+        # A genesis and nothing else: the proxy opens a session with HEADER,
+        # so none was opened. ORPHAN would be a false red, COMPLETE a false
+        # green (ruling 43; vector 6d, and 6c for the hook side).
+        return "NO_SESSION"
+    if events[0] != "HEADER":
         return "LIFECYCLE_ORPHAN"
     if not any(event in PROXY_TERMINALS for event in events):
         return "LIFECYCLE_ORPHAN"
