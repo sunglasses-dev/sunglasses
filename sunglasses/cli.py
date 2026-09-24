@@ -1266,6 +1266,44 @@ def _receipts_init(home):
     return 0
 
 
+def _receipts_off(home):
+    """R21 (c): the only road back to unsigned rows, and it is on the record."""
+    from .receipts import optin
+    try:
+        done = optin.turn_off(home)
+    except (OSError, ValueError) as exc:
+        print(f"\n  {RED}Signing was NOT turned off:{RESET} "
+              f"{_display(f'{type(exc).__name__}: {exc}', limit=200)}\n")
+        return 1
+    if done == "already off":
+        print(f"\n  {DIM}Signing is already off. Nothing was changed.{RESET}\n")
+        return 0
+    how = ("sealed with your key" if done == "sealed" else
+           "as an UNSIGNED row, because the key cannot sign; --verify will "
+           "show it as an unverified tail")
+    print(f"\n  {YELLOW}Signing is off.{RESET} The hook's chain ends with the "
+          f"off record, {how}.")
+    print(f"  {DIM}The private key moved to {home / optin.KEY_DIR / optin.RETIRED_DIR}; "
+          f"the public key stays, so the chain still verifies.\n  From now on "
+          f"receipts are unsigned day files. `sunglasses receipts init` makes "
+          f"a new key.{RESET}\n")
+    return 0
+
+
+def _verify_key(home):
+    """R21 (b): signing is on and the key cannot sign. Said by name, with the
+    cause; the logs are still verified with the public key."""
+    from .receipts import optin
+    if not optin.opted_in(home):
+        return 0
+    try:
+        optin.signer(home)
+    except optin.KeyUnusable as cause:
+        print(f"\n  {RED}KEY_UNUSABLE{RESET} {_display(str(cause), limit=400)}")
+        return 1
+    return 0
+
+
 def _chain_logs(directory):
     """Each signed log is its own directory of segments (T9 ruling 15)."""
     if not directory.is_dir():
@@ -1363,6 +1401,8 @@ def cmd_receipts(args):
 
     if getattr(args, "action", None) == "init":
         return _receipts_init(sunglasses_home())
+    if getattr(args, "action", None) == "off":
+        return _receipts_off(sunglasses_home())
 
     directory = sunglasses_home() / "receipts"
     files = sorted(directory.glob("*.jsonl"))
@@ -1433,7 +1473,7 @@ def cmd_receipts(args):
                 unparseable.append((path, lineno, _unreadable_preview(line)))
 
     if getattr(args, "verify", False):
-        code = 0
+        code = _verify_key(sunglasses_home())
         if files:
             # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
             # exit code is the lifecycle verdict it always had.
@@ -2250,9 +2290,10 @@ def main():
     receipts_parser = subparsers.add_parser(
         "receipts", help="Show the firewall audit trail")
     receipts_parser.add_argument(
-        "action", nargs="?", choices=["init"],
+        "action", nargs="?", choices=["init", "off"],
         help="init: create YOUR receipt signing key (needs sunglasses[receipts]). "
-             "Nothing else ever creates one.")
+             "Nothing else ever creates one. off: stop signing, recorded as the "
+             "signed log's last record; the only way back to unsigned receipts.")
     receipts_parser.add_argument(
         "--fingerprint", metavar="FP",
         help="With --verify: the key fingerprint you kept elsewhere. Without it "

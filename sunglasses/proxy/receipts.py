@@ -393,7 +393,11 @@ def _chain_for(directory, home):
         home = sunglasses_home()
     home = pathlib.Path(home)
     if not any((home / "keys").glob("receipt-*.ed25519")):
-        return None
+        if not (home / "receipts" / "hook").is_dir():
+            return None
+        from ..receipts import optin
+        if not optin.opted_in(home):     # R21: only `receipts off` opts out
+            return None
     from ..receipts import chain, optin
     try:
         signer = optin.signer(home)

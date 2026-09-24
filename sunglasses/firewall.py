@@ -1698,15 +1698,24 @@ class _HookReceipts:
     def __init__(self, home):
         self.home = home
         self.signed = any((home / "keys").glob("receipt-*.ed25519"))
+        if not self.signed and (home / "receipts" / "hook").is_dir():
+            # R21: a deleted key is not `receipts off`. A hook chain that the
+            # off record has not ended still means the user opted in.
+            from .receipts import optin
+            self.signed = optin.opted_in(home)
         self._chain = None
 
     def _writer(self):
         if self._chain is None:
-            from .receipts import chain, keys
+            from .receipts import optin
+            # Raises KeyUnusable naming the cause, before the signing code or
+            # the chain is touched (R21).
+            signer = optin.signer(self.home)
+            from .receipts import chain
             # One writer for both records: its in-memory note of the opening
             # it wrote is what lets the close seal it (R15d).
             self._chain = chain.Chain(self.home / "receipts" / "hook",
-                                      keys.load(self.home), producer="hook")
+                                      signer, producer="hook")
         return self._chain
 
     def opening(self, row: dict) -> None:
@@ -1985,6 +1994,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
                 check = ("Check the signing key in ~/.sunglasses/keys (private to "
                          "you, and sunglasses[receipts] installed), then the "
                          "receipts directory for permissions and disk space.")
+                from .receipts import optin
+                if isinstance(exc, optin.KeyUnusable):
+                    # R21 (a): the cause and the one command that clears it.
+                    check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
             decision = Decision(
                 "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
                 "SUNGLASSES firewall: the audit trail could not be written, so this "

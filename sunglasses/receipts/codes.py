@@ -25,6 +25,9 @@ CODES = {
     "KEY_TRUSTED": "the supplied key matches an independently obtained fingerprint",
     "KEY_UNTRUSTED": "valid under this supplied key; ownership unknown",
     "EXPECTED_KEY_MISMATCH": "the key does not match the pinned fingerprint",
+    "KEY_UNUSABLE": ("signing is on and the key cannot sign, so nothing new is "
+                     "signed; the cause and the command that clears it are "
+                     "printed with it (T9 ruling R21)"),
 
     # chain integrity
     "CHAIN_OK": "hashes and signatures hold across the verified prefix",

@@ -44,6 +44,9 @@ GENESIS = "genesis"
 PAIRS = {"in_flight": ("decision", "eval_id")}
 TERMINALS = {terminal: (opening, key) for opening, (terminal, key) in PAIRS.items()}
 CHAIN_EVENTS = {GENESIS, CHECKPOINT}
+# `sunglasses receipts off`, the hook chain's last word (R21 c). Known, and
+# pairs with nothing.
+CONTROL_EVENTS = {"receipts_off"}
 
 # The proxy's vocabulary, frozen here because this verifier stands alone and
 # imports nothing from the product; a test holds it equal to
@@ -224,7 +227,7 @@ def _lifecycle(prefix):
     for _, record, _ in prefix:
         event = record.get("event")
         body = record.get("body") or {}
-        if event in CHAIN_EVENTS:
+        if event in CHAIN_EVENTS or event in CONTROL_EVENTS:
             continue
         if event in PAIRS:
             open_[(event, body.get(PAIRS[event][1]))] = True
