@@ -715,7 +715,8 @@ class Route:
             # them would tell an operator the wrong thing to do next.
             self._withhold(request_id, outcome.provenance or
                            REASON_APPROVAL_REQUIRED, RULE_APPROVAL,
-                           attempt=attempt)
+                           attempt=attempt,
+                           rule_ids=getattr(outcome, "rule_ids", ()))
             return
 
         found = outcome.snapshot
@@ -1003,7 +1004,7 @@ class Route:
                        result=result)
 
     def _withhold(self, request_id, reason, rule, *, attempt=None,
-                  settlement=None, result=None, budget=None):
+                  settlement=None, result=None, budget=None, rule_ids=None):
         # R-168-R12/(b). THE BODY IS BUILT FIRST so the two cases can be one
         # if/else and the take can sit at the top level, where it plainly
         # dominates the write. Before this the take lived inside the claim
@@ -1029,7 +1030,8 @@ class Route:
             inspected_utf8_bytes=result.get("inspected_utf8_bytes", 0),
             observed_content_bytes=result.get("observed_content_bytes", 0),
             elapsed_ms=result.get("elapsed_ms", 0),
-            rule_ids=settlement.rule_ids if settlement else (),
+            rule_ids=(settlement.rule_ids if settlement
+                       else (rule_ids or ())),
             catalog=self.catalog,
             **self._approval_hint(reason))
         # R-168-R9/(b). TAKE, do not assume. If this obligation is already
