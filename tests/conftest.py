@@ -89,3 +89,18 @@ _ROOT = str(_pathlib.Path(__file__).resolve().parents[1])
 if _ROOT not in _os.environ.get("PYTHONPATH", "").split(_os.pathsep):
     _os.environ["PYTHONPATH"] = _os.pathsep.join(
         [_ROOT] + [p for p in _os.environ.get("PYTHONPATH", "").split(_os.pathsep) if p])
+
+
+# The user's home is not the suite's. With SUNGLASSES_HOME unset the product
+# reads ~/.sunglasses, so a dev box that ran `sunglasses receipts init` would
+# have every proxy test here sign with the developer's real key, and a --verify
+# test would read the developer's real chains: a suite that passes or fails by
+# the machine it runs on. Each test gets an empty home of its own; a test that
+# sets SUNGLASSES_HOME itself still wins, because its setenv comes later.
+# tests/test_suite_home_isolation.py is the control.
+import pytest as _pytest
+
+
+@_pytest.fixture(autouse=True)
+def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
+    monkeypatch.setenv("SUNGLASSES_HOME", str(tmp_path_factory.mktemp("sunglasses-home")))
