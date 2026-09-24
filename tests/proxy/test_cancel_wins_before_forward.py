@@ -36,7 +36,7 @@ def _cancel(request_id):
                         "params": {"requestId": request_id}}) + "\n").encode()
 
 
-def _drive(tmp_path, request_id, *, during_scan, settle=1.0):
+def _drive(tmp_path, request_id, *, during_scan, close_after_done=False):
     """Send one held call; while its scan runs, `during_scan(write)` sends more.
     Returns (forwarded tools/call frames, client replies, receipt rows, source)."""
     inspection.default_engine()
@@ -50,11 +50,22 @@ def _drive(tmp_path, request_id, *, during_scan, settle=1.0):
 
     c_r, c_w = os.pipe()
     forwarded = []
+    # EVENT-GATED, never a settle sleep: the item is DECIDED when the client
+    # gets an answer for it or the server gets the call. A fixed sleep here is
+    # a clock-shaped check -- it raced a cold engine build once already.
+    decided = threading.Event()
 
     def upstream_write(raw):
         forwarded.append(raw)
+        if json.loads(raw).get("id") == request_id:
+            decided.set()
 
-    client = _H["_Sink"]()
+    sink = _H["_Sink"]()
+
+    def client(raw):
+        sink(raw)
+        if any(m.get("id") == request_id for m in sink.messages()):
+            decided.set()
     session = pump.Session(strict=False)
     engine = route.Route(session=session, log=_H["_log"](tmp_path),
                          upstream_write=upstream_write, client_write=client,
@@ -66,14 +77,21 @@ def _drive(tmp_path, request_id, *, during_scan, settle=1.0):
     reader.start()
     os.write(c_w, _call(request_id))
     during_scan(lambda data: os.write(c_w, data), sent)
-    time.sleep(settle)
-    os.close(c_w)
+    assert decided.wait(30), "the held call was neither forwarded nor answered"
+    if close_after_done:
+        # The reader must end on ITS OWN verdict (a refusal), not on an EOF we
+        # caused mid-frame -- which would read MALFORMED_CLIENT/unterminated.
+        assert done.wait(30), "the client reader never finished"
+        os.close(c_w)
+    else:
+        os.close(c_w)
+        assert done.wait(30), "the client reader never finished"
     reader.join(10)
     rows = [json.loads(l) for p in sorted(pathlib.Path(tmp_path).rglob("*.jsonl"))
             for l in p.read_text().splitlines() if l.strip()]
     calls = [r for r in forwarded if json.loads(r).get("method") == "tools/call"]
     source = getattr(getattr(engine, "client_lookahead", None), "__self__", None)
-    return calls, client.messages(), rows, session, source
+    return calls, sink.messages(), rows, session, source
 
 
 def _then_set(frames):
@@ -119,12 +137,13 @@ def test_a_flood_during_the_scan_is_refused_the_same_way_as_without_one(tmp_path
             sent.set()
             try:
                 write(flood[65536:])
-            except BrokenPipeError:
+            except OSError:
                 pass  # refused at the bound; the reader stopped reading
         threading.Thread(target=pour, daemon=True).start()
 
     calls, replies, rows, session, source = _drive(tmp_path / "held", 1,
-                                                   during_scan=during, settle=3.0)
+                                                   during_scan=during,
+                                                   close_after_done=True)
     assert source is not None
     assert source.high_water <= framing.MAX_FRAME_BYTES + 1, source.high_water
     assert len(calls) == 1, "no cancel was sent, so the held call still goes"
@@ -170,10 +189,11 @@ def test_the_cross_thread_cancel_of_a_held_result_still_works(tmp_path):
     """T10's case B: the RESULT is held on the upstream thread and the cancel
     arrives on the client thread. Unchanged by this branch, and pinned."""
     inspection.default_engine()
-    release = threading.Event()
+    release, scanning = threading.Event(), threading.Event()
 
     def scan(params, *, channel, binding, content_bytes):
         if "late-result" in json.dumps(params):
+            scanning.set()
             release.wait(5)
         return inspection.scan(params, channel=channel, binding=binding,
                                content_bytes=content_bytes)
@@ -188,7 +208,7 @@ def test_the_cross_thread_cancel_of_a_held_result_still_works(tmp_path):
         {"jsonrpc": "2.0", "id": 7, "result": {"content": [
             {"type": "text", "text": "late-result"}]}}) + "\n").encode(),), daemon=True)
     upstream.start()
-    time.sleep(0.2)
+    assert scanning.wait(30), "the result scan never started"
     engine.client_frame(_cancel(7))
     release.set()
     upstream.join(10)

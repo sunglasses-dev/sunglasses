@@ -14,7 +14,8 @@ until the test has already written the cancel into the client's pipe. The
 proxy is still HOLDING the request at that moment, so a correct proxy honours
 the cancel: never forwards, answers REQUEST_CANCELLED once, delivers no result.
 
-RED on main 35f04ce. The fix PR removed the xfail line and added the engine warm-up (see the test).
+RED on main 35f04ce. The fix PR removes the xfail line below (T8 did, in 170e17d on
+feat/cancel-wins-before-forward, where it is green 3/3 alone).
 """
 import json
 import os
@@ -32,12 +33,6 @@ MARK = "held-for-cancel"
 
 
 def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_path):
-    # WARM THE ENGINE FIRST (T8, adopting this row). The first scan in a process
-    # builds the engine (~1.5 s) on the reader thread AFTER the cancel is
-    # written, which outlasted the 1 s below: upstream EOF then closed the
-    # session MALFORMED_UPSTREAM before the scan ended, and the row went red for
-    # a reason unrelated to cancel ordering whenever it ran first or alone.
-    inspection.default_engine()
     cancel_written = threading.Event()
 
     def scan(params, *, channel, binding, content_bytes):
@@ -46,6 +41,11 @@ def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_pa
             assert cancel_written.wait(10), "the test never wrote the cancel"
         return inspection.scan(params, channel=channel, binding=binding,
                                content_bytes=content_bytes)
+
+    # WARM-UP IS A SPEED-UP ONLY (T8, 170e17d). The row no longer depends on it:
+    # the wait below is gated on the client's reply, not on a clock.
+    if not os.environ.get("CANCEL_ROW_COLD"):
+        inspection.default_engine()
 
     c_r, c_w = os.pipe()
     u_r, u_w = os.pipe()
@@ -78,10 +78,22 @@ def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_pa
                    + "\n").encode())
     os.write(c_w, (json.dumps({"jsonrpc": "2.0", "method": "notifications/cancelled",
                                "params": {"requestId": 1}}) + "\n").encode())
+    # os.write on a pipe is unbuffered: when it returns, the cancel is in the
+    # kernel's pipe buffer, readable by the client reader. THEN the scan may end.
     cancel_written.set()
-    time.sleep(1.0)
+    # EVENT-GATED, not timed (T9, 9-23): wait for the client's ONE reply to id 1,
+    # whatever it is, before closing anything. A fixed sleep here raced the
+    # engine's cold build (~1.5 s): upstream EOF closed the session
+    # MALFORMED_UPSTREAM first and the row went red for the wrong reason.
+    deadline = time.monotonic() + 30
+    while not [m for m in client.messages() if m.get("id") == 1]:
+        assert time.monotonic() < deadline, "no reply to id 1 within 30 s"
+        time.sleep(0.01)
+    # Closing AFTER the reply, then joining, lets any server answer already in
+    # the upstream pipe drain through the reader before EOF, so a late result
+    # cannot be missed by closing too early.
     os.close(c_w); os.close(u_w)
-    reader_c.join(5); reader_u.join(5)
+    reader_c.join(10); reader_u.join(10)
 
     calls = [raw for raw in forwarded if json.loads(raw).get("method") == "tools/call"]
     replies = [m for m in client.messages() if m.get("id") == 1]
