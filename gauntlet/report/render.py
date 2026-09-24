@@ -235,7 +235,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 </style>
 <main>
 <h1>What our own adversarial harness proved last night</h1>
-<p class="detail">This page is an organization-run test of our own work, with
+<p class="detail">This page is a test our own organization runs on its own work, with
 observations recorded outside the process under test. It is not a third party
 certification. It publishes where the harness proves nothing as plainly as where
 it proves something, because a dashboard that only shows its good days is
@@ -260,7 +260,7 @@ indistinguishable from one that is broken.</p>
 {_figure("run.outcome", run["outcome"])}, exit code
 {_figure("run.exit_code", run["exit_code"])}.</p>
 <p class="detail">A run that refuses still publishes this report and still exits
-nonzero. Those are not in tension: if a refusing run published nothing, the last
+nonzero. Those are not in tension. If a refusing run published nothing, the last
 good page would stay up and a broken harness would look exactly like a passing
 one from out here.</p>
 </section>

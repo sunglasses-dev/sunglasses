@@ -236,7 +236,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
 
     if capmap is None:
         coverage = _unavailable("EVIDENCE_UNBOUND",
-                                f"capability map unusable: {capmap_error}")
+                                f"capability map unusable. {capmap_error}")
     elif corpus_digest is None:
         coverage = _unavailable("EVIDENCE_UNBOUND",
                                 "the pinned corpus is not present on this host")
@@ -250,9 +250,9 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     if examiner is None:
         harness = _unavailable(
             "EVIDENCE_UNBOUND",
-            "no examiner-authored machine-readable record. FIT is a finding "
+            "no record written by the examiner in a form this run can read. FIT is a finding "
             "about the instrument made by the examiner on a dated head under a "
-            "named contract; this run may reference such a record and may not "
+            "named contract. This run may reference such a record and may not "
             "write one. The delivered mutation plan holds 73 entries over 7 "
             "requirements and is not the 119-mutation examination manifest, so "
             "it cannot stand in for one.")
