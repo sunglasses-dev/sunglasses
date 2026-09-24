@@ -104,6 +104,11 @@ def _check_value(value, *, depth: int = 0, path: str = "$") -> None:
                 raise NotEncodable(
                     f"{path}: control character U+{ord(char):04X}. Diagnostics "
                     "are displayed separately and never inside signed bytes.")
+            if 0xD800 <= ord(char) <= 0xDFFF:
+                raise NotEncodable(
+                    f"{path.encode('utf-8', 'backslashreplace').decode()}: lone "
+                    f"surrogate U+{ord(char):04X}. UTF-8 cannot "
+                    "carry it, so there are no bytes to sign.")
         return
     if isinstance(value, list):
         if len(value) > MAX_ARRAY:
