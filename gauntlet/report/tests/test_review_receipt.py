@@ -105,4 +105,11 @@ def test_the_real_map_in_the_tree_is_not_reviewed_by_this_suite():
     # points MAP_PATH at its reviewed copy.
     real = pathlib.Path(classify.__file__).with_name("capability_map.json")
     data = json.loads(real.read_text())
-    assert data.get("review_state") == "unreviewed" and "review_receipt" not in data
+    if data.get("review_state") == "unreviewed":
+        assert "review_receipt" not in data
+        return
+    # Reviewed for real (capmap-d3cdba8-r2, 2026-09-23): the receipt must be a
+    # recorded review the loader accepts, and never the conftest's fixture one.
+    classify.load_map(real)
+    receipt = json.loads((real.parent / data["review_receipt"]).read_text())
+    assert (receipt["reviewer"], receipt["round"]) != ("TEST-FIXTURE", "suite")
