@@ -63,6 +63,10 @@ CODES = {
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
     "LIFECYCLE_ORPHAN": "an opening with no terminal, or a terminal with no opening",
     "LIFECYCLE_DUPLICATE": "more than one settlement for one invocation",
+    "PAIRING_UNKEYED":
+        "the session opened and ended; the items inside it carry no key to "
+        "pair them by, so whether each one settled is not judged (T9 ruling "
+        "R24, WIRE_SPEC section 4). Not a pass and not a failure.",
     "UNKNOWN_EVENT":
         "an event outside this verifier's vocabulary; its meaning is not "
         "judged, and chain integrity is unaffected",

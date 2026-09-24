@@ -45,6 +45,21 @@ PAIRS = {"in_flight": ("decision", "eval_id")}
 TERMINALS = {terminal: (opening, key) for opening, (terminal, key) in PAIRS.items()}
 CHAIN_EVENTS = {GENESIS, CHECKPOINT}
 
+# The proxy's vocabulary, frozen here because this verifier stands alone and
+# imports nothing from the product; a test holds it equal to
+# `sunglasses.proxy.receipts.EVENTS`. A proxy run's lifecycle is its SESSION:
+# HEADER, then one of the terminals. Its items are not paired (T9 ruling 24):
+# most carry no id_token to pair by, so the verifier names that limit instead.
+PROXY_EVENTS = frozenset({
+    "HEADER", "FRAME_IN", "FRAME_OUT", "ADMITTED", "SCAN_STARTED",
+    "HOLD_ENTERED", "SCAN_RESULT", "DISCARDED_LATE", "CANCEL_ACCEPTED",
+    "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE", "WRITE_STALLED",
+    "SETTLED", "UPSTREAM_CLOSED", "SESSION_TORN_DOWN", "WATCHDOG",
+    "RECEIPT_IO_ERROR", "NOTIFICATION_DROPPED", "TEARDOWN", "STDERR_BOUNDED",
+    "SETTLEMENT_REFUSED",
+})
+PROXY_TERMINALS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
+
 
 @dataclasses.dataclass
 class Report:
@@ -200,7 +215,11 @@ def _endpoint(prefix, records, expected):
 
 
 def _lifecycle(prefix):
-    """Judged over the VERIFIED prefix only."""
+    """Judged over the VERIFIED prefix only, by the rules of its producer."""
+    producer = next((record.get("producer") for _, record, _ in prefix
+                     if "producer" in record), None)
+    if producer == "proxy":
+        return _proxy_lifecycle(prefix)
     open_, closed, unknown = {}, set(), False
     for _, record, _ in prefix:
         event = record.get("event")
@@ -222,6 +241,21 @@ def _lifecycle(prefix):
     if any(ident not in closed for ident in open_):
         return "LIFECYCLE_ORPHAN"
     return "UNKNOWN_EVENT" if unknown else "LIFECYCLE_COMPLETE"
+
+
+def _proxy_lifecycle(prefix):
+    """A session opened by HEADER and ended by a terminal. An ended session is
+    PAIRING_UNKEYED, never LIFECYCLE_COMPLETE: that code says every opening
+    has its terminal, and the items inside were not paired (ruling 24)."""
+    events = [record.get("event") for _, record, _ in prefix
+              if record.get("event") not in CHAIN_EVENTS]
+    if not events or events[0] != "HEADER":
+        return "LIFECYCLE_ORPHAN"
+    if not any(event in PROXY_TERMINALS for event in events):
+        return "LIFECYCLE_ORPHAN"
+    if any(event not in PROXY_EVENTS for event in events):
+        return "UNKNOWN_EVENT"
+    return "PAIRING_UNKEYED"
 
 
 # -- one log: a directory of segments (T9 ruling 15) -----------------------------
