@@ -106,7 +106,8 @@ def fires(text):
     draft of this runner checked `file` only and produced six such phantom
     rows. A fail row is a harness defect until the stimulus is proven.
     """
-    for ch in ("file", "api_response", "log_memory", "agent_input"):
+    for ch in ("file", "api_response", "log_memory", "agent_input",
+               "tool_output", "web_content"):
         d = e.scan(text, channel=ch).to_dict()
         if RULE in {f["id"] for f in d["findings"]}:
             return True
