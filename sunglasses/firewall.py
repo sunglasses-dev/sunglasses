@@ -1665,16 +1665,32 @@ def write_receipt(record: dict, home=None) -> None:
     _restrict(path, 0o600)
 
 
-def _input_digest(tool_input) -> str:
+def _input_digest(tool_input):
     """SHA-256 of the canonical tool input. The receipt stores this and never
-    the input itself: an audit trail that quotes the payload becomes the leak."""
+    the input itself: an audit trail that quotes the payload becomes the leak.
+
+    None when the input cannot be encoded as UTF-8 (a lone surrogate). The
+    encode used to substitute `?`, so `x\\ud800`, `x\\ud801` and `x?` hashed
+    alike, and a digest that names three inputs names none of them (#8)."""
     import json as _json
     try:
         canonical = _json.dumps(tool_input, sort_keys=True, separators=(",", ":"),
                                 ensure_ascii=False, default=str)
     except (TypeError, ValueError):
         canonical = repr(tool_input)
-    return hashlib.sha256(canonical.encode("utf-8", "replace")).hexdigest()
+    try:
+        data = canonical.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    return hashlib.sha256(data).hexdigest()
+
+
+def _input_digest_fields(tool_input) -> dict:
+    """The receipt's digest field, plus the reason whenever there is no digest."""
+    digest = _input_digest(tool_input)
+    if digest is None:
+        return {"input_sha256": None, "input_sha256_reason": "unencodable"}
+    return {"input_sha256": digest}
 
 
 # ── Evaluation ──────────────────────────────────────────────────────────────
@@ -1857,7 +1873,7 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "eval_id": eval_id,
             "tool_name": payload.get("tool_name"),
             "session_id": payload.get("session_id"),
-            "input_sha256": _input_digest(payload.get("tool_input")),
+            **_input_digest_fields(payload.get("tool_input")),
         }, home=home)
     except Exception:  # noqa: BLE001
         # Losing the opening line must not change what the firewall does, for
@@ -1898,7 +1914,7 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "decision": decision.action,
             "lane": decision.lane,
             "rule_id": decision.rule_id,
-            "input_sha256": _input_digest(payload.get("tool_input")),
+            **_input_digest_fields(payload.get("tool_input")),
             "elapsed_ms": round((_time.perf_counter() - started) * 1000, 2),
             **extras,
             **({"error": error} if error else {}),
