@@ -1385,14 +1385,18 @@ class Route:
                 request_id = owed[2]
                 confirmed = False
                 try:
-                    self.client_write((json.dumps(envelope.withheld(
-                        request_id=request_id,
-                        reason_code=REASON_RECEIPT_IO_ERROR,
-                        rule=RULE_RESOURCE, accepted=False, status="not_run",
-                        inspection_complete=False, inspected_utf8_bytes=0,
-                        observed_content_bytes=0, elapsed_ms=0,
-                        catalog=self.catalog), separators=(",", ":"))
-                        + "\n").encode("utf-8"))
+                    # ASTRA refused-e430147 r2. THE SAME BUILDER AS EVERY
+                    # OTHER REFUSAL, with the same scan fields. This used to
+                    # hardcode `not_run` with both booleans false, so a failure
+                    # at the release authorisation -- after a SCAN_RESULT of
+                    # `complete` was on disk -- told the client no scan ran.
+                    # `_scanned` is set only once that SCAN_RESULT is written,
+                    # so an obligation nothing inspected keeps the default.
+                    # `record=False`: nothing can be written down now.
+                    frame, _, _ = self._withhold_result(
+                        request_id, REASON_RECEIPT_IO_ERROR, RULE_RESOURCE,
+                        record=False, **self._scanned_fields(request_id))
+                    self.client_write(frame)
                     # The bytes have moved: confirm, and no give-back may
                     # resurrect this one.
                     self.session.answered_on_the_wire(owed, final=True)
