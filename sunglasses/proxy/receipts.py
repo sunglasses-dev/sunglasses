@@ -88,8 +88,9 @@ PERMITTED_FIELDS = frozenset({
 # for the rest of the session. So a long value is cut and the cut is counted,
 # never refused. The writer's line check stays as the invariant; if it fires,
 # the bounds below are wrong, and that is a receipt failure like any other.
-RULE_IDS_KEPT = 256            # the first 256, in the order the engine gave
-RULE_IDS_BYTES = 6 * 1024      # and never more than this much of the line
+RULE_IDS_KEPT = 256            # the first 256, in the order the engine gave,
+RULE_IDS_BYTES = 6 * 1024      # and the kept ids, each encoded with its quotes,
+                               # total at most this; whichever cuts first (R43)
 LEAVES_KEPT = 8
 FIELD_BYTES = 72               # one encoded value; a sha256 hex digest is 66
 
@@ -97,6 +98,38 @@ FIELD_BYTES = 72               # one encoded value; a sha256 hex digest is 66
 def _encoded_size(value):
     return len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))
                .encode("utf-8", "surrogatepass"))
+
+
+# T9 ruling 43 part 2. The wire refuses a control character or a lone
+# surrogate, and a peer chooses the strings the proxy writes, so a refusal
+# here was an off switch the peer held. A receipt is never refused for what
+# the peer sent: a control character becomes its JSON escape as text, six
+# characters, so a newline can never split a record; a lone surrogate becomes
+# U+FFFD. Deterministic, counted per field in `sanitized`.
+_CONTROL = re.compile("[\x00-\x1f\x7f]")
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _sanitized(value):
+    """(the value with every replacement made, how many were made)."""
+    if isinstance(value, str):
+        text, controls = _CONTROL.subn(lambda m: "\\u%04x" % ord(m.group()), value)
+        text, surrogates = _SURROGATE.subn("\ufffd", text)
+        return text, controls + surrogates
+    # A container with nothing to replace is returned as it came, so what the
+    # wire accepts or refuses about its shape is unchanged.
+    if isinstance(value, (list, tuple)):
+        pairs = [_sanitized(item) for item in value]
+        count = sum(n for _, n in pairs)
+        return ([item for item, _ in pairs], count) if count else (value, 0)
+    if isinstance(value, dict):
+        out, count = {}, 0
+        for key, item in value.items():
+            key, n = _sanitized(key)
+            out[key], m = _sanitized(item)
+            count += n + m
+        return (out, count) if count else (value, 0)
+    return value, 0
 
 
 def _cut_text(text, budget):
@@ -131,9 +164,9 @@ def _bounded(value):
 
 
 def _kept_rule_ids(rule_ids):
-    kept, used = [], 2
+    kept, used = [], 0
     for rule_id in rule_ids:
-        cost = _encoded_size(rule_id) + 1
+        cost = _encoded_size(rule_id)
         if len(kept) == RULE_IDS_KEPT or used + cost > RULE_IDS_BYTES:
             break
         kept.append(rule_id)
@@ -339,7 +372,7 @@ class Log:
 
     def _clean(self, fields):
         """T9.R3. An allowlist, and provenance reduced to indices and hashes."""
-        clean, truncated = {}, {}
+        clean, truncated, sanitized = {}, {}, {}
         for name, value in (fields or {}).items():
             if name in FORBIDDEN_FIELDS or name not in PERMITTED_FIELDS:
                 continue
@@ -357,13 +390,20 @@ class Log:
                 if len(clean[name]) < len(value):
                     clean["rule_ids_omitted"] = len(value) - len(clean[name])
                 continue
+            # Replaced, THEN cut: the cut measures what is written, and the
+            # count is of what the peer sent, not of what survived the cut.
+            value, replaced = _sanitized(value)
+            if replaced:
+                sanitized[name] = replaced
             clean[name], cut = _bounded(value)
             if cut is not None:
                 truncated[name] = cut
-        # Derived here and nowhere else. None of the three names is permitted
-        # as input, so a caller cannot claim a cut that did not happen.
+        # Derived here and nowhere else. None of these names is permitted as
+        # input, so a caller cannot claim a cut or a repair that did not happen.
         if truncated:
             clean["truncated"] = truncated
+        if sanitized:
+            clean["sanitized"] = sanitized
         return clean
 
     @staticmethod
@@ -376,7 +416,7 @@ class Log:
         """
         out = {"index": entry.get("index"), "depth": entry.get("depth"),
                "bytes": entry.get("bytes"),
-               "value_sha256": _bounded(entry.get("value_sha256"))[0]}
+               "value_sha256": _bounded(_sanitized(entry.get("value_sha256"))[0])[0]}
         pointer = entry.get("pointer")
         if pointer is not None:
             out["pointer_sha256"] = hashlib.sha256(
