@@ -220,7 +220,14 @@ def _endpoint(prefix, records, expected):
 
 
 def _lifecycle(prefix):
-    """Judged over the VERIFIED prefix only, by the rules of its producer."""
+    """Judged over the VERIFIED prefix only, by the rules of its producer.
+
+    Nothing verified is EMPTY_CHAIN (ruling 41). Calling it complete would
+    say every opening has its terminal about a log where nothing was read. A
+    genesis alone IS verified, so a chain that started and recorded nothing
+    stays LIFECYCLE_COMPLETE (vector 6b pins that side)."""
+    if not prefix:
+        return "EMPTY_CHAIN"
     producer = next((record.get("producer") for _, record, _ in prefix
                      if "producer" in record), None)
     if producer == "proxy":

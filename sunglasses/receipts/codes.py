@@ -68,6 +68,10 @@ CODES = {
         "Not a pass.",
 
     # lifecycle
+    "EMPTY_CHAIN":
+        "no record was verified, so there is no lifecycle to judge (T9 ruling "
+        "R41). Not a pass and not a failure; the integrity result says why "
+        "nothing verified.",
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
     "LIFECYCLE_ORPHAN": "an opening with no terminal, or a terminal with no opening",
     "LIFECYCLE_DUPLICATE": "more than one settlement for one invocation",
