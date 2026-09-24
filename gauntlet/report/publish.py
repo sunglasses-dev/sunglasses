@@ -19,6 +19,10 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import fcntl
+import json
+import os
+import pathlib
 
 
 class StaleOverwrite(Exception):
@@ -70,3 +74,43 @@ class Published:
         if when.tzinfo is None:
             when = when.replace(tzinfo=datetime.timezone.utc)
         return (now - when).total_seconds() > hours * 3600
+
+
+def select_persisted(report: dict, history: pathlib.Path, *, digest: str) -> dict:
+    """`Published.select`, with the history in a FILE every process reads.
+
+    The nightly and a manual rerun are two processes. An in-memory refusal
+    protects neither from the other, so the ordering rule reads the append-only
+    history under an exclusive lock, applies the SAME `select` as above, and
+    appends what happened, including a refusal.
+
+    The one addition: the attempt that is already up, offered again (same
+    report bytes), is a RETRY. A writer that recorded its selection and then
+    failed to write the page must be able to finish, and a retried landing PR
+    must not grow the history.
+    """
+    history = pathlib.Path(history)
+    history.parent.mkdir(parents=True, exist_ok=True)
+    run = report.get("run") or {}
+    fresh = report.get("freshness") or {}
+    with open(history, "a+") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        fh.seek(0)
+        lines = [json.loads(x) for x in fh.read().splitlines() if x.strip()]
+        selected = [x for x in lines if x.get("selected")]
+        current = selected[-1] if selected else None
+        if current is not None and current.get("report_sha256") == digest:
+            return current
+        entry = {"run_id": run.get("id"), "finished_at": run.get("finished_at"),
+                 "outcome": run.get("outcome"), "report_sha256": digest,
+                 "measured_at": fresh.get("measured_at"),
+                 "policy_hours": fresh.get("policy_hours"), "selected": False}
+        site = Published(finished_at=current["finished_at"] if current else None)
+        try:
+            site.select(report)
+            entry["selected"] = True
+        finally:
+            fh.write(json.dumps(entry, sort_keys=True) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        return entry
