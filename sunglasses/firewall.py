@@ -1977,11 +1977,18 @@ def run_hook(stdin_text: str, home=None) -> dict:
         # the lifecycle records exist to remove. Those ASK, naming the dead control
         # rather than echoing an exception at the user.
         if decision.action != "deny":
+            check = ("Check the receipts directory under ~/.sunglasses for "
+                     "permissions and disk space.")
+            if receipts.signed:
+                # The user turned signing on, so the key is a likely cause, and
+                # the one a directory check would never find.
+                check = ("Check the signing key in ~/.sunglasses/keys (private to "
+                         "you, and sunglasses[receipts] installed), then the "
+                         "receipts directory for permissions and disk space.")
             decision = Decision(
                 "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
                 "SUNGLASSES firewall: the audit trail could not be written, so this "
-                "call would leave no record. Check the receipts directory under "
-                "~/.sunglasses for permissions and disk space. Approve only if you "
+                f"call would leave no record. {check} Approve only if you "
                 "would have approved it unrecorded.")
             error = f"receipts unwritable: {type(exc).__name__}: {exc}"
 

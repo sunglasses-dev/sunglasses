@@ -159,7 +159,17 @@ def test_an_unusable_key_asks_instead_of_writing_unsigned(keyed):
     out = run_hook(PAYLOAD, home=keyed)["hookSpecificOutput"]
     assert out["permissionDecision"] == "ask"
     assert "audit trail" in out["permissionDecisionReason"]
+    assert "~/.sunglasses/keys" in out["permissionDecisionReason"]   # names the key
     assert list((keyed / "receipts").glob("*.jsonl")) == []
+
+
+def test_a_legacy_write_failure_does_not_blame_a_key(home):
+    home.mkdir(parents=True)
+    (home / "receipts").write_text("a file where the directory belongs\n")
+    out = run_hook(PAYLOAD, home=home)["hookSpecificOutput"]
+    assert out["permissionDecision"] == "ask"
+    assert "receipts directory" in out["permissionDecisionReason"]
+    assert "keys" not in out["permissionDecisionReason"]
 
 
 def test_an_unusable_key_never_softens_a_deny(keyed):
@@ -191,4 +201,5 @@ def test_a_key_with_the_extra_gone_asks_and_writes_no_unsigned_line(keyed, tmp_p
     out = json.loads(proc.stdout)["hookSpecificOutput"]
     assert out["permissionDecision"] == "ask"
     assert "audit trail" in out["permissionDecisionReason"]
+    assert "sunglasses[receipts]" in out["permissionDecisionReason"]
     assert list((keyed / "receipts").glob("*.jsonl")) == []
