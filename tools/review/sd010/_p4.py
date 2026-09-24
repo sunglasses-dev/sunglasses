@@ -34,7 +34,13 @@ def run(tree):
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1")
     p = subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "no:cacheprovider",
-         "tests/test_sd010_embedded_boundary.py", "-q"],
+         "tests/test_sd010_embedded_boundary.py",
+         # Round 10: the generated matrix is what sees the escape-family
+         # variants. Its own mutation controls are deselected -- they mutate
+         # the rule in memory, which in a mutant tree tests the mutant twice.
+         "tests/test_sd010_escape_grammar.py", "--deselect",
+         "tests/test_sd010_escape_grammar.py::test_control_each_fragment_is_seen_by_the_matrix",
+         "-q"],
         cwd=tree, capture_output=True, text=True, env=env)
     tail = p.stdout.strip().splitlines()[-1] if p.stdout.strip() else "(no output)"
     return p.returncode, tail

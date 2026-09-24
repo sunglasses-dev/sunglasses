@@ -4,14 +4,16 @@ Emitted by `tools/review/sd010/build-package.sh @HEAD@ @BASE@` — every file he
 
 ## §1 WHAT THE RULE IS
 A detection rule for a `NAME=value` assignment that sits INSIDE structured text (a JSON string, a dict literal, a
-YAML line). It fires when the assignment starts at a boundary:
-start of text · newline · literal CR · escaped `\n` / `\r` · U+2028 / U+2029 · one of `" ' { [ ,`
-— each optionally followed by indentation, where indentation is a space, a tab, or an escaped `\t`.
-Between the name and the `=`, the separator admits any whitespace `\s` matches OR a backslash followed by one
-character from the one-character escape class this rule reads: `t n r f v`, YAML's `N _ L P`, and a backslash before
-any literal whitespace (escaped space, escaped tab character, line continuation). Round 7 found `\t`; round 8 found
-`\v` in Python and YAML strings, and the whole one-character class was closed together. NUMERIC escapes
-(`\x0b`, `\013`, `\u000b`) are deliberately NOT read: decoding them is a residual, like the `\uXXXX` boundary exclusion.
+YAML line). Round 10 (T9 ruling 13) stopped adding escapes one review at a time: the rule is now held to a TABLE.
+`tests/sd010_escape_grammar.py` lists every escape of JSON, Python and YAML 1.2 double-quoted strings (one character,
+`\xNN`, `\uNNNN`, `\UNNNNNNNN`, octal, `\N{name}` with its aliases, escaped line breaks), checks each spelling
+against `json.loads`, `ast.literal_eval` and `yaml.safe_load`, and generates 4400 cases in five positions (boundary,
+indentation, after an escaped newline, separator, the `=` itself), each with a lowercase control.
+**The contract:** the rule reports iff the RAW text or the text with the escape DECODED would report under the
+literal rule — boundary (start of text, the `str.splitlines` set, or one of `" ' { [ ,`), indentation (space, tab),
+the upper-case name, separator (`\s`), `=`. It is syntax-blind: a spelling that is an escape in any of the three
+grammars counts everywhere. Disclosed consequence: the r9 row `r9_python_escaped_space_indent` now BLOCKS, because
+backslash-space is YAML's escaped space.
 The name alternation is case-sensitive (inline `(?-i:)`, because the engine compiles with IGNORECASE).
 **The value is not inspected at all.** A bare space and a backtick are NOT boundaries.
 Declared channels (eight): message, file, code, api_response, log_memory, agent_input, tool_output, web_content —
@@ -48,19 +50,21 @@ Use the placeholders `{NAME}` `{NAME_LC}` `{VALUE}` `{URL}` for the assignment's
 those rows `[template]`. A block that does not parse is reported and not scored.
 
 **The axis that found the most in earlier rounds is the QUOTING and ENCODING context around the assignment, not the
-value.** Find another family of inputs the rule misses, or show that a closed shape is closed
-only for the exact form that was tested. Round 7's family is now closed; its rows are in the test file.
+value.** The escape grammar is now a table, so the productive question is what the TABLE is missing:
+an escape it does not list, a position it does not generate, or a decoder that disagrees with it. Find one and the
+matrix is wrong, not just the rule. `tests/test_sd010_escape_grammar.py` is the table's own test file.
 
 ## §5 WHAT IS STATED RATHER THAN CLAIMED
 - **No value-based exception exists.** Exceptions keyed on the value were a closed class: each was defeated by a
   chosen value. `DISCLOSED_MISSES` is empty and a test asserts it.
 - **One accepted ledger row:** `sunglasses-dev__env-var-docs-shapes.md` is blocked by this rule, booked in
   KNOWN_FAILURES with a reason and a ruling. `p3` reports it as accepted.
-- **Six decoding shapes are out of scope, by decision:** JSON `\uXXXX` escapes of `=`, newline, space and tab, one
-  nested escape, and one YAML sequence shape. Closing them means decoding string escapes before matching — a parser,
-  not a boundary. The NUMERIC escapes of a separator character (`\x0b`, `\013`, `\u000b`) are the same residual:
-  they name a character by its code. Every one-character escape (`\v`, YAML `\N \_ \L \P`, backslash + whitespace)
-  IS read, with a row per escape and a literal-twin control.
+- **Escapes are read by table, not decoded.** Every escape of a boundary, indentation, separator or `=` character,
+  in every spelling the three grammars have, is in the rule; the matrix holds it there (0 of 4400 disagree on every
+  channel) and 19 in-memory controls plus the `p4` variants V15–V21 each remove one family and watch it go red.
+  **Residual, by decision:** an escape INSIDE the name's letters (`API\x5fKEY=`). The name is a literal alternation;
+  decoding it is the parser this rule is not. **Bound, disclosed:** the boundary and indentation escape sets are
+  disjoint by construction — a spelling in both would make a run of it quadratic.
 - The consumer surface shadows this rule on the parent's three channels; `to_dict()` dedupes and is what CLI, API and
   SARIF show. Every probe that inspects a finding reads it; `p5` measures timing and inspects none.
 - Cost ratio stated by `p5` against its gate; pattern count 1554 → 1555.

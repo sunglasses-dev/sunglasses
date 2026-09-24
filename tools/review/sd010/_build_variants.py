@@ -12,35 +12,53 @@ OUT = os.path.join(D, "v")
 REL = os.path.join("sunglasses", "patterns.py")
 orig = io.open(os.path.join(SRC, REL), encoding="utf-8").read()
 
-# THE BOUNDARY CLASS MOVED AGAIN with the indentation fix, and the builder
-# REFUSED to build until these were retargeted -- five targets had gone stale.
-# That refusal is the feature: a mutation never injected reads as a kill you
-# did not earn. Two new rows cover what the fix added.
-IND  = r"(?:[ \t]|\\t)*"
-CLASS = r"""[\"'{\[,]"""
-# Round 7 moved the SEPARATOR: `\s*=` became this, and V11's target went stale
-# with it -- the builder refused until it was retargeted, as it should.
-SEP = r"(?:\s|\\[\stnrfv_LP])*="
+# ROUND 10 REWROTE THE RULE FROM A TABLE (T9 RULING 13), and every target
+# below moved with it; the builder refused until they were retargeted, which is
+# the feature. The indentation and separator groups now span several source
+# lines, so those targets are CUT from the file between two anchors that must
+# each occur once, rather than typed out and left to drift.
+def _between(start, end):
+    assert orig.count(start) == 1 and orig.count(end) == 1, (start, end)
+    i = orig.index(start)
+    return orig[i:orig.index(end, i)]
+
+CLASS = r"""\x85\u2028\u2029\"'{\[,]"""
+INDENT = _between(r'r"(?:[ \t]|(?-i:', r'r"(?-i:(?:API_KEY')
+SEP = _between(r'r"(?:\s|(?-i:', r'r"(?:=|(?-i:')
+LEAD = "\n" + " " * 12            # the indentation of a regex source line
+EQUALS_END = r'r"|\\N\{(?i:EQUALS SIGN)\}))",'
+EXCLUSION = r"""r"(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""
 
 MUTS = [
  ("V1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
- # every indentation allowance, everywhere
- ("V2-indentation-dropped",      IND, "", 0),      # every occurrence
- ("V4-bare-space-a-boundary",    CLASS, r"""[\"'{\[, ]"""),
- ("V5-line-start-dropped",       r"(?:\A" + IND + "|", "(?:"),
- ("V7-apostrophe-removed",       CLASS, r"""[\"{\[,]"""),
- ("V10-literal-CR-removed",      r"|\r" + IND, ""),
- # NEW, from round 4b's findings
- ("V12-escaped-tab-not-indent",  IND, r"[ \t]*", 0),   # every occurrence
- ("V13-unicode-separators-gone", r"|[\u2028\u2029]" + IND, ""),
- # NEW, from round 7's finding: the separator back to literal whitespace only
- ("V14-separator-literal-only",  SEP, r"\s*="),
+ ("V2-indentation-dropped",      INDENT, ""),
+ ("V4-bare-space-a-boundary",    CLASS, r"""\x85\u2028\u2029\"'{\[, ]"""),
+ ("V5-line-start-dropped",       r'r"(?:\A|', 'r"(?:'),
+ ("V7-apostrophe-removed",       CLASS, r"""\x85\u2028\u2029\"{\[,]"""),
+ ("V10-literal-CR-removed",      r"[\n\r\v\f", r"[\n\v\f"),
+ ("V12-escaped-tab-not-indent",  r"\\[ \tt]|", r"\\[ \t]|"),
+ ("V13-unicode-separators-gone", CLASS, r"""\x85\"'{\[,]"""),
+ ("V14-separator-literal-only",  SEP, r'r"\s*"' + LEAD),
+ # NEW in round 10: one row per escape family the table added. The matrix
+ # (tests/test_sd010_escape_grammar.py) is what sees these.
+ ("V15-boundary-hex-escapes-gone",
+  r'r"|\\x(?:0[a-dA-D]|1[c-eC-E]|85|2[27cC]|5[bB]|7[bB])"', 'r""'),
+ ("V16-boundary-octal-escapes-gone",
+  r'r"|\\(?:0?(?:1[2-5]|3[4-6]|4[27]|54)|205|133|173)"', 'r""'),
+ ("V17-line-feed-names-gone",
+  r"(?i:LINE FEED|NEW LINE|END OF LINE|LF|NL|EOL|CARRIAGE", r"(?i:CARRIAGE"),
+ ("V18-indentation-numeric-gone",
+  r"|\\x(?:09|20)|\\u00(?:09|20)|\\U000000(?:09|20)", ""),
+ ("V19-escaped-equals-gone",
+  r"\\x3[dD]|\\u003[dD]|\\U0000003[dD]|\\0?75", r"\\x3[dD]"),
+ # the OVER-FIRE direction: IGNORECASE reading \R \T \V as escapes, and a
+ # backslash before any whitespace read as an escape (r9's class)
+ ("V20-escapes-case-folded",     r"(?-i:\\", r"(?:\\", 0),   # every occurrence
+ ("V21-backslash-any-space",
+  r"\\[ \t\n\r\x85\u2028\u2029tnrfvNLP_]", r"\\[\stnrfvNLP_]"),
  # The CLASS control: put a value exclusion back and the evasion rows must go
  # quiet. This guards the decision the rule now rests on.
- ("V11-value-exclusion-readded",
-  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))""" + SEP + '",',
-  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))""" + SEP
-  + r"""(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""),
+ ("V11-value-exclusion-readded", EQUALS_END, EQUALS_END[:-2] + '"' + LEAD + EXCLUSION),
 ]
 
 # A mutation may need EVERY occurrence replaced, not the first. The
@@ -50,6 +68,12 @@ MUTS = [
 # an ineffective mutation is the same lie as a kill that never injected.
 MUTS = [(m + (1,)) if len(m) == 3 else m for m in MUTS]
 missing = [n for n, old, _new, _c in MUTS if old not in orig]
+# ONE occurrence means one. A target that also matched a comment or a sibling
+# rule would mutate the wrong bytes and read as a kill of this rule.
+ambiguous = [(n, orig.count(old)) for n, old, _new, c in MUTS
+             if c == 1 and orig.count(old) > 1]
+if ambiguous:
+    sys.exit(f"MUTATION TARGETS AMBIGUOUS, refusing: {ambiguous}")
 if missing:
     sys.exit(f"MUTATION TARGETS ABSENT, refusing to build a battery that would "
              f"silently skip: {missing}")
