@@ -88,6 +88,13 @@ BENIGN = {
     # whitespace after a key is only a separator when an `=` follows it.
     "escaped_whitespace_after_a_key_with_no_assignment":
         '{"note":"PASSWORD\\tis rotated\\nTOKEN\\fexpires"}',
+
+    # Round 8's paired controls for the widened class: the case scope still
+    # holds behind a vertical tab, and no escape is a separator without `=`.
+    "lowercase_key_behind_an_escaped_vtab":
+        "{'cfg': 'pass" + "word\\v=hunter" + "2'}",
+    "escaped_vtab_and_yaml_escapes_with_no_assignment":
+        "{'note': 'PASSWORD\\vis rotated'}\ncfg: \"TOKEN\\_expires\\ TOKEN\\Pnever\"\n",
 }
 
 
@@ -203,6 +210,41 @@ MUST_FIRE["sep_ctl_literal_tab_before_equals"] = '{"cfg":"' + "PASS" + 'WORD\t='
 MUST_FIRE["sep_ctl_space_before_equals"] = '{"cfg":"' + "PASS" + 'WORD =' + PW + '"}'
 MUST_FIRE["sep_ctl_escaped_tab_after_equals"] = (
     '{"cfg":"' + "PASS" + 'WORD=\\t' + PW + '"}')
+
+
+# ── ROUND 8's REVIEWER FOUND THE VERTICAL TAB, and round 7 had named the class ──
+# too narrowly. "Every JSON escape whose literal `\s` accepts" stopped at JSON,
+# and the payloads this rule reads are also Python and YAML strings, which have
+# more single-character escapes than JSON does. The class is every ONE-CHARACTER
+# escape, in any of those spellings, that stands for a character `\s` already
+# accepts literally:
+#   \v                    C, Python, JS and YAML (vertical tab)
+#   \_  \L  \P            YAML (no-break space, line and paragraph separator)
+#   backslash + a literal space, tab or newline
+#                         YAML's escaped space and tab, and a line continuation
+# Measured on 7430bc5 with a Python dict string: every one of them allowed while
+# its literal twin blocked. `\N` (YAML's next-line) was already caught, because
+# the engine compiles case-insensitively and `[tnrf]` takes `N`; it is a row
+# here so that stays a measured fact rather than a coincidence.
+# NUMERIC escapes (\x0b, \013, \u000b) stay out, with the JSON \uXXXX shapes:
+# they name a character by its code, so closing them means decoding the string
+# before matching, which is the parser the manifest excludes by decision.
+# The `sep_ctl_` row is the literal vertical tab, which blocked before.
+_PY = "{'cfg': '" + "PASS" + "WORD"
+MUST_FIRE["sep_escaped_vtab_before_equals"] = '{"cfg":"' + "PASS" + 'WORD\\v=' + PW + '"}'
+MUST_FIRE["sep_python_escaped_vtab_before_equals"] = _PY + "\\v=" + PW + "'}"
+MUST_FIRE["sep_yaml_escaped_vtab_before_equals"] = 'cfg: "' + "PASS" + 'WORD\\v=' + PW + '"\n'
+MUST_FIRE["sep_mixed_escaped_vtab_and_formfeed"] = _PY + "\\v\\f=" + PW + "'}"
+MUST_FIRE["sep_mixed_space_and_escaped_vtab"] = _PY + " \\v =" + PW + "'}"
+MUST_FIRE["sep_yaml_escaped_next_line"] = 'cfg: "' + "PASS" + 'WORD\\N=' + PW + '"\n'
+MUST_FIRE["sep_yaml_escaped_nbsp"] = 'cfg: "' + "PASS" + 'WORD\\_=' + PW + '"\n'
+MUST_FIRE["sep_yaml_escaped_line_separator"] = 'cfg: "' + "PASS" + 'WORD\\L=' + PW + '"\n'
+MUST_FIRE["sep_yaml_escaped_paragraph_separator"] = (
+    'cfg: "' + "PASS" + 'WORD\\P=' + PW + '"\n')
+MUST_FIRE["sep_yaml_escaped_space"] = 'cfg: "' + "PASS" + 'WORD\\ =' + PW + '"\n'
+MUST_FIRE["sep_yaml_escaped_tab_character"] = 'cfg: "' + "PASS" + 'WORD\\\t=' + PW + '"\n'
+MUST_FIRE["sep_escaped_line_continuation"] = _PY + "\\\n=" + PW + "'}"
+MUST_FIRE["sep_ctl_literal_vtab_before_equals"] = _PY + "\v=" + PW + "'}"
 
 
 # The compose interpolation. It was the last DISCLOSED miss, and it is a

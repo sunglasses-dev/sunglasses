@@ -422,13 +422,13 @@ def test_control_a_literal_only_separator_loses_exactly_the_escaped_rows():
     side all blocked before the fix, so if one of them goes quiet here this
     control is measuring something other than the separator.
     """
-    narrowed = _rule_regex().replace(r"(?:\s|\\[tnrf])*=", r"\s*=", 1)
+    narrowed = _rule_regex().replace(r"(?:\s|\\[\stnrfv_LP])*=", r"\s*=", 1)
     assert narrowed != _rule_regex(), "the separator no longer carries the escaped class"
     e = _mutate(**{RULE: narrowed})
     escaped = sorted(k for k in rows.MUST_FIRE
                      if k.startswith("sep_") and not k.startswith("sep_ctl_"))
     controls = sorted(k for k in rows.MUST_FIRE if k.startswith("sep_ctl_"))
-    assert len(escaped) == 7 and len(controls) == 3, (escaped, controls)
+    assert len(escaped) == 19 and len(controls) == 4, (escaped, controls)
     still = [k for k in escaped if RULE in _ids(e, rows.MUST_FIRE[k])[1]]
     assert still == [], (
         f"with the literal-only separator these still fire: {still}; "
