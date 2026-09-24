@@ -1435,3 +1435,88 @@ def test_the_inbound_release_receipt_names_the_generation_it_answered(tmp_path):
     assert authorised[0]["id_token"] != token_of(later_generation), (
         "the receipt does not distinguish generations of one id, which is the "
         "id-only key this whole lane exists to remove")
+
+
+# ── the status survives the refusal that follows a completed scan ────────
+# ASTRA refused-db2a0c3 r1: the scan COMPLETED and its SCAN_RESULT says so on
+# disk, then an invalidation or a cancel refused the answer -- and the client
+# envelope fell to its `not_run` default, telling the client no scan ran. Two
+# builders do this: the barrier asked after the scan, and the replacement the
+# pump asks for when authority moves at the handoff. RD03 checked the reason
+# and that the original was withheld, never the status.
+
+def _post_scan_refusal(tmp_path, when, authority, finding):
+    def act(r):
+        if authority == "invalidate":
+            r._invalidated = "DESCRIPTOR_CHANGED"
+        else:
+            r._cancel({"params": {"requestId": 1}})
+
+    if when == "during_scan":
+        route, out = _route(tmp_path, finding=finding, on_scan=act)
+    else:
+        route, out = _route(tmp_path, finding=finding)
+        _at_the_handoff(route, act)
+    route.pump_upstream(_answer())
+    return out
+
+
+# A cancel DURING the scan is not in this set, and not by omission: `_cancel`
+# answers the client itself, at once, with the vocabulary's own `cancelled`,
+# while the scan is still running -- there is no completed scan yet to report.
+# It is pinned below as that, so a change to it is a decision, not drift.
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+@pytest.mark.parametrize("when,authority", [("during_scan", "invalidate"),
+                                            ("at_handoff", "invalidate"),
+                                            ("at_handoff", "cancel")])
+def test_a_refusal_after_a_completed_scan_tells_the_client_what_the_receipt_says(
+        tmp_path, when, authority, finding):
+    out = _post_scan_refusal(tmp_path, when, authority, finding)
+    frames = [json.loads(raw) for raw in out if raw]
+    assert len(frames) == 1, frames
+    data = frames[0]["error"]["data"]
+    assert data["reason_code"] == ("DESCRIPTOR_CHANGED" if authority == "invalidate"
+                                   else "REQUEST_CANCELLED"), data
+    rows = [json.loads(line) for path in sorted(tmp_path.rglob("*.jsonl"))
+            for line in path.read_text().splitlines() if line.strip()]
+    results = [r for r in rows if r.get("kind") == "SCAN_RESULT"]
+    assert len(results) == 1 and results[0]["status"] == "complete", results
+    for field in ("status", "accepted", "inspection_complete"):
+        assert data[field] == results[0][field], (
+            f"{when}/{authority}: the receipt says {field}={results[0][field]!r} "
+            f"and the client was told {data[field]!r}")
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_a_cancel_during_the_scan_is_answered_at_once_as_cancelled(tmp_path, finding):
+    out = _post_scan_refusal(tmp_path, "during_scan", "cancel", finding)
+    frames = [json.loads(raw) for raw in out if raw]
+    assert len(frames) == 1, frames
+    data = frames[0]["error"]["data"]
+    assert (data["reason_code"], data["status"]) == ("REQUEST_CANCELLED", "cancelled"), data
+
+
+@pytest.mark.parametrize("finding", [False, True], ids=["clean", "finding"])
+def test_the_barrier_after_the_scan_builds_its_refusal_with_the_scans_fields(
+        tmp_path, finding):
+    """The OTHER builder, asked directly. On the wire, an invalidation during
+    the scan moves authority while the reader prepares, so the pump rebuilds
+    the answer through `_release_frame` and that rebuild is what crosses (the
+    rows above). The barrier's own refusal after the scan is therefore never
+    the frame that crosses in any shape measured here -- which is exactly why
+    it gets its own row: a builder only reached by being superseded is one
+    nobody would notice regressing."""
+    def invalidate(r):
+        r._invalidated = "DESCRIPTOR_CHANGED"
+
+    route, _ = _route(tmp_path, finding=finding, on_scan=invalidate)
+    raw = _answer()
+    built = route._inspect_result(raw, json.loads(raw))
+    assert built is not None and built[1] == "DESCRIPTOR_CHANGED", built
+    data = json.loads(built[0])["error"]["data"]
+    rows = [json.loads(line) for path in sorted(tmp_path.rglob("*.jsonl"))
+            for line in path.read_text().splitlines() if line.strip()]
+    results = [r for r in rows if r.get("kind") == "SCAN_RESULT"]
+    assert len(results) == 1 and results[0]["status"] == "complete", results
+    for field in ("status", "accepted", "inspection_complete"):
+        assert data[field] == results[0][field], (field, data, results[0])
