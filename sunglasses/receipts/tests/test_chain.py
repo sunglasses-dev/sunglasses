@@ -93,6 +93,56 @@ def test_a_sealed_end_is_continued_by_the_next_writer(home):
     assert _report(home, segment).results["chain_integrity"] == "CHAIN_OK"
 
 
+def _replace_last_line(path, record):
+    lines = path.read_bytes().splitlines(True)
+    path.write_bytes(b"".join(lines[:-1]) + wire.encode(record))
+
+
+def _forged_signature(record):
+    signature = record["signature"]
+    flipped = "0" if signature[0] != "0" else "1"
+    return dict(record, signature=flipped + signature[1:])
+
+
+def _signed_by_another_key(record):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    other = ed25519.Ed25519PrivateKey.from_private_bytes(bytes(range(1, 33)))
+    public = other.public_key().public_bytes(serialization.Encoding.Raw,
+                                             serialization.PublicFormat.Raw)
+    unsigned = {k: v for k, v in record.items() if k != "signature"}
+    unsigned["key_id"] = wire.key_fingerprint(public)
+    return dict(unsigned, signature=other.sign(
+        wire.checkpoint_signing_bytes(unsigned)).hex())
+
+
+@pytest.mark.parametrize("tamper", [_forged_signature, _signed_by_another_key])
+def test_a_sealed_end_whose_seal_does_not_verify_is_not_continued(home, tamper):
+    """R15b: a sealed tail is continued only when its closing checkpoint's
+    signature verifies under this writer's key. Otherwise the checkpoint is
+    just bytes: the segment is closed untouched and a new genesis names the
+    last checkpoint that does verify. The control is the test above."""
+    _writer(home).write(_call("a"), seal="close")
+    [old] = _segments(home)
+    records = _records(old)
+    _replace_last_line(old, tamper(records[-1]))
+    before = old.read_bytes()
+    genesis_checkpoint = records[1]
+    assert genesis_checkpoint["purpose"] == "genesis"
+
+    _writer(home).write(_call("b"), seal="close")
+
+    assert old.read_bytes() == before
+    assert len(_segments(home)) == 2
+    new = _segments(home)[1]
+    genesis = _records(new)[0]
+    assert genesis["body"]["previous"] == {
+        "chain_id": records[0]["chain_id"], "seq": genesis_checkpoint["seq"],
+        "hash": wire.record_hash(before.splitlines(True)[1])}
+    assert genesis["body"]["observed_unsigned"] == 3     # a's two rows + the seal
+    assert _report(home, new).results["chain_integrity"] == "CHAIN_OK"
+
+
 def test_a_restart_never_signs_an_unsigned_suffix(home):
     _writer(home).write(_call("a"))                        # crashed: never sealed
     [old] = _segments(home)
