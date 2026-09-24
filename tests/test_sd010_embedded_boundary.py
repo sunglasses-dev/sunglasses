@@ -46,7 +46,11 @@ PARENT = "GLS-SD-010"
 # Every channel the rule declares. The parent carries `file` and still misses
 # the embedded shapes on it, so this is not a channel fix and the test says so
 # by checking `file` alongside the result-direction channels.
-CHANNELS = ["message", "file", "code", "api_response", "log_memory", "agent_input"]
+# tool_output and web_content joined 2026-09-23 (T9 ruling 5): a JSON secret
+# dump in a tool's output or a fetched page is this rule's shape exactly, and
+# the channel lint found both missing with nothing saying it was deliberate.
+CHANNELS = ["message", "file", "code", "api_response", "log_memory", "agent_input",
+            "tool_output", "web_content"]
 
 
 def _engine_with(patterns):

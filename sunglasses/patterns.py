@@ -2621,6 +2621,12 @@ PATTERNS = [
     # reason, so the cost is a row someone must delete on purpose, not a
     # sentence a reviewer has to remember.
     #
+    # TOOL OUTPUT AND WEB CONTENT JOINED after round 7 (T9 ruling 5). A secret
+    # dump in a tool's output or a fetched page is this rule's shape exactly,
+    # and the channel lint found both missing with nothing saying it was a
+    # choice. Every must-fire row went red on each and every benign twin stayed
+    # clean on each; the corpus sweep is channel `file` and does not move.
+    #
     # NO KEYWORDS ON PURPOSE. The parent carries `API_KEY=` and friends as
     # keywords, which match independently of the regex; here that would fire on
     # the documentation prose this anchor was widened to avoid. The regex is the
@@ -2631,7 +2637,8 @@ PATTERNS = [
         "name": "Environment config secret dump (embedded)",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input"],
+        "channel": ["message", "file", "code", "api_response", "log_memory", "agent_input",
+                    "tool_output", "web_content"],
         "regex": [
             r"(?:\A(?:[ \t]|\\t)*|\n(?:[ \t]|\\t)*|\r(?:[ \t]|\\t)*"
             r"|\\n(?:[ \t]|\\t)*|\\r(?:[ \t]|\\t)*"
