@@ -718,7 +718,7 @@ python3 verify_ai_citations.py access.log --detail   # per-IP breakdown of fakes
 
 Output: verified / fake / uncheckable counts per claimed agent, plus the scanner tell (one IP wearing several vendor names). If you report AI citation numbers anywhere, run this first.
 
-## Wiring a route: `install`, `uninstall`, `doctor`
+## Wiring a route: `install`, `uninstall`
 
 **`install` rewrites your config. Read this before you try it.**
 
@@ -771,6 +771,28 @@ only; no CLI path and no `python -m sunglasses.proxy doctor` subcommand exists.
 Wiring one is a product decision, not a documentation fix, so the line is
 removed rather than rewritten into a command that would still not run.
 
+#### What `doctor.py` returns, and why `3` is not a failure
+
+SUNGLASSES uses the same four codes everywhere: `0` clean, `1` a real failure,
+`2` an operational error, `3` incomplete. For `doctor.py`, whose `run()` returns
+the exit code, that means:
+
+| code | meaning |
+|---|---|
+| `0` | every route it knows about is wrapped and every one passed a live check |
+| `1` | something it ran FAILED in front of it, or its own self-test failed |
+| `2` | it could not open a config or a record. It names the file. |
+| `3` | **not installed, or not verifiable.** A fact, not a failure. |
+
+**`3` is the code you get on a machine where nothing is wired yet, and it is the
+right answer.** "I looked and nothing is protected" and "I could not look" are
+different facts from "everything is fine", and a tool that collapses them into
+`0` is telling you that you are safe because it did not check. `0` and `3` never
+mean the same thing here.
+
+A failed self-test is always `1`, whatever the rest of the report says, because
+an instrument that failed has no standing to report on anything else.
+
 `install` keeps a copy of your original config and a record of what it changed,
 under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the
 copy still matches the digest taken at install time, and restores it. If the
@@ -788,27 +810,6 @@ target: /path/to/.mcp.json
 A client's server list is that client's file. Creating one from a guess would
 put a config where the client was not looking, and leave you wondering why
 nothing is wrapped.
-
-### Exit codes, and why `3` is not a failure
-
-SUNGLASSES uses the same four codes everywhere: `0` clean, `1` a real failure,
-`2` an operational error, `3` incomplete. For `doctor` that means:
-
-| code | meaning |
-|---|---|
-| `0` | every route it knows about is wrapped and every one passed a live check |
-| `1` | something it ran FAILED in front of it, or its own self-test failed |
-| `2` | it could not open a config or a record. It names the file. |
-| `3` | **not installed, or not verifiable.** A fact, not a failure. |
-
-**`3` is the code you get on a machine where nothing is wired yet, and it is the
-right answer.** "I looked and nothing is protected" and "I could not look" are
-different facts from "everything is fine", and a tool that collapses them into
-`0` is telling you that you are safe because it did not check. `0` and `3` never
-mean the same thing here.
-
-A failed self-test is always `1`, whatever the rest of the report says, because
-an instrument that failed has no standing to report on anything else.
 
 ### Why `install` may refuse when you think it should not
 
