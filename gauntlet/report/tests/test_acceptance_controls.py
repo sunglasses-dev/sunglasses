@@ -53,10 +53,11 @@ def capmap(tmp_path_factory):
 
     Nothing here marks the real map reviewed. Only a human review does that.
     """
-    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
-    data["review_state"] = classify.REVIEWED
-    path = tmp_path_factory.mktemp("capmap") / "reviewed.json"
-    path.write_text(json.dumps(data))
+    import review
+    path = tmp_path_factory.mktemp("capmap") / "capability_map.json"
+    path.write_text(pathlib.Path(classify.MAP_PATH).read_text())
+    review.record(path, "**GO**: test fixture, not a real review.\n", verdict="GO",
+                  reviewer="TEST-FIXTURE", round_id="capmap")
     return classify.load_map(path)
 
 
@@ -530,10 +531,21 @@ def _reload_map(data, tmp=None):
     # Defaults to reviewed so a row about SOME OTHER defect is not silently
     # answered by the review gate. A row that means to test review state sets
     # `review_state` itself and this leaves it alone.
+    # Since 2026-09-23 a review is RECORDED, not typed: a row about another
+    # defect gets a fixture review recorded AFTER its edit (review.record), so
+    # the content-hash check does not answer it first.
+    import tempfile
+    import review
     data = dict(data)
-    data.setdefault("review_state", classify.REVIEWED)
-    path = pathlib.Path(tmp or "/tmp") / "capability_map_under_test.json"
-    path.write_text(json.dumps(data))
+    path = pathlib.Path(tmp or tempfile.mkdtemp()) / "capability_map_under_test.json"
+    if data.get("review_state", classify.REVIEWED) == classify.REVIEWED:
+        data.pop("review_receipt", None)
+        data["review_state"] = "unreviewed"
+        path.write_text(json.dumps(data))
+        review.record(path, "**GO**: test fixture, not a real review.\n", verdict="GO",
+                      reviewer="TEST-FIXTURE", round_id="reload")
+    else:
+        path.write_text(json.dumps(data))
     return classify.load_map(path)
 
 
@@ -604,10 +616,11 @@ def test_an_unreviewed_map_is_refused(tmp_path):
 def test_a_reviewed_map_still_loads(tmp_path):
     """THE CONTROL. A fix that refused every map passes the row above and makes
     the tool useless; this row is the only reason that one means anything."""
-    data = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
-    data["review_state"] = "reviewed"
-    p = tmp_path / "reviewed.json"
-    p.write_text(json.dumps(data))
+    import review
+    p = tmp_path / "capability_map.json"
+    p.write_text(pathlib.Path(classify.MAP_PATH).read_text())
+    review.record(p, "**GO**: test fixture, not a real review.\n", verdict="GO",
+                  reviewer="TEST-FIXTURE", round_id="control")
     assert classify.load_map(p)["review_state"] == "reviewed"
 
 
