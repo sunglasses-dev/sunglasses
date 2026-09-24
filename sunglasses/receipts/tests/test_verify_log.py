@@ -23,13 +23,13 @@ sys.path.insert(0, str(HERE))
 import codes                                               # noqa: E402
 import verify                                              # noqa: E402
 import wire                                                # noqa: E402
-from test_verify import FP, PUBLIC, _Chain                 # noqa: E402
+from test_verify import FP, OTHER_SEED, PUBLIC, _Chain     # noqa: E402
 
 
-def _segment(chain_id, previous=None, observed_unsigned=0):
+def _segment(chain_id, previous=None, observed_unsigned=0, **kw):
     """A segment's opening, as the writer frames it: genesis (naming its
     predecessor, if any) and the genesis checkpoint."""
-    c = _Chain(chain_id=chain_id)
+    c = _Chain(chain_id=chain_id, **kw)
     c.lines = []
     body = {}
     if previous is not None:
@@ -256,3 +256,57 @@ def test_the_writers_own_rotation_verifies_as_one_log(tmp_path):
     public = keys.public_path(tmp_path, signer.fingerprint).read_bytes()
     report = verify.verify_log(log, public, expected_fingerprint=signer.fingerprint)
     assert _results(report) == LOG_OK
+
+
+# --- 12 · rotation: specified, not built (T9 ruling 40) -----------------------
+
+def _rotated():
+    """A log whose second segment names the first's last checkpoint, as a
+    rotation would, and is signed by a different key."""
+    a = _segment("seg-a")
+    a.call("e1")
+    a.seal("close")
+    b = _segment("seg-b", previous=_names(a), seed=OTHER_SEED)
+    b.call("e2")
+    b.seal("close")
+    return a, b
+
+
+def test_a_segment_under_another_key_names_the_rotation_limit(tmp_path):
+    log = _write(tmp_path / "hook", *_rotated())
+    report = verify.verify_log(log, PUBLIC, expected_fingerprint=FP)
+    assert report.results["chain_integrity"] == "ROTATION_UNSUPPORTED"
+    assert report.first_failure_segment == "segment-000002.chain"
+    assert codes.strict_exit_code(report.results) == 1
+    # The first segment, under the supplied key, is still judged on its own.
+    assert dict(report.segments)["segment-000001.chain"].results[
+        "chain_integrity"] == "CHAIN_OK"
+
+
+def test_the_control_the_same_log_under_one_key_is_one_log(tmp_path):
+    a, _ = _rotated()
+    b = _segment("seg-b", previous=_names(a))
+    b.call("e2")
+    b.seal("close")
+    log = _write(tmp_path / "hook", a, b)
+    assert _results(verify.verify_log(log, PUBLIC, expected_fingerprint=FP)) == LOG_OK
+
+
+def test_a_first_segment_under_another_key_is_still_a_context_mismatch(tmp_path):
+    """No predecessor named, so nothing claims a transition: not rotation."""
+    c = _segment("seg-a", seed=OTHER_SEED)
+    c.call("e1")
+    c.seal("close")
+    log = _write(tmp_path / "hook", c)
+    report = verify.verify_log(log, PUBLIC, expected_fingerprint=FP)
+    assert report.results["chain_integrity"] == "CONTEXT_MISMATCH"
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "Spec vector 12. Rotation is specified, not built and not claimed (T9 "
+    "ruling 40): the verifier prints ROTATION_UNSUPPORTED. This row is the "
+    "target, and it turns strict-xpass the day rotation is built."))
+def test_12_rotation_with_the_old_key_absent_is_successor_asserted(tmp_path):
+    log = _write(tmp_path / "hook", *_rotated())
+    report = verify.verify_log(log, PUBLIC, expected_fingerprint=FP)
+    assert report.results["chain_integrity"] == "SUCCESSOR_ASSERTED"

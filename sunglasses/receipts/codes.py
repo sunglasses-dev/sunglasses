@@ -61,6 +61,11 @@ CODES = {
         "old key, and not proof of the same owner.",
     "SUCCESSOR_ENDORSED": "the old key signed this successor binding",
     "LEGACY_UNSIGNED": "predates signing; integrity status unknown, not clean",
+    "ROTATION_UNSUPPORTED":
+        "a later segment is signed by another key: a key transition. Rotation "
+        "is specified (WIRE_SPEC, key loss and rotation) and not built, so "
+        "that segment and everything after it is not judged (T9 ruling R40). "
+        "Not a pass.",
 
     # lifecycle
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
@@ -112,7 +117,7 @@ def strict_exit_code(results: dict) -> int:
         "HISTORY_EXTENT_UNKNOWN", "EXPECTED_CHECKPOINT_MISSING",
         "CHECKPOINT_MISMATCH", "MISSING_GENESIS", "SEGMENT_MISSING",
         "LIFECYCLE_ORPHAN", "LIFECYCLE_DUPLICATE", "LEGACY_UNSIGNED",
-        "UNKNOWN_EVENT",
+        "UNKNOWN_EVENT", "ROTATION_UNSUPPORTED",
     }
     for kind in RESULT_KINDS:
         if results.get(kind) in failing:

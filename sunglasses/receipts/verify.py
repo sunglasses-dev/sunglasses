@@ -112,7 +112,7 @@ class _Walk:
     report: Report
     prefix: list             # (line_no, record, hash) of the verified prefix
     records: list            # every linked record
-    genesis: dict | None     # the first record, if it decoded
+    genesis: dict | None     # the first record, if it decoded as a genesis
 
 
 def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
@@ -134,6 +134,7 @@ def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
     records = []             # (line_no, record, hash) for every linked record
     verified = None          # index into `records` of the last verified checkpoint
     chain_id = None
+    genesis = None           # kept even when its key is not this one (R40)
     for index, line in enumerate(lines):
         line_no = index + 1
         try:
@@ -147,6 +148,7 @@ def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
                 fail("MISSING_GENESIS", line_no, "the first record is not a genesis")
                 break
             chain_id = record.get("chain_id")
+            genesis = record
         if (record.get("wire") != wire.WIRE_VERSION
                 or record.get("chain_id") != chain_id
                 or record.get("key_id") != fingerprint):
@@ -199,7 +201,7 @@ def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
 
     results["expected_endpoint"] = _endpoint(prefix, records, expected_endpoint)
     results["lifecycle"] = _lifecycle(prefix)
-    return _Walk(report, prefix, records, records[0][1] if records else None)
+    return _Walk(report, prefix, records, genesis)
 
 
 def _endpoint(prefix, records, expected):
@@ -328,6 +330,14 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
                 fail("HASH_LINK_MISMATCH", name,
                      "its genesis does not name the previous segment's last "
                      "verified checkpoint")
+        if (index and named is not None and walk.genesis is not None
+                and walk.genesis.get("key_id") != fingerprint):
+            # A successor under another key is a key transition. Rotation is
+            # specified, not built (R40): named as the limit, never judged,
+            # and never reported as a forgery it may not be.
+            fail("ROTATION_UNSUPPORTED", name,
+                 "this segment is signed by another key; rotation is not built")
+            continue
         own = walk.report.results["chain_integrity"]
         if own != "CHAIN_OK":
             fail(own, name, walk.report.failure_detail)
