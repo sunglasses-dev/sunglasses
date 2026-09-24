@@ -128,6 +128,18 @@ def test_without_the_extra_a_legacy_log_verifies_exactly_as_before(home, no_cryp
     assert "No orphans." in out
 
 
+def test_a_legacy_orphan_still_fails_beside_a_chain_that_passes(home):
+    """UNSIGNED is not a failure; an orphan in the legacy log still is."""
+    d = home / "receipts"
+    d.mkdir(parents=True)
+    (d / "2026-09-24.jsonl").write_text(json.dumps(
+        {"kind": "in_flight", "eval_id": "lost", "ts": "2026-09-24T01:00:00",
+         "tool_name": "Bash"}) + "\n")
+    code, out = _cli(home, "--verify")
+    assert code == 1
+    assert "LEGACY_UNSIGNED" in out
+    assert "orphan" in out
+
 # ── --verify on a chain: five results per log, printed per log ───────────────
 
 def test_a_sealed_hook_chain_prints_its_five_results(home):

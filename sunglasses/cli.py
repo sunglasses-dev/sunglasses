@@ -1240,18 +1240,138 @@ def _unreadable_preview(material, reason: str = "") -> str:
     return preview
 
 
+_RECEIPTS_EXTRA = 'pip install "sunglasses[receipts]"'
+
+
+def _receipts_init(home):
+    """T9 ruling 11 Q2: the USER's key, made only here, never on a first write."""
+    try:
+        from .receipts import keys
+    except ImportError:
+        print(f"\n  {RED}Signed receipts need the receipts extra:{RESET} "
+              f"{_RECEIPTS_EXTRA}  {DIM}(sunglasses[receipts]){RESET}\n")
+        return 1
+    try:
+        fingerprint = keys.init(home)
+    except keys.KeyExists:
+        print(f"\n  {YELLOW}A receipt key already exists{RESET} "
+              f"{DIM}in {home / keys.KEY_DIR}. Nothing was changed.{RESET}\n")
+        return 1
+    print(f"\n  {GREEN}Receipt key created.{RESET}")
+    print(f"  fingerprint  {BOLD}{fingerprint}{RESET}")
+    print(f"  {DIM}Keep this fingerprint somewhere other than this machine. The key "
+          f"beside a log\n  gives portability, not trust: "
+          f"`sunglasses receipts --verify --fingerprint <it>`\n  is how a "
+          f"verification says KEY_TRUSTED.{RESET}\n")
+    return 0
+
+
+def _chain_logs(directory):
+    """Each signed log is its own directory of segments (T9 ruling 15)."""
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.iterdir()
+                  if p.is_dir() and any(p.glob("segment-*.chain")))
+
+
+def _log_label(log):
+    """A log's directory name, printed inert: a name that is not plain is
+    shown escaped rather than sent to the terminal as it stands."""
+    import re as _re
+    name = log.name
+    return name if _re.fullmatch(r"[A-Za-z0-9._-]{1,64}", name) else ascii(name)
+
+
+def _log_chain_ids(log, wire):
+    """The chain ids a log's segments open with, to route a retained endpoint
+    to the one log it was retained from."""
+    ids = set()
+    for segment in log.glob("segment-*.chain"):
+        try:
+            with open(segment, "rb") as fh:
+                ids.add(wire.decode_strict(fh.readline()).get("chain_id"))
+        except (OSError, ValueError):
+            continue
+    return ids
+
+
+def _verify_chains(logs, args, home):
+    """Five results per log, printed per log; exit non-zero on any unknown."""
+    try:
+        from .receipts import codes, keys, verify, wire
+    except ImportError:
+        for log in logs:
+            print(f"  {RED}{_log_label(log)}{RESET}: a signed log, NOT "
+                  f"verified. The verifier needs {_RECEIPTS_EXTRA} "
+                  f"{DIM}(sunglasses[receipts]){RESET}")
+        return 1
+    endpoint = None
+    if args.endpoint:
+        try:
+            endpoint = _json_loads_object(args.endpoint)
+        except ValueError as exc:
+            print(f"  {RED}--endpoint must be a JSON object{RESET} {DIM}({exc}){RESET}")
+            return 2
+    public = _receipt_public_key(home, keys)
+    code = 0
+    for log in logs:
+        print()
+        if public is None:
+            print(f"  {RED}{_log_label(log)}{RESET}: a signed log, NOT "
+                  f"verified: no public key to check it with in "
+                  f"{home / keys.KEY_DIR / keys.PUBLIC_DIR}")
+            code = 1
+            continue
+        mine = endpoint if endpoint is not None and (
+            endpoint.get("chain_id") is None
+            or endpoint.get("chain_id") in _log_chain_ids(log, wire)) else None
+        report = verify.verify_log(log, public, expected_fingerprint=args.fingerprint,
+                                   expected_endpoint=mine)
+        print(verify.render_log(report, name=_log_label(log)))
+        code = max(code, codes.strict_exit_code(report.results))
+    print()
+    return code
+
+
+def _json_loads_object(text):
+    import json as _json
+    value = _json.loads(text)
+    if not isinstance(value, dict):
+        raise ValueError("not an object")
+    return value
+
+
+def _receipt_public_key(home, keys):
+    """The public key beside the logs: the local key's own, else the only one.
+    Raw 32 bytes, or None. Never trusted on its own: see --fingerprint."""
+    public_dir = home / keys.KEY_DIR / keys.PUBLIC_DIR
+    candidates = sorted(public_dir.glob("*.pub")) if public_dir.is_dir() else []
+    private = keys.private_path(home)
+    if private is not None:
+        prefix = private.stem.split("-", 1)[-1]
+        mine = [c for c in candidates if c.name.startswith(prefix)]
+        candidates = mine or candidates
+    if len(candidates) != 1:
+        return None
+    return candidates[0].read_bytes()
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail."""
     import json as _json
     from .firewall import sunglasses_home
 
+    if getattr(args, "action", None) == "init":
+        return _receipts_init(sunglasses_home())
+
     directory = sunglasses_home() / "receipts"
     files = sorted(directory.glob("*.jsonl"))
+    chain_logs = _chain_logs(directory) if getattr(args, "verify", False) else []
     if args.today:
         import datetime
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         files = [f for f in files if f.stem == today]
-    if not files:
+    if not files and not chain_logs:
         print(f"\n  {DIM}No receipts in {directory}. "
               f"Run `sunglasses init` to install the firewall.{RESET}\n")
         return 0
@@ -1307,7 +1427,17 @@ def cmd_receipts(args):
                 unparseable.append((path, lineno, _unreadable_preview(line)))
 
     if getattr(args, "verify", False):
-        return _verify_lifecycle(rows, directory, unparseable)
+        code = 0
+        if files:
+            # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
+            # exit code is the lifecycle verdict it always had.
+            print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
+                  f"{YELLOW}LEGACY_UNSIGNED{RESET} {DIM}-- predates signing; "
+                  f"integrity status unknown, not clean{RESET}")
+            code = _verify_lifecycle(rows, directory, unparseable)
+        if chain_logs:
+            code = max(code, _verify_chains(chain_logs, args, sunglasses_home()))
+        return code
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
     # (audit H2) or have been edited since. Everything pulled out of it is treated
@@ -2113,6 +2243,18 @@ def main():
     # receipts
     receipts_parser = subparsers.add_parser(
         "receipts", help="Show the firewall audit trail")
+    receipts_parser.add_argument(
+        "action", nargs="?", choices=["init"],
+        help="init: create YOUR receipt signing key (needs sunglasses[receipts]). "
+             "Nothing else ever creates one.")
+    receipts_parser.add_argument(
+        "--fingerprint", metavar="FP",
+        help="With --verify: the key fingerprint you kept elsewhere. Without it "
+             "the key beside the log is reported KEY_UNTRUSTED.")
+    receipts_parser.add_argument(
+        "--endpoint", metavar="JSON",
+        help='With --verify: a checkpoint you retained, {"chain_id", "seq", "hash"}. '
+             "Without it how far the history once extended is unknown.")
     receipts_parser.add_argument("--today", action="store_true", help="Today only")
     receipts_parser.add_argument("--limit", type=int, default=40,
                                  help="Rows to show (default 40)")

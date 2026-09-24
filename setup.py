@@ -23,7 +23,8 @@ setup(
     python_requires=">=3.9",
     install_requires=[],
     extras_require={
-        "dev": ["pytest", "PyYAML"],
+        # cryptography is in dev so the receipts tests run in CI, not skip.
+        "dev": ["pytest", "PyYAML", "cryptography>=41"],
         "image": ["Pillow", "pytesseract"],
         "pdf": ["PyPDF2"],
         "qr": ["pyzbar", "Pillow"],
@@ -32,7 +33,11 @@ setup(
         "media": ["Pillow", "pytesseract", "PyPDF2", "pyzbar"],
         "audio": ["openai-whisper"],
         "video": ["openai-whisper"],
-        "all": ["Pillow", "pytesseract", "PyPDF2", "pyzbar", "openai-whisper"],
+        # Signed receipts (#172): Ed25519 from PyCA. Optional, and inert until
+        # the user runs `sunglasses receipts init` (T9 ruling 11).
+        "receipts": ["cryptography>=41"],
+        "all": ["Pillow", "pytesseract", "PyPDF2", "pyzbar", "openai-whisper",
+                "cryptography>=41"],
     },
     include_package_data=True,
     package_data={
