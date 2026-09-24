@@ -111,7 +111,8 @@ valid under this supplied key, ownership unknown.
 
 Sign at creation, every **100 non-checkpoint records** by default, each observed
 session close, segment closure, export and key transition. The configured
-positive interval is bound **in the signed header**. Under the append lock, the
+positive interval, an integer of at least 1, is bound **in the signed
+header**. Under the append lock, the
 checkpoint at 100 is required before record 101 is admitted.
 
 A crash can leave up to 100 pending records under this healthy-writer policy.
@@ -122,6 +123,9 @@ Records visible after the last verified checkpoint report `UNVERIFIED_TAIL`
 with counts and file:line boundaries. An existing unsigned suffix is **never
 automatically signed on restart** merely because its hashes are consistent; it
 could have been rewritten while the writer was down.
+
+A last line without its terminating LF is a torn write, reported as
+`TRUNCATED_RECORD` (`verify.py:178`), never read as a shorter record.
 
 ## The endpoint, and the code most likely to be quoted wrongly
 
@@ -152,6 +156,10 @@ rotation with the old key available, the old key also signs the successor
 binding, which loss cannot manufacture: `SUCCESSOR_ENDORSED`.
 
 Old public keys are never overwritten. This is **not** forward-secure signing.
+
+None of this section is built yet. Today the verifier knows one key per log;
+a segment whose genesis names another key reports `ROTATION_UNSUPPORTED`
+instead of guessing whether a successor was meant.
 
 ## Offline verification
 
@@ -383,15 +391,35 @@ record before a verifier prints it.
 
 ## What is built here, and what is not
 
-Built: the encoding, the hashes, the signature construction, the fingerprint,
-the reason codes, the vectors, and 24 controls, every one a mutation with a
-positive control beside it so a checker that refuses everything cannot pass.
+Built in this directory: the encoding, the hashes, the signature construction
+and the fingerprint (`wire.py`); the reason codes (`codes.py`); the signing key,
+created only by `sunglasses receipts init` (`keys.py`); the writer with its
+per-chain lock, sequence, checkpoint cadence and segment rotation by size
+(`chain.py`); opting in and out (`optin.py`); the verifier for one segment and
+for a whole log, with its rendering (`verify.py`); the hook's row allowlist
+(`hook_rows.py`); and the vectors (`make_vectors.py`, `VECTORS.json`). Outside
+it, the firewall hook and the proxy each write a chain signed with the home's
+key, and `sunglasses receipts --verify` checks both.
 
-**Not built and not claimed:** the writer, the store, the per-chain append lock and
-sequence, rotation, epochs, the CLI, the offline bundle, concurrency between
-hook and proxy, and the durable release gate. ASTRA's 20 acceptance groups and 3
-limitation controls are future requirements, not results. This file proves the
-bytes and nothing about a system that does not exist yet.
+**Specified and not built, so not claimed:**
+
+- Key rotation and epochs. `SUCCESSOR_ASSERTED` and `SUCCESSOR_ENDORSED` are
+  defined above and nothing emits them. A segment signed by a key other than
+  the one being verified reports `ROTATION_UNSUPPORTED`, the way an unkeyed
+  proxy pair reports `PAIRING_UNKEYED`. Freeze vector 12 is a strict expected
+  failure until rotation is built.
+- The standalone offline bundle. The verifier is the one in this package.
+- A streaming verifier. The verifier reads one whole segment into memory, and
+  a segment is at most 256 MiB (`chain.py:62`).
+- A counted cut for long values. A proxy row whose `rule_ids` would pass 256
+  entries, or any row past the 16 KiB line, is refused by the writer, not
+  shortened with a count. The proxy keeps that failure, so every later row
+  in the session is refused too (`proxy/receipts.py:264-271`).
+- An upper bound on the checkpoint interval. The writer refuses an interval
+  that is not a positive integer (`chain.py:66`) and accepts any larger one.
+- Concurrency between hook and proxy beyond their separate chains, and the
+  durable release gate. ASTRA's acceptance groups remain requirements until a
+  review says otherwise.
 
 ## Not in the released artifact
 
