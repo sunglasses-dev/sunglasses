@@ -2303,6 +2303,17 @@ def cmd_uninstall(args):
     elif res.byte_exact:
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
               f"{DIM}(byte-identical){RESET}\n")
+    elif res.later:
+        # R38 (b). The only difference from our own after-image is a later
+        # sunglasses wrap on top, so say that and what undoes it rather than
+        # a sentence that reads as somebody else's edit.
+        names = ", ".join(repr(n) for n in res.later)
+        runs = " and ".join(f"sunglasses uninstall {n}" for n in res.later)
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        which = ("a later sunglasses install of {} is" if len(res.later) == 1
+                 else "later sunglasses installs of {} are").format(names)
+        print(f"  {DIM}{which} still wrapped here; run {runs} to restore the "
+              f"original{RESET}\n")
     else:
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "

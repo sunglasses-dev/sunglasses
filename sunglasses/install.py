@@ -113,14 +113,20 @@ class UninstallResult:
     install on the same file captured, not the bytes this one captured (R38).
     Two wraps undone first-installed-first end exactly where the user started,
     and the second uninstall used to call that a change.
+
+    `later` names the sunglasses installs still wrapped on top when they are
+    the ONLY difference from this install's after-image, oldest first. Empty
+    whenever anything else changed the file, so a foreign edit is never
+    blamed on an install.
     """
 
-    __slots__ = ("byte_exact", "kept_at", "earlier")
+    __slots__ = ("byte_exact", "kept_at", "earlier", "later")
 
-    def __init__(self, byte_exact, kept_at=None, earlier=False):
+    def __init__(self, byte_exact, kept_at=None, earlier=False, later=()):
         self.byte_exact = byte_exact
         self.kept_at = kept_at
         self.earlier = earlier
+        self.later = tuple(later)
 
 
 def _digest_bytes(b):
@@ -2171,6 +2177,18 @@ def _earlier_originals(home, name, target_id, sha_before):
     record while it is read.
     """
     found = []
+    for _, rec in _other_records_on(home, name, target_id):
+        if rec.get("file_sha_after") != sha_before:
+            continue
+        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
+            if _is_digest(digest) and digest not in found:
+                found.append(digest)
+    return found
+
+
+def _other_records_on(home, name, target_id):
+    """Every other completed install record that describes the same file.
+    A record we cannot read is skipped: these only ever inform wording."""
     d = _record_paths(home, name)[0]
     for rec_path in sorted(d.glob("*.json")):
         other = rec_path.stem
@@ -2180,14 +2198,30 @@ def _earlier_originals(home, name, target_id, sha_before):
             rec = _read_record(rec_path, other, expect_state="complete")
         except ConfigConflict:
             continue
-        if rec.get("target_path") != target_id:
-            continue
-        if rec.get("file_sha_after") != sha_before:
-            continue
-        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
-            if _is_digest(digest) and digest not in found:
-                found.append(digest)
-    return found
+        if rec.get("target_path") == target_id:
+            yield other, rec
+
+
+def _later_wraps(home, name, record, current_digest):
+    """The installs stacked on top of this one, when they explain the file.
+
+    R38 (b). Walks from this install's after-image through records whose
+    before-image is exactly the previous link's after-image, and answers only
+    if the walk lands on the file as it was just read. Any gap, any fork and
+    any edit on top means the file changed for some other reason, and the
+    answer is empty so the generic warning stands.
+    """
+    others = list(_other_records_on(home, name, record.get("target_path")))
+    chain = []
+    cursor = record.get("file_sha_after")
+    while cursor != current_digest:
+        step = [(n, r) for n, r in others
+                if r["file_sha_before"] == cursor and n not in chain]
+        if len(step) != 1:
+            return ()
+        chain.append(step[0][0])
+        cursor = step[0][1]["file_sha_after"]
+    return tuple(chain)
 
 
 def _earlier_of(record):
@@ -2994,4 +3028,6 @@ def _uninstall_locked(config_path, name, *, home):
         return UninstallResult(byte_exact=True, kept_at=kept_at)
     if written in _earlier_of(record):
         return UninstallResult(byte_exact=True, kept_at=kept_at, earlier=True)
-    return UninstallResult(byte_exact=False, kept_at=kept_at)
+    return UninstallResult(
+        byte_exact=False, kept_at=kept_at,
+        later=_later_wraps(home, name, record, _digest_bytes(current)))
