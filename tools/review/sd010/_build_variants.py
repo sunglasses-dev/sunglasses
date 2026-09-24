@@ -18,6 +18,9 @@ orig = io.open(os.path.join(SRC, REL), encoding="utf-8").read()
 # did not earn. Two new rows cover what the fix added.
 IND  = r"(?:[ \t]|\\t)*"
 CLASS = r"""[\"'{\[,]"""
+# Round 7 moved the SEPARATOR: `\s*=` became this, and V11's target went stale
+# with it -- the builder refused until it was retargeted, as it should.
+SEP = r"(?:\s|\\[tnrf])*="
 
 MUTS = [
  ("V1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
@@ -30,12 +33,14 @@ MUTS = [
  # NEW, from round 4b's findings
  ("V12-escaped-tab-not-indent",  IND, r"[ \t]*", 0),   # every occurrence
  ("V13-unicode-separators-gone", r"|[\u2028\u2029]" + IND, ""),
+ # NEW, from round 7's finding: the separator back to literal whitespace only
+ ("V14-separator-literal-only",  SEP, r"\s*="),
  # The CLASS control: put a value exclusion back and the evasion rows must go
  # quiet. This guards the decision the rule now rests on.
  ("V11-value-exclusion-readded",
-  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*=",""",
-  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))\s*="""
-  r"""(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""),
+  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))""" + SEP + '",',
+  r"""|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))""" + SEP
+  + r"""(?![ \t]*[\"']?[ \t]*(?:<|\$\{|your[_-]|x{3,}|example|changeme|redacted))","""),
 ]
 
 # A mutation may need EVERY occurrence replaced, not the first. The

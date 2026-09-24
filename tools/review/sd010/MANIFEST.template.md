@@ -7,6 +7,8 @@ A detection rule for a `NAME=value` assignment that sits INSIDE structured text 
 YAML line). It fires when the assignment starts at a boundary:
 start of text · newline · literal CR · escaped `\n` / `\r` · U+2028 / U+2029 · one of `" ' { [ ,`
 — each optionally followed by indentation, where indentation is a space, a tab, or an escaped `\t`.
+Between the name and the `=`, the separator admits any whitespace `\s` matches OR its escaped two-character
+form `\t` `\n` `\r` `\f` (added after round 7, which found the escaped tab there; the other three measured open too).
 The name alternation is case-sensitive (inline `(?-i:)`, because the engine compiles with IGNORECASE).
 **The value is not inspected at all.** A bare space and a backtick are NOT boundaries.
 
@@ -28,7 +30,7 @@ Do not print probe sources; this manifest says what each one measures.
 | p1-baseline | the rule fires on its reference set at head and not at base |
 | p2-matrix | the fixture matrix: must-fire, benign, and disclosed rows |
 | p3-sweep | specificity over the real-world corpus; an ACCEPTED ledger row is separated from an UNBOOKED cost, and only the latter fails |
-| p4-variants | sensitivity of the test file: ten pre-built trees under `v/`, one unchanged control plus nine each missing one guard. The control must be green; each of the nine must be DETECTED (pytest rc 1 AND a failed-test line) |
+| p4-variants | sensitivity of the test file: pre-built trees under `v/` (listed in `v/INDEX.json`), one unchanged control plus one per guard, each missing that guard. The control must be green; each variant must be DETECTED (pytest rc 1 AND a failed-test line) |
 | p5-ratio | timing ratio against the gate |
 | p6-robustness | six historical rows, each closed at head and reopened by its own designated variant |
 | p7-constructed | cases YOU write in VERDICT.md: `zsh @OUT@/probes/p7-constructed.sh value --cases-from-verdict` |
@@ -41,8 +43,8 @@ Use the placeholders `{NAME}` `{NAME_LC}` `{VALUE}` `{URL}` for the assignment's
 those rows `[template]`. A block that does not parse is reported and not scored.
 
 **The axis that found the most in earlier rounds is the QUOTING and ENCODING context around the assignment, not the
-value.** Find a seventh family of inputs the rule misses, or show that one of the eighteen closed shapes is closed
-only for the exact form that was tested.
+value.** Find another family of inputs the rule misses, or show that a closed shape is closed
+only for the exact form that was tested. Round 7's family is now closed; its rows are in the test file.
 
 ## §5 WHAT IS STATED RATHER THAN CLAIMED
 - **No value-based exception exists.** Exceptions keyed on the value were a closed class: each was defeated by a
