@@ -179,13 +179,32 @@ A committed vector file that regenerates differently fails `test_the_vectors_
 are_pinned` in the same commit, rather than six weeks later when an auditor's
 verifier disagrees with ours.
 
+## Chains and writers: one chain per log (T9 ruling 15)
+
+Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
+
+- **One chain per LOG.** The hook and each proxy log write separate chains, each
+  in its own directory with its own append lock and its own sequence. There is
+  no global sequence. A single chain shared by a per-call hook process and a
+  long-lived proxy would share one unsigned suffix, and a writer may never sign
+  a suffix it did not write.
+- **The hook seals each call.** Each hook invocation writes its rows, then a
+  `close` checkpoint over them, signed before the process exits. A call that
+  finds the tail sealed continues the segment; one that finds an unsigned tail
+  (a call that died) opens a new segment whose genesis names it.
+- **Durability** is `os.fsync` of the file and the directory for both producers,
+  one statement for both. `F_FULLFSYNC` is not used.
+- **The verifier reports per chain**: five results for each chain. Matching a
+  hook call to a proxy item across chains is a **lifecycle** result only. A
+  partner missing from another chain never changes either chain's integrity.
+
 ## What is built here, and what is not
 
 Built: the encoding, the hashes, the signature construction, the fingerprint,
 the reason codes, the vectors, and 24 controls, every one a mutation with a
 positive control beside it so a checker that refuses everything cannot pass.
 
-**Not built and not claimed:** the writer, the store, the append lock and global
+**Not built and not claimed:** the writer, the store, the per-chain append lock and
 sequence, rotation, epochs, the CLI, the offline bundle, concurrency between
 hook and proxy, and the durable release gate. ASTRA's 20 acceptance groups and 3
 limitation controls are future requirements, not results. This file proves the
