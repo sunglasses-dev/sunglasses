@@ -153,6 +153,10 @@ def names(c):
 UNTRUSTED, TRUSTED = "KEY_UNTRUSTED", "KEY_TRUSTED"
 OK, UNKNOWN_EXTENT = "CHAIN_OK", "HISTORY_EXTENT_UNKNOWN"
 NO_TAIL, TAIL, COMPLETE = "NO_VISIBLE_TAIL", "UNVERIFIED_TAIL", "LIFECYCLE_COMPLETE"
+# T9 ruling 41: nothing verified is its own answer, printed by name. It is
+# never COMPLETE (there is no lifecycle to be complete) and never a failure
+# (the integrity result already says what went wrong, if anything did).
+EMPTY = "EMPTY_CHAIN"
 NOT_EXPORTED = {
     "12": "rotation is specified, not built and not claimed (T9 ruling 40). "
           "The verifier prints ROTATION_UNSUPPORTED for a segment signed by "
@@ -217,7 +221,7 @@ def verifier_vectors() -> list:
     o = WireChain(seed=OTHER_SEED)
     o.seal("genesis")
     out.append(_vector("2c", "a chain signed by another key", o.data(),
-                       results=_results(integrity="CONTEXT_MISMATCH"),
+                       results=_results(integrity="CONTEXT_MISMATCH", lifecycle=EMPTY),
                        first_failure_line=1))
 
     c = sealed_chain()
@@ -258,13 +262,17 @@ def verifier_vectors() -> list:
     c = sealed_chain()
     out.append(_vector("5c", "no genesis: a suffix, not a history",
                        b"".join(c.lines[2:]),
-                       results=_results(integrity="MISSING_GENESIS"),
+                       results=_results(integrity="MISSING_GENESIS", lifecycle=EMPTY),
                        first_failure_line=1))
 
     c = sealed_chain()
     out.append(_vector("6", "truncated at a valid checkpoint is never complete (LC02)",
                        b"".join(c.lines[:2]), c, fingerprint=fp,
                        results=_results(TRUSTED), through=1))
+    g = WireChain()
+    g.seal("genesis")
+    out.append(_vector("6b", "genesis only: a started chain is not an empty one",
+                       g.data(), g, results=_results(), through=1))
     out.append(_vector("7", "a retained endpoint beyond the log",
                        b"".join(c.lines[:2]), c, endpoint=c.endpoint(4),
                        results=_results(endpoint="EXPECTED_CHECKPOINT_MISSING"),
@@ -287,7 +295,8 @@ def verifier_vectors() -> list:
     c.call("e1")
     out.append(_vector("8b", "no checkpoint at all: everything is tail, nothing "
                        "is verified, so there is no meaning line", c.data(),
-                       results=_results(tail=TAIL), tail=_tail(3, 1, 3)))
+                       results=_results(tail=TAIL, lifecycle=EMPTY),
+                       tail=_tail(3, 1, 3)))
 
     c = sealed_chain()
     c.event("in_flight", eval_id="e2")
