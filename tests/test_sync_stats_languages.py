@@ -29,12 +29,36 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-def test_sync_readme_runs_on_real_stats(tmp_path, monkeypatch):
+TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} unique keywords, {} attack categories (English-first \u2014 see [Language coverage](#language-coverage-measured))"
+
+
+def _expected_line(stats):
+    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["keywords_declared"]:,}',
+                            f'{stats["categories"]:,}')
+
+
+def test_sync_readme_rewrites_the_text_scanning_line(tmp_path, monkeypatch):
+    """The line must be REWRITTEN, counted, not merely survive the run."""
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_readme")
     stats = sync.get_real_stats()
-    (tmp_path / "README.md").write_text(
-        "Text scanning: 1 patterns, 1 keywords, 99 languages, 1 attack categories\n"
-    )
+    stale = TEXT_LINE.format("1", "2", "3")
+    (tmp_path / "README.md").write_text(f"x\n{stale}\ny\n")
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
-    sync.sync_readme(stats)
-    assert f'{stats["dedicated_pattern_languages"]} languages' in (tmp_path / "README.md").read_text()
+    assert sync.sync_readme(stats) is True
+    lines = (tmp_path / "README.md").read_text().splitlines()
+    assert lines.count(_expected_line(stats)) == 1
+    assert stale not in lines
+
+
+def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkeypatch):
+    """Against the real README the pattern must hit exactly one line, and a current
+    README must come out byte-identical (the declared keyword count, not the index's)."""
+    sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_real")
+    stats = sync.get_real_stats()
+    real = (ROOT / "README.md").read_text()
+    assert sum(1 for l in real.splitlines() if "Text scanning:" in l) == 1
+    assert real.splitlines().count(_expected_line(stats)) == 1, "README line is not current"
+    (tmp_path / "README.md").write_text(real)
+    monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
+    assert sync.sync_readme(stats) is False
+    assert (tmp_path / "README.md").read_text() == real

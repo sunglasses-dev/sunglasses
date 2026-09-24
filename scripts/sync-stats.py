@@ -37,8 +37,9 @@ def get_real_stats():
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
 
-    # sync_readme prints this count. It comes from the generator, the same source
-    # stats/current.json records, never from a literal.
+    # The typed language count stats/current.json records, from the same generator,
+    # never from a literal. (The README's Text scanning line no longer prints it:
+    # it points at the measured coverage table instead.)
     sys.path.insert(0, str(REPO_ROOT / "tools"))
     from gen_language_stats import measure
     languages = measure(patterns)["dedicated_pattern_languages"]
@@ -55,6 +56,9 @@ def get_real_stats():
         "patterns": total,
         "categories": len(categories),
         "keywords": keyword_count,
+        # README's "unique keywords" is the DECLARED count; `keywords` is the smaller
+        # pre-screen index. Writing the index there would state a different number.
+        "keywords_declared": info["keywords_declared"],
         "regex": regex_count,
         "dedicated_pattern_languages": languages,
         "version": version,
@@ -97,13 +101,12 @@ def sync_readme(stats):
         (r'\| Attack categories \| \d+ \|', f'| Attack categories | {stats["categories"]} |'),
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
-        # What Works Today line
-        # The language count was a LITERAL here on both sides, so this line would have
-        # re-emitted 13 no matter what the patterns said. It reads the typed field now,
-        # which tools/gen_language_stats.py measures from patterns.py.
-        (r'Text scanning: \d+ patterns, \d+ keywords, \d+ languages, \d+ attack categories',
-         f'Text scanning: {stats["patterns"]} patterns, {stats["keywords"]} keywords, '
-         f'{stats["dedicated_pattern_languages"]} languages, {stats["categories"]} attack categories'),
+        # What Works Today line. It must match the README as written (thousands
+        # separators, "unique keywords", no language count), or the replacement is a
+        # silent no-op, which it was from #147 until this pattern was fixed.
+        (r'Text scanning: [\d,]+ patterns, [\d,]+ unique keywords, [\d,]+ attack categories',
+         f'Text scanning: {stats["patterns"]:,} patterns, {stats["keywords_declared"]:,} unique keywords, '
+         f'{stats["categories"]:,} attack categories'),
     ]
     return update_file(readme, replacements, "README.md")
 
