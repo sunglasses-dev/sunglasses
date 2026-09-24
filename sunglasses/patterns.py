@@ -2551,6 +2551,16 @@ PATTERNS = [
     # not the one that was reported. `\uXXXX`-encoded separators stay in the
     # decoding residual below, for the reason given there.
     #
+    # ROUND 8 WIDENED "JSON" TO EVERY STRING SYNTAX THIS RULE READS. The
+    # reviewer found `\v` (Python and YAML, not JSON) open while its literal
+    # twin blocked. Measured on 7430bc5, the whole one-character class was
+    # open: `\v`, YAML's `\_` `\L` `\P`, and a backslash before a literal
+    # space, tab or newline (YAML's escaped space and tab, a line
+    # continuation). `[\stnrfv_LP]` is that class; the engine compiles
+    # case-insensitively, which is also why YAML's `\N` was already caught.
+    # Numeric escapes (\x0b, \013) name a character by its code, like \uXXXX,
+    # and stay with it in the residual.
+    #
     # STILL UNREPORTED, and named rather than chased: `\u003d`, `\u000a`,
     # `\u0020`, `\u0009` -- JSON \uXXXX escapes of the `=`, the newline, the
     # space and the tab -- plus one nested-escape and one YAML sequence shape.
@@ -2644,7 +2654,7 @@ PATTERNS = [
             r"|\\n(?:[ \t]|\\t)*|\\r(?:[ \t]|\\t)*"
             r"|[\u2028\u2029](?:[ \t]|\\t)*|[\"'{\[,](?:[ \t]|\\t)*)"
             r"(?-i:(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL"
-            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))(?:\s|\\[tnrf])*=",
+            r"|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY))(?:\s|\\[\stnrfv_LP])*=",
         ],
         "description": "An environment or config assignment embedded in quoted, serialized or indented content, which the line-anchored GLS-SD-010 cannot match. The key must be upper case, so a lower-case keyword argument in a code example is not a match. The value is not inspected at all: every exclusion tried on it was a switch an attacker could flip by writing the excluded shape around the secret, so this rule reports the assignment and accepts that documentation of an environment variable is reported too."
     },

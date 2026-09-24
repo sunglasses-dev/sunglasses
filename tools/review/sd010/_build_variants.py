@@ -20,7 +20,7 @@ IND  = r"(?:[ \t]|\\t)*"
 CLASS = r"""[\"'{\[,]"""
 # Round 7 moved the SEPARATOR: `\s*=` became this, and V11's target went stale
 # with it -- the builder refused until it was retargeted, as it should.
-SEP = r"(?:\s|\\[tnrf])*="
+SEP = r"(?:\s|\\[\stnrfv_LP])*="
 
 MUTS = [
  ("V1-case-scope-dropped",       "(?-i:(?:API_KEY", "(?:(?:API_KEY"),
