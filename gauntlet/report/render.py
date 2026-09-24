@@ -111,10 +111,10 @@ def _coverage_section(report: dict) -> str:
         _figure("coverage.total", coverage["total"]),
         " delivered schedules are drivable by this adapter against the pinned "
         "corpus recorded above. Further coverage requires real-route "
-        "capabilities; expanding the stand-in is excluded by the adopted plan.",
+        "capabilities. Expanding the stand-in is excluded by the adopted plan.",
         "</p>",
         '<p class="detail">Planning and execution are separate counts. '
-        "Being drivable is not being run, and being run is not passing. ",
+        "Being drivable is not being run. Being run is not passing. ",
         "Executed this run: ",
         _figure("coverage.execution_partition.passed",
                 coverage["execution_partition"]["passed"]),
