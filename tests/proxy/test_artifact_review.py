@@ -25,6 +25,19 @@ class Artifact:
     except Exception:continue
     self.frames.append(m);self.q.put(m)
   self.reader=threading.Thread(target=read,daemon=True);self.reader.start() if consume else None
+  self.ready()
+ def ready(self,timeout=60):
+  """R28: the proxy builds the scanner engine BEFORE it opens its log or reads a
+  frame, so on a busy machine start-up alone can take seconds. The deadline
+  rows (AR10, AR11, AR13) time the proxy's OWN clocks, which start at the
+  frame; counted from spawn, they also timed the engine build and went red on
+  load. So nothing is sent until the log's HEADER exists, which is written after
+  the build. A proxy that exits first is left for the row to observe."""
+  until=time.monotonic()+timeout
+  while self.p.poll() is None:
+   if any(f.read_text().strip() for f in (self.root/'state/receipts').glob('*.jsonl')):return
+   assert time.monotonic()<until,f"proxy running {timeout}s with no receipts HEADER"
+   time.sleep(.02)
  def send(self,m):self.p.stdin.write(wire(m));self.p.stdin.flush()
  def answer(self,i,timeout=None):
   """The reply to request `i`: a BOUNDED wait, and a failure that says what happened.

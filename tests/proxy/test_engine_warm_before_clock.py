@@ -13,6 +13,7 @@ the engine already exists. No timing assertion, so no load-dependent result.
 """
 import io
 import sys
+import threading
 
 import sunglasses.engine as engine_module
 from sunglasses.proxy import activation, inspection, serve
@@ -44,6 +45,11 @@ def _cold(monkeypatch):
 
 def test_the_engine_is_built_before_the_first_client_read(monkeypatch, tmp_path):
     _cold(monkeypatch)
+    # `main` sets the module's `_FINISHED` on its way out, and while it is set
+    # `exit_process` leaves with `os._exit`: a later in-process test that calls
+    # it would take the whole runner down with a clean exit and no summary.
+    # This run gets its own event; the module's stays clear.
+    monkeypatch.setattr(serve, "_FINISHED", threading.Event())
     client = _ClientThatRecordsTheEngine()
     serve.main(["--state-root", str(tmp_path / "state"), "--",
                 sys.executable, "-c", "import sys; sys.stdin.buffer.read()"],
