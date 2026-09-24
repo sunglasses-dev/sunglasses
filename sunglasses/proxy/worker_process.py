@@ -100,16 +100,33 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
         except Exception:
             collected["broken"] = True
 
-    reader = threading.Thread(target=collect, daemon=True)
-    reader.start()
-    try:
-        child.stdin.write(json.dumps(payload).encode("utf-8"))
-        child.stdin.close()
-    except OSError:
-        pass
-
+    # DELIVERY IS INSIDE THE DEADLINE (ASTRA worker-design r1, R1). The write
+    # used to come first and the clock after it, so a child that stopped
+    # draining stdin -- handed an admitted payload bigger than the pipe -- held
+    # this thread in `write` with the kill below unreachable, and a slow drain
+    # was then given a fresh full budget. One absolute deadline now exists
+    # before a byte is written, the write runs on its own thread, and this
+    # thread only ever waits on the clock.
+    data = json.dumps(payload).encode("utf-8")
     deadline = time.monotonic() + timeout_ms / 1000.0
-    reader.join(timeout=timeout_ms / 1000.0)
+
+    def deliver():
+        try:
+            child.stdin.write(data)
+            child.stdin.close()
+        except (OSError, ValueError):
+            # EPIPE from a child that answered without reading it all, or the
+            # group stopped under us. Neither is a result; the reader decides.
+            pass
+
+    reader = threading.Thread(target=collect, daemon=True)
+    writer = threading.Thread(target=deliver, daemon=True)
+    reader.start()
+    writer.start()
+
+    # The READER is what is joined: an overflow ends it at once, so the stdout
+    # bound still stops a flood mid-delivery rather than after it.
+    reader.join(timeout=max(0.0, deadline - time.monotonic()))
     timed_out = reader.is_alive()
     if not timed_out and not collected.get("over"):
         # EOF IS NOT EXIT. The reader finishes when the child closes stdout,
@@ -128,6 +145,12 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
         # still there. Stopping the GROUP rather than the pid catches anything
         # it spawned, which is T8.R12 read the same way serve.py reads it.
         supervisor.stop_group(child.pid, grace_ms=grace_ms, handle=child)
+        # The group is gone, so a blocked write has had its EPIPE. Join the
+        # writer BEFORE closing stdin from here: BufferedWriter.close takes the
+        # lock a blocked write holds, and closing first would put this thread
+        # back behind the very write the deadline exists to escape.
+        writer.join(timeout=1.0)
+        _close_stdin(child, writer)
         reader.join(timeout=1.0)
         return _fault(binding,
                       STATUS_EXCEPTION if collected.get("over")
@@ -137,11 +160,28 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
                       # running when time ran out" is already the whole fact.
                       CAUSE_MALFORMED_OUTPUT if collected.get("over") else None)
 
+    # The child has exited, so the write has finished or had its EPIPE. Close
+    # our end either way: a writer stopped by EPIPE leaves it open, and a
+    # long-lived proxy would leak one descriptor per scan.
+    writer.join(timeout=max(0.0, deadline - time.monotonic()))
+    _close_stdin(child, writer)
+
     if collected.get("broken"):
         # The read failed, which means the child stopped being there while we
         # were reading it. That is the host's problem, not the worker's logic.
         return _fault(binding, STATUS_EXCEPTION, CAUSE_CRASHED)
     return _parse(collected.get("out", b""), binding)
+
+
+def _close_stdin(child, writer):
+    """Close the parent's end, but never while the writer still holds it: a
+    close taken behind a blocked write would block with it."""
+    if writer.is_alive():
+        return
+    try:
+        child.stdin.close()
+    except (OSError, ValueError):
+        pass
 
 
 def default_argv():
