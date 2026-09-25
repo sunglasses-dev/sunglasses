@@ -171,10 +171,21 @@ def test_orphans_are_found_among_completed_calls(home):
 # whose ONLY line was a 31-byte truncated fragment, exit 0. A checker that
 # cannot read a line has to say so.
 
+def _cli_env(home):
+    """The environment every CLI child here runs in, stdout strict on every
+    platform. Under a C or C.UTF-8 locale, a Linux CI runner's, CPython gives
+    stdio errors=surrogateescape, which writes a lone \\udcXX (how a path's
+    undecodable byte arrives) back out as that raw byte instead of raising. A
+    restore control then reads green on a raw site there and red here. Strict
+    is the stronger oracle both ways: the restored raw site crashes, and a
+    fixed site that let a surrogate through would crash too."""
+    return dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONIOENCODING="utf-8:strict")
+
+
 def _verify(home):
     """Run the real CLI the way a user does, and return (exit code, plain text)."""
     import re as _re
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
                           cwd=TREE, capture_output=True, text=True, env=env)
     return proc.returncode, _re.sub(r"\x1b\[[0-9;]*m", "", proc.stdout + proc.stderr)
@@ -379,7 +390,7 @@ HOSTILE_BYTES = HOSTILE_TEXT.encode("utf-8") + b"\xe2\x82"
 
 def _verify_raw(home, mutate=None):
     """Run the real CLI and return (exit code, the BYTES a terminal receives)."""
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     if mutate is None:
         argv = [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"]
     else:
@@ -538,7 +549,7 @@ def test_a_lone_surrogate_tool_name_is_named_not_a_traceback(home):
     _write_bytes_file(home, "2026-09-12.jsonl",
                       (started + "\n" + decided + "\n"
                        + _orphan("orphan1", SURROGATE_TOOL) + "\n").encode("utf-8"))
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
         cwd=TREE, capture_output=True, env=env)
@@ -563,7 +574,7 @@ def test_the_pretty_table_survives_the_same_two_rows(home):
                     "eval_id": "b", "decision": RAW_EVAL_ID, "tool_name": "Bash"}),
     ]
     _write_bytes_file(home, "2026-09-12.jsonl", ("\n".join(rows) + "\n").encode("utf-8"))
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts"],
                           cwd=TREE, capture_output=True, env=env)
     assert b"Traceback" not in proc.stdout + proc.stderr, (
@@ -778,7 +789,7 @@ def _run_cli(home, verify, restore=None, cause=None, extra=None):
         f"verify={verify!r}, today=False, limit=40, action={action!r}, "
         f"**{(extra or dict())!r})))\n"
     )
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-c", code], cwd=TREE,
                           capture_output=True, env=env)
     return proc.returncode, proc.stdout + proc.stderr
