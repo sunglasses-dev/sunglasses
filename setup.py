@@ -15,7 +15,9 @@ setup(
         "Issues": "https://github.com/sunglasses-dev/sunglasses/issues",
     },
     license="MIT",
-    packages=find_packages(),
+    # tests/ carries no __init__.py today, so this changes nothing yet; it keeps
+    # a future one from shipping the suite as a package (T9 ruling 47).
+    packages=find_packages(exclude=["tests", "tests.*"]),
     # Claim only what CI proves. 3.8 has been EOL since Oct 2024 and was never
     # in the matrix; ">=3.8" was a claim about five versions backed by tests on
     # one. The matrix in .github/workflows/pattern-integrity.yml now covers every
@@ -41,7 +43,13 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "sunglasses": ["data/attacks/**/*.json"],
+        # sunglasses/receipts has no __init__.py and ships as package data of
+        # `sunglasses`. The spec and the vectors ship with it so an outsider can
+        # verify a fixture receipt without fetching either from GitHub (T9
+        # ruling 47, rehearsal gap G1). Its tests and make_vectors.py are
+        # pruned in MANIFEST.in (gap G2).
+        "sunglasses": ["data/attacks/**/*.json",
+                       "receipts/WIRE_SPEC.md", "receipts/VECTORS.json"],
     },
     entry_points={
         "console_scripts": [
