@@ -122,14 +122,28 @@ def _sanitized(value):
         pairs = [_sanitized(item) for item in value]
         count = sum(n for _, n in pairs)
         return ([item for item, _ in pairs], count) if count else (value, 0)
-    if isinstance(value, dict):
-        out, count = {}, 0
-        for key, item in value.items():
-            key, n = _sanitized(key)
-            out[key], m = _sanitized(item)
-            count += n + m
-        return (out, count) if count else (value, 0)
     return value, 0
+
+
+# T9 ruling 44. A signed row's keys are OURS, fixed by the schema. Escaping a
+# control character in an object's KEYS can make two keys one (`"a\x00"`
+# escapes to exactly the key `"a\\u0000"`), and the row then keeps one of
+# them with nothing saying the other existed. So a peer object is never
+# spliced into a row as an object: it is written as ONE string, its canonical
+# JSON, or that string's sha256 when over the field's budget, counted in
+# `digested`. ASCII escapes are lossless, so two keys stay two, a control
+# character or a lone surrogate is text, and nothing is replaced to count.
+def _has_object(value):
+    if isinstance(value, dict):
+        return True
+    if isinstance(value, (list, tuple)):
+        return any(_has_object(item) for item in value)
+    return False
+
+
+def _canonical(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=True,
+                      separators=(",", ":"))
 
 
 def _cut_text(text, budget):
@@ -372,7 +386,7 @@ class Log:
 
     def _clean(self, fields):
         """T9.R3. An allowlist, and provenance reduced to indices and hashes."""
-        clean, truncated, sanitized = {}, {}, {}
+        clean, truncated, sanitized, digested = {}, {}, {}, {}
         for name, value in (fields or {}).items():
             if name in FORBIDDEN_FIELDS or name not in PERMITTED_FIELDS:
                 continue
@@ -390,6 +404,19 @@ class Log:
                 if len(clean[name]) < len(value):
                     clean["rule_ids_omitted"] = len(value) - len(clean[name])
                 continue
+            if _has_object(value):
+                try:
+                    text = _canonical(value)
+                except (TypeError, ValueError):
+                    # Not JSON: a caller's bug, left for the wire to refuse.
+                    clean[name] = value
+                    continue
+                if _encoded_size(text) <= FIELD_BYTES:
+                    clean[name] = text
+                else:
+                    clean[name] = hashlib.sha256(text.encode("ascii")).hexdigest()
+                    digested[name] = len(text)
+                continue
             # Replaced, THEN cut: the cut measures what is written, and the
             # count is of what the peer sent, not of what survived the cut.
             value, replaced = _sanitized(value)
@@ -404,6 +431,8 @@ class Log:
             clean["truncated"] = truncated
         if sanitized:
             clean["sanitized"] = sanitized
+        if digested:
+            clean["digested"] = digested
         return clean
 
     @staticmethod

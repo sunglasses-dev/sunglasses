@@ -107,6 +107,16 @@ def test_lone_surrogate_keys_stay_two_keys(home):
     assert _verified(home)["chain_integrity"] == "CHAIN_OK"
 
 
+def test_the_control_del_is_escaped_too_so_the_wire_never_refuses_it(home):
+    """The wire refuses U+007F as it refuses U+0000 to U+001F. The canonical
+    JSON escapes it, so an object carrying it is still one written string."""
+    peer = {"a\x7f": "\x7f"}
+    row = _written(home, supported=peer)
+    assert row["supported"] == '{"a\\u007f":"\\u007f"}'
+    assert json.loads(row["supported"]) == peer
+    assert _verified(home)["chain_integrity"] == "CHAIN_OK"
+
+
 def test_an_object_inside_a_list_makes_the_whole_value_one_string(home):
     peer = ["tools/list", {"a\x00": 1, "a\\u0000": 2}]
     row = _written(home, offered=peer)
