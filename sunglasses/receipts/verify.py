@@ -6,8 +6,9 @@ it can be handed to an auditor who never installs the product.
 
 FIVE RESULTS, NEVER ONE. Key trust, chain integrity, unsigned tail, expected
 endpoint and lifecycle are computed and printed separately, and nothing here
-combines them. A caller who wants one number asks `codes.strict_exit_code`,
-which is deliberately harsh: an unknown is not a pass.
+combines them. A caller who wants one number asks `codes.exit_code`: 0 all
+ok, 1 any failure, 3 no failure and a limit (`strict=True` makes a limit 1).
+It is deliberately harsh: an unknown is not a pass.
 
 WHAT IS VERIFIED IS A PREFIX. The chain is walked from genesis; the verified
 prefix ends at the last checkpoint whose signature holds and whose links all

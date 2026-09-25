@@ -117,22 +117,80 @@ LIMITATIONS = {
 }
 
 
-def strict_exit_code(results: dict) -> int:
-    """Nonzero for invalid integrity, unknown key or extent, tail, or incomplete.
+# Every code is exactly one of three classes, and the exit code comes from the
+# class (T9 rulings R46, R48). OK is a result that holds. LIMIT is a verifier
+# that could not conclude because the caller did not supply something
+# (fingerprint, endpoint, key, session) or the feature is specified and not
+# built (R40), with log bytes consistent with clean. FAIL is a log whose bytes
+# contradict or lack what they must carry. Every limit exits non-zero.
+OK, FAIL, LIMIT = "ok", "fail", "limit"
 
-    A caller that wants one number gets this, and it is deliberately harsh: an
-    unknown is not a pass. The five results stay visible either way.
-    """
-    failing = {
-        "KEY_UNTRUSTED", "EXPECTED_KEY_MISMATCH", "HASH_LINK_MISMATCH",
-        "SEQUENCE_GAP", "SIGNATURE_INVALID", "TRUNCATED_RECORD",
-        "NONCANONICAL_BYTES", "CONTEXT_MISMATCH", "UNVERIFIED_TAIL",
-        "HISTORY_EXTENT_UNKNOWN", "EXPECTED_CHECKPOINT_MISSING",
-        "CHECKPOINT_MISMATCH", "MISSING_GENESIS", "SEGMENT_MISSING",
-        "LIFECYCLE_ORPHAN", "LIFECYCLE_DUPLICATE", "LEGACY_UNSIGNED",
-        "UNKNOWN_EVENT", "UNKNOWN_FIELD", "ROTATION_UNSUPPORTED",
-    }
-    for kind in RESULT_KINDS:
-        if results.get(kind) in failing:
-            return 1
-    return 0
+# 2 is the CLI's usage exit (argparse and a malformed argument), so a limit is 3.
+EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_LIMIT = 0, 1, 2, 3
+
+_OK_CODES = {"KEY_TRUSTED", "CHAIN_OK", "NO_VISIBLE_TAIL", "ENDPOINT_CONFIRMED",
+             "LIFECYCLE_COMPLETE"}
+_LIMIT_CODES = {"PAIRING_UNKEYED", "EMPTY_CHAIN", "NO_SESSION",
+                "ROTATION_UNSUPPORTED", "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN"}
+_FAIL_CODES = {"CHECKPOINT_MISMATCH", "CONTEXT_MISMATCH",
+               "EXPECTED_CHECKPOINT_MISSING", "EXPECTED_KEY_MISMATCH",
+               "HASH_LINK_MISMATCH", "KEY_UNUSABLE", "LEGACY_UNSIGNED",
+               "LIFECYCLE_DUPLICATE", "LIFECYCLE_ORPHAN", "MISSING_GENESIS",
+               "NONCANONICAL_BYTES", "PREDECESSOR_UNAVAILABLE", "SEGMENT_MISSING",
+               "SEQUENCE_GAP", "SIGNATURE_INVALID", "SUCCESSOR_ASSERTED",
+               "SUCCESSOR_ENDORSED", "TRUNCATED_RECORD", "UNKNOWN_EVENT",
+               "UNKNOWN_FIELD", "UNVERIFIED_TAIL"}
+
+
+def _tag(**groups) -> dict:
+    """The class table from the three named sets and nothing else. A code named
+    in two sets gets both tags joined ("ok+fail"), which is no class at all, so
+    untagged() reports it rather than one set silently winning."""
+    table = {}
+    for tag, members in groups.items():
+        for code in members:
+            table[code] = tag if code not in table else f"{table[code]}+{tag}"
+    return table
+
+
+# Built from the three sets only, never from CODES with a default: a code added
+# to CODES and to no set has no class, and untagged() names it (T11 on R46).
+CLASS = _tag(ok=_OK_CODES, limit=_LIMIT_CODES, fail=_FAIL_CODES)
+
+
+def untagged(codes_map=None, class_map=None) -> list:
+    """Every code whose class is missing or not one of the three, and every
+    class entry for a code that does not exist. Empty means the table holds."""
+    codes_map = CODES if codes_map is None else codes_map
+    class_map = CLASS if class_map is None else class_map
+    bad = [code for code in codes_map if class_map.get(code) not in (OK, FAIL, LIMIT)]
+    return bad + [code for code in class_map if code not in codes_map]
+
+
+def exit_code(results: dict, strict: bool = False) -> int:
+    """0 when every result is ok, 1 when any is a failure, 3 when none fails
+    and at least one is a limit. `strict` makes a limit exit 1.
+
+    A result that is not a known code exits 1: a code nobody classed is a code
+    nobody decided, so it cannot pass. The five results stay visible either
+    way."""
+    classes = [CLASS.get(results.get(kind), FAIL) for kind in RESULT_KINDS]
+    if FAIL in classes:
+        return EXIT_FAIL
+    if LIMIT in classes:
+        return EXIT_FAIL if strict else EXIT_LIMIT
+    return EXIT_OK
+
+
+def strict_exit_code(results: dict) -> int:
+    """exit_code with every limit counted as a failure."""
+    return exit_code(results, strict=True)
+
+
+def combine_exits(exits) -> int:
+    """One exit for several logs: any failure wins, then any limit. Not max(),
+    which would let a limit (3) outrank a failure (1)."""
+    exits = list(exits)
+    if EXIT_FAIL in exits or any(e not in (EXIT_OK, EXIT_LIMIT) for e in exits):
+        return EXIT_FAIL
+    return EXIT_LIMIT if EXIT_LIMIT in exits else EXIT_OK

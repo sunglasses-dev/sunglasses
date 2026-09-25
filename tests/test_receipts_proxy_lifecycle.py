@@ -61,7 +61,9 @@ def test_the_pairing_limit_is_neither_a_pass_nor_a_failure():
     passing = {"key_trust": "KEY_TRUSTED", "chain_integrity": "CHAIN_OK",
                "unsigned_tail": "NO_VISIBLE_TAIL",
                "expected_endpoint": "ENDPOINT_CONFIRMED"}
-    assert codes.strict_exit_code(dict(passing, lifecycle="PAIRING_UNKEYED")) == 0
+    # A limit (T9 rulings 46 and 48): exit 3, and 1 when strict.
+    assert codes.exit_code(dict(passing, lifecycle="PAIRING_UNKEYED")) == 3
+    assert codes.strict_exit_code(dict(passing, lifecycle="PAIRING_UNKEYED")) == 1
     assert codes.strict_exit_code(dict(passing, lifecycle="LIFECYCLE_ORPHAN")) == 1
 
 

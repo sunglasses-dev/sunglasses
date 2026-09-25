@@ -1334,7 +1334,9 @@ def _log_chain_ids(log, wire):
 
 
 def _verify_chains(logs, args, home):
-    """Five results per log, printed per log; exit non-zero on any unknown."""
+    """Five results per log, printed per log. Exit 1 on any failure, else 3 on
+    any limit, else 0; --strict counts a limit as a failure (T9 rulings R46,
+    R48). 2 stays the usage exit."""
     try:
         from .receipts import codes, keys, verify, wire
     except ImportError:
@@ -1366,7 +1368,8 @@ def _verify_chains(logs, args, home):
         report = verify.verify_log(log, public, expected_fingerprint=args.fingerprint,
                                    expected_endpoint=mine)
         print(verify.render_log(report, name=_log_label(log)))
-        code = max(code, codes.strict_exit_code(report.results))
+        code = codes.combine_exits(
+            [code, codes.exit_code(report.results, strict=args.strict)])
     print()
     return code
 
@@ -1482,7 +1485,9 @@ def cmd_receipts(args):
                   f"integrity status unknown, not clean{RESET}")
             code = _verify_lifecycle(rows, directory, unparseable)
         if chain_logs:
-            code = max(code, _verify_chains(chain_logs, args, sunglasses_home()))
+            # A failure anywhere wins, then a usage error, then a limit (R48).
+            chains = _verify_chains(chain_logs, args, sunglasses_home())
+            code = next((c for c in (1, 2, 3) if c in (code, chains)), 0)
         return code
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize
@@ -2302,6 +2307,12 @@ def main():
         "--endpoint", metavar="JSON",
         help='With --verify: a checkpoint you retained, {"chain_id", "seq", "hash"}. '
              "Without it how far the history once extended is unknown.")
+    receipts_parser.add_argument(
+        "--strict", action="store_true",
+        help="With --verify: count a limit as a failure, so the exit is 0 or 1. "
+             "Without it: 0 all ok, 1 any failure, 3 no failure and a limit "
+             "(something you did not supply, such as --fingerprint or "
+             "--endpoint, or a feature not built yet). 2 is a usage error.")
     receipts_parser.add_argument("--today", action="store_true", help="Today only")
     receipts_parser.add_argument("--limit", type=int, default=40,
                                  help="Rows to show (default 40)")

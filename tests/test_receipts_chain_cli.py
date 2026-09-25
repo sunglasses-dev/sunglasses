@@ -151,10 +151,11 @@ def test_a_sealed_hook_chain_prints_its_five_results(home):
     assert "unsigned_tail: NO_VISIBLE_TAIL" in out
     assert "lifecycle: LIFECYCLE_COMPLETE" in out
     # The key beside the log is portability, not trust, and the extent is
-    # unknown without a retained endpoint: an unknown is not a pass.
+    # unknown without a retained endpoint: an unknown is not a pass. Both are
+    # input the caller did not supply, so a limit: exit 3 (T9 ruling 48).
     assert "key_trust: KEY_UNTRUSTED" in out
     assert "expected_endpoint: HISTORY_EXTENT_UNKNOWN" in out
-    assert code == 1
+    assert code == 3
     for word in ("PASS", "VALID", "verified OK"):
         assert word not in out
 
