@@ -2120,6 +2120,12 @@ def _receipts_unwritable(decision, error, receipts, exc):
             check = (f"A receipts directory {exc}, and a signed log never "
                      f"turns unsigned on a guess. Fix it: make {exc.blocked_by} "
                      f"a directory, chmod 700.")
+    from .receipts import chain as _chain
+    if isinstance(exc, _chain.MarkerUnwritable):
+        # R62 B: which marker, why, and that the next call tries again.
+        check = (f"The hook log's marker {exc}, and no signed log is begun "
+                 f"without it. Fix ~/.sunglasses/keys (chmod 700) or free disk "
+                 f"space; the next call tries again.")
     decision = Decision(
         "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
         f"SUNGLASSES firewall: the audit trail could not be written ({cause}), "

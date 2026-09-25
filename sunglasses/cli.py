@@ -1668,6 +1668,13 @@ def cmd_receipts(args):
                 code = codes.combine_exits(code, _verify_chains(chain_logs, args, sunglasses_home()))
             if marker is not None:
                 code = codes.combine_exits(code, _verify_marker(marker, hook, sunglasses_home()))
+            elif hook in chain_logs:
+                # R62 (c): segments and no marker. Nothing names the chain this
+                # log opened with, so a wipe cannot be told: a limit, never a fail.
+                print(f"\n  {YELLOW}LOG_UNMARKED{RESET} {DIM}-- the hook log has "
+                      f"segments and no {optin.HOOK_MARKER[-1]} names its first chain, "
+                      f"so a wipe of it cannot be told{RESET}")
+                code = codes.combine_exits(code, codes.exit_for("LOG_UNMARKED", strict=strict))
             return code
 
         # A receipts file is bytes on disk: it may predate the write-side sanitize

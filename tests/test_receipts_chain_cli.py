@@ -23,7 +23,7 @@ import sys
 
 import pytest
 
-from sunglasses.receipts import chain, keys
+from sunglasses.receipts import chain, keys, optin
 
 TREE = pathlib.Path(__file__).resolve().parents[1]
 
@@ -68,7 +68,8 @@ def _legacy(home):
 def _hook_chain(home, calls=2):
     signer = keys.load(home)
     log = home / "receipts" / "hook"
-    writer = chain.Chain(log, signer, producer="hook")
+    # The marker the real hook passes (R62 c: an unmarked hook log is a limit).
+    writer = chain.Chain(log, signer, producer="hook", marker=optin.hook_marker(home))
     for n in range(calls):
         writer.write([{"event": "in_flight", "body": {"eval_id": f"e{n}"}},
                       {"event": "decision", "body": {"eval_id": f"e{n}"}}],

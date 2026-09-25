@@ -106,6 +106,12 @@ CODES = {
         "should have: a legacy day file, or a proxy run written with no key "
         "(T9 ruling 60). Named, never passed over. Not a pass and not a "
         "failure; a log supplied with --log and no chain is LEGACY_UNSIGNED.",
+    "LOG_UNMARKED":
+        "the hook log has segments and the home has no marker naming the chain "
+        "it opened with: a log begun before the marker existed, or one whose "
+        "marker is gone (T9 ruling 62). A wipe of it cannot be told from a log "
+        "never begun. Not a pass and not a failure; the log is marked when it "
+        "next opens a segment.",
 
     "UNKNOWN_FIELD":
         "a signed record carries a key outside the closed schema for its "
@@ -153,7 +159,7 @@ _OK_CODES = {"KEY_TRUSTED", "CHAIN_OK", "NO_VISIBLE_TAIL", "ENDPOINT_CONFIRMED",
              "LIFECYCLE_COMPLETE"}
 _LIMIT_CODES = {"PAIRING_UNKEYED", "EMPTY_CHAIN", "NO_SESSION",
                 "ROTATION_UNSUPPORTED", "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN",
-                "NO_LOG", "LOG_UNCHAINED"}
+                "NO_LOG", "LOG_UNCHAINED", "LOG_UNMARKED"}
 _FAIL_CODES = {"CHECKPOINT_MISMATCH", "CONTEXT_MISMATCH",
                "EXPECTED_CHECKPOINT_MISSING", "EXPECTED_KEY_MISMATCH",
                "HASH_LINK_MISMATCH", "KEY_UNUSABLE", "LEGACY_UNSIGNED",

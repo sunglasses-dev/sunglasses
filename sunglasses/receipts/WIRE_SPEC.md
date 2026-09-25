@@ -273,7 +273,15 @@ line with exactly the members `chain_id`, `event` (`log_genesis`), `key_id`,
 `log` (`hook`), `signature`, `t_wall_ns` and `wire`, naming that chain and the
 time its genesis carries, signed under the marker domain. `receipts init`
 never writes it. A marker already there is never replaced and never deleted,
-and it is never an error for the writer. Under `--verify` a marker whose chain
+and it is never an error for the writer. The marker is the genesis's
+precondition (T9 ruling 62): it is created before the segment, and when it
+cannot be created for any reason but already being there, no segment is
+begun, the hook asks naming the marker, and the next call tries again. A
+marker the writer created for a segment it then could not begin is taken
+back. A hook log begun before the marker existed is marked when it next
+opens a segment after one on disk, and never by a call that continues its
+tail. Under `--verify` hook segments with no marker are `LOG_UNMARKED`, a
+limit, since a wipe of that log cannot be told. Under `--verify` a marker whose chain
 opens no segment of `receipts/hook` is `LOG_MISSING`, a failure in both modes,
 because the log was begun and is gone or was wiped and begun again. A marker
 that cannot be read is `PATH_UNREADABLE`. One that is not canonical, carries
@@ -313,7 +321,7 @@ the commit that moved it.
 
 A segment is one file, `segment-NNNNNN.chain` (six digits, from 000001),
 created 0600 with `O_EXCL` in a 0700 directory beside a `LOCK` file that every
-write holds with `flock(LOCK_EX)` (chain.py:187, :210, :283-286). Its first
+write holds with `flock(LOCK_EX)` (chain.py:187, :215, :290-293). Its first
 line is a genesis and its second a checkpoint with purpose `genesis`
 (chain.py:209).
 
@@ -343,41 +351,41 @@ successor signs nothing that came after that checkpoint.
 
 | field | value | where |
 |---|---|---|
-| `wire` | `sg-receipt-chain/1` | chain.py:255 |
-| `chain_id` | the segment's | chain.py:255 |
-| `key_id` | the signing key's fingerprint | chain.py:256 |
-| `seq` | previous `seq` + 1 | chain.py:256 |
-| `prev_hash` | the chain hash of the previous line | chain.py:257 |
-| `event` | the producer's event name, never `genesis` or `checkpoint` | chain.py:257, :223 |
-| `producer` | as in the genesis | chain.py:258 |
-| `t_wall_ns` | integer, the writer's wall clock | chain.py:258 |
-| `body` | an object: the producer's allowed fields (see Redaction) | chain.py:259 |
-| `t_mono_ns` | integer, optional: the producer's monotonic clock (the proxy sets it) | chain.py:260-261 |
+| `wire` | `sg-receipt-chain/1` | chain.py:262 |
+| `chain_id` | the segment's | chain.py:262 |
+| `key_id` | the signing key's fingerprint | chain.py:263 |
+| `seq` | previous `seq` + 1 | chain.py:263 |
+| `prev_hash` | the chain hash of the previous line | chain.py:264 |
+| `event` | the producer's event name, never `genesis` or `checkpoint` | chain.py:264, :230 |
+| `producer` | as in the genesis | chain.py:265 |
+| `t_wall_ns` | integer, the writer's wall clock | chain.py:265 |
+| `body` | an object: the producer's allowed fields (see Redaction) | chain.py:266 |
+| `t_mono_ns` | integer, optional: the producer's monotonic clock (the proxy sets it) | chain.py:267-268 |
 
 A producer supplies only `event`, `body` and `t_mono_ns`. Any other field is
 refused before anything is written, so the envelope is always the writer's
-(chain.py:43, :219-222).
+(chain.py:43, :226-229).
 
 ### checkpoint
 
 | field | value | where |
 |---|---|---|
-| `chain_id` | the segment's | chain.py:246 |
-| `covered_head` | equal to `prev_hash`: the head this signature commits to | chain.py:246 |
-| `covered_seq` | `seq` - 1 | chain.py:247 |
-| `event` | `checkpoint` | chain.py:247 |
-| `interval` | the writer's interval, an integer of at least 1, so the cadence is inside the signed bytes | chain.py:248, :67 |
-| `key_id` | the signing key's fingerprint | chain.py:248 |
-| `prev_hash` | the chain hash of the previous line | chain.py:249 |
-| `purpose` | `genesis`, `interval`, `close`, or a producer's seal name | chain.py:249, :263-266 |
-| `seq` | previous `seq` + 1 | chain.py:249 |
-| `wire` | `sg-receipt-chain/1` | chain.py:250 |
-| `signature` | 128 lowercase hex: Ed25519 as in Hashing and signing | chain.py:251-252 |
+| `chain_id` | the segment's | chain.py:253 |
+| `covered_head` | equal to `prev_hash`: the head this signature commits to | chain.py:253 |
+| `covered_seq` | `seq` - 1 | chain.py:254 |
+| `event` | `checkpoint` | chain.py:254 |
+| `interval` | the writer's interval, an integer of at least 1, so the cadence is inside the signed bytes | chain.py:255, :67 |
+| `key_id` | the signing key's fingerprint | chain.py:255 |
+| `prev_hash` | the chain hash of the previous line | chain.py:256 |
+| `purpose` | `genesis`, `interval`, `close`, or a producer's seal name | chain.py:256, :270-273 |
+| `seq` | previous `seq` + 1 | chain.py:256 |
+| `wire` | `sg-receipt-chain/1` | chain.py:257 |
+| `signature` | 128 lowercase hex: Ed25519 as in Hashing and signing | chain.py:258-259 |
 
 A checkpoint has no `producer`, `t_wall_ns` or `body`. An `interval`
-checkpoint is written once `interval` records are unsigned (chain.py:263-264).
+checkpoint is written once `interval` records are unsigned (chain.py:270-271).
 A `genesis` or `close` seal is written even over nothing, and any other
-purpose only over at least one unsigned record (chain.py:265-266).
+purpose only over at least one unsigned record (chain.py:272-273).
 
 ### The vocabulary a verifier judges
 

@@ -19,7 +19,7 @@ import pytest
 
 pytest.importorskip("cryptography")
 
-from sunglasses.receipts import chain, codes, keys, wire   # noqa: E402
+from sunglasses.receipts import chain, codes, keys, optin, wire   # noqa: E402
 
 TREE = pathlib.Path(__file__).resolve().parents[1]
 BANNED = ("clean", "all good", "passed", "verified ok", "trusted log", "no issues")
@@ -37,7 +37,8 @@ def _signed_log(home):
     keys.init(home)
     signer = keys.load(home)
     log = home / "receipts" / "hook"
-    writer = chain.Chain(log, signer, producer="hook")
+    # The marker the real hook passes (R62 c: an unmarked hook log is a limit).
+    writer = chain.Chain(log, signer, producer="hook", marker=optin.hook_marker(home))
     for n in range(2):
         writer.write([{"event": "in_flight", "body": {"eval_id": f"e{n}"}},
                       {"event": "decision", "body": {"eval_id": f"e{n}"}}],

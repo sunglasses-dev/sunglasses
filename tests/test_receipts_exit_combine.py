@@ -114,5 +114,6 @@ def test_every_verdict_in_cmd_receipts_goes_through_the_combiner():
     assigns = re.findall(r"\n\s+code = (.+)", block)
     assert assigns[0].startswith("_verify_key("), assigns
     assert all(a.startswith("codes.combine_exits(code, ") for a in assigns[1:]), assigns
-    # key; lifecycle with the day files' LOG_UNCHAINED; runs; chains; marker.
-    assert len(assigns) == 5, assigns
+    # key; lifecycle with the day files' LOG_UNCHAINED; runs; chains; marker;
+    # hook segments with no marker, LOG_UNMARKED (R62 c).
+    assert len(assigns) == 6, assigns

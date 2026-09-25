@@ -207,11 +207,18 @@ class Chain:
         opened = dataclasses.replace(empty, seq=0, head=wire.record_hash(line),
                                      size=len(line), unsigned=1)
         pieces, _ = self._plan(opened, [], GENESIS)
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # R62 B: the marker first. No segment is begun that its marker could not
+        # name, and a marker this call made for a segment that was not begun
+        # is taken back, so the next call tries again from where this one began.
+        made = self._marker is not None and self._mark(genesis)
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except BaseException:
+            if made:
+                _discard(self._marker)
+            raise
         os.close(fd)
         self._append(path, [(line, False)] + pieces)
-        if previous is None and self._marker is not None:
-            self._write_marker(genesis)
         return self._read_tail()
 
     # -- building and writing --------------------------------------------------
@@ -288,12 +295,20 @@ class Chain:
         finally:
             os.close(fd)                   # closing releases the lock
 
-    def _write_marker(self, genesis) -> None:
-        """One signed line naming the chain this log first opened with, written
-        after its genesis is on disk so it never names a chain that is not. A
-        marker already there is never an error and never replaced (R60 a): a
-        log wiped and begun again opens another chain, and the verifier says
-        the one the marker names is missing."""
+    def _mark(self, genesis) -> bool:
+        """The marker naming the chain this segment opens, made with O_EXCL
+        before the segment is (T9 rulings 60, 62 B). True when this call made
+        it. A marker already there is never an error and never replaced: a log
+        wiped and begun again opens another chain, and the verifier says the
+        one the marker names is missing. Any other OSError is MarkerUnwritable,
+        and a marker this call created and could not finish is taken back, so
+        nothing half made is left to read as "already there".
+
+        Called for every new segment. At a fresh genesis that is the first
+        marker (a); after a segment on disk it marks a log begun before the
+        marker existed, and is a no op on any other (b). A tail continued in
+        place never calls it, so a missing marker is not written after the
+        fact by an ordinary call."""
         record = {"wire": wire.WIRE_VERSION, "event": MARKER_EVENT,
                   "log": self._dir.name, "chain_id": genesis["chain_id"],
                   "key_id": genesis["key_id"], "t_wall_ns": genesis["t_wall_ns"]}
@@ -302,13 +317,43 @@ class Chain:
         try:
             fd = os.open(self._marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
-            return
+            return False
+        except OSError as cause:
+            raise MarkerUnwritable(self._marker, cause) from cause
         try:
-            _write_all(fd, line)
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-        _fsync_dir(self._marker.parent)
+            try:
+                _write_all(fd, line)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            _fsync_dir(self._marker.parent)
+        except OSError as cause:
+            _discard(self._marker)
+            raise MarkerUnwritable(self._marker, cause) from cause
+        return True
+
+
+class MarkerUnwritable(OSError):
+    """The hook log's marker could not be made, so no segment was begun (T9
+    ruling 62 B). The hook asks naming it, and the next call tries again."""
+
+    def __init__(self, path, cause: OSError):
+        self.path = pathlib.Path(path)
+        self.cause = cause
+        super().__init__(cause.errno, f"{self.path} cannot be created "
+                                      f"({type(cause).__name__}: {cause.strerror})")
+
+    def __str__(self):
+        return self.strerror
+
+
+def _discard(path) -> None:
+    """Take back a marker this call made; a failure here leaves it to the
+    verifier, which names what it finds."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 @dataclasses.dataclass
