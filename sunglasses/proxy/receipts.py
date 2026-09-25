@@ -22,6 +22,7 @@ import re
 import pathlib
 import threading
 import time
+import uuid
 
 # T9.R2's allowlist. An event outside it cannot be written, for the same reason
 # the client envelope is built by naming fields: a log that accepts any kind is
@@ -52,6 +53,20 @@ TERMINAL_EVENTS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
 # these carried peer-chosen text straight into the evidence.
 _ID_TOKEN = re.compile(r"\A[0-9a-f]{16}\Z")
 _RULE_ID = re.compile(r"\AGLS-[A-Z0-9-]{1,60}\Z")
+# A run's id is its log's name under the state root's receipts/: 32 lowercase
+# hex, from new_run_id(). The writer names the log by this rule and the
+# verifier reads by it (T9 ruling 58): an entry with this name is a run's log,
+# so one that cannot be listed is PATH_UNREADABLE, never "not there".
+_RUN_ID = re.compile(r"\A[0-9a-f]{32}\Z")
+
+
+def new_run_id():
+    """A fresh run id, which is also the name of the run's log."""
+    return uuid.uuid4().hex
+
+
+def is_run_log_name(name):
+    return _RUN_ID.match(name) is not None
 
 # T9.R3's never-list, as field names rather than as a hope. Anything not in the
 # permitted set for an event is dropped, and these are named so a reader can see

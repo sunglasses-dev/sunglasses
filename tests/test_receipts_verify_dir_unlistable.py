@@ -20,10 +20,12 @@ import os
 import pathlib
 import subprocess
 import sys
+import uuid
 
 import pytest
 
 from sunglasses.firewall import run_hook
+from sunglasses.proxy import receipts as proxy_receipts
 from sunglasses.receipts import keys, optin, verify
 
 TREE = pathlib.Path(__file__).resolve().parents[1]
@@ -67,8 +69,14 @@ def unlistable():
         os.chmod(directory, 0o700)
 
 
+def _proxy_root(home):
+    """The proxy's default state root, ~/.sunglasses/proxy, under the HOME a
+    row gives its child: a row never reads the user's own proxy logs."""
+    return home.parent / "user" / ".sunglasses" / "proxy"
+
+
 def _receipts(home, *argv):
-    env = {**os.environ, "SUNGLASSES_HOME": str(home)}
+    env = {**os.environ, "SUNGLASSES_HOME": str(home), "HOME": str(home.parent / "user")}
     proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts", *argv],
                           cwd=TREE, env=env, capture_output=True, text=True)
     return proc.returncode, proc.stdout + proc.stderr
@@ -125,8 +133,7 @@ def test_verify_log_raises_on_an_unlistable_directory(home, unlistable):
 
 # ── structural: no listing left on Path.glob in the verifier ─────────────────
 
-VERIFIER_FUNCTIONS = ("_chain_logs", "_log_chain_ids", "_verify_received",
-                      "_receipt_public_key", "cmd_receipts")
+VERIFIER_MODULES = ("sunglasses/cli.py", "sunglasses/receipts/verify.py")
 
 
 def _glob_calls(tree):
@@ -136,15 +143,11 @@ def _glob_calls(tree):
 
 
 def test_no_verifier_path_lists_a_directory_with_glob():
-    cli = ast.parse((TREE / "sunglasses/cli.py").read_text())
-    functions = {node.name: node for node in ast.walk(cli)
-                 if isinstance(node, ast.FunctionDef)}
-    missing = set(VERIFIER_FUNCTIONS) - set(functions)
-    assert missing == set(), f"renamed, so this reads nothing: {missing}"
-    found = [f"cli.py:{line}" for name in VERIFIER_FUNCTIONS
-             for line in _glob_calls(functions[name])]
-    found += [f"verify.py:{line}" for line in
-              _glob_calls(ast.parse((TREE / "sunglasses/receipts/verify.py").read_text()))]
+    """R58 (2): the whole of cli.py and verify.py, not a list of functions. A
+    function list was the gap: a verifier helper added or renamed outside it
+    was never read."""
+    found = [f"{name}:{line}" for name in VERIFIER_MODULES
+             for line in _glob_calls(ast.parse((TREE / name).read_text()))]
     assert found == [], found
 
 
@@ -169,3 +172,135 @@ def test_the_control_an_absent_home_is_no_log(tmp_path):
     rc, out = _receipts(tmp_path / "never", "--verify")
     assert "NO_LOG" in out and "PATH_UNREADABLE" not in out, out[-400:]
     assert rc == 3, (rc, out[-400:])
+
+
+# ── R58: a log's own path in the wrong shape is not "no log" ────────────────
+
+@pytest.fixture
+def proxy_run(home):
+    """A proxy run's signed chain, by the proxy's own writer, at the state
+    root the verifier reads, closed the way serve closes one: a session with
+    no terminal is LIFECYCLE_ORPHAN, a FAIL, and no healthy control. The run
+    id is the one serve gives a run, written here from uuid itself, not from
+    the rule under test."""
+    log = proxy_receipts.Log(_proxy_root(home), run_id=uuid.uuid4().hex,
+                             header={"session_id": "r58-test"}, home=home)
+    log.event("SESSION_TORN_DOWN", reason_code=None, rule=None, settled=True)
+    log.close()
+    assert any(n.startswith("segment-") for n in os.listdir(log.path)), log.path
+    return log.path
+
+
+SHAPES = ["file", "dangling_symlink", "symlink_to_file"]
+
+
+def _wrong_shape(log, shape, outside):
+    """Put `shape` where a log's directory stands. Its signed segments and any
+    link target go OUTSIDE both receipts/ directories: left beside it the
+    segments would be a second log that verifies, and the row would read that
+    instead. The stimulus is proven: the log's receipts/ then holds the one
+    entry, the log's own name."""
+    outside.mkdir(exist_ok=True)
+    log.rename(outside / "moved")
+    if shape == "file":
+        log.write_bytes(b"not a directory\n")
+    elif shape == "dangling_symlink":
+        log.symlink_to(outside / "nowhere")
+    else:
+        target = outside / "a-file"
+        target.write_bytes(b"a file\n")
+        log.symlink_to(target)
+    assert os.path.lexists(log) and not log.is_dir(), shape
+    assert sorted(p.name for p in log.parent.iterdir()) == [log.name], shape
+    return log
+
+
+def _path_unreadable(rc, out, log):
+    assert "NO_LOG" not in out and "no receipts" not in out, out[-400:]
+    assert "Traceback" not in out, out[-400:]
+    assert "PATH_UNREADABLE" in out and str(log) in out, out[-400:]
+    assert rc == 1, (rc, out[-400:])
+
+
+@pytest.mark.parametrize("strict", STRICT)
+@pytest.mark.parametrize("shape", SHAPES)
+def test_the_hook_log_path_in_the_wrong_shape_is_path_unreadable(home, tmp_path, shape, strict):
+    log = _wrong_shape(optin.hook_log(home), shape, tmp_path / "outside")
+    _path_unreadable(*_receipts(home, "--verify", *strict), log)
+
+
+@pytest.mark.parametrize("strict", STRICT)
+@pytest.mark.parametrize("shape", SHAPES)
+def test_a_proxy_run_log_in_the_wrong_shape_is_path_unreadable(home, proxy_run, tmp_path,
+                                                               shape, strict):
+    """The hook's log still verifies here, so the gap read "CHAIN_OK" on a
+    home that lost a run's log: the run's name says it is a log (R58)."""
+    log = _wrong_shape(proxy_run, shape, tmp_path / "outside")
+    _path_unreadable(*_receipts(home, "--verify", *strict), log)
+
+
+@pytest.mark.parametrize("shape", SHAPES)
+def test_a_log_named_with_log_in_the_wrong_shape_is_path_unreadable(home, tmp_path, shape):
+    log = _wrong_shape(optin.hook_log(home), shape, tmp_path / "outside")
+    rc, out = _receipts(home, "--verify", "--log", str(log))
+    assert "not a directory of signed segments" not in out, out[-400:]
+    _path_unreadable(rc, out, log)
+
+
+def test_the_writer_and_the_verifier_name_a_run_log_by_one_rule():
+    """R58: the rule is written once, in the proxy's receipts module. serve
+    names each run with it and the verifier reads the proxy's logs by it."""
+    names = {proxy_receipts.new_run_id() for _ in range(64)}
+    assert len(names) == 64 and all(map(proxy_receipts.is_run_log_name, names))
+    for name in ("ab" * 16 + ".jsonl", "AB" * 16, "ab" * 15, "ab" * 17,
+                 "ab" * 16 + "\n", "notes.txt", "hook"):
+        assert not proxy_receipts.is_run_log_name(name), name
+
+    def names_used(module):
+        tree = ast.parse((TREE / module).read_text())
+        return {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+    assert {"new_run_id"} <= names_used("sunglasses/proxy/serve.py")
+    assert "uuid4" not in names_used("sunglasses/proxy/serve.py")
+    assert {"is_run_log_name"} <= names_used("sunglasses/cli.py")
+
+
+# ── R58 controls: a healthy run is read, what is not a log is passed over ───
+
+@pytest.mark.parametrize("strict", STRICT)
+def test_the_control_a_healthy_proxy_run_is_read_beside_the_hook_log(home, proxy_run, strict):
+    rc, out = _receipts(home, "--verify", *strict)
+    assert "CHAIN_OK" in out and "PATH_UNREADABLE" not in out, out[-400:]
+    assert out.count("segment(s)") == 2, out[-600:]
+    assert rc == (1 if strict else 3), (rc, out[-400:])
+
+
+@pytest.mark.parametrize("strict", STRICT)
+def test_the_control_a_stray_file_under_receipts_is_still_ignored(home, strict):
+    """Only a log's own name is held to R58. A file beside the hook's log that
+    is no log at all is not a log, so the healthy chain reads as before."""
+    (home / "receipts" / "notes.txt").write_bytes(b"not a log\n")
+    rc, out = _receipts(home, "--verify", *strict)
+    assert "CHAIN_OK" in out and "PATH_UNREADABLE" not in out, out[-400:]
+    assert "notes.txt" not in out, out[-400:]
+    assert rc == (1 if strict else 3), (rc, out[-400:])
+
+
+STRAYS = [pytest.param("notes.txt", "file", id="notes_txt"),
+          pytest.param("ab" * 16 + ".jsonl", "file", id="unchained_run_jsonl"),
+          pytest.param("AB" * 16, "file", id="uppercase_hex_file"),
+          pytest.param("ab" * 15, "file", id="short_hex_file"),
+          pytest.param("junk", "dir", id="non_hex_empty_dir")]
+
+
+@pytest.mark.parametrize("strict", STRICT)
+@pytest.mark.parametrize("name, kind", STRAYS)
+def test_the_control_a_stray_under_the_proxy_receipts_is_still_ignored(home, proxy_run,
+                                                                      name, kind, strict):
+    """A run's unchained `<run id>.jsonl` reads exactly as at 44e1dae7, and a
+    name that is not a run id is not a log: the two healthy logs read."""
+    stray = proxy_run.parent / name
+    stray.mkdir() if kind == "dir" else stray.write_bytes(b"not a log\n")
+    rc, out = _receipts(home, "--verify", *strict)
+    assert "CHAIN_OK" in out and "PATH_UNREADABLE" not in out, out[-400:]
+    assert name not in out and out.count("segment(s)") == 2, out[-600:]
+    assert rc == (1 if strict else 3), (rc, out[-400:])

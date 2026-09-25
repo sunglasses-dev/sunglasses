@@ -1306,13 +1306,17 @@ def _verify_key(home):
     return 0
 
 
-def _chain_logs(directory):
+def _chain_logs(directory, is_log_name):
     """Each signed log is its own directory of segments (T9 ruling 15). A
     directory here that cannot be listed raises Unlistable (R57): a signed log
-    it hides is not "no log"."""
+    it hides is not "no log". An entry whose NAME is a log's name, by the rule
+    its writer names it with (the hook's `hook`, a proxy run's 32 hex), is
+    listed with no is_dir() filter first, so a file or a symlink standing where
+    that log should be raises too (R58). Any other entry that is not a
+    directory is not a log, and is passed over as it always was."""
     from .receipts import _fs
     return [p for p in _fs.listing(directory, "*")
-            if p.is_dir() and _fs.listing(p, "segment-*.chain")]
+            if (is_log_name(p.name) or p.is_dir()) and _fs.listing(p, "segment-*.chain")]
 
 
 def _log_label(log):
@@ -1482,7 +1486,12 @@ def cmd_receipts(args):
             # The proxy writes one chain per run under its own state root, and the
             # hook's chain is under the home; both are signed with the home's key
             # (T9 ruling 24b). A run moved with `--state-root` is not found here.
-            chain_logs = _chain_logs(directory) + _chain_logs(state_root() / "receipts")
+            from .proxy import receipts as proxy_receipts
+            from .receipts import optin
+            hook = optin.hook_log(sunglasses_home())
+            chain_logs = (_chain_logs(directory, lambda name: directory / name == hook)
+                          + _chain_logs(state_root() / "receipts",
+                                        proxy_receipts.is_run_log_name))
         if args.today:
             import datetime
             today = datetime.datetime.now().strftime("%Y-%m-%d")

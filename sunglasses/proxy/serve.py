@@ -32,7 +32,6 @@ import subprocess
 import sys
 import threading
 import time
-import uuid
 
 from . import (approvals, bounds, control, framing, pump, receipts, route,
                supervisor)
@@ -142,7 +141,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
 
-    run_id = uuid.uuid4().hex
+    run_id = receipts.new_run_id()
     try:
         log = receipts.Log(state_root(root), run_id=run_id, header={
             "session_id": run_id,
