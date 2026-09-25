@@ -7,7 +7,11 @@ was decided on a failure (ASTRA receipts172 r3, item 3). Every presence
 decision in the receipts paths asks here instead: a directory that is not
 there has no entries, and one that is there and cannot be listed raises.
 Ruling 57 draws "there" at the directory entry: a file or a symlink where
-the directory should be is there, and raises too.
+the directory should be is there, and raises too. Ruling 62 draws "not
+there" on the way down: a path is absent only when its nearest existing
+ancestor is a directory that can be listed. A file, a dangling symlink, a
+symlink to a file or an unlistable directory standing above it is in the
+way, and raises naming that ancestor (ASTRA receipts172 r4).
 """
 from __future__ import annotations
 
@@ -19,33 +23,55 @@ import pathlib
 class Unlistable(OSError):
     """Something is at the path and its entries cannot be read. Never "empty"."""
 
-    def __init__(self, directory, cause: OSError):
+    def __init__(self, directory, cause: OSError, blocked_by=None):
         self.directory = pathlib.Path(directory)
         self.cause = cause
-        super().__init__(cause.errno,
-                         f"{self.directory} cannot be listed ({type(cause).__name__})")
+        self.blocked_by = None if blocked_by is None else pathlib.Path(blocked_by)
+        text = f"{self.directory} cannot be listed ({type(cause).__name__})"
+        if self.blocked_by is not None:
+            text += f": {self.blocked_by} above it is not a directory that can be listed"
+        super().__init__(cause.errno, text)
 
     def __str__(self):
         return self.strerror
+
+
+def obstruction(path):
+    """For a path with no directory entry: None when it is genuinely absent,
+    that is when its nearest existing ancestor is a directory that can be
+    listed (T9 ruling 62); otherwise that ancestor, which stands in the way.
+    A symlink to a directory is a directory here, as it is to every open."""
+    for parent in pathlib.Path(path).parents:
+        if not os.path.lexists(parent):
+            continue
+        try:
+            with os.scandir(parent):
+                return None
+        except OSError:
+            return parent
+    return None
 
 
 def listing(directory, pattern) -> list[pathlib.Path]:
     """The entries of `directory` whose names match `pattern`, sorted. Three
     outcomes, and only one of them is "nothing there" (T9 ruling 57):
 
-    - absent: no directory entry at the path at all (os.path.lexists is
-      False, a missing parent included) -> [];
+    - absent: no directory entry at the path, and the nearest existing
+      ancestor is a directory that can be listed (R62) -> [];
     - a listable directory -> its matching entries;
     - anything else at the path -> Unlistable: a directory that cannot be
       read, and also a regular file, a dangling symlink or a symlink to a
-      file standing where the directory should be. Something is there, so
-      it is never read as empty."""
+      file standing where the directory should be, or above it. Something
+      is there, so it is never read as empty."""
     directory = pathlib.Path(directory)
     try:
         names = os.listdir(directory)
     except (FileNotFoundError, NotADirectoryError) as cause:
         if not os.path.lexists(directory):
-            return []              # no entry at all: nothing there to hide anything
+            blocked = obstruction(directory)
+            if blocked is None:
+                return []          # no entry, under a directory that says so
+            raise Unlistable(directory, cause, blocked_by=blocked) from cause
         raise Unlistable(directory, cause) from cause
     except OSError as cause:
         raise Unlistable(directory, cause) from cause

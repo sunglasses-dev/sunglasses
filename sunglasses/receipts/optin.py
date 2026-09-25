@@ -52,11 +52,17 @@ def has_key(home) -> bool:
 
 
 def _key_dir_unlistable(home, unlistable) -> KeyUnusable:
+    # R62: when something above the key directory is in the way, that is the
+    # path to name and to fix, not the key directory under it.
+    blocked = getattr(unlistable, "blocked_by", None)
+    where = "" if blocked is None else f": {blocked} above it is not a directory that can be listed"
+    fix = home / KEY_DIR if blocked is None else blocked
     return KeyUnusable(
         f"the key directory {home / KEY_DIR} cannot be listed "
-        f"({type(unlistable.cause).__name__}), so whether the key is there "
-        f"cannot be known, and a signed log never turns unsigned on a guess. "
-        f"Fix it: chmod 700 {home / KEY_DIR} (or `{OFF}` to stop signing)")
+        f"({type(unlistable.cause).__name__}){where}, so whether the key is "
+        f"there cannot be known, and a signed log never turns unsigned on a "
+        f"guess. Fix it: make {fix} a directory, chmod 700 "
+        f"(or `{OFF}` to stop signing)")
 
 
 def signer(home):

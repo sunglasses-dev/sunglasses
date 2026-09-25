@@ -1681,10 +1681,24 @@ class _Confession(str):
 def _present(path) -> bool:
     """Whether any directory entry is at `path`. lstat, so a dangling symlink
     is present (R57). Absence is False; an lstat that fails for any other
-    reason raises (R56), so it never reads as absent."""
+    reason raises (R56), so it never reads as absent. And no entry is absent
+    only under a directory that can be listed (R62): with a file, a dangling
+    symlink, a symlink to a file or an unlistable directory above it, this
+    answers True, and the receipts code it hands to raises naming what is in
+    the way. The walk is receipts._fs.obstruction's, repeated here so that an
+    install without a key still imports nothing of the receipts package."""
     try:
         _os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
+        import pathlib
+        for parent in pathlib.Path(path).parents:
+            if not _os.path.lexists(parent):
+                continue
+            try:
+                with _os.scandir(parent):
+                    return False
+            except OSError:
+                return True
         return False
     return True
 
@@ -2041,6 +2055,11 @@ def _receipts_unwritable(decision, error, receipts, exc):
         # R56: which directory, and that it could not be listed, not "empty".
         check = (f"A receipts directory {exc}, and a signed log never turns "
                  f"unsigned on a guess. Fix its permissions (chmod 700).")
+        if getattr(exc, "blocked_by", None) is not None:
+            # R62: the thing in the way is what to fix, not the path under it.
+            check = (f"A receipts directory {exc}, and a signed log never "
+                     f"turns unsigned on a guess. Fix it: make {exc.blocked_by} "
+                     f"a directory, chmod 700.")
     decision = Decision(
         "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
         f"SUNGLASSES firewall: the audit trail could not be written ({cause}), "

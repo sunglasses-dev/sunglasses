@@ -246,12 +246,15 @@ def test_listing_absent_listable_and_unlistable(tmp_path, unlistable):
 
 def test_listing_draws_absent_at_the_directory_entry(tmp_path):
     """R57: only NO entry is absent; a file or a symlink in the directory's
-    place is there. A missing or non-directory PARENT means no entry."""
+    place is there. A missing parent means no entry; a non-directory parent
+    is in the way (R62, which amends R57 here: test_receipts_ancestor_obstruction)."""
     from sunglasses.receipts import _fs
     a_file = tmp_path / "a-file"
     a_file.write_text("")
     assert _fs.listing(tmp_path / "no" / "parent", "*") == []
-    assert _fs.listing(a_file / "under-a-file", "*") == []
+    with pytest.raises(_fs.Unlistable) as raised:
+        _fs.listing(a_file / "under-a-file", "*")
+    assert raised.value.blocked_by == a_file
     dangling = tmp_path / "dangling"
     dangling.symlink_to(tmp_path / "gone")
     to_file = tmp_path / "to-file"
