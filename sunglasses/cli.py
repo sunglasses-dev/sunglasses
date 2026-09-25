@@ -1333,10 +1333,11 @@ def _log_chain_ids(log, wire):
     return ids
 
 
-def _verify_chains(logs, args, home):
+def _verify_chains(logs, args, home, public=None):
     """Five results per log, printed per log. Exit 1 on any failure, else 3 on
     any limit, else 0; --strict counts a limit as a failure (T9 rulings R46,
-    R48). 2 stays the usage exit."""
+    R48). 2 stays the usage exit. `public` is the key for a received log
+    (`--log`); without it the key is read from `home`."""
     try:
         from .receipts import codes, keys, verify, wire
     except ImportError:
@@ -1352,7 +1353,8 @@ def _verify_chains(logs, args, home):
         except ValueError as exc:
             print(f"  {RED}--endpoint must be a JSON object{RESET} {DIM}({exc}){RESET}")
             return 2
-    public = _receipt_public_key(home, keys)
+    if public is None:
+        public = _receipt_public_key(home, keys)
     code = 0
     for log in logs:
         print()
@@ -1372,6 +1374,46 @@ def _verify_chains(logs, args, home):
             [code, codes.exit_code(report.results, strict=args.strict)])
     print()
     return code
+
+
+def _verify_received(args):
+    """`--verify --log PATH`: a log someone else sent (T9 ruling 47, gap G3).
+
+    The home is never read: not its logs, not its keys, not its signing state,
+    so a verifier's own setup cannot fail or pass a log it did not write. The
+    key is `--public-key PATH`, else the one `*.pub` file inside the log
+    directory. Either way it is portability, not trust: without --fingerprint
+    it is KEY_UNTRUSTED, a limit."""
+    import pathlib
+    log = pathlib.Path(args.log)
+    if not (log.is_dir() and any(log.glob("segment-*.chain"))):
+        print(f"\n  {RED}--log {_display(str(log), limit=200)}{RESET}: not a "
+              f"directory of signed segments (segment-*.chain). Nothing "
+              f"verified.\n")
+        return 1
+    if args.public_key:
+        source = pathlib.Path(args.public_key)
+        try:
+            public = source.read_bytes()
+        except OSError as exc:
+            print(f"\n  {RED}--public-key {_display(str(source), limit=200)}{RESET}: "
+                  f"cannot be read ({_display(exc.strerror or str(exc), limit=80)}). "
+                  f"Nothing verified.\n")
+            return 1
+    else:
+        beside = sorted(log.glob("*.pub"))
+        if len(beside) != 1:
+            print(f"\n  {RED}{_log_label(log)}{RESET}: NOT verified: no public key. "
+                  f"Found {len(beside)} *.pub file(s) beside the log; name one "
+                  f"with --public-key PATH.\n")
+            return 1
+        source, public = beside[0], beside[0].read_bytes()
+    if len(public) != 32:
+        print(f"\n  {RED}{_display(str(source), limit=200)}{RESET}: not a public "
+              f"key (an Ed25519 public key is 32 raw bytes, this is "
+              f"{len(public)}). Nothing verified.\n")
+        return 1
+    return _verify_chains([log], args, None, public=public)
 
 
 def _json_loads_object(text):
@@ -1406,6 +1448,12 @@ def cmd_receipts(args):
         return _receipts_init(sunglasses_home())
     if getattr(args, "action", None) == "off":
         return _receipts_off(sunglasses_home())
+
+    if getattr(args, "log", None) is not None or getattr(args, "public_key", None) is not None:
+        if not getattr(args, "verify", False) or args.log is None:
+            print(f"\n  {RED}--log needs --verify, and --public-key needs --log{RESET}\n")
+            return 2
+        return _verify_received(args)
 
     directory = sunglasses_home() / "receipts"
     files = sorted(directory.glob("*.jsonl"))
@@ -2307,6 +2355,15 @@ def main():
         "--endpoint", metavar="JSON",
         help='With --verify: a checkpoint you retained, {"chain_id", "seq", "hash"}. '
              "Without it how far the history once extended is unknown.")
+    receipts_parser.add_argument(
+        "--log", metavar="PATH",
+        help="With --verify: verify this one log directory, one someone sent "
+             "you. Your own home is never read. The key is --public-key, else "
+             "the one *.pub file inside PATH.")
+    receipts_parser.add_argument(
+        "--public-key", metavar="PATH",
+        help="With --log: the sender's raw 32-byte public key file. Pair it with "
+             "--fingerprint, or it is KEY_UNTRUSTED.")
     receipts_parser.add_argument(
         "--strict", action="store_true",
         help="With --verify: count a limit as a failure, so the exit is 0 or 1. "

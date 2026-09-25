@@ -646,6 +646,15 @@ _SITE_RESTORES = {
     "off_failure": ("_display(f'{type(exc).__name__}: {exc}', limit=200)",
                     "f'{type(exc).__name__}: {exc}'"),
     "verify_key_unusable": ("_display(str(cause), limit=400)", "str(cause)"),
+    # R47 `--verify --log`: a path or an OS error the verifier was handed, not
+    # a receipt field, and printed on the same terminal.
+    "received_log": ("--log {_display(str(log), limit=200)}", "--log {str(log)}"),
+    "received_key_path": ("--public-key {_display(str(source), limit=200)}",
+                          "--public-key {str(source)}"),
+    "received_key_error": ("_display(exc.strerror or str(exc), limit=80)",
+                           "exc.strerror or str(exc)"),
+    "received_key_size": ("{RED}{_display(str(source), limit=200)}{RESET}: not a public",
+                          "{RED}{str(source)}{RESET}: not a public"),
 }
 
 # The R21 sites say what a failure said, and a failure's text is whatever the
@@ -664,6 +673,12 @@ _CAUSE_SITES = {
         "def _fail(home):\n"
         "    raise optin.KeyUnusable({payload!r})\n"
         "optin.signer = _fail\n", None),
+    "received_key_error": (
+        "def _fail(self):\n"
+        "    raise OSError(13, {payload!r})\n"
+        "pathlib.Path.read_bytes = _fail\n", None),
+    "received_key_size": (
+        "pathlib.Path.read_bytes = lambda self: bytes(31)\n", None),
 }
 
 # Every payload carries an erase, a cursor home and a bidi override, which is
@@ -685,6 +700,8 @@ def _clean_decision(**over):
 
 def _fixture(site, payload):
     """(rows, verify) for one site, with `payload` inside the DISPLAYED slice."""
+    if site.startswith("received_"):
+        return [json.dumps(_clean_decision())], True
     if site in _CAUSE_SITES:
         return [json.dumps(_clean_decision())], site == "verify_key_unusable"
     if site.startswith("orphan_"):
@@ -710,9 +727,28 @@ def _fixture(site, payload):
     return [json.dumps(_clean_decision(**{field: payload + "x"}))], False
 
 
-def _run_cli(home, verify, restore=None, cause=None):
+def _received(home, site, payload):
+    """The `--log` arguments for an R47 site: the payload is in the path shown,
+    or, for the key's read error, in the error the read raises."""
+    if not site.startswith("received_"):
+        return None
+    log = home / "inbox" / "hook"
+    log.mkdir(parents=True)
+    (log / "segment-000001.chain").write_bytes(b"")
+    # A path reaches the CLI through argv, which never carries a lone
+    # surrogate: its bytes arrive surrogate-escaped (\udcXX). Hand the path
+    # over in that form, still undisplayable raw.
+    payload = os.fsdecode(payload.encode("utf-8", "surrogatepass"))
+    if site == "received_log":
+        return {"log": str(home / "inbox" / (payload + "x")), "public_key": None}
+    key = "kept.pub" if site == "received_key_error" else payload + "x.pub"
+    return {"log": str(log), "public_key": str(home / key)}
+
+
+def _run_cli(home, verify, restore=None, cause=None, extra=None):
     """The real CLI in a subprocess, with at most ONE display site put to raw.
-    `cause` is (site, payload) for a site whose text comes from a failure."""
+    `cause` is (site, payload) for a site whose text comes from a failure;
+    `extra` is more arguments, for the R47 `--log` sites."""
     prelude = "import pathlib, sys, types\nfrom sunglasses import cli\n"
     action = None
     if cause is not None:
@@ -728,7 +764,8 @@ def _run_cli(home, verify, restore=None, cause=None):
         )
     code = prelude + (
         f"sys.exit(cli.cmd_receipts(types.SimpleNamespace("
-        f"verify={verify!r}, today=False, limit=40, action={action!r})))\n"
+        f"verify={verify!r}, today=False, limit=40, action={action!r}, "
+        f"**{(extra or dict())!r})))\n"
     )
     env = dict(os.environ, SUNGLASSES_HOME=str(home))
     proc = subprocess.run([sys.executable, "-c", code], cwd=TREE,
@@ -796,7 +833,8 @@ def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, paylo
     """Two runtime assertions per site: control bytes and a lone surrogate."""
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
-    _code, raw = _run_cli(home, verify, cause=_cause(site, payload))
+    _code, raw = _run_cli(home, verify, cause=_cause(site, payload),
+                          extra=_received(home, site, _PAYLOADS[payload]))
     assert b"Traceback" not in raw, raw.decode("utf-8", "replace")
     _assert_inert(raw)
 
@@ -812,7 +850,8 @@ def test_control_restoring_one_site_replays_it(home, site, payload):
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
     _code, raw = _run_cli(home, verify, restore=site,
-                          cause=_cause(site, payload))
+                          cause=_cause(site, payload),
+                          extra=_received(home, site, _PAYLOADS[payload]))
     if payload == "control":
         assert ESC_ERASE in raw and CURSOR_HOME in raw, (
             f"{site}: restoring this one call did not replay its controls, so "
