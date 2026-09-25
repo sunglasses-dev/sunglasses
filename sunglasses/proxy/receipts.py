@@ -309,7 +309,7 @@ class Log:
 
     def __init__(self, root, *, run_id, header, home=None):
         self.root = pathlib.Path(root) / "receipts"
-        self.root.mkdir(parents=True, exist_ok=True)
+        _make_receipts_dir(self.root)
         self._lock = threading.Lock()
         self._seq = 0
         self._failure = None
@@ -541,6 +541,26 @@ class _Closed:
 
 
 _CLOSED = _Closed()
+
+
+def _make_receipts_dir(root):
+    """T9 ruling 63 (b). A file, a dangling symlink or a symlink to a file at
+    the receipts directory, at the state root or above it made `mkdir` raise
+    out of `serve.main` as a traceback with no cause named. It is a receipt
+    failure like any other: raised before the session opens, naming what is
+    in the way."""
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError as cause:
+        blocked = None
+        if isinstance(cause, (FileExistsError, NotADirectoryError)):
+            from ..receipts import _fs
+            blocked = root if os.path.lexists(root) else _fs.obstruction(root)
+        where = ("" if blocked is None else
+                 f": {blocked} is not a directory. Fix it: make {blocked} a "
+                 f"directory, chmod 700")
+        raise ReceiptIOError(f"the receipts directory {root} cannot be made "
+                             f"({type(cause).__name__}){where}") from None
 
 
 def _chain_for(directory, home):
