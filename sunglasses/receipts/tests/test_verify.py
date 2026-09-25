@@ -333,4 +333,5 @@ def test_every_numbered_vector_is_exported_or_says_why_not():
     numbers = {v["id"].rstrip("abcde") for v in _exported("verifier")}
     numbers |= {v["id"] for v in _exported("verifier_logs")}
     numbers |= set(_exported("verifier_not_exported"))
-    assert numbers == {str(n) for n in range(1, 19)}
+    # 1 to 18 are the spec freeze's rows; 19 is T9 ruling 44.
+    assert numbers == {str(n) for n in range(1, 20)}

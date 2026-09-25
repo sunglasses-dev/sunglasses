@@ -387,6 +387,24 @@ def verifier_vectors() -> list:
     c.seal()
     out.append(_vector("15b", "two terminals for one opening", c.data(), c,
                        results=_results(lifecycle="LIFECYCLE_DUPLICATE"), through=5))
+    # 19, T9 ruling 44, numbered past the spec freeze's 1 to 18: a signed
+    # row's keys are the schema's, closed per record kind. A key outside it is
+    # UNKNOWN_FIELD, a failure: the bytes verify, and the row still says
+    # something no honest writer can say.
+    c = WireChain(producer="proxy")
+    c.event("HEADER", session_id="0" * 32)
+    c.event("SETTLED", reason="ok", smuggled="x")
+    c.event("SESSION_TORN_DOWN", settled=True)
+    c.seal("close")
+    out.append(_vector("19", "a body key outside the schema", c.data(), c,
+                       results=_results(lifecycle="UNKNOWN_FIELD"), through=4))
+    c = WireChain(producer="proxy")
+    c.event("HEADER", session_id="0" * 32)
+    c.event("SETTLED", supported={"a": 1})
+    c.event("SESSION_TORN_DOWN", settled=True)
+    c.seal("close")
+    out.append(_vector("19b", "an object where the schema has a value", c.data(), c,
+                       results=_results(lifecycle="UNKNOWN_FIELD"), through=4))
     return out
 
 
