@@ -1683,6 +1683,54 @@ _CLEAN = Decision("defer", "deterministic", "GLS-FW-CLEAN",
                   "SUNGLASSES firewall: no deterministic violation.")
 
 
+# ── Input bound ─────────────────────────────────────────────────────────────
+# Every step after arrival walks the whole payload: the parse, the surfaces the
+# rules read, the digest in the receipt. How deep that walk goes is set by the
+# caller, and the tool input is text the model writes. So depth is bounded on
+# the raw text, before anything parses it, and an input past the bound is a
+# decision in its own right rather than something the later steps attempt.
+#
+# 64 levels counts the payload object itself. A real tool call sits a handful
+# of levels down (payload, tool_input, a list of edits, one edit), and MCP
+# arguments that are more than a few dozen deep are not something any tool
+# asks for.
+MAX_INPUT_NESTING = 64
+
+# One linear pass. A JSON string (including one left open at the end of the
+# text) is consumed whole so brackets inside it do not count; outside strings
+# only the four structural brackets are matched. The string branch cannot
+# backtrack: its two inner alternatives never start on the same character and
+# the closing quote is optional.
+_NESTING_TOKEN = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"?|[\[\]{}]', re.S)
+
+
+def input_too_deep(text: str, bound: int = MAX_INPUT_NESTING) -> bool:
+    """True when `text`, read as JSON, nests more than `bound` levels deep.
+
+    Works on the raw text so it can run before any parser, and stops at the
+    first bracket past the bound. Malformed text is judged by its brackets
+    alone; a parser would reject it anyway."""
+    if text.count("[") + text.count("{") <= bound:
+        return False    # the common case: too few openers to get there at all
+    depth = 0
+    for m in _NESTING_TOKEN.finditer(text):
+        c = m.group()
+        if c == "[" or c == "{":
+            depth += 1
+            if depth > bound:
+                return True
+        elif c == "]" or c == "}":
+            depth -= 1
+    return False
+
+
+_TOO_DEEP = Decision(
+    "deny", "deterministic", "GLS-FW-SEC-NESTING",
+    f"SUNGLASSES firewall: this tool call's input is nested more than "
+    f"{MAX_INPUT_NESTING} levels deep, which is past what the firewall accepts. "
+    f"Flatten the input and retry.")
+
+
 def evaluate(payload: dict, home=None) -> "tuple":
     """Run the deterministic lane over one PreToolUse payload.
 
@@ -1843,8 +1891,16 @@ def run_hook(stdin_text: str, home=None) -> dict:
     #
     # This does NOT make the hook fail closed — that is the harness's contract,
     # not ours. It makes the failure legible.
+    #
+    # Checked before either parse below, so an input past the bound is never
+    # parsed at all. It still arrives (in_flight) and still gets a decision.
     try:
-        payload = _json.loads(stdin_text) if stdin_text.strip() else {}
+        too_deep = input_too_deep(stdin_text)
+    except Exception:  # noqa: BLE001 — not str: the parse below decides
+        too_deep = False
+    try:
+        payload = (_json.loads(stdin_text)
+                   if stdin_text.strip() and not too_deep else {})
         if not isinstance(payload, dict):
             payload = {}
     except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
@@ -1865,10 +1921,13 @@ def run_hook(stdin_text: str, home=None) -> dict:
         pass
 
     try:
-        payload = _json.loads(stdin_text) if stdin_text.strip() else {}
-        if not isinstance(payload, dict):
-            raise ValueError("hook payload was not a JSON object")
-        decision, error, extras = evaluate(payload, home=home)
+        if too_deep:
+            decision = _TOO_DEEP
+        else:
+            payload = _json.loads(stdin_text) if stdin_text.strip() else {}
+            if not isinstance(payload, dict):
+                raise ValueError("hook payload was not a JSON object")
+            decision, error, extras = evaluate(payload, home=home)
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
         error = f"{type(exc).__name__}: {exc}"
         decision = Decision(
