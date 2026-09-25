@@ -407,6 +407,7 @@ what moved.
 ### Known issues
 
 - If `sunglasses uninstall <name>` cannot remove its install record, it still reports the entry as restored. The record `<name>.json` and the copy `<name>.original` stay in `~/.sunglasses/proxy/installs`, and a later install or uninstall of that name refuses. Remove both files by hand.
+- If a file, a link or an unreadable directory sits where the proxy keeps its approvals or captures, `sunglasses proxy` startup exits with a traceback instead of a named refusal and can leave the upstream server running. A capture that cannot be written is reported as an upstream fault.
 
 ### PENDING — open, not shipped, and not to be described as shipped
 
