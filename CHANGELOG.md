@@ -5,12 +5,6 @@ All notable changes to Sunglasses are documented here.
 
 ## [0.6.0] — 2026-09-26
 
-> **DRAFT.** Entries above the PENDING block describe work already merged to
-> `main` and were written from each merged pull request body, not from memory.
-> Entries in the PENDING block describe work that is open and **must not be
-> described as shipped until its pull request merges**; on ship day they move up
-> and lose the marker, or they leave with the release.
-
 ### Added
 
 - **A local MCP proxy that mediates a stdio session, and what it actually
@@ -156,6 +150,7 @@ All notable changes to Sunglasses are documented here.
   do to your configuration file. **Wiring is not approval and neither is
   protection**: what the proxy enforces, and only once the server's tool
   snapshot has been approved at an interactive terminal, is the entry above.
+- **Freeze the wire before anything writes to it.** (#172)
 
 ### Changed
 
@@ -195,6 +190,12 @@ All notable changes to Sunglasses are documented here.
   more existed, so a clause with many literals read as a clause with three. It
   prints the remainder count now. Nothing about matching changed; the defect was
   entirely in what a reader was told.
+- **One server was publishing two channel vocabularies, and nothing compared them.** (#215)
+- **The published mirror did not describe the shipped scanner.** (#228)
+- **Remove the 24 advisory-only mirror files #70 left behind.** (#239)
+- **Counts read from PATTERNS, not hand-typed.** (#240)
+- **Fix the KeyError and the four README patterns that matched nothing.** (#245)
+- **Bound input nesting depth before parse.** (#248)
 
 ### Continuous integration
 
@@ -226,10 +227,12 @@ what moved.
 - **Time every `re.compile` on the 3.12 leg, when asked.** (#200)
 - **Let the compile timer write the whole distribution, not just the head.** (#203)
 - **A main merge stops cancelling the previous commit's queued run.** (#205)
+- **The gate's own line carries the full forty hex.** (#226)
+- **Name the guard that exists, not the one that does not.** (#227)
 
 ### Documentation
 
-- **`GLS-SD-010`'s open gap was published narrower than it is.** 0.5.9's notes,
+- **`GLS-SD-010`'s open gap was published narrower than it is.** (#218) 0.5.9's notes,
   the README and the site all described it as a gap in the RESULT direction:
   "GLS-SD-010 (line-anchored `API_KEY=`) stays open in the result direction
   because its anchor cannot match inside a JSON string." The reason is right and
@@ -299,6 +302,12 @@ what moved.
 - **The README showed a refusal without the two values it then tells you to use.** (#207)
 - **The anchor-spec key's stated reason is false at this scale.** (#209)
 - **0.6.0 claims the proxy, with the condition attached.** (#212)
+- **The pattern DB said 1546 and the shipped package says 1554.** (#192)
+- **The install bullet claimed enforcement on wiring, not on approval.** (#220)
+- **Three pages describing a release that shipped two days ago.** (#222)
+- **Cite #221 on the two bullets it added.** (#223)
+- **`glama.json` so the Glama listing can be claimed.** (#238)
+- **Stop titling doctor as a command in 0.6.0; move its exit table under the no-CLI note.** (#244)
 
 ### Tests
 
@@ -390,6 +399,14 @@ what moved.
   suite live, the singular form handed it a stranger's process. Adds
   `foreign_pytests()` returning every candidate; the guard's own behaviour is
   unchanged.
+- **The FP corpus had no document that documents an environment variable.** (#219)
+- **The marker read waited for the file to exist, not to have content.** (#224)
+- **A ten-second wall clock was standing in for the assertion.** (#225)
+- **The environment guard splits a named lookup's literal path (R52).** (#247)
+
+### Known issues
+
+- If `sunglasses uninstall <name>` cannot remove its install record, it still reports the entry as restored. The record `<name>.json` and the copy `<name>.original` stay in `~/.sunglasses/proxy/installs`, and a later install or uninstall of that name refuses. Remove both files by hand.
 
 ### PENDING — open, not shipped, and not to be described as shipped
 
