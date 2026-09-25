@@ -1665,6 +1665,104 @@ def write_receipt(record: dict, home=None) -> None:
     _restrict(path, 0o600)
 
 
+class _Confession(str):
+    """One evaluation's config errors: the text the legacy receipt has always
+    carried, plus `types`, their class names, for the signed log, which never
+    carries a message (T9 ruling 11 Q3)."""
+    types: tuple = ()
+
+    @classmethod
+    def of(cls, errors) -> "_Confession":
+        text = cls("; ".join(str(e) for e in errors))
+        text.types = tuple(type(e).__name__ for e in errors)
+        return text
+
+
+def _present(path) -> bool:
+    """Whether any directory entry is at `path`. lstat, so a dangling symlink
+    is present (R57). Absence is False; an lstat that fails for any other
+    reason raises (R56), so it never reads as absent. And no entry is absent
+    only under a directory that can be listed (R62): with a file, a dangling
+    symlink, a symlink to a file or an unlistable directory above it, this
+    answers True, and the receipts code it hands to raises naming what is in
+    the way. The walk is receipts._fs.obstruction's, repeated here so that an
+    install without a key still imports nothing of the receipts package."""
+    try:
+        _os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        import pathlib
+        for parent in pathlib.Path(path).parents:
+            if not _os.path.lexists(parent):
+                continue
+            try:
+                with _os.scandir(parent):
+                    return False
+            except OSError:
+                return True
+        return False
+    return True
+
+
+class _HookReceipts:
+    """Where one call's two records go.
+
+    The legacy day file, unchanged, until the user runs `sunglasses receipts
+    init`. From then on the signed chain IS the log (T9 ruling 11 Q1): the
+    opening is appended unsigned before the work, and the terminal goes with a
+    `close` checkpoint that seals the call (ruling 15). Whether a key exists is
+    one directory listing; nothing is imported to answer it, so an install
+    without a key never loads the signing code.
+
+    A key that exists but cannot be used (unsafe mode, the extra removed) is a
+    receipt failure like a full disk: it raises, and the caller's F6 rule
+    applies. It never falls back to writing unsigned lines, because a signed
+    log that silently turns into an unsigned one is the downgrade the signing
+    exists to show.
+    """
+
+    def __init__(self, home):
+        self.home = home
+        # R21: a deleted key is not `receipts off`. A hook chain that the off
+        # record has not ended still means the user opted in. R56: a key or
+        # chain directory that cannot be listed raises here, never reads as
+        # "not opted in", and run_hook's guard asks, naming the cause. With
+        # neither directory there, nothing of the receipts package loads.
+        self.signed = False
+        if _present(home / "keys") or _present(home / "receipts" / "hook"):
+            from .receipts import optin
+            self.signed = optin.opted_in(home)
+        self._chain = None
+
+    def _writer(self):
+        if self._chain is None:
+            from .receipts import optin
+            # Raises KeyUnusable naming the cause, before the signing code or
+            # the chain is touched (R21).
+            signer = optin.signer(self.home)
+            from .receipts import chain
+            # One writer for both records: its in-memory note of the opening
+            # it wrote is what lets the close seal it (R15d).
+            self._chain = chain.Chain(self.home / "receipts" / "hook",
+                                      signer, producer="hook")
+        return self._chain
+
+    def opening(self, row: dict) -> None:
+        if not self.signed:
+            write_receipt(row, home=self.home)
+            return
+        from .receipts import hook_rows
+        self._writer().write([{"event": "in_flight",
+                               "body": hook_rows.in_flight(_sanitize_record(row))}])
+
+    def terminal(self, row: dict, error_types=()) -> None:
+        if not self.signed:
+            write_receipt(row, home=self.home)
+            return
+        from .receipts import hook_rows
+        body = hook_rows.decision(_sanitize_record(row), error_types=error_types)
+        self._writer().write([{"event": "decision", "body": body}], seal="close")
+
+
 def _input_digest(tool_input) -> str:
     """SHA-256 of the canonical tool input. The receipt stores this and never
     the input itself: an audit trail that quotes the payload becomes the leak."""
@@ -1778,7 +1876,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
                             # fallback verdict instead of a silent fall-through
 
     def confession():
-        return "; ".join(errors) if errors else None
+        return _Confession.of(errors) if errors else None
 
     try:
         policy = load_policy(home / "policy.yaml")
@@ -1788,7 +1886,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         # still holds, so this does not short-circuit the remaining lanes. What
         # changes is the FALLBACK: where nothing else decided, the answer is no
         # longer `{}` but an ask that names which control is down.
-        errors.append(str(down))
+        errors.append(down)
         extras["policy_state"] = down.state
         policy_down = Decision(
             "ask", "error", f"GLS-FW-POLICY-{down.state.upper().replace('_', '-')}",
@@ -1797,7 +1895,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
             f"under ~/.sunglasses or run `sunglasses init --policy`. Approve only if "
             f"you would have approved this call unchecked.")
     except PolicyError as exc:
-        errors.append(str(exc))
+        errors.append(exc)
     else:
         decision = check_policy(tool_name, tool_input, policy)
         if decision is not None:
@@ -1816,7 +1914,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         try:
             state = load_pin_state(home / "pin_state.json")
         except PolicyError as exc:
-            errors.append(str(exc))
+            errors.append(exc)
         else:
             if state:
                 age = pin_state_age_s(state)
@@ -1835,7 +1933,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
         try:
             pins = load_pins(home / "pins.json")
         except PolicyError as exc:
-            errors.append(str(exc))
+            errors.append(exc)
         else:
             extras["pin_reach"] = pin_reach(tool_name, pins)
             decision = check_pin_by_name(tool_name, pins)
@@ -1906,19 +2004,27 @@ def run_hook(stdin_text: str, home=None) -> dict:
     except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
         payload = {}
     eval_id = _new_eval_id()
+    error_types = ()
+    # T9 RULING 34. THE RECEIPTS PATH IS INSIDE THE GUARD, construction too.
+    # Building `_HookReceipts` decides whether the user opted in, which reads
+    # the chain's tail, and it used to run above every `try`: an exception
+    # there left `run_hook` altogether and the hook exited 1, which the host
+    # does not block on. A failure here is F6 like the terminal's, below: the
+    # call asks, naming the cause, and a deny stays a deny.
+    receipts = None
+    receipts_down = None
     try:
-        write_receipt({
+        receipts = _HookReceipts(home)
+        receipts.opening({
             "ts": _now_iso(),
             "kind": "in_flight",
             "eval_id": eval_id,
             "tool_name": payload.get("tool_name"),
             "session_id": payload.get("session_id"),
             "input_sha256": _input_digest(payload.get("tool_input")),
-        }, home=home)
-    except Exception:  # noqa: BLE001
-        # Losing the opening line must not change what the firewall does, for
-        # the same reason losing the closing one does not.
-        pass
+        })
+    except Exception as exc:  # noqa: BLE001
+        receipts_down = exc
 
     try:
         if too_deep:
@@ -1928,8 +2034,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
             if not isinstance(payload, dict):
                 raise ValueError("hook payload was not a JSON object")
             decision, error, extras = evaluate(payload, home=home)
+            error_types = getattr(error, "types", ())
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
         error = f"{type(exc).__name__}: {exc}"
+        error_types = (type(exc).__name__,)
         decision = Decision(
             "defer", "error", "GLS-FW-ERROR",
             "SUNGLASSES firewall: internal error, deferring to normal permission "
@@ -1947,8 +2055,15 @@ def run_hook(stdin_text: str, home=None) -> dict:
         # was the one receipt not flagged as degraded.
         extras = {**extras, "degraded": True}
 
+    if receipts_down is not None:
+        # Decided BEFORE the terminal, so the terminal (if it can be written)
+        # records the answer the host is actually given.
+        decision, error = _receipts_unwritable(decision, error, receipts,
+                                               receipts_down)
     try:
-        write_receipt({
+        if receipts is None:
+            raise receipts_down
+        receipts.terminal({
             "ts": _now_iso(),
             "kind": "decision",
             "eval_id": eval_id,
@@ -1961,25 +2076,55 @@ def run_hook(stdin_text: str, home=None) -> dict:
             "elapsed_ms": round((_time.perf_counter() - started) * 1000, 2),
             **extras,
             **({"error": error} if error else {}),
-        }, home=home)
+        }, error_types=error_types)
     except Exception as exc:  # noqa: BLE001
-        # F6 — THE AUDIT TRAIL IS DOWN.
-        #
-        # Losing an audit line must not WEAKEN a decision, so a deny stays a deny
-        # and is returned unchanged. But a `defer` or an `allow` that nobody can
-        # record is a call with no evidence it happened, which is the same silence
-        # the lifecycle records exist to remove. Those ASK, naming the dead control
-        # rather than echoing an exception at the user.
-        if decision.action != "deny":
-            decision = Decision(
-                "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
-                "SUNGLASSES firewall: the audit trail could not be written, so this "
-                "call would leave no record. Check the receipts directory under "
-                "~/.sunglasses for permissions and disk space. Approve only if you "
-                "would have approved it unrecorded.")
-            error = f"receipts unwritable: {type(exc).__name__}: {exc}"
+        decision, error = _receipts_unwritable(decision, error, receipts, exc)
 
     return decision.to_hook_output()
+
+
+def _receipts_unwritable(decision, error, receipts, exc):
+    """F6 — THE AUDIT TRAIL IS DOWN.
+
+    Losing an audit line must not WEAKEN a decision, so a deny stays a deny
+    and is returned unchanged. But a `defer` or an `allow` that nobody can
+    record is a call with no evidence it happened, which is the same silence
+    the lifecycle records exist to remove. Those ASK, naming the dead control
+    rather than echoing an exception at the user.
+
+    `receipts` is None when building it is what failed (T9 ruling 34). That
+    build is the opt-in decision, so it counts as signed: the key is a likely
+    cause and the one a directory check would never find.
+    """
+    if decision.action == "deny":
+        return decision, error
+    from .receipts import optin
+    cause = "KEY_UNUSABLE" if isinstance(exc, optin.KeyUnusable) else "RECEIPT_IO_ERROR"
+    check = ("Check the receipts directory under ~/.sunglasses for "
+             "permissions and disk space.")
+    if receipts is None or receipts.signed:
+        check = ("Check the signing key in ~/.sunglasses/keys (private to "
+                 "you, and sunglasses[receipts] installed), then the "
+                 "receipts directory for permissions and disk space.")
+        if isinstance(exc, optin.KeyUnusable):
+            # R21 (a): the cause and the one command that clears it.
+            check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
+    from .receipts import _fs
+    if isinstance(exc, _fs.Unlistable):
+        # R56: which directory, and that it could not be listed, not "empty".
+        check = (f"A receipts directory {exc}, and a signed log never turns "
+                 f"unsigned on a guess. Fix its permissions (chmod 700).")
+        if getattr(exc, "blocked_by", None) is not None:
+            # R62: the thing in the way is what to fix, not the path under it.
+            check = (f"A receipts directory {exc}, and a signed log never "
+                     f"turns unsigned on a guess. Fix it: make {exc.blocked_by} "
+                     f"a directory, chmod 700.")
+    decision = Decision(
+        "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
+        f"SUNGLASSES firewall: the audit trail could not be written ({cause}), "
+        f"so this call would leave no record. {check} Approve only if you "
+        "would have approved it unrecorded.")
+    return decision, f"receipts unwritable: {type(exc).__name__}: {exc}"
 
 
 def _new_eval_id() -> str:
@@ -2305,7 +2450,19 @@ def main(argv=None) -> int:
         stdin_text = _sys.stdin.read()
     except Exception:  # noqa: BLE001
         stdin_text = ""
-    _sys.stdout.write(_json.dumps(run_hook(stdin_text)))
+    try:
+        out = run_hook(stdin_text)
+    except Exception as exc:  # noqa: BLE001
+        # T9 RULING 35, THE BELT. Anything that escapes `run_hook` would exit
+        # 1, and the host proceeds on exit 1: the fail-open. It asks instead,
+        # naming the exception's TYPE only -- its text is not trusted to be
+        # printable, or even to exist.
+        out = Decision(
+            "ask", "error", "GLS-FW-HOOK-FAULT",
+            f"SUNGLASSES firewall: the hook failed ({type(exc).__name__}), so "
+            "this call was not checked and not recorded. Approve only if you "
+            "would have approved it unchecked.").to_hook_output()
+    _sys.stdout.write(_json.dumps(out))
     return 0
 
 

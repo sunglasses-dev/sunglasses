@@ -32,7 +32,6 @@ import subprocess
 import sys
 import threading
 import time
-import uuid
 
 from . import (approvals, bounds, control, framing, pump, receipts, route,
                supervisor)
@@ -142,12 +141,19 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
 
-    run_id = uuid.uuid4().hex
-    log = receipts.Log(state_root(root), run_id=run_id, header={
-        "session_id": run_id,
-        "budget_version": "sg-proxy-budget/1",
-        "catalog_version": "sg-proxy-catalog/1",
-        "contract_version": "GATE3_CONTRACT_v5.1"})
+    run_id = receipts.new_run_id()
+    try:
+        log = receipts.Log(state_root(root), run_id=run_id, header={
+            "session_id": run_id,
+            "budget_version": "sg-proxy-budget/1",
+            "catalog_version": "sg-proxy-catalog/1",
+            "contract_version": "GATE3_CONTRACT_v5.1"})
+    except receipts.ReceiptIOError as failure:
+        # T9.R4, ruling 24b(a). No receipt, no mediation: the server is never
+        # started, and the user is told what is wrong and how to clear it.
+        stderr.write(f"sunglasses proxy: the receipt log could not be opened, "
+                     f"so nothing was started. {failure}\n")
+        return 1
 
     child = subprocess.Popen(
         upstream_argv,

@@ -204,9 +204,23 @@ def test_control_the_old_fall_through_returns_empty_for_every_state(home, label,
     )
 
 
-def test_control_the_old_receipt_handling_swallows_an_unwritable_trail(home):
+def _present_before_r62(path):
+    """The opt-in probe as it was before R62: a plain lstat."""
+    try:
+        os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return True
+
+
+def test_control_the_old_receipt_handling_swallows_an_unwritable_trail(home, monkeypatch):
+    # R62: a file where the receipts directory belongs also hides whether the
+    # hook chain is there, so the opt-in probe asks on this stimulus as well.
+    # The control restores both old behaviours; F6 alone is measured on a
+    # stimulus the probe does not see in test_receipts_ancestor_obstruction.py.
     _healthy(home)
     _break_receipts(home)
+    monkeypatch.setattr(firewall, "_present", _present_before_r62)
     original = firewall.write_receipt
     firewall.write_receipt = lambda *a, **k: None   # the old "pass" on failure
     try:

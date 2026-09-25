@@ -171,10 +171,21 @@ def test_orphans_are_found_among_completed_calls(home):
 # whose ONLY line was a 31-byte truncated fragment, exit 0. A checker that
 # cannot read a line has to say so.
 
+def _cli_env(home):
+    """The environment every CLI child here runs in, stdout strict on every
+    platform. Under a C or C.UTF-8 locale, a Linux CI runner's, CPython gives
+    stdio errors=surrogateescape, which writes a lone \\udcXX (how a path's
+    undecodable byte arrives) back out as that raw byte instead of raising. A
+    restore control then reads green on a raw site there and red here. Strict
+    is the stronger oracle both ways: the restored raw site crashes, and a
+    fixed site that let a surrogate through would crash too."""
+    return dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONIOENCODING="utf-8:strict")
+
+
 def _verify(home):
     """Run the real CLI the way a user does, and return (exit code, plain text)."""
     import re as _re
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
                           cwd=TREE, capture_output=True, text=True, env=env)
     return proc.returncode, _re.sub(r"\x1b\[[0-9;]*m", "", proc.stdout + proc.stderr)
@@ -379,7 +390,7 @@ HOSTILE_BYTES = HOSTILE_TEXT.encode("utf-8") + b"\xe2\x82"
 
 def _verify_raw(home, mutate=None):
     """Run the real CLI and return (exit code, the BYTES a terminal receives)."""
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     if mutate is None:
         argv = [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"]
     else:
@@ -538,7 +549,7 @@ def test_a_lone_surrogate_tool_name_is_named_not_a_traceback(home):
     _write_bytes_file(home, "2026-09-12.jsonl",
                       (started + "\n" + decided + "\n"
                        + _orphan("orphan1", SURROGATE_TOOL) + "\n").encode("utf-8"))
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
         cwd=TREE, capture_output=True, env=env)
@@ -563,7 +574,7 @@ def test_the_pretty_table_survives_the_same_two_rows(home):
                     "eval_id": "b", "decision": RAW_EVAL_ID, "tool_name": "Bash"}),
     ]
     _write_bytes_file(home, "2026-09-12.jsonl", ("\n".join(rows) + "\n").encode("utf-8"))
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts"],
                           cwd=TREE, capture_output=True, env=env)
     assert b"Traceback" not in proc.stdout + proc.stderr, (
@@ -642,6 +653,54 @@ _SITE_RESTORES = {
     "pretty_lane": ("_display(row.get('lane', ''), limit=13)",
                     "str(row.get('lane', ''))"),
     "summary_decision": ("_display(k, 10)", "str(k)"),
+    # R21. These two print an exception's text, not a receipt field.
+    "off_failure": ("_display(f'{type(exc).__name__}: {exc}', limit=200)",
+                    "f'{type(exc).__name__}: {exc}'"),
+    "verify_key_unusable": ("_display(str(cause), limit=400)", "str(cause)"),
+    # R47 `--verify --log`: a path or an OS error the verifier was handed, not
+    # a receipt field, and printed on the same terminal.
+    "received_log": ("--log {_display(str(log), limit=200)}", "--log {str(log)}"),
+    "received_key_path": ("--public-key {_display(str(source), limit=200)}",
+                          "--public-key {str(source)}"),
+    "received_key_error": ("_display(exc.strerror or str(exc), limit=80)",
+                           "exc.strerror or str(exc)"),
+    "received_key_size": ("{RED}{_display(str(source), limit=200)}{RESET}: not a public",
+                          "{RED}{str(source)}{RESET}: not a public"),
+    # R57: PATH_UNREADABLE names the path it could not list, and a path is
+    # whatever the directory tree or the caller's --log put in it.
+    "path_unreadable": ("_display(str(unreadable), limit=300)", "str(unreadable)"),
+}
+
+# The R21 sites say what a failure said, and a failure's text is whatever the
+# key file, the chain or the OS put in it. So their fixture is the CAUSE: the
+# subprocess replaces the one call that fails with one that raises the payload.
+# site -> (code run before the CLI, with {payload} filled in; receipts action)
+_CAUSE_SITES = {
+    "off_failure": (
+        "from sunglasses.receipts import optin\n"
+        "def _fail(home):\n"
+        "    raise OSError({payload!r})\n"
+        "optin.turn_off = _fail\n", "off"),
+    "verify_key_unusable": (
+        "from sunglasses.receipts import optin\n"
+        "optin.opted_in = lambda home: True\n"
+        "def _fail(home):\n"
+        "    raise optin.KeyUnusable({payload!r})\n"
+        "optin.signer = _fail\n", None),
+    "received_key_error": (
+        "def _fail(self):\n"
+        "    raise OSError(13, {payload!r})\n"
+        "pathlib.Path.read_bytes = _fail\n", None),
+    "received_key_size": (
+        "pathlib.Path.read_bytes = lambda self: bytes(31)\n", None),
+    "path_unreadable": (
+        "from sunglasses.receipts import _fs\n"
+        "_real = _fs.listing\n"
+        "def _fail(directory, pattern):\n"
+        "    if pattern == '*.jsonl':\n"
+        "        raise _fs.Unlistable(pathlib.Path({payload!r}), PermissionError(13, 'denied'))\n"
+        "    return _real(directory, pattern)\n"
+        "_fs.listing = _fail\n", None),
 }
 
 # Every payload carries an erase, a cursor home and a bidi override, which is
@@ -663,6 +722,10 @@ def _clean_decision(**over):
 
 def _fixture(site, payload):
     """(rows, verify) for one site, with `payload` inside the DISPLAYED slice."""
+    if site.startswith("received_"):
+        return [json.dumps(_clean_decision())], True
+    if site in _CAUSE_SITES:
+        return [json.dumps(_clean_decision())], site == "verify_key_unusable"
     if site.startswith("orphan_"):
         started, decided = _pair()
         field = {"orphan_ts": "ts", "orphan_tool": "tool_name",
@@ -686,9 +749,33 @@ def _fixture(site, payload):
     return [json.dumps(_clean_decision(**{field: payload + "x"}))], False
 
 
-def _run_cli(home, verify, restore=None):
-    """The real CLI in a subprocess, with at most ONE display site put to raw."""
+def _received(home, site, payload):
+    """The `--log` arguments for an R47 site: the payload is in the path shown,
+    or, for the key's read error, in the error the read raises."""
+    if not site.startswith("received_"):
+        return None
+    log = home / "inbox" / "hook"
+    log.mkdir(parents=True)
+    (log / "segment-000001.chain").write_bytes(b"")
+    # A path reaches the CLI through argv, which never carries a lone
+    # surrogate: its bytes arrive surrogate-escaped (\udcXX). Hand the path
+    # over in that form, still undisplayable raw.
+    payload = os.fsdecode(payload.encode("utf-8", "surrogatepass"))
+    if site == "received_log":
+        return {"log": str(home / "inbox" / (payload + "x")), "public_key": None}
+    key = "kept.pub" if site == "received_key_error" else payload + "x.pub"
+    return {"log": str(log), "public_key": str(home / key)}
+
+
+def _run_cli(home, verify, restore=None, cause=None, extra=None):
+    """The real CLI in a subprocess, with at most ONE display site put to raw.
+    `cause` is (site, payload) for a site whose text comes from a failure;
+    `extra` is more arguments, for the R47 `--log` sites."""
     prelude = "import pathlib, sys, types\nfrom sunglasses import cli\n"
+    action = None
+    if cause is not None:
+        inject, action = _CAUSE_SITES[cause[0]]
+        prelude += inject.format(payload=cause[1])
     if restore is not None:
         old, new = _SITE_RESTORES[restore]
         prelude += (
@@ -699,9 +786,10 @@ def _run_cli(home, verify, restore=None):
         )
     code = prelude + (
         f"sys.exit(cli.cmd_receipts(types.SimpleNamespace("
-        f"verify={verify!r}, today=False, limit=40)))\n"
+        f"verify={verify!r}, today=False, limit=40, action={action!r}, "
+        f"**{(extra or dict())!r})))\n"
     )
-    env = dict(os.environ, SUNGLASSES_HOME=str(home))
+    env = _cli_env(home)
     proc = subprocess.run([sys.executable, "-c", code], cwd=TREE,
                           capture_output=True, env=env)
     return proc.returncode, proc.stdout + proc.stderr
@@ -757,13 +845,18 @@ def test_the_matrix_covers_every_display_site():
         f"no restore control.\n  " + "\n  ".join(calls))
 
 
+def _cause(site, payload):
+    return (site, _PAYLOADS[payload]) if site in _CAUSE_SITES else None
+
+
 @pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
 @pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
 def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, payload):
-    """Twenty runtime assertions: ten sites, control bytes and a lone surrogate."""
+    """Two runtime assertions per site: control bytes and a lone surrogate."""
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
-    _code, raw = _run_cli(home, verify)
+    _code, raw = _run_cli(home, verify, cause=_cause(site, payload),
+                          extra=_received(home, site, _PAYLOADS[payload]))
     assert b"Traceback" not in raw, raw.decode("utf-8", "replace")
     _assert_inert(raw)
 
@@ -771,14 +864,16 @@ def test_no_display_site_lets_receipt_bytes_reach_the_terminal(home, site, paylo
 @pytest.mark.parametrize("payload", sorted(_PAYLOADS), ids=sorted(_PAYLOADS))
 @pytest.mark.parametrize("site", sorted(_SITE_RESTORES), ids=sorted(_SITE_RESTORES))
 def test_control_restoring_one_site_replays_it(home, site, payload):
-    """And each of the twenty goes red on its own when that ONE call is raw.
+    """And each of them goes red on its own when that ONE call is raw.
 
     Not the helper globally. The reviewer's finding was a site the global
     mutation could not distinguish from a covered one.
     """
     rows, verify = _fixture(site, _PAYLOADS[payload])
     _write_rows(home, rows)
-    _code, raw = _run_cli(home, verify, restore=site)
+    _code, raw = _run_cli(home, verify, restore=site,
+                          cause=_cause(site, payload),
+                          extra=_received(home, site, _PAYLOADS[payload]))
     if payload == "control":
         assert ESC_ERASE in raw and CURSOR_HOME in raw, (
             f"{site}: restoring this one call did not replay its controls, so "

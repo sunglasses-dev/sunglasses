@@ -22,6 +22,7 @@ import re
 import pathlib
 import threading
 import time
+import uuid
 
 # T9.R2's allowlist. An event outside it cannot be written, for the same reason
 # the client envelope is built by naming fields: a log that accepts any kind is
@@ -52,6 +53,20 @@ TERMINAL_EVENTS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
 # these carried peer-chosen text straight into the evidence.
 _ID_TOKEN = re.compile(r"\A[0-9a-f]{16}\Z")
 _RULE_ID = re.compile(r"\AGLS-[A-Z0-9-]{1,60}\Z")
+# A run's id is its log's name under the state root's receipts/: 32 lowercase
+# hex, from new_run_id(). The writer names the log by this rule and the
+# verifier reads by it (T9 ruling 58): an entry with this name is a run's log,
+# so one that cannot be listed is PATH_UNREADABLE, never "not there".
+_RUN_ID = re.compile(r"\A[0-9a-f]{32}\Z")
+
+
+def new_run_id():
+    """A fresh run id, which is also the name of the run's log."""
+    return uuid.uuid4().hex
+
+
+def is_run_log_name(name):
+    return _RUN_ID.match(name) is not None
 
 # T9.R3's never-list, as field names rather than as a hope. Anything not in the
 # permitted set for an event is dropped, and these are named so a reader can see
@@ -79,6 +94,113 @@ PERMITTED_FIELDS = frozenset({
     "catalog_version", "contract_version",
 })
 
+
+
+# T9 ruling 41. Every variable-length field has its own bound, so a row fits
+# the wire's 16 KiB line BY CONSTRUCTION. rule_ids come from matches on
+# attacker input, and when an oversized row was refused the failure was kept
+# and every later row refused with it: enough matches switched the audit off
+# for the rest of the session. So a long value is cut and the cut is counted,
+# never refused. The writer's line check stays as the invariant; if it fires,
+# the bounds below are wrong, and that is a receipt failure like any other.
+RULE_IDS_KEPT = 256            # the first 256, in the order the engine gave,
+RULE_IDS_BYTES = 6 * 1024      # and the kept ids, each encoded with its quotes,
+                               # total at most this; whichever cuts first (R43)
+LEAVES_KEPT = 8
+FIELD_BYTES = 72               # one encoded value; a sha256 hex digest is 66
+
+
+def _encoded_size(value):
+    return len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+               .encode("utf-8", "surrogatepass"))
+
+
+# T9 ruling 43 part 2. The wire refuses a control character or a lone
+# surrogate, and a peer chooses the strings the proxy writes, so a refusal
+# here was an off switch the peer held. A receipt is never refused for what
+# the peer sent: a control character becomes its JSON escape as text, six
+# characters, so a newline can never split a record; a lone surrogate becomes
+# U+FFFD. Deterministic, counted per field in `sanitized`.
+_CONTROL = re.compile("[\x00-\x1f\x7f]")
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _sanitized(value):
+    """(the value with every replacement made, how many were made)."""
+    if isinstance(value, str):
+        text, controls = _CONTROL.subn(lambda m: "\\u%04x" % ord(m.group()), value)
+        text, surrogates = _SURROGATE.subn("\ufffd", text)
+        return text, controls + surrogates
+    # A container with nothing to replace is returned as it came, so what the
+    # wire accepts or refuses about its shape is unchanged.
+    if isinstance(value, (list, tuple)):
+        pairs = [_sanitized(item) for item in value]
+        count = sum(n for _, n in pairs)
+        return ([item for item, _ in pairs], count) if count else (value, 0)
+    return value, 0
+
+
+# T9 ruling 44. A signed row's keys are OURS, fixed by the schema. Escaping a
+# control character in an object's KEYS can make two keys one (`"a\x00"`
+# escapes to exactly the key `"a\\u0000"`), and the row then keeps one of
+# them with nothing saying the other existed. So a peer object is never
+# spliced into a row as an object: it is written as ONE string, its canonical
+# JSON, or that string's sha256 when over the field's budget, counted in
+# `digested`. ASCII escapes are lossless, so two keys stay two, a control
+# character or a lone surrogate is text, and nothing is replaced to count.
+def _has_object(value):
+    if isinstance(value, dict):
+        return True
+    if isinstance(value, (list, tuple)):
+        return any(_has_object(item) for item in value)
+    return False
+
+
+def _canonical(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=True,
+                      separators=(",", ":"))
+
+
+def _cut_text(text, budget):
+    """The longest prefix of `text` whose encoding fits `budget` bytes."""
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if _encoded_size(text[:middle]) <= budget:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low]
+
+
+def _bounded(value):
+    """(what is written, the original length if it was cut, else None).
+
+    Text keeps its longest prefix that fits. A list or object too large for
+    its field is not written at all, and the marker says how long it was.
+    A value JSON cannot express is passed through for the wire to refuse, as
+    before: that is a caller's bug, not something a peer can send."""
+    if value is None or isinstance(value, (bool, int, float)):
+        return value, None
+    try:
+        if _encoded_size(value) <= FIELD_BYTES:
+            return value, None
+    except (TypeError, ValueError):
+        return value, None
+    if isinstance(value, str):
+        return _cut_text(value, FIELD_BYTES), len(value)
+    return None, len(value)
+
+
+def _kept_rule_ids(rule_ids):
+    kept, used = [], 0
+    for rule_id in rule_ids:
+        cost = _encoded_size(rule_id)
+        if len(kept) == RULE_IDS_KEPT or used + cost > RULE_IDS_BYTES:
+            break
+        kept.append(rule_id)
+        used += cost
+    return kept
 
 
 def _check_value(name, value):
@@ -185,18 +307,27 @@ class Verification:
 class Log:
     """One ordered writer, opened before the first frame."""
 
-    def __init__(self, root, *, run_id, header):
+    def __init__(self, root, *, run_id, header, home=None):
         self.root = pathlib.Path(root) / "receipts"
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.path = self.root / f"{run_id}.jsonl"
+        _make_receipts_dir(self.root)
         self._lock = threading.Lock()
         self._seq = 0
         self._failure = None
         self.on_fsync = None
-        # OPENED NOW, not on the first event. A log created lazily cannot record
-        # a failure that happens before it, which is exactly the window R1 is
-        # closing by saying "opened before the first frame".
-        self._handle = self.path.open("a", encoding="utf-8")
+        self._handle = None
+        # #172, T9 rulings 11 and 24b. Once the user has run `receipts init` the
+        # signed chain IS the log: one chain per run, in the directory beside
+        # where its jsonl would have been. The key lives in the sunglasses home
+        # and nowhere else; `--state-root` moves the log, never the key. With no
+        # key nothing below is imported and the jsonl is what it always was.
+        self._chain = _chain_for(self.root / run_id, home)
+        self.path = (self.root / run_id if self._chain is not None
+                     else self.root / f"{run_id}.jsonl")
+        if self._chain is None:
+            # OPENED NOW, not on the first event. A log created lazily cannot
+            # record a failure that happens before it, which is exactly the
+            # window R1 is closing by saying "opened before the first frame".
+            self._handle = self.path.open("a", encoding="utf-8")
         self._write_row(dict(header or {}), kind="HEADER")
 
     # ── writing ─────────────────────────────────────────────────────────────
@@ -213,7 +344,9 @@ class Log:
                 f"accepts any kind has whatever schema the last caller chose")
         return self._write_row(fields, kind=kind)
 
-    def _write_row(self, fields, *, kind):
+    def _write_row(self, fields, *, kind, seal=None):
+        if self._chain is not None:
+            return self._chain_row(fields, kind=kind, seal=seal)
         with self._lock:
             if self._failure is not None:
                 raise ReceiptIOError(str(self._failure))
@@ -242,17 +375,79 @@ class Log:
             self._seq += 1
             return row
 
+    def _chain_row(self, fields, *, kind, seal):
+        """The same allowlisted fields, as one chain record. The chain keeps
+        the order and the time: `t_mono_ns` is the proxy's clock, an integer,
+        and the wall clock is the writer's. Any failure to append, including a
+        value the wire refuses, is a receipt failure (R4): it is remembered, and
+        every later write stops the session through `record_or_stop`."""
+        body = self._clean(fields)
+        with self._lock:
+            if self._failure is not None:
+                raise ReceiptIOError(str(self._failure))
+            try:
+                self._chain.write([{"event": kind, "body": body,
+                                    "t_mono_ns": time.monotonic_ns()}], seal=seal)
+            except Exception as failure:
+                self._failure = failure
+                # R41: the cause is named. The wire's messages carry field
+                # paths, sizes and bounds, never a value, so naming it here
+                # copies nothing a peer wrote.
+                raise ReceiptIOError(
+                    f"the signed receipt could not be written: "
+                    f"{type(failure).__name__}: {str(failure)[:200]}") from failure
+            self._seq += 1
+            return dict(body, seq=self._seq - 1, kind=kind)
+
     def _clean(self, fields):
         """T9.R3. An allowlist, and provenance reduced to indices and hashes."""
-        clean = {}
+        clean, truncated, sanitized, digested = {}, {}, {}, {}
         for name, value in (fields or {}).items():
             if name in FORBIDDEN_FIELDS or name not in PERMITTED_FIELDS:
                 continue
             if name == "leaf_provenance":
-                clean[name] = [self._leaf(entry) for entry in value or ()]
+                leaves = list(value or ())
+                clean[name] = [self._leaf(entry) for entry in leaves[:LEAVES_KEPT]]
+                if len(leaves) > LEAVES_KEPT:
+                    clean["leaf_provenance_omitted"] = len(leaves) - LEAVES_KEPT
                 continue
+            # Checked whole, THEN cut: the cut decides what is kept, never
+            # what is checked, so a bad id cannot hide past the bound.
             _check_value(name, value)
-            clean[name] = value
+            if name == "rule_ids":
+                clean[name] = _kept_rule_ids(value)
+                if len(clean[name]) < len(value):
+                    clean["rule_ids_omitted"] = len(value) - len(clean[name])
+                continue
+            if _has_object(value):
+                try:
+                    text = _canonical(value)
+                except (TypeError, ValueError):
+                    # Not JSON: a caller's bug, left for the wire to refuse.
+                    clean[name] = value
+                    continue
+                if _encoded_size(text) <= FIELD_BYTES:
+                    clean[name] = text
+                else:
+                    clean[name] = hashlib.sha256(text.encode("ascii")).hexdigest()
+                    digested[name] = len(text)
+                continue
+            # Replaced, THEN cut: the cut measures what is written, and the
+            # count is of what the peer sent, not of what survived the cut.
+            value, replaced = _sanitized(value)
+            if replaced:
+                sanitized[name] = replaced
+            clean[name], cut = _bounded(value)
+            if cut is not None:
+                truncated[name] = cut
+        # Derived here and nowhere else. None of these names is permitted as
+        # input, so a caller cannot claim a cut or a repair that did not happen.
+        if truncated:
+            clean["truncated"] = truncated
+        if sanitized:
+            clean["sanitized"] = sanitized
+        if digested:
+            clean["digested"] = digested
         return clean
 
     @staticmethod
@@ -265,7 +460,7 @@ class Log:
         """
         out = {"index": entry.get("index"), "depth": entry.get("depth"),
                "bytes": entry.get("bytes"),
-               "value_sha256": entry.get("value_sha256")}
+               "value_sha256": _bounded(_sanitized(entry.get("value_sha256"))[0])[0]}
         pointer = entry.get("pointer")
         if pointer is not None:
             out["pointer_sha256"] = hashlib.sha256(
@@ -280,7 +475,14 @@ class Log:
         which is the same rule seen from the other side: there must be no moment
         where the payload is gone and the record is not there.
         """
-        self.event("RELEASE_AUTHORIZED", id_token=id_token)
+        if self._chain is not None:
+            # Signed as well as durable: a `release` checkpoint seals the
+            # authorisation, and the writer fsyncs a checkpoint before it
+            # returns, so the signature is on disk before the first byte leaves.
+            self._write_row({"id_token": id_token}, kind="RELEASE_AUTHORIZED",
+                            seal="release")
+        else:
+            self.event("RELEASE_AUTHORIZED", id_token=id_token)
         self._fsync()
         return write()
 
@@ -288,7 +490,7 @@ class Log:
         try:
             if self.on_fsync is not None:
                 self.on_fsync()
-            else:
+            elif self._handle is not None:
                 os.fsync(self._handle.fileno())
         except Exception as failed:
             self._failure = failed
@@ -313,8 +515,77 @@ class Log:
 
     def close(self):
         with self._lock:
+            if self._chain is not None:
+                # WIRE_SPEC: sign at each observed session close, so a session
+                # that ended leaves nothing unsigned behind it. A chain that has
+                # already failed is not written again.
+                if self._failure is None:
+                    try:
+                        self._chain.close()
+                    except Exception as failure:
+                        self._failure = failure
+                self._chain = _CLOSED
+                return
             if not self._handle.closed:
                 self._handle.close()
+
+
+class _Closed:
+    """A chained log after `close()`: nothing more is written to it."""
+
+    def write(self, events, *, seal=None):
+        raise ReceiptIOError("the receipt log is closed")
+
+    def close(self):
+        pass
+
+
+_CLOSED = _Closed()
+
+
+def _make_receipts_dir(root):
+    """T9 ruling 63 (b). A file, a dangling symlink or a symlink to a file at
+    the receipts directory, at the state root or above it made `mkdir` raise
+    out of `serve.main` as a traceback with no cause named. It is a receipt
+    failure like any other: raised before the session opens, naming what is
+    in the way."""
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError as cause:
+        blocked = None
+        if isinstance(cause, (FileExistsError, NotADirectoryError)):
+            from ..receipts import _fs
+            blocked = root if os.path.lexists(root) else _fs.obstruction(root)
+        where = ("" if blocked is None else
+                 f": {blocked} is not a directory. Fix it: make {blocked} a "
+                 f"directory, chmod 700")
+        raise ReceiptIOError(f"the receipts directory {root} cannot be made "
+                             f"({type(cause).__name__}){where}") from None
+
+
+def _chain_for(directory, home):
+    """The run's chain writer when the user has a key, else None.
+
+    Whether a key exists is one directory listing, so an install without one
+    imports none of the signing code. A key that exists and cannot sign is not
+    a reason to write unsigned rows (R21, R24b): it is a receipt failure, raised
+    here before the session opens, naming the cause and the command that clears
+    it."""
+    if home is None:
+        from ..firewall import sunglasses_home
+        home = sunglasses_home()
+    home = pathlib.Path(home)
+    from ..receipts import optin
+    try:
+        # R21: only `receipts off` opts out. R56: a key or chain directory
+        # that cannot be listed is a receipt failure, never "not opted in".
+        if not optin.opted_in(home):
+            return None
+        signer = optin.signer(home)
+    except (optin.KeyUnusable, OSError) as unusable:
+        raise ReceiptIOError(str(unusable)) from None
+    from ..receipts import chain
+    return chain.Chain(directory, signer, producer="proxy")
 
 
 # ── T9.R5 ──────────────────────────────────────────────────────────────────

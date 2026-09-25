@@ -2,3 +2,8 @@ include README.md
 include LICENSE
 recursive-include attack-db *.json *.md
 recursive-include sunglasses *.py
+include sunglasses/receipts/WIRE_SPEC.md sunglasses/receipts/VECTORS.json
+# The receipts tests and the vector generator are source-tree tools: the tests
+# read the tree, and make_vectors.py fails on import from an installed wheel.
+prune sunglasses/receipts/tests
+exclude sunglasses/receipts/make_vectors.py
