@@ -215,7 +215,9 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
                                 server_id=_identity(upstream_argv))
     except OSError as failure:
         where = failure.filename or state_root(root)
-        stderr.write(f"sunglasses proxy: the approval store at {where} could "
+        what = ("capture store" if pathlib.Path(where).name == "captures"
+                else "approval store")
+        stderr.write(f"sunglasses proxy: the {what} at {where} could "
                      f"not be made, so nothing was started "
                      f"({type(failure).__name__}). Fix it: make {where} a "
                      f"directory you own, chmod 700.\n")
