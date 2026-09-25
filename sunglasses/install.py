@@ -1295,8 +1295,15 @@ def _unlink_under_proof(fh, target, *, owner, retained):
         return False
     try:
         target.unlink()
-    except OSError:
-        pass
+    except OSError as e:
+        # R76. The removal was REFUSED, so the file is still there and the
+        # caller must not go on as if it were gone: both callers remove the
+        # owner file next, and that file is the only proof a later collect
+        # can use. Burning it on a failed unlink left the alias uncollectable
+        # for good, and the call that did it reported nothing retained.
+        _note_retained(retained, target, "could not remove it (%s, %s)" % (
+            type(e).__name__, errno.errorcode.get(e.errno, e.errno)))
+        return False
     return True
 
 
