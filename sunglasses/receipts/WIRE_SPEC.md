@@ -74,7 +74,17 @@ before checking it is checking your own rewrite.
   lowercase hex digits, so a newline can never split a record in two. Each
   lone surrogate becomes U+FFFD. The same input always gives the same
   output, and the record says how many were replaced in `sanitized`, keyed
-  by field (proxy/receipts.py:103-132)
+  by field (proxy/receipts.py:103-126)
+- **a peer's object is one string, never an object in the row (T9 ruling
+  44).** Replacing inside an object's keys could make two keys one: `"a\u0000"`
+  (a real NUL) escapes to exactly the six characters of the key
+  `"a\\u0000"`. So a value that is an object, or a list holding one at any
+  depth, is written as ONE string, its canonical JSON: keys sorted, every
+  character outside printable ASCII as a `\u` escape, no spaces. That is
+  lossless, so two keys stay two, and nothing is replaced or counted in
+  `sanitized`. Over the field's 72 bytes it is written as the sha256 of that
+  string, 64 lowercase hex, and `digested` maps the field to the string's
+  length (proxy/receipts.py:128-146, 407-419)
 
 ## The three domain prefixes
 
@@ -135,7 +145,7 @@ automatically signed on restart** merely because its hashes are consistent; it
 could have been rewritten while the writer was down.
 
 A last line without its terminating LF is a torn write, reported as
-`TRUNCATED_RECORD` (`verify.py:178`), never read as a shorter record.
+`TRUNCATED_RECORD` (`verify.py:225`), never read as a shorter record.
 
 ## The endpoint, and the code most likely to be quoted wrongly
 
@@ -300,6 +310,17 @@ product.
   opens a session with `HEADER`, so none was opened. Not `LIFECYCLE_ORPHAN`,
   since nothing opened, and not `LIFECYCLE_COMPLETE`; neither a pass nor a
   failure (vector 6d).
+- a key outside the closed schema for its record kind is `UNKNOWN_FIELD`
+  (T9 ruling 44), a failure and never a limit: a signed row's keys are the
+  writer's, so an extra one says something no honest writer can say. The
+  kinds are the checkpoint, the envelope of every other record, the genesis
+  body, and the body of a proxy or a hook record, each held in verify.py
+  as a copy of its writer's set (verify.py:66-111, 280-281, 307-328).
+  Inside a proxy body no field holds an object; `leaf_provenance` entries
+  and the markers have their own keys. A body whose chain names no producer
+  is a test vector's and is not judged, though its envelope is. Judged over
+  the verified prefix like the rest, and before the producer's own rules
+  (vectors 19 and 19b).
 
 ## Redaction: what is never signed
 
@@ -353,15 +374,15 @@ is not a chain and this spec does not cover it.
   `PERMITTED_FIELDS` (proxy/receipts.py:64-82) is dropped without a note.
 - The values of `reason_code`, `status`, `method`, `rule_ids`, `id_token` and
   `rule` are checked against the proxy's own catalog or grammar, and a value
-  outside is refused, never trimmed (proxy/receipts.py:177-227). The whole
+  outside is refused, never trimmed (proxy/receipts.py:191-241). The whole
   value is checked before any cut, so a bad entry cannot hide past a bound.
 - `leaf_provenance` keeps index, depth, byte count and the value's digest; the
   JSON pointer is hashed to `pointer_sha256`, never carried (proxy/receipts.py:
-  410-424). No caller writes it at this head.
+  438-453). No caller writes it at this head.
 - **A row fits its line by construction (T9 ruling 41).** A long value is cut
   and the cut is counted, never refused, because the values come from matches
   on what a peer sent and a refusal would stop the audit for the rest of the
-  session (proxy/receipts.py:84-174, 373-407):
+  session (proxy/receipts.py:84-188, 387-436):
   - `rule_ids` keeps the first 256 in the order the engine gave, and the
     kept ids, each encoded with its quotes, total at most 6 KiB; whichever
     cuts first (T9 ruling 43). `rule_ids_omitted` counts every id left out,
@@ -369,15 +390,17 @@ is not a chain and this spec does not cover it.
     characters, so 256 of them are kept whole.
   - `leaf_provenance` keeps the first 8 entries; the rest are counted in
     `leaf_provenance_omitted`.
+  - a field holding an object is its canonical JSON or that string's
+    digest, as the canonicalisation section says, counted in `digested`.
   - every other field is first replaced as the canonicalisation section
     says, counted in `sanitized`, and then keeps at most 72 bytes once
-    encoded. Text keeps its longest prefix that fits; a longer list or
-    object is written as `null`. Either way `truncated` maps the field to
-    the length it had when it was cut.
-  - the four markers are derived by the writer and are not permitted input,
+    encoded. Text keeps its longest prefix that fits; a longer list is
+    written as `null`. Either way `truncated` maps the field to the length
+    it had when it was cut.
+  - the five markers are derived by the writer and are not permitted input,
     so a caller cannot claim a cut or a repair that did not happen.
 - The chained body is the same cleaned fields, plus the proxy's `t_mono_ns`
-  (proxy/receipts.py:349-371). The 16 KiB line check stays as the invariant,
+  (proxy/receipts.py:363-385). The 16 KiB line check stays as the invariant,
   and a test feeds every permitted field at its worst to show nothing reaches
   it. If it ever fires, the bounds above are wrong: like any other failure to
   append, it stops the session as a receipt failure (R4), the refusal is kept
