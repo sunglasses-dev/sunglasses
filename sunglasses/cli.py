@@ -1371,7 +1371,7 @@ def _verify_chains(logs, args, home, public=None):
                                    expected_endpoint=mine)
         print(verify.render_log(report, name=_log_label(log)))
         code = codes.combine_exits(
-            [code, codes.exit_code(report.results, strict=args.strict)])
+            code, codes.exit_code(report.results, strict=args.strict))
     print()
     return code
 
@@ -1524,18 +1524,19 @@ def cmd_receipts(args):
                 unparseable.append((path, lineno, _unreadable_preview(line)))
 
     if getattr(args, "verify", False):
+        from .receipts import codes
+        # One combiner for the key, the legacy log and the chains (T9 ruling
+        # 50): a verdict joins the ones before it and never replaces them.
         code = _verify_key(sunglasses_home())
         if files:
             # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
-            # exit code is the lifecycle verdict it always had.
+            # lifecycle verdict is the one it always had, joined to the key's.
             print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
                   f"{YELLOW}LEGACY_UNSIGNED{RESET} {DIM}-- predates signing; "
                   f"integrity status unknown, not clean{RESET}")
-            code = _verify_lifecycle(rows, directory, unparseable)
+            code = codes.combine_exits(code, _verify_lifecycle(rows, directory, unparseable))
         if chain_logs:
-            # A failure anywhere wins, then a usage error, then a limit (R48).
-            chains = _verify_chains(chain_logs, args, sunglasses_home())
-            code = next((c for c in (1, 2, 3) if c in (code, chains)), 0)
+            code = codes.combine_exits(code, _verify_chains(chain_logs, args, sunglasses_home()))
         return code
 
     # A receipts file is bytes on disk: it may predate the write-side sanitize

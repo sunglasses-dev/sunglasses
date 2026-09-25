@@ -150,7 +150,7 @@ def test_exits_across_logs_combine_failure_over_limit(exits, combined):
     # max() would make a limit (3) outrank a failure (1).
     limit = codes.EXIT_LIMIT
     exits = [limit if e == "L" else e for e in exits]
-    assert codes.combine_exits(exits) == (limit if combined == "L" else combined)
+    assert codes.combine_exits(*exits) == (limit if combined == "L" else combined)
 
 
 # ── (c) the spec states the exits, the strict rule and the class test ───────

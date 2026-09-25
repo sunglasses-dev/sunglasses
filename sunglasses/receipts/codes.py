@@ -187,10 +187,11 @@ def strict_exit_code(results: dict) -> int:
     return exit_code(results, strict=True)
 
 
-def combine_exits(exits) -> int:
-    """One exit for several logs: any failure wins, then any limit. Not max(),
-    which would let a limit (3) outrank a failure (1)."""
-    exits = list(exits)
-    if EXIT_FAIL in exits or any(e not in (EXIT_OK, EXIT_LIMIT) for e in exits):
+def combine_exits(*exits) -> int:
+    """One exit for several verdicts: the key, a legacy log, every chain
+    (T9 ruling 50). Any failure wins, then a usage error, then any limit. Not
+    max(), which would let a limit (3) outrank a failure (1). A value outside
+    the table is a failure."""
+    if any(e not in (EXIT_OK, EXIT_USAGE, EXIT_LIMIT) for e in exits):
         return EXIT_FAIL
-    return EXIT_LIMIT if EXIT_LIMIT in exits else EXIT_OK
+    return next((e for e in (EXIT_USAGE, EXIT_LIMIT) if e in exits), EXIT_OK)
