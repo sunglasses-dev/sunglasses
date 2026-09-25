@@ -542,6 +542,66 @@ def test_the_next_call_tries_the_marker_again(tmp_path, monkeypatch, how):
     assert "LOG_MISSING" not in text and "LOG_UNMARKED" not in text, text
 
 
+_CAUSE = {"eacces": "Permission denied", "enospc-create": os.strerror(errno.ENOSPC),
+          "enospc-write": os.strerror(errno.ENOSPC)}
+
+
+@pytest.mark.parametrize("how", _FAULTS)
+def test_the_ask_names_the_cause_not_only_the_marker(tmp_path, monkeypatch, how):
+    """T9 ruling 64 (a): the ask names why, so the reader knows what to fix."""
+    home = _keyed(tmp_path)
+    undo = _fault(monkeypatch, home, how)
+    try:
+        out = run_hook(_call(0), home=home)["hookSpecificOutput"]
+    finally:
+        undo()
+    reason = out["permissionDecisionReason"]
+    assert out["permissionDecision"] == "ask", out
+    assert MARKER in reason and _CAUSE[how] in reason, reason
+
+
+def _real_hook(home, payload):
+    """The REAL entry point the host runs: a decision on stdout, and its exit."""
+    proc = subprocess.run([sys.executable, "-m", "sunglasses.firewall"],
+                          input=payload, cwd=TREE, env=_env(home),
+                          capture_output=True, text=True)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a 0500 dir")
+@pytest.mark.parametrize("unmarked", [False, True], ids=["fresh", "upgrader"])
+def test_the_real_hook_exits_zero_asking_and_the_next_call_retries(tmp_path, request, unmarked):
+    """T9 ruling 64 (a), end to end: exit 0 with the named ask, no segment,
+    no marker; then the same entry, with keys/ writable again, marks the log.
+    Both at a fresh genesis and for a log begun before the marker existed.
+    The named reason is what separates this ask from the hook's belt, which
+    also exits 0 asking but names only an exception type."""
+    if unmarked:
+        home = request.getfixturevalue("opted_in")
+        _unmark_and_tear(home)
+    else:
+        home = _keyed(tmp_path)
+    before = _segments(home / "receipts" / "hook")
+    (home / keys.KEY_DIR).chmod(0o500)
+    try:
+        code, stdout, stderr = _real_hook(home, _call(3))
+    finally:
+        (home / keys.KEY_DIR).chmod(0o700)
+    assert code == 0, (code, stderr[-400:])
+    out = json.loads(stdout)["hookSpecificOutput"]
+    assert out["permissionDecision"] == "ask", out
+    reason = out["permissionDecisionReason"]
+    assert "GLS-FW-HOOK-FAULT" not in reason and MARKER in reason, reason
+    assert "Permission denied" in reason, reason
+    assert _segments(home / "receipts" / "hook") == before
+    assert _markers(home) == []
+    code, stdout, stderr = _real_hook(home, _call(4))
+    assert code == 0, (code, stderr[-400:])
+    assert json.loads(stdout).get("hookSpecificOutput", {}).get("permissionDecision") != "ask", stdout
+    (marker,) = _markers(home)
+    assert wire.decode_strict(marker.read_bytes())["chain_id"] in _hook_ids(home)
+
+
 def _unmark_and_tear(home):
     """A hook log begun before the marker existed, whose tail is torn."""
     for marker in _markers(home):
