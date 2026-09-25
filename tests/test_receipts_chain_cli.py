@@ -4,8 +4,9 @@ signed chains (#172).
 
 T9 RULING 11: the chain IS the log when enabled. With the extra missing, or
 before the user has run `receipts init`, nothing changes for an existing
-install, and `--verify` calls a legacy log UNSIGNED, never a failure. The key is
-made only by an explicit `receipts init`, never on a first write.
+install, and `--verify` names a legacy log LOG_UNCHAINED, a limit, never a
+failure (T9 ruling 60). The key is made only by an explicit `receipts init`,
+never on a first write.
 
 T9 RULING 15: one chain per log, each verified alone with its own five results.
 The key that sits beside a log gives portability, not trust: it is reported
@@ -110,26 +111,26 @@ def test_init_without_the_extra_says_what_to_install_and_makes_nothing(home, no_
     assert not (home / "keys").exists()
 
 
-# ── --verify on a legacy log: UNSIGNED, never a failure ──────────────────────
+# ── --verify on a legacy log: LOG_UNCHAINED, never a failure ─────────────────
 
-def test_a_legacy_log_is_called_unsigned_and_its_exit_code_is_unchanged(home):
+def test_a_legacy_log_is_called_unchained_and_exits_on_the_limit(home):
     _legacy(home)
     code, out = _cli(home, "--verify")
-    assert code == 0, out                         # the lifecycle verdict, as before
-    assert "LEGACY_UNSIGNED" in out
+    assert code == 3, out                         # the lifecycle verdict joined to the limit
+    assert "LOG_UNCHAINED" in out
     assert "No orphans." in out
 
 
-def test_without_the_extra_a_legacy_log_verifies_exactly_as_before(home, no_crypto):
+def test_without_the_extra_a_legacy_log_verifies_as_with_it(home, no_crypto):
     _legacy(home)
     code, out = _cli(home, "--verify", no_crypto=no_crypto)
-    assert code == 0, out
-    assert "LEGACY_UNSIGNED" in out
+    assert code == 3, out
+    assert "LOG_UNCHAINED" in out
     assert "No orphans." in out
 
 
 def test_a_legacy_orphan_still_fails_beside_a_chain_that_passes(home):
-    """UNSIGNED is not a failure; an orphan in the legacy log still is."""
+    """UNCHAINED is not a failure; an orphan in the legacy log still is."""
     d = home / "receipts"
     d.mkdir(parents=True)
     (d / "2026-09-24.jsonl").write_text(json.dumps(
@@ -137,7 +138,7 @@ def test_a_legacy_orphan_still_fails_beside_a_chain_that_passes(home):
          "tool_name": "Bash"}) + "\n")
     code, out = _cli(home, "--verify")
     assert code == 1
-    assert "LEGACY_UNSIGNED" in out
+    assert "LOG_UNCHAINED" in out
     assert "orphan" in out
 
 # ── --verify on a chain: five results per log, printed per log ───────────────
@@ -202,7 +203,7 @@ def test_an_edited_chain_fails_and_a_clean_legacy_log_does_not_hide_it(home):
     code, out = _cli(home, "--verify", "--fingerprint", fp)
     assert code == 1
     assert "chain_integrity: CHAIN_OK" not in out.split("-- segment")[0]
-    assert "LEGACY_UNSIGNED" in out
+    assert "LOG_UNCHAINED" in out
 
 
 def test_each_log_is_verified_alone(home):

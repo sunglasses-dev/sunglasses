@@ -38,6 +38,7 @@ except ImportError:
 
 GENESIS = "genesis"
 CHECKPOINT = "checkpoint"
+MARKER_EVENT = "log_genesis"
 SEGMENT_GLOB = "segment-*.chain"
 PRODUCER_FIELDS = {"event", "body", "t_mono_ns"}
 _CHUNK = 1 << 16
@@ -60,7 +61,7 @@ class _Tail:
 class Chain:
     def __init__(self, directory, signer, *, producer: str, interval: int = 100,
                  max_records: int = 1_000_000, max_bytes: int = 256 << 20,
-                 clock=time.time_ns):
+                 clock=time.time_ns, marker=None):
         if signer is None:
             raise ValueError("no key: no chain is written (spec §2)")
         if isinstance(interval, bool) or not isinstance(interval, int) or interval < 1:
@@ -74,6 +75,9 @@ class Chain:
         self._max_records = max_records
         self._max_bytes = max_bytes
         self._clock = clock
+        # Where this log's genesis marker goes (T9 ruling 60), or None for a log
+        # that has none. Written once, at the first genesis, never rewritten.
+        self._marker = None if marker is None else pathlib.Path(marker)
         # (path, size, head) at the end of OUR last write, while the unsigned
         # suffix there is ours. Anything else on disk is not ours to seal.
         self._mine = None
@@ -206,6 +210,8 @@ class Chain:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         os.close(fd)
         self._append(path, [(line, False)] + pieces)
+        if previous is None and self._marker is not None:
+            self._write_marker(genesis)
         return self._read_tail()
 
     # -- building and writing --------------------------------------------------
@@ -281,6 +287,28 @@ class Chain:
             yield
         finally:
             os.close(fd)                   # closing releases the lock
+
+    def _write_marker(self, genesis) -> None:
+        """One signed line naming the chain this log first opened with, written
+        after its genesis is on disk so it never names a chain that is not. A
+        marker already there is never an error and never replaced (R60 a): a
+        log wiped and begun again opens another chain, and the verifier says
+        the one the marker names is missing."""
+        record = {"wire": wire.WIRE_VERSION, "event": MARKER_EVENT,
+                  "log": self._dir.name, "chain_id": genesis["chain_id"],
+                  "key_id": genesis["key_id"], "t_wall_ns": genesis["t_wall_ns"]}
+        signature = self._signer.sign(wire.marker_signing_bytes(record))
+        line = wire.encode(dict(record, signature=signature.hex()))
+        try:
+            fd = os.open(self._marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            return
+        try:
+            _write_all(fd, line)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _fsync_dir(self._marker.parent)
 
 
 @dataclasses.dataclass

@@ -9,9 +9,11 @@ stays the CLI's usage exit. `--strict` turns a limit into 1.
 
 A code with no tag is a code whose exit nobody decided, so the enumeration test
 goes red the moment one is added to CODES without a class, and a result that is
-not a known code at all exits 1. The seven limits are named here one by one,
+not a known code at all exits 1. The eight limits are named here one by one,
 so moving a code between classes is a red too. NO_LOG, the seventh, is a
-`--verify` that found nothing on disk to verify (T9 ruling 53).
+`--verify` that found nothing on disk to verify (T9 ruling 53). LOG_UNCHAINED,
+the eighth, is a log the home walk found with no chain and nothing to say it
+should have one (T9 ruling 60).
 """
 import json
 import os
@@ -27,7 +29,7 @@ from sunglasses.receipts import codes
 TREE = pathlib.Path(__file__).resolve().parents[1]
 
 LIMITS = {"PAIRING_UNKEYED", "EMPTY_CHAIN", "NO_SESSION", "ROTATION_UNSUPPORTED",
-          "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN", "NO_LOG"}
+          "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN", "NO_LOG", "LOG_UNCHAINED"}
 OKS = {"KEY_TRUSTED", "CHAIN_OK", "NO_VISIBLE_TAIL", "ENDPOINT_CONFIRMED",
        "LIFECYCLE_COMPLETE"}
 
@@ -81,11 +83,11 @@ def test_the_control_a_tag_for_a_code_that_does_not_exist_is_found():
 
 
 @pytest.mark.parametrize("code", sorted(LIMITS))
-def test_each_of_the_seven_limits_is_a_limit(code):
+def test_each_of_the_eight_limits_is_a_limit(code):
     assert codes.CLASS[code] == codes.LIMIT
 
 
-def test_the_limit_class_is_exactly_the_seven():
+def test_the_limit_class_is_exactly_the_eight():
     assert {c for c, t in codes.CLASS.items() if t == codes.LIMIT} == LIMITS
 
 
@@ -96,7 +98,7 @@ def test_the_ok_class_is_the_five_passing_results():
 @pytest.mark.parametrize("code", [
     "UNKNOWN_FIELD", "SEQUENCE_GAP", "LIFECYCLE_ORPHAN", "KEY_UNUSABLE",
     "LEGACY_UNSIGNED", "PREDECESSOR_UNAVAILABLE", "SUCCESSOR_ASSERTED",
-    "SUCCESSOR_ENDORSED", "PATH_UNREADABLE"])
+    "SUCCESSOR_ENDORSED", "PATH_UNREADABLE", "LOG_MISSING"])
 def test_these_are_failures(code):
     assert codes.CLASS[code] == codes.FAIL
 

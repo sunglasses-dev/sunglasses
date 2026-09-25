@@ -1743,7 +1743,8 @@ class _HookReceipts:
             # One writer for both records: its in-memory note of the opening
             # it wrote is what lets the close seal it (R15d).
             self._chain = chain.Chain(self.home / "receipts" / "hook",
-                                      signer, producer="hook")
+                                      signer, producer="hook",
+                                      marker=optin.hook_marker(self.home))
         return self._chain
 
     def opening(self, row: dict) -> None:

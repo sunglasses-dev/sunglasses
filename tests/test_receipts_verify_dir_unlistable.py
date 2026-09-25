@@ -286,7 +286,6 @@ def test_the_control_a_stray_file_under_receipts_is_still_ignored(home, strict):
 
 
 STRAYS = [pytest.param("notes.txt", "file", id="notes_txt"),
-          pytest.param("ab" * 16 + ".jsonl", "file", id="unchained_run_jsonl"),
           pytest.param("AB" * 16, "file", id="uppercase_hex_file"),
           pytest.param("ab" * 15, "file", id="short_hex_file"),
           pytest.param("junk", "dir", id="non_hex_empty_dir")]
@@ -296,8 +295,9 @@ STRAYS = [pytest.param("notes.txt", "file", id="notes_txt"),
 @pytest.mark.parametrize("name, kind", STRAYS)
 def test_the_control_a_stray_under_the_proxy_receipts_is_still_ignored(home, proxy_run,
                                                                       name, kind, strict):
-    """A run's unchained `<run id>.jsonl` reads exactly as at 44e1dae7, and a
-    name that is not a run id is not a log: the two healthy logs read."""
+    """A name that is not a run id is not a log: the two healthy logs read.
+    A run's unchained `<run id>.jsonl` is a log since T9 ruling 60, named as
+    LOG_UNCHAINED (tests/test_receipts_log_missing_and_run_jsonl.py)."""
     stray = proxy_run.parent / name
     stray.mkdir() if kind == "dir" else stray.write_bytes(b"not a log\n")
     rc, out = _receipts(home, "--verify", *strict)

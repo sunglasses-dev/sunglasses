@@ -86,7 +86,7 @@ before checking it is checking your own rewrite.
   string, 64 lowercase hex, and `digested` maps the field to the string's
   length (proxy/receipts.py:128-146, 407-419)
 
-## The three domain prefixes
+## The four domain prefixes
 
 Frozen. Changing one is a new format version, never an edit: every previously
 signed checkpoint verifies under the domain it was signed with, and a silent
@@ -97,6 +97,7 @@ change makes old history look forged.
 | record chain hash | `sunglasses-receipt-chain/1\x00record\x00` |
 | checkpoint signature | `sunglasses-receipt-chain/1\x00checkpoint\x00` |
 | key fingerprint | `sunglasses-receipt-key/1\x00ed25519\x00` |
+| hook log marker signature (T9 ruling 60) | `sunglasses-receipt-chain/1\x00marker\x00` |
 
 Separate domains mean the same bytes can never be presented as the other kind.
 
@@ -108,6 +109,9 @@ Separate domains mean the same bytes can never be presented as the other kind.
 - **checkpoint signature** = Ed25519 over the checkpoint domain prefix plus the
   checkpoint's canonical record with **only its `signature` member omitted**,
   followed by one LF. Without omitting it the signature would cover itself.
+- **marker signature** = Ed25519 over the marker domain prefix plus the hook
+  log marker's canonical record with **only its `signature` member omitted**,
+  followed by one LF (T9 ruling 60).
 - **predecessor** covers checkpoint signatures too. The completed signed
   checkpoint becomes the next predecessor.
 - **covered head** is the previous record's hash.
@@ -207,11 +211,13 @@ LIMIT = verifier could not conclude because the CALLER did not supply something 
 - **ok**: the result holds. `KEY_TRUSTED`, `CHAIN_OK`, `NO_VISIBLE_TAIL`,
   `ENDPOINT_CONFIRMED` and `LIFECYCLE_COMPLETE`.
 - **limit**: `KEY_UNTRUSTED`, `HISTORY_EXTENT_UNKNOWN`, `PAIRING_UNKEYED`,
-  `EMPTY_CHAIN`, `NO_SESSION`, `ROTATION_UNSUPPORTED` and `NO_LOG`. A limit is
-  neither a pass nor a failure, and it is never a pass.
+  `EMPTY_CHAIN`, `NO_SESSION`, `ROTATION_UNSUPPORTED`, `NO_LOG` and
+  `LOG_UNCHAINED` (T9 ruling 60). A limit is neither a pass nor a failure, and
+  it is never a pass.
 - **fail**: every other code, including `UNKNOWN_FIELD` (T9 ruling 44),
-  `KEY_UNUSABLE`, `LEGACY_UNSIGNED`, `PATH_UNREADABLE` (T9 ruling 57) and the
-  rotation codes a verifier does not emit yet.
+  `KEY_UNUSABLE`, `LEGACY_UNSIGNED`, `PATH_UNREADABLE` (T9 ruling 57),
+  `LOG_MISSING` (T9 ruling 60) and the rotation codes a verifier does not emit
+  yet.
 
 The exit, over every result of every log verified:
 
@@ -250,8 +256,32 @@ log when it holds segments, and one the verifier cannot list is
 `PATH_UNREADABLE` too. A known name that is a listable directory with no
 segments is passed over without a warning, as before. A `--log PATH` the
 verifier cannot list is `PATH_UNREADABLE`; no name rule applies to it. Any
-other entry that is not a directory is not a log and is passed over, and so is
-a run's unchained `<run id>.jsonl`, exactly as before.
+other entry that is not a directory is not a log and is passed over.
+
+A log with no chain (T9 ruling 60). A proxy run in a home with no key writes
+its rows to `<run id>.jsonl` under the proxy's `receipts/`, and a hook that
+predates signing writes day files under the home's `receipts/`. `--verify`
+names each one `LOG_UNCHAINED`, a limit, so exit 3 and 1 under `--strict`,
+joined to the day files' lifecycle verdict. The walk found these logs and
+nothing says they should have been signed. The claim decides the exit, so a
+log the caller supplies with `--log` that carries no chain is a failure. Plain
+`receipts` names a run's `.jsonl` too, and stays exit 0.
+
+The hook log's marker (T9 ruling 60). At the hook chain's first genesis the
+writer creates `keys/log-hook.genesis` with `O_EXCL`. It holds one canonical
+line with exactly the members `chain_id`, `event` (`log_genesis`), `key_id`,
+`log` (`hook`), `signature`, `t_wall_ns` and `wire`, naming that chain and the
+time its genesis carries, signed under the marker domain. `receipts init`
+never writes it. A marker already there is never replaced and never deleted,
+and it is never an error for the writer. Under `--verify` a marker whose chain
+opens no segment of `receipts/hook` is `LOG_MISSING`, a failure in both modes,
+because the log was begun and is gone or was wiped and begun again. A marker
+that cannot be read is `PATH_UNREADABLE`. One that is not canonical, carries
+another member, names another log or does not verify under its key is a
+failure naming why, and never `LOG_MISSING`. With no marker, a hook log with
+no segments stays `NO_LOG`. The marker belongs to its chain, and rotation,
+when built, retires it with the chain. Proxy runs carry no marker until
+0.6.2, so an emptied run directory is passed over as stated above.
 
 ## The vectors
 
@@ -278,71 +308,71 @@ the commit that moved it.
 
 A segment is one file, `segment-NNNNNN.chain` (six digits, from 000001),
 created 0600 with `O_EXCL` in a 0700 directory beside a `LOCK` file that every
-write holds with `flock(LOCK_EX)` (chain.py:183, :206, :277-280). Its first
+write holds with `flock(LOCK_EX)` (chain.py:187, :210, :283-286). Its first
 line is a genesis and its second a checkpoint with purpose `genesis`
-(chain.py:205).
+(chain.py:209).
 
 ### genesis
 
 | field | value | where |
 |---|---|---|
-| `wire` | `sg-receipt-chain/1` | chain.py:197 |
-| `chain_id` | 32 lowercase hex, fresh per segment (`secrets.token_hex(16)`) | chain.py:184, :197 |
-| `key_id` | the signing key's fingerprint | chain.py:198 |
-| `seq` | `0` | chain.py:198 |
-| `prev_hash` | `null`, the only null predecessor in a segment | chain.py:199 |
-| `event` | `genesis` | chain.py:199 |
-| `producer` | the writer's producer name; the callers pass `hook` or `proxy`, and a writer refuses a directory whose genesis names another (R15) | chain.py:200, :87-92 |
-| `t_wall_ns` | integer, the writer's wall clock, not trusted time | chain.py:200 |
-| `body` | `{}` for a log's first segment, else the predecessor object below | chain.py:185-201 |
+| `wire` | `sg-receipt-chain/1` | chain.py:201 |
+| `chain_id` | 32 lowercase hex, fresh per segment (`secrets.token_hex(16)`) | chain.py:188, :201 |
+| `key_id` | the signing key's fingerprint | chain.py:202 |
+| `seq` | `0` | chain.py:202 |
+| `prev_hash` | `null`, the only null predecessor in a segment | chain.py:203 |
+| `event` | `genesis` | chain.py:203 |
+| `producer` | the writer's producer name; the callers pass `hook` or `proxy`, and a writer refuses a directory whose genesis names another (R15) | chain.py:204, :91-96 |
+| `t_wall_ns` | integer, the writer's wall clock, not trusted time | chain.py:204 |
+| `body` | `{}` for a log's first segment, else the predecessor object below | chain.py:189-205 |
 
 A successor's genesis `body` carries `previous`, the `{chain_id, seq, hash}`
 of the last checkpoint that verifies in the segment before it (`seq` and
 `hash` are `null` when none does), and `observed_unsigned`, the count of
 complete records seen after that checkpoint. When they apply it also carries
 `observed_torn_bytes` (bytes after the last LF) and `observed_undecodable:
-true` (chain.py:186-194). These are observations and never a vouch: the
+true` (chain.py:190-198). These are observations and never a vouch: the
 successor signs nothing that came after that checkpoint.
 
 ### event
 
 | field | value | where |
 |---|---|---|
-| `wire` | `sg-receipt-chain/1` | chain.py:249 |
-| `chain_id` | the segment's | chain.py:249 |
-| `key_id` | the signing key's fingerprint | chain.py:250 |
-| `seq` | previous `seq` + 1 | chain.py:250 |
-| `prev_hash` | the chain hash of the previous line | chain.py:251 |
-| `event` | the producer's event name, never `genesis` or `checkpoint` | chain.py:251, :217 |
-| `producer` | as in the genesis | chain.py:252 |
-| `t_wall_ns` | integer, the writer's wall clock | chain.py:252 |
-| `body` | an object: the producer's allowed fields (see Redaction) | chain.py:253 |
-| `t_mono_ns` | integer, optional: the producer's monotonic clock (the proxy sets it) | chain.py:254-255 |
+| `wire` | `sg-receipt-chain/1` | chain.py:255 |
+| `chain_id` | the segment's | chain.py:255 |
+| `key_id` | the signing key's fingerprint | chain.py:256 |
+| `seq` | previous `seq` + 1 | chain.py:256 |
+| `prev_hash` | the chain hash of the previous line | chain.py:257 |
+| `event` | the producer's event name, never `genesis` or `checkpoint` | chain.py:257, :223 |
+| `producer` | as in the genesis | chain.py:258 |
+| `t_wall_ns` | integer, the writer's wall clock | chain.py:258 |
+| `body` | an object: the producer's allowed fields (see Redaction) | chain.py:259 |
+| `t_mono_ns` | integer, optional: the producer's monotonic clock (the proxy sets it) | chain.py:260-261 |
 
 A producer supplies only `event`, `body` and `t_mono_ns`. Any other field is
 refused before anything is written, so the envelope is always the writer's
-(chain.py:42, :213-216).
+(chain.py:43, :219-222).
 
 ### checkpoint
 
 | field | value | where |
 |---|---|---|
-| `chain_id` | the segment's | chain.py:240 |
-| `covered_head` | equal to `prev_hash`: the head this signature commits to | chain.py:240 |
-| `covered_seq` | `seq` - 1 | chain.py:241 |
-| `event` | `checkpoint` | chain.py:241 |
-| `interval` | the writer's interval, an integer of at least 1, so the cadence is inside the signed bytes | chain.py:242, :66 |
-| `key_id` | the signing key's fingerprint | chain.py:242 |
-| `prev_hash` | the chain hash of the previous line | chain.py:243 |
-| `purpose` | `genesis`, `interval`, `close`, or a producer's seal name | chain.py:243, :257-260 |
-| `seq` | previous `seq` + 1 | chain.py:243 |
-| `wire` | `sg-receipt-chain/1` | chain.py:244 |
-| `signature` | 128 lowercase hex: Ed25519 as in Hashing and signing | chain.py:245-246 |
+| `chain_id` | the segment's | chain.py:246 |
+| `covered_head` | equal to `prev_hash`: the head this signature commits to | chain.py:246 |
+| `covered_seq` | `seq` - 1 | chain.py:247 |
+| `event` | `checkpoint` | chain.py:247 |
+| `interval` | the writer's interval, an integer of at least 1, so the cadence is inside the signed bytes | chain.py:248, :67 |
+| `key_id` | the signing key's fingerprint | chain.py:248 |
+| `prev_hash` | the chain hash of the previous line | chain.py:249 |
+| `purpose` | `genesis`, `interval`, `close`, or a producer's seal name | chain.py:249, :263-266 |
+| `seq` | previous `seq` + 1 | chain.py:249 |
+| `wire` | `sg-receipt-chain/1` | chain.py:250 |
+| `signature` | 128 lowercase hex: Ed25519 as in Hashing and signing | chain.py:251-252 |
 
 A checkpoint has no `producer`, `t_wall_ns` or `body`. An `interval`
-checkpoint is written once `interval` records are unsigned (chain.py:257-258).
+checkpoint is written once `interval` records are unsigned (chain.py:263-264).
 A `genesis` or `close` seal is written even over nothing, and any other
-purpose only over at least one unsigned record (chain.py:259-260).
+purpose only over at least one unsigned record (chain.py:265-266).
 
 ### The vocabulary a verifier judges
 
@@ -390,7 +420,7 @@ writer sees a body. Paths are relative to `sunglasses/`.
 Each producer builds its own body from an allowlist. The writer adds only the
 envelope (see Record fields) and refuses any other top level field.
 
-**The hook** (`receipts/hook_rows.py`, called from firewall.py:1741 and :1748)
+**The hook** (`receipts/hook_rows.py`, called from firewall.py:1742 and :1749)
 
 - An allowlist with a grammar per field (hook_rows.py:64-83). `in_flight`
   carries `eval_id` (16 hex), `tool_name`, `session_id` (printable, at most 256
@@ -531,9 +561,9 @@ key, and `sunglasses receipts --verify` checks both.
   failure until rotation is built.
 - The standalone offline bundle. The verifier is the one in this package.
 - A streaming verifier. The verifier reads one whole segment into memory, and
-  a segment is at most 256 MiB (`chain.py:62`).
+  a segment is at most 256 MiB (`chain.py:63`).
 - An upper bound on the checkpoint interval. The writer refuses an interval
-  that is not a positive integer (`chain.py:66`) and accepts any larger one.
+  that is not a positive integer (`chain.py:67`) and accepts any larger one.
 - Concurrency between hook and proxy beyond their separate chains, and the
   durable release gate. ASTRA's acceptance groups remain requirements until a
   review says otherwise.
