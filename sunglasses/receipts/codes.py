@@ -86,6 +86,11 @@ CODES = {
     "UNKNOWN_EVENT":
         "an event outside this verifier's vocabulary; its meaning is not "
         "judged, and chain integrity is unaffected",
+    "UNKNOWN_FIELD":
+        "a signed record carries a key outside the closed schema for its "
+        "record kind (T9 ruling R44). A signed row's keys are the writer's, "
+        "fixed by the schema, so an extra one is a failure, never a limit; "
+        "chain integrity is unaffected.",
 }
 
 # Exactly what a verifier prints about what a valid signature means. ASTRA's
@@ -125,7 +130,7 @@ def strict_exit_code(results: dict) -> int:
         "HISTORY_EXTENT_UNKNOWN", "EXPECTED_CHECKPOINT_MISSING",
         "CHECKPOINT_MISMATCH", "MISSING_GENESIS", "SEGMENT_MISSING",
         "LIFECYCLE_ORPHAN", "LIFECYCLE_DUPLICATE", "LEGACY_UNSIGNED",
-        "UNKNOWN_EVENT", "ROTATION_UNSUPPORTED",
+        "UNKNOWN_EVENT", "UNKNOWN_FIELD", "ROTATION_UNSUPPORTED",
     }
     for kind in RESULT_KINDS:
         if results.get(kind) in failing:

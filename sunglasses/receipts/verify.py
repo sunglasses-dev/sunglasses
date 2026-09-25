@@ -63,6 +63,53 @@ PROXY_EVENTS = frozenset({
 })
 PROXY_TERMINALS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
 
+# T9 ruling 44. A signed record's keys are the writer's, fixed by its schema,
+# so the key set is CLOSED per record kind and a key outside it is
+# UNKNOWN_FIELD, a failure: a quiet overwrite or a "first key wins" would let
+# the row say something its writer never built. A schema maps each key to
+# None (a scalar, or a list of scalars) or to the schema of the object it
+# holds (or of each object in its list). Copies of the writers' sets, held
+# equal by tests, since this verifier imports nothing from the product.
+ENVELOPE = frozenset({"wire", "chain_id", "key_id", "seq", "prev_hash", "event",
+                      "producer", "t_wall_ns", "t_mono_ns", "body"})
+CHECKPOINT_KEYS = frozenset({"wire", "chain_id", "key_id", "seq", "prev_hash",
+                             "event", "covered_head", "covered_seq", "interval",
+                             "purpose", "signature"})
+GENESIS_BODY = {"previous": {"chain_id": None, "seq": None, "hash": None},
+                "observed_unsigned": None, "observed_torn_bytes": None,
+                "observed_undecodable": None}
+# `sunglasses.proxy.receipts.PERMITTED_FIELDS`. No field holds an object: a
+# peer object is written as one string, its canonical JSON or its digest.
+PROXY_FIELDS = frozenset({
+    "direction", "kind", "method", "id_type", "id_token", "raw_len",
+    "raw_sha256", "accepted", "status", "detector_status",
+    "inspection_complete", "decision", "rule_ids", "inspected_bytes",
+    "observed_bytes", "elapsed_ms", "worker_pid", "leaf_provenance", "bytes",
+    "reason_code", "rule", "budget", "settled", "supervised", "count",
+    "cause_kind", "origin", "bound", "redelivering", "method_known",
+    "advertised", "supported", "offered", "reason", "terminal",
+    "session_id", "server_identity", "config_sha", "budget_version",
+    "catalog_version", "contract_version",
+})
+_MARKER = dict.fromkeys(PROXY_FIELDS)
+PROXY_BODY = {**dict.fromkeys(PROXY_FIELDS),
+              "leaf_provenance": dict.fromkeys(
+                  ("index", "depth", "bytes", "value_sha256", "pointer_sha256")),
+              "rule_ids_omitted": None, "leaf_provenance_omitted": None,
+              "truncated": _MARKER, "sanitized": _MARKER, "digested": _MARKER}
+# `sunglasses.receipts.hook_rows`: the pairing and decision keys, then the
+# ones `decision` and `_body` derive.
+HOOK_FIELDS = frozenset({
+    "eval_id", "tool_name", "session_id", "input_sha256", "decision", "lane",
+    "rule_id", "degraded", "fuzzy_lane", "pin_state_stale", "policy_state",
+    "pin_source", "pin_reach", "pin_checked_at", "elapsed_us",
+    "pin_state_age_s", "cleared_canaries", "error_types", "input_digest",
+    "withheld", "withheld_unnamed",
+})
+HOOK_BODY = {**dict.fromkeys(HOOK_FIELDS),
+             "cleared_canaries": {"rule_id": None, "fingerprint": None}}
+BODIES = {"proxy": PROXY_BODY, "hook": HOOK_BODY}
+
 
 @dataclasses.dataclass
 class Report:
@@ -230,6 +277,8 @@ def _lifecycle(prefix):
         return "EMPTY_CHAIN"
     producer = next((record.get("producer") for _, record, _ in prefix
                      if "producer" in record), None)
+    if any(_unknown_field(record, producer) for _, record, _ in prefix):
+        return "UNKNOWN_FIELD"
     if producer == "proxy":
         return _proxy_lifecycle(prefix)
     open_, closed, unknown = {}, set(), False
@@ -253,6 +302,30 @@ def _lifecycle(prefix):
     if any(ident not in closed for ident in open_):
         return "LIFECYCLE_ORPHAN"
     return "UNKNOWN_EVENT" if unknown else "LIFECYCLE_COMPLETE"
+
+
+def _unknown_field(record, producer):
+    """A key outside the closed schema for this record's kind (ruling 44).
+    A body with no named producer is only a test vector's, and is not judged;
+    its envelope still is."""
+    event = record.get("event")
+    if event == CHECKPOINT:
+        return not record.keys() <= CHECKPOINT_KEYS
+    if not record.keys() <= ENVELOPE:
+        return True
+    schema = GENESIS_BODY if event == GENESIS else BODIES.get(producer)
+    return schema is not None and _outside(record.get("body"), schema)
+
+
+def _outside(value, schema):
+    if isinstance(value, list):
+        return any(_outside(item, schema) for item in value)
+    if not isinstance(value, dict):
+        return False
+    if schema is None:
+        return bool(value)
+    return any(key not in schema or _outside(item, schema[key])
+               for key, item in value.items())
 
 
 def _proxy_lifecycle(prefix):
