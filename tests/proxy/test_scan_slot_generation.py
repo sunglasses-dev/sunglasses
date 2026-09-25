@@ -11,7 +11,12 @@ scan.
 The key is the obligation token, (origin, id-type, id, generation), the same
 thing the receipts name, plus the direction the scan read.
 """
+import itertools
 import json
+
+import pytest
+
+from sunglasses.proxy.route import REQUEST, RESULT
 
 from test_request_direction_receipt_fields import (_NOT_RUN, _route,
                                                    _scan_row, _told)
@@ -74,3 +79,72 @@ def test_a_reused_id_is_told_its_own_scan_not_the_last_response(
     assert fired and len(calls) == 3, (fired, calls)
     assert _told(out) == {"status": said["status"], "accepted": False,
                           "inspection_complete": False}
+
+
+def test_a_paid_request_scan_cannot_be_told_again(tmp_path, tmp_path_factory):
+    """T9 ruling 33, the CLIENT slot. A slot pays ONE answer. The request is
+    scanned clean and its release authorisation fails before a byte crosses,
+    so the refusal carries THIS scan's fields. Once that refusal is on the
+    wire, the token it paid can no longer be told that scan, in either
+    direction a payer asks."""
+    home = tmp_path_factory.mktemp("reference")
+    reference, _ = _route(home)
+    reference.client_frame(_REQUEST)
+    said = _scan_row(home)
+    assert said["status"] == "complete", said
+
+    route, out = _route(tmp_path)
+    crossed = []
+    route.upstream_write = crossed.append
+    paid = []
+    answered = route.session.answered_on_the_wire
+
+    def recording(token, **kw):
+        paid.append(token)
+        return answered(token, **kw)
+
+    route.session.answered_on_the_wire = recording
+    fired = _fail_receipts_at(route, "RELEASE_AUTHORIZED")
+    route.client_frame(_REQUEST)
+    assert fired, "the RELEASE_AUTHORIZED receipt was never reached"
+    # The slot existed and paid: nothing crossed (so `_cross_upstream` never
+    # cleared it) and the refusal told the scan.
+    assert crossed == [] and _told(out) == said, (crossed, out)
+    assert len(paid) == 1, paid
+    for direction in (None, REQUEST):
+        assert route._scanned_fields(1, token=paid[0],
+                                     direction=direction) == {}, direction
+
+
+# The token a payer spends, and the same id's NEXT generation (a reused id).
+_OWED = ("client", "int", 1, 1)
+_NEXT = ("client", "int", 1, 2)
+# Every state one slot can hold: empty, or a scan of either generation read in
+# either direction.
+_SLOT_STATES = [None] + [(token, direction, {"status": "complete"})
+                         for token in (_OWED, _NEXT)
+                         for direction in (REQUEST, RESULT)]
+
+
+def _spend_as_the_loop_did(slots, owed):
+    """a976f83's `_spend_scan`, over a dict so the reference itself computes
+    no attribute name: every slot holding the owed token is emptied."""
+    for slot in ("_scanned", "_scanned_request"):
+        if slots[slot] is not None and slots[slot][0] == owed:
+            slots[slot] = None
+    return slots
+
+
+@pytest.mark.parametrize("scanned, scanned_request",
+                         list(itertools.product(_SLOT_STATES, repeat=2)))
+def test_named_slot_clears_leave_what_the_loop_left(tmp_path, scanned,
+                                                    scanned_request):
+    """T9 R51. The named rewrite of `_spend_scan` (R3) leaves both slots
+    exactly as the loop did, across slot x token x direction."""
+    route, _ = _route(tmp_path)
+    route._scanned, route._scanned_request = scanned, scanned_request
+    route._spend_scan(_OWED)
+    want = _spend_as_the_loop_did({"_scanned": scanned,
+                                   "_scanned_request": scanned_request}, _OWED)
+    assert {"_scanned": route._scanned,
+            "_scanned_request": route._scanned_request} == want

@@ -467,10 +467,13 @@ class Route:
     def _spend_scan(self, owed):
         """A slot pays ONE answer. Once that answer is on the wire the slot
         is gone, so nothing later can be told this scan again."""
-        for slot in ("_scanned", "_scanned_request"):
-            scanned = getattr(self, slot)
-            if scanned is not None and scanned[0] == owed:
-                setattr(self, slot, None)
+        # Each slot by name: tests/test_repair_v056.py (R3) refuses a getattr
+        # or setattr whose attribute name is computed.
+        if self._scanned is not None and self._scanned[0] == owed:
+            self._scanned = None
+        if (self._scanned_request is not None
+                and self._scanned_request[0] == owed):
+            self._scanned_request = None
 
     def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
