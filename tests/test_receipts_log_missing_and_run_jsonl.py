@@ -378,3 +378,74 @@ def test_control_a_stray_name_is_not_a_run_log(never, name):
     assert "LOG_UNCHAINED" not in out, out
     assert "NO_LOG" in out, out
     assert code == 3, out
+
+
+# ── Flag 4: the published marker vector, replayed by the real command ─────────
+
+def _vectors():
+    return json.loads((TREE / "sunglasses" / "receipts" / "VECTORS.json").read_text())
+
+
+def _vector_home(tmp_path, line):
+    """A home holding only the vector's public key and the given marker line:
+    no private key, no hook log. Every byte comes from VECTORS.json."""
+    v = _vectors()
+    home = tmp_path / "sunglasses-home"
+    _user(home).mkdir(parents=True)
+    pub = keys.public_path(home, v["key"]["fingerprint"])
+    pub.parent.mkdir(parents=True)
+    pub.write_bytes(bytes.fromhex(v["key"]["public_hex"]))
+    (home / keys.KEY_DIR / MARKER).write_bytes(line)
+    return home
+
+
+@pytest.mark.parametrize("strict", STRICT)
+def test_the_marker_vector_with_no_hook_log_is_log_missing(tmp_path, strict):
+    """An outside implementation writing the vector's bytes gets the verdict
+    ours gets: the marker verifies, and the chain it names is not there."""
+    marker = _vectors()["records"]["marker"]
+    home = _vector_home(tmp_path, bytes.fromhex(marker["line_hex"]))
+    code, out = _receipts(home, "--verify", *strict)
+    assert "LOG_MISSING" in out, out
+    assert marker["record_signed"]["chain_id"] in out, out
+    assert "SIGNATURE_INVALID" not in out and "Traceback" not in out, out
+    assert code == 1, out
+
+
+@pytest.mark.parametrize("strict", STRICT)
+def test_control_the_marker_vector_beside_the_chain_it_names_is_not_missing(tmp_path, strict):
+    """Positive control: the same marker, with a hook log opening the chain
+    it names, is not LOG_MISSING. So the row above reads the marker, not
+    merely any file at that name."""
+    sys.path.insert(0, str(TREE / "sunglasses" / "receipts"))
+    try:
+        import make_vectors
+    finally:
+        sys.path.pop(0)
+    marker = _vectors()["records"]["marker"]
+    home = _vector_home(tmp_path, bytes.fromhex(marker["line_hex"]))
+    chain = make_vectors.WireChain(chain_id=marker["record_signed"]["chain_id"],
+                                   producer="hook")
+    chain.seal("genesis")
+    log = home / "receipts" / "hook"
+    log.mkdir(parents=True)
+    (log / "segment-000000.chain").write_bytes(chain.data())
+    code, out = _receipts(home, "--verify", *strict)
+    assert "LOG_MISSING" not in out and "Traceback" not in out, out
+    assert "CHAIN_OK" in out, out
+
+
+@pytest.mark.parametrize("strict", STRICT)
+def test_control_the_marker_vector_with_one_signature_byte_flipped_fails_signed(tmp_path, strict):
+    """Negative control: a flipped signature byte is SIGNATURE_INVALID and
+    never reaches LOG_MISSING, so the verdict above rests on the signature."""
+    marker = _vectors()["records"]["marker"]
+    signed = dict(marker["record_signed"])
+    sig = bytearray.fromhex(signed["signature"])
+    sig[0] ^= 1
+    signed["signature"] = sig.hex()
+    home = _vector_home(tmp_path, wire.encode(signed))
+    code, out = _receipts(home, "--verify", *strict)
+    assert "SIGNATURE_INVALID" in out and MARKER in out, out
+    assert "LOG_MISSING" not in out and "Traceback" not in out, out
+    assert code == 1, out

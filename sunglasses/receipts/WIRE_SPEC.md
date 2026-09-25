@@ -297,6 +297,11 @@ A committed vector file that regenerates differently fails `test_the_vectors_
 are_pinned` in the same commit, rather than six weeks later when an auditor's
 verifier disagrees with ours.
 
+The file carries one signed marker (`records.marker`) beside the genesis, the
+event and the checkpoint. Its line verifies under the marker domain and under
+no other, and a home holding only that line and the vector key reads
+`LOG_MISSING` under `--verify`, because the chain it names is not there.
+
 ## Record fields
 
 Read from the writer at this head, not designed here. Every row cites the
