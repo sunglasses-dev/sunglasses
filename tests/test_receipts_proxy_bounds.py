@@ -17,7 +17,7 @@ at its worst and requires the row to be written.
 """
 import pytest
 
-from sunglasses.proxy import envelope, selector
+from sunglasses.proxy import envelope, route, selector, worker_process
 from sunglasses.proxy import receipts as proxy_receipts
 from sunglasses.proxy.serve import state_root
 from sunglasses.receipts import chain, keys, verify, wire
@@ -168,6 +168,9 @@ def _worst_fields():
         "method": max(selector.KNOWN_METHODS, key=len),
         "rule": max(envelope.RULES, key=len),
         "id_token": TOKEN,
+        "detector_status": max((worker_process.CAUSE_CRASHED,
+                                worker_process.CAUSE_MALFORMED_OUTPUT,
+                                route.CAUSE_SCHEMA_INVALID), key=len),
         "rule_ids": [f"GLS-{n:04d}-" + "Z" * 55 for n in range(2000)],
         "leaf_provenance": [{"index": wire.MIN_INT, "depth": wire.MIN_INT,
                              "bytes": wire.MIN_INT, "value_sha256": wide,

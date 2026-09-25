@@ -580,8 +580,7 @@ class Route:
             # (T9 ruling 14).
             self._scanned = (self._obligation(request_id), RESULT,
                              {"status": unusable["status"]})
-            self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **unusable)
+            self._record_unusable(unusable)
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False,
                                          status=unusable["status"])
@@ -1089,8 +1088,7 @@ class Route:
             unusable = _unusable(result)
             self._scanned_request = (self._obligation(request_id, attempt),
                                      REQUEST, {"status": unusable["status"]})
-            self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **unusable)
+            self._record_unusable(unusable)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
                                   RULE_RESOURCE, attempt=attempt,
                                   status=unusable["status"])
@@ -1502,6 +1500,31 @@ class Route:
                         self.session.owe_again(owed)
         finally:
             self._paying = False
+
+    def _record_unusable(self, unusable):
+        """The SCAN_RESULT row for a result `_unusable` read, by name.
+
+        #172 closed the row's keys: no writer site splices a mapping into a
+        row, so what a row can say is readable at the call. `_unusable`
+        returns `status` and, only when there is one, `detector_status`, and
+        the field is OMITTED rather than written as null (a null claims a
+        cause and names nobody, and `_check_value` refuses it). Hence two
+        calls and not one keyword with a default.
+
+        No raise for a key nobody named. This runs inside both readers, and
+        serve.py's readers swallow what escapes them: a raise here stopped
+        the reader with the id unanswered and no SCAN_RESULT, and the
+        teardown row named no reason (T8 probe 9-25). A new field in
+        `_unusable` fails tests/proxy/test_refused_result_names_its_fields.py
+        instead.
+        """
+        if "detector_status" in unusable:
+            self._record("SCAN_RESULT", accepted=False,
+                         inspection_complete=False, status=unusable["status"],
+                         detector_status=unusable["detector_status"])
+        else:
+            self._record("SCAN_RESULT", accepted=False,
+                         inspection_complete=False, status=unusable["status"])
 
     def _record(self, event, **fields):
         """Every receipt goes through here so a log that cannot be written
