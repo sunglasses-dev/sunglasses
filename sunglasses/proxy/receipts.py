@@ -540,17 +540,16 @@ def _chain_for(directory, home):
         from ..firewall import sunglasses_home
         home = sunglasses_home()
     home = pathlib.Path(home)
-    if not any((home / "keys").glob("receipt-*.ed25519")):
-        if not (home / "receipts" / "hook").is_dir():
-            return None
-        from ..receipts import optin
-        if not optin.opted_in(home):     # R21: only `receipts off` opts out
-            return None
-    from ..receipts import chain, optin
+    from ..receipts import optin
     try:
+        # R21: only `receipts off` opts out. R56: a key or chain directory
+        # that cannot be listed is a receipt failure, never "not opted in".
+        if not optin.opted_in(home):
+            return None
         signer = optin.signer(home)
-    except optin.KeyUnusable as unusable:
+    except (optin.KeyUnusable, OSError) as unusable:
         raise ReceiptIOError(str(unusable)) from None
+    from ..receipts import chain
     return chain.Chain(directory, signer, producer="proxy")
 
 

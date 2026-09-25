@@ -28,9 +28,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 try:
-    from . import wire
+    from . import _fs, wire
 except ImportError:
-    import wire                        # type: ignore[no-redef]
+    import _fs, wire                   # type: ignore[no-redef]
 
 KEY_DIR = "keys"
 PUBLIC_DIR = "public"
@@ -70,7 +70,8 @@ def _raw_public(private: ed25519.Ed25519PrivateKey) -> bytes:
 
 
 def private_path(home) -> pathlib.Path | None:
-    found = sorted(_key_dir(home).glob("receipt-*.ed25519"))
+    # R56: a key directory that cannot be listed raises, never "no key".
+    found = _fs.listing(_key_dir(home), "receipt-*.ed25519")
     return found[0] if found else None
 
 

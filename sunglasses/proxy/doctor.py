@@ -346,21 +346,20 @@ def receipts_key_status(home=None):
     """(OFF | ON | KEY_UNUSABLE, cause). Signing on with a key that cannot
     sign stops every wrapped route's proxy before it starts (R24b a), so the
     doctor names it rather than leaving the user a route that will not start
-    and no reason (R21 b). No key and no hook chain imports nothing."""
+    and no reason (R21 b). No key imports none of the signing code."""
     import pathlib
     if home is None:
         from ..firewall import sunglasses_home
         home = sunglasses_home()
     home = pathlib.Path(home)
-    if (not any((home / "keys").glob("receipt-*.ed25519"))
-            and not (home / "receipts" / "hook").is_dir()):
-        return "OFF", ""
     from ..receipts import optin
-    if not optin.opted_in(home):
-        return "OFF", ""
     try:
+        # R56: a directory that cannot be listed is never OFF. The route's
+        # proxy would refuse to start on it, so the doctor says why.
+        if not optin.opted_in(home):
+            return "OFF", ""
         optin.signer(home)
-    except optin.KeyUnusable as cause:
+    except (optin.KeyUnusable, OSError) as cause:
         return "KEY_UNUSABLE", str(cause)
     return "ON", ""
 

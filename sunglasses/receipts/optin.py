@@ -23,7 +23,7 @@ import os
 import pathlib
 import time
 
-from . import wire
+from . import _fs, wire
 
 KEY_DIR = "keys"
 KEY_GLOB = "receipt-*.ed25519"
@@ -42,7 +42,21 @@ class KeyUnusable(Exception):
 
 
 def has_key(home) -> bool:
-    return any((pathlib.Path(home) / KEY_DIR).glob(KEY_GLOB))
+    """R56: a key directory that cannot be listed is not "no key". Whether a
+    key is there cannot be known, so the key cannot sign, said by name."""
+    home = pathlib.Path(home)
+    try:
+        return bool(_fs.listing(home / KEY_DIR, KEY_GLOB))
+    except _fs.Unlistable as unlistable:
+        raise _key_dir_unlistable(home, unlistable) from None
+
+
+def _key_dir_unlistable(home, unlistable) -> KeyUnusable:
+    return KeyUnusable(
+        f"the key directory {home / KEY_DIR} cannot be listed "
+        f"({type(unlistable.cause).__name__}), so whether the key is there "
+        f"cannot be known, and a signed log never turns unsigned on a guess. "
+        f"Fix it: chmod 700 {home / KEY_DIR} (or `{OFF}` to stop signing)")
 
 
 def signer(home):
@@ -56,9 +70,11 @@ def signer(home):
             f"the signing key in {home / KEY_DIR} needs {EXTRA}, which is not "
             f"installed. Install it: pip install '{EXTRA}' (or `{OFF}` to "
             f"stop signing)") from None
-    path = keys.private_path(home)
     try:
+        path = keys.private_path(home)
         found = keys.load(home)
+    except _fs.Unlistable as unlistable:
+        raise _key_dir_unlistable(home, unlistable) from None
     except keys.KeyUnsafe:
         raise KeyUnusable(
             f"the signing key {path} is not private to you. Fix it: "
@@ -79,12 +95,18 @@ def hook_log(home) -> pathlib.Path:
 
 
 def opted_in(home) -> bool:
-    """A key, or a hook chain whose last word is not `receipts off` (R21)."""
+    """A key, or a hook chain whose last word is not `receipts off` (R21).
+
+    Never False on a directory it could not list (R56): an unlistable key
+    directory raises KeyUnusable, an unlistable hook chain raises
+    _fs.Unlistable, and the caller's receipt-failure path answers."""
     return has_key(home) or _chain_open(hook_log(home))
 
 
 def _chain_open(directory) -> bool:
-    segments = sorted(pathlib.Path(directory).glob(SEGMENT_GLOB))
+    # T9 ruling 56: Path.glob read a chain nobody could list as no chain, so
+    # a deleted key under an unlistable chain went quietly unsigned.
+    segments = _fs.listing(directory, SEGMENT_GLOB)
     if not segments:
         return False
     # A tail that cannot be read is not an off record: it stays opted in, and
@@ -148,13 +170,13 @@ def _append_unsigned(directory) -> bool:
     """The off record as an unsigned row on the chain's last segment, linked
     to the record before it. Nothing here can sign. False when there is no
     chain to write it on."""
-    segments = sorted(directory.glob(SEGMENT_GLOB))
+    segments = _fs.listing(directory, SEGMENT_GLOB)
     if not segments:
         return False
     fd = os.open(directory / "LOCK", os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)          # the writer's lock (chain.py)
-        path = sorted(directory.glob(SEGMENT_GLOB))[-1]
+        path = _fs.listing(directory, SEGMENT_GLOB)[-1]
         data = path.read_bytes()
         if not data.endswith(b"\n"):
             raise ValueError(f"{path} ends in a torn record; nothing was appended")
@@ -177,7 +199,7 @@ def _append_unsigned(directory) -> bool:
 
 def _retire_key(home) -> None:
     retired = home / KEY_DIR / RETIRED_DIR
-    for path in sorted((home / KEY_DIR).glob(KEY_GLOB)):
+    for path in _fs.listing(home / KEY_DIR, KEY_GLOB):
         retired.mkdir(mode=0o700, exist_ok=True)
         target = retired / path.name
         n = 1

@@ -368,7 +368,7 @@ writer sees a body. Paths are relative to `sunglasses/`.
 Each producer builds its own body from an allowlist. The writer adds only the
 envelope (see Record fields) and refuses any other top level field.
 
-**The hook** (`receipts/hook_rows.py`, called from firewall.py:1727 and :1734)
+**The hook** (`receipts/hook_rows.py`, called from firewall.py:1741 and :1748)
 
 - An allowlist with a grammar per field (hook_rows.py:64-83). `in_flight`
   carries `eval_id` (16 hex), `tool_name`, `session_id` (printable, at most 256

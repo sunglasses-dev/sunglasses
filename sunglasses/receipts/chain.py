@@ -32,9 +32,9 @@ import secrets
 import time
 
 try:
-    from . import wire
+    from . import _fs, wire
 except ImportError:
-    import wire                        # type: ignore[no-redef]
+    import _fs, wire                   # type: ignore[no-redef]
 
 GENESIS = "genesis"
 CHECKPOINT = "checkpoint"
@@ -123,7 +123,7 @@ class Chain:
         return self._open_segment(previous=tail)
 
     def _segments(self):
-        return sorted(self._dir.glob(SEGMENT_GLOB))
+        return _fs.listing(self._dir, SEGMENT_GLOB)   # R56: raises, never "no tail"
 
     def _read_tail(self) -> _Tail | None:
         segments = self._segments()

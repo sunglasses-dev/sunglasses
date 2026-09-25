@@ -1678,6 +1678,17 @@ class _Confession(str):
         return text
 
 
+def _present(path) -> bool:
+    """Whether any directory entry is at `path`. lstat, so a dangling symlink
+    is present (R57). Absence is False; an lstat that fails for any other
+    reason raises (R56), so it never reads as absent."""
+    try:
+        _os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return True
+
+
 class _HookReceipts:
     """Where one call's two records go.
 
@@ -1697,10 +1708,13 @@ class _HookReceipts:
 
     def __init__(self, home):
         self.home = home
-        self.signed = any((home / "keys").glob("receipt-*.ed25519"))
-        if not self.signed and (home / "receipts" / "hook").is_dir():
-            # R21: a deleted key is not `receipts off`. A hook chain that the
-            # off record has not ended still means the user opted in.
+        # R21: a deleted key is not `receipts off`. A hook chain that the off
+        # record has not ended still means the user opted in. R56: a key or
+        # chain directory that cannot be listed raises here, never reads as
+        # "not opted in", and run_hook's guard asks, naming the cause. With
+        # neither directory there, nothing of the receipts package loads.
+        self.signed = False
+        if _present(home / "keys") or _present(home / "receipts" / "hook"):
             from .receipts import optin
             self.signed = optin.opted_in(home)
         self._chain = None
@@ -2022,6 +2036,11 @@ def _receipts_unwritable(decision, error, receipts, exc):
         if isinstance(exc, optin.KeyUnusable):
             # R21 (a): the cause and the one command that clears it.
             check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
+    from .receipts import _fs
+    if isinstance(exc, _fs.Unlistable):
+        # R56: which directory, and that it could not be listed, not "empty".
+        check = (f"A receipts directory {exc}, and a signed log never turns "
+                 f"unsigned on a guess. Fix its permissions (chmod 700).")
     decision = Decision(
         "ask", "error", "GLS-FW-RECEIPTS-UNWRITABLE",
         f"SUNGLASSES firewall: the audit trail could not be written ({cause}), "

@@ -1271,7 +1271,7 @@ def _receipts_off(home):
     from .receipts import optin
     try:
         done = optin.turn_off(home)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, optin.KeyUnusable) as exc:   # R57: a key dir that cannot be listed
         print(f"\n  {RED}Signing was NOT turned off:{RESET} "
               f"{_display(f'{type(exc).__name__}: {exc}', limit=200)}\n")
         return 1
@@ -1294,11 +1294,13 @@ def _verify_key(home):
     """R21 (b): signing is on and the key cannot sign. Said by name, with the
     cause; the logs are still verified with the public key."""
     from .receipts import optin
-    if not optin.opted_in(home):
-        return 0
     try:
+        # R56: a key or chain directory that cannot be listed is not "signing
+        # off"; whether the key can sign cannot be known, so it is said.
+        if not optin.opted_in(home):
+            return 0
         optin.signer(home)
-    except optin.KeyUnusable as cause:
+    except (optin.KeyUnusable, OSError) as cause:
         print(f"\n  {RED}KEY_UNUSABLE{RESET} {_display(str(cause), limit=400)}")
         return 1
     return 0
