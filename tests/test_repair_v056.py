@@ -617,8 +617,11 @@ def test_disable_extractors_can_only_make_a_result_more_conservative(bundle, tmp
     assert _one_json_doc(threat)["is_clean"] is False
 
 
-def test_package_reads_no_undeclared_environment_variables():
-    """The wheel may read exactly three env vars, and each is accounted for."""
+def _environment_audit(pkg):
+    """Audit every .py file under `pkg`: (found, read_names, refusals, allowed,
+    wire_constants). The package guard below runs it on the wheel's own tree;
+    the R52 fixtures run it on a probe written to a temporary directory, so
+    each refusal has a red that stays in the suite."""
     import ast
     import re
 
@@ -1032,8 +1035,16 @@ def test_package_reads_no_undeclared_environment_variables():
                         if not (isinstance(a, ast.Constant) and isinstance(a.value, str)):
                             refusals.append(f"{relpath}:{node.lineno} {fname} with a computed name (R3)")
                             break
-                        if fname in {"import_module", "__import__"} and a.value.split(".")[0] in OS_MODULE_LITERALS:
-                            refusals.append(f"{relpath}:{node.lineno} {fname} of the os module; only a plain import may name it (R3)")
+                        # R52 (T11 probe, 2026-09-24): a literal is a PATH, and every segment of it is
+                        # a name. `attrgetter("os.environ")(pathlib)` walked to the environment
+                        # through a literal no rule split, since only import_module/__import__ checked
+                        # a segment, and only the first. Every segment of every named lookup's
+                        # literal answers to the set R12 applies to a whole literal.
+                        refused = [seg for seg in a.value.split(".")
+                                   if seg in OS_MODULE_LITERALS | REFUSED_LITERAL_NAMES]
+                        if refused:
+                            refusals.append(f"{relpath}:{node.lineno} {fname} path {a.value!r} names a refused "
+                                            f"attribute {refused[0]!r}; only a plain import may reach os (R3)")
                 if isinstance(node.func, ast.Name) and fname in {"globals", "locals", "vars"}:
                     refusals.append(f"{relpath}:{node.lineno} {fname}() namespace introspection (R4)")
             if isinstance(node, ast.Attribute) and node.attr in MODULE_DUNDERS:
@@ -1147,7 +1158,6 @@ def test_package_reads_no_undeclared_environment_variables():
     found = set()
     read_names = set()
     refusals = []
-    pkg = os.path.dirname(_package_location())
     for dirpath, _dirs, files in os.walk(pkg):
         if "__pycache__" in dirpath:
             continue
@@ -1165,6 +1175,13 @@ def test_package_reads_no_undeclared_environment_variables():
             names, bad = _audit(tree, os.path.relpath(path, pkg))
             read_names.update(names)
             refusals.extend(bad)
+    return found, read_names, refusals, allowed, wire_constants
+
+
+def test_package_reads_no_undeclared_environment_variables():
+    """The wheel may read exactly three env vars, and each is accounted for."""
+    found, read_names, refusals, allowed, wire_constants = _environment_audit(
+        os.path.dirname(_package_location()))
 
     undeclared = found - allowed - wire_constants
     assert not undeclared, f"undeclared env vars in the package: {sorted(undeclared)}"
@@ -1183,6 +1200,54 @@ def test_package_reads_no_undeclared_environment_variables():
     assert not smuggled, (
         f"{smuggled} is exempted as a wire constant and is read from the "
         f"environment; the exemption is not true")
+
+
+# R52 (T11 probe on main dd3dedd, 2026-09-24). Each probe is one module, audited
+# on its own. `True` = the guard must refuse it; a probe held to the dotted-path
+# rule must be refused BY that rule, so its mutant has a red of its own.
+_R52_PATH_RULE = "names a refused attribute"
+_R52_PROBES = {
+    # the probe that passed on main: a dotted literal walks pathlib -> os -> environ
+    "dotted_os_environ": ('import operator\nimport pathlib\n'
+                          'HOME = operator.attrgetter("os.environ")(pathlib).get("HOME")\n', _R52_PATH_RULE),
+    # the refused name in the MIDDLE of the path, after a harmless first segment
+    "dotted_middle": ('import operator\nimport shutil\n'
+                      'HOME = operator.attrgetter("shutil.os.environ")(shutil).get("HOME")\n', _R52_PATH_RULE),
+    # a refused name that is not the LAST segment
+    "dotted_not_last": ('import operator\nimport pathlib\n'
+                        'HOME = operator.attrgetter("os.environ.get")(pathlib)("HOME")\n', _R52_PATH_RULE),
+    # an os re-export that is not an os module literal
+    "dotted_reexport": ('import operator\nimport tempfile\n'
+                        'HOME = operator.attrgetter("_os.environ")(tempfile).get("HOME")\n', _R52_PATH_RULE),
+    # single segments: held by R12 and the string-token rule as well as the path rule
+    "single_attrgetter_alias": ('import operator as op\n\ndef home(cfg):\n'
+                                '    return op.attrgetter("environ")(cfg).get("HOME")\n', True),
+    "single_methodcaller": ('import operator\n\ndef home(cfg):\n'
+                            '    return operator.methodcaller("getenv", "HOME")(cfg)\n', True),
+    # CONTROLS: what was refused stays refused, and what passed still passes
+    "control_pathlib_os_environ": ('import pathlib\nHOME = pathlib.os.environ.get("HOME")\n', True),
+    "control_import_module_os": ('import importlib\nm = importlib.import_module("os")\n', True),
+    "control_env_none": ('import os\nimport subprocess\nENV = None\n'
+                         'HOME = os.environ.get("SUNGLASSES_HOME")\n'
+                         'subprocess.run(["true"], env=ENV)\n', False),
+    "control_dotted_benign": ('import operator\nimport os\n'
+                              'HOME = os.environ.get("SUNGLASSES_HOME")\n'
+                              'def size(stat):\n    return operator.attrgetter("st_size.real")(stat)\n', False),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_R52_PROBES))
+def test_the_environment_guard_refuses_each_r52_probe(tmp_path, name):
+    source, want = _R52_PROBES[name]
+    (tmp_path / "probe.py").write_text(source)
+    _found, read_names, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    if want is False:
+        # the audit read the probe (its one canonical read is seen) and refused nothing
+        assert read_names == {"SUNGLASSES_HOME"} and refusals == [], (read_names, refusals)
+    elif want is True:
+        assert refusals, f"{name} passed the guard"
+    else:
+        assert any(want in r for r in refusals), (name, refusals)
 
 
 # ==========================================================================
