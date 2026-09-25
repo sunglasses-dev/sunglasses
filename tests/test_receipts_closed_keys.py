@@ -35,7 +35,7 @@ sys.path.insert(0, str(pathlib.Path(verify.__file__).parent))
 from make_vectors import TEST_SEED, WireChain, public_bytes  # noqa: E402
 
 HEADER = {"session_id": "0" * 32, "budget_version": "sg-proxy-budget/1",
-          "catalog_version": "sg-proxy-catalog/1",
+          "catalog_version": "sg-proxy-catalog/2",
           "contract_version": "GATE3_CONTRACT_v5.1"}
 RUN = "c" * 32
 # Two keys that are different to the peer and the same once a control
