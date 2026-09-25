@@ -146,6 +146,9 @@ CAUSE_KINDS = frozenset({
     # route.py: the receipt log could not be written, so the session cannot
     # say what it did. A resource fault, not a protocol one.
     "RECEIPT_WRITE_FAILED",
+    # route.py: a capture under the state root could not be written, so no
+    # approval can ever be made for this session. T9 ruling 64.
+    "CAPTURE_IO_ERROR",
 })
 
 

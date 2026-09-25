@@ -211,7 +211,7 @@ def test_T803_clean_nonzero_upstream_code_propagated():
 
 
 def log_at(tmp_path):
-    return receipts.Log(tmp_path,run_id='review-run',header=dict(session_id='s',server_identity='review-server',config_sha='a'*64,budget_version='sg-proxy-budget/1',catalog_version='sg-proxy-catalog/1',contract_version='5.3'))
+    return receipts.Log(tmp_path,run_id='review-run',header=dict(session_id='s',server_identity='review-server',config_sha='a'*64,budget_version='sg-proxy-budget/1',catalog_version='sg-proxy-catalog/2',contract_version='5.3'))
 
 
 def test_T901_receipt_kind_cannot_be_overwritten(tmp_path):

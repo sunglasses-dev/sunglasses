@@ -41,6 +41,11 @@ REASONS = frozenset({
     # turned a deliberate fault-and-close into a ValueError out of the reader.
     # Six gate rows (RC29 x4, RC32 x2) caught it.
     "INTERNAL_FAULT",
+    # T9 ruling 64. The proxy's own state could not be written, a capture the
+    # operator would approve from. The proxy's fault and never the server's,
+    # so it is not MALFORMED_UPSTREAM, and not INTERNAL_FAULT either: that one
+    # closes for one reason only (session.py, DECISION_AUTHORITY_MOVED).
+    "STATE_IO_ERROR",
 })
 
 RULES = frozenset({"S1", "S2", "S3", "S4", "S5", "S6", "S7"})
