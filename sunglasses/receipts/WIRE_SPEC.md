@@ -238,14 +238,20 @@ it may not read, or a file or symlink where a directory should be) prints
 "nothing to verify" would be false. Only a path with no directory entry at all
 is absent.
 
-Which entries are logs is fixed by name, the rule each writer names its log
-with (T9 ruling 58). Under the home's `receipts/` the hook's log is `hook`.
-Under the proxy's `receipts/` a run's log is its run id, 32 lowercase hex
-(`[0-9a-f]{32}`, the whole name). A known name the verifier cannot list (a
-file, a dangling symlink, a symlink to a file, a directory it may not read)
-is `PATH_UNREADABLE`, never passed over. A log named with `--log PATH` is held
-to the same rule. Any other entry that is not a directory is not a log and is
-passed over, and so is a run's unchained `<run id>.jsonl`, exactly as before.
+Which entries are logs: under the home's `receipts/` the hook's log is `hook`,
+and under the proxy's default `receipts/` a run's log is its run id, 32
+lowercase hex (`[0-9a-f]{32}`, the whole name), the rule the writer names it
+with (T9 ruling 58). A run written by a proxy started with `--state-root PATH`
+is not read by `--verify` unless it is named with `--log PATH`.
+An entry with a known name that the verifier cannot
+list (a file, a dangling symlink, a symlink to a file, a directory it may not
+read) is `PATH_UNREADABLE`, never passed over. Any other directory is read as a
+log when it holds segments, and one the verifier cannot list is
+`PATH_UNREADABLE` too. A known name that is a listable directory with no
+segments is passed over without a warning, as before. A `--log PATH` the
+verifier cannot list is `PATH_UNREADABLE`; no name rule applies to it. Any
+other entry that is not a directory is not a log and is passed over, and so is
+a run's unchained `<run id>.jsonl`, exactly as before.
 
 ## The vectors
 
