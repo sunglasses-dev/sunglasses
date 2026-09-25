@@ -256,3 +256,104 @@ def test_a_capture_that_cannot_be_written_exits_nonzero(tmp_path, linger):
     finally:
         _unlock(tmp_path)
     assert proc.returncode != 0
+
+
+@needs_modes
+@pytest.mark.parametrize("linger", [False, True], ids=["echo", "linger"])
+def test_the_receipt_names_the_capture_fault(tmp_path, linger):
+    """T9 ruling 64: the session closes on the proxy's own cause, and the run
+    log says which, so a reader of the receipt is not left to guess."""
+    state = _obstruct(tmp_path, "captures", "0000")
+    try:
+        _proc, replies = _run(tmp_path, state, linger=linger)
+    finally:
+        _unlock(tmp_path)
+    assert "STATE_IO_ERROR" in _reason_codes(replies, state)
+
+
+def test_the_run_log_carries_the_catalog_it_was_written_under(tmp_path):
+    """Ruling 64: a new reason is a new catalog, sg-proxy-catalog/2."""
+    state = _obstruct(tmp_path, None, None)
+    _run(tmp_path, state)
+    (log,) = (state / "receipts").glob("*.jsonl")
+    header = json.loads(log.read_text().splitlines()[0])
+    assert header.get("catalog_version") == "sg-proxy-catalog/2", header
+
+
+# ── the approval store read and written through a fault ───────────────────
+
+SHA = "a" * 64
+
+
+@needs_modes
+def test_an_unlistable_approvals_dir_is_invalid_not_absent(tmp_path):
+    """T507 in the same function: an unreadable record is not an absent one.
+    `exists()` answers False on EACCES, so an approved server whose approvals
+    directory cannot be listed read as never approved."""
+    from sunglasses.proxy import approvals
+
+    store = approvals.Store(tmp_path / "state", server_id="s")
+    store.write_raw({"approved_by": "human", "snapshot_sha256": SHA,
+                     "server_identity": "s", "tools": {}})
+    assert store._record_or_reason()[1] is None   # control: readable, valid
+    store.approvals.chmod(0o000)
+    try:
+        assert store._record_or_reason() == (None, approvals.INVALID)
+        assert store.state() == approvals.INVALID
+    finally:
+        store.approvals.chmod(0o700)
+
+
+def test_control_no_record_is_still_absent(tmp_path):
+    from sunglasses.proxy import approvals
+
+    store = approvals.Store(tmp_path / "state", server_id="s")
+    assert store._record_or_reason() == (None, None)
+    assert store.state() == approvals.UNAPPROVED
+
+
+def _approve(state):
+    from sunglasses.proxy import commands
+
+    out, err = io.StringIO(), io.StringIO()
+    code = commands._approve("s", {"snapshot": SHA, "state-root": str(state)},
+                             out, err, confirm=lambda: True)
+    return code, err.getvalue()
+
+
+def _captured(tmp_path):
+    state = tmp_path / "state"
+    (state / "captures").mkdir(parents=True)
+    (state / "captures" / f"s.{SHA}.json").write_text(
+        json.dumps({"tools_by_name": {}}))
+    return state
+
+
+@needs_modes
+def test_approve_names_an_approvals_dir_it_cannot_write(tmp_path):
+    state = _captured(tmp_path)
+    (state / "approvals").mkdir()
+    (state / "approvals").chmod(0o500)
+    try:
+        code, err = _approve(state)
+    finally:
+        (state / "approvals").chmod(0o700)
+    assert code == 1, err
+    assert err.startswith("sunglasses proxy:") and str(state / "approvals") in err, err
+    assert not (state / "approvals" / "s.json").exists()
+
+
+@pytest.mark.parametrize("how", ["file", "dangling"])
+def test_approve_names_an_obstructed_approvals_dir(tmp_path, how):
+    state = _captured(tmp_path)
+    _obstruct(tmp_path, "approvals", how)
+    code, err = _approve(state)
+    assert code == 1, err
+    assert err.startswith("sunglasses proxy:") and str(state / "approvals") in err, err
+
+
+def test_control_approve_writes_the_record(tmp_path):
+    state = _captured(tmp_path)
+    code, err = _approve(state)
+    assert code == 0, err
+    assert (state / "approvals" / "s.json").exists()
