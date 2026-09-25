@@ -10,6 +10,7 @@
 Chains are built by `_Chain` in test_verify from the wire alone, never by the
 writer. Every refusal has its positive control in the same parametrize.
 """
+import dataclasses
 import pathlib
 import sys
 
@@ -174,7 +175,7 @@ def test_row4_the_report_carries_no_boolean_verdict():
     c, end = _valid_and_false()
     report = verify.verify(c.data(), PUBLIC, expected_fingerprint=FP,
                            expected_endpoint=c.endpoint(end))
-    public = {k: v for k, v in vars(report).items() if not k.startswith("_")}
+    public = {k: v for k, v in dataclasses.asdict(report).items() if not k.startswith("_")}
     assert not [k for k, v in public.items() if isinstance(v, bool)]
     assert set(report.results) == set(codes.RESULT_KINDS)
     assert all(isinstance(v, str) for v in report.results.values())

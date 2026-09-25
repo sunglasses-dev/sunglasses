@@ -232,15 +232,29 @@ def test_segments_are_owner_only(home):
     assert stat.S_IMODE(os.stat(segment).st_mode) == 0o600
 
 
-def test_a_checkpoint_is_fsynced_with_its_directory(home, monkeypatch):
-    writer = _writer(home)
-    writer.write(_call("a"))
-    synced = []
-    real = os.fsync
-    monkeypatch.setattr(chain.os, "fsync", lambda fd: synced.append(
-        stat.S_ISDIR(os.fstat(fd).st_mode)) or real(fd))
-    writer.seal("release")
-    assert set(synced) == {True, False}
+_FSYNC_SPY = """
+import os, stat, sys; sys.path.insert(0, sys.argv[1])
+import chain, keys, pathlib
+home = pathlib.Path(sys.argv[2])
+writer = chain.Chain(home / "receipts" / "chain", keys.load(home), producer="hook")
+writer.write([{"event": "in_flight", "body": {"eval_id": "a"}},
+              {"event": "decision", "body": {"eval_id": "a"}}])
+synced, real = [], os.fsync
+os.fsync = lambda fd: synced.append(stat.S_ISDIR(os.fstat(fd).st_mode)) or real(fd)
+writer.seal("release")
+print(" ".join(sorted({"dir" if d else "file" for d in synced})))
+"""
+
+
+def test_a_checkpoint_is_fsynced_with_its_directory(home):
+    # The spy runs in a child process: the package's environment guard
+    # (tests/test_repair_v056.py) refuses any handle on the os module in
+    # package code, a monkeypatch of it included (T9 ruling 50).
+    import subprocess
+    proc = subprocess.run([sys.executable, "-c", _FSYNC_SPY, str(HERE.parent), str(home)],
+                          capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.split() == ["dir", "file"], proc.stdout
 
 
 def test_no_signer_is_refused(home, tmp_path):
@@ -431,7 +445,7 @@ def _spec_tables():
     return tables
 
 
-def test_the_spec_names_every_field_the_writer_writes(home):
+def test_the_spec_names_every_field_the_writer_writes(home, tables=None):
     writer = _writer(home, max_records=8)
     writer.write(_call("a"), seal="close")
     writer.write([{"event": "in_flight", "body": {"eval_id": "b"}, "t_mono_ns": 7},
@@ -443,7 +457,7 @@ def test_the_spec_names_every_field_the_writer_writes(home):
         for record in _records(path):
             kind = record["event"] if record["event"] in seen else "event"
             seen[kind] |= set(record)
-    tables = _spec_tables()
+    tables = _spec_tables() if tables is None else tables
     assert {name: set(rows) for name, rows in tables.items()} == seen
     source = (HERE.parent / "chain.py").read_text(encoding="utf-8").splitlines()
     for name, rows in tables.items():
@@ -454,9 +468,8 @@ def test_the_spec_names_every_field_the_writer_writes(home):
                 "not write it")
 
 
-def test_the_control_a_field_the_spec_does_not_name_is_caught(home, monkeypatch):
+def test_the_control_a_field_the_spec_does_not_name_is_caught(home):
     tables = _spec_tables()
     del tables["event"]["t_mono_ns"]
-    monkeypatch.setattr(sys.modules[__name__], "_spec_tables", lambda: tables)
     with pytest.raises(AssertionError):
-        test_the_spec_names_every_field_the_writer_writes(home)
+        test_the_spec_names_every_field_the_writer_writes(home, tables)
