@@ -149,6 +149,9 @@ CAUSE_KINDS = frozenset({
     # route.py: a capture under the state root could not be written, so no
     # approval can ever be made for this session. T9 ruling 64.
     "CAPTURE_IO_ERROR",
+    # serve.py: a reader thread raised out of the Route, so nothing is reading
+    # that side any more. Either direction, one fault. T9 ruling R69.
+    "READER_FAILED",
 })
 
 
