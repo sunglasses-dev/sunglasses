@@ -180,7 +180,19 @@ def test_the_upstream_is_stopped_when_wiring_the_route_raises(
     def boom(**_kwargs):
         raise RuntimeError("wiring failed")
 
+    # The spawn is seen where it happens. The server's own pid file is not a
+    # control here: a group stopped at once is stopped before the server has
+    # written it, which read as "never spawned" on the very fix this pins.
+    spawned = []
+    real_popen = serve.subprocess.Popen
+
+    def recording_popen(*args, **kwargs):
+        child = real_popen(*args, **kwargs)
+        spawned.append(child)
+        return child
+
     monkeypatch.setattr(serve, "build_route", boom)
+    monkeypatch.setattr(serve.subprocess, "Popen", recording_popen)
     state = _obstruct(tmp_path, None, None)
     try:
         serve.main(["--state-root", str(state), "--"]
@@ -189,8 +201,8 @@ def test_the_upstream_is_stopped_when_wiring_the_route_raises(
                    stderr=io.StringIO())
     except Exception:
         pass
-    pid = _upstream_pid(tmp_path)
-    assert pid is not None, "the reader cannot see the spawn (control)"
+    assert len(spawned) == 1, "the upstream was never spawned (control)"
+    pid = spawned[0].pid
     try:
         assert not _still_running_after(pid), \
             f"the upstream {pid} outlived a failed wiring"
@@ -234,15 +246,31 @@ def test_a_capture_that_cannot_be_written_is_not_blamed_on_the_server(
 @pytest.mark.parametrize("linger", [False, True], ids=["echo", "linger"])
 @pytest.mark.parametrize("which", ["captures", None],
                          ids=["captures-0000", "control-none"])
-def test_every_request_is_answered_when_a_capture_cannot_be_written(
+def test_every_request_read_before_the_close_is_answered(
         tmp_path, which, linger):
+    """Gate per R66 (pending T9, A recommended). A close answers every id the
+    proxy READ and forwards nothing after it; a request still unread in the
+    pipe is not read (serve._drain_client stops on any close, as it does for
+    the receipt fault). So the tripping list is answered with the proxy's own
+    cause, and the call behind it is answered or never reaches the server."""
     state = _obstruct(tmp_path, which, "0000")
     try:
         _proc, replies = _run(tmp_path, state, linger=linger)
     finally:
         _unlock(tmp_path)
-    answered = sorted(r.get("id") for r in replies if "id" in r)
-    assert answered == [1, 2, 3], replies
+    answered = [r.get("id") for r in replies if "id" in r]
+    assert len(answered) == len(set(answered)), replies
+    if which is None:
+        assert sorted(answered) == [1, 2, 3], replies   # control
+        return
+    assert 1 in answered and 2 in answered, replies
+    (listed,) = [r for r in replies if r.get("id") == 2]
+    assert listed.get("error", {}).get("data", {}).get(
+        "reason_code") == "STATE_IO_ERROR", listed
+    if 3 not in answered:
+        ingress = tmp_path / "ingress.log"
+        seen = ingress.read_bytes() if ingress.exists() else b""
+        assert b'"tools/call"' not in seen, "a call went on after the close"
 
 
 @needs_modes
