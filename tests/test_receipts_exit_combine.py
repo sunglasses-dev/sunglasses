@@ -107,7 +107,9 @@ def test_the_three_verdicts_in_cmd_receipts_all_go_through_the_combiner():
     joined with combine_exits, and nothing is assigned to `code` bare after
     the key's own verdict."""
     source = (TREE / "sunglasses" / "cli.py").read_text(encoding="utf-8")
-    block = source.split('if getattr(args, "verify", False):\n', 1)[1].split("return code", 1)[0]
+    # The whole line: "return code" alone is also the start of "return codes.".
+    block = source.split('if getattr(args, "verify", False):\n', 1)[1].split(
+        "return code\n", 1)[0]
     assigns = re.findall(r"\n\s+code = (.+)", block)
     assert assigns[0].startswith("_verify_key("), assigns
     assert all(a.startswith("codes.combine_exits(code, ") for a in assigns[1:]), assigns

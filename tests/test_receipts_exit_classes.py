@@ -9,8 +9,9 @@ stays the CLI's usage exit. `--strict` turns a limit into 1.
 
 A code with no tag is a code whose exit nobody decided, so the enumeration test
 goes red the moment one is added to CODES without a class, and a result that is
-not a known code at all exits 1. The six limits are named here one by one, so
-moving a code between classes is a red too.
+not a known code at all exits 1. The seven limits are named here one by one,
+so moving a code between classes is a red too. NO_LOG, the seventh, is a
+`--verify` that found nothing on disk to verify (T9 ruling 53).
 """
 import json
 import os
@@ -26,7 +27,7 @@ from sunglasses.receipts import codes
 TREE = pathlib.Path(__file__).resolve().parents[1]
 
 LIMITS = {"PAIRING_UNKEYED", "EMPTY_CHAIN", "NO_SESSION", "ROTATION_UNSUPPORTED",
-          "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN"}
+          "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN", "NO_LOG"}
 OKS = {"KEY_TRUSTED", "CHAIN_OK", "NO_VISIBLE_TAIL", "ENDPOINT_CONFIRMED",
        "LIFECYCLE_COMPLETE"}
 
@@ -80,11 +81,11 @@ def test_the_control_a_tag_for_a_code_that_does_not_exist_is_found():
 
 
 @pytest.mark.parametrize("code", sorted(LIMITS))
-def test_each_of_the_six_limits_is_a_limit(code):
+def test_each_of_the_seven_limits_is_a_limit(code):
     assert codes.CLASS[code] == codes.LIMIT
 
 
-def test_the_limit_class_is_exactly_the_six():
+def test_the_limit_class_is_exactly_the_seven():
     assert {c for c, t in codes.CLASS.items() if t == codes.LIMIT} == LIMITS
 
 
@@ -166,12 +167,14 @@ def test_the_spec_states_the_exits_and_the_strict_rule():
         assert row in section
     assert "`--strict` counts a limit as a failure" in section
     assert ("LIMIT = verifier could not conclude because the CALLER did not "
-            "supply something (fingerprint, endpoint, key, session) or the "
+            "supply something (fingerprint, endpoint, key, session, log) or the "
             "feature is specified-not-built (R40), log bytes consistent with "
             "clean. FAIL = the log's bytes contradict or lack what they must "
             "carry. Every limit exits non-zero.") in section
     for code in LIMITS:
         assert f"`{code}`" in section
+    assert ("`--verify` with nothing on disk to verify prints `NO_LOG` and "
+            "exits 3") in section
     assert "(strict exit\n  0)" not in spec
 
 
@@ -214,3 +217,75 @@ def test_the_cli_exits_3_on_a_limit_and_1_under_strict(tmp_path):
     # A malformed argument stays the usage exit, never a limit.
     code, out = _cli(home, "--verify", "--endpoint", "[1]")
     assert code == 2, out
+
+
+# ── T9 ruling 53: nothing on disk is a limit, a listing is not a verdict ─────
+
+@pytest.mark.parametrize("code,default,strict", [
+    ("KEY_TRUSTED", 0, 0), ("NO_LOG", 3, 1), ("SEQUENCE_GAP", 1, 1),
+    ("NOT_A_CODE", 1, 1)])
+def test_one_code_standing_alone_exits_by_its_class(code, default, strict):
+    assert codes.exit_for(code) == default
+    assert codes.exit_for(code, strict=True) == strict
+
+
+def test_verify_with_nothing_on_disk_is_no_log_a_limit(tmp_path):
+    home = tmp_path / "empty-home"
+    code, out = _cli(home, "--verify")
+    assert "NO_LOG" in out, out
+    assert "sunglasses init" in out, out
+    assert code == codes.EXIT_LIMIT == 3, out
+    code, out = _cli(home, "--verify", "--strict")
+    assert "NO_LOG" in out, out
+    assert code == 1, out
+    assert not home.exists()
+
+
+def test_the_control_a_listing_with_nothing_on_disk_stays_0(tmp_path):
+    # Without --verify no verdict was asked for, so there is none to give.
+    code, out = _cli(tmp_path / "empty-home")
+    assert "No receipts" in out, out
+    assert "NO_LOG" not in out, out
+    assert code == 0, out
+
+
+def _vector_log(tmp_path, vector="17", name="hook"):
+    """A multi-segment log from the shipped vectors, its key beside it, and the
+    endpoint its last checkpoint commits to, read from the record itself."""
+    from sunglasses.receipts import wire
+    data = json.loads((TREE / "sunglasses" / "receipts" / "VECTORS.json").read_text())
+    v = next(x for x in data["verifier_logs"] if x["id"] == vector)
+    log = tmp_path / name
+    log.mkdir()
+    for seg in v["logs"][name]:
+        (log / seg["name"]).write_bytes(bytes.fromhex(seg["data_hex"]))
+    (log / f"{v['expected_fingerprint']}.pub").write_bytes(bytes.fromhex(v["public_hex"]))
+    lines = b"".join(bytes.fromhex(seg["data_hex"])
+                     for seg in v["logs"][name]).splitlines(keepends=True)
+    last = [line for line in lines if wire.decode_strict(line)["event"] == "checkpoint"][-1]
+    rec = wire.decode_strict(last)
+    endpoint = {"chain_id": rec["chain_id"], "seq": rec["seq"],
+                "hash": wire.record_hash(last)}
+    return log, v["expected_fingerprint"], json.dumps(endpoint), len(v["logs"][name])
+
+
+def test_a_segment_checked_alone_under_a_confirmed_log_says_so(tmp_path):
+    """T9 ruling 53 (O1), display only. Each segment is checked alone, with no
+    endpoint; under a log whose endpoint is confirmed that is not an unknown
+    extent, and printing HISTORY_EXTENT_UNKNOWN there reads as a contradiction.
+    The exit and the segment's own result are unchanged."""
+    pytest.importorskip("cryptography")
+    log, fp, endpoint, n = _vector_log(tmp_path)
+    assert n == 3
+    argv = ("--verify", "--log", str(log), "--fingerprint", fp)
+    code, out = _cli(tmp_path / "home", *argv, "--endpoint", endpoint, "--strict")
+    assert out.count("expected_endpoint: ENDPOINT_CONFIRMED") == 1, out
+    assert out.count("expected_endpoint: segment checked alone (no endpoint)") == n, out
+    assert "HISTORY_EXTENT_UNKNOWN" not in out, out
+    assert code == 0, out
+    # The control: with no endpoint the log's extent IS unknown, a limit, and
+    # every segment still says HISTORY_EXTENT_UNKNOWN.
+    code, out = _cli(tmp_path / "home", *argv)
+    assert out.count("expected_endpoint: HISTORY_EXTENT_UNKNOWN") == n + 1, out
+    assert "segment checked alone" not in out, out
+    assert code == 3, out

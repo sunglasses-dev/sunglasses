@@ -86,6 +86,12 @@ CODES = {
     "UNKNOWN_EVENT":
         "an event outside this verifier's vocabulary; its meaning is not "
         "judged, and chain integrity is unaffected",
+    # nothing to judge at all
+    "NO_LOG":
+        "nothing on disk to verify, so there is no verdict (T9 ruling 53). "
+        "Not a pass and not a failure; `sunglasses init` installs the "
+        "firewall that writes the log.",
+
     "UNKNOWN_FIELD":
         "a signed record carries a key outside the closed schema for its "
         "record kind (T9 ruling R44). A signed row's keys are the writer's, "
@@ -120,7 +126,7 @@ LIMITATIONS = {
 # Every code is exactly one of three classes, and the exit code comes from the
 # class (T9 rulings R46, R48). OK is a result that holds. LIMIT is a verifier
 # that could not conclude because the caller did not supply something
-# (fingerprint, endpoint, key, session) or the feature is specified and not
+# (fingerprint, endpoint, key, session, log) or the feature is specified and not
 # built (R40), with log bytes consistent with clean. FAIL is a log whose bytes
 # contradict or lack what they must carry. Every limit exits non-zero.
 OK, FAIL, LIMIT = "ok", "fail", "limit"
@@ -131,7 +137,8 @@ EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_LIMIT = 0, 1, 2, 3
 _OK_CODES = {"KEY_TRUSTED", "CHAIN_OK", "NO_VISIBLE_TAIL", "ENDPOINT_CONFIRMED",
              "LIFECYCLE_COMPLETE"}
 _LIMIT_CODES = {"PAIRING_UNKEYED", "EMPTY_CHAIN", "NO_SESSION",
-                "ROTATION_UNSUPPORTED", "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN"}
+                "ROTATION_UNSUPPORTED", "KEY_UNTRUSTED", "HISTORY_EXTENT_UNKNOWN",
+                "NO_LOG"}
 _FAIL_CODES = {"CHECKPOINT_MISMATCH", "CONTEXT_MISMATCH",
                "EXPECTED_CHECKPOINT_MISSING", "EXPECTED_KEY_MISMATCH",
                "HASH_LINK_MISMATCH", "KEY_UNUSABLE", "LEGACY_UNSIGNED",
@@ -180,6 +187,18 @@ def exit_code(results: dict, strict: bool = False) -> int:
     if LIMIT in classes:
         return EXIT_FAIL if strict else EXIT_LIMIT
     return EXIT_OK
+
+
+def exit_for(code: str, strict: bool = False) -> int:
+    """The exit for one code standing alone, not one of the five results
+    (NO_LOG, T9 ruling 53), derived from its class the way exit_code is. An
+    unknown code exits 1."""
+    tag = CLASS.get(code, FAIL)
+    if tag == OK:
+        return EXIT_OK
+    if tag == LIMIT:
+        return EXIT_FAIL if strict else EXIT_LIMIT
+    return EXIT_FAIL
 
 
 def strict_exit_code(results: dict) -> int:

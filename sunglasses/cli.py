@@ -1469,9 +1469,17 @@ def cmd_receipts(args):
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         files = [f for f in files if f.stem == today]
     if not files and not chain_logs:
-        print(f"\n  {DIM}No receipts in {directory}. "
+        if not getattr(args, "verify", False):
+            # A listing is not a verdict: an empty one is still exit 0.
+            print(f"\n  {DIM}No receipts in {directory}. "
+                  f"Run `sunglasses init` to install the firewall.{RESET}\n")
+            return 0
+        # --verify asked for a verdict and there is nothing to reach one on:
+        # a limit, never a pass (T9 ruling 53).
+        from .receipts import codes
+        print(f"\n  {YELLOW}NO_LOG{RESET} {DIM}-- no receipts in {directory}. "
               f"Run `sunglasses init` to install the firewall.{RESET}\n")
-        return 0
+        return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
 
     # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
     # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time

@@ -202,13 +202,13 @@ offline.
 Every reason code is exactly one of three classes, and a verifier's exit code
 comes from the class, never from a list kept somewhere else.
 
-LIMIT = verifier could not conclude because the CALLER did not supply something (fingerprint, endpoint, key, session) or the feature is specified-not-built (R40), log bytes consistent with clean. FAIL = the log's bytes contradict or lack what they must carry. Every limit exits non-zero.
+LIMIT = verifier could not conclude because the CALLER did not supply something (fingerprint, endpoint, key, session, log) or the feature is specified-not-built (R40), log bytes consistent with clean. FAIL = the log's bytes contradict or lack what they must carry. Every limit exits non-zero.
 
 - **ok**: the result holds. `KEY_TRUSTED`, `CHAIN_OK`, `NO_VISIBLE_TAIL`,
   `ENDPOINT_CONFIRMED` and `LIFECYCLE_COMPLETE`.
 - **limit**: `KEY_UNTRUSTED`, `HISTORY_EXTENT_UNKNOWN`, `PAIRING_UNKEYED`,
-  `EMPTY_CHAIN`, `NO_SESSION` and `ROTATION_UNSUPPORTED`. A limit is neither
-  a pass nor a failure, and it is never a pass.
+  `EMPTY_CHAIN`, `NO_SESSION`, `ROTATION_UNSUPPORTED` and `NO_LOG`. A limit is
+  neither a pass nor a failure, and it is never a pass.
 - **fail**: every other code, including `UNKNOWN_FIELD` (T9 ruling 44),
   `KEY_UNUSABLE`, `LEGACY_UNSIGNED` and the rotation codes a verifier does
   not emit yet.
@@ -226,6 +226,10 @@ The exit, over every result of every log verified:
 failure in one log is never hidden by a limit in another: across logs, 1 wins
 over 3. A result that is not a known code exits 1, and a new code with no
 class fails the enumeration test in CI before it can ship.
+
+`--verify` with nothing on disk to verify prints `NO_LOG` and exits 3 (1 under
+`--strict`), with the hint to run `sunglasses init` (T9 ruling 53). Without
+`--verify` the same empty listing exits 0, because a listing is not a verdict.
 
 ## The vectors
 

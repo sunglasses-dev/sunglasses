@@ -460,19 +460,28 @@ def render_log(report: LogReport, name: str = "log") -> str:
     if report.first_failure_segment is not None:
         out.append(f"first failure: {report.first_failure_segment} "
                    f"({report.failure_detail})")
+    # A segment is checked alone, with no endpoint, so on its own its extent
+    # is unknown. Under a log whose endpoint is confirmed that line reads as a
+    # contradiction, so it says what happened instead (T9 ruling 53). Display
+    # only: the segment's result and the exit are unchanged.
+    alone = report.results["expected_endpoint"] == "ENDPOINT_CONFIRMED"
     for segment_name, segment in report.segments:
         out.append("")
         out.append(f"-- {segment_name}")
-        out.append(render(segment))
+        out.append(render(segment, alone=alone))
     return "\n".join(out)
 
 
-def render(report: Report) -> str:
+def render(report: Report, alone: bool = False) -> str:
     """Five lines, then the bounds, then what a valid signature means. There
-    is no summary line, by design."""
+    is no summary line, by design. `alone` is a segment under a log whose
+    endpoint is confirmed (see render_log)."""
     out = [f"key: {report.fingerprint}"]
     for kind in codes.RESULT_KINDS:
         code = report.results[kind]
+        if alone and kind == "expected_endpoint" and code == "HISTORY_EXTENT_UNKNOWN":
+            out.append(f"{kind}: segment checked alone (no endpoint)")
+            continue
         out.append(f"{kind}: {code} -- {codes.CODES.get(code, '')}")
     if report.first_failure_line is not None:
         out.append(f"first failure: line {report.first_failure_line} "
