@@ -1419,9 +1419,9 @@ def _collect_discharged_notes(d, held_name):
     fact about the file system rather than a claim by a competing note, which
     is what makes it safe to act on where round 12's discard was not.
     """
+    retained: list = []
     if not held_name:
         return retained
-    retained: list = []
     if (d / held_name).exists():
         return retained
     # The loop variable is NOT `q`, and that is not a style choice. Round 12's

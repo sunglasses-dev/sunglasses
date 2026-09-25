@@ -13,6 +13,7 @@ test_install_transaction). The refusal is a PermissionError raised for the
 alias only, so it runs on any platform; chflags is a BSD tool.
 """
 import errno
+import hashlib
 import json
 import os
 import pathlib
@@ -145,3 +146,36 @@ def test_the_alias_is_collected_once_the_refusal_clears(
         "with the refusal gone the collect could not finish: alias %s, owner "
         "%s, retained %r" % (alias.exists(), owner.exists(), again))
     assert not _names(again, alias), again
+
+
+# R76 fold (T9 ruling 81 (3)). `_collect_discharged_notes` returned `retained`
+# BEFORE assigning it when it was handed no held name, and recovery hands it
+# exactly that for a note `_read_note` refuses but `_reclaim_one` accepts: one
+# with a valid `held` and `sha256` and no `owner`. The bytes went back and the
+# note was removed, then UnboundLocalError escaped `_reclaim_taken` and the
+# orphan sweep after it never ran. Measured on main 801ca97d, off lock.
+
+@pytest.mark.parametrize("held_name", [None, ""], ids=["none", "empty"])
+def test_a_note_with_no_held_name_collects_nothing(tmp_path, held_name):
+    assert inst._collect_discharged_notes(tmp_path, held_name) == []
+
+
+@pytest.mark.parametrize("owner", [None, "an-interrupted-take"],
+                         ids=["no_owner", "control_owner"])
+def test_recovery_from_a_note_without_an_owner_finishes(tmp_path, owner):
+    records, _, _, bytes_path = inst._record_paths(tmp_path, "github")
+    records.mkdir(parents=True)
+    held = records / "github.original.discarding-1-a"
+    held.write_bytes(b'{"a": 1}\n')
+    note = {"held": held.name,
+            "sha256": hashlib.sha256(held.read_bytes()).hexdigest()}
+    if owner is not None:
+        note["owner"] = owner
+    (records / "github.taking").write_text(json.dumps(note), encoding="utf-8")
+    read = inst._read_note(records / "github.taking")
+    assert (read is None) == (owner is None), (
+        "the stimulus did not hold: _read_note answered %r" % (read,))
+    assert inst._reclaim_taken(tmp_path, "github") is True
+    assert bytes_path.read_bytes() == b'{"a": 1}\n'
+    assert sorted(p.name for p in records.iterdir()) == ["github.original"]
+
