@@ -87,6 +87,12 @@ CODES = {
         "an event outside this verifier's vocabulary; its meaning is not "
         "judged, and chain integrity is unaffected",
     # nothing to judge at all
+    "PATH_UNREADABLE":
+        "something is on disk where a log or its key is read, and it cannot "
+        "be listed: a directory it may not read, or a file or symlink where a "
+        "directory should be (T9 ruling 57). Never NO_LOG, since nothing to "
+        "verify would be false, and never a pass; the path and the OS cause "
+        "are printed with it.",
     "NO_LOG":
         "nothing on disk to verify, so there is no verdict (T9 ruling 53). "
         "Not a pass and not a failure; `sunglasses init` installs the "
@@ -143,7 +149,8 @@ _FAIL_CODES = {"CHECKPOINT_MISMATCH", "CONTEXT_MISMATCH",
                "EXPECTED_CHECKPOINT_MISSING", "EXPECTED_KEY_MISMATCH",
                "HASH_LINK_MISMATCH", "KEY_UNUSABLE", "LEGACY_UNSIGNED",
                "LIFECYCLE_DUPLICATE", "LIFECYCLE_ORPHAN", "MISSING_GENESIS",
-               "NONCANONICAL_BYTES", "PREDECESSOR_UNAVAILABLE", "SEGMENT_MISSING",
+               "NONCANONICAL_BYTES", "PATH_UNREADABLE", "PREDECESSOR_UNAVAILABLE",
+               "SEGMENT_MISSING",
                "SEQUENCE_GAP", "SIGNATURE_INVALID", "SUCCESSOR_ASSERTED",
                "SUCCESSOR_ENDORSED", "TRUNCATED_RECORD", "UNKNOWN_EVENT",
                "UNKNOWN_FIELD", "UNVERIFIED_TAIL"}

@@ -655,6 +655,9 @@ _SITE_RESTORES = {
                            "exc.strerror or str(exc)"),
     "received_key_size": ("{RED}{_display(str(source), limit=200)}{RESET}: not a public",
                           "{RED}{str(source)}{RESET}: not a public"),
+    # R57: PATH_UNREADABLE names the path it could not list, and a path is
+    # whatever the directory tree or the caller's --log put in it.
+    "path_unreadable": ("_display(str(unreadable), limit=300)", "str(unreadable)"),
 }
 
 # The R21 sites say what a failure said, and a failure's text is whatever the
@@ -679,6 +682,14 @@ _CAUSE_SITES = {
         "pathlib.Path.read_bytes = _fail\n", None),
     "received_key_size": (
         "pathlib.Path.read_bytes = lambda self: bytes(31)\n", None),
+    "path_unreadable": (
+        "from sunglasses.receipts import _fs\n"
+        "_real = _fs.listing\n"
+        "def _fail(directory, pattern):\n"
+        "    if pattern == '*.jsonl':\n"
+        "        raise _fs.Unlistable(pathlib.Path({payload!r}), PermissionError(13, 'denied'))\n"
+        "    return _real(directory, pattern)\n"
+        "_fs.listing = _fail\n", None),
 }
 
 # Every payload carries an erase, a cursor home and a bidi override, which is

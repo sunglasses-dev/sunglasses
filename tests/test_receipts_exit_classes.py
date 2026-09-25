@@ -96,7 +96,7 @@ def test_the_ok_class_is_the_five_passing_results():
 @pytest.mark.parametrize("code", [
     "UNKNOWN_FIELD", "SEQUENCE_GAP", "LIFECYCLE_ORPHAN", "KEY_UNUSABLE",
     "LEGACY_UNSIGNED", "PREDECESSOR_UNAVAILABLE", "SUCCESSOR_ASSERTED",
-    "SUCCESSOR_ENDORSED"])
+    "SUCCESSOR_ENDORSED", "PATH_UNREADABLE"])
 def test_these_are_failures(code):
     assert codes.CLASS[code] == codes.FAIL
 

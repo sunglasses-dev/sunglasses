@@ -17,7 +17,7 @@ import pathlib
 
 
 class Unlistable(OSError):
-    """The directory exists and its entries cannot be read. Never "empty"."""
+    """Something is at the path and its entries cannot be read. Never "empty"."""
 
     def __init__(self, directory, cause: OSError):
         self.directory = pathlib.Path(directory)

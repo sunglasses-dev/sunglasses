@@ -1,8 +1,8 @@
 """Verify a receipt chain offline, and say exactly what the answer means.
 
-WIRE_SPEC §Offline: a standalone verifier with NO `sunglasses` import. It needs
-this directory's `wire.py` and `codes.py` and PyCA's Ed25519, nothing else, so
-it can be handed to an auditor who never installs the product.
+WIRE_SPEC §Offline: a standalone verifier with NO `sunglasses` import. It
+needs this directory's `wire.py`, `codes.py`, `_fs.py` and PyCA's Ed25519,
+nothing else, so it can be handed to an auditor who never installs the product.
 
 FIVE RESULTS, NEVER ONE. Key trust, chain integrity, unsigned tail, expected
 endpoint and lifecycle are computed and printed separately, and nothing here
@@ -30,9 +30,9 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 try:                                   # inside the package
-    from . import codes, wire
+    from . import _fs, codes, wire
 except ImportError:                    # the standalone bundle: a flat directory
-    import codes                       # type: ignore[no-redef]
+    import _fs, codes                  # type: ignore[no-redef]
     import wire                        # type: ignore[no-redef]
 
 CHECKPOINT = "checkpoint"
@@ -375,7 +375,7 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
     checkpoint. `expected_endpoint` may carry `chain_id` to say which segment
     it was retained from."""
     import pathlib
-    paths = sorted(pathlib.Path(directory).glob(SEGMENT_GLOB))
+    paths = _fs.listing(pathlib.Path(directory), SEGMENT_GLOB)   # R57: raises
     walks = [(p.name, _verify(p.read_bytes(), public_key, expected_fingerprint, None))
              for p in paths]
     fingerprint = wire.key_fingerprint(public_key)

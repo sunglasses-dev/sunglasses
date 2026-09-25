@@ -1307,11 +1307,12 @@ def _verify_key(home):
 
 
 def _chain_logs(directory):
-    """Each signed log is its own directory of segments (T9 ruling 15)."""
-    if not directory.is_dir():
-        return []
-    return sorted(p for p in directory.iterdir()
-                  if p.is_dir() and any(p.glob("segment-*.chain")))
+    """Each signed log is its own directory of segments (T9 ruling 15). A
+    directory here that cannot be listed raises Unlistable (R57): a signed log
+    it hides is not "no log"."""
+    from .receipts import _fs
+    return [p for p in _fs.listing(directory, "*")
+            if p.is_dir() and _fs.listing(p, "segment-*.chain")]
 
 
 def _log_label(log):
@@ -1325,8 +1326,9 @@ def _log_label(log):
 def _log_chain_ids(log, wire):
     """The chain ids a log's segments open with, to route a retained endpoint
     to the one log it was retained from."""
+    from .receipts import _fs
     ids = set()
-    for segment in log.glob("segment-*.chain"):
+    for segment in _fs.listing(log, "segment-*.chain"):
         try:
             with open(segment, "rb") as fh:
                 ids.add(wire.decode_strict(fh.readline()).get("chain_id"))
@@ -1387,8 +1389,9 @@ def _verify_received(args):
     directory. Either way it is portability, not trust: without --fingerprint
     it is KEY_UNTRUSTED, a limit."""
     import pathlib
+    from .receipts import _fs
     log = pathlib.Path(args.log)
-    if not (log.is_dir() and any(log.glob("segment-*.chain"))):
+    if not _fs.listing(log, "segment-*.chain"):          # R57: raises, never "not a log"
         print(f"\n  {RED}--log {_display(str(log), limit=200)}{RESET}: not a "
               f"directory of signed segments (segment-*.chain). Nothing "
               f"verified.\n")
@@ -1403,7 +1406,7 @@ def _verify_received(args):
                   f"Nothing verified.\n")
             return 1
     else:
-        beside = sorted(log.glob("*.pub"))
+        beside = _fs.listing(log, "*.pub")
         if len(beside) != 1:
             print(f"\n  {RED}{_log_label(log)}{RESET}: NOT verified: no public key. "
                   f"Found {len(beside)} *.pub file(s) beside the log; name one "
@@ -1429,8 +1432,9 @@ def _json_loads_object(text):
 def _receipt_public_key(home, keys):
     """The public key beside the logs: the local key's own, else the only one.
     Raw 32 bytes, or None. Never trusted on its own: see --fingerprint."""
+    from .receipts import _fs
     public_dir = home / keys.KEY_DIR / keys.PUBLIC_DIR
-    candidates = sorted(public_dir.glob("*.pub")) if public_dir.is_dir() else []
+    candidates = _fs.listing(public_dir, "*.pub")      # R57: raises, never "no key"
     private = keys.private_path(home)
     if private is not None:
         prefix = private.stem.split("-", 1)[-1]
@@ -1441,151 +1445,166 @@ def _receipt_public_key(home, keys):
     return candidates[0].read_bytes()
 
 
+def _path_unreadable(unreadable):
+    """R57: a path that is there and cannot be listed. One code, a failure in
+    both modes, naming the path and the OS cause."""
+    from .receipts import codes
+    print(f"\n  {RED}PATH_UNREADABLE{RESET} {DIM}-- "
+          f"{_display(str(unreadable), limit=300)}. Something is on disk there "
+          f"and cannot be read, so nothing under it was verified.{RESET}\n")
+    return codes.exit_for("PATH_UNREADABLE")
+
+
 def cmd_receipts(args):
-    """Pretty-print the firewall audit trail."""
-    import json as _json
-    from .firewall import sunglasses_home
+    """Pretty-print the firewall audit trail. A directory it must list and
+    cannot is PATH_UNREADABLE, exit 1, whichever road reached it (R57)."""
+    from .receipts import _fs
+    try:
+        import json as _json
+        from .firewall import sunglasses_home
 
-    if getattr(args, "action", None) == "init":
-        return _receipts_init(sunglasses_home())
-    if getattr(args, "action", None) == "off":
-        return _receipts_off(sunglasses_home())
+        if getattr(args, "action", None) == "init":
+            return _receipts_init(sunglasses_home())
+        if getattr(args, "action", None) == "off":
+            return _receipts_off(sunglasses_home())
 
-    if getattr(args, "log", None) is not None or getattr(args, "public_key", None) is not None:
-        if not getattr(args, "verify", False) or args.log is None:
-            print(f"\n  {RED}--log needs --verify, and --public-key needs --log{RESET}\n")
-            return 2
-        return _verify_received(args)
+        if getattr(args, "log", None) is not None or getattr(args, "public_key", None) is not None:
+            if not getattr(args, "verify", False) or args.log is None:
+                print(f"\n  {RED}--log needs --verify, and --public-key needs --log{RESET}\n")
+                return 2
+            return _verify_received(args)
 
-    directory = sunglasses_home() / "receipts"
-    files = sorted(directory.glob("*.jsonl"))
-    chain_logs = []
-    if getattr(args, "verify", False):
-        from .proxy.serve import state_root
-        # The proxy writes one chain per run under its own state root, and the
-        # hook's chain is under the home; both are signed with the home's key
-        # (T9 ruling 24b). A run moved with `--state-root` is not found here.
-        chain_logs = _chain_logs(directory) + _chain_logs(state_root() / "receipts")
-    if args.today:
-        import datetime
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        files = [f for f in files if f.stem == today]
-    if not files and not chain_logs:
-        if not getattr(args, "verify", False):
-            # A listing is not a verdict: an empty one is still exit 0.
-            print(f"\n  {DIM}No receipts in {directory}. "
+        directory = sunglasses_home() / "receipts"
+        files = _fs.listing(directory, "*.jsonl")
+        chain_logs = []
+        if getattr(args, "verify", False):
+            from .proxy.serve import state_root
+            # The proxy writes one chain per run under its own state root, and the
+            # hook's chain is under the home; both are signed with the home's key
+            # (T9 ruling 24b). A run moved with `--state-root` is not found here.
+            chain_logs = _chain_logs(directory) + _chain_logs(state_root() / "receipts")
+        if args.today:
+            import datetime
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            files = [f for f in files if f.stem == today]
+        if not files and not chain_logs:
+            if not getattr(args, "verify", False):
+                # A listing is not a verdict: an empty one is still exit 0.
+                print(f"\n  {DIM}No receipts in {directory}. "
+                      f"Run `sunglasses init` to install the firewall.{RESET}\n")
+                return 0
+            # --verify asked for a verdict and there is nothing to reach one on:
+            # a limit, never a pass (T9 ruling 53).
+            from .receipts import codes
+            print(f"\n  {YELLOW}NO_LOG{RESET} {DIM}-- no receipts in {directory}. "
                   f"Run `sunglasses init` to install the firewall.{RESET}\n")
-            return 0
-        # --verify asked for a verdict and there is nothing to reach one on:
-        # a limit, never a pass (T9 ruling 53).
-        from .receipts import codes
-        print(f"\n  {YELLOW}NO_LOG{RESET} {DIM}-- no receipts in {directory}. "
-              f"Run `sunglasses init` to install the firewall.{RESET}\n")
-        return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
+            return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
 
-    # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
-    # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
-    # and can find an interpreter with no sunglasses installed. But it means a
-    # recreated venv or an upgraded python leaves a hook that cannot start, and that
-    # is the ONE failure mode which writes no receipt, because nothing runs to write
-    # it. A firewall that is quietly off is worse than no firewall, so the place a
-    # user goes to read the audit trail is where it has to be said.
-    _warn_if_hook_interpreter_missing()
+        # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+        # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
+        # and can find an interpreter with no sunglasses installed. But it means a
+        # recreated venv or an upgraded python leaves a hook that cannot start, and that
+        # is the ONE failure mode which writes no receipt, because nothing runs to write
+        # it. A firewall that is quietly off is worse than no firewall, so the place a
+        # user goes to read the audit trail is where it has to be said.
+        _warn_if_hook_interpreter_missing()
 
-    # The pretty printer skips a line it cannot parse, which is right for a
-    # human scrolling their history. Verify mode inherited that skip and then
-    # certified the file, so a receipts file whose only line was a truncated
-    # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
-    # read a line must say so, not average it away.
-    # Read BYTES and decode one line at a time. `read_text()` decodes the whole
-    # file at once, so a single truncated multibyte character anywhere in it
-    # raises and the command analyses NOTHING: a write cut mid-character (the
-    # process was killed between the two appends) took down the whole audit
-    # trail with a traceback rather than reporting an incomplete run.
-    #
-    # An undecodable line is counted and LOCATED. It is never decoded with
-    # errors="replace" and then accepted, because a line rebuilt from
-    # substitution characters is not the line that was written, and reporting on
-    # it would be reporting on something nobody sent.
-    rows = []
-    unparseable = []
-    for path in files:
-        try:
-            raw = path.read_bytes()
-        except OSError as exc:
-            unparseable.append(
-                (path, 0, f"<unreadable file: {_unreadable_preview(str(exc))}>"))
-            continue
-        for lineno, chunk in enumerate(raw.split(b"\n"), 1):
-            if not chunk.strip():
-                continue
+        # The pretty printer skips a line it cannot parse, which is right for a
+        # human scrolling their history. Verify mode inherited that skip and then
+        # certified the file, so a receipts file whose only line was a truncated
+        # ENOSPC fragment reported "No orphans" and exited 0. A checker that cannot
+        # read a line must say so, not average it away.
+        # Read BYTES and decode one line at a time. `read_text()` decodes the whole
+        # file at once, so a single truncated multibyte character anywhere in it
+        # raises and the command analyses NOTHING: a write cut mid-character (the
+        # process was killed between the two appends) took down the whole audit
+        # trail with a traceback rather than reporting an incomplete run.
+        #
+        # An undecodable line is counted and LOCATED. It is never decoded with
+        # errors="replace" and then accepted, because a line rebuilt from
+        # substitution characters is not the line that was written, and reporting on
+        # it would be reporting on something nobody sent.
+        rows = []
+        unparseable = []
+        for path in files:
             try:
-                line = chunk.decode("utf-8")
-            except UnicodeDecodeError as exc:
-                # The bytes as written, never a lossy decode.
+                raw = path.read_bytes()
+            except OSError as exc:
                 unparseable.append(
-                    (path, lineno, _unreadable_preview(chunk, exc.reason)))
+                    (path, 0, f"<unreadable file: {_unreadable_preview(str(exc))}>"))
                 continue
-            try:
-                rows.append(_json.loads(line))
-            except ValueError:
-                # Decoded, so it is text — and text out of a damaged receipt is
-                # exactly the thing that must not reach a terminal as it stands.
-                unparseable.append((path, lineno, _unreadable_preview(line)))
+            for lineno, chunk in enumerate(raw.split(b"\n"), 1):
+                if not chunk.strip():
+                    continue
+                try:
+                    line = chunk.decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    # The bytes as written, never a lossy decode.
+                    unparseable.append(
+                        (path, lineno, _unreadable_preview(chunk, exc.reason)))
+                    continue
+                try:
+                    rows.append(_json.loads(line))
+                except ValueError:
+                    # Decoded, so it is text — and text out of a damaged receipt is
+                    # exactly the thing that must not reach a terminal as it stands.
+                    unparseable.append((path, lineno, _unreadable_preview(line)))
 
-    if getattr(args, "verify", False):
-        from .receipts import codes
-        # One combiner for the key, the legacy log and the chains (T9 ruling
-        # 50): a verdict joins the ones before it and never replaces them.
-        code = _verify_key(sunglasses_home())
-        if files:
-            # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
-            # lifecycle verdict is the one it always had, joined to the key's.
-            print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
-                  f"{YELLOW}LEGACY_UNSIGNED{RESET} {DIM}-- predates signing; "
-                  f"integrity status unknown, not clean{RESET}")
-            code = codes.combine_exits(code, _verify_lifecycle(rows, directory, unparseable))
-        if chain_logs:
-            code = codes.combine_exits(code, _verify_chains(chain_logs, args, sunglasses_home()))
-        return code
+        if getattr(args, "verify", False):
+            from .receipts import codes
+            # One combiner for the key, the legacy log and the chains (T9 ruling
+            # 50): a verdict joins the ones before it and never replaces them.
+            code = _verify_key(sunglasses_home())
+            if files:
+                # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
+                # lifecycle verdict is the one it always had, joined to the key's.
+                print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
+                      f"{YELLOW}LEGACY_UNSIGNED{RESET} {DIM}-- predates signing; "
+                      f"integrity status unknown, not clean{RESET}")
+                code = codes.combine_exits(code, _verify_lifecycle(rows, directory, unparseable))
+            if chain_logs:
+                code = codes.combine_exits(code, _verify_chains(chain_logs, args, sunglasses_home()))
+            return code
 
-    # A receipts file is bytes on disk: it may predate the write-side sanitize
-    # (audit H2) or have been edited since. Everything pulled out of it is treated
-    # as untrusted before it reaches the terminal.
-    colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
-    print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
-          f"{len(files)} day(s)){RESET}")
-    print(f"  {DIM}{'─' * 74}{RESET}")
-    # PRE-EXISTING, and fixed here because it is the same boundary in the same
-    # file: this table sanitized its fields, which strips a control but leaves a
-    # lone surrogate, so a valid row with `"tool_name": "mcp__tool\ud800tail"`
-    # crashed the renderer on main too. The summary below sanitized nothing at
-    # all and printed a receipt-supplied `decision` verbatim. Both go through
-    # `_display` now. Neither is a defect this PR introduced.
-    for row in rows[-args.limit:]:
-        decision = _display(row.get("decision", "?"), limit=10)
-        color = colors.get(decision, "")
-        stamp = _display(str(row.get("ts", ""))[11:19], limit=8)
-        note = _display(row.get("rule_id", ""), limit=44)
-        if row.get("lane") == "error":
-            note = _display(row.get("error", "error"), limit=44)
-        tool = _display(row.get("tool_name"), limit=24) or "-"
-        print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
-              f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
-              f"{tool:<24} {DIM}{note}{RESET}")
+        # A receipts file is bytes on disk: it may predate the write-side sanitize
+        # (audit H2) or have been edited since. Everything pulled out of it is treated
+        # as untrusted before it reaches the terminal.
+        colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
+        print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
+              f"{len(files)} day(s)){RESET}")
+        print(f"  {DIM}{'─' * 74}{RESET}")
+        # PRE-EXISTING, and fixed here because it is the same boundary in the same
+        # file: this table sanitized its fields, which strips a control but leaves a
+        # lone surrogate, so a valid row with `"tool_name": "mcp__tool\ud800tail"`
+        # crashed the renderer on main too. The summary below sanitized nothing at
+        # all and printed a receipt-supplied `decision` verbatim. Both go through
+        # `_display` now. Neither is a defect this PR introduced.
+        for row in rows[-args.limit:]:
+            decision = _display(row.get("decision", "?"), limit=10)
+            color = colors.get(decision, "")
+            stamp = _display(str(row.get("ts", ""))[11:19], limit=8)
+            note = _display(row.get("rule_id", ""), limit=44)
+            if row.get("lane") == "error":
+                note = _display(row.get("error", "error"), limit=44)
+            tool = _display(row.get("tool_name"), limit=24) or "-"
+            print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
+                  f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
+                  f"{tool:<24} {DIM}{note}{RESET}")
 
-    counts = {}
-    for row in rows:
-        counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
-    summary = "  ".join(f"{colors.get(k, '')}{_display(k, 10)}: {v}{RESET}"
-                        for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
-    print(f"  {DIM}{'─' * 74}{RESET}")
-    print(f"  {summary}")
-    # An audit trail that only reports blocks cannot answer "was it even
-    # running?", so the quiet calls are counted here on purpose.
-    print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
-          f"recorded, not just the blocks.{RESET}\n")
-    return 0
+        counts = {}
+        for row in rows:
+            counts[row.get("decision", "?")] = counts.get(row.get("decision", "?"), 0) + 1
+        summary = "  ".join(f"{colors.get(k, '')}{_display(k, 10)}: {v}{RESET}"
+                            for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
+        print(f"  {DIM}{'─' * 74}{RESET}")
+        print(f"  {summary}")
+        # An audit trail that only reports blocks cannot answer "was it even
+        # running?", so the quiet calls are counted here on purpose.
+        print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
+              f"recorded, not just the blocks.{RESET}\n")
+        return 0
+    except _fs.Unlistable as unreadable:
+        return _path_unreadable(unreadable)
 
 
 def _offer_starter_policy(args):

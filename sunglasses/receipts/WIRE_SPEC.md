@@ -210,8 +210,8 @@ LIMIT = verifier could not conclude because the CALLER did not supply something 
   `EMPTY_CHAIN`, `NO_SESSION`, `ROTATION_UNSUPPORTED` and `NO_LOG`. A limit is
   neither a pass nor a failure, and it is never a pass.
 - **fail**: every other code, including `UNKNOWN_FIELD` (T9 ruling 44),
-  `KEY_UNUSABLE`, `LEGACY_UNSIGNED` and the rotation codes a verifier does
-  not emit yet.
+  `KEY_UNUSABLE`, `LEGACY_UNSIGNED`, `PATH_UNREADABLE` (T9 ruling 57) and the
+  rotation codes a verifier does not emit yet.
 
 The exit, over every result of every log verified:
 
@@ -230,6 +230,13 @@ class fails the enumeration test in CI before it can ship.
 `--verify` with nothing on disk to verify prints `NO_LOG` and exits 3 (1 under
 `--strict`), with the hint to run `sunglasses init` (T9 ruling 53). Without
 `--verify` the same empty listing exits 0, because a listing is not a verdict.
+
+A path the verifier must list that is there and cannot be listed (a directory
+it may not read, or a file or symlink where a directory should be) prints
+`PATH_UNREADABLE` with the path and the OS cause and exits 1, with or without
+`--strict` (T9 ruling 57). It is never `NO_LOG`: something is on disk, so
+"nothing to verify" would be false. Only a path with no directory entry at all
+is absent.
 
 ## The vectors
 
