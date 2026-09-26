@@ -700,13 +700,35 @@ def descriptor_hash(descriptor) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _stat_or_absent(path):
+    """`os.stat(path)`, or None when nothing is there (ENOENT). Every other
+    OSError reaches the caller.
+
+    STAT FIRST, never `Path.exists()`. `exists()` answers False for more than a
+    missing file: a symlink loop and a parent that is a file on every version,
+    and a directory the hook cannot search on 3.14 (on 3.11 to 3.13 that one
+    raised PermissionError out of the loader instead, and the hook caught it and
+    deferred the call to the normal permission flow unchecked). Each loader read
+    False as "never installed" and the control went off with nothing on screen
+    (T9 ruling 59, Q4).
+    """
+    try:
+        return _os.stat(path)
+    except FileNotFoundError:
+        return None
+
+
 def load_pins(path) -> dict:
-    """Read pins.json. Absent = empty. Corrupt = PolicyError (never 'trust all')."""
+    """Read pins.json. Absent = empty. Corrupt or unreadable = PolicyError
+    (never 'trust all')."""
     import json as _json
     import pathlib
     p = pathlib.Path(path)
-    if not p.exists():
-        return {"tools": {}}
+    try:
+        if _stat_or_absent(p) is None:
+            return {"tools": {}}
+    except OSError as exc:
+        raise PolicyError(f"pins file at {p} is unreadable: {exc}") from exc
     try:
         data = _json.loads(p.read_text())
     except (ValueError, OSError) as exc:
@@ -855,8 +877,11 @@ def load_pin_state(path) -> "dict | None":
     import json as _json
     import pathlib as _pathlib
     p = _pathlib.Path(path)
-    if not p.exists():
-        return None
+    try:
+        if _stat_or_absent(p) is None:
+            return None
+    except OSError as exc:
+        raise PolicyError(f"pin state at {p} is unreadable: {exc}") from exc
     try:
         data = _json.loads(p.read_text())
     except (ValueError, OSError) as exc:
@@ -1327,17 +1352,19 @@ def load_policy(path) -> dict:
     """
     import pathlib
     p = pathlib.Path(path)
-    if not p.exists():
-        if (p.parent / INSTALL_MARKER).exists():
-            raise PolicyDown("missing", str(p))
-        return {}
-    # STAT BEFORE READ. A FIFO with no writer blocks in the kernel, so the hook
-    # sat past the harness's 10 second timeout with no stdout and no receipt,
-    # and a timed-out hook FAILS OPEN. A socket, a device node or a directory in
-    # that path is the same class: not a thing we can read, and answering that
-    # from metadata costs nothing and cannot block.
+    # STAT BEFORE READ, and before deciding the file is absent: only ENOENT is
+    # absent (see `_stat_or_absent`). A FIFO with no writer blocks in the
+    # kernel, so the hook sat past the harness's 10 second timeout with no
+    # stdout and no receipt, and a timed-out hook FAILS OPEN. A socket, a device
+    # node or a directory in that path is the same class: not a thing we can
+    # read, and answering that from metadata costs nothing and cannot block.
     try:
-        st = _os.stat(p)
+        st = _stat_or_absent(p)
+        if st is None:
+            marker = p.parent / INSTALL_MARKER
+            if _stat_or_absent(marker) is not None:
+                raise PolicyDown("missing", str(p))
+            return {}
     except OSError as exc:
         raise PolicyDown("unreadable", f"{exc} ({p})") from exc
     if not _stat.S_ISREG(st.st_mode):
