@@ -1,0 +1,38 @@
+{
+ "witness": "G2-16.wire_name",
+ "route": "proxy_strict",
+ "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+ "driven_against_note": "ADAPTER AGAINST HARNESS. The mediator here is the gauntlet's own passthrough, not the shipped route. This is evidence that the adapter drives the step and that the step now measures egress; it is NOT proof about the product's real route.",
+ "engine_root": "/private/tmp/claude-501/-Users-azrollin/1dbfe431-2791-4551-a3cd-4bc546953918/scratchpad/wt-gaunt",
+ "executor": "gauntlet/boundary/gen2/execute.py run()",
+ "steps": [
+  "send_file",
+  "await_client_error",
+  "assert_zero_upstream_copies"
+ ],
+ "assertions": [
+  {
+   "op": "await_client_error",
+   "id": 1601,
+   "held": true,
+   "deadline_ms": 3000,
+   "code": -32070
+  },
+  {
+   "op": "assert_zero_upstream_copies",
+   "path": "wire_name.requests.jsonl",
+   "copies": 0,
+   "held": true,
+   "basis": "proxy_strict"
+  }
+ ],
+ "mediator_settled": {
+  "reason": "PROHIBITED_SECRET",
+  "forwarded": false,
+  "finding": true,
+  "inspection_complete": true,
+  "detector_status": "complete"
+ },
+ "recorded_at": "2026-09-22T20:17:30.690968+00:00",
+ "run_id": "2647b42dc118d1cf"
+}

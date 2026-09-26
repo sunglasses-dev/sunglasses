@@ -1,0 +1,408 @@
+{
+ "map_version": 1,
+ "revision": "2026-09-23-h",
+ "authored_by": "T10",
+ "review_state": "reviewed",
+ "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
+ "bound_to": {
+  "adapter_path": "gauntlet/boundary/gen2/adapter.py",
+  "mediator_paths": [
+   "gauntlet/boundary/proxy",
+   "gauntlet/boundary/client",
+   "gauntlet/boundary/destination"
+  ],
+  "note": "Relevant identity changes invalidate every entry until revalidated. The producer records the digests it actually read; a digest mismatch invalidates this map rather than carrying it across."
+ },
+ "units": {
+  "note": "Capability is not the opcode. An entry declares which tuple decides it, because opcode membership omits actor, selector, target, direction, schema, barriers and transport.",
+  "arm_fault": "opcode+kind",
+  "await_event": "opcode+event+actor",
+  "default": "opcode"
+ },
+ "enumerated_values": {
+  "arm_fault.kind": {
+   "available": [
+    "exception",
+    "hang",
+    "barrier"
+   ],
+   "source": "gauntlet/boundary/proxy/fault_dispatch.py:45 SELECTABLE",
+   "basis": "enumerated_source_constant",
+   "note": "An explicit closed list, so membership is an enumeration rather than a resemblance. A kind outside it is a real-route capability, not an unclassified op."
+  },
+  "await_event.event": {
+   "available": [
+    "SCAN_STARTED",
+    "HOLD_ENTERED",
+    "CANCEL_ACCEPTED"
+   ],
+   "source": "gauntlet/boundary/gen2/adapter.py SUPPORTED_EVENTS",
+   "basis": "enumerated_source_constant",
+   "note": "Four of the contract's seven are refused by name. Binding one to a neighbouring event would make the adapter the author of the scenario's meaning."
+  },
+  "plan.refusal_class": {
+   "available": [
+    "drivable",
+    "missing_operation",
+    "event_gap",
+    "no_steps",
+    "fault_gap"
+   ],
+   "source": "gauntlet/boundary/gen2/adapter.py CLASSES / classify()",
+   "basis": "enumerated_source_constant",
+   "note": "A REFUSAL CLASS NOBODY NAMES IS A REFUSAL CLASS NOBODY COUNTS. `event_gap` existed in behaviour and in no vocabulary: the coverage ledger and both route sweeps caught only `missing_operation`, and their accounting still summed to 74 because the operation check always fired first. Implementing release_any_old_workers removed the mask and four G2-21 variants fell out of the accounting entirely. Measured 2026-09-22: 27 drivable, 43 missing_operation, 4 event_gap. FIFTH CLASS 2026-09-23, fault_gap: an arm_fault (kind, target) pair the executor cannot inject. Checked last, so no variant moves today; measured that assert_pending_retired alone would have made four release_scheduler variants drivable and unfaulted."
+  }
+ },
+ "classified": {
+  "answer_relist": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "no occurrence of relist, next_page or cursor machinery anywhere in proxy/, client/ or destination/",
+   "caveat": "absence by inspection is not proof of exhaustive absence; it is a located judgement, revalidated when the route identity changes",
+   "status": "PARKED 2026-09-23 (T9 ruling). The 'absent' above is about the HARNESS tree and is true there; the PRODUCT has lazy relist + a cursor pager since #168 (route.py list_changed -> _activated=False; next tools/call -> _activate_once -> activation.activate(list_pages=self._pager()) -> snapshot.collect). Measured at plan level over all 74 variants: implementing this op alone unlocks 0 witnesses; +1 (G2-19.removed_tool) only once APPROVAL_INVALIDATED is emitted (T8 5b9e2b8, 0.6.1) and mirrored. The contract answers the relist BEFORE the triggering call while the product relists ON it, so a build must be an armed responder, not a blocking wait. Do not rebuild from the 'absent' label. Note: ~/.claude/state/warroom/ANSWER_RELIST_MEASURED_2026-09-23.md"
+  },
+  "answer_next_page": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "as answer_relist: no pagination machinery in the mediator",
+   "caveat": "absence by inspection is not proof of exhaustive absence",
+   "status": "PARKED 2026-09-23 with answer_relist (same note). Its one user, G2-19.paged_list, also needs assert_generation_not_activated, so this op alone unlocks 0."
+  },
+  "set_pin_state": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03: pin is a real-route capability only T8's proxy will have"
+  },
+  "assert_pin_matches_reviewed_hash_only": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, pin family"
+  },
+  "begin_explicit_approval": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_no_implicit_approval_or_pin_write": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval and pin families"
+  },
+  "launch_and_approve": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_no_inherited_approval": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "commit_reviewed_snapshot_only": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "switch_upstream_snapshot": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "assert_generation_not_activated": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, approval family"
+  },
+  "restart_with_same_pin_store": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, pin family"
+  },
+  "configure_private_doctor_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family"
+  },
+  "invoke_real_doctor": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family; the operation names the real product surface"
+  },
+  "assert_configured_route_status": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, doctor family"
+  },
+  "arm_receipt_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "execute_receipt_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "assert_production_receipt_schema_redaction_and_completion": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, receipts family"
+  },
+  "arm_process_transport_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "execute_process_transport_profile": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "assert_deadline_and_process_group_cleanup": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "evidence": "T9 ruling 2026-09-14 04:03, transport limits family"
+  },
+  "invoke_real_install": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "the operation invokes the real installation entry point; the stand-in mediator has no installer"
+  },
+  "invoke_real_uninstall_if_profile_allows": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "as invoke_real_install"
+  },
+  "execute_config_transaction_profile": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "config transaction machinery is a product surface; absent from the mediator"
+  },
+  "snapshot_private_config_bytes_and_mode": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "reads real private configuration bytes and mode; absent from the mediator"
+  },
+  "compare_config_bytes_entries_mode_and_claim": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "compares real configuration state; absent from the mediator"
+  },
+  "assert_zero_upstream_copies": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "2647b42dc118d1cf",
+   "step_record": "gauntlet/report/witnesses/G2-16.wire_name.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "G2-16.wire_name driven on proxy_strict through gauntlet/boundary/gen2/execute.py. The step recorded copies=0 held=true and the mediator's own receipts recorded SETTLED reason=PROHIBITED_SECRET forwarded=false, so the assertion and the mediator agree. ADAPTER AGAINST HARNESS: the mediator driven here is the gauntlet's own passthrough, not the shipped route, so this is evidence that the adapter drives the step and that the step measures egress. It is NOT proof about the product's real route and must not be read as the stronger claim.",
+   "caveat": "This step could not hold on ANY run before 2026-09-22: it counted the reference file against the client wire, and the reference IS the file the schedule sends. Two runs of this variant, one with the scanner raising and one with it finding the secret, printed identical output. The witness is therefore evidence about the CORRECTED step."
+  },
+  "assert_no_second_forward_and_no_pending_overwrite": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "ruled_by": "T8",
+   "ruled_at": "2026-09-22",
+   "evidence": "WITNESS 2b. G2-20.duplicate_pending driven on proxy_strict AFTER the harness mediator was made to mirror the product: exactly one forward for id 2002, none forwarded twice, one ADMISSION_REFUSED naming duplicate_pending_id, and SETTLED MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING with forwarded=false. The subject comes from the REUSED ID and not from payload content, which is why it arrives even though these requests carry nothing inspectable. ADAPTER AGAINST HARNESS: this says the harness now behaves as T8 measured the product behaving, NOT that the product does. ANSWERED YES. sunglasses/proxy/session.py: a request whose id is already in `_owed` emits ADMISSION_REFUSED with reason 'duplicate_pending_id', tears down with Cause MALFORMED_CLIENT / ID_REUSED_WHILE_PENDING, and RETURNS BEFORE the `_owed[request_id] = ...` assignment \u2014 so there is no second forward and the pending entry is never overwritten. Both halves are observable: the refusal is a receipt and the teardown carries a typed cause. Re-verified at gauntlet/report-rebase head, not taken from the report: the refuse, the teardown and the early return are lines 335-343, and ID_REUSED_WHILE_PENDING is raised from session.py and pump.py both.",
+   "executed_attempt": {
+    "run_id": "d728bee81e860d7f",
+    "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.json",
+    "outcome": "NO SUBJECT \u2014 not a pass and not a failure",
+    "detail": "Driven end to end on G2-20.duplicate_pending. The scenario's precondition never arises in this harness: the requests carry `arguments: {}`, so the mediator records NO_INSPECTABLE_CONTENT, never holds (HOLD_ENTERED held=false) and writes no RPC_EGRESS. With nothing pending there is nothing for the property to be true of. The first version of this assertion returned held=true on that emptiness, which is the vacuous pass this harness keeps finding in itself; it now reports subject=false.",
+    "separate_harness_gap": "Not exercised by this run: passthrough.py assigns `self._pending[request_id] = handle` unconditionally with no duplicate check, where the product refuses with ADMISSION_REFUSED duplicate_pending_id and tears down. Even given a held request, this harness would not reproduce the product's behaviour.",
+    "superseded_by": "witness 2b, run 0a38cebd95ebe37b. Kept, not replaced: subject=false was the true state of the harness before the mirror, and a record that quietly becomes a pass hides that the instrument changed."
+   },
+   "run_id": "0a38cebd95ebe37b",
+   "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.2b.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness"
+  },
+  "assert_secondary_and_reverse_complete_independently": {
+   "bucket": "route_capability",
+   "basis": "reviewed_ruling",
+   "ruled_by": "T8",
+   "ruled_at": "2026-09-22",
+   "evidence": "ANSWERED YES FOR DISTINCT IDS. `_owed` is keyed per id and each entry carries its own `origin` alongside `at` and `method` (session.py), so two items with different ids complete independently. Verified at head.",
+   "caveat": "NOT UNCONDITIONAL, and an adapter that asserts it as such is WRONG on one shape. Where a client id is REUSED while still pending \u2014 G2-15 \u2014 the answer is a deliberate NO: that is the same teardown as the row above, by design. An implementation of this op must scope its claim to distinct ids or it will fail a scenario the product handles correctly.",
+   "witnessed_by": {
+    "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+    "run_id": "34acaf393f5c",
+    "scope": "distinct ids only, as ruled; typed ids \"2001\" and 2001 held apart"
+   }
+  },
+  "arm_fault[kind=request_worker]": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "d728bee81e860d7f",
+   "step_record": "gauntlet/report/witnesses/G2-20.duplicate_pending.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "G2-20.duplicate_pending driven on proxy_strict. The step selected the worker's `barrier` mode for the session and the run recorded it. Scoped: the mode is chosen before the session starts, which is faithful only because every delivered schedule arms BEFORE its first send. KEYED PER KIND, because `units.arm_fault` is 'opcode+kind' and this map's whole point is that capability is not the opcode. A bare `arm_fault` entry collapsed the per-kind buckets and broke two acceptance controls, which is the controls doing their job."
+  },
+  "arm_fault[kind=result_worker]": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "34acaf393f5c",
+   "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "evidence": "WITNESS 3. G2-20.typed_ids driven on proxy_strict in head_of_line mode. The barrier was SCOPED to the item the kind names (str \"2001\", result): the wrapper's hold log shows exactly that item, the secondary (int 2001) and the reverse request completed, the hold was released IN the session (1731-1764 ms after the run began, behind the secondary's scan), and the primary then settled CLEAN, forwarded, byte-identical, id type str. 3/3 identical per mode (head_of_line and contract), run ids in the step record.",
+   "caveat": "Adapter-against-harness, not the shipped product. Before a7afd09 this kind could not have a subject: the barrier held every scan and was released only after the session ended, so every held item died at SCAN_DEADLINE while the row said released:true."
+  },
+  "release_fault_barrier": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "34acaf393f5c",
+   "step_record": "gauntlet/report/witnesses/G2-20.typed_ids.proxy_strict.json",
+   "driven_against": "gauntlet/boundary/proxy/passthrough.py",
+   "witness_class": "adapter-against-harness",
+   "ruled_by": "T9",
+   "ruled_at": "2026-09-23",
+   "basis_commits": {
+    "a7afd09": "released IN the session, only once the scoped hold was entered (require_fresh_barrier)",
+    "9be748d": "witness 3, 3/3 identical per mediator mode"
+   },
+   "evidence": "WITNESS 3 (G2-20.typed_ids). The release was touched at the step's place in the schedule after the wrapper's log showed the named item ENTERED the hold; the held item then settled CLEAN and forwarded. Before a7afd09 the release ran after the server had exited, so nothing waiting on it was ever released and the row still said released:true.",
+   "answers": {
+    "open_question": "release and barrier machinery is present (fault_dispatch.py:100, passthrough.py:349) but integration is unevidenced; presence of a symbol is not integration",
+    "owner": "T8",
+    "declared_at": "2026-09-14"
+   }
+  },
+  "cancel_behind_scan": {
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "no per-run id exists; 24 runs (8 configs x 3) at gauntlet 5d8cc9f, each in the step record",
+   "step_record": "gauntlet/report/witnesses/cancel_behind_scan.product.runs.json",
+   "driven_against": "PRODUCT: sunglasses/proxy serve._drain_client + serve._drain + route.Route at 474c849 (both --worker modes) and 35f04ce (in-process)",
+   "witness_class": "product-route (serve's own reader loops)",
+   "ruled_by": "T9",
+   "ruled_at": "2026-09-23",
+   "finding": "#7: a cancel arriving on the client thread while its OWN request is scanned is read only after the scan; a clean scan forwards the cancelled call +1.1-3.4 s; 1/15 the client got the RESULT. Cross-thread cancel works 12/12.",
+   "red_row": "tests/proxy/test_cancel_behind_scan.py (2199b7e): deterministic, xfail(strict) on main; fails without the marker on 'the server received a call the client cancelled while it was held'",
+   "evidence": "warroom/CANCEL_BEHIND_SCAN_2026-09-23.md",
+   "caveat": "The first key compared B's cancel with the REQUEST scan (the wrong item) and read True; corrected to the marked item's scan. The stub server answers instantly, so 1/15 is 'possible', not a rate."
+  },
+  "release_any_old_workers": {
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "the mediator emits WORKER_OUTPUT with accepted and discarded_reason (gauntlet/boundary/proxy/passthrough.py:379-381); gen2/adapter.py:50 lists the op in IMPLEMENTED (added 2026-09-22 with its test); gen2/execute.py:727 answers it from those WORKER_OUTPUT receipts, including discard and absence",
+   "caveat": "an inspection of the HARNESS mediator, not a run and not the product route: no executed witness exists and release semantics are not certified. All 5 delivered variants naming it stay blocked by event gaps, so reclassifying it moves no count (main stays 29/40/5/0/0)",
+   "reconciled": "2026-09-23 (T10), ASTRA capmap-88403e5-r1 NO GO: the entry was stale. It was unclassified with open_question \"discard machinery present (passthrough.py:375) but no evidence a schedule drives it\" (declared 2026-09-14, owner T8) after the op was implemented"
+  }
+ },
+ "unclassified": {
+  "execute_armed_worker_fault": {
+   "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  },
+  "assert_pending_retired": {
+   "open_question": "retirement is emitted at passthrough.py:528 but whether the adapter can assert it is unevidenced",
+   "owner": "T8",
+   "declared_at": "2026-09-14"
+  }
+ },
+ "coverage_losses": {
+  "native_direct_route": {
+   "scenarios": [
+    "G2-12"
+   ],
+   "tests_refused": [
+    "test_astra_fit_round3.py::test_r1_actual_g2_12_direct_route_is_gradeable",
+    "test_astra_fit_round4.py::test_r1_configured_direct_route_produces_own_capture",
+    "test_astra_fit_round5.py::test_native_direct_independent_captures",
+    "test_astra_fit_native.py::test_native_g2_04_pair"
+   ],
+   "reason": "The frozen config at ARCHIVE/evidence/GATE2_RUN_2026-09-13/live4/G2-04.main.control/mcp.control.json names an absolute node entrypoint inside ANOTHER SESSION'S scratchpad (78494234-...), which was reaped. No durable install of @modelcontextprotocol/server-filesystem exists on this machine. The child dies MODULE_NOT_FOUND.",
+   "effect": "There is NO executed native direct-route evidence for G2-12 while this holds. Refused by name rather than run, the same answer this harness gives hook_stdout and release_scheduler: a scenario whose component does not exist is not a failing scenario.",
+   "cost_before_refusing": "Each of the three waited ten seconds and, until run_one released its observer in a finally, took four neighbours down with it. Three failing rows were failing seven.",
+   "re_enable": "A pinned, gitignored, per-checkout install of the server-filesystem package. Test-only dependency. The delivery is NOT edited and no network fixture was installed off a peer ruling.",
+   "declared_at": "2026-09-22",
+   "downstream": {
+    "test_astra_fit_round2.py::test_r4_native_pair_counters": "reads evidence/native_pair/results.json, which test_native_g2_04_pair writes. Refused naming its producer rather than reporting a missing file, because 'the file is not there' sends the next reader looking for a path problem when the answer is that nothing produced it."
+   }
+  },
+  "v1_2_correction_checks": {
+   "tests_refused": [
+    "test_v1_2_corrections_vendored.py::test_all_43_correction_checks_pass_including_the_restorations"
+   ],
+   "reason": "grader_v1_2.FIT is the absolute path /private/tmp/GATE2_FIT_40d5c26_2026-09-14, a private temporary tree that was reaped. The durable copy on the review Desktop carries the calibration PLAN and none of the row.json outputs, which are the run's results and existed only there.",
+   "effect": "ASTRA's 43 v1.2 correction checks, including the three restoration controls, have nothing to grade. His script is NOT edited.",
+   "re_enable": "Re-run the calibration pair and keep its row.json somewhere durable. This is a missing RUN, not a path fix.",
+   "declared_at": "2026-09-22"
+  }
+ },
+ "branch_subjects": {
+  "what": "Kinds with a SUBJECT on a product BRANCH and none on main. NOT counted by classify(): main counts stay drivable/missing_op/event_gap/no_steps/fault_gap = 29/40/5/0/0.",
+  "finding_6": "client envelope says status not_run for a validate-refused worker answer while disk records SCAN_RESULT exception/schema_invalid (route.py:575 default under record=False); pre-existing on main in-process; own 0.6.1 row, T8 lane",
+  "kinds": {
+   "worker_missing_axes": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control (honest child) PROHIBITED_CONTENT"
+   },
+   "worker_false_string": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control PROHIBITED_CONTENT"
+   },
+   "worker_conflicting_allow": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld; control PROHIBITED_CONTENT"
+   },
+   "worker_wrong_binding": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, withheld (after T8 489cb71 removed the parent-binding stamp); control PROHIBITED_CONTENT"
+   },
+   "worker_review_only": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "REVIEW_REQUIRED, complete, withheld; control delivered clean"
+   },
+   "worker_finding_incomplete": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "SCAN_EXCEPTION, status incomplete, rule GLS-PI-016-API kept; control PROHIBITED_CONTENT"
+   },
+   "worker_complete_finding": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "PROHIBITED_CONTENT, complete/accepted, GLS-MECH-003 + GLS-PI-016-API; failing control = finding_incomplete on the same payload"
+   },
+   "receipt_worker": {
+    "subject_on": "474c849 (feat/worker-process-opt-in, --worker process; c7c7072 merged)",
+    "subject_on_main": "NONE on 35f04ce: no worker process is wired, so these shapes cannot arise",
+    "driver": "gauntlet/boundary/gen2/product_route.py (real Route + real ProcessScan; one substitution = the child)",
+    "repeats": "3/3 identical at 489cb71; re-driven 1x on 474c849 and on a local c7c7072+489cb71 merge, verdicts identical",
+    "note": "~/.claude/state/warroom/PRODUCT_ROUTE_WORKER_KINDS_2026-09-23.md",
+    "observed": "FULL (was PARTIAL): 9 failing-child stimuli authored from the PRODUCT's receipt vocabulary (P in every receipts.PERMITTED_FIELDS name, in status/detector_status/decision/finding rule_id, in error extras, as stdout exception text, as a second stdout line, on stderr) -> SCAN_EXCEPTION, withheld, cause schema_invalid or malformed_output, P absent from every receipt and from the client, session reaches WRITE_COMPLETE (never stopped); honest-child control PROHIBITED_CONTENT; positive controls prove the leak detector sees P. 3/3 on 474c849.",
+    "report": "gauntlet/boundary/gen2/receipt_worker_report.py N <product-root> [out]"
+   }
+  }
+ },
+ "review_receipt": "reviews/2026-09-23-h.receipt.json"
+}
