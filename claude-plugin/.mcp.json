@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sunglasses": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "sunglasses.mcp"
+      ]
+    }
+  }
+}
