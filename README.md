@@ -33,7 +33,7 @@ a child process and mediates the stdio session between it and your client.
 **What it does depends entirely on whether that server has been approved, and
 the two states are very different.**
 
-### Before approval — nothing is inspected
+### Before approval, nothing is inspected
 
 Out of the box, every `tools/list` and `tools/call` is refused before any
 inspection runs. The client receives a typed JSON-RPC error:
@@ -69,7 +69,7 @@ prompt.
 
 **An approval belongs to one server, not to a tool list.** The snapshot hash
 covers the descriptors, and two different servers exposing the same tools have
-the same `snapshot_sha256` — but they get different `server_id`s, and the
+the same `snapshot_sha256`, but they get different `server_id`s, and the
 approval is stored against the `server_id`. Measured: two servers whose
 captures both read `snapshot_sha256` `26aeeb2f7c5b61aa…` carry the ids
 `8740fa6360ce72946fa5a99e86974e01` and `0096972d2543ec556ad9eefe9c144b05`, and
@@ -80,7 +80,7 @@ So **changing the command behind a familiar tool list does not inherit the
 approval you already gave.** A server that presents the same descriptors as one
 you trust is still a server you have not approved.
 
-### After approval — both directions, in the credential lane
+### After approval (both directions, in the credential lane)
 
 With the snapshot approved, the mediator inspects messages in both directions
 and withholds one whose content the engine blocks, returning the reason code,
@@ -98,16 +98,16 @@ the rule, the bytes inspected and the rule ids that fired:
 - **`GLS-SD-010` is line-anchored, and that is a limit in every channel.** It
   matches an assignment at the start of a line, so a `KEY=value` that is
   indented by any whitespace, or sits inside a JSON string, or sits behind a
-  quote, is not matched **on any channel** — not in a tool result, and not in a
+  quote, is not matched **on any channel**, not in a tool result, and not in a
   file or a message either, which are channels it does declare. Indentation
   alone is enough, which makes this wider than it sounds: a config block, a YAML
   mapping or an indented snippet all miss. Note the assignment's POSITION is
-  what matters and not the quoting of its value — `PASSWORD="hunter2"` at a line
+  what matters and not the quoting of its value. `PASSWORD="hunter2"` at a line
   start is matched, `"PASSWORD=hunter2"` is not. When the value is in a known credential format the
   `GLS-SD-001` family still catches it everywhere (`GLS-SD-001` on file,
   message and web content, `GLS-SD-001-API` in a tool result), so what is
-  actually uncovered is an assignment whose value has no recognisable shape —
-  a password, a DSN, an internal token — once it is embedded. Closing it needs
+  actually uncovered is an assignment whose value has no recognisable shape
+  (a password, a DSN, an internal token) once it is embedded. Closing it needs
   a different anchor, which is a new rule with its own fixtures rather than a
   channel added to this one.
 - **A credential in a tool CALL does not reach the server.** Verified by reading
@@ -127,13 +127,13 @@ Four exit statuses, deliberately different signals:
 | exit | meaning |
 |---|---|
 | `0` | inspection completed in the supported scope, and nothing matched |
-| `1` | threat found — the inspection may still have been incomplete, and that is reported alongside |
-| `3` | **incomplete** — nothing matched in the part that was inspected; some component was not |
+| `1` | threat found (the inspection may still have been incomplete, and that is reported alongside) |
+| `3` | **incomplete**, nothing matched in the part that was inspected; some component was not |
 | `2` | usage or operational error |
 
 **`0` and `3` never collapse into each other.** "Everything I support reading here was read,
 and nothing matched" and "this format was not inspected" are different facts, and the second
-one is where agents get hurt. Exit `0` is not a guarantee that a file is safe — only that the
+one is where agents get hurt. Exit `0` is not a guarantee that a file is safe, only that the
 supported scope was covered and no pattern fired. In JSON the same split is explicit:
 `is_clean` is `not threat_found and inspection_complete`.
 
@@ -154,9 +154,9 @@ fails on an HTTP error instead of saving the error page, so the script only runs
 download actually succeeded.
 
 The script writes three fixture files into a temp directory, and deliberately scans a fourth
-path that does not exist — five scanner invocations in total, because the archive is scanned
+path that does not exist, five scanner invocations in total, because the archive is scanned
 twice (human output and JSON). The script's own commands execute; **scanned content stays
-data** — it is never executed, and the ZIP is not extracted.
+data** (it is never executed, and the ZIP is not extracted).
 
 Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
 presentation are not shown because they vary:
@@ -199,7 +199,7 @@ And the same archive as JSON. Selected fields from the scan document, not the wh
 ```
 
 `decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
-the result says so. **Do not treat `decision: allow` alone as permission to proceed — this
+the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
 result is incomplete.** The document exposes the distinction; acting on it is the caller's
 job.
 
@@ -208,21 +208,21 @@ fields; report a mismatch against your installed version.*
 
 ⭐ If this is useful, consider starring the repository.
 
-**🕶 Or try it in your browser — no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) — scan text, GitHub repos, or images. Image OCR runs locally in your browser; the image never leaves your device.
+**🕶 Or try it in your browser, no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) (scan text, GitHub repos, or images). Image OCR runs locally in your browser; the image never leaves your device.
 
 ---
 
 ## What is SUNGLASSES?
 
-Most AI agent attacks don't look like attacks. They hide inside normal-looking content — emails, web pages, images, audio, PDFs, QR codes — and try to hijack your agent's behavior.
+Most AI agent attacks don't look like attacks. They hide inside normal-looking content (emails, web pages, images, audio, PDFs, QR codes) and try to hijack your agent's behavior.
 
-SUNGLASSES is a free, open-source input inspection layer. It does not sit invisibly in front of your agent and sanitise everything it reads — nothing does. It gives you three surfaces you invoke deliberately:
+SUNGLASSES is a free, open-source input inspection layer. It does not sit invisibly in front of your agent and sanitise everything it reads (nothing does). It gives you three surfaces you invoke deliberately:
 
-- **`sunglasses scan`** — inspect a file, a repo or a string on demand, in CI or at the terminal. Reports what it found *and what it could not read*.
-- **The Claude Code firewall hook** — inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
-- **The MCP server** — exposes scanning to an agent as a tool it can call.
+- **`sunglasses scan`**, inspect a file, a repo or a string on demand, in CI or at the terminal. Reports what it found *and what it could not read*.
+- **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
+- **The MCP server**, exposes scanning to an agent as a tool it can call.
 
-It flags; it does not silently strip. Content it cannot inspect — an archive, an image whose OCR is unavailable, a file over the size cap — is reported as **not inspected**, never as clean.
+It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean.
 
 **What it scans:**
 - Text: emails, messages, files, APIs, web content, logs
@@ -233,7 +233,7 @@ It flags; it does not silently strip. Content it cannot inspect — an archive, 
 - QR Codes: decode QR codes and barcodes, scan content
 
 **What it catches:**
-- Prompt injection (English-first; dedicated non-English patterns in 13 languages, two patterns each — see [Language coverage](#language-coverage-measured))
+- Prompt injection (English-first; dedicated non-English patterns in 13 languages, two patterns each, see [Language coverage](#language-coverage-measured))
 - Credential exfiltration
 - Command injection
 - Memory poisoning
@@ -242,18 +242,18 @@ It flags; it does not silently strip. Content it cannot inspect — an archive, 
 
 **What it doesn't do:**
 - Doesn't touch authentication (OAuth, cookies, tokens, headers)
-- Doesn't monitor agent behavior (that's SHIELD — coming later)
-- Runs 100% locally — no cloud, no API keys, no telemetry for scanning
+- Doesn't monitor agent behavior (that's SHIELD, coming later)
+- Runs 100% locally, no cloud, no API keys, no telemetry for scanning
 
-**Email screening:** A real client sends a real email. But their PC is infected — malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, `scanner.scan_email(body, attachments)` returns a scan document — the findings, the three axes, and a named list of anything it could not read — and **your code decides** whether to pass the mail on, quarantine it or ask a human. Nothing is silently rewritten or stripped: SUNGLASSES flags, you act. An attachment that needs a DEEP scan is reported as not yet inspected rather than counted as clean.
+**Email screening:** A real client sends a real email. But their PC is infected, malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, `scanner.scan_email(body, attachments)` returns a scan document (the findings, the three axes, and a named list of anything it could not read) and **your code decides** whether to pass the mail on, quarantine it or ask a human. Nothing is silently rewritten or stripped: SUNGLASSES flags, you act. An attachment that needs a DEEP scan is reported as not yet inspected rather than counted as clean.
 
-## We're Not the Only Ones — And That's OK
+## We're Not the Only Ones, And That's OK
 
-Tools like **Lakera Guard**, **LLM Guard**, **NVIDIA NeMo Guardrails**, and **Azure Prompt Shields** also protect AI agents from prompt injection. They're good at what they do — especially ML-based detection of novel attacks.
+Tools like **Lakera Guard**, **LLM Guard**, **NVIDIA NeMo Guardrails**, and **Azure Prompt Shields** also protect AI agents from prompt injection. They're good at what they do, especially ML-based detection of novel attacks.
 
 We built SUNGLASSES for a different use case: **local-only, offline, zero-cost, no LLM needed.** Your data never leaves your machine. No API keys. No cloud calls. Works air-gapped.
 
-Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapter system** to connect with other security tools in the same pipeline. Security is layers — we're the local foundation layer.
+Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapter system** to connect with other security tools in the same pipeline. Security is layers, we're the local foundation layer.
 
 ## Privacy
 
@@ -301,14 +301,14 @@ sunglasses info
 
 ### Exit codes
 
-Every scan exits through one contract, on every path — text, file, repo, deep
-scan, and errors. `0` is a claim, so it is reserved for scans that earned it.
+Every scan exits through one contract, on every path (text, file, repo, deep
+scan, and errors). `0` is a claim, so it is reserved for scans that earned it.
 
 | code | meaning |
 |---|---|
-| `0` | Inspection completed in the supported scope, and nothing matched. Not a statement that the file is safe — only that everything we could read was read, and no pattern fired. |
+| `0` | Inspection completed in the supported scope, and nothing matched. Not a statement that the file is safe, only that everything we could read was read, and no pattern fired. |
 | `1` | Threat found. Incompleteness, if any, is still reported alongside it. |
-| `2` | Usage or operational error — **nothing was scanned in the scope this invocation was asked for**. A path that does not exist, a directory, a socket, an unreadable file, an invalid argument, a failed deep scan. For an aggregate (a repository, an email with attachments) a *part* that could not be read is reported as incomplete (`3`) with that part named — `2` is for the case where the whole request failed. |
+| `2` | Usage or operational error, **nothing was scanned in the scope this invocation was asked for**. A path that does not exist, a directory, a socket, an unreadable file, an invalid argument, a failed deep scan. For an aggregate (a repository, an email with attachments) a *part* that could not be read is reported as incomplete (`3`) with that part named. `2` is for the case where the whole request failed. |
 | `3` | **Incomplete**: found nothing in the part that could be read. An archive we do not extract, a PDF whose text layer needs `sunglasses[media]`, audio without `--deep`, or input past the size cap. |
 
 Precedence is `1 > 3 > 2 > 0`: a threat we did find outranks the part we could
@@ -345,7 +345,7 @@ sunglasses scan --file meeting.mp4 --deep      # scan video
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
-**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost is roughly linear in input length (~50 µs/byte) — but **not on every input shape**: the matcher is quadratic on a single unbroken token, so a long token can cost far more than its length suggests (measured curve and consequences in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md)). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes — a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
+**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost is roughly linear in input length (~50 µs/byte), but **not on every input shape**: the matcher is quadratic on a single unbroken token, so a long token can cost far more than its length suggests (measured curve and consequences in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md)). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes, a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
 
 **Exit codes.** `0` = read the whole input, found nothing. `1` = threat found. `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 
@@ -398,9 +398,9 @@ result = scanner.scan_auto("any_file.ext")
 
 | Metric | Value |
 |--------|-------|
-| Scan latency — short input (18 chars) | ~0.7 ms |
-| Scan latency — typical attack string (median of 38) | ~4.2 ms |
-| Scan latency — real README (median of 76, ~8.1 KB) | ~311 ms |
+| Scan latency, short input (18 chars) | ~0.7 ms |
+| Scan latency, typical attack string (median of 38) | ~4.2 ms |
+| Scan latency, real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
 | Patterns | 1,554 |
 | Keywords | 6,964 unique declared (7,786 entries across all patterns); the pre-screen index holds 6,675 — 289 generic keywords are deliberately excluded from it. `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
@@ -408,15 +408,15 @@ result = scanner.scan_auto("any_file.ext")
 | Attack categories | 118 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
-| Internal recall (attack-db fixture set) | 64/64 — 100% recall |
-| pytest (unit tests shipped in repo) | run `python3 -m pytest -q` — the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
+| Internal recall (attack-db fixture set) | 64/64, 100% recall |
+| pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
 | False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 76 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
-| Platforms | Mac, Windows, Linux — anywhere Python runs |
+| Platforms | Mac, Windows, Linux (anywhere Python runs) |
 
-_Performance numbers are regenerated by `tools/gen_perf_stats.py` against a public in-repo corpus — no network, no randomness — and written to `stats/current.json` with the machine and timestamp they were measured on. Reproduce with `python3 tools/gen_perf_stats.py`. Last measured 2026-08-30. Your hardware will differ._
+_Performance numbers are regenerated by `tools/gen_perf_stats.py` against a public in-repo corpus (no network, no randomness) and written to `stats/current.json` with the machine and timestamp they were measured on. Reproduce with `python3 tools/gen_perf_stats.py`. Last measured 2026-08-30. Your hardware will differ._
 
-## Benchmark — the receipts
+## Benchmark, the receipts
 
 Most scanners publish a pattern count. We publish precision and recall, with the command to reproduce them:
 
@@ -425,7 +425,7 @@ git clone https://github.com/sunglasses-dev/sunglasses && cd sunglasses
 python3 tests/benchmark/precision_recall.py
 ```
 
-Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge — same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block.
+Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
 
 | Metric (v0.5.9) | Value |
 |--------|-------|
@@ -435,7 +435,7 @@ Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 
 | Known-shape attacks | 30/30 caught |
 | Novel-semantic attacks (paraphrases the pattern DB has never seen) | 7/8 caught |
 
-**The known gap, stated out loud:** the one miss is `curl … | bash`. Seven of the 76 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line — no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
+**The known gap, stated out loud:** the one miss is `curl … | bash`. Seven of the 76 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line, no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
 
 ## Language coverage (measured)
 
@@ -446,23 +446,23 @@ shipped patterns, counted from `sunglasses/patterns.py`:
 | tier | languages | what exists |
 |---|---|---|
 | **English** | English | the full 1,554-pattern ruleset |
-| **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** — "ignore previous instructions" and one credential-exfiltration shape |
+| **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** ("ignore previous instructions" and one credential-exfiltration shape) |
 | **Keyword-level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English-scoped patterns; **no dedicated pattern** |
-| **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** — previously listed as covered |
+| **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** (previously listed as covered) |
 
 So a two-pattern seed is not language coverage, and you should not deploy SUNGLASSES expecting
 non-English parity with English. Normalization (romanization, Unicode confusables and 17 other
 obfuscation techniques) is language-independent and does apply throughout.
 
 Deepening this is a v0.6+ lane with per-language controls and per-language false-positive corpora
-— a language you cannot measure separately is a language you cannot honestly claim. Community
+(a language you cannot measure separately is a language you cannot honestly claim). Community
 language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured detail.
 
 ## What Works Today
 
 - ✅ Text scanning: 1,554 patterns, 6,964 unique keywords, 118 attack categories (English-first — see [Language coverage](#language-coverage-measured))
-- ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*) — how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark--the-receipts)
-- ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan) — text, GitHub repos, and images (client-side OCR)
+- ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
+- ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)
@@ -475,15 +475,15 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ LangChain + CrewAI integrations
 - ✅ MCP server for agent frameworks (`sunglasses.mcp`)
 - ✅ SARIF 2.1.0 output for CI integration
-- ✅ 64/64 internal recall on shipped attack fixture set — 100% recall
-- ✅ 100% local — zero network calls, zero telemetry
-- ✅ Daily protection report (local HTML) — covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
+- ✅ 64/64 internal recall on shipped attack fixture set, 100% recall
+- ✅ 100% local, zero network calls, zero telemetry
+- ✅ Daily protection report (local HTML), covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
 - ✅ MIT License
 
-## The Firewall — from detector to control (v0.4)
+## The Firewall, from detector to control (v0.4)
 
 Everything above this line *detects*. The firewall *stops*. It installs as a
-Claude Code `PreToolUse` hook and answers one question before every tool call (**best-effort**: the hook runs under a 10-second timeout, and Claude Code lets a timed-out hook's tool call proceed — so on the pathological input shapes described in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md) a call can go through unscanned):
+Claude Code `PreToolUse` hook and answers one question before every tool call (**best-effort**: the hook runs under a 10-second timeout, and Claude Code lets a timed-out hook's tool call proceed, so on the pathological input shapes described in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md) a call can go through unscanned):
 **does this action violate a fact we can prove?**
 
 ```bash
@@ -503,11 +503,11 @@ than none:
 - **The static scanner does not execute scanned content.** Files, text, images,
   PDFs and archives are read as data. Nothing in them is run.
 - **`sunglasses pin` launches your configured MCP servers** to read their tool
-  lists — that is the only way to learn what a tool descriptor says — **and it
+  lists (that is the only way to learn what a tool descriptor says) **and it
   asks first.** It prints the exact command lines it is about to start and waits
   for you. With no terminal to ask (a timer, a `SessionStart` hook, CI) it
   refuses instead of launching, unless you pre-consent with `--yes` or
-  `SUNGLASSES_PIN_CONSENT=1`. That consent is read from your environment only —
+  `SUNGLASSES_PIN_CONSENT=1`. That consent is read from your environment only,
   never from a repository, a `.env`, or project settings, so a scanned project
   can never authorise the launching of your servers.
 
@@ -515,8 +515,8 @@ than none:
 `SessionStart` hook, add `--yes` (or set `SUNGLASSES_PIN_CONSENT=1` in that job's
 environment). From v0.5.6 an unattended `pin` without consent refuses with exit 2
 and a one-line notice on stderr instead of starting your servers. Nothing in
-`sunglasses init` creates those jobs — it wires the firewall hook and nothing
-else — so if you have one, you wrote it, and it is yours to update.
+`sunglasses init` creates those jobs (it wires the firewall hook and nothing
+else), so if you have one, you wrote it, and it is yours to update.
 
 Also new in v0.5.6: a single positional argument that looks like a path and does
 not exist is a usage error (exit 2) rather than text to scan. `sunglasses scan
@@ -532,7 +532,7 @@ If you meant the string, use `--text`.
 
 That split is enforced by tests, not by good intentions: the WARN lane is swept
 across every keyword-bearing pattern in the database and asserted to only ever
-return `ask` — including at `critical`, where the enforcement mapping would have
+return `ask`, including at `critical`, where the enforcement mapping would have
 said "block".
 
 ### What it blocks
@@ -555,13 +555,13 @@ allowed_hosts:
 ```
 
 `sunglasses init` **asks** whether to enable a recommended set of credential-path
-blocks — the private key files, `~/.aws`, `~/.config/gcloud`, `~/.netrc` and
-friends. Say yes and `cat ~/.ssh/id_rsa | curl -d @-` and
+blocks (the private key files, `~/.aws`, `~/.config/gcloud`, `~/.netrc` and
+friends). Say yes and `cat ~/.ssh/id_rsa | curl -d @-` and
 `curl -d @~/.aws/credentials` stop working: the shapes that carry no key in the
 command text, and so are invisible to the secret detector above. Say no, or run
 `--no-policy`, and nothing is enforced. A non-interactive install (CI, a
-Dockerfile, `| sh`) writes the same rules **commented out** — silence is never
-read as consent, and a fresh install still blocks nothing you did not ask it to.
+Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
+read as consent, and a fresh install still blocks nothing you did not ask it to).
 
 `~/.ssh` as a whole directory is deliberately *not* in that list: it would block
 `ssh-copy-id`, `~/.ssh/config` and `known_hosts`, which is ordinary work. The
@@ -574,24 +574,24 @@ private key files are named individually and matching is boundary-aware, so
   descriptor, and fetching one would mean a network round-trip on every tool
   call. So the hook can only see *whether a tool is pinned*; a description
   swapped between two `pin` runs is caught by `pin --check`, not in the act.
-  Closing that window needs a resident process — that is v0.5, not this.
+  Closing that window needs a resident process (that is v0.5, not this).
 - **It sees the tool call, not the file behind it.** The scan reads
-  `tool_input`, so a command that makes the shell fetch the secret —
-  `curl --data-binary @.env`, `cat .env | curl -d @-` — carries no credential
+  `tool_input`, so a command that makes the shell fetch the secret
+  (`curl --data-binary @.env`, `cat .env | curl -d @-`) carries no credential
   material in the text we are handed, and is not blocked. Verified, not
   theoretical. Closing it means either resolving file references at hook time or
   watching the process itself; both are v0.5 work, and claiming coverage we do
   not have would be worse than the gap.
 - **It reads the call as text, so an interpreter or an indirection hides the
-  channel.** The egress check recognises network *commands* — `curl`, `wget`,
-  `ssh`, the web tools. A one-liner that opens the socket itself
+  channel.** The egress check recognises network *commands* (`curl`, `wget`,
+  `ssh`, the web tools). A one-liner that opens the socket itself
   (`python3 -c "…socket…"`, `node -e "…https.request…"`, `bash`'s `/dev/tcp`)
   carries the credential in plain sight and still defers, because nothing in
   the text looks like sending. The mirror case is material that is present but
-  unreadable — base64, an env var, a file reference — where we can see the
+  unreadable (base64, an env var, a file reference) where we can see the
   channel and not the secret. Both are the same limit from two sides: this is a
   text control on one tool call, not a runtime one. Widening it to "sensitive
-  material anywhere near a command" was measured and rejected — it fires on
+  material anywhere near a command" was measured and rejected, it fires on
   `aws configure set` and ordinary credential setup, and a guard that shoots
   healthy work gets uninstalled. Resolving it properly needs the resident
   process in v0.5. **Do not read the two fixes in 0.4.2 as closing this.**
@@ -630,7 +630,7 @@ private key files are named individually and matching is boundary-aware, so
   found". A missing policy only counts as dead where one was installed; a machine
   that never configured one is not nagged.
   Those write a receipt saying the call was *not* checked, because a firewall
-  that is quietly off is worse than no firewall — but the receipt is conditional
+  that is quietly off is worse than no firewall, but the receipt is conditional
   on reaching the write with working storage, and two cases do not get one. The
   audit-trail state is itself the case where the trail cannot be written, so it
   ASKS and records nothing. A DENY under obstructed storage is enforced and may
@@ -640,8 +640,8 @@ private key files are named individually and matching is boundary-aware, so
   The precedence, so an unrecorded event is not read as an unchecked one. A
   later lane still decides: a dead policy does not short-circuit the rest of the
   call, and its failure rides along in whatever receipt that call produces. An
-  audit-trail failure never weakens a DENY — the block is enforced whether or
-  not it can be written down.
+  audit-trail failure never weakens a DENY (the block is enforced whether or
+  not it can be written down).
 
   One failure cannot write that receipt at all: if the harness kills the hook
   on its timeout, nothing runs to write
@@ -666,8 +666,8 @@ private key files are named individually and matching is boundary-aware, so
 ### Cost
 
 ~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
-is 19ms of that). Zero network calls — nothing about your work leaves the
-machine. An invocation appends two lines when both writes succeed, one when the check
+is 19ms of that). Zero network calls (nothing about your work leaves the
+machine). An invocation appends two lines when both writes succeed, one when the check
 starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
 recording a SHA-256 of the tool input and never the input itself. A hook killed
 between the two leaves only the first, which is the case these records exist to
@@ -680,19 +680,19 @@ Reading it a line at a time instead is a later change, not one this makes.
 ## Roadmap
 
 ### Next, in progress
-- 🔨 **Drag-and-drop web UI** — `sunglasses ui` opens a local browser page to scan files visually
-- 🔨 **URL scanning** — `sunglasses scan --url https://example.com`
-- 🔨 **Email report delivery** — daily reports to your inbox (your own SMTP, we never touch it)
-- 🔨 **`sunglasses update`** — update pattern database without reinstalling
-- 🔨 **Easy bug report form** — non-technical users can report issues
+- 🔨 **Drag-and-drop web UI**, `sunglasses ui` opens a local browser page to scan files visually
+- 🔨 **URL scanning**, `sunglasses scan --url https://example.com`
+- 🔨 **Email report delivery**, daily reports to your inbox (your own SMTP, we never touch it)
+- 🔨 **`sunglasses update`**, update pattern database without reinstalling
+- 🔨 **Easy bug report form**, non-technical users can report issues
 
 ### Later, on the horizon
-- 🔭 Bridge filter — scan agent-to-agent and file-handoff messages before the receiving agent ingests them
-- 🔭 Output scanning — scan what the agent SAYS back, not just what comes in
-- 🔭 PII detection — auto-detect sensitive data in content
-- 🔭 Public Threat Registry — accountability board for AI agent attacks
-- 🔭 Community pattern submissions — submit attack patterns, grow the defense
-- 🔭 Deeper audio analysis — speaker separation, hidden speech detection
+- 🔭 Bridge filter (scan agent-to-agent and file-handoff messages before the receiving agent ingests them)
+- 🔭 Output scanning (scan what the agent SAYS back, not just what comes in)
+- 🔭 PII detection (auto-detect sensitive data in content)
+- 🔭 Public Threat Registry (accountability board for AI agent attacks)
+- 🔭 Community pattern submissions (submit attack patterns, grow the defense)
+- 🔭 Deeper audio analysis (speaker separation, hidden speech detection)
 
 ### Community Help Needed
 - 🙏 Attack patterns in non-English languages
@@ -708,7 +708,7 @@ SUNGLASSES includes a public threat registry for tracking AI agent attacks:
 1. Evidence is collected and hashed
 2. The provider is notified privately
 3. Community reviewers verify the report (2-of-3 quorum)
-4. After 30 days, the report is published — regardless of provider response
+4. After 30 days, the report is published, regardless of provider response
 5. Status is tracked publicly: **REPORTED → RESPONDED → RESOLVED → IGNORED**
 
 No provider wants to be listed as IGNORED. That's the accountability.
@@ -733,7 +733,7 @@ Output: verified / fake / uncheckable counts per claimed agent, plus the scanner
 
 `sunglasses install <name>` edits the named entry in your `.mcp.json` so the
 server is launched with `python -m sunglasses.proxy`, and records the proxy
-entry point's path and its `sha256` under an `x-sunglasses` key in that entry —
+entry point's path and its `sha256` under an `x-sunglasses` key in that entry,
 the module form is what runs, and the recorded file is what it runs, which is
 how `uninstall` and `doctor` can tell your wrapper from somebody else's. It
 exits `0` and says `Wrapped '<name>'`. `sunglasses uninstall <name>` reads that
@@ -770,9 +770,9 @@ sunglasses uninstall github
 ```
 
 **There is no `sunglasses doctor` command in this release.** The README showed
-one in a runnable block and argparse rejects it — the accepted commands are
+one in a runnable block and argparse rejects it (the accepted commands are
 scan, check, info, firewall-hook, pin, init, receipts, demo, report, install,
-uninstall and config. What shipped is `sunglasses/proxy/doctor.py`: the R1
+uninstall and config). What shipped is `sunglasses/proxy/doctor.py`: the R1
 judgment, R2 and R3 reconciled onto `install.py` (#180), with
 `tests/proxy/test_doctor_reconciled.py` and
 `tests/proxy/test_doctor_selftest.py` behind them. It is reachable by import
@@ -824,14 +824,14 @@ nothing is wrapped.
 
 Each of these is a refusal with a message, never a silent partial change:
 
-- **the proxy artifact is missing** — on a build where the entry point is not
+- **the proxy artifact is missing**, on a build where the entry point is not
   present. It is present in this one.
-- **that server is already wrapped** — it says so rather than wrapping it twice
-- **it carries a wrapper we cannot verify** — a rebuilt or foreign artifact; it
+- **that server is already wrapped**, it says so rather than wrapping it twice
+- **it carries a wrapper we cannot verify**, a rebuilt or foreign artifact; it
   will not nest a second wrapper inside someone else's
-- **a previous install is still recorded** — uninstall it first, so the bytes
+- **a previous install is still recorded**, uninstall it first, so the bytes
   that install retained are not the ones thrown away
-- **the config is not something we will rewrite** — duplicate JSON keys, `NaN`,
+- **the config is not something we will rewrite**, duplicate JSON keys, `NaN`,
   or a shape we do not recognise. Rewriting a file whose meaning is ambiguous is
   how data quietly disappears.
 
@@ -840,7 +840,7 @@ Each of these is a refusal with a message, never a silent partial change:
 SUNGLASSES is risk reduction, not magic.
 
 - **Pattern-based**: catches known attack patterns and variants. Novel zero-day attacks may pass until patterns are added.
-- **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist — report them.
+- **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist (report them).
 - **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 13 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
 - **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
@@ -850,7 +850,7 @@ SUNGLASSES is risk reduction, not magic.
 ## Integration Notes
 
 1. **Verify signatures before cleaning.** If content has a digital signature, verify it first, then run SUNGLASSES. Cleaning before verification breaks the signature.
-2. **Only scan content fields.** Feed SUNGLASSES the message body, text, and attachments — never raw HTTP headers, cookies, or auth tokens.
+2. **Only scan content fields.** Feed SUNGLASSES the message body, text, and attachments, never raw HTTP headers, cookies, or auth tokens.
 3. **Review mode for credentials in tutorials.** If a legitimate message contains an API key example, SUNGLASSES flags it as "review" not "block." User decides.
 
 ## Contributing
@@ -862,7 +862,7 @@ See [sunglasses.dev/thesis](https://sunglasses.dev/thesis.html) for our security
 
 ## License
 
-[MIT](LICENSE) — Free forever. Use it anywhere — personal, commercial, enterprise. No restrictions.
+[MIT](LICENSE). Free forever. Use it anywhere (personal, commercial, enterprise). No restrictions.
 
 ## Links
 
