@@ -1,0 +1,43 @@
+{
+  "manifest_version": "0.3",
+  "name": "sunglasses",
+  "display_name": "Sunglasses",
+  "version": "0.6.0",
+  "description": "Local input firewall for AI agents. Scans text and files before an agent reads them. No network.",
+  "long_description": "Sunglasses runs on your machine and checks text and files for prompt injection, credential leaks and data exfiltration before an agent acts on them. It reports what it matched and what it could not read, so a clean result is a floor and never a guarantee. Plain text works out of the box. Images, PDFs and QR codes need the optional readers from the Python package. Beta, MIT licensed.",
+  "author": {
+    "name": "sunglasses-dev",
+    "url": "https://github.com/sunglasses-dev"
+  },
+  "homepage": "https://sunglasses.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sunglasses-dev/sunglasses"
+  },
+  "license": "MIT",
+  "keywords": ["security", "prompt injection", "agents", "local", "scanner"],
+  "server": {
+    "type": "python",
+    "entry_point": "server/lib/sunglasses/mcp.py",
+    "mcp_config": {
+      "command": "python3",
+      "args": ["-m", "sunglasses.mcp"],
+      "env": {
+        "PYTHONPATH": "${__dirname}/server/lib",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "platform_overrides": {
+        "win32": { "command": "python" }
+      }
+    }
+  },
+  "tools": [
+    { "name": "scan_text", "description": "Scans text for prompt injection, credential leaks and data exfiltration and returns a decision with its findings." },
+    { "name": "scan_file", "description": "Scans a file the same way. Plain text works out of the box and other formats need the optional readers." },
+    { "name": "scanner_info", "description": "Reports the scanner version and the size of its pattern set." }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "python": ">=3.9" }
+  }
+}
