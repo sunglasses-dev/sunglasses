@@ -32,8 +32,8 @@ def test_the_contract_digest_is_pinned_to_the_document_on_disk():
     response that defeats the purpose.
     """
     import hashlib
-    document = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-                / "GATE3_DESIGN_REVIEW_2026-09-13" / "tools_v2" / "PROFILE_STEPS.md")
+    import review_root
+    document = review_root.GATE3 / "tools_v2" / "PROFILE_STEPS.md"
     assert document.is_file(), f"the frozen contract is not at {document}"
     assert hashlib.sha256(document.read_bytes()).hexdigest() == adapter.PROFILE_STEPS_SHA256
 

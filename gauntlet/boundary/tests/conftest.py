@@ -34,11 +34,13 @@ import sys
 # support code. Both deliveries' test_independent.py and test_followup.py are
 # byte identical and so is probe_support, verified before this changed, so the
 # newest directory supersedes rather than competes.
-_EXAMS = sorted((pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04")
-                .glob("GATE2_FIT_*"))
-EXAM = _EXAMS[-1] if _EXAMS else (
-    pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-    / "GATE2_FIT_0ba36c8_2026-09-13")
+_BOUNDARY = str(pathlib.Path(__file__).resolve().parents[1])
+if _BOUNDARY not in sys.path:      # appended, never inserted: import order is the suite's
+    sys.path.append(_BOUNDARY)
+import review_root                                         # noqa: E402
+
+_EXAMS = sorted(review_root.ROOT.glob("GATE2_FIT_*"))
+EXAM = _EXAMS[-1] if _EXAMS else review_root.ROOT / "GATE2_FIT_0ba36c8_2026-09-13"
 REPO = pathlib.Path(__file__).resolve().parents[3]
 
 # ONE LIVE ROOT PER CHECKOUT, not one for the machine. This was a fixed path,

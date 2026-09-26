@@ -28,8 +28,12 @@ import sys
 import tempfile
 
 PACKAGE = pathlib.Path.home() / ".claude" / "state" / "warroom" / "GATE2_SCENARIOS"
-REVIEW_ROOT = (pathlib.Path.home() / "Desktop" / "SUNGLASSES_ASTRA_REVIEW_2026-09-04"
-               / "GATE3_DESIGN_REVIEW_2026-09-13")
+_BOUNDARY = str(pathlib.Path(__file__).resolve().parents[1])
+if _BOUNDARY not in sys.path:      # appended, never inserted: import order is the suite's
+    sys.path.append(_BOUNDARY)
+import review_root                                         # noqa: E402
+
+REVIEW_ROOT = review_root.GATE3
 REVIEW = REVIEW_ROOT / "fixtures"
 MATERIALISER = REVIEW_ROOT / "materialize_specs.py"
 
