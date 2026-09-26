@@ -1,0 +1,18 @@
+{
+  "name": "sunglasses",
+  "version": "0.6.0",
+  "description": "Local input firewall for AI agents. Scans text and files before an agent reads them. Needs pip install sunglasses first, on Python 3.9 or newer.",
+  "author": {
+    "name": "sunglasses-dev",
+    "url": "https://github.com/sunglasses-dev"
+  },
+  "homepage": "https://sunglasses.dev",
+  "repository": "https://github.com/sunglasses-dev/sunglasses",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "prompt-injection",
+    "scanner",
+    "mcp"
+  ]
+}
