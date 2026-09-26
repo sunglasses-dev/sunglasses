@@ -3,6 +3,21 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.2] — UNRELEASED
+
+### Fixed
+
+- **A stale alias whose removal is refused is kept and reported, and can be
+  collected later.** The collectors of dead forgets removed an alias's owner
+  file even when the kernel refused to remove the alias itself, and reported
+  nothing retained. The alias could then never be collected. The refusal is
+  now reported by path with its error class, the owner file is kept, and the
+  next collection removes both once the refusal clears.
+- **Recovery from a take note that names no owner now finishes.** A note with
+  a held copy and its checksum but no owner put the bytes back and removed the
+  note, then crashed before the orphan sweep that follows it. The collector
+  now answers an empty list when it is handed no held name.
+
 ## [0.6.0] — 2026-09-26
 
 ### Added
