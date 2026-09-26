@@ -222,3 +222,46 @@ def test_the_page_declares_its_language_as_the_landing_lint_requires(honest, tmp
     page = write_page.write(_dump(tmp_path, "r.json", _at(honest, "2026-09-23T03:00:00+00:00")),
                             landing, tmp_path / "attempts.jsonl").read_text()
     assert re.search(r'<html[^>]*\blang="en"', page)
+
+
+def test_an_UNBOUND_identity_says_not_bound_never_the_word_None(tmp_path, monkeypatch):
+    """Measured 2026-09-23 22:5x on the first fresh refusal page: "Capability map
+    revision None, review state None". A refused map leaves both identities null,
+    render printed Python's repr, and the landing dry run passed it because the
+    bound text "None" equals str(None). A null is unbound, and says so in words."""
+    unreviewed = tmp_path / "capability_map.json"
+    raw = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    raw["review_state"] = "unreviewed"
+    raw.pop("review_receipt", None)
+    unreviewed.write_text(json.dumps(raw))
+    monkeypatch.setattr(classify, "MAP_PATH", unreviewed)
+    report, _ = produce.build(run_id="unbound-identities")
+    assert report["identities"]["capability_map_revision"] is None
+    landing = tmp_path / "landing"
+    landing.mkdir()
+    page = write_page.write(_dump(tmp_path, "r.json", report), landing,
+                            tmp_path / "attempts.jsonl").read_text()
+    visible = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    assert not re.search(r">\s*None\s*<", visible), "a null rendered as the word None"
+    assert 'data-bound="identities.capability_map_revision"' not in visible, \
+        "an unbound value must not be dressed as a bound figure"
+    inputs = visible.split('id="inputs"')[1]
+    assert inputs.count("not bound") == 2
+
+
+def test_the_public_page_names_no_internal_session(tmp_path, monkeypatch):
+    """The first fresh refusal page told the public "Budget policy is T9's".
+    T8/T9/T10/T11 are our terminals, not anything a reader can look up."""
+    unreviewed = tmp_path / "capability_map.json"
+    raw = json.loads(pathlib.Path(classify.MAP_PATH).read_text())
+    raw["review_state"] = "unreviewed"
+    raw.pop("review_receipt", None)
+    unreviewed.write_text(json.dumps(raw))
+    monkeypatch.setattr(classify, "MAP_PATH", unreviewed)
+    report, _ = produce.build(run_id="no-session-names")
+    landing = tmp_path / "landing"
+    landing.mkdir()
+    page = write_page.write(_dump(tmp_path, "r.json", report), landing,
+                            tmp_path / "attempts.jsonl").read_text()
+    visible = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    assert not re.findall(r"\bT(?:8|9|10|11)\b", visible)

@@ -165,8 +165,8 @@ def load_map(path: pathlib.Path | None = None) -> dict:
     if data.get("review_state") != REVIEWED:
         raise MapInvalid(
             f"capability map review_state is {data.get('review_state')!r}, not "
-            f"{REVIEWED!r}. A well-formed map that nobody reviewed is not a "
-            "reviewed map, and every ceiling computed from one is an assertion "
+            f"{REVIEWED!r}. A map that validates but that nobody reviewed is not a "
+            "reviewed map. Every ceiling computed from one is an assertion "
             "wearing a citation.")
     # A REVIEW IS RECORDED, NEVER TYPED (T9 row 2026-09-23). `reviewed` counts only
     # with a receipt bound to this map's content and a committed GO verdict; see
