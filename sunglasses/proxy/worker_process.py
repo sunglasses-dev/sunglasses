@@ -68,7 +68,10 @@ DECISION_REVIEW = "review"
 # loading is bounded HERE, separately, and a spare that never gets ready is
 # killed and the item faults -- it is never handed a scan.
 STARTUP_MS = 10_000
-READY_ENV = "SUNGLASSES_WORKER_READY_FD"
+# The pipe is named on the spare's command line, `--ready-fd N`, never in its
+# environment: the package reads exactly three environment variables and sets
+# none. `_proxy_worker` imports this name, so there is one spelling.
+READY_FLAG = "--ready-fd"
 
 
 def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
@@ -250,13 +253,11 @@ def _fault(binding, status, cause=None):
 def _spawn(argv):
     """A child that will say `R` on its own pipe once the engine is loaded."""
     ready_r, ready_w = os.pipe()
-    env = dict(os.environ)
-    env[READY_ENV] = str(ready_w)
     try:
         child = subprocess.Popen(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, start_new_session=True,
-            pass_fds=(ready_w,), env=env)
+            [*argv, READY_FLAG, str(ready_w)], stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            start_new_session=True, pass_fds=(ready_w,))
     finally:
         os.close(ready_w)
     return child, ready_r
