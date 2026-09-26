@@ -27,3 +27,5 @@ gauntlet/runs/
 # launchd.out/launchd.err there, which left the repo permanently dirty
 # after the first scheduled run. A dirty tree is how a real change gets
 # lost in the noise.)
+gauntlet/boundary/tests/evidence/
+.suite-in-progress.lock
