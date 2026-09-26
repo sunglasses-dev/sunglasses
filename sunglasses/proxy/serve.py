@@ -33,8 +33,8 @@ import sys
 import threading
 import time
 
-from . import (approvals, bounds, control, framing, pump, receipts, route,
-               supervisor)
+from . import (approvals, bounds, control, framing, inspection, pump,
+               receipts, route, supervisor)
 
 USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
          "[--state-root PATH] -- <server command> [args...]\n")
@@ -137,6 +137,14 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     if not upstream_argv:
         stderr.write(USAGE)
         return EXIT_USAGE
+
+    # R28. Build the pattern set NOW, before the first frame is read. Its first
+    # use was the activation scan of the server's first tools/list page, which
+    # runs inside snapshot.collect's list deadline: a cold build (~10 s of CPU)
+    # on a busy machine ran the list past it, the activation came back
+    # incomplete, and nothing was captured to approve. Warm before the clock,
+    # never move the clock.
+    inspection.default_engine()
 
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
