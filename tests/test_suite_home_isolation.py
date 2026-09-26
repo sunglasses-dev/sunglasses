@@ -28,3 +28,14 @@ def test_the_control_a_test_that_sets_its_home_is_obeyed(tmp_path, monkeypatch):
     monkeypatch.setenv("SUNGLASSES_HOME", str(home))
     assert sunglasses_home() == home
     assert os.environ["SUNGLASSES_HOME"] == str(home)
+
+
+def test_the_proxy_state_root_is_not_the_developers():
+    """`receipts` names every run log under the proxy's state root (T9 ruling
+    60), and that root is $HOME's: a dev box that ever ran the proxy with no
+    key would put its own runs into every --verify test here."""
+    import pathlib
+    import pwd
+    real = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir).resolve()
+    assert not state_root().resolve().is_relative_to(real / ".sunglasses"), state_root()
+    assert pathlib.Path.home().resolve() != real

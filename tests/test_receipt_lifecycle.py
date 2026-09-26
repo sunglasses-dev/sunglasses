@@ -226,7 +226,8 @@ def test_a_clean_paired_file_is_still_clean(home):
            '{"kind":"in_flight","eval_id":"x","ts":"t","tool_name":"Bash"}\n'
            '{"kind":"decision","eval_id":"x"}\n')
     code, out = _verify(home)
-    assert code == 0 and "No orphans" in out, out
+    # A day file carries no chain: LOG_UNCHAINED, a limit (T9 ruling 60).
+    assert code == 3 and "No orphans" in out and "LOG_UNCHAINED" in out, out
 
 
 # R2. An unmatched opening record proves the PAIR is incomplete. It does not
@@ -260,7 +261,7 @@ def test_a_live_evaluation_looks_the_same_as_a_killed_one_and_is_not_called_dead
            '{"kind":"in_flight","eval_id":"live","ts":"t","tool_name":"Read"}\n'
            '{"kind":"decision","eval_id":"live","decision":"allow"}\n')
     code, out = _verify(home)
-    assert code == 0, "a completed evaluation must stop being reported"
+    assert code == 3, "a completed evaluation must stop being reported"
 
 
 def test_a_denied_call_whose_terminal_write_failed_is_not_reported_as_unchecked(home):

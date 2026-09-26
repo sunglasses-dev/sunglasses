@@ -1459,6 +1459,84 @@ def _path_unreadable(unreadable):
     return codes.exit_for("PATH_UNREADABLE")
 
 
+_MARKER_FIELDS = {"wire", "event", "log", "chain_id", "key_id", "t_wall_ns",
+                  "signature"}
+
+
+def _hook_marker(home):
+    """The hook log's genesis marker (T9 ruling 60): its path, None when there
+    is none, or the Unlistable that says whether there is one cannot be known."""
+    from .receipts import _fs, optin
+    path = optin.hook_marker(home)
+    try:
+        return path if _fs.listing(path.parent, path.name) else None
+    except _fs.Unlistable as unreadable:
+        return unreadable
+
+
+def _verify_marker(marker, hook, home):
+    """Ruling 60: the marker names the chain the hook log first opened with.
+    That chain in the log is nothing to say; that chain absent is LOG_MISSING.
+    A marker that cannot be read is PATH_UNREADABLE, and one that does not hold
+    is a failure naming why, never "missing". Every outcome but the first is
+    exit 1 in both modes."""
+    import re as _re
+    from .receipts import codes, wire
+    if isinstance(marker, OSError):
+        return _path_unreadable(marker)
+    try:
+        raw = marker.read_bytes()
+    except OSError as cause:
+        return _path_unreadable(f"{marker} cannot be read ({type(cause).__name__})")
+    try:
+        from cryptography.exceptions import InvalidSignature
+        from .receipts import keys
+    except ImportError:
+        print(f"\n  {RED}{marker.name}{RESET}: a signed marker, NOT verified. The "
+              f"verifier needs {_RECEIPTS_EXTRA} {DIM}(sunglasses[receipts]){RESET}")
+        return 1
+
+    def fail(code, why):
+        print(f"\n  {RED}{code}{RESET} {DIM}-- {marker.name}: {why}{RESET}")
+        return codes.exit_for(code)
+
+    try:
+        record = wire.decode_strict(raw)
+    except ValueError as cause:
+        return fail("NONCANONICAL_BYTES", "not one canonical marker line")
+    if set(record) - _MARKER_FIELDS:
+        return fail("UNKNOWN_FIELD", f"carries {len(set(record) - _MARKER_FIELDS)} "
+                    "field(s) a marker does not have")
+    key_id, chain_id = record.get("key_id"), record.get("chain_id")
+    if (record.get("event") != "log_genesis" or record.get("log") != hook.name
+            or not isinstance(chain_id, str) or not _re.fullmatch(r"[0-9a-f]{32}", chain_id)
+            or not isinstance(record.get("t_wall_ns"), int)
+            or not isinstance(key_id, str) or not _re.fullmatch(r"[0-9a-f]{64}", key_id)
+            or not isinstance(record.get("signature"), str)):
+        return fail("CONTEXT_MISMATCH", f"not the {hook.name} log's genesis marker")
+    try:
+        public = keys.public_key(home, key_id)
+    except FileNotFoundError:
+        return fail("SIGNATURE_INVALID", f"signed by key {key_id[:16]}, which is not "
+                    f"in {keys.KEY_DIR}/{keys.PUBLIC_DIR}, so it cannot be checked")
+    except OSError as cause:
+        return _path_unreadable(f"{keys.public_path(home, key_id)} cannot be read "
+                                f"({type(cause).__name__})")
+    except ValueError:
+        return fail("SIGNATURE_INVALID", f"key {key_id[:16]} is not an ed25519 key")
+    try:
+        public.verify(bytes.fromhex(record["signature"]), wire.marker_signing_bytes(record))
+    except (InvalidSignature, ValueError):
+        return fail("SIGNATURE_INVALID", f"the signature does not verify under key "
+                    f"{key_id[:16]}")
+    if chain_id in _log_chain_ids(hook, wire):
+        return 0
+    print(f"\n  {RED}LOG_MISSING{RESET} {DIM}-- {marker.name} names {hook.name} chain "
+          f"{chain_id}, and no segment of {hook} opens with it. "
+          f"The log it must carry is not there.{RESET}")
+    return codes.exit_for("LOG_MISSING")
+
+
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail. A directory it must list and
     cannot is PATH_UNREADABLE, exit 1, whichever road reached it (R57)."""
@@ -1480,14 +1558,21 @@ def cmd_receipts(args):
 
         directory = sunglasses_home() / "receipts"
         files = _fs.listing(directory, "*.jsonl")
+        from .proxy.serve import state_root
+        from .proxy import receipts as proxy_receipts
+        # A proxy run in a home with no key writes its rows to `<run id>.jsonl`
+        # with no chain. By the rule its writer names runs with, it is a log,
+        # and both commands name it (T9 ruling 60, Q3).
+        runs = [p for p in _fs.listing(state_root() / "receipts", "*.jsonl")
+                if proxy_receipts.is_run_log_name(p.stem)]
         chain_logs = []
+        marker = None
         if getattr(args, "verify", False):
-            from .proxy.serve import state_root
             # The proxy writes one chain per run under its own state root, and the
             # hook's chain is under the home; both are signed with the home's key
             # (T9 ruling 24b). A run moved with `--state-root` is not found here.
-            from .proxy import receipts as proxy_receipts
             from .receipts import optin
+            marker = _hook_marker(sunglasses_home())
             hook = optin.hook_log(sunglasses_home())
             chain_logs = (_chain_logs(directory, lambda name: directory / name == hook)
                           + _chain_logs(state_root() / "receipts",
@@ -1496,7 +1581,7 @@ def cmd_receipts(args):
             import datetime
             today = datetime.datetime.now().strftime("%Y-%m-%d")
             files = [f for f in files if f.stem == today]
-        if not files and not chain_logs:
+        if not files and not chain_logs and not runs and marker is None:
             if not getattr(args, "verify", False):
                 # A listing is not a verdict: an empty one is still exit 0.
                 print(f"\n  {DIM}No receipts in {directory}. "
@@ -1564,15 +1649,32 @@ def cmd_receipts(args):
             # One combiner for the key, the legacy log and the chains (T9 ruling
             # 50): a verdict joins the ones before it and never replaces them.
             code = _verify_key(sunglasses_home())
+            strict = getattr(args, "strict", False)
             if files:
-                # T9 ruling 11 Q1: a legacy log is UNSIGNED, never a failure. Its
-                # lifecycle verdict is the one it always had, joined to the key's.
+                # A legacy log found on the walk carries no chain, and nothing says
+                # it should have: LOG_UNCHAINED, a limit (T9 rulings 11 Q1, 60).
+                # Its lifecycle verdict is the one it always had, joined to it.
                 print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
-                      f"{YELLOW}LEGACY_UNSIGNED{RESET} {DIM}-- predates signing; "
+                      f"{YELLOW}LOG_UNCHAINED{RESET} {DIM}-- predates signing; "
                       f"integrity status unknown, not clean{RESET}")
-                code = codes.combine_exits(code, _verify_lifecycle(rows, directory, unparseable))
+                code = codes.combine_exits(code, _verify_lifecycle(rows, directory, unparseable),
+                                           codes.exit_for("LOG_UNCHAINED", strict=strict))
+            for run in runs:
+                print(f"\n  {DIM}proxy run {run.name}{RESET} "
+                      f"{YELLOW}LOG_UNCHAINED{RESET} {DIM}-- written with no key, so "
+                      f"no chain; integrity status unknown, not clean{RESET}")
+                code = codes.combine_exits(code, codes.exit_for("LOG_UNCHAINED", strict=strict))
             if chain_logs:
                 code = codes.combine_exits(code, _verify_chains(chain_logs, args, sunglasses_home()))
+            if marker is not None:
+                code = codes.combine_exits(code, _verify_marker(marker, hook, sunglasses_home()))
+            elif hook in chain_logs:
+                # R62 (c): segments and no marker. Nothing names the chain this
+                # log opened with, so a wipe cannot be told: a limit, never a fail.
+                print(f"\n  {YELLOW}LOG_UNMARKED{RESET} {DIM}-- the hook log has "
+                      f"segments and no {optin.HOOK_MARKER[-1]} names its first chain, "
+                      f"so a wipe of it cannot be told{RESET}")
+                code = codes.combine_exits(code, codes.exit_for("LOG_UNMARKED", strict=strict))
             return code
 
         # A receipts file is bytes on disk: it may predate the write-side sanitize
@@ -1611,6 +1713,11 @@ def cmd_receipts(args):
         # running?", so the quiet calls are counted here on purpose.
         print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
               f"recorded, not just the blocks.{RESET}\n")
+        for run in runs:
+            print(f"  {DIM}proxy run {run.name}: written with no key, so "
+                  f"no chain{RESET}")
+        if runs:
+            print()
         return 0
     except _fs.Unlistable as unreadable:
         return _path_unreadable(unreadable)

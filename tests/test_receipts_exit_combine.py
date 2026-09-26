@@ -66,15 +66,16 @@ def test_a_broken_key_is_not_cleared_by_a_clean_legacy_day(home):
     _break_key(home)
     code, out = _cli(home, "--verify")
     assert "KEY_UNUSABLE" in out, out
-    assert "LEGACY_UNSIGNED" in out, out
+    assert "LOG_UNCHAINED" in out, out
     assert code == codes.EXIT_FAIL, out
 
 
-def test_the_control_a_clean_legacy_day_with_a_usable_key_exits_0(home):
+def test_the_control_a_clean_legacy_day_with_a_usable_key_is_the_limit(home):
+    """A clean day is LOG_UNCHAINED, exit 3 (T9 ruling 60): no failure."""
     _legacy(home)
     code, out = _cli(home, "--verify")
     assert "KEY_UNUSABLE" not in out, out
-    assert code == 0, out
+    assert code == codes.EXIT_LIMIT, out
 
 
 def test_a_broken_key_with_a_legacy_day_and_a_chain_limit_is_1_never_3(home):
@@ -102,7 +103,7 @@ def test_one_combiner_failure_then_usage_then_limit(exits, combined):
     assert codes.combine_exits(*exits) == combined
 
 
-def test_the_three_verdicts_in_cmd_receipts_all_go_through_the_combiner():
+def test_every_verdict_in_cmd_receipts_goes_through_the_combiner():
     """Read, not trusted: every verdict assigned in the --verify block is
     joined with combine_exits, and nothing is assigned to `code` bare after
     the key's own verdict."""
@@ -113,4 +114,6 @@ def test_the_three_verdicts_in_cmd_receipts_all_go_through_the_combiner():
     assigns = re.findall(r"\n\s+code = (.+)", block)
     assert assigns[0].startswith("_verify_key("), assigns
     assert all(a.startswith("codes.combine_exits(code, ") for a in assigns[1:]), assigns
-    assert len(assigns) == 3, assigns
+    # key; lifecycle with the day files' LOG_UNCHAINED; runs; chains; marker;
+    # hook segments with no marker, LOG_UNMARKED (R62 c).
+    assert len(assigns) == 6, assigns

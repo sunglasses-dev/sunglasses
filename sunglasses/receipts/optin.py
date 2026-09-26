@@ -32,6 +32,8 @@ EXTRA = "sunglasses[receipts]"
 OFF = "sunglasses receipts off"
 OFF_EVENT = "receipts_off"
 HOOK_LOG = ("receipts", "hook")
+# The hook log's genesis marker, beside the key (T9 ruling 60).
+HOOK_MARKER = (KEY_DIR, "log-hook.genesis")
 SEGMENT_GLOB = "segment-*.chain"
 _TAIL_BYTES = 1 << 16
 
@@ -100,6 +102,10 @@ def hook_log(home) -> pathlib.Path:
     return pathlib.Path(home).joinpath(*HOOK_LOG)
 
 
+def hook_marker(home) -> pathlib.Path:
+    return pathlib.Path(home).joinpath(*HOOK_MARKER)
+
+
 def opted_in(home) -> bool:
     """A key, or a hook chain whose last word is not `receipts off` (R21).
 
@@ -163,7 +169,8 @@ def turn_off(home) -> str:
         usable = None
     if usable is not None:
         from . import chain
-        chain.Chain(directory, usable, producer="hook").write(
+        chain.Chain(directory, usable, producer="hook",
+                    marker=hook_marker(home)).write(
             [{"event": OFF_EVENT, "body": {}}], seal="close")
         done = "sealed"
     else:

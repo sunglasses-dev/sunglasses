@@ -98,9 +98,17 @@ if _ROOT not in _os.environ.get("PYTHONPATH", "").split(_os.pathsep):
 # the machine it runs on. Each test gets an empty home of its own; a test that
 # sets SUNGLASSES_HOME itself still wins, because its setenv comes later.
 # tests/test_suite_home_isolation.py is the control.
+#
+# The proxy's state root is not a variable at all: it is ~/.sunglasses/proxy,
+# from $HOME (serve.state_root), and `receipts` names every run log there
+# (T9 ruling 60). So $HOME is the test's own too. PYTHONUSERBASE keeps a
+# dependency installed with `pip --user` importable under the new $HOME.
 import pytest as _pytest
+import site as _site
 
 
 @_pytest.fixture(autouse=True)
 def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("SUNGLASSES_HOME", str(tmp_path_factory.mktemp("sunglasses-home")))
+    monkeypatch.setenv("PYTHONUSERBASE", _os.environ.get("PYTHONUSERBASE") or _site.getuserbase())
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))

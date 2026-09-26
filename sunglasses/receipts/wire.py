@@ -49,6 +49,9 @@ WIRE_VERSION = "sg-receipt-chain/1"
 RECORD_DOMAIN = b"sunglasses-receipt-chain/1\x00record\x00"
 CHECKPOINT_DOMAIN = b"sunglasses-receipt-chain/1\x00checkpoint\x00"
 FINGERPRINT_DOMAIN = b"sunglasses-receipt-key/1\x00ed25519\x00"
+# The hook log's genesis marker, beside the key (T9 ruling 60). Its own domain,
+# so a marker's signature is never a checkpoint's and never the other way.
+MARKER_DOMAIN = b"sunglasses-receipt-chain/1\x00marker\x00"
 
 # Fixed, not negotiated. A file that names its own algorithm lets an attacker
 # pick the weakest one the verifier still supports.
@@ -227,6 +230,14 @@ def checkpoint_signing_bytes(checkpoint: dict) -> bytes:
     if SIGNATURE_MEMBER in checkpoint:
         checkpoint = {k: v for k, v in checkpoint.items() if k != SIGNATURE_MEMBER}
     return CHECKPOINT_DOMAIN + encode(checkpoint)
+
+
+def marker_signing_bytes(marker: dict) -> bytes:
+    """Exactly what a log marker's signature covers: the marker minus its own
+    signature member, canonically encoded, under the marker domain."""
+    if SIGNATURE_MEMBER in marker:
+        marker = {k: v for k, v in marker.items() if k != SIGNATURE_MEMBER}
+    return MARKER_DOMAIN + encode(marker)
 
 
 def key_fingerprint(public_key_bytes: bytes) -> str:

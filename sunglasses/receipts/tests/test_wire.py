@@ -65,6 +65,43 @@ def test_the_two_domains_are_different(vectors):
                                            wire.CHECKPOINT_DOMAIN)
 
 
+def test_the_four_domains_are_different_and_the_vectors_name_them(vectors):
+    """T9 ruling 60 adds the marker's. Each prefix is also no prefix of
+    another, so no signed bytes of one kind start like another kind's."""
+    domains = [wire.RECORD_DOMAIN, wire.CHECKPOINT_DOMAIN,
+               wire.FINGERPRINT_DOMAIN, wire.MARKER_DOMAIN]
+    for a in domains:
+        assert [b for b in domains if b.startswith(a)] == [a], a
+    assert bytes.fromhex(vectors["domains"]["marker_hex"]) == wire.MARKER_DOMAIN
+
+
+def test_the_marker_vector_replays(vectors):
+    """The published marker: its line decodes to its record, its signing bytes
+    are the marker domain plus the canonical record, and it verifies."""
+    public = ed25519.Ed25519PublicKey.from_public_bytes(
+        bytes.fromhex(vectors["key"]["public_hex"]))
+    marker = vectors["records"]["marker"]
+    line = bytes.fromhex(marker["line_hex"])
+    assert line.endswith(b"\n") and wire.decode_strict(line) == marker["record_signed"]
+    assert marker["record_signed"]["key_id"] == vectors["key"]["fingerprint"]
+    signing = bytes.fromhex(marker["signing_bytes_hex"])
+    assert signing == wire.MARKER_DOMAIN + wire.encode(marker["record_unsigned"])
+    assert signing == wire.marker_signing_bytes(marker["record_signed"])
+    public.verify(bytes.fromhex(marker["signature_hex"]), signing)
+
+
+@pytest.mark.parametrize("domain", ["record", "checkpoint"])
+def test_a_marker_signature_does_not_verify_under_another_domain(vectors, domain):
+    from cryptography.exceptions import InvalidSignature
+    public = ed25519.Ed25519PublicKey.from_public_bytes(
+        bytes.fromhex(vectors["key"]["public_hex"]))
+    marker = vectors["records"]["marker"]
+    other = bytes.fromhex(vectors["domains"][domain + "_hex"])
+    with pytest.raises(InvalidSignature):
+        public.verify(bytes.fromhex(marker["signature_hex"]),
+                      other + wire.encode(marker["record_unsigned"]))
+
+
 # --- SR01, a line edited ---------------------------------------------------
 
 def test_editing_a_committed_record_changes_its_chain_hash(vectors):
