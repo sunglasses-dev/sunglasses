@@ -255,6 +255,16 @@ We built SUNGLASSES for a different use case: **local-only, offline, zero-cost, 
 
 Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapter system** to connect with other security tools in the same pipeline. Security is layers — we're the local foundation layer.
 
+## Privacy
+
+This section is about the MCP server, `python -m sunglasses.mcp`, the process an agent or a Claude plugin starts.
+
+The server reads only the text you pass to `scan_text` and the file you name in `scan_file`. The scan runs on your machine. The server opens no network connection, sends nothing anywhere and keeps no copy of what it scans. It collects no data, so there is nothing to store, share or retain.
+
+Audio and video are the one exception, and only with an optional extra. If you install `sunglasses[audio]`, `sunglasses[video]` or `sunglasses[all]` and ask for a DEEP scan, the Whisper library downloads its speech model the first time. A video scan also writes the sound track or subtitle track to a temporary file on your machine and deletes it once the track is read. What you scan still stays on your machine. Without those extras nothing is downloaded.
+
+The proxy is a separate process with its own state. It keeps the approvals you grant and its capture files on your machine, as [What the proxy enforces](#what-the-proxy-enforces) describes.
+
 ## Quick Start
 
 ```bash
