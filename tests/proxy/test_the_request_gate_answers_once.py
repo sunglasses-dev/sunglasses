@@ -9,7 +9,10 @@ a gate that withholds is also a gate that can drop.
 * A late cancel for an EARLIER generation of the id does not withhold a later
   request on that id. The gate answers nobody, so withholding a request that
   `_cancel` never answered would leave the client waiting for ever (R66).
-* DESCRIPTOR_CHANGED passes through on the request side (R106.3 ruling A).
+* R111.3 (B, which replaced ruling A). An invalidation accepted while a
+  call is scanned withholds it with one DESCRIPTOR_CHANGED answer. One
+  accepted before the call was admitted does not, and a cancel in the
+  same window keeps its own answer and adds no second.
 * A cancel accepted AFTER the gate decided is a cancel of a forwarded call:
   the call reaches the server once and the client is answered once.
 """
@@ -136,17 +139,43 @@ def test_a_late_cancel_for_an_earlier_generation_does_not_withhold(tmp_path):
     assert upstream.writes[-1] == _call()
 
 
-def test_descriptor_changed_does_not_withhold_the_request(tmp_path):
+def test_descriptor_changed_during_the_scan_withholds_with_one_answer(
+        tmp_path):
     engine, upstream, client, scans = _route(
         tmp_path,
         during_scan=lambda e: e.session.accept_invalidation(
             "DESCRIPTOR_CHANGED"))
     engine.client_frame(_call())
 
+    assert upstream.writes == [], (
+        "a call admitted before the invalidation was forwarded after it")
+    assert client.codes() == ["DESCRIPTOR_CHANGED"], client.codes()
+
+
+def test_control_an_invalidation_before_admission_does_not_withhold(tmp_path):
+    engine, upstream, client, scans = _route(tmp_path)
+    engine.session.accept_invalidation("DESCRIPTOR_CHANGED")
+    engine.client_frame(_call())
+
     assert upstream.writes == [_call()], (
-        "the request was withheld on an invalidation, and the client got "
+        "a call admitted after the invalidation was withheld by it, which is "
+        f"the session's sticky flag and not this call's revision: "
         f"{client.codes()}")
     assert client.codes() == []
+
+
+def test_a_cancel_and_an_invalidation_in_one_scan_answer_once(tmp_path):
+    def both(e):
+        e.session.accept_invalidation("DESCRIPTOR_CHANGED")
+        e._cancel({"params": {"requestId": 1}})
+    engine, upstream, client, scans = _route(tmp_path, during_scan=both)
+    engine.client_frame(_call())
+
+    assert upstream.writes == []
+    assert client.codes() == ["REQUEST_CANCELLED"], (
+        f"the client was answered {client.codes()}")
+    settled = [r for r in _rows(engine) if r.get("kind") == "SETTLED"]
+    assert len(settled) == 1, settled
 
 
 def test_a_cancel_after_the_gate_is_a_cancel_of_a_forwarded_call(tmp_path):

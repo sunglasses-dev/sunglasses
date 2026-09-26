@@ -739,7 +739,11 @@ class Route:
                            attempt=attempt)
             return
 
+        approved_under = None
         if method == "tools/call":
+            # R111.3. Read BEFORE the approval is asked, so anything that moves
+            # the approval after this point is seen at the handoff.
+            approved_under = self._approval_stamp()
             blocked = self._approval_reason(message)
             if blocked is not None:
                 # T5.R2. Before any scan, because a call we may not make is not
@@ -774,7 +778,7 @@ class Route:
             return
 
         self._inspect(raw, message, method, request_id=request_id,
-                      attempt=attempt)
+                      attempt=attempt, approved_under=approved_under)
 
     # ── T2.R6, T2.R7 and T5: the list flow ─────────────────────────────────
 
@@ -1020,7 +1024,8 @@ class Route:
 
     # ── the held path ──────────────────────────────────────────────────────
 
-    def _inspect(self, raw, message, method, *, request_id, attempt=None):
+    def _inspect(self, raw, message, method, *, request_id, attempt=None,
+                 approved_under=None):
         channel = selector.channel_for(method, REQUEST)
         params = message.get("params")
         params = params if isinstance(params, (dict, list)) else {}
@@ -1078,7 +1083,8 @@ class Route:
                      observed_bytes=result.get("observed_content_bytes", 0))
 
         if settlement.reason == REASON_CLEAN:
-            self._release(raw, request_id, attempt=attempt)
+            self._release(raw, request_id, attempt=attempt,
+                          approved_under=approved_under)
             return
         self._settle_withheld(request_id, settlement.reason, settlement.rule,
                               attempt=attempt, settlement=settlement,
@@ -1086,7 +1092,7 @@ class Route:
 
     # ── the two exits ──────────────────────────────────────────────────────
 
-    def _release(self, raw, request_id, *, attempt=None):
+    def _release(self, raw, request_id, *, attempt=None, approved_under=None):
         """T9.R2. The authorisation is durable BEFORE the first original byte
         leaves, so there is no moment where the payload is gone and the record
         of letting it go is not there.
@@ -1099,8 +1105,23 @@ class Route:
         if request_id is NO_ID:
             self._forward(raw, request_id, attempt)
             return
-        if self.session.request_release_decision(
-                request_id, origin=CLIENT) == REASON_REQUEST_CANCELLED:
+        # R111.3. A call approved against descriptors or an approval record
+        # that moved before this point is withheld with its one answer. The
+        # record half is read here; the descriptor half is decided with the
+        # claim, under the authority lock `accept_invalidation` takes.
+        descriptors_at = None
+        if approved_under is not None:
+            descriptors_at, record_at = approved_under
+            if record_at != self._approval_stamp()[1]:
+                # A revision the session never holds, so the gate says moved.
+                descriptors_at = -1
+        decision = self.session.request_release_decision(
+            request_id, origin=CLIENT, admitted_under=descriptors_at)
+        if decision == REASON_REQUEST_CANCELLED:
+            return
+        if decision == REASON_DESCRIPTOR_CHANGED:
+            self._withhold(request_id, REASON_DESCRIPTOR_CHANGED, RULE_APPROVAL,
+                           attempt=attempt)
             return
         # R111.2. The gate's answer was a claim. A cancel accepted while it is
         # held was recorded and not answered; it is answered here, after the
@@ -1269,6 +1290,12 @@ class Route:
         self.session.answered_on_the_wire(owed, final=True)
 
     # ── plumbing ───────────────────────────────────────────────────────────
+
+    def _approval_stamp(self):
+        """R111.3. What a call's approval is read under: the session's
+        descriptor revision and the approval record's own revision."""
+        return (self.session.descriptor_revision(),
+                getattr(self.approvals, "revision", None))
 
     def _approval_reason(self, message):
         """No store is no approval. A gate that opens when its authority is

@@ -446,6 +446,12 @@ class Session:
         self._releasing: dict = {}
         self._cancel_deferred: set = set()
         self._invalidated_as = None
+        # R111.3. Moves on every accepted invalidation and on nothing else.
+        # `_invalidated_as` is sticky for the session, so gating on it would
+        # also refuse a call re-approved against the NEW descriptors, and the
+        # authority epoch moves on cancellations too. A request carries the
+        # value it was admitted under and the gate compares that.
+        self._descriptor_revision = 0
         # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
         # Round 4 claimed the decision and the discharge were atomic because
@@ -926,6 +932,7 @@ class Session:
         """
         with self._authority_lock:
             self._invalidated_as = reason
+            self._descriptor_revision += 1
             self._authority_epoch += 1
             self._core._emit("APPROVAL_INVALIDATED", None, reason_code=reason)
 
@@ -1031,7 +1038,13 @@ class Session:
                 return "DESCRIPTOR_CHANGED"
             return None
 
-    def request_release_decision(self, request_id, *, origin=ORIGIN_CLIENT):
+    def descriptor_revision(self):
+        """R111.3. The value a request is admitted under."""
+        with self._authority_lock:
+            return self._descriptor_revision
+
+    def request_release_decision(self, request_id, *, origin=ORIGIN_CLIENT,
+                                 admitted_under=None):
         """R106.3. The REQUEST side's handoff gate, inside the settlement owner.
 
         The result direction asks `release_decision` at the handoff and the
@@ -1060,6 +1073,13 @@ class Session:
         caller must end it with `end_request_release` once the write returns.
         A cancel accepted while the claim is held is not answered by `_cancel`;
         `end_request_release` hands it back to the caller, after the write.
+
+        R111.3. `admitted_under` is the descriptor revision a call's approval
+        was read under. If an invalidation was accepted since, the call was
+        approved against descriptors that moved and the answer is
+        `"DESCRIPTOR_CHANGED"`, with no claim taken. The caller owes that
+        answer; unlike a cancel, nobody has sent it. A cancellation is asked
+        first, because its answer is already on the wire.
         """
         identity = key(origin, request_id)
         with self._settlement:
@@ -1068,6 +1088,9 @@ class Session:
                         self._cancelled_at.get(identity) == \
                         self._generation.get(identity, 0):
                     return "REQUEST_CANCELLED"
+                if admitted_under is not None and \
+                        admitted_under != self._descriptor_revision:
+                    return "DESCRIPTOR_CHANGED"
                 self._releasing[identity] = self._generation.get(identity, 0)
                 self._cancel_deferred.discard(identity)
                 return None
