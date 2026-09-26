@@ -73,6 +73,15 @@ def _figure(path: str, value) -> str:
     return f'<span class="fig" data-bound="{_esc(path)}">{_esc(value)}</span>'
 
 
+def _bound_or_not(path: str, value) -> str:
+    """A figure when the field holds one; the words "not bound" when it is null.
+
+    str(None) is "None", and a bound span reading "None" transcribes its field
+    exactly, so no transcription check can catch it (measured 2026-09-23).
+    """
+    return _figure(path, value) if value is not None else "<em>not bound</em>"
+
+
 def _state_note(panel: dict) -> str:
     state = panel.get("state")
     code = panel.get("reason_code")
@@ -102,10 +111,10 @@ def _coverage_section(report: dict) -> str:
         _figure("coverage.total", coverage["total"]),
         " delivered schedules are drivable by this adapter against the pinned "
         "corpus recorded above. Further coverage requires real-route "
-        "capabilities; expanding the stand-in is excluded by the adopted plan.",
+        "capabilities. Expanding the stand-in is excluded by the adopted plan.",
         "</p>",
         '<p class="detail">Planning and execution are separate counts. '
-        "Being drivable is not being run, and being run is not passing. ",
+        "Being drivable is not being run. Being run is not passing. ",
         "Executed this run: ",
         _figure("coverage.execution_partition.passed",
                 coverage["execution_partition"]["passed"]),
@@ -226,7 +235,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 </style>
 <main>
 <h1>What our own adversarial harness proved last night</h1>
-<p class="detail">This page is an organization-run test of our own work, with
+<p class="detail">This page is a test our own organization runs on its own work, with
 observations recorded outside the process under test. It is not a third party
 certification. It publishes where the harness proves nothing as plainly as where
 it proves something, because a dashboard that only shows its good days is
@@ -251,7 +260,7 @@ indistinguishable from one that is broken.</p>
 {_figure("run.outcome", run["outcome"])}, exit code
 {_figure("run.exit_code", run["exit_code"])}.</p>
 <p class="detail">A run that refuses still publishes this report and still exits
-nonzero. Those are not in tension: if a refusing run published nothing, the last
+nonzero. Those are not in tension. If a refusing run published nothing, the last
 good page would stay up and a broken harness would look exactly like a passing
 one from out here.</p>
 </section>
@@ -277,11 +286,11 @@ and not provider requests. A deterministic run adds none.</p>
 <section id="inputs">
 <h2>What this was measured against</h2>
 <p class="detail">Corpus digest
-{_figure("identities.corpus_digest", report["identities"]["corpus_digest"])}.
+{_bound_or_not("identities.corpus_digest", report["identities"]["corpus_digest"])}.
 Capability map revision
-{_figure("identities.capability_map_revision",
+{_bound_or_not("identities.capability_map_revision",
          report["identities"]["capability_map_revision"])}, review state
-{_figure("identities.capability_map_review_state",
+{_bound_or_not("identities.capability_map_review_state",
          report["identities"]["capability_map_review_state"])}.</p>
 </section>
 </main>
