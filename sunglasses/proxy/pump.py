@@ -921,7 +921,30 @@ class Session:
         """
         with self._authority_lock:
             self._observe_authority()
-            return key(origin, request_id) in self._cancelled_ids
+            return self._cancel_is_live(key(origin, request_id))
+
+    def _cancel_is_live(self, identity):
+        """R107. Does an accepted cancel speak for the item being decided now?
+
+        `_cancelled_ids` is never cleared, and both result-side readers used to
+        ask it by identity alone. A late cancel for an id that was already
+        answered then stood for the rest of the session: the client reused the
+        id (RC19b accepts that once the frame is gone), the server executed the
+        call, and the result was answered REQUEST_CANCELLED. The client was
+        told "cancelled" about a call that ran (R106.4, measured red 3/3).
+
+        A cancel speaks for the generation that was live when it was accepted
+        (`_cancelled_at`, R106.3). The item being decided is named the way the
+        settlement names it, by id AND generation: the standing record's key
+        while it settles, otherwise the live core key, the same pair
+        `recorded_terminal` reads. A cancel for a retired generation is inert,
+        which is what the protocol asks of a cancel for a completed request.
+        The set stays as the record. Caller holds `_authority_lock`.
+        """
+        if identity not in self._cancelled_ids:
+            return False
+        record_key = self._settling_key.get(identity) or self._core_key(identity)
+        return self._cancelled_at.get(identity) == record_key[-1]
 
     def authority_state(self):
         """The cancelled ids and the invalidation, read TOGETHER under one lock.
@@ -983,7 +1006,7 @@ class Session:
             recorded = self.recorded_terminal(request_id, origin=origin)
             if recorded is not None and recorded.rule == "S3":
                 return None
-            if identity in self._cancelled_ids:
+            if self._cancel_is_live(identity):
                 return "REQUEST_CANCELLED"
             if self._invalidated_as:
                 return "DESCRIPTOR_CHANGED"
