@@ -977,8 +977,16 @@ class Route:
         # R-168-R4a. Accepted in the session, under ITS lock, so a reader
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
-        self.session.accept_cancellation(target, origin=CLIENT)
+        deferred = self.session.accept_cancellation(target, origin=CLIENT)
         self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
+        if deferred:
+            # R111.2. The call is being written upstream right now. Answering
+            # here would tell the client "cancelled" before the bytes leave;
+            # `_release` finishes this cancel once the write has returned.
+            return
+        self._finish_cancel(target)
+
+    def _finish_cancel(self, target):
         if self.session.is_settling(target, origin=CLIENT):
             # R-168-R3. The item has left `_pending` and its answer is in the
             # reader's hands, NOT the client's. Settling it here would be the
@@ -1088,9 +1096,26 @@ class Route:
         settlement owner, and `_cancel` has already written SETTLED and the
         client's one answer, so this adds neither.
         """
-        if request_id is not NO_ID and self.session.request_release_decision(
+        if request_id is NO_ID:
+            self._forward(raw, request_id, attempt)
+            return
+        if self.session.request_release_decision(
                 request_id, origin=CLIENT) == REASON_REQUEST_CANCELLED:
             return
+        # R111.2. The gate's answer was a claim. A cancel accepted while it is
+        # held was recorded and not answered; it is answered here, after the
+        # write, so its answer never precedes the call it cancels.
+        finished = False
+        try:
+            self._forward(raw, request_id, attempt)
+            finished = True
+        finally:
+            deferred = self.session.end_request_release(request_id,
+                                                        origin=CLIENT)
+        if finished and deferred:
+            self._finish_cancel(request_id)
+
+    def _forward(self, raw, request_id, attempt):
         try:
             self.log.authorise_release(self._token(request_id, attempt),
                                        write=lambda: self.upstream_write(raw))

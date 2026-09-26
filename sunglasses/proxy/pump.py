@@ -433,6 +433,18 @@ class Session:
         # cancel; `_cancel` has answered that one. A stale mark would drop an
         # admitted id with no answer at all (R66).
         self._cancelled_at: dict = {}
+        # R111.2. identity -> the generation whose request is being released
+        # upstream right now. The gate's check and this claim are one step
+        # under `_authority_lock`, and a cancellation is accepted under the
+        # same lock, so every cancel lands either BEFORE the claim (the gate
+        # withholds) or AFTER it (the call is on its way). A cancel after it
+        # is recorded in `_cancel_deferred` and not answered until the write
+        # has returned, so no client is told "cancelled" before the bytes of
+        # that call leave. The claim is not the settlement lock held across
+        # the write: that lock would park the upstream reader behind a write
+        # the upstream may not be reading, and the pair can deadlock.
+        self._releasing: dict = {}
+        self._cancel_deferred: set = set()
         self._invalidated_as = None
         # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
@@ -879,6 +891,13 @@ class Session:
             # this sees is the one the reader last admitted.
             self._cancelled_at[identity] = self._generation.get(identity, 0)
             self._authority_epoch += 1
+            # R111.2. The request of this generation is being written
+            # upstream. Its cancel is recorded and stays authoritative, but
+            # the answer waits for the write (`end_request_release`).
+            if self._releasing.get(identity) == self._cancelled_at[identity]:
+                self._cancel_deferred.add(identity)
+                return True
+            return False
 
     def accept_invalidation(self, reason):
         """T5.R4. The descriptors moved; every undelivered answer of this
@@ -1036,6 +1055,11 @@ class Session:
         Only the cancellation withholds. `DESCRIPTOR_CHANGED` passes through
         (R106.3 ruling A): a withheld request that `_cancel` did not answer has
         no answer at all. Returns `"REQUEST_CANCELLED"` or None.
+
+        R111.2. A None is a CLAIM, taken in the same step as the check, and the
+        caller must end it with `end_request_release` once the write returns.
+        A cancel accepted while the claim is held is not answered by `_cancel`;
+        `end_request_release` hands it back to the caller, after the write.
         """
         identity = key(origin, request_id)
         with self._settlement:
@@ -1044,7 +1068,21 @@ class Session:
                         self._cancelled_at.get(identity) == \
                         self._generation.get(identity, 0):
                     return "REQUEST_CANCELLED"
+                self._releasing[identity] = self._generation.get(identity, 0)
+                self._cancel_deferred.discard(identity)
                 return None
+
+    def end_request_release(self, request_id, *, origin=ORIGIN_CLIENT):
+        """R111.2. End the claim `request_release_decision` took. True means
+        a cancel was accepted while the call was being written, and its answer
+        is now the caller's to finish."""
+        identity = key(origin, request_id)
+        with self._authority_lock:
+            self._releasing.pop(identity, None)
+            if identity in self._cancel_deferred:
+                self._cancel_deferred.discard(identity)
+                return True
+            return False
 
     def _final_decision(self, request_id, decided):
         """The decision that actually reaches the wire, taken UNDER the lock.
