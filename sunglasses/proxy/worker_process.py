@@ -81,6 +81,8 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
     `child` is an already-running worker (a warm spare from `ProcessScan`).
     Everything after the spawn is identical: the deadline, the stdout bound and
     the kill all apply to it the same way, and the clock starts at the write.
+    With `child=None` the spawn and the engine load are inside `timeout_ms`;
+    the product path is `ProcessScan`, which loads before the clock (R114).
     """
     timeout_ms = bounds.INSPECTION_MS if timeout_ms is None else timeout_ms
     grace_ms = bounds.KILL_GRACE_MS if grace_ms is None else grace_ms
