@@ -34,10 +34,16 @@ import threading
 import time
 
 from . import (approvals, bounds, control, framing, inspection, pump,
-               receipts, route, supervisor)
+               receipts, route, supervisor, worker_process)
 
 USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
-         "[--state-root PATH] -- <server command> [args...]\n")
+         "[--state-root PATH] [--worker inprocess|process] "
+         "-- <server command> [args...]\n")
+
+# OPT-IN, and the default is the behaviour that shipped. `process` runs every
+# scan in a child with T8.R4's kill on deadline and T8.R7's stdout bound;
+# `inprocess` is byte-for-byte what serve did before the flag existed.
+WORKER_MODES = ("inprocess", "process")
 
 EXIT_OK = 0
 EXIT_FAULT = 1
@@ -61,11 +67,13 @@ def parse(argv):
     parsed = {}
     index = 0
     while index < len(options):
-        if options[index] in ("--config", "--state-root") and \
+        if options[index] in ("--config", "--state-root", "--worker") and \
                 index + 1 < len(options):
             parsed[options[index][2:]] = options[index + 1]
             index += 2
             continue
+        if options[index].startswith("--worker="):
+            parsed["worker"] = options[index].split("=", 1)[1]
         index += 1
     return (upstream or None), parsed
 
@@ -108,7 +116,7 @@ def install_records_home(override=None):
 
 
 def build_route(*, session, log, upstream_argv, upstream_write, client_write,
-                root=None):
+                root=None, worker=None):
     """The wiring, separated so it can be inspected without spawning anything.
 
     The approval store is the REAL one and not a bypass. T5.R2 refuses calls
@@ -124,17 +132,49 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     # forwarding it, which is correct but useless: this is what lets the proxy
     # run its own list and therefore what lets a human ever approve a server.
     channel = control.Control(session=session, upstream_write=upstream_write)
-    return route.Route(session=session, log=log,
-                       upstream_write=upstream_write,
-                       client_write=client_write, approvals=store,
-                       control=channel, server_identity=identity)
+    # No `scan=` at all in the default mode, so Route keeps its own default and
+    # the in-process path is not merely equivalent but the same call.
+    extra = ({"scan": worker_process.ProcessScan()} if worker == "process"
+             else {})
+    try:
+        return route.Route(session=session, log=log,
+                           upstream_write=upstream_write,
+                           client_write=client_write, approvals=store,
+                           control=channel, server_identity=identity, **extra)
+    except BaseException as error:
+        # The spare is running already and the teardown that closes it only
+        # runs once a session exists, so a Route that fails to build would
+        # leave it behind (measured 9-25: reparented to pid 1, still loading).
+        if extra:
+            _close_spare(extra["scan"], error)
+        raise
+
+
+def _close_spare(scan, error):
+    """Close the spare while `error` is on its way out, and never in its place.
+
+    The error that is leaving says why the wiring failed. A close that raised
+    through here would replace it with one that does not, so a close failure is
+    caught and written onto `error` as a note, which a traceback prints on 3.11
+    and later. On 3.9 and 3.10 there are no notes and the close failure is not
+    shown; the wiring error still leaves unchanged. An interrupt during the
+    close is not caught: the user stopping the process wins.
+    """
+    try:
+        scan.close()
+    except Exception as failure:  # noqa: BLE001
+        if hasattr(error, "add_note"):
+            error.add_note(f"closing the warm spare failed too: {failure!r}")
 
 
 def main(argv=None, stdin=None, stdout=None, stderr=None):
     stderr = stderr if stderr is not None else sys.stderr
     upstream_argv, options = parse(sys.argv[1:] if argv is None else argv)
     root = options.get("state-root")
-    if not upstream_argv:
+    worker = options.get("worker", "inprocess")
+    # A misspelled mode must not quietly run the other one: `parse` skips what
+    # it does not know, so the value is checked here, by name.
+    if not upstream_argv or worker not in WORKER_MODES:
         stderr.write(USAGE)
         return EXIT_USAGE
 
@@ -189,7 +229,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
 
     engine = build_route(session=session, log=log, upstream_argv=upstream_argv,
                          upstream_write=to_upstream, client_write=to_client,
-                         root=root)
+                         root=root, worker=worker)
 
     # AR14. BOTH directions are threads, and the process ends when EITHER of
     # them does.
@@ -242,6 +282,11 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         _record_ending(log, session, code)
         log.close()
         supervisor.stop_group(child.pid, handle=child)
+        # The warm spare, if any. `exit_process` leaves through `os._exit`, so
+        # an atexit hook would never run and the spare would outlive us.
+        close_scan = getattr(engine.scan, "close", None)
+        if close_scan is not None:
+            close_scan()
     return code
 
 
