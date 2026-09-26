@@ -137,10 +137,35 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     # the in-process path is not merely equivalent but the same call.
     extra = ({"scan": worker_process.ProcessScan()} if worker == "process"
              else {})
-    return route.Route(session=session, log=log,
-                       upstream_write=upstream_write,
-                       client_write=client_write, approvals=store,
-                       control=channel, server_identity=identity, **extra)
+    try:
+        return route.Route(session=session, log=log,
+                           upstream_write=upstream_write,
+                           client_write=client_write, approvals=store,
+                           control=channel, server_identity=identity, **extra)
+    except BaseException as error:
+        # The spare is running already and the teardown that closes it only
+        # runs once a session exists, so a Route that fails to build would
+        # leave it behind (measured 9-25: reparented to pid 1, still loading).
+        if extra:
+            _close_spare(extra["scan"], error)
+        raise
+
+
+def _close_spare(scan, error):
+    """Close the spare while `error` is on its way out, and never in its place.
+
+    The error that is leaving says why the wiring failed. A close that raised
+    through here would replace it with one that does not, so a close failure is
+    caught and written onto `error` as a note, which a traceback prints on 3.11
+    and later. On 3.9 and 3.10 there are no notes and the close failure is not
+    shown; the wiring error still leaves unchanged. An interrupt during the
+    close is not caught: the user stopping the process wins.
+    """
+    try:
+        scan.close()
+    except Exception as failure:  # noqa: BLE001
+        if hasattr(error, "add_note"):
+            error.add_note(f"closing the warm spare failed too: {failure!r}")
 
 
 def main(argv=None, stdin=None, stdout=None, stderr=None):
