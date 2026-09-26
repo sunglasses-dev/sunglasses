@@ -15,6 +15,7 @@ collector closing a pipe.
 import io
 import os
 import sys
+import threading
 import time
 
 import pytest
@@ -132,6 +133,11 @@ def test_a_close_that_raises_does_not_hide_why_the_wiring_failed(
 def test_control_the_spare_is_closed_when_the_session_ends(tmp_path, monkeypatch):
     """The path that already closed it: a session that ran and ended."""
     spares = _record_spares(monkeypatch)
+    # `main` sets the module's `_FINISHED` on its way out, and while it is set
+    # `exit_process` leaves with `os._exit`: a later in-process test that calls
+    # it would take the whole runner down with a clean exit and no summary.
+    # This run gets its own event; the module's stays clear.
+    monkeypatch.setattr(serve, "_FINISHED", threading.Event())
     serve.main(["--worker", "process", "--state-root", str(tmp_path),
                 "--"] + UPSTREAM,
                stdin=io.BytesIO(b""), stdout=io.BytesIO(), stderr=io.StringIO())

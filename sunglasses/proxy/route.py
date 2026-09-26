@@ -59,15 +59,13 @@ def _unusable(result):
     A `worker.LocalFault` keeps its own status and its own cause, and a fault
     with no cause (a deadline, an engine that raised in-process) records NONE
     rather than borrowing one. Only a result the proxy did not build is a
-    contract failure. The field is OMITTED when there is no cause, never
-    written as null: a supplied null claims a cause and names nobody.
+    contract failure. Returns (status, cause); `Route._record_unusable` OMITS
+    the field when there is no cause, never writing null: a supplied null
+    claims a cause and names nobody.
     """
     if isinstance(result, worker.LocalFault):
-        fields = {"status": result.get("status")}
-        if result.get("detector_status") is not None:
-            fields["detector_status"] = result["detector_status"]
-        return fields
-    return {"status": "exception", "detector_status": CAUSE_SCHEMA_INVALID}
+        return result.get("status"), result.get("detector_status")
+    return "exception", CAUSE_SCHEMA_INVALID
 
 REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
@@ -502,8 +500,7 @@ class Route:
             # Either the scan produced a result that did not fit the contract,
             # or this process built a fault because it produced none -- and
             # `validate` refuses both. `_unusable` keeps them apart.
-            self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **_unusable(result))
+            self._record_unusable(result)
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False)
 
@@ -984,8 +981,7 @@ class Route:
             # T4.R2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
-            self._record("SCAN_RESULT", accepted=False,
-                         inspection_complete=False, **_unusable(result))
+            self._record_unusable(result)
             self._settle_withheld(request_id, REASON_SCAN_EXCEPTION,
                                   RULE_RESOURCE, attempt=attempt)
             return
@@ -1362,6 +1358,18 @@ class Route:
                         self.session.owe_again(owed)
         finally:
             self._paying = False
+
+    def _record_unusable(self, result):
+        """The SCAN_RESULT for a result `worker.validate` refused, every field
+        named here: the closed key rule (#172) forbids splicing a mapping into
+        a row, so the two shapes are two calls, not one dict."""
+        status, cause = _unusable(result)
+        if cause is None:
+            return self._record("SCAN_RESULT", accepted=False,
+                                inspection_complete=False, status=status)
+        return self._record("SCAN_RESULT", accepted=False,
+                            inspection_complete=False, status=status,
+                            detector_status=cause)
 
     def _record(self, event, **fields):
         """Every receipt goes through here so a log that cannot be written
