@@ -14,10 +14,10 @@
   "media_types": 6,
   "reports_published": 3,
   "team_size": 5,
-  "last_updated": "2026-09-25T17:38:19-07:00",
+  "last_updated": "2026-09-26T00:38:19+00:00",
   "last_updated_by": "sunglasses-publish-sh",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-09-25",
+  "released": "2026-09-26",
   "scan_speed": {
     "quickstart_median_ms": 0.74,
     "quickstart_input_chars": 18,
