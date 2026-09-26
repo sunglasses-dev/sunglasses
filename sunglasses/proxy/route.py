@@ -1126,15 +1126,14 @@ class Route:
         # R111.2. The gate's answer was a claim. A cancel accepted while it is
         # held was recorded and not answered; it is answered here, after the
         # write, so its answer never precedes the call it cancels.
-        finished = False
+        # R111.2b. After the write ATTEMPT, returned or raised: a write that
+        # raised has still ended, and the cancel the client sent is owed its
+        # one answer either way (R66). The exception leaves as before.
         try:
             self._forward(raw, request_id, attempt)
-            finished = True
         finally:
-            deferred = self.session.end_request_release(request_id,
-                                                        origin=CLIENT)
-        if finished and deferred:
-            self._finish_cancel(request_id)
+            if self.session.end_request_release(request_id, origin=CLIENT):
+                self._finish_cancel(request_id)
 
     def _forward(self, raw, request_id, attempt):
         try:
