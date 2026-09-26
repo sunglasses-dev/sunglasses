@@ -8,18 +8,17 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sunglasses-dev/sunglasses/badge)](https://scorecard.dev/viewer/?uri=github.com/sunglasses-dev/sunglasses)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,554 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run.
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,554 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run, best effort under its 10 second timeout.
 
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
 - An MCP server your agent calls, and a GitHub Action that scans every pull request
 - A Claude Code hook that blocks credential paths and policy violations before a tool runs
-
-**What is next**
-- A local MCP proxy that checks what a tool RETURNS, not only what goes into it.
-  It ships in this release and it enforces **only after a human approves the
-  server at an interactive terminal** — see [What the proxy enforces](#what-the-proxy-enforces).
-  Installing it is not protection on its own.
+- A local MCP proxy that refuses every `tools/list` and `tools/call` until a person
+  approves the server at an interactive terminal. **Once approved, it withholds a
+  credential in a tool call or in a tool result, which is the credential lane and not
+  general inspection of everything a tool returns.** Installing it is not protection
+  on its own. See [What the proxy enforces](#what-the-proxy-enforces).
 - Outside that lane this reads input, so a clean result is a confidence floor and not a guarantee
 
 Sunglasses is a local, open-source scanner for text and supported files. It reports what
