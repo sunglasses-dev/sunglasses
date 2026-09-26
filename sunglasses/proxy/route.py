@@ -1081,7 +1081,16 @@ class Route:
     def _release(self, raw, request_id, *, attempt=None):
         """T9.R2. The authorisation is durable BEFORE the first original byte
         leaves, so there is no moment where the payload is gone and the record
-        of letting it go is not there."""
+        of letting it go is not there.
+
+        R106.3. A request whose cancellation the client has already been
+        answered for is never forwarded. The session decides, inside its
+        settlement owner, and `_cancel` has already written SETTLED and the
+        client's one answer, so this adds neither.
+        """
+        if request_id is not NO_ID and self.session.request_release_decision(
+                request_id, origin=CLIENT) == REASON_REQUEST_CANCELLED:
+            return
         try:
             self.log.authorise_release(self._token(request_id, attempt),
                                        write=lambda: self.upstream_write(raw))

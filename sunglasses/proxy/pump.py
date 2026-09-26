@@ -425,6 +425,14 @@ class Session:
         # other thread, which is the exclusion the property needs.
         self._authority_lock = threading.RLock()
         self._cancelled_ids: set = set()
+        # R106.3. identity -> the generation that was live when its
+        # cancellation was accepted. `_cancelled_ids` is never cleared, so on
+        # its own it cannot tell a cancel for THIS request from a late one for
+        # an earlier generation of the same id. The request gate withholds
+        # without answering, so it may only act on the live generation's
+        # cancel; `_cancel` has answered that one. A stale mark would drop an
+        # admitted id with no answer at all (R66).
+        self._cancelled_at: dict = {}
         self._invalidated_as = None
         # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
@@ -863,8 +871,13 @@ class Session:
         the thing the reviewer's XB03 requires and the thing a writer under the
         settlement lock cannot do.
         """
+        identity = key(origin, request_id)
         with self._authority_lock:
-            self._cancelled_ids.add(key(origin, request_id))
+            self._cancelled_ids.add(identity)
+            # Read without `_settlement`, and ordered anyway: admission and
+            # cancellation both run on the client reader, so the generation
+            # this sees is the one the reader last admitted.
+            self._cancelled_at[identity] = self._generation.get(identity, 0)
             self._authority_epoch += 1
 
     def accept_invalidation(self, reason):
@@ -975,6 +988,40 @@ class Session:
             if self._invalidated_as:
                 return "DESCRIPTOR_CHANGED"
             return None
+
+    def request_release_decision(self, request_id, *, origin=ORIGIN_CLIENT):
+        """R106.3. The REQUEST side's handoff gate, inside the settlement owner.
+
+        The result direction asks `release_decision` at the handoff and the
+        request direction asked nobody: a cancel recorded and answered while
+        its request was being scanned still let the call reach the server
+        (R104, measured red 3/3). This is that question for the request side,
+        asked where the result side asks it: under `_settlement`, then
+        `_authority_lock`, the same order `_retire_prepared` takes them.
+
+        THE LINEARISATION POINT IS THIS CALL. A cancellation is accepted under
+        `_authority_lock`, and `_cancel` answers the client only after that
+        acceptance returns, so a cancel the client saw answered before this
+        call is seen here and nothing is forwarded. A cancel accepted after it
+        is a cancel of a forwarded call, which is what it was before this gate.
+
+        It reads the cancelled set directly and does NOT call
+        `release_decision`, because that stamps `_authority_observed`, the
+        epoch the RESULT reader's pending decision was derived from. A second
+        thread stamping it would move the result side's staleness test.
+
+        Only the cancellation withholds. `DESCRIPTOR_CHANGED` passes through
+        (R106.3 ruling A): a withheld request that `_cancel` did not answer has
+        no answer at all. Returns `"REQUEST_CANCELLED"` or None.
+        """
+        identity = key(origin, request_id)
+        with self._settlement:
+            with self._authority_lock:
+                if identity in self._cancelled_ids and \
+                        self._cancelled_at.get(identity) == \
+                        self._generation.get(identity, 0):
+                    return "REQUEST_CANCELLED"
+                return None
 
     def _final_decision(self, request_id, decided):
         """The decision that actually reaches the wire, taken UNDER the lock.
