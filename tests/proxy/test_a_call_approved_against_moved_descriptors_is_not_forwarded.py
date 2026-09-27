@@ -21,6 +21,8 @@ import os
 import threading
 import time
 
+import pytest
+
 from sunglasses.proxy import approvals, control, pump, receipts
 from sunglasses.proxy.route import Route
 
@@ -256,5 +258,67 @@ def test_red_a_call_whose_approval_record_changed_during_the_scan_is_not_forward
             "was changed on disk")
         assert server.client.codes_for(3) == ["DESCRIPTOR_CHANGED"], (
             server.client.codes_for(3))
+    finally:
+        server.close()
+
+
+# ── the revision moves before the invalidation is recorded (r4, the `!`) ────
+#
+# On main `accept_invalidation` gained #263's in-memory APPROVAL_INVALIDATED
+# record, in the same `_authority_lock` block as this lane's revision bump. The
+# bump runs FIRST. If the record raised and the bump came after it, the session
+# would say "invalidated" while the revision a call was admitted under still
+# matched, and the call would be forwarded. Nothing in the rows above makes the
+# record raise, so the order was unpinned (ASTRA r4 package, mutant X6).
+
+def _failing_invalidation_record(server):
+    """Every session event passes through except APPROVAL_INVALIDATED, which
+    raises. Returns the list of kinds that raised."""
+    core = server.engine.session._core
+    real, raised = core._emit, []
+
+    def emit(kind, request_id, **fields):
+        if kind == "APPROVAL_INVALIDATED":
+            raised.append(kind)
+            raise OSError("control: the invalidation record could not be made")
+        return real(kind, request_id, **fields)
+    core._emit = emit
+    return raised
+
+
+def test_red_a_call_approved_before_an_unrecorded_invalidation_is_not_forwarded(
+        tmp_path):
+    server = _approved_server(tmp_path)
+    raised = _failing_invalidation_record(server)
+
+    def invalidate():
+        with pytest.raises(OSError):
+            server.engine._invalidated = "DESCRIPTOR_CHANGED"
+    server.during_scan = invalidate
+    server.engine.client_frame(_call(3))
+    try:
+        assert raised == ["APPROVAL_INVALIDATED"], (
+            f"the record never raised, so this row proves nothing: {raised}")
+        assert 3 not in server.calls_written_upstream(), (
+            "the session took the invalidation but its record raised, and a "
+            "call approved before it was forwarded: the revision did not move")
+        assert server.client.codes_for(3) == ["DESCRIPTOR_CHANGED"], (
+            server.client.codes_for(3))
+    finally:
+        server.close()
+
+
+def test_control_the_raising_record_alone_withholds_nothing(tmp_path):
+    """THE POSITIVE CONTROL. The same patched record with no invalidation: the
+    call is forwarded, so the row above is red only because of the order."""
+    server = _approved_server(tmp_path)
+    raised = _failing_invalidation_record(server)
+    server.during_scan = lambda: None
+    server.engine.client_frame(_call(3))
+    try:
+        assert raised == []
+        assert 3 in server.calls_written_upstream(), (
+            server.client.codes_for(3))
+        assert server.client.codes_for(3) == []
     finally:
         server.close()
