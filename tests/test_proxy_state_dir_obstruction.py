@@ -385,3 +385,43 @@ def test_control_approve_writes_the_record(tmp_path):
     code, err = _approve(state)
     assert code == 0, err
     assert (state / "approvals" / "s.json").exists()
+
+
+# ── A CALL THAT MEETS THE FAULT FIRST (T9 ruling 123 (b), 2026-09-26) ─────
+# `_activate_once` is the only activation a tools/call ever gets, and its
+# STATE_IO_ERROR branch is what `_approval_reason` reads. Dropping that branch
+# survived every row above (on 01463eb and on the reviewed 2ce7811 alike): a
+# session whose first request is a call, not a list, was told the server was
+# unapproved under S4 and kept running. This row drives that call.
+
+def _call_route(tmp_path):
+    import types
+    from sunglasses.proxy import pump, receipts, route
+    session = pump.Session()
+    out = []
+    log = receipts.Log(tmp_path, run_id="call-first", header={})
+    rt = route.Route(session=session, log=log, client_write=out.append,
+                     upstream_write=lambda b: None, catalog=(),
+                     approvals=types.SimpleNamespace(
+                         may_call=lambda *a: "APPROVAL_REQUIRED",
+                         invalidate=lambda: None))
+    rt.control = object()
+    rt._pager = lambda: None
+    return session, rt, out, log
+
+
+def test_a_call_that_meets_a_state_fault_is_refused_as_one(tmp_path,
+                                                          monkeypatch):
+    from sunglasses.proxy import activation
+    session, rt, out, log = _call_route(tmp_path)
+    monkeypatch.setattr(activation, "activate", lambda *a, **k: activation.Outcome(
+        False, provenance=activation.STATE_IO_ERROR,
+        detail="approvals: not a directory"))
+    rt.client_frame(_frame({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                            "params": {"name": "review"}}))
+    log.close()
+    assert rt._state_fault == "approvals: not a directory"
+    assert len(out) == 1, out
+    data = json.loads(out[0])["error"]["data"]
+    assert (data["reason_code"], data["rule"]) == ("STATE_IO_ERROR", "S3"), data
+    assert session._closed == ("STATE_IO_ERROR", "S3"), session._closed
