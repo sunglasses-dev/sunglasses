@@ -3,6 +3,15 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.3] — UNRELEASED
+
+### Changed
+
+- 0.6.3 changes our MCP server's tool descriptions; an existing proxy approval
+  of the sunglasses server reports DESCRIPTOR_CHANGED until you run proxy
+  approve again. That is the pin working.
+
+
 ## [0.6.2] — 2026-09-27
 
 ### Added
