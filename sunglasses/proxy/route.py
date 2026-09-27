@@ -74,6 +74,7 @@ REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
 REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
 REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
+REASON_STATE_IO_ERROR = "STATE_IO_ERROR"
 
 
 class _NoFrameId:
@@ -155,6 +156,7 @@ class Route:
         self._approved_tools = {}
         self._activated = False
         self._activated_sha = None
+        self._state_fault = None
         # T5.R4 and T6.R5, the two things that can retire a held item while its
         # answer is still in flight. Kept on the session because ONE authority
         # decides whether a result may be released, and a check that lives in
@@ -701,6 +703,11 @@ class Route:
             if blocked is not None:
                 # T5.R2. Before any scan, because a call we may not make is not
                 # a call whose contents are interesting.
+                if blocked == REASON_STATE_IO_ERROR:
+                    self._withhold(request_id, blocked, RULE_RESOURCE,
+                                   attempt=attempt)
+                    self._close_on_state_fault()
+                    return
                 self._withhold(request_id, blocked, RULE_APPROVAL,
                                attempt=attempt)
                 return
@@ -750,6 +757,16 @@ class Route:
             scan=self.page_scan,
             server_identity=self.server_identity or getattr(
                 self.approvals, "server_id", None))
+
+        if not outcome.activated and outcome.provenance == REASON_STATE_IO_ERROR:
+            # T9 ruling 64 (c). Our own state failed, so this id is refused as
+            # a resource fault and the session ends: every later list would fail
+            # the same way and no approval can ever be made from here.
+            self._state_fault = outcome.detail
+            self._withhold(request_id, REASON_STATE_IO_ERROR, RULE_RESOURCE,
+                           attempt=attempt)
+            self._close_on_state_fault()
+            return
 
         if not outcome.activated:
             # T5.R2. The provenance travels: APPROVAL_REQUIRED describes a
@@ -1186,6 +1203,8 @@ class Route:
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
         self._activate_once()
+        if self._state_fault is not None:
+            return REASON_STATE_IO_ERROR
         # The descriptor sha comes from the snapshot this session ACTIVATED,
         # not from an argument a caller supplies. T5.R2 admits a call when the
         # tool's descriptor matches the approved one, and a sha handed in from
@@ -1234,6 +1253,8 @@ class Route:
             # Nothing is lost by not re-assigning: the session's revoke is
             # sticky, so the release barrier already refuses everything.
             self._invalidated = outcome.provenance
+        elif outcome.provenance == REASON_STATE_IO_ERROR:
+            self._state_fault = outcome.detail
 
     def _record_sha(self):
         """What the approval record on DISK says right now.
@@ -1307,6 +1328,15 @@ class Route:
         moved."""
         if token is not None:
             self.session.answered_on_the_wire(token, final=final)
+
+    def _close_on_state_fault(self):
+        """T9 ruling 64 (c). Pay first, then close, as the receipt fault does
+        below; the literal is kept so test_t4_contract's sweep reads it."""
+        self._pay_bounded_refusals()
+        self.session._close(
+            "STATE_IO_ERROR",
+            self._state_fault or "the proxy's state could not be written",
+            rule=RULE_RESOURCE, kind="CAPTURE_IO_ERROR")
 
     def _pay_bounded_refusals(self):
         """One bounded RECEIPT_IO_ERROR to every client still owed a frame.

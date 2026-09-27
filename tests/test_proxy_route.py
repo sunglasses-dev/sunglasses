@@ -65,7 +65,7 @@ def _log(tmp_path):
     return receipts.Log(tmp_path, run_id="run", header={
         "session": "s", "server_identity": "sha", "config_sha": "c",
         "budget_version": "sg-proxy-budget/1",
-        "catalog_version": "sg-proxy-catalog/1",
+        "catalog_version": "sg-proxy-catalog/2",
         "contract_version": "GATE3_CONTRACT_v5.1"})
 
 

@@ -116,7 +116,7 @@ def install_records_home(override=None):
 
 
 def build_route(*, session, log, upstream_argv, upstream_write, client_write,
-                root=None, worker=None):
+                root=None, worker=None, store=None):
     """The wiring, separated so it can be inspected without spawning anything.
 
     The approval store is the REAL one and not a bypass. T5.R2 refuses calls
@@ -127,7 +127,8 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     this decorative.
     """
     identity = _identity(upstream_argv)
-    store = approvals.Store(state_root(root), server_id=identity)
+    if store is None:
+        store = approvals.Store(state_root(root), server_id=identity)
     # T2.R6's channel. Without it the route refuses a tools/list rather than
     # forwarding it, which is correct but useless: this is what lets the proxy
     # run its own list and therefore what lets a human ever approve a server.
@@ -194,7 +195,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         log = receipts.Log(state_root(root), run_id=run_id, header={
             "session_id": run_id,
             "budget_version": "sg-proxy-budget/1",
-            "catalog_version": "sg-proxy-catalog/1",
+            "catalog_version": "sg-proxy-catalog/2",
             "contract_version": "GATE3_CONTRACT_v5.1"})
     except receipts.ReceiptIOError as failure:
         # T9.R4, ruling 24b(a). No receipt, no mediation: the server is never
@@ -203,14 +204,42 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
                      f"so nothing was started. {failure}\n")
         return 1
 
+    # T9 ruling 64 (a). The approval store is made BEFORE the server is
+    # started, for the same reason as the log above: a file or a link where
+    # `approvals/` or `captures/` belongs raised out of `build_route` after the
+    # spawn, as a traceback, and left a server that ignores EOF running with
+    # nobody mediating it. After the log, so the log's own refusal still comes
+    # first and this one is written down.
+    try:
+        store = approvals.Store(state_root(root),
+                                server_id=_identity(upstream_argv))
+    except OSError as failure:
+        where = failure.filename or state_root(root)
+        what = ("capture store" if pathlib.Path(where).name == "captures"
+                else "approval store")
+        stderr.write(f"sunglasses proxy: the {what} at {where} could "
+                     f"not be made, so nothing was started "
+                     f"({type(failure).__name__}). Fix it: make {where} a "
+                     f"directory you own, chmod 700.\n")
+        _record_refusal(log, "STATE_IO_ERROR")
+        return EXIT_FAULT
+
     child = subprocess.Popen(
         upstream_argv,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         start_new_session=True)
-
-    session = pump.Session(strict=True)
-    session.attach_upstream(child, pgid=_group_of(child))
+    # T9 ruling 64 (b). From here every way out stops the server's group. The
+    # teardown below only ran once the session threads had started, so a raise
+    # between the spawn and them orphaned the child.
+    try:
+        session = pump.Session(strict=True)
+        session.attach_upstream(child, pgid=_group_of(child))
+    except BaseException as failure:
+        _abandon(child, log, stderr, failure)
+        if not isinstance(failure, Exception):
+            raise
+        return EXIT_FAULT
 
     write_lock = threading.Lock()
 
@@ -227,9 +256,16 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         child.stdin.write(raw)
         child.stdin.flush()
 
-    engine = build_route(session=session, log=log, upstream_argv=upstream_argv,
-                         upstream_write=to_upstream, client_write=to_client,
-                         root=root, worker=worker)
+    try:
+        engine = build_route(session=session, log=log,
+                             upstream_argv=upstream_argv,
+                             upstream_write=to_upstream, client_write=to_client,
+                             root=root, worker=worker, store=store)
+    except BaseException as failure:
+        _abandon(child, log, stderr, failure)
+        if not isinstance(failure, Exception):
+            raise
+        return EXIT_FAULT
 
     # AR14. BOTH directions are threads, and the process ends when EITHER of
     # them does.
@@ -257,11 +293,10 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     watchdog = threading.Thread(
         target=_watchdog, args=(session, log, writing_since, done, child),
         daemon=True)
-    reader.start()
-    client.start()
-    watchdog.start()
-
     try:
+        reader.start()
+        client.start()
+        watchdog.start()
         done.wait()
     finally:
         _close(child)
@@ -272,8 +307,11 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         # is cut to the kill grace; the thread is a daemon and the process
         # leaves without it.
         stalled = session.closed_with()
-        reader.join(timeout=bounds.KILL_GRACE_MS / 1000
-                    if stalled and stalled[0] == "SCAN_DEADLINE" else 5)
+        # Ruling 64 (b): a thread that could not be started is not joined,
+        # or the join's own RuntimeError would skip the stop below.
+        if reader.ident is not None:
+            reader.join(timeout=bounds.KILL_GRACE_MS / 1000
+                        if stalled and stalled[0] == "SCAN_DEADLINE" else 5)
         code = _exit_code(session, child)
         finished.set()
         # T905. The log needs a terminal event or it does not verify, and it
@@ -289,6 +327,31 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
             close_scan()
     return code
 
+
+
+def _record_refusal(log, reason):
+    """The terminal row for a run that ended before its session began, best
+    effort, then the log closed. A refusal is written down like any ending."""
+    try:
+        log.event("SESSION_TORN_DOWN", reason_code=reason, rule="S3",
+                  settled=True)
+    except Exception:
+        pass
+    try:
+        log.close()
+    except Exception:
+        pass
+
+
+def _abandon(child, log, stderr, failure=None):
+    """T9 ruling 64 (b). The server was started and the session was not: stop
+    its group, then say so. Never a traceback from here (T10.R3)."""
+    _close(child)
+    supervisor.stop_group(child.pid, handle=child)
+    _record_refusal(log, "INTERNAL_FAULT")
+    if failure is not None:
+        stderr.write(f"sunglasses proxy: the session could not be wired, so "
+                     f"the server was stopped ({type(failure).__name__}).\n")
 
 
 def _record_ending(log, session, code):

@@ -234,8 +234,16 @@ class Store:
 
     def _record_or_reason(self):
         """The record, or the reason it cannot be used. Never a default."""
-        if not self._path.exists():
+        # T9 ruling 64 (e). `exists()` answers False on ANY OSError, so a
+        # record in a directory that cannot be listed read as no record at
+        # all: an approved server shown as never approved. Only "not there"
+        # is absent; every other failure to look is T507's unreadable.
+        try:
+            os.lstat(self._path)
+        except FileNotFoundError:
             return None, None
+        except OSError:
+            return None, INVALID
         try:
             text = self._path.read_text()
         except OSError:

@@ -22,6 +22,7 @@ approve time, so what a human looks at is what was on the wire.
 from __future__ import annotations
 
 APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
+STATE_IO_ERROR = "STATE_IO_ERROR"
 
 from . import inspection
 from . import snapshot as _snapshot
@@ -92,7 +93,18 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
 
     # T5.R2. Captured whatever the verdict, so the operator has the thing they
     # would be approving.
-    store.capture(found.sha256, found.capture())
+    # T9 ruling 64 (c). A capture that cannot be written is the PROXY's state
+    # failing, and it used to raise out of the reader: the session ended as the
+    # server's MALFORMED_UPSTREAM, or, with a server that outlives EOF, not at
+    # all. It is named here and the route closes on it.
+    try:
+        store.capture(found.sha256, found.capture())
+    except OSError as failure:
+        where = failure.filename or "the state root"
+        return Outcome(False, provenance=STATE_IO_ERROR,
+                       detail=f"the capture under {where} could not be "
+                              f"written ({type(failure).__name__})",
+                       snapshot=found)
 
     verdict = store.activate(server_identity=server_identity,
                              snapshot_sha256=found.sha256,

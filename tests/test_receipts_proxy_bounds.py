@@ -23,7 +23,7 @@ from sunglasses.proxy.serve import state_root
 from sunglasses.receipts import chain, keys, verify, wire
 
 HEADER = {"session_id": "0" * 32, "budget_version": "sg-proxy-budget/1",
-          "catalog_version": "sg-proxy-catalog/1",
+          "catalog_version": "sg-proxy-catalog/2",
           "contract_version": "GATE3_CONTRACT_v5.1"}
 TOKEN = "0123456789abcdef"
 RUN = "c" * 32

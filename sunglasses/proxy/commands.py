@@ -140,7 +140,10 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     # anything in the process tree could flip.
     root = (pathlib.Path(options["state-root"]) if options.get("state-root")
             else state_root())
-    store = approvals.Store(root, server_id=server_id)
+    try:
+        store = approvals.Store(root, server_id=server_id)
+    except OSError as failure:
+        return _state_fault(stderr, failure, root)
     capture = store.captures / f"{server_id}.{snapshot}.json"
     if not capture.exists():
         stderr.write(
@@ -166,9 +169,23 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
         stderr.write("not approved\n")
         return EXIT_FAULT
 
-    store.approve(snapshot_sha256=snapshot, viewed=True)
+    try:
+        store.approve(snapshot_sha256=snapshot, viewed=True)
+    except OSError as failure:
+        # T9 ruling 64. A record that could not be written is a refusal that
+        # says where, never a traceback, and never "approved".
+        return _state_fault(stderr, failure, root)
     stdout.write("approved\n")
     return EXIT_OK
+
+
+def _state_fault(stderr, failure, root):
+    where = failure.filename or root
+    stderr.write(f"sunglasses proxy: the approval store at {where} could not "
+                 f"be written, so nothing was approved "
+                 f"({type(failure).__name__}). Fix it: make it a directory "
+                 f"you own, chmod 700.\n")
+    return EXIT_FAULT
 
 
 def _ask(stdout):
