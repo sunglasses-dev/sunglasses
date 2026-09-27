@@ -126,6 +126,11 @@ def test_one_fault_one_kind_wherever_the_code_is_standing():
         # the fault. Found by this row when the serve.py site was wired, which
         # is the row working rather than the row being edited around.
         "FRAME_UNTERMINATED": 2,
+        # serve.py's two reader threads, the upstream's `_drain` and the
+        # client's `_drain_client`: a Route method raised and nothing reads that
+        # side any more. The detail names the direction and the class; the kind
+        # names the fault once (T9 ruling R69).
+        "READER_FAILED": 2,
     }
     for kind, sites in shared.items():
         if len(sites) > 1:
@@ -234,7 +239,7 @@ THE_CATALOG = frozenset({
     "FRAME_JSONRPC_VERSION", "FRAME_ENVELOPE_INVALID", "FRAME_ID_TYPE",
     "PROTOCOL_VERSION_UNSUPPORTED", "CLIENT_RESPONSE_UNSOLICITED",
     "DEADLINE_EXPIRED", "WATCHDOG_FAILED", "DECISION_AUTHORITY_MOVED",
-    "RECEIPT_WRITE_FAILED", "CAPTURE_IO_ERROR",
+    "RECEIPT_WRITE_FAILED", "CAPTURE_IO_ERROR", "READER_FAILED",
 })
 
 
@@ -254,7 +259,7 @@ def test_the_catalog_is_pinned_here_not_only_validated_at_construction():
         "added without declaring": sorted(CAUSE_KINDS - THE_CATALOG),
         "declared but gone": sorted(THE_CATALOG - CAUSE_KINDS),
     }
-    assert len(THE_CATALOG) == 25
+    assert len(THE_CATALOG) == 26
 
 
 def test_the_receipt_field_set_is_exactly_the_four_fixed_vocabularies():

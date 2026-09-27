@@ -218,6 +218,31 @@ class Route:
                                                     self._release_record)):
             self._release_inbound(raw)
 
+    def pay_retained_refusals(self):
+        """The debt a close retained, paid by the side still standing.
+
+        T9 ruling R69. `Session._close` keeps a refusal for every client still
+        owed a frame, and `read_upstream` pays them on its way out. When the
+        upstream reader is the thing that failed, that generator is dead and
+        its exit is never reached, so serve.py's drain calls this instead. Each
+        refusal crosses through `_release_inbound` exactly as the reader's own
+        would: authorised and recorded before its bytes move, and a receipt
+        that cannot be written still falls back to the bounded payment.
+        """
+        for raw in self.session._drain_refusals():
+            self._release_inbound(raw)
+
+    def announce_close(self, reason, rule):
+        """T9 ruling 70 (a). The close, said to the client, as the one error
+        JSON-RPC allows without an id. A frame that raised before admission
+        has no id this proxy trusts, so it is owed no per-id refusal, and this
+        is how the client learns why it was cut off. The frame is the one
+        `_answer_close` sends a request that arrives after a close. It carries
+        the reason and the rule; the class is in the close's detail, because
+        `envelope.withheld` drops every detail by design (T4.R7).
+        """
+        self._answer_close((reason, rule), None)
+
     def _release_inbound(self, raw):
         """AR08. T9.R2 applies in BOTH directions.
 

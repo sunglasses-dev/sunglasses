@@ -495,11 +495,31 @@ def _sweep_until_done(session, log, writing_since, done, interval):
 def _drain(engine, child, done):
     try:
         engine.pump_upstream(child.stdout)
-    except Exception:
-        # The session records the fault. A traceback here is the one place
-        # upstream-adjacent text could reach an operator's terminal, and
-        # T10.R3's last sentence refuses that for the same reason.
-        pass
+    except Exception as failure:
+        # T9 ruling R69. A reader that dies ends the session BY NAME. This was
+        # `pass` under a comment saying the session records the fault, and it
+        # did not: the teardown found no reason, wrote SESSION_TORN_DOWN with
+        # reason_code null, exited 0, and a request already forwarded was
+        # never answered (T8 probe 2026-09-25, both readers).
+        #
+        # The detail is the CLASS and never the message. A traceback here is
+        # the one place upstream-adjacent text could reach an operator's
+        # terminal, and T10.R3's last sentence refuses that; the message is
+        # the same text by another route.
+        try:
+            engine.session._close(
+                "SCAN_EXCEPTION",
+                f"the upstream reader stopped: {type(failure).__name__}",
+                rule="S3", kind="READER_FAILED")
+        except Exception:
+            pass
+        # `read_upstream` pays what the close retained on its way out, and
+        # that is the generator that just died. R66: an id read before the
+        # close is answered.
+        try:
+            engine.pay_retained_refusals()
+        except Exception:
+            pass
     finally:
         done.set()
 
@@ -518,8 +538,35 @@ def _drain_client(engine, session, stdin, done):
             session._close("MALFORMED_CLIENT",
                            "the client stopped in the middle of a frame",
                            kind="FRAME_UNTERMINATED")
-    except Exception:
-        pass
+    except Exception as failure:
+        # T9 ruling R69, the client side, and the same fault as `_drain`'s:
+        # one kind, the direction in the detail, the class and not the message.
+        # The debt is paid by the upstream reader, which is still running: the
+        # close stops the server's group, its stdout ends, and `read_upstream`
+        # pays what the close retained on its way out. Nothing this reader had
+        # not already handed to the Route is forwarded, because it reads no
+        # further.
+        #
+        # T9 ruling 70 (a). A frame that raised before admission is owed no
+        # per-id refusal, so the close itself is said to the client, and it is
+        # said FIRST. The close ends the server's group, the upstream reader
+        # ends with it, and the process can be gone before this thread runs
+        # another line: a write placed after `_close` never reached the client
+        # (T8 probe 2026-09-25). A close in a log line only is the silent
+        # `pass` again. Only when nothing closed first, so the frame never
+        # names a cause that is not the session's.
+        if session.closed_with() is None:
+            try:
+                engine.announce_close("SCAN_EXCEPTION", "S3")
+            except Exception:
+                pass
+        try:
+            session._close(
+                "SCAN_EXCEPTION",
+                f"the client reader stopped: {type(failure).__name__}",
+                rule="S3", kind="READER_FAILED")
+        except Exception:
+            pass
     finally:
         done.set()
 
