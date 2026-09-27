@@ -72,7 +72,7 @@ def _build_tool_class():
         description: str = (
             "Scan text for prompt injection attacks, jailbreak attempts, and other "
             "AI security threats. Input should be the text to scan. Returns a JSON "
-            "object with 'decision' (allow/block/quarantine), 'is_clean' (bool), "
+            "object with 'decision' (allow/block/quarantine/allow_redacted), 'is_clean' (bool), "
             "'findings' (list of threats), and 'summary' (human-readable result)."
         )
 

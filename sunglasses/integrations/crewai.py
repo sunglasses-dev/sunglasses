@@ -75,7 +75,7 @@ def _try_crewai_tool():
         def sunglasses_scan(text: str) -> str:
             """Scan text for prompt injection attacks, jailbreak attempts, and
             other AI security threats. Returns JSON with 'decision'
-            (allow/block/quarantine), 'is_clean' (bool), 'findings' (list of
+            (allow/block/quarantine/allow_redacted), 'is_clean' (bool), 'findings' (list of
             detected threats), and 'summary' (human-readable one-liner)."""
             return _scan_text(text)
 
@@ -92,7 +92,7 @@ def _make_standalone():
     def sunglasses_scan(text: str, channel: str = "message") -> str:
         """Scan text for prompt injection attacks, jailbreak attempts, and
         other AI security threats. Returns JSON with 'decision'
-        (allow/block/quarantine), 'is_clean' (bool), 'findings' (list of
+        (allow/block/quarantine/allow_redacted), 'is_clean' (bool), 'findings' (list of
         detected threats), and 'summary' (human-readable one-liner).
 
         Works standalone or as a CrewAI tool (install crewai for full integration).
