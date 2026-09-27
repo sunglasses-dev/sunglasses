@@ -110,10 +110,16 @@ OFF_THE_CLOCK_MS = 30_000
 # not return to `run` until the marker has content. The deadline then bounds
 # what the child does, which is what the rows are about, and the signal is
 # never sent to a child that has not yet reached the thing being tested.
+# `arm` returns the moment the child was up, for the rows that time `run`
+# from a thread (the delivery rows below): their own bounded wait counts from
+# there, not from a start-up the row is not about.
 @pytest.fixture
 def the_clock_starts_when_the_child_is_up(monkeypatch):
+    import threading
+
     def arm(marker):
         spawn = worker_process.subprocess.Popen
+        up = threading.Event()
 
         class _UpBeforeTheClock(spawn):
             def __init__(self, *args, **kwargs):
@@ -125,9 +131,12 @@ def the_clock_starts_when_the_child_is_up(monkeypatch):
                     if time.monotonic() > gone:
                         pytest.fail(f"no marker after {HANG_GUARD_S}s")
                     time.sleep(0.01)
+                up.at = time.monotonic()
+                up.set()
 
         monkeypatch.setattr(worker_process.subprocess, "Popen",
                             _UpBeforeTheClock)
+        return up
     return arm
 
 
@@ -426,14 +435,19 @@ _ANSWER = json.dumps({"binding": BINDING, "accepted": True, "status": "complete"
                       "elapsed_ms": 1, "findings": []})
 
 
-def test_an_answer_whose_exit_trails_its_eof_is_the_answer():
+def test_an_answer_whose_exit_trails_its_eof_is_the_answer(
+        tmp_path, the_clock_starts_when_the_child_is_up):
     """Prints one valid line, closes stdout, then takes 50 ms to exit -- well
     inside a 1,000 ms budget. That is an answer, not a deadline."""
+    ready = tmp_path / "ready"
+    the_clock_starts_when_the_child_is_up(ready)
     lingers = _script(
-        "import os,sys,time;sys.stdin.read();"
+        f"import os,sys,time;open({str(ready)!r},'w').write('up');"
+        "sys.stdin.read();"
         f"sys.stdout.write({_ANSWER!r}+'\\n');sys.stdout.flush();"
         "os.close(1);time.sleep(0.05)")
     for _ in range(5):
+        ready.unlink(missing_ok=True)   # each run waits for its own child
         out = worker_process.run({"params": {}}, argv=lingers, binding=BINDING,
                                  timeout_ms=1000)
         assert out["status"] == "complete", out
@@ -441,7 +455,7 @@ def test_an_answer_whose_exit_trails_its_eof_is_the_answer():
 
 
 def test_a_child_that_closes_stdout_and_then_hangs_is_still_a_deadline(
-        tmp_path):
+        tmp_path, the_clock_starts_when_the_child_is_up):
     """The other direction. Waiting for the exit must stay inside the SAME
     budget: a child that answers and then never leaves is still running at
     the deadline, and T8.R4 says that child is killed and reported."""
@@ -450,10 +464,10 @@ def test_a_child_that_closes_stdout_and_then_hangs_is_still_a_deadline(
         f"import os,sys,time;open({str(marker)!r},'w').write(str(os.getpid()));"
         f"sys.stdin.read();sys.stdout.write({_ANSWER!r}+'\\n');"
         "sys.stdout.flush();os.close(1);time.sleep(300)")
-    started = time.monotonic()
+    up = the_clock_starts_when_the_child_is_up(marker)
     out = worker_process.run({"params": {}}, argv=stays, binding=BINDING,
                              timeout_ms=300)
-    waited = time.monotonic() - started
+    waited = time.monotonic() - up.at   # from the clock, not from start-up
     assert out["status"] == "deadline", out
     assert waited >= 0.300, f"reported after {waited:.3f}s against 300 ms"
     pid = int(marker.read_text())
@@ -510,18 +524,26 @@ def _gone(pid, within=3.0):
     return False
 
 
-def _run_bounded(marker, **kw):
-    """`run()` on a thread; (result, seconds) or a failure naming the hang."""
+def _run_bounded(marker, up, **kw):
+    """`run()` on a thread; (result, seconds) or a failure naming the hang.
+
+    The seconds, and the wait for the hang, count from `up`: the moment the
+    child was up and `run`'s clock could start. Start-up has its own guard,
+    HANG_GUARD_S inside the fixture, which ends this thread if it is spent."""
     import threading
     box = {}
 
     def call():
-        started = time.monotonic()
-        box["out"] = worker_process.run(**kw)
-        box["s"] = time.monotonic() - started
+        try:
+            box["out"] = worker_process.run(**kw)
+            box["end"] = time.monotonic()
+        except BaseException as e:  # a fixture failure raised on this thread
+            box["err"] = e
 
     t = threading.Thread(target=call, daemon=True)
     t.start()
+    while t.is_alive() and not up.wait(0.05):
+        pass
     t.join(STALL_BUDGET_MS / 1000 + STALL_GRACE_MS / 1000 + 2.0)
     if t.is_alive():
         try:
@@ -531,7 +553,9 @@ def _run_bounded(marker, **kw):
         t.join(5)
         pytest.fail("run() never returned: the payload write blocked and the "
                     "deadline behind it could not fire")
-    return box["out"], box["s"]
+    if "err" in box:
+        raise box["err"]
+    return box["out"], box["end"] - up.at
 
 
 def _stalled_child(marker, after_pid):
@@ -555,10 +579,11 @@ STALLS = {
 
 @pytest.mark.parametrize("shape", sorted(STALLS))
 def test_a_child_that_will_not_take_the_payload_still_meets_its_deadline(
-        tmp_path, shape):
+        tmp_path, shape, the_clock_starts_when_the_child_is_up):
     marker = tmp_path / "pid"
+    up = the_clock_starts_when_the_child_is_up(marker)
     out, took = _run_bounded(
-        marker, payload={"params": {"text": "a" * PIPE_OVER}},
+        marker, up, payload={"params": {"text": "a" * PIPE_OVER}},
         argv=_stalled_child(marker, STALLS[shape]), binding=BINDING,
         timeout_ms=STALL_BUDGET_MS, grace_ms=STALL_GRACE_MS)
     assert out["status"] == "deadline", out
@@ -571,7 +596,8 @@ def test_a_child_that_will_not_take_the_payload_still_meets_its_deadline(
     assert _gone(int(marker.read_text())), "the stalled child's group outlived its deadline"
 
 
-def test_control_a_large_payload_to_a_child_that_reads_it_all_completes(tmp_path):
+def test_control_a_large_payload_to_a_child_that_reads_it_all_completes(
+        tmp_path, the_clock_starts_when_the_child_is_up):
     """The repair must not turn a big request into a deadline: same payload
     size, a child that drains it at once and answers inside the budget."""
     marker = tmp_path / "pid"
@@ -580,7 +606,8 @@ def test_control_a_large_payload_to_a_child_that_reads_it_all_completes(tmp_path
               "n=len(sys.stdin.buffer.read());"
               f"print(json.dumps(dict(json.loads({_ANSWER!r}),"
               "observed_content_bytes=n)))")
-    out, _ = _run_bounded(marker, payload={"params": {"text": "a" * PIPE_OVER}},
+    up = the_clock_starts_when_the_child_is_up(marker)
+    out, _ = _run_bounded(marker, up, payload={"params": {"text": "a" * PIPE_OVER}},
                           argv=_script(answer), binding=BINDING, timeout_ms=2000)
     assert out["status"] == "complete", out
     assert out["observed_content_bytes"] > PIPE_OVER, (
