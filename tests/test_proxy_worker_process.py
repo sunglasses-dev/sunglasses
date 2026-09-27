@@ -61,7 +61,8 @@ def _ok_worker(result=None):
 
 def test_a_worker_that_answers_returns_its_result(tmp_path):
     out = worker_process.run({"params": {}}, argv=_ok_worker(),
-                             binding=BINDING)
+                             binding=BINDING,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert out["decision"] == "allow"
     assert out["status"] == "complete"
 
@@ -73,7 +74,7 @@ def test_the_payload_reaches_the_child_on_stdin():
     echo = _script("import sys,json;d=sys.stdin.read();"
                    "print(json.dumps({'seen':len(d)}))")
     out = worker_process.run({"params": {"text": "hello"}}, argv=echo,
-                             binding=BINDING)
+                             binding=BINDING, timeout_ms=OFF_THE_CLOCK_MS)
     assert out["seen"] > 0
 
 
@@ -84,6 +85,15 @@ def test_the_payload_reaches_the_child_on_stdin():
 # operations bounded at 200 ms and 5 s: a 20-125x margin on an idle box, and
 # they reran anyway, because the failure is the tail and not the mean.
 HANG_GUARD_S = 60
+
+# A row whose subject is NOT the clock still runs under one: `run` defaults to
+# bounds.INSPECTION_MS (2 s), and a starved CI runner has taken longer than
+# that to start a python child at all. #260's integrity (3.9) job, 1 h 23 m
+# against ~40 m, reported `deadline` on the answers-twice row, whose subject is
+# the second completion. Those rows pass this instead: far past any start-up,
+# still under HANG_GUARD_S, and never waited on, because each stand-in exits.
+# The rows whose subject IS the deadline keep their own numbers.
+OFF_THE_CLOCK_MS = 30_000
 
 
 # ── T8.R4 · the deadline is a kill ───────────────────────────────────────
@@ -272,7 +282,8 @@ def test_the_stdout_bound_is_the_named_number(size, expected):
         "'elapsed_ms':1,'findings':[],'pad':'x'*%d};"
         "print(json.dumps(r))" % (BINDING, size))
     out = worker_process.run({"params": {}}, argv=_script(body),
-                             binding=BINDING, stdout_limit=200_000)
+                             binding=BINDING, stdout_limit=200_000,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert out["status"] == expected
 
 
@@ -286,20 +297,23 @@ def test_a_worker_that_answers_twice_is_a_fault_and_not_a_choice():
         "'inspection_complete':True,'decision':'allow',"
         "'inspected_utf8_bytes':0,'observed_content_bytes':0,"
         "'elapsed_ms':1,'findings':[]});print(r);print(r)" % BINDING)
-    out = worker_process.run({"params": {}}, argv=twice, binding=BINDING)
+    out = worker_process.run({"params": {}}, argv=twice, binding=BINDING,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert out["status"] == "exception"
     assert out["accepted"] is False
 
 
 def test_a_worker_that_says_nothing_is_a_fault():
     silent = _script("import sys;sys.stdin.read()")
-    out = worker_process.run({"params": {}}, argv=silent, binding=BINDING)
+    out = worker_process.run({"params": {}}, argv=silent, binding=BINDING,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert out["status"] == "exception"
 
 
 def test_a_worker_that_prints_rubbish_is_a_fault_and_never_a_verdict():
     noise = _script("import sys;sys.stdin.read();print('not json at all')")
-    out = worker_process.run({"params": {}}, argv=noise, binding=BINDING)
+    out = worker_process.run({"params": {}}, argv=noise, binding=BINDING,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert out["status"] == "exception"
     assert out["decision"] != "allow"
 
@@ -310,7 +324,7 @@ def test_every_fault_carries_the_binding_it_was_asked_about():
     """A fault result is settled like any other, so it has to be bound to the
     invocation that produced it or T4.R2 rejects it as another item's answer."""
     out = worker_process.run({"params": {}}, argv=_script("import sys;sys.stdin.read()"),
-                             binding=BINDING)
+                             binding=BINDING, timeout_ms=OFF_THE_CLOCK_MS)
     assert out["binding"] == BINDING
 
 
@@ -319,7 +333,8 @@ def test_a_fault_never_carries_the_childs_own_words():
     a traceback is the most natural thing for it to print."""
     shouty = _script("import sys;sys.stdin.read();"
                      "print('SECRET-FROM-THE-WORKER');sys.exit(3)")
-    out = worker_process.run({"params": {}}, argv=shouty, binding=BINDING)
+    out = worker_process.run({"params": {}}, argv=shouty, binding=BINDING,
+                             timeout_ms=OFF_THE_CLOCK_MS)
     assert "SECRET-FROM-THE-WORKER" not in json.dumps(out)
 
 
@@ -338,7 +353,7 @@ def test_the_worker_runs_in_its_own_process_group(tmp_path):
         f"import os,sys;open({str(marker)!r},'w').write(str(os.getpgid(0)));"
         "sys.stdin.read()")
     worker_process.run({"params": {}}, argv=report, binding=BINDING,
-                       timeout_ms=300)
+                       timeout_ms=OFF_THE_CLOCK_MS)
     assert int(marker.read_text()) != os.getpgid(0), \
         "the worker shares our group, so its deadline kill would hit us"
 
