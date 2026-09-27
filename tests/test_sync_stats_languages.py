@@ -29,7 +29,7 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} unique keywords, {} attack categories (English-first \u2014 see [Language coverage](#language-coverage-measured))"
+TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} unique keywords, {} attack categories (English-first, see [Language coverage](#language-coverage-measured))"
 
 
 def _expected_line(stats):
@@ -65,7 +65,7 @@ def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkey
 
 
 KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the pre-screen "
-                "index holds {} — {} generic keywords are deliberately excluded from it. "
+                "index holds {} ({} generic keywords are deliberately excluded from it). "
                 "`engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |")
 
 

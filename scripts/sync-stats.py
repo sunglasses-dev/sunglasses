@@ -103,10 +103,10 @@ def sync_readme(stats):
         # difference, so the row cannot contradict itself after a sync.
         (r'\| Patterns \| [\d,]+ \|', f'| Patterns | {stats["patterns"]:,} |'),
         (r'\| Keywords \| [\d,]+ unique declared \([\d,]+ entries across all patterns\); '
-         r'the pre-screen index holds [\d,]+ \u2014 [\d,]+ generic keywords',
+         r'the pre-screen index holds [\d,]+ \([\d,]+ generic keywords',
          f'| Keywords | {stats["keywords_declared"]:,} unique declared '
          f'({stats["keyword_entries"]:,} entries across all patterns); '
-         f'the pre-screen index holds {stats["keywords"]:,} \u2014 '
+         f'the pre-screen index holds {stats["keywords"]:,} ('
          f'{stats["keywords_declared"] - stats["keywords"]:,} generic keywords'),
         (r'\| Attack categories \| [\d,]+ \|', f'| Attack categories | {stats["categories"]:,} |'),
         # What Works Today header
