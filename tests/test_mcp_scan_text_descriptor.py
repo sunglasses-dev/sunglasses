@@ -94,3 +94,52 @@ def test_the_control_our_own_listing_activates_through_the_proxy_scan():
     found = snapshot.collect(lambda cursor: page, scan=r._scan_page)
     assert (found.complete, found.reason, found.detail) == (True, None, "")
     assert re.fullmatch(r"[0-9a-f]{64}", found.sha256)
+
+
+# ── Every descriptor, not only this one ─────────────────────────────────────
+# The same three word list sat in the LangChain and CrewAI tool descriptions,
+# which a model reads exactly as it reads this one. Fixing one surface and
+# leaving its siblings is how the class survives, so the check is over the
+# package source. patterns.py is rule data, not text a tool shows a model.
+
+import pathlib                                              # noqa: E402
+
+PACKAGE = pathlib.Path(mcp.__file__).resolve().parent
+_SEP = r"[\s/,|]+(?:or\s+)?"
+_THREE = re.compile(rf"\ballow{_SEP}block{_SEP}quarantine\b")
+_FOUR = re.compile(rf"\ballow{_SEP}block{_SEP}quarantine{_SEP}allow_redacted\b")
+
+
+def _decision_lists():
+    """(path:line, complete) for every allow, block, quarantine list in the package."""
+    found = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        if path.name == "patterns.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        complete = {m.start() for m in _FOUR.finditer(text)}
+        for m in _THREE.finditer(text):
+            line = text.count("\n", 0, m.start()) + 1
+            found.append((f"{path.relative_to(PACKAGE.parent)}:{line}",
+                          m.start() in complete))
+    return found
+
+
+def test_no_descriptor_names_three_decisions_without_allow_redacted():
+    short = [where for where, complete in _decision_lists() if not complete]
+    assert short == []
+
+
+def test_the_control_the_walk_reads_the_package():
+    """An empty walk passes the row above. The scan_text list must be found,
+    and found complete, or the walk read nothing."""
+    lists = dict(_decision_lists())
+    assert lists.get("sunglasses/mcp.py:"
+                     f"{_line_of('sunglasses/mcp.py', 'or allow_redacted) and')}") is True
+    assert _THREE.search("a decision (allow/block/quarantine) and more")
+    assert not _FOUR.search("a decision (allow/block/quarantine) and more")
+
+
+def _line_of(rel, needle):
+    text = (PACKAGE.parent / rel).read_text(encoding="utf-8")
+    return text.count("\n", 0, text.index(needle)) + 1
