@@ -3,7 +3,7 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [0.6.2] — UNRELEASED
+## [0.6.2] — 2026-09-27
 
 ### Added
 
@@ -90,6 +90,60 @@ All notable changes to Sunglasses are documented here.
 - **`install`, `uninstall` and `doctor` refuse an empty `--config`.** (#267)
   Before this `install <name> --config ""` edited `./.mcp.json` even though no
   file was named. All three now refuse it with exit 2.
+
+### Continuous integration
+
+These change no shipped code and are listed so the release accounts for what
+moved.
+
+- **`stats/current.json` moves to 0.6.0.** (#249) It is the one scanner side
+  file the publish script writes after the upload. The counts are unchanged.
+- **`stats/current.json` carries the UTC day 0.6.0 shipped.** (#257) It said
+  2026-09-25, the Pacific day of the same ship, while PyPI, the CHANGELOG
+  heading and the GitHub Release said 2026-09-26.
+- **The two README lines `scripts/sync-stats.py` writes carry no dash.** (#268)
+  The script, its matcher and its tests changed in the same commit, so the next
+  sync keeps the new form.
+
+### Documentation
+
+- **The README lists the proxy under what works today.** (#251) The approval
+  condition stays in the same sentence. The proxy refuses every `tools/list`
+  and `tools/call` until a person approves the server at an interactive
+  terminal.
+- **The README has a Privacy section for the MCP server.** (#258) It says what
+  `python -m sunglasses.mcp` reads and that it opens no network connection,
+  sends nothing and keeps no copy. It names the one exception, the Whisper
+  model download for audio and video.
+- **A punctuation pass over the README.** (#259) Every em dash in the prose
+  becomes a comma, a period or parentheses. The words are unchanged.
+- **`plugin.json` and `mcp.json` at the repository root.** (#260) Directories
+  that follow the Agent Plugins 1.0.0 standard read them. `mcp.json` declares
+  one stdio server that runs `python3 -m sunglasses.mcp`, the launch
+  `server.json` already publishes.
+
+### Tests
+
+- **Worker rows whose subject is not the clock stop running under one.** (#261)
+  Nine rows in `tests/test_proxy_worker_process.py` ran under the 2 s default
+  deadline while asserting something else, so a slow python start read as a
+  deadline.
+- **The deadline rows start their clock when the child is up.** (#262) A
+  fixture holds the worker until the stand in writes its marker, so python
+  start up no longer counts against a bound of a few hundred ms.
+
+### Gauntlet
+
+- **The gauntlet report and the six questions it refuses to answer.** (#171)
+  The report generator exits 3 while six operations have no reviewed
+  capability classification.
+- **A null identity reads "not bound".** (#241) The report renders a null
+  corpus digest, capability map revision or review state as "not bound" and
+  never as "None". Its page copy follows the project's style rule.
+- **`GAUNTLET_REVIEW_ROOT` names the review directory.** (#242) It was a
+  hardcoded path in five modules and one test. Unset, empty or relative, it
+  resolves to a directory that does not exist, so a clean checkout produces
+  the REFUSED report and stops there.
 
 ### Known issues
 
