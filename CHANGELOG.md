@@ -9,7 +9,17 @@ All notable changes to Sunglasses are documented here.
 
 - 0.6.3 changes our MCP server's tool descriptions; an existing proxy approval
   of the sunglasses server reports DESCRIPTOR_CHANGED until you run proxy
-  approve again. That is the pin working.
+  approve again. That is the pin working. (#274)
+
+### Fixed
+
+- GLS-DFP-122 no longer refuses an honest MCP server whose tool descriptions
+  say it redacts secrets, skips hidden files or overrides a default. The rule
+  now needs an instruction aimed at findings or at policy. On 0.6.2 it refused
+  14 of the 26 honest descriptors we measured. On 0.6.3 it refuses none of
+  them. A description that repeats an attack's own words can still be refused.
+  Two paraphrase misses now pass the rule. They are listed as known failures
+  in the rule's test and are the target of 0.6.4.
 
 
 ## [0.6.2] — 2026-09-27
