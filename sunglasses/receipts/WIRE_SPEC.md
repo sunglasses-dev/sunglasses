@@ -546,6 +546,10 @@ record before a verifier prints it.
   **`PAIRING_UNKEYED`**, which is neither a pass nor a failure (a limit:
   exit 3, and 1 under `--strict`), and never `LIFECYCLE_COMPLETE`, because that code says every opening
   has its terminal and nobody checked.
+- **A revoke is a record** (T9 ruling 120). `APPROVAL_INVALIDATED` is written
+  when the proxy revokes authority, with its cause in `reason_code` and no new
+  field; it is not paired, and a verifier that predates it reads it as
+  `UNKNOWN_EVENT` under lifecycle, never an integrity failure.
 - **The target is unchanged, and not yet judged.** Freeze vector 15, "proxy
   `ADMITTED` without `SETTLED` → lifecycle failure; `FORWARD_SUPPRESSED` +
   `SETTLED REQUEST_CANCELLED` → lifecycle ok", stays the requirement. It is

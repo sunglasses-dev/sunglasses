@@ -862,10 +862,33 @@ class Session:
 
     def accept_invalidation(self, reason):
         """T5.R4. The descriptors moved; every undelivered answer of this
-        generation is from a server nobody approved."""
+        generation is from a server nobody approved.
+
+        THE TRANSITION IS RECORDED, not just its consequences. Every effect of
+        an invalidation already names its cause -- a dropped notification
+        carries `reason_code` (`_handoff_notification`), a settlement becomes
+        DESCRIPTOR_CHANGED (`_final_decision`), and the authority accessor
+        returns it while stamping the epoch. What was missing is the moment
+        itself: this method changed authority SILENTLY, so the evidence showed
+        consequences and never the cause.
+
+        That gap is only visible in the case nobody tests: revoke authority
+        while NOTHING is outstanding and there are no consequences to carry the
+        reason, so the record stream says nothing at all. "Did authority change,
+        and when" was not answerable from receipts -- only "something was
+        dropped because it had".
+
+        This event is IN MEMORY. `_core._emit` appends to `session.events` and
+        nothing copies those to the log, so the durable record is the route's:
+        `Route._invalidated` writes it through `_record`, and the chain's own
+        `seq` orders two of them. The epoch stays in memory, where the reader
+        validates against it; it is not a receipt field (T9 ruling 120, the
+        wire is frozen with v0.6.0).
+        """
         with self._authority_lock:
             self._invalidated_as = reason
             self._authority_epoch += 1
+            self._core._emit("APPROVAL_INVALIDATED", None, reason_code=reason)
 
     def cancellation_accepted(self, request_id, *, origin):
         """Is THIS id's cancellation accepted? Asked with the session's own key.

@@ -60,7 +60,7 @@ PROXY_EVENTS = frozenset({
     "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE", "WRITE_STALLED",
     "SETTLED", "UPSTREAM_CLOSED", "SESSION_TORN_DOWN", "WATCHDOG",
     "RECEIPT_IO_ERROR", "NOTIFICATION_DROPPED", "TEARDOWN", "STDERR_BOUNDED",
-    "SETTLEMENT_REFUSED",
+    "SETTLEMENT_REFUSED", "APPROVAL_INVALIDATED",
 })
 PROXY_TERMINALS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
 
@@ -366,6 +366,7 @@ class LogReport:
     first_failure_segment: str | None = None
     failure_detail: str | None = None
     fingerprint: str | None = None
+    authority_transitions: int = 0       # R120: APPROVAL_INVALIDATED, verified
 
 
 def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
@@ -436,6 +437,12 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
     # Judged over the verified prefixes in order: an item may open before a
     # size rotation and settle after it.
     results["lifecycle"] = _lifecycle([r for _, w in walks for r in w.prefix])
+    # T9 ruling 120. How many times authority was revoked, counted over the
+    # VERIFIED prefixes only, so a revoke in an unsigned tail is not counted as
+    # evidence. A count, not a result: it changes no code and no exit.
+    report.authority_transitions = sum(
+        1 for _, w in walks for _, record, _ in w.prefix
+        if record.get("event") == "APPROVAL_INVALIDATED")
     return report
 
 
@@ -460,6 +467,10 @@ def render_log(report: LogReport, name: str = "log") -> str:
     if report.first_failure_segment is not None:
         out.append(f"first failure: {report.first_failure_segment} "
                    f"({report.failure_detail})")
+    if report.authority_transitions:
+        # Only when there is one, so every existing log prints what it did.
+        out.append(f"authority transitions: {report.authority_transitions} "
+                   f"APPROVAL_INVALIDATED record(s) in the verified prefix")
     # A segment is checked alone, with no endpoint, so on its own its extent
     # is unknown. Under a log whose endpoint is confirmed that line reads as a
     # contradiction, so it says what happened instead (T9 ruling 53). Display

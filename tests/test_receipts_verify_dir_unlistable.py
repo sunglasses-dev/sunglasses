@@ -122,7 +122,7 @@ def test_an_unlistable_received_log_names_the_cause(home, unlistable, mode):
 
 
 def test_verify_log_raises_on_an_unlistable_directory(home, unlistable):
-    """verify.py:378: an unlistable directory is not "no segment in this log"."""
+    """verify.py:379: an unlistable directory is not "no segment in this log"."""
     public = next(iter(sorted(os.listdir(home / keys.KEY_DIR / keys.PUBLIC_DIR))))
     key = (home / keys.KEY_DIR / keys.PUBLIC_DIR / public).read_bytes()
     unlistable(optin.hook_log(home), 0o000)

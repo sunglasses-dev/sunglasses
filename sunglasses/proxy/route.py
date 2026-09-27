@@ -323,10 +323,18 @@ class Route:
         acceptance that a later caller will forget. Recording it here means
         every way of setting it, ours or a control's, bumps the epoch the
         reader validates against.
+
+        And every way of setting it is a DURABLE record (T9 ruling 120.1). The
+        session's own APPROVAL_INVALIDATED goes to `session.events`, which is
+        memory; this is the one that reaches the chain. Here rather than in the
+        session because the route owns the log, and after the acceptance so the
+        record never claims a revoke the session has not taken. Two revokes are
+        two records, and the chain's signed `seq` is their order.
         """
         self._invalidated_reason = reason
         if reason is not None:
             self.session.accept_invalidation(reason)
+            self._record("APPROVAL_INVALIDATED", reason_code=reason)
 
     def _release_gate(self, request_id):
         """R-168-R3/R4a. The release barrier, asked again AT THE HANDOFF.
@@ -1217,10 +1225,15 @@ class Route:
                 self.approvals, "server_id", None))
         if outcome.activated:
             self._approved_tools = dict(outcome.snapshot.tools)
-        else:
-            self._invalidated = (outcome.provenance
-                                 if outcome.provenance == REASON_DESCRIPTOR_CHANGED
-                                 else self._invalidated)
+        elif outcome.provenance == REASON_DESCRIPTOR_CHANGED:
+            # ONLY an actual revoke is assigned (T9 ruling 120.1). This used to
+            # re-assign the CURRENT value on every other failure, and the setter
+            # reads every assignment as a revoke: a route already revoked
+            # accepted a second invalidation that never happened, bumping the
+            # epoch again, and with the durable record it would write one too.
+            # Nothing is lost by not re-assigning: the session's revoke is
+            # sticky, so the release barrier already refuses everything.
+            self._invalidated = outcome.provenance
 
     def _record_sha(self):
         """What the approval record on DISK says right now.

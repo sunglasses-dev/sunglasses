@@ -41,6 +41,13 @@ EVENTS = frozenset({
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
     "SETTLEMENT_REFUSED",
+    # APPROVAL_INVALIDATED. The third time this list has cost a change, and the
+    # two comments above are the first two. The durable record is written by
+    # `Route._invalidated` through `_record` (the session's `_emit` is memory
+    # only and checks nothing), so a kind missing here is a ValueError on the
+    # revoke path. A new KIND and no new field (T9 ruling 120): a 0.6.0 verifier
+    # reads it as UNKNOWN_EVENT under lifecycle, never an integrity failure.
+    "APPROVAL_INVALIDATED",
 })
 
 # T9.R5. The events that END a session. A log that stops without one of these
@@ -92,6 +99,11 @@ PERMITTED_FIELDS = frozenset({
     "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
+    # NO `authority_epoch` (T9 ruling 120). This set is FROZEN with the wire
+    # #172 shipped inside v0.6.0: every 0.6.0 verifier holds a copy and reads a
+    # key outside it as UNKNOWN_FIELD, a failure (R44), and a post-tag change is
+    # an epoch, never an edit (R22). The transition record carries its reason in
+    # `reason_code`, and the chain's signed `seq` orders two of them.
 })
 
 
