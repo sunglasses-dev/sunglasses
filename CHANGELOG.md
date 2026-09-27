@@ -22,6 +22,12 @@ All notable changes to Sunglasses are documented here.
   hook segments begun before any marker are the limit `LOG_UNMARKED`.
   `VECTORS.json` carries the marker as a published vector. The marker proves a
   hook log was begun. It does not prove which records were in it.
+- **`sunglasses doctor` is a command.** (#267) It reads your config,
+  classifies each entry `WRAPPED`, `DIRECT` or `UNVERIFIED` against the
+  recorded entry point and its digest, and names every source it could not
+  open. It cannot yet run the live self-test, so it reports its five self-test
+  checks as `NOT RUN` and exits `1` on every machine. `--config` scopes the
+  read to that one file and a missing file is refused by name.
 
 ### Changed
 
@@ -31,6 +37,11 @@ All notable changes to Sunglasses are documented here.
   nothing was outstanding left no receipt at all. The reason rides in
   `reason_code`, so the frozen 0.6.0 wire gets no new key and the published
   vectors are unchanged.
+- **`ADMITTED` names who authored the request.** (#269) The record now
+  carries `origin` beside the id type. `origin` is checked against the proxy's
+  three values before anything writes it, and an explicit null is refused like
+  any other wrong value. An event that never carries origin still writes
+  without one.
 
 ### Fixed
 
@@ -39,9 +50,10 @@ All notable changes to Sunglasses are documented here.
   refused by name with exit 1 and nothing is started. Every exit between
   spawning the server and opening the session stops the server's process
   group. A capture that cannot be written closes the session with
-  `CAPTURE_IO_ERROR` under the new cause kind `STATE_IO_ERROR`. Before this it
-  was reported as the server's fault or ended the session with requests
-  unanswered.
+  `CAPTURE_IO_ERROR` under the new cause kind `STATE_IO_ERROR` in the
+  session's close. The durable receipt does not yet carry the kind. Before
+  this it was reported as the server's fault or ended the session with
+  requests unanswered.
 - **The proxy builds the scanner engine before the list deadline starts.**
   (#246) The engine was built on first use, inside the deadline for the
   server's first `tools/list` page, so a slow cold build could mark the list
@@ -68,6 +80,20 @@ All notable changes to Sunglasses are documented here.
   a held copy and its checksum but no owner put the bytes back and removed the
   note, then crashed before the orphan sweep that follows it. The collector
   now answers an empty list when it is handed no held name.
+- **A proxy reader that dies closes the session by name.** (#266) Either
+  reader now closes the session with `SCAN_EXCEPTION` under the new cause kind
+  `READER_FAILED` in the session's close, and the process exits nonzero. The
+  durable receipt does not yet carry the kind. Before this a reader that
+  raised ended the session as a clean end with exit 0, and a request already
+  forwarded was never answered. The close detail names the exception class and
+  never its message.
+- **`install`, `uninstall` and `doctor` refuse an empty `--config`.** (#267)
+  Before this `install <name> --config ""` edited `./.mcp.json` even though no
+  file was named. All three now refuse it with exit 2.
+
+### Known issues
+
+- 0.6.0 said closes carry a cause_kind so a receipt can be checked against a fixture byte for byte. The kind reaches the in-memory close; the on-disk receipt does not carry it yet. Fixed in 0.6.3.
 
 ## [0.6.0] — 2026-09-26
 
