@@ -69,10 +69,18 @@ def handle_tools_list(params):
         "tools": [
             {
                 "name": "scan_text",
+                # Pinned word for word by tests/test_mcp_scan_text_descriptor.py.
+                # The proxy approves a server by the sha of its whole tools/list,
+                # so editing this retires every proxy approval of this server.
                 "description": (
-                    "Scan text for prompt injection attacks, data exfiltration attempts, "
-                    "credential leaks, and other AI agent security threats. "
-                    "Returns a decision (allow/block/quarantine), severity, and detailed findings."
+                    "Scan text for prompt injection, data exfiltration, credential leaks and "
+                    "other AI agent security threats. Returns findings, a severity, a decision "
+                    "(allow, block, quarantine or allow_redacted) and inspection_complete. "
+                    "The decision is reported to the caller and is not enforced. This tool "
+                    "blocks nothing and returns the matched text of each finding in full, "
+                    "allow_redacted included. isError false means the scan ran, not that "
+                    "the input is clean. "
+                    "Read is_clean and inspection_complete in the result."
                 ),
                 "inputSchema": {
                     "type": "object",
