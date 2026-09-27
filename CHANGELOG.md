@@ -5,15 +5,66 @@ All notable changes to Sunglasses are documented here.
 
 ## [0.6.2] — UNRELEASED
 
+### Added
+
+- **An opt in process worker for the proxy.** (#255) `serve` gains a worker
+  mode `process` that runs each scan in a child process. Delivery to the child
+  runs on its own thread inside one absolute deadline, a hung scan is stopped
+  at that deadline and the client gets `SCAN_EXCEPTION`. Every fault the child
+  path returns names its cause. The `inprocess` mode stays the default and its
+  path is the same call as before. Each scan in the process mode waits on a
+  warm child, so a call costs more than in process and the mode stays opt in.
+- **The hook log marks its own start, and receipts names a missing hook log
+  and an unchained run.** (#256) The hook writes one signed marker,
+  `keys/log-hook.genesis`, at its first genesis. Under `receipts --verify` a
+  marker whose chain opens no hook segment is `LOG_MISSING`, a failure. A run
+  log found on the home walk with no chain is the limit `LOG_UNCHAINED`, and
+  hook segments begun before any marker are the limit `LOG_UNMARKED`.
+  `VECTORS.json` carries the marker as a published vector. The marker proves a
+  hook log was begun. It does not prove which records were in it.
+
+### Changed
+
+- **Revoking authority is a durable record.** (#263) Revoking authority now
+  writes `APPROVAL_INVALIDATED` with its reason at that moment. Before this the
+  transition was silent and only its effects named a cause, so revoking while
+  nothing was outstanding left no receipt at all. The reason rides in
+  `reason_code`, so the frozen 0.6.0 wire gets no new key and the published
+  vectors are unchanged.
+
 ### Fixed
 
+- **An unusable proxy state directory is a named refusal and never an
+  orphan.** (#264) A file or link where `approvals/` or `captures/` belongs is
+  refused by name with exit 1 and nothing is started. Every exit between
+  spawning the server and opening the session stops the server's process
+  group. A capture that cannot be written closes the session with
+  `CAPTURE_IO_ERROR` under the new cause kind `STATE_IO_ERROR`. Before this it
+  was reported as the server's fault or ended the session with requests
+  unanswered.
+- **The proxy builds the scanner engine before the list deadline starts.**
+  (#246) The engine was built on first use, inside the deadline for the
+  server's first `tools/list` page, so a slow cold build could mark the list
+  incomplete. It is now built before the first client frame is read.
+- **An unencodable input gets no digest, never a substituted one.** (#253) An
+  input that cannot be encoded as `UTF-8` now gets `input_sha256` null and
+  `input_sha256_reason` `unencodable` in the receipt. Before this it got the
+  digest of a substituted byte, so two different inputs could share one
+  digest. Encodable inputs hash exactly as before.
+- **The hook's loaders stat first, and only a missing file reads as absent.**
+  (#252) The loaders for `policy.yaml`, `pins.json` and `pin_state.json` read a
+  symlink loop, a parent that is a file or a home the hook cannot search as
+  never installed. Each loader now stats first. Only `ENOENT` is absent and
+  any other error becomes the named failure the hook already reports. The
+  proxy reads `pins.json` through the same loader, so an unreadable pins file
+  now holds the activation where it used to read as no pins.
 - **A stale alias whose removal is refused is kept and reported, and can be
-  collected later.** The collectors of dead forgets removed an alias's owner
+  collected later.** (#254) The collectors of dead forgets removed an alias's owner
   file even when the kernel refused to remove the alias itself, and reported
   nothing retained. The alias could then never be collected. The refusal is
   now reported by path with its error class, the owner file is kept, and the
   next collection removes both once the refusal clears.
-- **Recovery from a take note that names no owner now finishes.** A note with
+- **Recovery from a take note that names no owner now finishes.** (#254) A note with
   a held copy and its checksum but no owner put the bytes back and removed the
   note, then crashed before the orphan sweep that follows it. The collector
   now answers an empty list when it is handed no held name.
