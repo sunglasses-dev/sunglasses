@@ -22,12 +22,15 @@ Fail closed is the direction throughout. A scan that raised did not look, so it
 is `exception` and never `allow`, because allow is the engine's word for having
 looked.
 
-WHAT THIS IS NOT: the T4 worker PROCESS. The engine runs in this process, so
-T8.R4's kill on deadline and T8.R7's worker stdout bound do not apply to it and
-a scan that hangs stalls the session rather than being killed at 2,000 ms. The
-session holds the message throughout, so nothing is released by the stall, but
-the bound is not enforced and saying otherwise would be the kind of claim this
-lane exists to refuse. The worker process lane is owed.
+WHAT THIS IS NOT, IN THE DEFAULT MODE: the T4 worker PROCESS. By default
+(`--worker inprocess`) the engine runs in this process, so T8.R4's kill on
+deadline and T8.R7's worker stdout bound do not apply to it and a scan that
+hangs stalls the session rather than being killed at 2,000 ms. The session
+holds the message throughout, so nothing is released by the stall, but the
+bound is not enforced on that path and saying otherwise would be the kind of
+claim this lane exists to refuse. `--worker process` runs this same function
+in a child (`worker_process.ProcessScan`) where both bounds ARE enforced; it is
+opt-in, and the sentence above stays true of the default.
 """
 from __future__ import annotations
 
@@ -128,18 +131,18 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
         # of time recorded "the scanner broke" for "the scanner did not finish
         # in the budget" -- different facts, and only one is a reason to
         # distrust the scanner.
-        return _result(binding, accepted=False, status=STATUS_DEADLINE,
-                       inspection_complete=False, decision=DECISION_REVIEW,
-                       inspected=0, observed=content_bytes, elapsed=0,
-                       findings=())
+        return worker.LocalFault(_result(
+            binding, accepted=False, status=STATUS_DEADLINE,
+            inspection_complete=False, decision=DECISION_REVIEW,
+            inspected=0, observed=content_bytes, elapsed=0, findings=()))
     except Exception:
         # T4.R3. A scan that raised did not look. `allow` is the engine's word
         # for having looked and found nothing, and the exception text is
         # peer-adjacent prose that never reaches a result.
-        return _result(binding, accepted=False, status=STATUS_EXCEPTION,
-                       inspection_complete=False, decision=DECISION_REVIEW,
-                       inspected=0, observed=content_bytes, elapsed=0,
-                       findings=())
+        return worker.LocalFault(_result(
+            binding, accepted=False, status=STATUS_EXCEPTION,
+            inspection_complete=False, decision=DECISION_REVIEW,
+            inspected=0, observed=content_bytes, elapsed=0, findings=()))
 
     truncated = bool(getattr(result, "truncated", False)) or not bool(
         getattr(result, "extraction_complete", True))

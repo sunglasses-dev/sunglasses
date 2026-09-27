@@ -53,6 +53,23 @@ class Invalid(ValueError):
     """The worker's result cannot be believed. Always S3, never a verdict."""
 
 
+class LocalFault(dict):
+    """A result THIS PROCESS built because the scan did not produce one.
+
+    `validate` refuses every unaccepted result, so a fault the proxy assigned
+    itself -- a deadline, an engine that raised, a child that died -- lands in
+    the same `except Invalid` as a worker whose output broke the contract. The
+    route used to label everything there `schema_invalid`, which overwrote the
+    one fact the fault was built to carry.
+
+    THE TYPE IS THE PROVENANCE, and that is why it is a type and not a key.
+    Anything the worker prints arrives through `json.loads`, which only ever
+    builds a plain dict: a child that writes `"detector_status": "crashed"`
+    cannot produce a LocalFault, so a cause is believed only when this process
+    assigned it. A marker KEY would be one more thing a hostile worker can type.
+    """
+
+
 def _typed(value, kind):
     """`isinstance` with the bool hole closed, for the two kinds actually used.
 

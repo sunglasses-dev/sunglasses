@@ -167,6 +167,8 @@ def _worst_fields():
         "status": max(envelope.STATUSES, key=len),
         "method": max(selector.KNOWN_METHODS, key=len),
         "rule": max(envelope.RULES, key=len),
+        "detector_status": max(("crashed", "malformed_output",
+                                "schema_invalid"), key=len),
         "id_token": TOKEN,
         "rule_ids": [f"GLS-{n:04d}-" + "Z" * 55 for n in range(2000)],
         "leaf_provenance": [{"index": wire.MIN_INT, "depth": wire.MIN_INT,
