@@ -250,6 +250,28 @@ def _check_value(name, value):
     # OURS: a supplied None would claim a cause and name nobody, and the route
     # OMITS the field when there is no cause. Same hole, same day, as origin on
     # feat/admitted-carries-origin (ASTRA r1, 2026-09-22).
+    if name == "origin":
+        # ORIGIN IS OURS, and that is exactly why it is checked here. The five
+        # fields below are checked because they arrived from the WIRE; this one
+        # is checked because it did not. `pump` defines the vocabulary as three
+        # constants, and `route`/`framing` were passing the bare literals
+        # "client" and "upstream" instead -- equal by value today, with nothing
+        # keeping them equal. A fourth spelling, or a typo, becomes a false fact
+        # in a durable record the moment anything reads origin off a receipt to
+        # decide what happened, which is what putting it on ADMITTED is for.
+        from .pump import ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM
+        if value not in (ORIGIN_CLIENT, ORIGIN_PROXY, ORIGIN_UPSTREAM):
+            raise ValueError(
+                f"origin {value!r} is not one of this proxy's three origins")
+        return
+    # ORIGIN IS CHECKED BEFORE THIS LINE ON PURPOSE. `None` here means "the
+    # caller did not have one", which is right for the wire-supplied fields
+    # below. For origin it was a hole: the check lived AFTER this return, so an
+    # explicit `origin=None` skipped it and was written as a null author -- a
+    # record claiming nobody sent the request. An OMITTED origin never reaches
+    # this function (`_clean` iterates only the fields passed), so optional
+    # stays optional; a SUPPLIED None is a value, and it is not one of three.
+    # (ASTRA r1 on 8d21e5d, 2026-09-22.)
     if value is None:
         return
     if name == "reason_code":

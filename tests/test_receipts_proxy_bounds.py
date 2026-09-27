@@ -17,7 +17,7 @@ at its worst and requires the row to be written.
 """
 import pytest
 
-from sunglasses.proxy import envelope, selector
+from sunglasses.proxy import envelope, pump, selector
 from sunglasses.proxy import receipts as proxy_receipts
 from sunglasses.proxy.serve import state_root
 from sunglasses.receipts import chain, keys, verify, wire
@@ -169,6 +169,10 @@ def _worst_fields():
         "rule": max(envelope.RULES, key=len),
         "detector_status": max(("crashed", "malformed_output",
                                 "schema_invalid"), key=len),
+        # The three origins `receipts._check_value` accepts, by the names it
+        # imports. Before origin was checked it took the free text default.
+        "origin": max((pump.ORIGIN_CLIENT, pump.ORIGIN_PROXY,
+                       pump.ORIGIN_UPSTREAM), key=len),
         "id_token": TOKEN,
         "rule_ids": [f"GLS-{n:04d}-" + "Z" * 55 for n in range(2000)],
         "leaf_provenance": [{"index": wire.MIN_INT, "depth": wire.MIN_INT,
