@@ -174,7 +174,27 @@ jobs:
         with:
           name: dist
           path: dist/
+      # /ship uploads the release to PyPI before it pushes the tag, so this job
+      # normally finds the version already there. PyPI has no trusted publisher
+      # for this workflow yet, so the upload step failed at the token exchange
+      # on every release since 0.6.0 (invalid-publisher) and the run went red
+      # although nothing was wrong. So this job asks PyPI first. A version it
+      # already holds skips the upload and stays green. Any other answer, even no answer,
+      # runs the upload as before, so a version missing from PyPI still fails red.
+      - name: Is this version already on PyPI
+        id: onpypi
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/sunglasses/$VERSION/json" || true)"
+          echo "PyPI answered $CODE for sunglasses $VERSION"
+          if [ "$CODE" = "200" ]; then
+            echo "sunglasses $VERSION is already on PyPI, the upload is skipped"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        if: steps.onpypi.outputs.exists != 'true'
         with:
           attestations: true
           print-hash: true
