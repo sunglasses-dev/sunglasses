@@ -20,6 +20,8 @@ All notable changes to Sunglasses are documented here.
   them. A description that repeats an attack's own words can still be refused.
   Two paraphrase misses now pass the rule. They are listed as known failures
   in the rule's test and are the target of 0.6.4.
+- The preprocessor decodes one more invisible-character encoding before
+  matching.
 
 ### Documentation
 
