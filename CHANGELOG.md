@@ -3,7 +3,7 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [0.6.3] — UNRELEASED
+## [0.6.3] — 2026-09-28
 
 ### Changed
 
@@ -20,6 +20,14 @@ All notable changes to Sunglasses are documented here.
   them. A description that repeats an attack's own words can still be refused.
   Two paraphrase misses now pass the rule. They are listed as known failures
   in the rule's test and are the target of 0.6.4.
+
+### Documentation
+
+- The README says how to connect the MCP server and check the connection. It
+  also says what the answer means. The server returns a decision and stops
+  nothing itself. `isError` false means the call completed, not that the input
+  is clean. A response can quote the matched part of your input, so treat scan
+  results as sensitive content. (#273)
 
 
 ## [0.6.2] — 2026-09-27
