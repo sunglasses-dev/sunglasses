@@ -1,0 +1,31 @@
+{
+  "id": "GLS-PE-111",
+  "name": "Agent told to tamper with the proxy's own state",
+  "version": "1.0",
+  "category": "privilege_escalation",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response",
+    "web_content"
+  ],
+  "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, or to start the server outside the proxy. Each one removes the human check the proxy exists to keep.",
+  "keywords": [],
+  "regex": [
+    "\\b(?:cp|mv|rm|tee|ln|touch|rsync|truncate|shred|unlink|write|overwrite|edit|modify|delete|remove|replace|wipe)\\b[^\\n]{0,120}?(?:~|\\$HOME|\\$\\{HOME\\}|%USERPROFILE%|/(?:Users|home)/[^/\\s]+|/root)[/\\\\]\\.sunglasses[/\\\\]proxy(?:[/\\\\](?:approvals|captures|installs|locks|receipts)\\b|(?![\\w/\\\\-]))",
+    "(?<![-=])>{1,2}\\s*(?:~|\\$HOME|\\$\\{HOME\\}|%USERPROFILE%|/(?:Users|home)/[^/\\s]+|/root)[/\\\\]\\.sunglasses[/\\\\]proxy(?:[/\\\\](?:approvals|captures|installs|locks|receipts)\\b|(?![\\w/\\\\-]))",
+    "(?:\\bsunglasses\\s+proxy\\s+approve|\\bsunglasses\\.proxy\\s+approve|\\bsunglasses\\s+uninstall)\\b[^\\n]{0,160}?\\b(?:yourself|on\\s+(?:the\\s+|their\\s+)?users?'?s?\\s+behalf|for\\s+the\\s+user|without\\s+(?:asking|prompting|confirmation|the\\s+user|a\\s+human|them)|so\\s+(?:that\\s+)?(?:the\\s+user|they|nobody|no\\s+one)\\s+(?:is|are|isn'?t|aren'?t|won'?t|does|doesn'?t|do\\s+not|does\\s+not|never)|automatically|silently|non-?interactively)\\b",
+    "\\b(?:skip|avoid|bypass|suppress)\\s+(?:the\\s+|a\\s+|any\\s+)?(?:approval|confirmation)\\b[^\\n]{0,160}?(?:\\bsunglasses\\s+proxy\\s+approve|\\bsunglasses\\.proxy\\s+approve|\\bsunglasses\\s+uninstall)\\b",
+    "(?:\\|\\s*|\\bscript\\s+-q\\S*\\s+\\S+\\s+|\\bexpect\\b[^\\n]{0,60}?)(?:python3?\\s+-m\\s+)?(?:\\bsunglasses\\s+proxy\\s+approve|\\bsunglasses\\.proxy\\s+approve|\\bsunglasses\\s+uninstall)\\b",
+    "\\b(?:runs?|running|launch(?:es)?|starts?|calls?|invoke|points?)\\b[^\\n]{0,80}?\\bdirectly\\b[^\\n]{0,40}?\\b(?:instead\\s+of|rather\\s+than|without)\\b[^\\n]{0,30}?\\b(?:(?:going|passing|routing)\\s+)?(?:through|via)\\s+(?:the\\s+)?sunglasses\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-PE-111"
+}
