@@ -5,6 +5,15 @@ All notable changes to Sunglasses are documented here.
 
 ## [0.6.4] — UNRELEASED
 
+### Added
+
+- Text that tells an agent to tamper with the proxy's own state is now
+  blocked. GLS-PE-111 reads an instruction to write or remove files under
+  ~/.sunglasses/proxy, to run proxy approve in place of the human or to start
+  a server outside the proxy. Our own README and docs name the same paths and
+  the same command and stay allowed. Measured on 0.6.3 before the change 1 of
+  13 attack scans was caught, by GLS-CI-001 on a plain rm -rf.
+
 ### Documentation
 
 - The README now says what the code does. Twelve statements that did not
