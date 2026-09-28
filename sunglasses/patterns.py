@@ -27418,6 +27418,36 @@ PATTERNS = [
         ],
         "description": "A structured MCP git ref/path argument beginning with `-` is consumed by the git CLI as an option, so `--output=` turns a read-only diff request into an arbitrary file overwrite."
     },
+    # ── git config that runs a program ──────────────────────────────────────
+    # A coding agent is told to point `core.fsmonitor` or `core.hooksPath` at a
+    # path. Git then runs that program itself on the next `git status` or commit,
+    # so the instruction never has to say "run". The VALUE is the whole test. A
+    # boolean (`core.fsmonitor true`, the built in daemon) and a bare directory
+    # name (`core.hooksPath .husky`) are not paths and do not match.
+    {
+        "id": "GLS-CI-027",
+        "name": "Git fsmonitor pointed at a program",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["message", "file", "api_response", "web_content"],
+        "regex": [
+            r"""\bgit\b[^\n]{0,80}?\bcore\.fsmonitor(?:\s*=\s*|\s+)["']?(?:(?:\.{1,2}[/\\]|\.[\w-]+[/\\]|[/~$%]|[A-Za-z]:\\)[^\s"'`;|&<>]+|[\w.-]+(?:[/\\][\w.-]+)*\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\b)""",
+            r"""(?:\bcore\.|(?<![\w.]))fsmonitor\s*=\s*["']?(?:(?:\.{1,2}[/\\]|\.[\w-]+[/\\]|[/~$%]|[A-Za-z]:\\)[^\s"'`;|&<>]+|[\w.-]+(?:[/\\][\w.-]+)*\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\b)""",
+        ],
+        "description": "core.fsmonitor set to a path. Git runs that program on every status, so pointing it at a script in the checkout or a temp directory is code execution without a visible run step."
+    },
+    {
+        "id": "GLS-CI-028",
+        "name": "Git hooksPath repointed at a path",
+        "category": "command_injection",
+        "severity": "high",
+        "channel": ["api_response"],
+        "regex": [
+            r"""\bgit\b[^\n]{0,80}?\bcore\.hookspath(?:\s*=\s*|\s+)["']?(?:(?:\.{1,2}[/\\]|\.[\w-]+[/\\]|[/~$%]|[A-Za-z]:\\)[^\s"'`;|&<>]+|[\w.-]+(?:[/\\][\w.-]+)*\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\b)""",
+            r"""(?:\bcore\.|(?<![\w.]))hookspath\s*=\s*["']?(?:(?:\.{1,2}[/\\]|\.[\w-]+[/\\]|[/~$%]|[A-Za-z]:\\)[^\s"'`;|&<>]+|[\w.-]+(?:[/\\][\w.-]+)*\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\b)""",
+        ],
+        "description": "core.hooksPath set to a path. Every later commit runs whatever that directory holds. Read on one channel only because project READMEs legitimately tell a human to set it."
+    },
     {
         "id": "GLS-AB-011",
         "name": "Streamable HTTP Session Hijacking",
