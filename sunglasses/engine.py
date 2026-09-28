@@ -26,7 +26,7 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import VIEW_SEP, normalize
+from .preprocessor import VIEW_SEP, decode_shadow_ascii, normalize
 
 
 # Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
@@ -1130,6 +1130,12 @@ class SunglassesEngine:
         # The derivation errs toward extracting nothing, and extracting nothing
         # just means "evaluate", so this can cost time but never a finding.
         prefilter_present = self._literal_index.present(_prefilter.fold(text))
+        # The raw text read with one more invisible encoding decoded, for rules
+        # that match raw text. None for ordinary text, which costs nothing.
+        shadow = decode_shadow_ascii(text)
+        shadow_present = None
+        if shadow is not None:
+            shadow_present = self._literal_index.present(_prefilter.fold(shadow))
         # A rule may declare `match_on: "normalized"`. Step 3.5 already gives the
         # normalized view to keyword CANDIDATES, but a rule reaches that pass only
         # if one of its keywords is in the index, and the index drops anything on
@@ -1149,13 +1155,15 @@ class SunglassesEngine:
             # detections whose filler was U+2028 / U+2029: the raw text matched
             # and the folded text did not, so a flag meant to ADD reach removed
             # some. Raw stays first and decides; normalized is a second look.
-            subjects = [(text, prefilter_present)]
+            subjects = [(text, prefilter_present, text)]
+            if shadow is not None:
+                subjects.append((shadow, shadow_present, shadow))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
-                subjects.append((normalized, normalized_present))
-            for subject, present in subjects:
+                subjects.append((normalized, normalized_present, text))
+            for subject, present, frame in subjects:
               matched_here = False
               for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
@@ -1180,7 +1188,7 @@ class SunglassesEngine:
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
                     elif pattern["id"].startswith("GLS-MECH-") and \
-                            self._is_defensively_framed(text, match.start()):
+                            self._is_defensively_framed(frame, match.start()):
                         # Shape rules also match prose that DESCRIBES the shape.
                         # Downgrade, don't discard — see DEFENSIVE_FRAMING.
                         finding["severity"] = "review"

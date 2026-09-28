@@ -87,6 +87,9 @@ VIEW_SEP = "\x1e"
 def normalize(text: str) -> str:
     """Full normalization pipeline. Returns cleaned text for pattern matching."""
     text = text.replace(VIEW_SEP, " ")
+    # Read before strip_invisible removes them, so the plain view still loses
+    # them (a split phrase keeps matching) and the shadow view sees the text.
+    shadow = decode_shadow_ascii(text)
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
@@ -147,7 +150,25 @@ def normalize(text: str) -> str:
         if rot != text:
             text = text + " " + VIEW_SEP + " " + rot
         text = text.lower()
+    if shadow is not None:
+        # Its own views, behind the separator, so an excerpt never joins it
+        # to the plain text.
+        text = text + " " + VIEW_SEP + " " + normalize(shadow)
     return text
+
+
+# Invisible code points that shadow printable ASCII one for one.
+SHADOW_ASCII = re.compile('[\U000e0020-\U000e007e]')
+
+
+def decode_shadow_ascii(text: str):
+    """The input with each shadow code point read as the ASCII it shadows.
+
+    None when there is none, so ordinary text gains no extra view.
+    """
+    if not SHADOW_ASCII.search(text):
+        return None
+    return SHADOW_ASCII.sub(lambda m: chr(ord(m.group()) - 0xE0000), text)
 
 
 def strip_invisible(text: str) -> str:
