@@ -14,13 +14,16 @@ All notable changes to Sunglasses are documented here.
 ### Fixed
 
 - GLS-DFP-122 no longer refuses an honest MCP server whose tool descriptions
-  say it redacts secrets, skips hidden files or overrides a default. The rule
-  now needs an instruction aimed at findings or at policy. On 0.6.2 it refused
-  14 of the 26 honest descriptors we measured. On 0.6.3 it refuses none of
-  them. A description that repeats an attack's own words can still be refused.
-  Two paraphrase misses now pass the rule. They are listed as known failures
-  in the rule's test and are the target of 0.6.4.
-- The preprocessor decodes one more invisible-character encoding before
+  say it redacts secrets, skips hidden files or overrides a default.
+  GLS-DFP-122 now needs an instruction aimed at the scanner's findings or
+  policy. On 0.6.2 it refused 14 of 26 honest tool descriptions we measured.
+  On 0.6.3 it refuses none of them. A description that repeats an attack's own
+  words can still be refused. Two paraphrase misses now pass the rule. They
+  are listed as known failures in the rule's test and are the target of 0.6.4.
+- Text written in Unicode tag characters (U+E0020 to U+E007E) is now decoded
+  and scanned. On 0.6.2 and earlier those characters were removed before
+  matching, so an instruction written entirely in them was not seen by any
+  rule. The plain view still removes them, so a phrase split by them keeps
   matching.
 
 ### Documentation

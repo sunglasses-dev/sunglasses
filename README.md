@@ -895,6 +895,10 @@ SUNGLASSES is risk reduction, not magic.
 
 **Known in 0.6.2.** The proxy can refuse an honest MCP server whose tool descriptions use words like redacts, hidden or overrides. Rule GLS-DFP-122 reads them as instructions smuggled into a tool schema, so the server is not activated and `tools/list` returns `PROHIBITED_CONTENT` with `rule_ids` `["GLS-DFP-122"]`. No capture is written, so there is nothing to approve. 0.6.2 has no setting that lets one rule or one server through. To use that server anyway, `sunglasses uninstall <name>` restores its original entry, and its calls then reach it without passing through the proxy. 0.6.3 narrows the rule.
 
+**Known in 0.6.2 and earlier.** An instruction written in Unicode tag characters was not scanned. Fixed in 0.6.3.
+
+**Known in 0.6.2.** GLS-DFP-122 refused honest tool descriptions that mentioned findings or policy in passing. Narrowed in 0.6.3.
+
 ## Integration Notes
 
 1. **Verify signatures before cleaning.** If content has a digital signature, verify it first, then run SUNGLASSES. Cleaning before verification breaks the signature.
