@@ -12,6 +12,7 @@ Register with Claude Code:
     claude mcp add sunglasses -- python -m sunglasses.mcp
 """
 
+import argparse
 import json
 import sys
 import os
@@ -376,8 +377,29 @@ def write_message(msg):
     sys.stdout.flush()
 
 
-def main():
+def _parse_args(argv):
+    """Answer --help and --version before anything reads stdin.
+
+    Before this fix main() never looked at argv, so `--help` started the server and
+    read the operator's terminal as JSON-RPC. Any other argument is still
+    ignored, as it always was, so a client config that passes one keeps working,
+    but the server now says on stderr which ones it ignored.
+    """
+    parser = argparse.ArgumentParser(
+        prog="python -m sunglasses.mcp",
+        description="Run the SUNGLASSES MCP server. It speaks JSON-RPC over stdio, "
+                    "so an MCP client starts it and writes to its stdin. "
+                    "Tools: scan_text, scan_file, scanner_info.",
+    )
+    parser.add_argument("--version", action="version", version=f"sunglasses-mcp {SERVER_VERSION}")
+    return parser.parse_known_args(argv)
+
+
+def main(argv=None):
     """Run the SUNGLASSES MCP server on stdio."""
+    _, ignored = _parse_args(sys.argv[1:] if argv is None else argv)
+    if ignored:
+        sys.stderr.write(f"[sunglasses-mcp] Ignoring arguments: {' '.join(ignored)}\n")
     # Log to stderr so it doesn't interfere with the JSON-RPC protocol
     sys.stderr.write(f"[sunglasses-mcp] Starting SUNGLASSES MCP server v{SERVER_VERSION}\n")
     sys.stderr.flush()
