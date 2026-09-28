@@ -8,6 +8,7 @@ encoded rows below are allowed with no finding.
 import pytest
 
 from sunglasses.engine import SunglassesEngine
+from sunglasses.patterns import PATTERNS
 from sunglasses.preprocessor import VIEW_SEP, normalize
 
 ENGINE = SunglassesEngine()
@@ -37,12 +38,20 @@ CONTROLS = [
 ]
 
 
+PI_001_CHANNELS = set(next(p for p in PATTERNS if p["id"] == "GLS-PI-001")["channel"])
+
+
 @pytest.mark.parametrize("sid,text", ENCODED, ids=[r[0] for r in ENCODED])
-@pytest.mark.parametrize("channel", ["message", "web_content", "file"])
+@pytest.mark.parametrize("channel", ["message", "web_content", "file", "api_response", "tool_output"])
 def test_encoded_instruction_is_refused(sid, text, channel):
     result = ENGINE.scan(text, channel=channel)
     assert result.decision == "block", (sid, channel, result.decision)
-    assert "GLS-PI-001" in {f["id"] for f in result.findings}, (sid, channel)
+    ids = {f["id"] for f in result.findings}
+    # GLS-PI-001 is named only on its own channels; elsewhere other rules refuse it.
+    if channel in PI_001_CHANNELS:
+        assert "GLS-PI-001" in ids, (sid, channel)
+    else:
+        assert ids, (sid, channel)
 
 
 @pytest.mark.parametrize("sid,text,expected", CONTROLS, ids=[r[0] for r in CONTROLS])
