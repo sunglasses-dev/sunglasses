@@ -71,6 +71,17 @@ def test_an_unknown_argument_is_still_ignored_and_named():
     assert _answered_initialize(proc.stdout), proc.stdout[:600]
 
 
+@pytest.mark.parametrize("prefix", ["--ver", "--he"])
+def test_a_prefix_of_a_flag_is_not_the_flag(prefix):
+    """argparse accepts a unique prefix by default, so `--ver` would print the
+    version and exit. A config that passes one must still start the server."""
+    proc = _run(prefix)
+    assert proc.returncode == 0, (proc.returncode, proc.stderr[-600:])
+    assert STARTED in proc.stderr, proc.stderr[:600]
+    assert f"Ignoring arguments: {prefix}" in proc.stderr, proc.stderr[:600]
+    assert _answered_initialize(proc.stdout), proc.stdout[:600]
+
+
 def test_the_stimulus_shows_a_started_server_when_no_flag_is_given():
     """The control. Without a flag the server starts, says so on stderr and
     answers `initialize`. If this row fails, the rows above prove nothing."""

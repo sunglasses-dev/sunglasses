@@ -387,6 +387,9 @@ def _parse_args(argv):
     """
     parser = argparse.ArgumentParser(
         prog="python -m sunglasses.mcp",
+        # A prefix such as --ver must not count as --version. Ignored arguments
+        # start the server, and an abbreviation would turn one into an exit.
+        allow_abbrev=False,
         description="Run the SUNGLASSES MCP server. It speaks JSON-RPC over stdio, "
                     "so an MCP client starts it and writes to its stdin. "
                     "Tools: scan_text, scan_file, scanner_info.",
