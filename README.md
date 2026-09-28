@@ -33,7 +33,7 @@ a child process and mediates the stdio session between it and your client.
 **What it does depends entirely on whether that server has been approved, and
 the two states are very different.**
 
-### Before approval, no call reaches the server
+### Before approval, none of your client's calls reach the server
 
 Out of the box, every `tools/list` and `tools/call` from your client is
 refused. The client receives a typed JSON-RPC error like this one.
@@ -408,7 +408,7 @@ result = scanner.scan_auto("any_file.ext")
 
 | Mode | What it scans | Speed | Runs in your call? |
 |------|--------------|-------|---------------|
-| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size (~54s at 1MB) | Yes, it returns when done |
+| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size | Yes, it returns when done |
 | **DEEP** (on request) | Audio, video | Depends on the media length and the Whisper model | Yes, it returns when done |
 
 ## Performance
