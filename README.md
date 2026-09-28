@@ -33,10 +33,10 @@ a child process and mediates the stdio session between it and your client.
 **What it does depends entirely on whether that server has been approved, and
 the two states are very different.**
 
-### Before approval, nothing is inspected
+### Before approval, your client's tool requests are refused
 
-Out of the box, every `tools/list` and `tools/call` is refused before any
-inspection runs. The client receives a typed JSON-RPC error:
+Out of the box, every `tools/list` and `tools/call` from your client is
+refused. The client receives a typed JSON-RPC error like this one.
 
 ```json
 {"jsonrpc":"2.0","id":3,"error":{"code":-32070,"message":"SUNGLASSES_WITHHELD",
@@ -51,11 +51,15 @@ inspection runs. The client receives a typed JSON-RPC error:
 needs, and the refusal is where you get them.** You do not have to look inside
 the state directory to find out what to approve.
 
-`status: not_run` and `inspected_utf8_bytes: 0` are the literal truth of it:
-the call is not forwarded to the server, so nothing is scanned and nothing is
-sent. **Installing the proxy does not protect anything by itself.**
+`status: not_run` and `inspected_utf8_bytes: 0` describe your client's
+request. It is not forwarded to the server and its arguments are not scanned.
+The proxy does read the server's own tool list first. It fetches every
+`tools/list` page from the server and scans the descriptors to build the
+snapshot you approve. A page with a finding is refused on that finding before
+any approval is looked up. **Installing the proxy does not protect anything by
+itself.**
 
-Approval is a deliberate human step and cannot be scripted:
+Approval is a deliberate human step and it requires an interactive terminal.
 
 ```
 $ python -m sunglasses.proxy approve <server_id> --snapshot <snapshot_sha256>
@@ -63,9 +67,10 @@ approving records that a human viewed this capture, and this is not an
 interactive terminal, so nobody did          # exits 1, nothing is recorded
 ```
 
-It records that a **person** looked at the server's tool descriptors. A pipe
-cannot look, so it refuses from one. Run it at a real terminal and answer the
-prompt.
+It prints the tool names and the first 16 characters of each descriptor
+digest, then asks. It records that someone at an interactive terminal answered
+yes to that list. From a pipe it refuses. Run it at a real terminal and answer
+the prompt.
 
 **An approval belongs to one server, not to a tool list.** The snapshot hash
 covers the descriptors, and two different servers exposing the same tools have
@@ -243,7 +248,7 @@ It flags; it does not silently strip. Content it cannot inspect (an archive, an 
 **What it doesn't do:**
 - Doesn't touch authentication (OAuth, cookies, tokens, headers)
 - Doesn't monitor agent behavior (that's SHIELD, coming later)
-- Runs 100% locally, no cloud, no API keys, no telemetry for scanning
+- Scans on your machine with no cloud, no API keys and no telemetry. Text, image, PDF and QR scanning needs no network. Audio and video scanning downloads the Whisper speech model the first time and reuses it after that
 
 **Email screening:** A real client sends a real email. But their PC is infected, malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, `scanner.scan_email(body, attachments)` returns a scan document (the findings, the three axes, and a named list of anything it could not read) and **your code decides** whether to pass the mail on, quarantine it or ask a human. Nothing is silently rewritten or stripped: SUNGLASSES flags, you act. An attachment that needs a DEEP scan is reported as not yet inspected rather than counted as clean.
 
@@ -272,8 +277,10 @@ The proxy is a separate process with its own state. It keeps the approvals you g
 ```bash
 # Install
 pip install sunglasses              # text scanning — zero dependencies
-pip install sunglasses[media]       # + images (OCR/EXIF), PDFs, QR codes
-pip install sunglasses[all]         # + audio & video scanning (installs Whisper)
+pip install 'sunglasses[media]'     # + images (OCR/EXIF), PDFs, QR codes
+pip install 'sunglasses[all]'       # + audio & video scanning (installs Whisper)
+# Keep the quotes. zsh reads [ ] as a file pattern and stops with "no matches found".
+# OCR needs tesseract, QR codes need zbar, audio and video need ffmpeg.
 
 # Check what's installed on your system
 sunglasses check
@@ -294,7 +301,7 @@ sunglasses scan --json "some text to check"
 # Scan from stdin (pipe from other tools)
 echo "check this" | sunglasses scan --stdin
 
-# Run the demo (10 attack scenarios)
+# Run the demo (10 examples, 9 attacks and 1 clean message)
 sunglasses demo
 
 # See what's loaded
@@ -336,7 +343,7 @@ A path-shaped argument that does not exist is a usage error, not text. Pass
 Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:
 
 ```bash
-pip install sunglasses[all]                    # installs Whisper
+pip install 'sunglasses[all]'                  # installs Whisper
 brew install ffmpeg                            # Mac
 # or: apt install ffmpeg                       # Linux
 
@@ -390,7 +397,7 @@ result = scanner.scan_email("email body text", attachments=["invoice.pdf", "logo
 # Scan an image (OCR + EXIF metadata + hidden text + QR codes)
 result = scanner.scan_fast("photo.png")
 
-# Scan audio/video (runs in background, agent keeps working)
+# Scan audio/video (runs in your call and returns when the transcript is scanned)
 result = scanner.scan_deep("meeting.mp4")
 
 # Auto-detect: FAST for text/images/PDFs, DEEP prompt for audio/video
@@ -399,10 +406,10 @@ result = scanner.scan_auto("any_file.ext")
 
 ## Two Speed Modes
 
-| Mode | What it scans | Speed | Blocks agent? |
+| Mode | What it scans | Speed | Runs in your call? |
 |------|--------------|-------|---------------|
-| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size (~54s at 1MB) | Never |
-| **DEEP** (background) | Audio, video | 30 sec - 10 min | Never (runs separately) |
+| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size | Yes, it returns when done |
+| **DEEP** (on request) | Audio, video | Depends on the media length and the Whisper model | Yes, it returns when done |
 
 ## Performance
 
@@ -473,7 +480,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ Text scanning: 1,554 patterns, 6,964 unique keywords, 118 attack categories (English-first, see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
-- ✅ Negation handling: "do NOT run rm -rf" correctly downgrades severity
+- ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)
 - ✅ PDF scanning: page text + metadata + annotations
@@ -486,7 +493,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ MCP scanning server. Run `python -m sunglasses.mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
 - ✅ SARIF 2.1.0 output for CI integration
 - ✅ 64/64 internal recall on shipped attack fixture set, 100% recall
-- ✅ 100% local, zero network calls, zero telemetry
+- ✅ Local scanning with zero telemetry. Only audio and video need a download, the Whisper model on first use
 - ✅ Daily protection report (local HTML), covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
 - ✅ MIT License
 
@@ -711,18 +718,6 @@ Reading it a line at a time instead is a later change, not one this makes.
 - 🙏 Integration examples with other agent frameworks
 - 🙏 Audio/video testing with real-world media files
 
-## Threat Registry
-
-SUNGLASSES includes a public threat registry for tracking AI agent attacks:
-
-1. Evidence is collected and hashed
-2. The provider is notified privately
-3. Community reviewers verify the report (2-of-3 quorum)
-4. After 30 days, the report is published, regardless of provider response
-5. Status is tracked publicly: **REPORTED → RESPONDED → RESOLVED → IGNORED**
-
-No provider wants to be listed as IGNORED. That's the accountability.
-
 ## Verify AI Agent Traffic In Your Logs
 
 A user agent is a claim. Anyone can type `ChatGPT-User` into a request header. We found 2,437 fake AI agent requests in one week of our own logs, probing for AI coding agent credential files ([full report](https://sunglasses.dev/reports/fake-ai-agents-credential-recon-august-2026)).
@@ -757,7 +752,7 @@ inspects once approved is described under [What the proxy enforces](#what-the-pr
 and is measured there rather than inferred from the fact that a wrap succeeded.
 
 Content you route through the CLI, the Claude Code hook or the MCP server is
-scanned. Server responses arrive with 0.6.0.
+scanned.
 
 That wording is deliberate and it matches the site. A denial that spells out the
 claim it is denying still puts the claim in the file, and our claim gate matches
@@ -822,8 +817,9 @@ the one you asked for.
 
 #### What `doctor` returns, and why `3` is not a failure
 
-SUNGLASSES uses the same four codes everywhere: `0` clean, `1` a real failure,
-`2` an operational error, `3` incomplete. For `doctor` that means:
+SUNGLASSES uses the same four codes on every command. What `1` means depends on
+the command. For `scan` it is a finding. For `doctor` the table below gives each
+code.
 
 | code | meaning |
 |---|---|
@@ -886,9 +882,9 @@ Each of these is a refusal with a message, never a silent partial change:
 SUNGLASSES is risk reduction, not magic.
 
 - **Pattern-based**: catches known attack patterns and variants. Novel zero-day attacks may pass until patterns are added.
-- **Negation-aware**: "Do NOT run rm -rf" correctly downgrades to review instead of block. But edge cases may exist (report them).
+- **Negation-aware**. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical. Edge cases exist, so report the ones you find.
 - **Multilingual depth varies, and it varies a lot**: English has the full ruleset; 13 languages have exactly two dedicated patterns each; 7 more appear only as keywords inside English-scoped patterns; Persian and Bengali have neither. Measured counts in [Language coverage](#language-coverage-measured). Community contributions welcome.
-- **OCR accuracy**: depends on image quality and font clarity. EXIF/metadata scanning is 100% accurate.
+- **OCR accuracy** depends on image quality and font clarity.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
 - **`install` wraps; it does not by itself protect**: `sunglasses install` rewrites the named entry to launch through the proxy entry point and exits 0, and `uninstall` restores the original byte-identical. Out of the box the wrapped server enforces nothing until its tool snapshot is approved at an interactive terminal; what is enforced after that is stated under Proxy enforcement, measured rather than inferred. Do not read a successful wrap as a protection claim.
 - **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
@@ -897,13 +893,11 @@ SUNGLASSES is risk reduction, not magic.
 
 **Known in 0.6.2 and earlier.** An instruction written in Unicode tag characters was not scanned. Fixed in 0.6.3.
 
-**Known in 0.6.2.** GLS-DFP-122 refused honest tool descriptions that mentioned findings or policy in passing. Narrowed in 0.6.3.
-
 ## Integration Notes
 
 1. **Verify signatures before cleaning.** If content has a digital signature, verify it first, then run SUNGLASSES. Cleaning before verification breaks the signature.
 2. **Only scan content fields.** Feed SUNGLASSES the message body, text, and attachments, never raw HTTP headers, cookies, or auth tokens.
-3. **Review mode for credentials in tutorials.** If a legitimate message contains an API key example, SUNGLASSES flags it as "review" not "block." User decides.
+3. **A credential example in a tutorial is blocked.** A published example key, such as the one in AWS's own documentation, is blocked as critical the same as a live key. The scanner cannot tell the two apart, so your code decides whether the message goes through.
 
 ## Contributing
 

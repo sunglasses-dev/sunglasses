@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.4] — UNRELEASED
+
+### Documentation
+
+- The README now says what the code does. Twelve statements that did not
+  match the code are rewritten. A statement with no true form is removed.
+  Before approval the proxy refuses your client's tool requests unscanned.
+  Approval needs an interactive terminal and a yes. A published example key is
+  blocked as critical. The Threat Registry section is gone because that
+  workflow never existed. (#275)
+
+
 ## [0.6.3] — 2026-09-28
 
 ### Changed
