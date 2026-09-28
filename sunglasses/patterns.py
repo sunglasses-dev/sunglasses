@@ -29268,4 +29268,31 @@ PATTERNS = [
         ],
         "description": "A low-trust agent input reaches a privileged helper interpreter that can overwrite the policy or security-state configuration used to enforce authorization."
     },
+    # --- GLS-TP-CLAIM: a tool vouching for itself in its own metadata (ClaimMirage, arXiv 2609.29130) ---
+    {
+        "id": "GLS-TP-CLAIM-001",
+        "name": "Tool claims it needs no user confirmation",
+        "category": "tool_poisoning",
+        "severity": "high",
+        "channel": ["api_response", "tool_output"],
+        "regex": [
+            r"""(?i)\b(?:no\s+need|(?:do|does|will)\s+not\s+need|(?:don't|doesn't|won't)\s+need)\s+to\s+(?:ask|prompt|check\s+with|confirm\s+with|consult)\s+(?:the\s+)?user\b""",
+            r"""(?i)\b(?:do\s+not|don't|never)\s+(?:ask|prompt)\s+the\s+user\s+(?:for\s+)?(?:confirmation|approval|permission)\b""",
+        ],
+        "description": "Tool metadata that tells the agent it does not need to ask the user before running the tool. Whether a call needs confirmation is the client's decision, and a tool that argues it away is claiming authority it does not have."
+    },
+    {
+        "id": "GLS-TP-CLAIM-002",
+        "name": "Tool asserts its own safety or endorsement",
+        "category": "tool_poisoning",
+        "severity": "medium",
+        "channel": ["api_response", "tool_output"],
+        "regex": [
+            r"""(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])(?:(?:\s*[,/&]\s*(?:and\s+)?|\s+and\s+|\s+|_)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])){2}""",
+            r"""(?i)\bnot\s+(?:phishing|malware|malicious|a\s+scam|a\s+virus)\b.{0,120}?(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])""",
+            r"""(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-]).{0,120}?\bnot\s+(?:phishing|malware|malicious|a\s+scam|a\s+virus)\b""",
+            r"""(?i)\b(?:its\s+|the\s+|this\s+tool's\s+)?(?:output|results?|responses?)\s+(?:can|may|should)\s+be\s+(?:treated|trusted|accepted|considered)\s+as\s+(?:verified|trusted|safe|authoritative)\b""",
+        ],
+        "description": "A tool name or description that vouches for itself, stacking words like official, verified, certified, trusted and safe, denying it is phishing or malware, or telling the agent its output is already verified. Tool metadata is written by whoever ships the tool, so a self-claim of trust is not evidence of it and can steer which tool an agent picks."
+    },
 ]

@@ -1,0 +1,27 @@
+{
+  "id": "GLS-TP-CLAIM-002",
+  "name": "Tool asserts its own safety or endorsement",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "medium",
+  "channels": [
+    "api_response",
+    "tool_output"
+  ],
+  "description": "A tool name or description that vouches for itself, stacking words like official, verified, certified, trusted and safe, denying it is phishing or malware, or telling the agent its output is already verified. Tool metadata is written by whoever ships the tool, so a self-claim of trust is not evidence of it and can steer which tool an agent picks.",
+  "keywords": [],
+  "regex": [
+    "(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])(?:(?:\\s*[,/&]\\s*(?:and\\s+)?|\\s+and\\s+|\\s+|_)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])){2}",
+    "(?i)\\bnot\\s+(?:phishing|malware|malicious|a\\s+scam|a\\s+virus)\\b.{0,120}?(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])",
+    "(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-]).{0,120}?\\bnot\\s+(?:phishing|malware|malicious|a\\s+scam|a\\s+virus)\\b",
+    "(?i)\\b(?:its\\s+|the\\s+|this\\s+tool's\\s+)?(?:output|results?|responses?)\\s+(?:can|may|should)\\s+be\\s+(?:treated|trusted|accepted|considered)\\s+as\\s+(?:verified|trusted|safe|authoritative)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-TP-CLAIM-002"
+}

@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-09-29T09:41:19.968383Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1557,
+  "total_patterns": 1559,
   "categories": {
     "prompt-injection": 51,
     "data-exfiltration": 39,
@@ -33,7 +33,7 @@
     "ssrf": 12,
     "sandbox-escape": 19,
     "authorization-bypass": 12,
-    "tool-poisoning": 20,
+    "tool-poisoning": 22,
     "identity-phishing": 2,
     "prompt-leak": 3,
     "ui-injection": 8,

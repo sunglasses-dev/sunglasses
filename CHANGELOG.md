@@ -23,6 +23,14 @@ All notable changes to Sunglasses are documented here.
 - `python -m sunglasses.mcp --help`, `-h` and `--version` now print and exit 0 instead of starting the server and reading the terminal as JSON-RPC. Every other argument is still ignored, and the server now names the ignored ones on stderr. (#276)
 - setup.py carries six keywords and four classifiers so the package can be found on PyPI by topic. The classifiers name where it runs today, macOS and Linux, since receipts and the installer use fcntl. (#277)
 - A Claude plugin manifest in `claude-plugin/` lists the shipped MCP server so it can be installed as a plugin. The plugin runs `python3 -m sunglasses.mcp` from the installed package and adds no code of its own. (#278)
+- A tool that vouches for itself in its own metadata is now flagged.
+  GLS-TP-CLAIM-001 blocks a tool description that tells the agent it need not
+  ask the user for confirmation. GLS-TP-CLAIM-002 quarantines a name or
+  description that stacks claims of being official, verified and safe. It also
+  quarantines a denial of being phishing or malware and a statement that the
+  tool's own output is already verified. Neither rule carries an exclusion
+  read from the scanned text. Measured on 0.6.3 before the change 0 of 5
+  attack scans were caught.
 
 ### Documentation
 
