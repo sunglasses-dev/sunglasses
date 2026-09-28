@@ -263,6 +263,8 @@ The server reads only the text you pass to `scan_text` and the file you name in 
 
 Audio and video are the one exception, and only with an optional extra. If you install `sunglasses[audio]`, `sunglasses[video]` or `sunglasses[all]` and ask for a DEEP scan, the Whisper library downloads its speech model the first time. A video scan also writes the sound track or subtitle track to a temporary file on your machine and deletes it once the track is read. What you scan still stays on your machine. Without those extras nothing is downloaded.
 
+What the server sends back goes to your MCP client. A response can quote the matched part of your input. That quote can include a string that looks like a credential. Treat scan results as sensitive content.
+
 The proxy is a separate process with its own state. It keeps the approvals you grant and its capture files on your machine, as [What the proxy enforces](#what-the-proxy-enforces) describes.
 
 ## Quick Start
@@ -366,6 +368,14 @@ print(result.is_clean)     # False — v0.5.6: this now means "no findings AND f
                            # `result.threat_found` alone is the OPPOSITE condition.
 print(result.latency_ms)   # ~0.7ms on a short input; scales with length
 ```
+
+### Connect the MCP server
+
+The root `mcp.json` starts the server with `command` set to `python3` and `args` set to `["-m", "sunglasses.mcp"]`. A desktop client may not use the same PATH as your terminal, so set `command` to the absolute path of the Python that has Sunglasses installed. In a virtual environment that is `/absolute/path/to/.venv/bin/python` on macOS and Linux. On Windows it is the environment's `Scripts\python.exe`. Keep `args` as it is.
+
+To check the connection, confirm that your client lists `scan_text`, `scan_file` and `scanner_info`. Call `scanner_info` with `{}`. Then call `scan_text` with `{"text": "The team lunch is at noon on Friday."}`. The answer has `isError` false. Its result reads `"decision": "allow"`, `"inspection_complete": true` and `"is_clean": true`. `scan_file` takes an absolute path on the machine that runs the server.
+
+The MCP server returns its decision to the caller and stops nothing itself. A decision of `block`, `quarantine` or `allow_redacted` is an answer to your client. The tool does not hold back or redact anything downstream. `isError` false means the call completed. It does not mean the input is clean, so read `is_clean` and `inspection_complete` as well.
 
 ## Scan Images, Audio, Video, PDFs, QR Codes
 
@@ -473,7 +483,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ CLI: `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`, `sunglasses report`
 - ✅ Python API: `SunglassesEngine` for text, `SunglassesScanner` for media
 - ✅ LangChain + CrewAI integrations
-- ✅ MCP server for agent frameworks (`sunglasses.mcp`)
+- ✅ MCP scanning server. Run `python -m sunglasses.mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
 - ✅ SARIF 2.1.0 output for CI integration
 - ✅ 64/64 internal recall on shipped attack fixture set, 100% recall
 - ✅ 100% local, zero network calls, zero telemetry
@@ -882,6 +892,8 @@ SUNGLASSES is risk reduction, not magic.
 - **Audio/video**: transcribes audio to text via Whisper, then scans text. Does not do frequency analysis or source separation. Hidden whispers that Whisper can hear will be caught; ultrasonic attacks won't.
 - **`install` wraps; it does not by itself protect**: `sunglasses install` rewrites the named entry to launch through the proxy entry point and exits 0, and `uninstall` restores the original byte-identical. Out of the box the wrapped server enforces nothing until its tool snapshot is approved at an interactive terminal; what is enforced after that is stated under Proxy enforcement, measured rather than inferred. Do not read a successful wrap as a protection claim.
 - **No web UI yet**: deep scan is CLI/Python only for now. Drag-and-drop UI is on the roadmap.
+
+**Known in 0.6.2.** The proxy can refuse an honest MCP server whose tool descriptions use words like redacts, hidden or overrides. Rule GLS-DFP-122 reads them as instructions smuggled into a tool schema, so the server is not activated and `tools/list` returns `PROHIBITED_CONTENT` with `rule_ids` `["GLS-DFP-122"]`. No capture is written, so there is nothing to approve. 0.6.2 has no setting that lets one rule or one server through. To use that server anyway, `sunglasses uninstall <name>` restores its original entry, and its calls then reach it without passing through the proxy. 0.6.3 narrows the rule.
 
 ## Integration Notes
 
