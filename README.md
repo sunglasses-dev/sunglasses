@@ -893,8 +893,6 @@ SUNGLASSES is risk reduction, not magic.
 
 **Known in 0.6.2 and earlier.** An instruction written in Unicode tag characters was not scanned. Fixed in 0.6.3.
 
-**Known in 0.6.2.** GLS-DFP-122 refused honest tool descriptions that mentioned findings or policy in passing. Narrowed in 0.6.3.
-
 ## Integration Notes
 
 1. **Verify signatures before cleaning.** If content has a digital signature, verify it first, then run SUNGLASSES. Cleaning before verification breaks the signature.
